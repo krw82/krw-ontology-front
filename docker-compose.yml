@@ -1,0 +1,85 @@
+services:
+  reverse-proxy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - app-network
+    depends_on:
+      web:
+        condition: service_started
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - MCP_BASE_URL=http://mcp:8000
+      - MCP_BEARER_TOKEN=${MCP_BEARER_TOKEN}
+      - WEB_COMMIT=${WEB_COMMIT}
+      - KRW_ONTOLOGY_COMMIT=${KRW_ONTOLOGY_COMMIT}
+      - DAILY_USER_QUESTION_LIMIT=${DAILY_USER_QUESTION_LIMIT:-20}
+      - GLOBAL_CONCURRENT_RUN_LIMIT=${GLOBAL_CONCURRENT_RUN_LIMIT:-5}
+      - DAILY_COST_CAP_USD=${DAILY_COST_CAP_USD:-5.00}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-6}
+      - LEASE_TIMEOUT_MINUTES=${LEASE_TIMEOUT_MINUTES:-5}
+    depends_on:
+      mcp:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+      args:
+        KRW_ONTOLOGY_COMMIT: ${KRW_ONTOLOGY_COMMIT:-main}
+    environment:
+      - KRW_ONTOLOGY_ROOT=/srv/krw-ontology-data/current
+      - MCP_BEARER_TOKEN=${MCP_BEARER_TOKEN}
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8000
+      - MCP_TRANSPORT=streamable-http
+      - MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-INFO}
+      - KRW_ONTOLOGY_COMMIT=${KRW_ONTOLOGY_COMMIT}
+      - MCP_ALLOWED_ORIGINS=http://web:3000
+    volumes:
+      - /srv/krw-ontology-data:/srv/krw-ontology-data:ro
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - app-network
+    restart: unless-stopped
+    # No ports: section — this container is NOT published to the host
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:

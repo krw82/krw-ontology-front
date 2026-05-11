@@ -1,0 +1,129 @@
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap");
+@import "tailwindcss";
+
+@theme inline {
+  /* Colors - Coinbase Institutional Style System */
+  --color-canvas: #ffffff;
+  --color-surface: #fbf8ff;
+  --color-surface-soft: #f7f7f7;
+  --color-surface-strong: #eef0f3;
+  --color-surface-dark: #0a0b0d;
+  --color-surface-dark-elevated: #16181c;
+  --color-surface-container: #ededfb;
+  --color-surface-container-low: #f3f2ff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-high: #e7e7f5;
+  --color-surface-container-highest: #e1e1ef;
+  --color-surface-dim: #d9d9e7;
+  --color-surface-bright: #fbf8ff;
+
+  --color-ink: #0a0b0d;
+  --color-body: #5b616e;
+  --color-body-strong: #0a0b0d;
+  --color-muted: #7c828a;
+  --color-muted-soft: #a8acb3;
+
+  --color-primary: #003ec7;
+  --color-primary-container: #0052ff;
+  --color-primary-active: #003ecc;
+  --color-primary-disabled: #a8b8cc;
+  --color-primary-fixed: #dde1ff;
+  --color-primary-fixed-dim: #b7c4ff;
+
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #dfe3ff;
+  --color-on-primary-fixed: #001452;
+  --color-on-primary-fixed-variant: #0038b6;
+
+  --color-secondary: #5d5f5f;
+  --color-secondary-container: #dcdddd;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #5f6161;
+
+  --color-tertiary: #952200;
+  --color-tertiary-container: #bf3003;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #ffddd5;
+
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #93000a;
+
+  --color-on-surface: #191b25;
+  --color-on-surface-variant: #434656;
+  --color-on-background: #191b25;
+  --color-inverse-surface: #2e303a;
+  --color-inverse-on-surface: #f0effe;
+  --color-inverse-primary: #b7c4ff;
+
+  --color-outline: #737688;
+  --color-outline-variant: #c3c5d9;
+
+  --color-hairline: #dee1e6;
+  --color-hairline-soft: #eef0f3;
+
+  --color-on-dark: #ffffff;
+  --color-on-dark-soft: #a8acb3;
+
+  --color-semantic-up: #05b169;
+  --color-semantic-down: #cf202f;
+  --color-accent-yellow: #f4b000;
+
+  --color-background: #fbf8ff;
+
+  /* Spacing */
+  --spacing-xxs: 4px;
+  --spacing-xs: 8px;
+  --spacing-sm: 12px;
+  --spacing-base: 16px;
+  --spacing-md: 20px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 48px;
+  --spacing-section: 96px;
+
+  /* Border Radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 9999px;
+  --radius-full: 9999px;
+
+  /* Font Families */
+  --font-inter: "Inter", -apple-system, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-on-surface);
+  font-family: var(--font-inter);
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar hide utility */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Selection */
+::selection {
+  background: var(--color-primary-container);
+  color: var(--color-on-primary-container);
+}
+
+/* Focus visible */
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
