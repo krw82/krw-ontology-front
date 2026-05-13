@@ -13,9 +13,6 @@ export interface PromptContext {
   companies?: CompanyPromptContext[];
 }
 
-const KRW_ONTOLOGY_RESEARCH_SKILL =
-  "/krw-ontology:krw-ontology-research";
-
 export function buildSystemPrompt(
   context?: PromptContext,
   history: Array<{ role: string; content: string }> = [],
@@ -24,15 +21,10 @@ export function buildSystemPrompt(
 
   return `You are the KRW Ontology web chat runtime.
 
-The user prompt may begin with a Claude Code skill command. Treat that command as the primary research workflow instruction.
+The user prompt begins with the exact Claude Code skill command for the active pass. Follow that skill.
 Use only the configured read-only KRW Ontology tools for evidence retrieval.
-Do not perform web searches or mutate local files.${contextBlock}`;
-}
-
-export function buildResearchPrompt(
-  userMessage: string,
-): string {
-  return `${KRW_ONTOLOGY_RESEARCH_SKILL} ${userMessage}`;
+Do not perform web searches or mutate local files.
+Use the runtime context only as scope and history for that active pass.${contextBlock}`;
 }
 
 function buildRuntimeContext(

@@ -1,7 +1,15 @@
 import { NextRequest } from "next/server";
 import { getAuthUser, handleAuthError, forbiddenError } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { ChatSessionRow, MessageRow, AgentRunRow } from "@/types/database";
+import type {
+  AgentRunRow,
+  ChatSessionRow,
+  CitationRow,
+  MessageRow,
+  ResearchArtifactRow,
+  ToolCallRow,
+} from "@/types/database";
+import { toResearchArtifact } from "@/lib/artifacts/db";
 
 function notFoundError(message: string) {
   return Response.json(
@@ -33,16 +41,16 @@ export async function GET(
     .single<ChatSessionRow>();
 
   if (error || !session) {
-    return notFoundError("Session not found");
+    return notFoundError("채팅을 찾지 못했습니다.");
   }
 
   if (session.user_id !== user.id) {
-    return forbiddenError("Session does not belong to user");
+    return forbiddenError("이 채팅에 접근할 권한이 없습니다.");
   }
 
   const { data: messages } = await supabase
     .from("messages")
-    .select("id, session_id, role, content, created_at")
+    .select("id, session_id, role, content, status, created_at, updated_at")
     .eq("session_id", sessionId)
     .order("created_at", { ascending: true })
     .returns<MessageRow[]>();
@@ -50,15 +58,60 @@ export async function GET(
   const { data: runs } = await supabase
     .from("agent_runs")
     .select(
-      "id, status, model, started_at, finished_at, latency_ms, input_tokens, output_tokens, ontology_release_id, error_code"
+      "id, status, model, assistant_message_id, started_at, finished_at, latency_ms, input_tokens, output_tokens, estimated_cost_usd, ontology_release_id, index_generated_at, error_code, error_message"
     )
     .eq("session_id", sessionId)
     .order("started_at", { ascending: true })
     .returns<Partial<AgentRunRow>[]>();
 
+  const runIds = (runs ?? [])
+    .map((run) => run.id)
+    .filter((id): id is string => Boolean(id));
+  const messageIds = (messages ?? []).map((message) => message.id);
+
+  const [{ data: toolCalls }, { data: citations }, { data: researchArtifacts }] =
+    await Promise.all([
+      runIds.length > 0
+        ? supabase
+            .from("tool_calls")
+            .select(
+              "id, run_id, tool_use_id, tool_name, arguments_json, result_summary, result_json, result_text, started_at, finished_at, error_message",
+            )
+            .in("run_id", runIds)
+            .order("started_at", { ascending: true })
+            .returns<ToolCallRow[]>()
+        : Promise.resolve({ data: [] as ToolCallRow[] }),
+      runIds.length > 0
+        ? supabase
+            .from("citations")
+            .select(
+              "id, message_id, run_id, object_id, ticker, document_type, period, section, quote_text, claim_text, evidence_grade, source_quality, trace_json",
+            )
+            .in("run_id", runIds)
+            .order("id", { ascending: true })
+            .returns<CitationRow[]>()
+        : Promise.resolve({ data: [] as CitationRow[] }),
+      messageIds.length > 0
+        ? supabase
+            .from("research_artifacts")
+            .select(
+              "id, session_id, run_id, message_id, artifact_version, artifact_type, title, summary, tickers, source_scope, answer_alignment, artifact_json, blocks_json, evidence_refs, quality_json, source_json, html_snapshot, created_at",
+            )
+            .in("message_id", messageIds)
+            .order("created_at", { ascending: true })
+            .returns<ResearchArtifactRow[]>()
+        : Promise.resolve({ data: [] as ResearchArtifactRow[] }),
+    ]);
+
+  const richAnswers = (researchArtifacts ?? []).map(toResearchArtifact);
+
   return Response.json({
     session,
     messages: messages ?? [],
     runs: runs ?? [],
+    tool_calls: toolCalls ?? [],
+    citations: citations ?? [],
+    rich_answers: richAnswers,
+    research_artifacts: richAnswers,
   });
 }

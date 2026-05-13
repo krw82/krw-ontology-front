@@ -24,7 +24,7 @@ export function useSessions() {
       const res = await fetch(
         `/api/sessions?page=${page}&limit=${limit}`,
       );
-      if (!res.ok) throw new Error("Failed to fetch sessions");
+      if (!res.ok) throw new Error("채팅 목록을 불러오지 못했습니다.");
       const data: ListSessionsResponse = await res.json();
       setSessions(data.sessions);
       return data;
@@ -48,7 +48,7 @@ export function useSessions() {
         });
         if (!res.ok) {
           const err = await res.json().catch(() => null);
-          throw new Error(err?.error?.message || "Failed to create session");
+          throw new Error(err?.error?.message || "새 채팅을 만들지 못했습니다.");
         }
         const data: CreateSessionResponse = await res.json();
         return data.session;

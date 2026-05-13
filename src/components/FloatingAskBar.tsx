@@ -43,13 +43,13 @@ export default function FloatingAskBar({ selectedTicker }: FloatingAskBarProps) 
   };
 
   return (
-    <div className="fixed top-[75%] left-1/2 -translate-x-1/2 w-full max-w-[700px] px-md z-[100] pointer-events-none">
+    <div className="pointer-events-none fixed bottom-[calc(16px+env(safe-area-inset-bottom))] left-1/2 z-[100] w-full max-w-[700px] -translate-x-1/2 px-base sm:top-[75%] sm:bottom-auto sm:px-md">
       <form
         onSubmit={handleSubmit}
-        className="bg-surface-strong/95 backdrop-blur-sm border border-hairline rounded-full flex items-center p-[4px] pl-base shadow-lg hover:shadow-xl transition-shadow pointer-events-auto"
+        className="pointer-events-auto flex items-center rounded-full border border-hairline bg-surface-strong/95 p-[4px] pl-sm shadow-lg backdrop-blur-sm transition-shadow hover:shadow-xl sm:pl-base"
       >
         <input
-          className="flex-grow bg-transparent border-0 focus:ring-0 focus:outline-none text-[16px] leading-[1.5] font-bold text-ink placeholder:text-muted-soft"
+          className="min-w-0 flex-grow border-0 bg-transparent text-[15px] font-bold leading-[1.5] text-ink placeholder:text-muted-soft focus:outline-none focus:ring-0 sm:text-[16px]"
           placeholder="KRW Ontology에 질문하세요..."
           type="text"
           value={query}
@@ -58,7 +58,7 @@ export default function FloatingAskBar({ selectedTicker }: FloatingAskBarProps) 
         />
         <button
           type="submit"
-          className="bg-primary-container text-on-primary h-[44px] px-lg rounded-full text-[16px] leading-[1.15] font-semibold hover:bg-primary-active transition-colors flex items-center justify-center"
+          className="flex h-[44px] shrink-0 items-center justify-center rounded-full bg-primary-container px-base text-[15px] font-semibold leading-[1.15] text-on-primary transition-colors hover:bg-primary-active sm:px-lg sm:text-[16px]"
           aria-label="질문 제출"
         >
           질문

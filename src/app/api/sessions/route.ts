@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
+import { buildSessionPreview } from "@/lib/chat/session-preview";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { createClient } from "@/lib/supabase/server";
 import type { CreateSessionRequest } from "@/types/api-contracts";
-import type { ChatSessionRow, MessageRow } from "@/types/database";
+import type { ChatSessionRow, MessageRow, AgentRunRow } from "@/types/database";
 
 export async function GET(request: NextRequest) {
   let user;
@@ -26,12 +27,10 @@ export async function GET(request: NextRequest) {
   const {
     data: sessions,
     error,
-    count,
   } = await supabase
     .from("chat_sessions")
     .select(
-      "id, title, scope_type, default_tickers, created_at, updated_at",
-      { count: "exact" }
+      "id, title, scope_type, default_tickers, created_at, updated_at"
     )
     .eq("user_id", user.id)
     .order("updated_at", { ascending: false })
@@ -40,7 +39,7 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     return Response.json(
-      { error: { code: "internal_error" as const, message: "Failed to fetch sessions" } },
+      { error: { code: "internal_error" as const, message: "채팅 목록을 불러오지 못했습니다." } },
       { status: 500 }
     );
   }
@@ -49,11 +48,12 @@ export async function GET(request: NextRequest) {
   const sessionIds = (sessions ?? []).map((s) => s.id);
   const lastMessages: Record<string, { content: string; created_at: string }> =
     {};
+  const latestRunStatus: Record<string, AgentRunRow["status"]> = {};
 
   if (sessionIds.length > 0) {
     const { data: msgs } = await supabase
       .from("messages")
-      .select("session_id, content, created_at")
+      .select("session_id, content, status, created_at")
       .in("session_id", sessionIds)
       .order("created_at", { ascending: false })
       .returns<MessageRow[]>();
@@ -62,28 +62,51 @@ export async function GET(request: NextRequest) {
       for (const m of msgs) {
         if (!lastMessages[m.session_id]) {
           lastMessages[m.session_id] = {
-            content: m.content.slice(0, 100),
+            content: buildSessionPreview(m),
             created_at: m.created_at,
           };
         }
       }
     }
+
+    const { data: runs } = await supabase
+      .from("agent_runs")
+      .select("session_id, status, started_at")
+      .in("session_id", sessionIds)
+      .order("started_at", { ascending: false })
+      .returns<AgentRunRow[]>();
+
+    if (runs) {
+      for (const run of runs) {
+        if (!latestRunStatus[run.session_id]) {
+          latestRunStatus[run.session_id] = run.status;
+        }
+      }
+    }
   }
 
-  const summaries = (sessions ?? []).map((s) => ({
-    id: s.id,
-    title: s.title,
-    scope_type: s.scope_type,
-    default_tickers: s.default_tickers ?? [],
-    last_message_preview: lastMessages[s.id]?.content ?? null,
-    last_message_at: lastMessages[s.id]?.created_at ?? null,
-    created_at: s.created_at,
-    updated_at: s.updated_at,
-  }));
+  const summaries = (sessions ?? [])
+    .map((s) => ({
+      id: s.id,
+      title: s.title,
+      scope_type: s.scope_type,
+      default_tickers: s.default_tickers ?? [],
+      last_message_preview: lastMessages[s.id]?.content ?? null,
+      last_message_at: lastMessages[s.id]?.created_at ?? null,
+      latest_run_status: latestRunStatus[s.id] ?? null,
+      created_at: s.created_at,
+      updated_at: s.updated_at,
+    }))
+    .filter(
+      (summary) =>
+        summary.last_message_at !== null ||
+        summary.latest_run_status === "running" ||
+        summary.latest_run_status === "pending",
+    );
 
   return Response.json({
     sessions: summaries,
-    total: count ?? 0,
+    total: summaries.length,
     page,
     limit,
   });
@@ -152,15 +175,15 @@ export async function POST(request: NextRequest) {
   const title =
     body.title ||
     (body.scope_type === "company" && body.default_tickers
-      ? `Research: ${body.default_tickers.join(", ")}`
-      : "New Chat");
+      ? `리서치: ${body.default_tickers.join(", ")}`
+      : "새 채팅");
 
   if (title.length > 200) {
     return Response.json(
       {
         error: {
           code: "validation_error" as const,
-          message: "Title must be under 200 characters",
+          message: "제목은 200자 이하여야 합니다.",
         },
       },
       { status: 400 }
@@ -182,7 +205,7 @@ export async function POST(request: NextRequest) {
 
   if (error || !session) {
     return Response.json(
-      { error: { code: "internal_error", message: "Failed to create session" } },
+      { error: { code: "internal_error", message: "새 채팅을 만들지 못했습니다." } },
       { status: 500 }
     );
   }

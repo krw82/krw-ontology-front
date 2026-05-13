@@ -6,7 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:unit": "vitest run",
+    "supabase:login": "npx supabase login",
+    "supabase:orgs": "npx supabase orgs list",
+    "supabase:projects": "npx supabase projects list",
+    "supabase:link": "npx supabase link",
+    "supabase:db:push:dry": "npx supabase db push --dry-run",
+    "supabase:db:push": "npx supabase db push"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.110",
@@ -28,6 +35,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.6"
   }
 }

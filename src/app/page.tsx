@@ -25,22 +25,22 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen overflow-hidden bg-surface-dark text-on-dark">
+    <div className="min-h-[100dvh] overflow-x-hidden bg-surface-dark text-on-dark">
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-surface-dark/80 backdrop-blur-xl">
-        <nav className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6 lg:px-8">
+        <nav className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link
             href="/"
-            className="flex items-center gap-3 text-sm font-bold uppercase tracking-[0.2em]"
+            className="flex min-w-0 items-center gap-3 text-sm font-bold uppercase tracking-[0.16em] sm:tracking-[0.2em]"
           >
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-container text-on-primary">
               K
             </span>
-            <span>KRW Ontology</span>
+            <span className="truncate">KRW Ontology</span>
           </Link>
 
           <div className="hidden items-center gap-8 text-sm text-on-dark-soft md:flex">
             <Link href="/chat" className="transition-colors hover:text-on-dark">
-              Research
+              리서치
             </Link>
           </div>
 
@@ -49,13 +49,13 @@ export default function Home() {
               href="/login"
               className="hidden rounded-pill border border-white/15 px-4 py-2 text-sm font-semibold text-on-dark transition-colors hover:border-primary-fixed hover:text-primary-fixed sm:inline-flex"
             >
-              Sign In
+              로그인
             </Link>
             <Link
               href="/companies"
               className="rounded-pill bg-primary-fixed px-4 py-2 text-sm font-bold text-on-primary-fixed transition-colors hover:bg-primary-fixed-dim"
             >
-              Explore
+              시작하기
             </Link>
           </div>
         </nav>
@@ -63,7 +63,7 @@ export default function Home() {
 
       <main
         id="main-content"
-        className="relative flex min-h-screen items-center px-6 pb-24 pt-32 lg:px-8"
+        className="relative flex min-h-[100dvh] items-center px-4 pb-16 pt-28 sm:px-6 sm:pb-24 sm:pt-32 lg:px-8"
       >
         <div
           aria-hidden="true"
@@ -134,39 +134,38 @@ export default function Home() {
           </svg>
         </div>
 
-        <section className="relative z-10 mx-auto flex max-w-5xl flex-col items-center text-center">
-          <h1 className="max-w-4xl text-balance text-[48px] font-black leading-[0.96] tracking-normal text-on-dark md:text-[64px] lg:text-[76px]">
-            Welcome to the KRW Ontology Research Cockpit
+        <section className="relative z-10 mx-auto flex w-full min-w-0 max-w-5xl flex-col items-center text-center">
+          <h1 className="w-full max-w-[22rem] break-words text-balance text-[40px] font-black leading-[1.02] tracking-normal text-on-dark sm:max-w-4xl sm:text-[48px] sm:leading-[0.98] md:text-[64px] lg:text-[76px]">
+            KRW.AI 기업 리서치
           </h1>
 
-          <p className="mt-7 max-w-2xl text-lg leading-8 text-on-dark-soft md:text-xl">
-            Query corporate structures, governance risk, and market context
-            with evidence-first Korean equity research workflows.
+          <p className="mt-5 max-w-2xl text-base leading-7 text-on-dark-soft sm:mt-7 md:text-xl md:leading-8">
+            기존 AI 보다 좀더 자세한 회사, 기업 분석 결과를 확인하세요.
           </p>
 
           <form
             onSubmit={handleSubmit}
-            className="mt-10 flex w-full max-w-3xl items-center gap-3 rounded-pill border border-white/15 bg-white/10 p-3 shadow-2xl shadow-primary/20 backdrop-blur-xl"
+            className="mt-8 flex w-full max-w-3xl items-center gap-2 rounded-[28px] border border-white/15 bg-white/10 p-2 shadow-2xl shadow-primary/20 backdrop-blur-xl sm:mt-10 sm:gap-3 sm:rounded-pill sm:p-3"
           >
-            <div className="flex min-w-0 flex-1 items-center gap-3 pl-4">
-              <span className="material-symbols-outlined text-[24px] text-primary-fixed">
+            <div className="flex min-w-0 flex-1 items-center gap-2 pl-2 sm:gap-3 sm:pl-4">
+              <span className="material-symbols-outlined text-[22px] text-primary-fixed sm:text-[24px]">
                 search
               </span>
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                className="h-14 min-w-0 flex-1 bg-transparent text-base text-on-dark outline-none placeholder:text-on-dark-soft"
-                placeholder="Query Samsung, SK Hynix, governance risk, or 한국어 분석..."
-                aria-label="Research query"
+                className="h-12 min-w-0 flex-1 bg-transparent text-base text-on-dark outline-none placeholder:text-on-dark-soft sm:h-14"
+                placeholder="아마존의 클라우드 컴퓨팅 관련 비즈니스에 대해 자세히 알고싶어요, 테슬라에 대해 알려주세요  ..."
+                aria-label="리서치 질문"
               />
             </div>
             <button
               type="submit"
               disabled={!query.trim()}
-              aria-label="Send query"
-              className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white text-surface-dark shadow-lg shadow-black/20 transition-transform hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
+              aria-label="질문 보내기"
+              className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-surface-dark shadow-lg shadow-black/20 transition-transform hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 sm:h-14 sm:w-14"
             >
-              <span className="material-symbols-outlined text-[34px]">
+              <span className="material-symbols-outlined text-[30px] sm:text-[34px]">
                 arrow_upward
               </span>
             </button>
@@ -174,8 +173,8 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="relative z-10 border-t border-white/10 bg-surface-dark px-6 py-6 text-center text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
-        © 2026 KRW Ontology Research. Institutional Grade Data.
+      <footer className="relative z-10 border-t border-white/10 bg-surface-dark px-4 py-6 text-center text-xs font-semibold uppercase leading-5 tracking-[0.12em] text-white/45 sm:px-6 sm:tracking-[0.18em]">
+        © 2026 KRW Ontology Research. 근거 기반 기업 데이터.
       </footer>
     </div>
   );

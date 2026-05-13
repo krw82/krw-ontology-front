@@ -27,7 +27,7 @@ export default function ChatError({
       <h2 className="text-[20px] leading-[1.4] font-semibold text-ink mb-sm">
         채팅 오류
       </h2>
-      <p className="text-[16px] leading-[1.5] text-muted mb-lg max-w-md text-center">
+      <p className="text-[16px] leading-[1.5] text-muted mb-lg max-w-[440px] text-center">
         {sanitizeError(error.message)}
       </p>
       <button

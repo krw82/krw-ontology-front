@@ -62,10 +62,11 @@ function composeMessage(message: string, attachments: TextAttachment[]): string 
 export default function Composer({
   onSend,
   disabled = false,
-  placeholder = "Ask a follow-up question or request deeper analysis...",
+  placeholder = "후속 질문이나 심층 분석을 요청하세요...",
   initialValue,
 }: ComposerProps) {
-  const [value, setValue] = useState(initialValue?.trim() ? "" : (initialValue ?? ""));
+  const initialDraftValue = initialValue?.trim() ? "" : (initialValue ?? "");
+  const [value, setValue] = useState(initialDraftValue);
   const [attachments, setAttachments] = useState<TextAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -78,6 +79,15 @@ export default function Composer({
   );
   const payloadLimit =
     attachments.length > 0 ? MAX_CHAT_PAYLOAD_CHARS : MAX_CHAT_MESSAGE_CHARS;
+  const isOverLimit = composedLength > payloadLimit;
+
+  const syncTextareaValue = useCallback((nextValue: string) => {
+    setValue(nextValue);
+  }, []);
+
+  const readTextareaValue = useCallback(() => {
+    return textareaRef.current?.value ?? value;
+  }, [value]);
 
   useEffect(() => {
     if (hasAutoSent.current) return;
@@ -143,7 +153,12 @@ export default function Composer({
   };
 
   const handleSubmit = () => {
-    const message = composeMessage(value, attachments);
+    const latestValue = readTextareaValue();
+    if (latestValue !== value) {
+      setValue(latestValue);
+    }
+
+    const message = composeMessage(latestValue, attachments);
     if (!message.trim() || disabled) return;
     if (message.length > payloadLimit) {
       setAttachmentError(
@@ -157,6 +172,7 @@ export default function Composer({
     setAttachments([]);
     setAttachmentError(null);
     if (textareaRef.current) {
+      textareaRef.current.value = "";
       textareaRef.current.style.height = "auto";
     }
   };
@@ -169,23 +185,23 @@ export default function Composer({
   };
 
   return (
-    <div className="py-base px-lg bg-canvas border-t border-hairline">
+    <div className="border-t border-hairline bg-canvas px-base py-sm sm:px-lg sm:py-base">
       {(attachments.length > 0 || attachmentError) && (
-        <div className="max-w-3xl mx-auto mb-xs flex flex-wrap items-center gap-xs">
+        <div className="mx-auto mb-xs flex max-w-3xl flex-wrap items-center gap-xs">
           {attachments.map((file) => (
             <div
               key={file.id}
-              className="inline-flex items-center gap-xs rounded-full border border-hairline bg-surface-soft px-sm py-xxs text-[12px] leading-[1.4] text-body"
+              className="inline-flex max-w-full items-center gap-xs rounded-full border border-hairline bg-surface-soft px-sm py-xxs text-[12px] leading-[1.4] text-body"
             >
               <span className="material-symbols-outlined text-[16px] text-primary">
                 description
               </span>
-              <span className="max-w-[220px] truncate">{file.name}</span>
+              <span className="max-w-[160px] truncate sm:max-w-[220px]">{file.name}</span>
               <span className="text-muted-soft">{formatBytes(file.size)}</span>
               <button
                 type="button"
-                className="rounded-full p-[2px] text-muted hover:text-ink transition-colors"
-                aria-label={`Remove ${file.name}`}
+                className="rounded-full p-[2px] text-muted transition-colors hover:text-ink"
+                aria-label={`${file.name} 첨부 제거`}
                 onClick={() => removeAttachment(file.id)}
                 disabled={disabled}
               >
@@ -202,7 +218,7 @@ export default function Composer({
           )}
         </div>
       )}
-      <div className="max-w-3xl mx-auto relative flex items-end bg-surface-soft border border-outline-variant rounded-xl p-[4px] focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
+      <div className="relative mx-auto flex max-w-3xl items-end rounded-xl border border-outline-variant bg-surface-soft p-[4px] transition-all focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
         <input
           ref={fileInputRef}
           className="hidden"
@@ -213,10 +229,10 @@ export default function Composer({
           disabled={disabled}
         />
         <button
-          className="mb-1 ml-1 p-sm text-body rounded-full hover:bg-surface-dim transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="mb-1 ml-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-body transition-colors hover:bg-surface-dim disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled}
-          aria-label="Attach txt or md file"
+          aria-label="txt 또는 md 파일 첨부"
           type="button"
         >
           <span className="material-symbols-outlined text-[20px]">
@@ -225,22 +241,26 @@ export default function Composer({
         </button>
         <textarea
           ref={textareaRef}
-          className="w-full bg-transparent border-none focus:ring-0 focus:outline-none resize-none text-[16px] leading-[1.5] font-normal text-on-surface py-md px-sm max-h-[120px]"
+          className="max-h-[120px] w-full resize-none border-none bg-transparent px-xs py-sm text-[16px] font-normal leading-[1.5] text-on-surface focus:outline-none focus:ring-0 sm:px-sm sm:py-md"
           maxLength={MAX_CHAT_MESSAGE_CHARS}
           placeholder={placeholder}
           rows={1}
-          style={{ minHeight: 56 }}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
+          style={{ minHeight: 48 }}
+          defaultValue={initialDraftValue}
+          onChange={(event) => syncTextareaValue(event.currentTarget.value)}
+          onInput={(event) => syncTextareaValue(event.currentTarget.value)}
+          onCompositionEnd={(event) =>
+            syncTextareaValue(event.currentTarget.value)
+          }
           onKeyDown={handleKeyDown}
           disabled={disabled}
-          aria-label="Message input"
+          aria-label="메시지 입력"
         />
         <button
-          className="mb-1 mr-1 p-sm bg-primary-container text-on-primary rounded-full hover:bg-primary-active transition-colors flex-shrink-0 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          className="mb-1 mr-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary shadow-sm transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:opacity-50"
           onClick={handleSubmit}
-          disabled={disabled || !composeMessage(value, attachments).trim()}
-          aria-label="Send message"
+          disabled={disabled || isOverLimit}
+          aria-label="메시지 보내기"
           type="button"
         >
           <span className="material-symbols-outlined text-[20px]">
@@ -248,16 +268,9 @@ export default function Composer({
           </span>
         </button>
       </div>
-      <div className="max-w-3xl mx-auto mt-xs flex justify-center gap-md">
+      <div className="mx-auto mt-xs flex max-w-3xl items-center justify-end">
         <span className="text-xs text-muted-soft">
-          Press{" "}
-          <kbd className="font-mono bg-surface border border-hairline px-1 rounded">
-            Enter
-          </kbd>{" "}
-          to send
-        </span>
-        <span className="text-xs text-muted-soft">
-          Total{" "}
+          전체{" "}
           {composedLength.toLocaleString()}/
           {payloadLimit.toLocaleString()}
         </span>

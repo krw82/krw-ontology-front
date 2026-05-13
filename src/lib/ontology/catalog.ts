@@ -3,9 +3,7 @@ import "server-only";
 import { readdir, readFile } from "fs/promises";
 import path from "path";
 
-const DEFAULT_PLUGIN_PATH =
-  "~/krw-ontology/plugins/krw-ontology";
-const DEFAULT_ONTOLOGY_ROOT = "~/krw-ontology-data";
+import { getKrwOntologyPluginPath } from "@/lib/agent/mcp-client";
 
 type CompanyArtifactIndex = {
   ticker?: string;
@@ -64,7 +62,7 @@ async function readFirstJsonl<T>(filePath: string): Promise<T | null> {
 }
 
 async function resolveRootFromPlugin(): Promise<string | null> {
-  const pluginPath = process.env.KRW_ONTOLOGY_PLUGIN_PATH || DEFAULT_PLUGIN_PATH;
+  const pluginPath = getKrwOntologyPluginPath();
   const mcpConfig = await readJsonFile<{
     mcpServers?: Record<string, { env?: Record<string, string> }>;
   }>(path.join(pluginPath, ".mcp.json"));
@@ -75,11 +73,11 @@ async function resolveRootFromPlugin(): Promise<string | null> {
 }
 
 export async function getOntologyRoot(): Promise<string> {
-  return (
-    process.env.KRW_ONTOLOGY_ROOT ||
-    (await resolveRootFromPlugin()) ||
-    DEFAULT_ONTOLOGY_ROOT
-  );
+  const root = process.env.KRW_ONTOLOGY_ROOT || (await resolveRootFromPlugin());
+  if (!root) {
+    throw new Error("Missing required environment variable: KRW_ONTOLOGY_ROOT");
+  }
+  return root;
 }
 
 function periodRank(period: string): number {
@@ -96,8 +94,33 @@ function trimSentence(text: string, maxLength = 260): string {
   return `${normalized.slice(0, maxLength - 1).trimEnd()}...`;
 }
 
+const SECTOR_LABELS: Record<string, string> = {
+  consumer: "소비재",
+  consumer_discretionary: "임의소비재",
+  consumer_staples: "필수소비재",
+  energy: "에너지",
+  energy_lng: "에너지 · LNG",
+  financials: "금융",
+  healthcare: "헬스케어",
+  industrials: "산업재",
+  materials: "소재",
+  semiconductor: "반도체",
+  technology: "기술",
+  utilities: "유틸리티",
+};
+
+function normalizeLabelKey(value: string): string {
+  return value
+    .trim()
+    .replace(/([a-z])([A-Z])/g, "$1_$2")
+    .replace(/[\s-]+/g, "_")
+    .toLowerCase();
+}
+
 function formatLabel(value: string | undefined): string {
-  if (!value) return "Indexed Ontology Company";
+  if (!value) return "인덱싱된 기업";
+  const sectorLabel = SECTOR_LABELS[normalizeLabelKey(value)];
+  if (sectorLabel) return sectorLabel;
   return value
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
@@ -151,9 +174,9 @@ async function buildCompany(root: string, ticker: string): Promise<IndexedCompan
     `Indexed ontology coverage for ${ticker}.`;
   const activities = profile?.primary_business_activities?.slice(0, 3) ?? [];
   const factors = profile?.key_external_factors?.slice(0, 4) ?? [];
-  const coverage = `${periods.length} filings indexed${
+  const coverage = `${periods.length}개 공시 인덱싱${
     documentTypes.length ? ` · ${documentTypes.join(", ")}` : ""
-  }${latestPeriod ? ` · latest ${latestPeriod}` : ""}`;
+  }${latestPeriod ? ` · 최신 ${latestPeriod}` : ""}`;
 
   return {
     ticker,

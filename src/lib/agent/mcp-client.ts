@@ -3,9 +3,6 @@ import "server-only";
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 
-const DEFAULT_PLUGIN_PATH =
-  "~/krw-ontology/plugins/krw-ontology";
-
 const KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX =
   "mcp__plugin_krw-ontology_krw-ontology__";
 const KRW_ONTOLOGY_DIRECT_TOOL_PREFIX = "mcp__krw-ontology__";
@@ -19,6 +16,7 @@ export const KRW_ONTOLOGY_MCP_TOOLS = [
   "krw_ontology_quality",
   "krw_ontology_compare",
   "krw_ontology_plan_query",
+  "krw_ontology_chain",
 ] as const;
 
 export const KRW_ONTOLOGY_SDK_ALLOWED_TOOLS = KRW_ONTOLOGY_MCP_TOOLS.flatMap(
@@ -62,11 +60,14 @@ interface PluginMcpConfig {
 }
 
 export function getKrwOntologyPluginPath(): string {
-  return (
-    process.env.KRW_ONTOLOGY_PLUGIN_PATH ||
-    process.env.CLAUDE_PLUGIN_PATH ||
-    DEFAULT_PLUGIN_PATH
-  );
+  const pluginPath =
+    process.env.KRW_ONTOLOGY_PLUGIN_PATH || process.env.CLAUDE_PLUGIN_PATH;
+  if (!pluginPath) {
+    throw new Error(
+      "Missing required environment variable: KRW_ONTOLOGY_PLUGIN_PATH",
+    );
+  }
+  return pluginPath;
 }
 
 async function exists(filePath: string): Promise<boolean> {
@@ -82,21 +83,19 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
   const pluginPath = getKrwOntologyPluginPath();
   const manifestPath = path.join(pluginPath, ".claude-plugin", "plugin.json");
   const mcpConfigPath = path.join(pluginPath, ".mcp.json");
-  const skillPath = path.join(
-    pluginPath,
-    "skills",
-    "krw-ontology-research",
-    "SKILL.md",
-  );
+  const requiredSkillPaths = [
+    path.join(pluginPath, "skills", "krw-ontology-research", "SKILL.md"),
+    path.join(pluginPath, "skills", "krw-ontology-answer-composer", "SKILL.md"),
+  ];
 
   try {
-    const [hasManifest, hasMcpConfig, hasSkill] = await Promise.all([
+    const [hasManifest, hasMcpConfig, ...hasRequiredSkills] = await Promise.all([
       exists(manifestPath),
       exists(mcpConfigPath),
-      exists(skillPath),
+      ...requiredSkillPaths.map((skillPath) => exists(skillPath)),
     ]);
 
-    if (!hasManifest || !hasMcpConfig || !hasSkill) {
+    if (!hasManifest || !hasMcpConfig || !hasRequiredSkills.every(Boolean)) {
       return {
         connected: false,
         releaseId: null,
@@ -106,7 +105,7 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
         objectCount: null,
         root: null,
         pluginPath,
-        error: "KRW Ontology Claude plugin files are incomplete",
+        error: "KRW Ontology Claude plugin workflow files are incomplete",
       };
     }
 

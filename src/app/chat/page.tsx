@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import TopNav from "@/components/TopNav";
 import ChatMessage from "@/components/ChatMessage";
 import Composer from "@/components/Composer";
-import { useSessions } from "@/hooks/useSessions";
 import { useChat } from "@/hooks/useChat";
+import { getSessionTickers, buildChatSessionHref } from "@/lib/chat/history-state";
 
 function sanitizeError(message: string): string {
   // Strip stack traces and internal details
@@ -25,14 +25,14 @@ type CompaniesResponse = {
 };
 
 function ChatContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const ticker = searchParams.get("ticker");
   const queryParam = searchParams.get("query");
   const existingSessionId = searchParams.get("sessionId");
 
-  const [sessionId, setSessionId] = useState<string | null>(existingSessionId);
+  const sessionId = existingSessionId;
   const [sessionError, setSessionError] = useState<string | null>(null);
-  const { createSession, creating } = useSessions();
   const scrollRef = useRef<HTMLDivElement>(null);
   const hasLoadedRef = useRef(false);
   const cancelledRef = useRef(false);
@@ -45,63 +45,60 @@ function ChatContent() {
     };
   }, []);
 
-  // Create session on mount only if no existing sessionId
   useEffect(() => {
-    if (existingSessionId) return;
+    if (existingSessionId || !ticker) return;
+
     let stale = false;
-    async function init() {
-      setSessionError(null);
+    const tickerToValidate = ticker;
 
-      if (ticker) {
-        const normalizedTicker = ticker.trim().toUpperCase();
-        try {
-          const res = await fetch(
-            `/api/companies?ticker=${encodeURIComponent(normalizedTicker)}`,
-            { cache: "no-store" },
+    async function validateTicker() {
+      const normalizedTicker = tickerToValidate.trim().toUpperCase();
+      try {
+        const res = await fetch(
+          `/api/companies?ticker=${encodeURIComponent(normalizedTicker)}`,
+          { cache: "no-store" },
+        );
+        const data = (await res.json()) as CompaniesResponse;
+        const isIndexed =
+          res.ok &&
+          data.companies?.some(
+            (company) => company.ticker === normalizedTicker,
           );
-          const data = (await res.json()) as CompaniesResponse;
-          const isIndexed =
-            res.ok &&
-            data.companies?.some(
-              (company) => company.ticker === normalizedTicker,
-            );
 
-          if (!isIndexed) {
-            if (!stale && !cancelledRef.current) {
-              setSessionError(
-                `현재 온톨로지 인덱스에 없는 회사입니다: ${normalizedTicker}`,
-              );
-            }
-            return;
-          }
-        } catch {
-          if (!stale && !cancelledRef.current) {
-            setSessionError("회사 인덱스를 확인하지 못했습니다.");
-          }
-          return;
+        if (!isIndexed && !stale && !cancelledRef.current) {
+          setSessionError(
+            `현재 온톨로지 인덱스에 없는 회사입니다: ${normalizedTicker}`,
+          );
+        }
+      } catch {
+        if (!stale && !cancelledRef.current) {
+          setSessionError("회사 인덱스를 확인하지 못했습니다.");
         }
       }
-
-      const session = await createSession({
-        scope_type: ticker ? "company" : "global",
-        default_tickers: ticker ? [ticker.trim().toUpperCase()] : undefined,
-      });
-      if (stale || cancelledRef.current) return;
-      if (session) {
-        setSessionId(session.id);
-      } else {
-        // H-06: show session creation error to user
-        setSessionError("세션 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
-      }
     }
-    init();
+
+    validateTicker();
+
     return () => {
       stale = true;
     };
-  }, [ticker, createSession, existingSessionId]);
+  }, [ticker, existingSessionId]);
 
-  // useChat hook — only active when we have a sessionId
-  const chat = useChat({ sessionId: sessionId ?? "" });
+  const effectiveSessionError = existingSessionId || !ticker ? null : sessionError;
+
+  const handleSessionCreated = useCallback(
+    (createdSessionId: string) => {
+      router.replace(buildChatSessionHref(createdSessionId), { scroll: false });
+    },
+    [router],
+  );
+
+  const chat = useChat({
+    sessionId: sessionId ?? "",
+    scopeType: ticker ? "company" : "global",
+    defaultTickers: ticker ? [ticker.trim().toUpperCase()] : [],
+    onSessionCreated: handleSessionCreated,
+  });
 
   // H-08: stable loadSession via ref-based guard
   const loadSessionRef = useRef(chat.loadSession);
@@ -128,9 +125,10 @@ function ChatContent() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [chat.messages, chat.streamingContent, scrollToBottom]);
+  }, [chat.activity, chat.messages, chat.streamingContent, scrollToBottom]);
 
   const isStreaming = chat.status === "running";
+  const contextTickers = getSessionTickers(chat.session, ticker);
 
   const handleSend = useCallback(
     async (content: string) => {
@@ -138,6 +136,7 @@ function ChatContent() {
     },
     [chat],
   );
+
 
   const handleCancel = useCallback(async () => {
     await chat.cancelRun();
@@ -155,87 +154,88 @@ function ChatContent() {
   }, [chat.status, handleCancel]);
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* Top Nav */}
       <TopNav />
 
       {/* Main Workspace */}
-      <main id="main-content" className="flex-1 w-full max-w-[1200px] mx-auto flex overflow-hidden">
+      <main id="main-content" className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 overflow-hidden">
         {/* Chat Canvas */}
-        <div className="flex-1 flex flex-col relative bg-canvas">
+        <div className="relative flex min-w-0 flex-1 flex-col bg-canvas">
           {/* Chat History */}
           {/* L-04: aria-live region for screen readers */}
           <div
             ref={scrollRef}
-            className="flex-1 overflow-y-auto px-xl pb-[96px]"
+            className="flex-1 overflow-y-auto px-base pb-[calc(88px+env(safe-area-inset-bottom))] sm:px-xl sm:pb-[96px]"
             aria-live="polite"
-            aria-label="Chat messages"
+            aria-label="채팅 메시지"
             role="log"
           >
             {/* Spacer */}
-            <div className="h-[96px]" />
+            <div className="h-xl sm:h-[96px]" />
 
             {/* Ticker context indicator */}
-            {ticker && (
-              <div className="max-w-3xl mx-auto mb-lg">
-                <span className="inline-flex items-center gap-xs px-md py-xs bg-surface-soft border border-hairline rounded-full text-[14px] leading-[1.4] font-medium text-body">
+            {contextTickers.length > 0 && (
+              <div className="mx-auto mb-lg w-full max-w-3xl">
+                <span className="inline-flex max-w-full items-center gap-xs rounded-full border border-hairline bg-surface-soft px-sm py-xs text-[13px] font-medium leading-[1.4] text-body sm:px-md sm:text-[14px]">
                   <span className="material-symbols-outlined text-[16px] text-primary">
                     business
                   </span>
-                  Context:{" "}
-                  <span className="font-mono font-medium text-ink">
-                    {ticker}
+                  <span className="shrink-0">분석 대상:</span>{" "}
+                  <span className="truncate font-mono font-medium text-ink">
+                    {contextTickers.join(", ")}
                   </span>
                 </span>
               </div>
             )}
 
             {/* L-09: Loading skeleton for session */}
-            {(!sessionId || creating) && !existingSessionId && !sessionError && (
-              <div className="max-w-3xl mx-auto space-y-xl" aria-busy="true">
-                <div className="flex flex-col w-full animate-pulse">
-                  <div className="flex items-start gap-md mb-sm">
-                    <div className="w-8 h-8 rounded-full bg-surface-soft" />
-                    <div className="h-5 w-40 bg-surface-soft rounded" />
-                  </div>
-                  <div className="pl-[48px] space-y-md">
-                    <div className="h-4 w-3/4 bg-surface-soft rounded" />
-                    <div className="h-4 w-1/2 bg-surface-soft rounded" />
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* H-06: Session creation error */}
-            {sessionError && (
-              <div className="max-w-3xl mx-auto">
-                <div className="bg-error-container/10 border border-error/20 rounded-xl p-lg text-error text-[16px] leading-[1.5]">
+            {effectiveSessionError && (
+              <div className="mx-auto max-w-3xl">
+                <div className="rounded-xl border border-error/20 bg-error-container/10 p-base text-[15px] leading-[1.5] text-error sm:p-lg sm:text-[16px]">
                   <span className="material-symbols-outlined text-[18px] mr-xs align-middle">
                     error
                   </span>
-                  {sessionError}
+                  {effectiveSessionError}
                 </div>
               </div>
             )}
 
             {/* Messages */}
-            <div className="max-w-3xl mx-auto space-y-xl">
+            <div className="mx-auto w-full min-w-0 max-w-3xl space-y-lg sm:space-y-xl">
               {chat.messages
                 .filter((msg): msg is typeof msg & { role: "user" | "assistant" } =>
                   msg.role === "user" || msg.role === "assistant"
                 )
-                .map((msg, idx, arr) => (
-                <ChatMessage
-                  key={msg.id}
-                  role={msg.role}
-                  content={msg.content}
-                  citations={
-                    msg.role === "assistant" && idx === arr.length - 1 && !isStreaming
-                      ? chat.citations
-                      : undefined
-                  }
-                />
-              ))}
+                .map((msg, idx, arr) => {
+                  const isLastAssistant =
+                    msg.role === "assistant" && idx === arr.length - 1;
+                  const citations =
+                    msg.role === "assistant" && !isStreaming
+                      ? chat.citations.filter((citation) =>
+                          citation.message_id
+                            ? citation.message_id === msg.id
+                            : isLastAssistant,
+                        )
+                      : undefined;
+                  const richAnswers =
+                    msg.role === "assistant"
+                      ? chat.richAnswers.filter(
+                          (answer) => answer.message_id === msg.id,
+                        )
+                      : undefined;
+
+                  return (
+                    <ChatMessage
+                      key={msg.id}
+                      role={msg.role}
+                      content={msg.content}
+                      citations={citations}
+                      richAnswers={richAnswers}
+                    />
+                  );
+                })}
 
               {/* Streaming response */}
               {isStreaming && chat.streamingContent && (
@@ -243,6 +243,7 @@ function ChatContent() {
                   role="assistant"
                   content={chat.streamingContent}
                   isStreaming={true}
+                  activity={chat.activity}
                   citations={chat.citations}
                 />
               )}
@@ -251,14 +252,15 @@ function ChatContent() {
                   role="assistant"
                   content=""
                   isStreaming={true}
+                  activity={chat.activity}
                 />
               )}
 
               {/* Error */}
               {chat.error && (
-                <div className="flex flex-col w-full">
-                  <div className="pl-[48px]">
-                    <div className="bg-error-container/10 border border-error/20 rounded-xl p-lg text-error text-[16px] leading-[1.5]">
+                <div className="flex w-full flex-col">
+                  <div className="pl-0 sm:pl-[48px]">
+                    <div className="rounded-xl border border-error/20 bg-error-container/10 p-base text-[15px] leading-[1.5] text-error sm:p-lg sm:text-[16px]">
                       <span className="material-symbols-outlined text-[18px] mr-xs align-middle">
                         error
                       </span>
@@ -270,18 +272,18 @@ function ChatContent() {
 
               {/* Empty state */}
               {chat.messages.length === 0 && !isStreaming && sessionId && !sessionError && (
-                <div className="flex flex-col items-center justify-center py-xxl text-center">
-                  <div className="w-16 h-16 bg-surface-soft rounded-full flex items-center justify-center mb-lg">
-                    <span className="material-symbols-outlined text-[32px] text-primary">
+                <div className="flex w-full min-w-0 flex-col items-center justify-center py-xxl text-center">
+                  <div className="mb-lg flex h-14 w-14 items-center justify-center rounded-full bg-surface-soft sm:h-16 sm:w-16">
+                    <span className="material-symbols-outlined text-[28px] text-primary sm:text-[32px]">
                       auto_awesome
                     </span>
                   </div>
-                  <h2 className="text-[18px] leading-[1.33] font-semibold text-ink mb-sm">
+                  <h2 className="mb-sm text-[18px] font-semibold leading-[1.33] text-ink">
                     KRW Ontology에 질문하세요
                   </h2>
-                  <p className="text-[16px] leading-[1.5] font-normal text-muted max-w-md">
-                    {ticker
-                      ? `${ticker}의 재무 데이터, 실적, 온톨로지 분석에 대해 질문해보세요.`
+                  <p className="w-full min-w-[280px] max-w-[440px] whitespace-normal text-[15px] font-normal leading-[1.5] text-muted [overflow-wrap:normal] [word-break:keep-all] sm:text-[16px]">
+                    {contextTickers.length > 0
+                      ? `${contextTickers.join(", ")}의 재무 데이터, 실적, 온톨로지 분석에 대해 질문해보세요.`
                       : "어떤 기업의 재무 데이터, 실적, 온톨로지 분석에 대해서도 질문해보세요."}
                   </p>
                 </div>
@@ -292,12 +294,10 @@ function ChatContent() {
           {/* M-09: Session creation loading indicator */}
           <Composer
             onSend={handleSend}
-            disabled={isStreaming || !sessionId || creating}
+            disabled={isStreaming || Boolean(effectiveSessionError)}
             placeholder={
-              sessionError
+              effectiveSessionError
                 ? "인덱스에 있는 회사만 채팅할 수 있습니다."
-                : creating
-                ? "세션을 생성하는 중..."
                 : isStreaming
                   ? "응답을 기다리는 중..."
                   : "후속 질문이나 심층 분석을 요청하세요..."
@@ -307,11 +307,11 @@ function ChatContent() {
 
           {/* Cancel button overlay when streaming */}
           {isStreaming && (
-            <div className="absolute bottom-[100px] left-1/2 -translate-x-1/2 z-10">
+            <div className="absolute bottom-[calc(92px+env(safe-area-inset-bottom))] left-1/2 z-10 -translate-x-1/2 sm:bottom-[100px]">
               <button
                 onClick={handleCancel}
-                className="px-lg py-sm bg-surface-strong border border-hairline rounded-full text-[14px] leading-[1.4] font-medium text-body hover:bg-surface-dim transition-colors flex items-center gap-xs shadow-sm"
-                aria-label="Cancel response"
+                className="flex items-center gap-xs rounded-full border border-hairline bg-surface-strong px-base py-sm text-[14px] font-medium leading-[1.4] text-body shadow-sm transition-colors hover:bg-surface-dim sm:px-lg"
+                aria-label="응답 생성 중지"
               >
                 <span className="material-symbols-outlined text-[16px]">
                   stop_circle
@@ -330,8 +330,8 @@ export default function ChatPage() {
   return (
     <Suspense
       fallback={
-        <div className="h-screen flex items-center justify-center bg-canvas">
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="flex h-[100dvh] items-center justify-center bg-canvas">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
       }
     >

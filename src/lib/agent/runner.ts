@@ -13,11 +13,24 @@ import {
   getKrwOntologyPluginPath,
   isKrwOntologySdkTool,
 } from "./mcp-client";
+import { buildClaudeAgentEnv } from "./env";
+import { requireEnv } from "@/lib/env";
 import {
-  buildResearchPrompt,
   buildSystemPrompt,
   type CompanyPromptContext,
 } from "./system-prompt";
+import {
+  buildComposerPassPrompt,
+  buildResearchPassPrompt,
+} from "./workflow";
+import {
+  DISPLAY_PLAN_OUTPUT_SCHEMA,
+  RESEARCH_SYNTHESIS_OUTPUT_SCHEMA,
+  parseDisplayPlanOutput,
+  parseDisplayPlanOutputText,
+  parseResearchSynthesisOutput,
+  parseResearchSynthesisOutputText,
+} from "@/lib/artifacts/display-plan";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
 import {
   createAccumulator,
@@ -34,7 +47,6 @@ import type { MCPToolName, DocumentType } from "@/types/api-contracts";
 
 const MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const DEFAULT_MAX_TURNS = 20;
-const DEFAULT_AGENT_CWD = "~/krw-ontology";
 
 export interface AgentRunOptions {
   sessionId: string;
@@ -45,6 +57,7 @@ export interface AgentRunOptions {
   history?: Array<{ role: string; content: string }>;
   abortSignal?: AbortSignal;
   onSdkDiagnostics?: (diagnostics: SdkDiagnostics) => Promise<void>;
+  onTextDelta?: (delta: string, fullText: string) => Promise<void>;
 }
 
 export interface AgentRunResult {
@@ -56,7 +69,14 @@ export interface AgentRunResult {
 
 type UnknownRecord = Record<string, unknown>;
 
+interface ToolResultRecord {
+  toolUseId: string | null;
+  text: string;
+  json: unknown;
+}
+
 export interface SdkDiagnostics {
+  passName?: "research" | "composer";
   requestedModel?: string;
   observedModels?: string[];
   cwd?: string;
@@ -81,7 +101,7 @@ export async function runAgent(
   const { sendEvent } = createSSEWriter(streamWriter);
   const acc = createAccumulator();
   const pluginPath = getKrwOntologyPluginPath();
-  const cwd = process.env.CLAUDE_AGENT_CWD || DEFAULT_AGENT_CWD;
+  const cwd = requireEnv("CLAUDE_AGENT_CWD");
   const abortController = new AbortController();
 
   const abortHandler = () => abortController.abort();
@@ -101,10 +121,10 @@ export async function runAgent(
     promptContext,
     shouldResume ? [] : (options.history ?? []),
   );
-  const prompt = buildResearchPrompt(options.userMessage);
+  const researchPrompt = buildResearchPassPrompt(options.userMessage);
 
   const requestedModel = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
-  const sdkOptions: Options = {
+  const baseSdkOptions: Options = {
     cwd,
     model: requestedModel,
     pathToClaudeCodeExecutable:
@@ -125,18 +145,156 @@ export async function runAgent(
     includePartialMessages: false,
     abortController,
     env: buildClaudeAgentEnv(),
-    ...(shouldResume
-      ? { resume: options.sessionId }
-      : { sessionId: options.sessionId }),
   };
-
-  const openToolCalls = new Set<string>();
   const observedModels = new Set<string>();
+
+  try {
+    await sendEvent("activity_update", {
+      stage: "connecting",
+      label: "자료 연결 확인 중",
+    });
+    const researchResult = await runSdkPass({
+      passName: "research",
+      prompt: researchPrompt,
+      sdkOptions: {
+        ...baseSdkOptions,
+        outputFormat: {
+          type: "json_schema",
+          schema: RESEARCH_SYNTHESIS_OUTPUT_SCHEMA,
+        },
+        ...(shouldResume
+          ? { resume: options.sessionId }
+          : { sessionId: options.sessionId }),
+      },
+      options,
+      requestedModel,
+      cwd,
+      pluginPath,
+      sendEvent,
+      observedModels,
+      suppressTextDeltas: true,
+    });
+
+    if (researchResult.status !== "completed") {
+      return researchResult;
+    }
+
+    const researchSynthesis =
+      parseResearchSynthesisOutput(researchResult.acc.structuredOutput) ??
+      parseResearchSynthesisOutputText(serializePassOutput(researchResult.acc));
+    if (!researchSynthesis) {
+      if (researchResult.acc.fullText.trim()) {
+        researchResult.acc.structuredOutput = null;
+        researchResult.acc.researchSynthesisOutput = null;
+        researchResult.acc.researchSynthesisText = null;
+        return researchResult;
+      }
+
+      return {
+        acc: researchResult.acc,
+        status: "failed",
+        errorCode: "claude_api_error",
+        errorMessage:
+          "리서치 단계에서 화면에 표시할 수 있는 구조화 결과를 받지 못했습니다.",
+      };
+    }
+    researchResult.acc.researchSynthesisOutput = researchSynthesis;
+    researchResult.acc.researchSynthesisText = JSON.stringify(researchSynthesis);
+
+    await sendEvent("activity_update", {
+      stage: "composing",
+      label: "답변 구성 중",
+    });
+    const composerResult = await runSdkPass({
+      passName: "composer",
+      prompt: buildComposerPassPrompt({
+        question: options.userMessage,
+        research_synthesis: researchSynthesis,
+        runtime: {
+          supports_structured_output: true,
+          language: inferRuntimeLanguage(options.userMessage),
+        },
+      }),
+      sdkOptions: {
+        ...baseSdkOptions,
+        allowedTools: [],
+        outputFormat: {
+          type: "json_schema",
+          schema: DISPLAY_PLAN_OUTPUT_SCHEMA,
+        },
+        resume: options.sessionId,
+      },
+      options,
+      requestedModel,
+      cwd,
+      pluginPath,
+      sendEvent,
+      observedModels,
+      suppressTextDeltas: true,
+    });
+
+    const displayPlan =
+      parseDisplayPlanOutput(composerResult.acc.structuredOutput) ??
+      parseDisplayPlanOutputText(serializePassOutput(composerResult.acc));
+    if (displayPlan) {
+      composerResult.acc.displayPlanOutput = displayPlan;
+    }
+
+    return {
+      ...composerResult,
+      acc: mergePassAccumulators(researchResult.acc, composerResult.acc),
+    };
+  } catch (err) {
+    if (options.abortSignal?.aborted || abortController.signal.aborted) {
+      return { acc, status: "cancelled" };
+    }
+
+    const rawErrorMessage =
+      err instanceof Error ? err.message : "Unknown Claude Agent SDK error";
+    const errorCode = errorCodeFromMessage(rawErrorMessage);
+    return {
+      acc,
+      status: "failed",
+      errorCode,
+      errorMessage: userFacingErrorMessage(errorCode, rawErrorMessage),
+    };
+  } finally {
+    options.abortSignal?.removeEventListener("abort", abortHandler);
+  }
+}
+
+async function runSdkPass(params: {
+  passName: "research" | "composer";
+  prompt: string;
+  sdkOptions: Options;
+  options: AgentRunOptions;
+  requestedModel: string;
+  cwd: string;
+  pluginPath: string;
+  sendEvent: ReturnType<typeof createSSEWriter>["sendEvent"];
+  observedModels: Set<string>;
+  suppressTextDeltas: boolean;
+}): Promise<AgentRunResult> {
+  const {
+    passName,
+    prompt,
+    sdkOptions,
+    options,
+    requestedModel,
+    cwd,
+    pluginPath,
+    sendEvent,
+    observedModels,
+    suppressTextDeltas,
+  } = params;
+  const acc = createAccumulator();
+  const openToolCalls = new Set<string>();
   let finalResult: AgentRunResult | null = null;
 
   try {
     const sdkQuery = query({ prompt, options: sdkOptions });
     await reportSdkInitialization({
+      passName,
       sdkQuery,
       options,
       requestedModel,
@@ -155,6 +313,7 @@ export async function runAgent(
       if (observedModel && !observedModels.has(observedModel)) {
         observedModels.add(observedModel);
         await options.onSdkDiagnostics?.({
+          passName,
           observedModels: Array.from(observedModels),
           observedAt: new Date().toISOString(),
         });
@@ -165,16 +324,18 @@ export async function runAgent(
         acc,
         openToolCalls,
         sendEvent,
+        onTextDelta: options.onTextDelta,
+        suppressTextDeltas,
       });
 
       if (message.type === "result") {
         closeOpenToolCalls(acc, openToolCalls);
 
         if (message.subtype === "success") {
+          acc.structuredOutput = message.structured_output ?? null;
           const resultText = typeof message.result === "string" ? message.result : "";
           if (!acc.fullText.trim() && resultText.trim()) {
             addToken(acc, resultText);
-            await sendEvent("token", { text: resultText });
           }
           const usage = usageFromSdkMessage(message);
           setUsage(acc, usage.inputTokens, usage.outputTokens);
@@ -197,7 +358,7 @@ export async function runAgent(
 
     return finalResult ?? { acc, status: "completed" };
   } catch (err) {
-    if (options.abortSignal?.aborted || abortController.signal.aborted) {
+    if (options.abortSignal?.aborted) {
       return { acc, status: "cancelled" };
     }
 
@@ -210,12 +371,43 @@ export async function runAgent(
       errorCode,
       errorMessage: userFacingErrorMessage(errorCode, rawErrorMessage),
     };
-  } finally {
-    options.abortSignal?.removeEventListener("abort", abortHandler);
   }
 }
 
+function serializePassOutput(acc: AccumulatedRun): string {
+  if (acc.structuredOutput !== null && acc.structuredOutput !== undefined) {
+    return JSON.stringify(acc.structuredOutput, null, 2);
+  }
+
+  return acc.fullText.trim();
+}
+
+function mergePassAccumulators(
+  researchAcc: AccumulatedRun,
+  composerAcc: AccumulatedRun,
+): AccumulatedRun {
+  return {
+    ...composerAcc,
+    fullText: researchAcc.fullText,
+    structuredOutput: composerAcc.structuredOutput,
+    researchSynthesisOutput:
+      researchAcc.researchSynthesisOutput ?? researchAcc.structuredOutput,
+    researchSynthesisText:
+      researchAcc.researchSynthesisText ?? serializePassOutput(researchAcc),
+    displayPlanOutput: composerAcc.displayPlanOutput ?? composerAcc.structuredOutput,
+    toolCalls: [...researchAcc.toolCalls, ...composerAcc.toolCalls],
+    citations: [...researchAcc.citations, ...composerAcc.citations],
+    inputTokens: researchAcc.inputTokens + composerAcc.inputTokens,
+    outputTokens: researchAcc.outputTokens + composerAcc.outputTokens,
+  };
+}
+
+function inferRuntimeLanguage(userMessage: string): string {
+  return /[가-힣]/.test(userMessage) ? "ko" : "en";
+}
+
 async function reportSdkInitialization(params: {
+  passName: "research" | "composer";
   sdkQuery: ReturnType<typeof query>;
   options: AgentRunOptions;
   requestedModel: string;
@@ -225,6 +417,7 @@ async function reportSdkInitialization(params: {
   sdkOptions: Options;
 }) {
   const {
+    passName,
     sdkQuery,
     options,
     requestedModel,
@@ -237,6 +430,7 @@ async function reportSdkInitialization(params: {
   if (!options.onSdkDiagnostics) return;
 
   const diagnostics: SdkDiagnostics = {
+    passName,
     requestedModel,
     cwd,
     pluginPath,
@@ -311,32 +505,32 @@ async function getCompanyPromptContexts(
     }));
 }
 
-function buildClaudeAgentEnv(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    CLAUDE_AGENT_SDK_CLIENT_APP: "krw-ontology-front/0.1.0",
-  };
-
-  const apiKey = env.ANTHROPIC_API_KEY?.trim();
-  if (!apiKey || apiKey === "sk-placeholder" || apiKey === "sk-ant-...") {
-    delete env.ANTHROPIC_API_KEY;
-  }
-
-  return env;
-}
-
 async function consumeSdkMessage(params: {
   message: SDKMessage;
   acc: AccumulatedRun;
   openToolCalls: Set<string>;
   sendEvent: (event: Parameters<ReturnType<typeof createSSEWriter>["sendEvent"]>[0], data: unknown) => Promise<void>;
+  onTextDelta?: (delta: string, fullText: string) => Promise<void>;
+  suppressTextDeltas?: boolean;
 }) {
-  const { message, acc, openToolCalls, sendEvent } = params;
+  const {
+    message,
+    acc,
+    openToolCalls,
+    sendEvent,
+    onTextDelta,
+    suppressTextDeltas,
+  } = params;
 
   if (message.type === "assistant") {
-    for (const block of getContentBlocks(message.message)) {
+    const blocks = getContentBlocks(message.message);
+    const containsToolUse = blocks.some((block) => block.type === "tool_use");
+
+    for (const block of blocks) {
       if (block.type === "text" && typeof block.text === "string") {
+        if (containsToolUse || suppressTextDeltas) continue;
         addToken(acc, block.text);
+        await onTextDelta?.(block.text, acc.fullText);
         await sendEvent("token", { text: block.text });
       }
 
@@ -362,9 +556,33 @@ async function consumeSdkMessage(params: {
   }
 
   if (message.type === "user") {
-    for (const toolResult of extractToolResultTexts(message)) {
+    for (const toolResult of extractToolResults(message)) {
+      const wasOpen =
+        toolResult.toolUseId !== null && openToolCalls.has(toolResult.toolUseId);
+
+      if (toolResult.toolUseId) {
+        endToolCall(
+          acc,
+          toolResult.toolUseId,
+          summarizeToolResult(toolResult.text),
+          null,
+          toolResult.json,
+          toolResult.text,
+        );
+
+        if (wasOpen) {
+          openToolCalls.delete(toolResult.toolUseId);
+          await sendEvent("tool_call_end", {
+            tool_call_id: toolResult.toolUseId,
+            result_summary: summarizeToolResult(toolResult.text),
+            error_message: null,
+            duration_ms: toolCallDurationMs(acc, toolResult.toolUseId),
+          });
+        }
+      }
+
       const prevCitationCount = acc.citations.length;
-      extractCitations(acc, toolResult);
+      extractCitations(acc, toolResult.text, toolResult.json);
       for (let i = prevCitationCount; i < acc.citations.length; i++) {
         await sendEvent("citation", acc.citations[i]);
       }
@@ -412,22 +630,32 @@ function getContentBlocks(message: unknown): UnknownRecord[] {
   return Array.isArray(content) ? content.filter(isRecord) : [];
 }
 
-function extractToolResultTexts(message: SDKMessage): string[] {
+function extractToolResults(message: SDKMessage): ToolResultRecord[] {
   if (message.type !== "user") return [];
 
-  const texts: string[] = [];
+  const results: ToolResultRecord[] = [];
   const toolUseResult = message.tool_use_result;
 
   if (toolUseResult) {
-    texts.push(stringifyToolResult(toolUseResult));
+    const text = stringifyToolResult(toolUseResult);
+    results.push({
+      toolUseId: null,
+      text,
+      json: parseToolJson(text),
+    });
   }
 
   for (const block of getContentBlocks(message.message)) {
     if (block.type !== "tool_result") continue;
-    texts.push(stringifyToolResult(block.content));
+    const text = stringifyToolResult(block.content);
+    results.push({
+      toolUseId: typeof block.tool_use_id === "string" ? block.tool_use_id : null,
+      text,
+      json: parseToolJson(text),
+    });
   }
 
-  return texts.filter((text) => text.trim().length > 0);
+  return results.filter((result) => result.text.trim().length > 0);
 }
 
 function stringifyToolResult(value: unknown): string {
@@ -444,6 +672,20 @@ function stringifyToolResult(value: unknown): string {
   }
 
   return JSON.stringify(value);
+}
+
+function parseToolJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function summarizeToolResult(text: string): string | null {
+  const compact = text.replace(/\s+/g, " ").trim();
+  if (!compact) return null;
+  return compact.slice(0, 2000);
 }
 
 function normalizeMcpToolName(name: unknown): MCPToolName | null {
@@ -524,6 +766,9 @@ function numberValue(value: unknown): number | null {
 
 function errorCodeFromMessage(message: string): AgentRunResult["errorCode"] {
   const lower = message.toLowerCase();
+  if (lower.includes("not logged in") || lower.includes("please run /login")) {
+    return "auth_required";
+  }
   if (lower.includes("rate limit") || lower.includes("429")) {
     return "claude_rate_limited";
   }
@@ -538,8 +783,17 @@ function userFacingErrorMessage(
   if (code === "claude_rate_limited") {
     return "현재 Claude Code 계정/API 요청 한도에 도달했습니다. 잠시 후 다시 시도하거나, 실제 ANTHROPIC_API_KEY를 설정한 뒤 서버를 재시작해주세요.";
   }
+  if (code === "auth_required") {
+    return "Claude Code 인증 정보가 이 웹 앱 실행 환경에 전달되지 않았습니다. 터미널 Claude가 된다면 사용자 Claude 설정의 인증 env를 앱이 읽도록 서버를 재시작해주세요. 계속 실패하면 실제 ANTHROPIC_API_KEY를 .env.local에 설정하세요.";
+  }
+  if (code === "mcp_unavailable") {
+    return "온톨로지 도구 연결을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.";
+  }
 
-  return rawMessage;
+  if (process.env.NODE_ENV !== "production") {
+    console.warn("[claude-agent-sdk] execution failed", rawMessage);
+  }
+  return "에이전트 실행 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
 }
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -603,12 +857,17 @@ function addCitationFromBundle(acc: AccumulatedRun, bundle: UnknownRecord) {
     claim_text: firstText(claims, 500),
     evidence_grade: null,
     source_quality: null,
+    trace_json: bundle,
   });
 }
 
-function extractCitations(acc: AccumulatedRun, resultContent: string) {
+function extractCitations(
+  acc: AccumulatedRun,
+  resultContent: string,
+  parsedResult: unknown = null,
+) {
   try {
-    const data: unknown = JSON.parse(resultContent);
+    const data: unknown = parsedResult ?? JSON.parse(resultContent);
     if (!isRecord(data)) return;
 
     if (Array.isArray(data.results)) {

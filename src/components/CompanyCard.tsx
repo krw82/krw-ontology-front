@@ -26,50 +26,50 @@ export default function CompanyCard({ company }: CompanyCardProps) {
 
   return (
     <Link href={`/chat?ticker=${encodeURIComponent(company.ticker)}`}>
-      <article className="bg-canvas border border-hairline rounded-[24px] p-lg hover:shadow-md transition-all group relative overflow-hidden flex flex-col cursor-pointer">
-        <div className="flex justify-between items-start mb-md">
-          <div>
-            <h2 className="text-[36px] leading-[1.11] tracking-[-0.5px] font-normal text-ink group-hover:text-primary-container transition-colors">
+      <article className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-hairline bg-canvas p-base transition-all hover:shadow-md sm:p-lg">
+        <div className="mb-md flex items-start justify-between gap-base">
+          <div className="min-w-0">
+            <h2 className="text-[32px] font-normal leading-[1.11] tracking-normal text-ink transition-colors group-hover:text-primary-container sm:text-[36px]">
               {company.ticker}
             </h2>
-            <span className="font-mono text-[12px] leading-[1.4] font-medium text-muted">
+            <span className="block truncate font-mono text-[12px] font-medium leading-[1.4] text-muted">
               {company.name}
             </span>
           </div>
-          <div className="w-[40px] h-[40px] bg-surface-strong rounded-full flex items-center justify-center text-ink">
+          <div className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-surface-strong text-ink">
             <span className="material-symbols-outlined">{icon}</span>
           </div>
         </div>
-        <p className="text-[16px] leading-[1.5] font-normal text-body mb-lg flex-grow">
+        <p className="mb-lg flex-grow text-[15px] font-normal leading-[1.5] text-body sm:text-[16px]">
           {company.description}
         </p>
-        <div className="space-y-sm pt-base border-t border-hairline-soft">
+        <div className="space-y-sm border-t border-hairline-soft pt-base">
           {company.coverage && (
             <div className="flex flex-col gap-xxs">
-              <span className="text-[16px] leading-[1.5] font-bold text-ink">
-                Coverage
+              <span className="text-[15px] font-bold leading-[1.5] text-ink sm:text-[16px]">
+                인덱싱 범위
               </span>
-              <p className="text-[14px] leading-[1.5] font-normal text-muted">
+              <p className="text-[14px] font-normal leading-[1.5] text-muted">
                 {company.coverage}
               </p>
             </div>
           )}
           {company.core_strength && (
             <div className="flex flex-col gap-xxs">
-              <span className="text-[16px] leading-[1.5] font-bold text-ink">
-                Business Activity
+              <span className="text-[15px] font-bold leading-[1.5] text-ink sm:text-[16px]">
+                주요 사업 활동
               </span>
-              <p className="text-[14px] leading-[1.5] font-normal text-muted">
+              <p className="text-[14px] font-normal leading-[1.5] text-muted">
                 {company.core_strength}
               </p>
             </div>
           )}
           {company.critical_risk && (
             <div className="flex flex-col gap-xxs">
-              <span className="text-[16px] leading-[1.5] font-bold text-ink">
-                Key Factors
+              <span className="text-[15px] font-bold leading-[1.5] text-ink sm:text-[16px]">
+                핵심 변수
               </span>
-              <p className="text-[14px] leading-[1.5] font-normal text-muted">
+              <p className="text-[14px] font-normal leading-[1.5] text-muted">
                 {company.critical_risk}
               </p>
             </div>

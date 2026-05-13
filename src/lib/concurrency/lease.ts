@@ -9,11 +9,9 @@ const LEASE_TIMEOUT_MINUTES = parseInt(
   10
 );
 
-export interface LeaseResult {
-  acquired: boolean;
-  reason?: string;
-  runId?: string;
-}
+export type LeaseResult =
+  | { acquired: true; runId: string }
+  | { acquired: false; reason: string };
 
 export async function tryAcquireLease(
   sessionId: string,

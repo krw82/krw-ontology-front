@@ -6,11 +6,17 @@ import type {
 
 export interface AccumulatedRun {
   fullText: string;
+  structuredOutput: unknown;
+  researchSynthesisOutput: unknown;
+  researchSynthesisText: string | null;
+  displayPlanOutput: unknown;
   toolCalls: Array<{
     id: string;
     toolName: MCPToolName;
     argumentsJson: string;
     resultSummary: string | null;
+    resultJson: unknown;
+    resultText: string | null;
     startedAt: string;
     finishedAt: string | null;
     errorMessage: string | null;
@@ -23,6 +29,10 @@ export interface AccumulatedRun {
 export function createAccumulator(): AccumulatedRun {
   return {
     fullText: "",
+    structuredOutput: null,
+    researchSynthesisOutput: null,
+    researchSynthesisText: null,
+    displayPlanOutput: null,
     toolCalls: [],
     citations: [],
     inputTokens: 0,
@@ -61,6 +71,8 @@ export function startToolCall(
     toolName,
     argumentsJson: JSON.stringify(args),
     resultSummary: null,
+    resultJson: null,
+    resultText: null,
     startedAt: new Date().toISOString(),
     finishedAt: null,
     errorMessage: null,
@@ -71,14 +83,22 @@ export function endToolCall(
   acc: AccumulatedRun,
   id: string,
   resultSummary: string | null,
-  errorMessage: string | null
+  errorMessage: string | null,
+  resultJson?: unknown,
+  resultText?: string | null,
 ) {
   const tc = acc.toolCalls.find((t) => t.id === id);
   if (tc) {
     const now = new Date();
     tc.resultSummary = resultSummary
       ? resultSummary.slice(0, 2000)
-      : null;
+      : tc.resultSummary;
+    if (resultJson !== undefined) {
+      tc.resultJson = resultJson;
+    }
+    if (resultText !== undefined) {
+      tc.resultText = resultText ? resultText.slice(0, 100_000) : null;
+    }
     tc.finishedAt = now.toISOString();
     tc.errorMessage = errorMessage;
   }

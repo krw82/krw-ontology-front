@@ -6,17 +6,27 @@ import type {
   StreamingEventType,
   RunStatus,
   StreamingCitation,
+  ChatCitation,
   StreamingToolCallStart,
   StreamingToolCallEnd,
   QuotaStatus,
   ReleaseMetadata,
   ErrorCode,
   GetChatSessionResponse,
+  Session,
+  ResearchArtifact,
+  ResearchActivityUpdate,
+  MCPToolName,
 } from "@/types/api-contracts";
 import { getChatContentLimit } from "@/lib/chat-limits";
+import { deriveLoadedChatState } from "@/lib/chat/history-state";
 
 interface UseChatOptions {
   sessionId: string;
+  scopeType?: "global" | "company";
+  defaultTickers?: string[];
+  defaultDocumentTypes?: string[];
+  onSessionCreated?: (sessionId: string) => void;
 }
 
 export interface ToolCallState {
@@ -27,12 +37,15 @@ export interface ToolCallState {
 }
 
 export interface ChatState {
+  session: Session | null;
   messages: Message[];
   status: RunStatus | "idle";
   streamingContent: string;
   error: string | null;
+  activity: ResearchActivityUpdate | null;
   toolCalls: ToolCallState[];
-  citations: StreamingCitation[];
+  citations: ChatCitation[];
+  richAnswers: ResearchArtifact[];
   runId: string | null;
   usage: {
     input_tokens: number;
@@ -44,19 +57,74 @@ export interface ChatState {
   quota: QuotaStatus | null;
 }
 
-export function useChat({ sessionId }: UseChatOptions) {
-  const [state, setState] = useState<ChatState>({
+function createInitialChatState(): ChatState {
+  return {
+    session: null,
     messages: [],
     status: "idle",
     streamingContent: "",
     error: null,
+    activity: null,
     toolCalls: [],
     citations: [],
+    richAnswers: [],
     runId: null,
     usage: null,
     release: null,
     quota: null,
-  });
+  };
+}
+
+function mergeRichAnswers(
+  current: ResearchArtifact[],
+  incoming: ResearchArtifact[],
+): ResearchArtifact[] {
+  if (incoming.length === 0) return current;
+  const byId = new Map(current.map((artifact) => [artifact.id, artifact]));
+  for (const artifact of incoming) {
+    byId.set(artifact.id, artifact);
+  }
+  return Array.from(byId.values());
+}
+
+function activityForTool(toolName: MCPToolName): ResearchActivityUpdate {
+  if (
+    toolName === "krw_ontology_catalog" ||
+    toolName === "krw_ontology_topic_map" ||
+    toolName === "krw_ontology_plan_query"
+  ) {
+    return {
+      stage: "connecting",
+      label: "자료 연결 확인 중",
+    };
+  }
+
+  if (
+    toolName === "krw_ontology_trace" ||
+    toolName === "krw_ontology_chain" ||
+    toolName === "krw_ontology_quality" ||
+    toolName === "krw_ontology_compare"
+  ) {
+    return {
+      stage: "checking_evidence",
+      label: "핵심 근거 정리 중",
+    };
+  }
+
+  return {
+    stage: "researching",
+    label: "관련 근거 확인 중",
+  };
+}
+
+export function useChat({
+  sessionId,
+  scopeType = "global",
+  defaultTickers = [],
+  defaultDocumentTypes = [],
+  onSessionCreated,
+}: UseChatOptions) {
+  const [state, setState] = useState<ChatState>(() => createInitialChatState());
 
   const abortRef = useRef<AbortController | null>(null);
   const statusRef = useRef<ChatState["status"]>("idle");
@@ -65,13 +133,66 @@ export function useChat({ sessionId }: UseChatOptions) {
   const lastEventIdRef = useRef<string>("");
   const retryCountRef = useRef(0);
   const activeRunIdRef = useRef<string | null>(null);
+  const activeAssistantMessageIdRef = useRef<string | null>(null);
+  const activeSessionIdRef = useRef<string | null>(sessionId || null);
 
   useEffect(() => {
     statusRef.current = state.status;
   }, [state.status]);
 
+  useEffect(() => {
+    if (sessionId) {
+      activeSessionIdRef.current = sessionId;
+      return;
+    }
+
+    activeSessionIdRef.current = null;
+    activeRunIdRef.current = null;
+    activeAssistantMessageIdRef.current = null;
+    finalizedRef.current = false;
+    streamingContentRef.current = "";
+    lastEventIdRef.current = "";
+    retryCountRef.current = 0;
+    setState(createInitialChatState());
+  }, [sessionId]);
+
   const handleSSEEvent = useCallback((eventType: StreamingEventType, data: unknown) => {
     switch (eventType) {
+      case "run_started": {
+        const d = data as {
+          run_id: string;
+          message_id: string;
+          session_id?: string;
+        };
+        if (!sessionId && d.session_id) {
+          activeSessionIdRef.current = d.session_id;
+          onSessionCreated?.(d.session_id);
+        }
+        activeRunIdRef.current = d.run_id;
+        activeAssistantMessageIdRef.current = d.message_id;
+        setState((prev) => ({
+          ...prev,
+          messages: prev.messages.map((message) => ({
+            ...message,
+            session_id: d.session_id ?? message.session_id,
+          })),
+          runId: d.run_id,
+          activity: {
+            stage: "preparing",
+            label: "분석 준비 중",
+          },
+          status: "running",
+        }));
+        break;
+      }
+      case "activity_update": {
+        const d = data as ResearchActivityUpdate;
+        setState((prev) => ({
+          ...prev,
+          activity: d,
+        }));
+        break;
+      }
       case "token": {
         const d = data as { text: string };
         if (d.text) {
@@ -87,6 +208,7 @@ export function useChat({ sessionId }: UseChatOptions) {
         const d = data as StreamingToolCallStart;
         setState((prev) => ({
           ...prev,
+          activity: activityForTool(d.tool_name),
           toolCalls: [
             ...prev.toolCalls,
             {
@@ -135,6 +257,8 @@ export function useChat({ sessionId }: UseChatOptions) {
             latency_ms: number;
           };
           quota: QuotaStatus;
+          rich_answers?: ResearchArtifact[];
+          artifacts?: ResearchArtifact[];
         };
         finalizedRef.current = true;
         activeRunIdRef.current = d.run_id;
@@ -145,9 +269,11 @@ export function useChat({ sessionId }: UseChatOptions) {
                 ...prev.messages,
                 {
                   id: d.message_id || crypto.randomUUID(),
-                  session_id: sessionId,
+                  session_id:
+                    activeSessionIdRef.current || sessionId,
                   role: "assistant" as const,
                   content: finalContent,
+                  status: "completed" as const,
                   created_at: new Date().toISOString(),
                 },
               ]
@@ -156,10 +282,15 @@ export function useChat({ sessionId }: UseChatOptions) {
             ...prev,
             messages: newMessages,
             streamingContent: "",
+            activity: null,
             runId: d.run_id,
             release: d.release,
             usage: d.usage,
             quota: d.quota,
+            richAnswers: mergeRichAnswers(
+              prev.richAnswers,
+              d.rich_answers ?? d.artifacts ?? [],
+            ),
             status: "completed",
           };
         });
@@ -177,9 +308,10 @@ export function useChat({ sessionId }: UseChatOptions) {
           const partialMessage: Message | null = trimmed
             ? {
                 id: crypto.randomUUID(),
-                session_id: prev.messages[0]?.session_id ?? "",
+                session_id: activeSessionIdRef.current || sessionId,
                 role: "assistant",
                 content: trimmed,
+                status: "failed",
                 created_at: new Date().toISOString(),
               }
             : null;
@@ -188,6 +320,7 @@ export function useChat({ sessionId }: UseChatOptions) {
             status: "failed",
             error: d.error_message,
             streamingContent: "",
+            activity: null,
             messages: partialMessage
               ? [...prev.messages, partialMessage]
               : prev.messages,
@@ -200,21 +333,76 @@ export function useChat({ sessionId }: UseChatOptions) {
         setState((prev) => ({
           ...prev,
           status: "cancelled",
+          activity: null,
         }));
         break;
       }
     }
-  }, [sessionId]);
+  }, [onSessionCreated, sessionId]);
+
+  const readStream = useCallback(
+    async (response: Response): Promise<boolean> => {
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("응답 스트림을 열지 못했습니다.");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        let boundary: number;
+        while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+          const eventBlock = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+
+          let eventType: StreamingEventType | null = null;
+          const dataLines: string[] = [];
+          let eventId: string | null = null;
+
+          for (const line of eventBlock.split("\n")) {
+            if (line.startsWith("event: ")) {
+              eventType = line.slice(7).trim() as StreamingEventType;
+            } else if (line.startsWith("data: ")) {
+              dataLines.push(line.slice(6));
+            } else if (line.startsWith("data:")) {
+              dataLines.push(line.slice(5));
+            } else if (line.startsWith("id: ")) {
+              eventId = line.slice(4).trim();
+            }
+          }
+
+          if (eventId) {
+            lastEventIdRef.current = eventId;
+          }
+
+          if (eventType && dataLines.length > 0) {
+            try {
+              const data = JSON.parse(dataLines.join("\n"));
+              handleSSEEvent(eventType, data);
+            } catch {
+              // Ignore parse errors for incomplete data
+            }
+          }
+        }
+      }
+
+      return finalizedRef.current;
+    },
+    [handleSSEEvent],
+  );
 
   const sendMessage = useCallback(
     async (content: string) => {
-      if (!sessionId) return;
       if (!content.trim() || statusRef.current === "running") return;
       const contentLimit = getChatContentLimit(content);
       if (content.length > contentLimit) {
         setState((prev) => ({
           ...prev,
-          error: `Message too long (max ${contentLimit.toLocaleString()} chars)`,
+          error: `메시지가 너무 깁니다. 최대 ${contentLimit.toLocaleString()}자까지 입력할 수 있습니다.`,
         }));
         return;
       }
@@ -228,9 +416,10 @@ export function useChat({ sessionId }: UseChatOptions) {
 
       const userMessage: Message = {
         id: crypto.randomUUID(),
-        session_id: sessionId,
+        session_id: sessionId || "pending",
         role: "user",
         content: content.trim(),
+        status: "completed",
         created_at: new Date().toISOString(),
       };
 
@@ -240,8 +429,13 @@ export function useChat({ sessionId }: UseChatOptions) {
         status: "running",
         streamingContent: "",
         error: null,
+        activity: {
+          stage: "preparing",
+          label: "분석 준비 중",
+        },
         toolCalls: [],
         citations: [],
+        richAnswers: [],
         usage: null,
         release: null,
         quota: null,
@@ -253,58 +447,6 @@ export function useChat({ sessionId }: UseChatOptions) {
       const MAX_RETRIES = 3;
       const RETRY_BASE_DELAY_MS = 1000;
 
-      async function readStream(response: Response): Promise<boolean> {
-        const reader = response.body?.getReader();
-        if (!reader) throw new Error("No response body");
-
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-
-          let boundary: number;
-          while ((boundary = buffer.indexOf("\n\n")) !== -1) {
-            const eventBlock = buffer.slice(0, boundary);
-            buffer = buffer.slice(boundary + 2);
-
-            let eventType: StreamingEventType | null = null;
-            const dataLines: string[] = [];
-            let eventId: string | null = null;
-
-            for (const line of eventBlock.split("\n")) {
-              if (line.startsWith("event: ")) {
-                eventType = line.slice(7).trim() as StreamingEventType;
-              } else if (line.startsWith("data: ")) {
-                dataLines.push(line.slice(6));
-              } else if (line.startsWith("data:")) {
-                dataLines.push(line.slice(5));
-              } else if (line.startsWith("id: ")) {
-                eventId = line.slice(4).trim();
-              }
-            }
-
-            if (eventId) {
-              lastEventIdRef.current = eventId;
-            }
-
-            if (eventType && dataLines.length > 0) {
-              try {
-                const data = JSON.parse(dataLines.join("\n"));
-                handleSSEEvent(eventType, data);
-              } catch {
-                // Ignore parse errors for incomplete data
-              }
-            }
-          }
-        }
-
-        return finalizedRef.current;
-      }
-
       try {
         const response = await fetch("/api/chat/run", {
           method: "POST",
@@ -313,9 +455,12 @@ export function useChat({ sessionId }: UseChatOptions) {
             Accept: "text/event-stream",
           },
           body: JSON.stringify({
-            session_id: sessionId,
+            ...(sessionId ? { session_id: sessionId } : {}),
             content: content.trim(),
             request_id: requestId,
+            scope_type: scopeType,
+            default_tickers: defaultTickers,
+            default_document_types: defaultDocumentTypes,
           }),
           signal: abortController.signal,
         });
@@ -323,7 +468,7 @@ export function useChat({ sessionId }: UseChatOptions) {
         if (!response.ok) {
           const errorData = await response.json().catch(() => null);
           throw new Error(
-            errorData?.error?.message || `Request failed: ${response.status}`,
+            errorData?.error?.message || `요청에 실패했습니다: ${response.status}`,
           );
         }
 
@@ -339,12 +484,14 @@ export function useChat({ sessionId }: UseChatOptions) {
             await new Promise((r) => setTimeout(r, delay));
 
             if (finalizedRef.current || abortController.signal.aborted) break;
+            if (!activeRunIdRef.current) break;
 
             try {
               const reconnectParams = new URLSearchParams({
-                session_id: sessionId,
+                session_id: activeSessionIdRef.current || sessionId,
                 run_id: activeRunIdRef.current ?? "",
                 last_event_id: lastEventIdRef.current,
+                content_length: String(streamingContentRef.current.length),
               });
               const retryResp = await fetch(
                 `/api/chat/run/reconnect?${reconnectParams}`,
@@ -371,9 +518,10 @@ export function useChat({ sessionId }: UseChatOptions) {
               const partialMessage: Message | null = trimmed
                 ? {
                     id: crypto.randomUUID(),
-                    session_id: sessionId,
+                    session_id: activeSessionIdRef.current || sessionId,
                     role: "assistant",
                     content: trimmed,
+                    status: "completed",
                     created_at: new Date().toISOString(),
                   }
                 : null;
@@ -383,6 +531,7 @@ export function useChat({ sessionId }: UseChatOptions) {
                   ? [...prev.messages, partialMessage]
                   : prev.messages,
                 streamingContent: "",
+                activity: null,
                 status: "completed",
               };
             });
@@ -399,6 +548,7 @@ export function useChat({ sessionId }: UseChatOptions) {
               return {
                 ...prev,
                 streamingContent: "",
+                activity: null,
                 status: "completed",
               };
             }
@@ -408,32 +558,41 @@ export function useChat({ sessionId }: UseChatOptions) {
                 ...prev.messages,
                 {
                   id: crypto.randomUUID(),
-                  session_id: sessionId,
+                  session_id: activeSessionIdRef.current || sessionId,
                   role: "assistant",
                   content: c,
+                  status: "completed",
                   created_at: new Date().toISOString(),
                 },
               ],
               streamingContent: "",
+              activity: null,
               status: "completed",
             };
           });
         }
       } catch (err) {
         if ((err as Error).name === "AbortError") {
-          setState((prev) => ({ ...prev, status: "cancelled" }));
+          setState((prev) => ({ ...prev, status: "cancelled", activity: null }));
         } else {
           setState((prev) => ({
             ...prev,
             status: "failed",
             error: (err as Error).message,
+            activity: null,
           }));
         }
       } finally {
         abortRef.current = null;
       }
     },
-    [handleSSEEvent, sessionId],
+    [
+      defaultDocumentTypes,
+      defaultTickers,
+      readStream,
+      scopeType,
+      sessionId,
+    ],
   );
 
   const cancelRun = useCallback(async () => {
@@ -453,12 +612,29 @@ export function useChat({ sessionId }: UseChatOptions) {
       const res = await fetch(`/api/chat/${sessionId}`);
       if (!res.ok) return;
       const data: GetChatSessionResponse = await res.json();
+      const loaded = deriveLoadedChatState(data.messages || [], data.runs || []);
+      finalizedRef.current = loaded.status !== "running";
+      activeRunIdRef.current = loaded.activeRunId;
+      activeAssistantMessageIdRef.current = loaded.activeAssistantMessageId;
+      streamingContentRef.current = loaded.streamingContent;
       setState((prev) => ({
         ...prev,
-        messages: data.messages || [],
+        session: data.session,
+        messages: loaded.messages,
+        status: loaded.status,
+        activity:
+          loaded.status === "running"
+            ? {
+                stage: "preparing",
+                label: "분석 상태 복원 중",
+              }
+            : null,
+        streamingContent: loaded.streamingContent,
+        runId: loaded.activeRunId,
+        citations: (data.citations ?? []) as ChatCitation[],
+        richAnswers: data.rich_answers ?? data.research_artifacts ?? [],
         ...(data.runs && data.runs.length > 0
           ? {
-              runId: data.runs[data.runs.length - 1].id,
               usage:
                 data.runs[data.runs.length - 1].input_tokens != null
                   ? {
@@ -466,7 +642,8 @@ export function useChat({ sessionId }: UseChatOptions) {
                         data.runs[data.runs.length - 1].input_tokens ?? 0,
                       output_tokens:
                         data.runs[data.runs.length - 1].output_tokens ?? 0,
-                      estimated_cost_usd: 0,
+                      estimated_cost_usd:
+                        data.runs[data.runs.length - 1].estimated_cost_usd ?? 0,
                       latency_ms:
                         data.runs[data.runs.length - 1].latency_ms ?? 0,
                     }
@@ -475,9 +652,58 @@ export function useChat({ sessionId }: UseChatOptions) {
           : {}),
       }));
     } catch {
-      setState((prev) => ({ ...prev, error: "Failed to load session" }));
+      setState((prev) => ({ ...prev, error: "채팅을 불러오지 못했습니다." }));
     }
   }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    if (state.status !== "running" || !state.runId) return;
+    if (abortRef.current) return;
+
+    const abortController = new AbortController();
+    abortRef.current = abortController;
+    finalizedRef.current = false;
+    activeRunIdRef.current = state.runId;
+
+    const reconnect = async () => {
+      try {
+        const reconnectParams = new URLSearchParams({
+          session_id: sessionId,
+          run_id: state.runId ?? "",
+          last_event_id: lastEventIdRef.current,
+          content_length: String(streamingContentRef.current.length),
+        });
+        const response = await fetch(
+          `/api/chat/run/reconnect?${reconnectParams}`,
+          { signal: abortController.signal },
+        );
+        if (response.ok) {
+          await readStream(response);
+        }
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          setState((prev) => ({
+            ...prev,
+            error: "실행 중인 응답을 다시 연결하지 못했습니다.",
+          }));
+        }
+      } finally {
+        if (abortRef.current === abortController) {
+          abortRef.current = null;
+        }
+      }
+    };
+
+    reconnect();
+
+    return () => {
+      abortController.abort();
+      if (abortRef.current === abortController) {
+        abortRef.current = null;
+      }
+    };
+  }, [readStream, sessionId, state.runId, state.status]);
 
   return useMemo(
     () => ({

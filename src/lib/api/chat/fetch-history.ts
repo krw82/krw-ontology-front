@@ -44,7 +44,7 @@ export async function fetchHistory(
   if (msgError || !userMessage) {
     return {
       ok: false,
-      response: errorResponse(500, "internal_error", "Failed to save message", requestId),
+      response: errorResponse(500, "internal_error", "메시지를 저장하지 못했습니다.", requestId),
     };
   }
 

@@ -37,16 +37,28 @@ export async function validateRequest(
     return { ok: false, response: errorResponse(400, "validation_error", "Invalid JSON body") };
   }
 
-  const { session_id, content, request_id } = body;
+  const { content, request_id } = body;
 
-  if (!session_id || !content || !request_id) {
+  if (!content || !request_id) {
     return {
       ok: false,
       response: errorResponse(
         400,
         "validation_error",
-        "Missing required fields: session_id, content, request_id",
+        "Missing required fields: content, request_id",
         request_id
+      ),
+    };
+  }
+
+  if (!body.session_id && body.scope_type === "company" && !body.default_tickers?.length) {
+    return {
+      ok: false,
+      response: errorResponse(
+        400,
+        "validation_error",
+        "default_tickers required for company scope",
+        request_id,
       ),
     };
   }

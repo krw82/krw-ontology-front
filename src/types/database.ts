@@ -26,6 +26,7 @@ export interface MessageRow extends Record<string, unknown> {
   content: string;
   status: "pending" | "streaming" | "completed" | "failed";
   created_at: string;
+  updated_at: string;
 }
 
 export interface AgentRunRow extends Record<string, unknown> {
@@ -38,7 +39,7 @@ export interface AgentRunRow extends Record<string, unknown> {
   model: string;
   status: "pending" | "running" | "completed" | "failed" | "cancelled";
   lease_expires_at: string | null;
-  started_at: string;
+  started_at: string | null;
   finished_at: string | null;
   latency_ms: number | null;
   input_tokens: number | null;
@@ -58,9 +59,12 @@ export interface AgentRunRow extends Record<string, unknown> {
 export interface ToolCallRow extends Record<string, unknown> {
   id: string;
   run_id: string;
+  tool_use_id: string | null;
   tool_name: string;
-  arguments_json: string;
+  arguments_json: Json;
   result_summary: string | null;
+  result_json: Json | null;
+  result_text: string | null;
   started_at: string;
   finished_at: string | null;
   error_message: string | null;
@@ -97,6 +101,35 @@ export interface ConcurrencyLeaseRow extends Record<string, unknown> {
   released_at: string | null;
 }
 
+export interface ResearchArtifactRow extends Record<string, unknown> {
+  id: string;
+  session_id: string;
+  run_id: string;
+  message_id: string;
+  artifact_version: "krw-artifact/v1";
+  artifact_type:
+    | "company_overview"
+    | "financial_snapshot"
+    | "scenario_impact"
+    | "market_report_impact"
+    | "risk_review"
+    | "filing_timeline"
+    | "comparison"
+    | "evidence_path";
+  title: string;
+  summary: string;
+  tickers: string[] | null;
+  source_scope: Json | null;
+  answer_alignment: Json | null;
+  artifact_json: Json | null;
+  blocks_json: Json;
+  evidence_refs: Json | null;
+  quality_json: Json | null;
+  source_json: Json | null;
+  html_snapshot: string | null;
+  created_at: string;
+}
+
 // Supabase Database type for createClient generic
 export interface Database {
   public: {
@@ -119,11 +152,12 @@ export interface Database {
       };
       messages: {
         Row: MessageRow;
-        Insert: Omit<MessageRow, "id" | "created_at"> & {
+        Insert: Omit<MessageRow, "id" | "created_at" | "updated_at"> & {
           id?: string;
           created_at?: string;
+          updated_at?: string;
         };
-        Update: Partial<Omit<MessageRow, "id" | "created_at">>;
+        Update: Partial<Omit<MessageRow, "id" | "created_at" | "updated_at">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];
@@ -214,6 +248,21 @@ export interface Database {
           acquired_at?: string;
         };
         Update: Partial<Omit<ConcurrencyLeaseRow, "id">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      research_artifacts: {
+        Row: ResearchArtifactRow;
+        Insert: Omit<ResearchArtifactRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<ResearchArtifactRow, "id" | "created_at">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];

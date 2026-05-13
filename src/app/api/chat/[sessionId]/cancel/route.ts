@@ -35,11 +35,11 @@ export async function POST(
     .single<ChatSessionRow>();
 
   if (!session) {
-    return notFoundError("Session not found");
+    return notFoundError("채팅을 찾지 못했습니다.");
   }
 
   if (session.user_id !== user.id) {
-    return forbiddenError("Session does not belong to user");
+    return forbiddenError("이 채팅에 접근할 권한이 없습니다.");
   }
 
   // Find active run
@@ -52,7 +52,7 @@ export async function POST(
 
   if (!activeRuns || activeRuns.length === 0) {
     return Response.json(
-      { error: { code: "no_active_run", message: "No active run to cancel" } },
+      { error: { code: "no_active_run", message: "중지할 실행 중 응답이 없습니다." } },
       { status: 404 }
     );
   }

@@ -41,12 +41,12 @@ export async function resolveSession(
   if (sessionError || !session) {
     return {
       ok: false,
-      response: errorResponse(404, "not_found", "Session not found", requestId),
+      response: errorResponse(404, "not_found", "채팅을 찾지 못했습니다.", requestId),
     };
   }
 
   if (session.user_id !== userId) {
-    return { ok: false, response: forbiddenError("Session does not belong to user", requestId) };
+    return { ok: false, response: forbiddenError("이 채팅에 접근할 권한이 없습니다.", requestId) };
   }
 
   return {

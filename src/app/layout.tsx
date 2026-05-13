@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import { Suspense } from "react";
+import AppShell from "@/components/AppShell";
 import "./globals.css";
 
 const inter = Inter({
@@ -17,7 +19,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "KRW Ontology",
   description:
-    "Institutional-grade research and data analysis powered by KRW Ontology.",
+    "KRW Ontology가 제공하는 근거 기반 기업 리서치와 데이터 분석.",
 };
 
 export default function RootLayout({
@@ -27,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="ko"
       className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-canvas text-on-surface">
@@ -38,7 +40,9 @@ export default function RootLayout({
         >
           메인 콘텐츠로 이동
         </a>
-        {children}
+        <Suspense fallback={children}>
+          <AppShell>{children}</AppShell>
+        </Suspense>
       </body>
     </html>
   );

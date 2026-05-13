@@ -1,55 +1,36 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      if (mode === "signin") {
-        const { error: authError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (authError) throw authError;
-      } else {
-        const { error: authError } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-        if (authError) throw authError;
-      }
-      router.push("/companies");
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Unknown error";
-      const map: Record<string, string> = {
-        "Invalid login credentials": "이메일 또는 비밀번호가 올바르지 않습니다",
-        "User already registered": "이미 가입된 이메일입니다",
-        "Email not confirmed": "이메일 인증이 필요합니다",
-      };
-      setError(map[message] ?? "로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요");
-    } finally {
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=/companies`,
+        },
+      });
+      if (authError) throw authError;
+    } catch {
+      setError("Google 로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
       setLoading(false);
+    } finally {
+      // A successful OAuth start redirects the browser away from this page.
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-surface-dark relative overflow-hidden">
+    <div className="relative flex min-h-[100dvh] flex-col overflow-x-hidden bg-surface-dark">
       {/* Geometric network background */}
       <div className="absolute inset-0 opacity-20">
         <svg
@@ -147,128 +128,73 @@ export default function LoginPage() {
       </div>
 
       {/* Top Nav on Dark */}
-      <header className="bg-surface-dark w-full sticky top-0 h-[64px] border-b border-white/10 flex-shrink-0 z-50">
-        <div className="flex justify-between items-center w-full max-w-[1600px] mx-auto px-md h-full">
-          <div className="flex items-center gap-lg">
+      <header className="sticky top-0 z-50 h-[64px] w-full flex-shrink-0 border-b border-white/10 bg-surface-dark">
+        <div className="mx-auto flex h-full w-full max-w-[1600px] items-center justify-between gap-base px-base sm:px-md">
+          <div className="flex min-w-0 items-center gap-lg">
             <Link
               href="/"
-              className="text-[18px] leading-[1.33] font-semibold text-on-dark tracking-tight"
+              className="truncate text-[18px] font-semibold leading-[1.33] tracking-tight text-on-dark"
             >
               KRW Ontology
             </Link>
           </div>
-          <div className="flex items-center gap-md">
+          <div className="flex shrink-0 items-center gap-md">
             <Link
               href="/"
-              className="text-[14px] leading-[1.4] font-medium text-on-dark-soft hover:text-on-dark transition-colors"
+              className="hidden text-[14px] font-medium leading-[1.4] text-on-dark-soft transition-colors hover:text-on-dark sm:inline"
             >
-              Documentation
+              홈
             </Link>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex items-center justify-center relative z-10 px-md">
-        <div className="w-full max-w-[440px]">
+      <main className="relative z-10 flex flex-1 items-center justify-center px-base py-xl sm:px-md">
+        <div className="w-full max-w-[440px] min-w-0">
           {/* Auth Card */}
-          <div className="bg-surface-dark-elevated rounded-[24px] p-xl border border-white/10">
-            <div className="text-center mb-xl">
-              <h1 className="text-[36px] leading-[1.11] tracking-[-0.5px] font-normal text-on-dark mb-sm">
-                {mode === "signin" ? "Sign In" : "Create Account"}
+          <div className="rounded-xl border border-white/10 bg-surface-dark-elevated p-lg sm:rounded-[24px] sm:p-xl">
+            <div className="mb-lg text-center sm:mb-xl">
+              <h1 className="mb-sm text-[32px] font-normal leading-[1.12] tracking-normal text-on-dark sm:text-[36px]">
+                로그인
               </h1>
-              <p className="text-[16px] leading-[1.5] font-normal text-on-dark-soft">
-                {mode === "signin"
-                  ? "Access institutional-grade ontology research."
-                  : "Join KRW Ontology for research and data analysis."}
+              <p className="text-[16px] font-normal leading-[1.5] text-on-dark-soft">
+                Google 계정으로 로그인하고 온톨로지 리서치를 시작하세요.
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-md">
-              <div>
-                <label
-                  htmlFor="email"
-                  className="block text-[14px] leading-[1.4] font-medium text-on-dark-soft mb-xs"
-                >
-                  Email
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-surface-dark border border-white/10 rounded-[12px] h-[48px] px-base text-[16px] leading-[1.5] font-normal text-on-dark placeholder:text-on-dark-soft focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
-                  placeholder="you@company.com"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="password"
-                  className="block text-[14px] leading-[1.4] font-medium text-on-dark-soft mb-xs"
-                >
-                  Password
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-surface-dark border border-white/10 rounded-[12px] h-[48px] px-base text-[16px] leading-[1.5] font-normal text-on-dark placeholder:text-on-dark-soft focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-colors"
-                  placeholder="Enter your password"
-                  minLength={6}
-                  maxLength={128}
-                />
-              </div>
-
+            <div className="space-y-md">
               {error && (
-                <div className="text-[14px] leading-[1.5] font-normal text-semantic-down bg-semantic-down/10 border border-semantic-down/20 rounded-[12px] p-sm">
+                <div className="rounded-[12px] border border-semantic-down/20 bg-semantic-down/10 p-sm text-[14px] font-normal leading-[1.5] text-semantic-down">
                   {error}
                 </div>
               )}
 
               <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-primary-container text-on-primary text-[16px] leading-[1.15] font-semibold h-[44px] rounded-full hover:bg-primary-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading
-                  ? "Loading..."
-                  : mode === "signin"
-                    ? "Sign In"
-                    : "Create Account"}
-              </button>
-            </form>
-
-            <div className="mt-lg text-center">
-              <button
-                onClick={() => {
-                  setMode(mode === "signin" ? "signup" : "signin");
-                  setError(null);
-                }}
-                className="text-[16px] leading-[1.15] font-semibold text-primary hover:text-primary-fixed transition-colors"
                 type="button"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+                className="flex h-[48px] w-full items-center justify-center gap-sm rounded-full bg-white px-base text-[16px] font-semibold leading-[1.15] text-surface-dark transition-colors hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {mode === "signin"
-                  ? "Don't have an account? Sign Up"
-                  : "Already have an account? Sign In"}
+                <span className="flex h-6 w-6 items-center justify-center rounded-full border border-black/10 text-[15px] font-bold text-[#4285f4]">
+                  G
+                </span>
+                {loading ? "이동 중..." : "Google로 계속하기"}
               </button>
             </div>
           </div>
 
           {/* Subtitle */}
-          <p className="text-center mt-lg text-[14px] leading-[1.5] font-normal text-on-dark-soft">
-            Institutional-grade research powered by KRW Ontology.
+          <p className="mt-lg text-center text-[14px] font-normal leading-[1.5] text-on-dark-soft">
+            KRW Ontology가 제공하는 근거 기반 기업 리서치.
           </p>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 py-lg text-center border-t border-white/5">
-        <p className="text-[14px] leading-[1.5] font-normal text-on-dark-soft">
-          &copy; 2026 KRW Ontology. All rights reserved.
+      <footer className="relative z-10 border-t border-white/5 px-base py-lg text-center">
+        <p className="text-[14px] font-normal leading-[1.5] text-on-dark-soft">
+          &copy; 2026 KRW Ontology. 모든 권리 보유.
         </p>
       </footer>
     </div>

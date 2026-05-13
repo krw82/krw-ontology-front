@@ -1,6 +1,9 @@
 import { NextRequest } from "next/server";
 import { checkMcpHealth } from "@/lib/agent/mcp-client";
 import type { McpHealthResult } from "@/lib/agent/mcp-client";
+import { getIndexedCompany } from "@/lib/ontology/catalog";
+import { createClient } from "@/lib/supabase/server";
+import type { ChatSessionRow } from "@/types/database";
 import {
   validateRequest,
   resolveSession,
@@ -43,10 +46,17 @@ export async function POST(request: NextRequest) {
   if (!validation.ok) return validation.response;
   const { body, userId } = validation.data;
 
-  const { session_id, content, request_id } = body;
+  const { content, request_id } = body;
 
   // 2. Resolve session (lookup + ownership check)
-  const sessionResult = await resolveSession(session_id, userId, request_id);
+  const sessionIdResult = await getOrCreateSessionId(body, userId, request_id);
+  if (!sessionIdResult.ok) return sessionIdResult.response;
+
+  const sessionResult = await resolveSession(
+    sessionIdResult.sessionId,
+    userId,
+    request_id,
+  );
   if (!sessionResult.ok) return sessionResult.response;
   const session = sessionResult.session;
 
@@ -58,11 +68,11 @@ export async function POST(request: NextRequest) {
   // 4. Check MCP health (cached for 30s)
   const mcpHealth = await getCachedMcpHealth();
   if (!mcpHealth.connected) {
-    return errorResponse(503, "mcp_unavailable", "MCP service unavailable", request_id);
+    return errorResponse(503, "mcp_unavailable", "온톨로지 도구에 연결할 수 없습니다.", request_id);
   }
 
   // 5. Save user message & fetch history
-  const historyResult = await fetchHistory(session_id, content, request_id);
+  const historyResult = await fetchHistory(session.id, content, request_id);
   if (!historyResult.ok) return historyResult.response;
 
   // 6. Acquire lease, run agent, stream results
@@ -75,4 +85,71 @@ export async function POST(request: NextRequest) {
     quota,
     mcpHealth,
   });
+}
+
+async function getOrCreateSessionId(
+  body: import("@/types/api-contracts").ChatRunRequest,
+  userId: string,
+  requestId: string,
+): Promise<{ ok: true; sessionId: string } | { ok: false; response: Response }> {
+  if (body.session_id) {
+    return { ok: true, sessionId: body.session_id };
+  }
+
+  const scopeType = body.scope_type ?? "global";
+  let defaultTickers = body.default_tickers ?? [];
+
+  if (scopeType === "company") {
+    defaultTickers = defaultTickers.map((ticker) => ticker.trim().toUpperCase());
+    const indexedCompanies = await Promise.all(
+      defaultTickers.map((ticker) => getIndexedCompany(ticker)),
+    );
+    const missingTicker = defaultTickers.find(
+      (_, index) => !indexedCompanies[index],
+    );
+
+    if (missingTicker) {
+      return {
+        ok: false,
+        response: errorResponse(
+          400,
+          "validation_error",
+          `현재 온톨로지 인덱스에 없는 회사입니다: ${missingTicker}`,
+          requestId,
+        ),
+      };
+    }
+  }
+
+  const title =
+    scopeType === "company" && defaultTickers.length > 0
+      ? `리서치: ${defaultTickers.join(", ")}`
+      : "새 채팅";
+
+  const supabase = await createClient();
+  const { data: session, error } = await supabase
+    .from("chat_sessions")
+    .insert({
+      user_id: userId,
+      title,
+      scope_type: scopeType,
+      default_tickers: defaultTickers,
+      default_document_types: body.default_document_types ?? [],
+    })
+    .select("id")
+    .single<ChatSessionRow>();
+
+  if (error || !session) {
+    return {
+      ok: false,
+      response: errorResponse(
+        500,
+        "internal_error",
+        "새 채팅을 만들지 못했습니다.",
+        requestId,
+      ),
+    };
+  }
+
+  return { ok: true, sessionId: session.id };
 }
