@@ -1,0 +1,57 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const migrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260514045332_harden_chat_rls.sql",
+);
+const leaseReadMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260514045627_lock_concurrency_lease_reads.sql",
+);
+
+describe("harden chat RLS migration", () => {
+  const migration = readFileSync(migrationPath, "utf8");
+  const leaseReadMigration = readFileSync(leaseReadMigrationPath, "utf8");
+
+  it("revokes direct client writes from server-owned chat tables", () => {
+    expect(migration).toContain("REVOKE INSERT, UPDATE, DELETE ON TABLE");
+    for (const table of [
+      "messages",
+      "agent_runs",
+      "tool_calls",
+      "citations",
+      "research_artifacts",
+      "usage_daily",
+      "concurrency_leases",
+    ]) {
+      expect(migration).toContain(table);
+    }
+    expect(migration).toContain("FROM anon, authenticated");
+  });
+
+  it("drops write policies that let clients forge lifecycle rows", () => {
+    for (const policy of [
+      "messages_insert_own",
+      "messages_update_own",
+      "runs_insert_own",
+      "runs_update_own",
+      "tool_calls_insert_own",
+      "tool_calls_update_own",
+      "citations_insert_own",
+      "citations_update_own",
+      "research_artifacts_insert_own",
+      "research_artifacts_update_own",
+    ]) {
+      expect(migration).toContain(`DROP POLICY IF EXISTS "${policy}"`);
+    }
+  });
+
+  it("removes all direct authenticated access to concurrency leases", () => {
+    expect(leaseReadMigration).toContain(
+      "REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLE concurrency_leases",
+    );
+    expect(leaseReadMigration).toContain("FROM anon, authenticated, PUBLIC");
+  });
+});

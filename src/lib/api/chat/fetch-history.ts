@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { MAX_PROMPT_HISTORY_MESSAGES } from "@/lib/agent/system-prompt";
 import type { ErrorCode } from "@/types/api-contracts";
 
 export interface HistoryResult {
@@ -55,11 +56,14 @@ export async function fetchHistory(
     .eq("session_id", sessionId)
     .eq("status", "completed")
     .neq("id", userMessage.id)
-    .order("created_at", { ascending: true })
+    .in("role", ["user", "assistant"])
+    .order("created_at", { ascending: false })
+    .limit(MAX_PROMPT_HISTORY_MESSAGES)
     .returns<Array<{ role: string; content: string }>>();
 
-  const history: Array<{ role: string; content: string }> = (previousMessages ?? [])
-    .filter((m) => m.role === "user" || m.role === "assistant");
+  const history: Array<{ role: string; content: string }> = [
+    ...(previousMessages ?? []),
+  ].reverse();
 
   return {
     ok: true,

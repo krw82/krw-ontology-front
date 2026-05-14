@@ -458,7 +458,7 @@ async function handleCompletedRun(params: CompletedRunParams) {
     structuredAnswer: structuredOutput,
     researchSynthesis,
     displayPlan,
-    fallbackWhenMissing: !structuredOutput,
+    fallbackWhenMissing: Boolean(researchSynthesis) && !structuredOutput,
   });
 
   const visibleAnswer = deriveVisibleAnswer(

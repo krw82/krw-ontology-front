@@ -13,9 +13,15 @@ export interface PromptContext {
   companies?: CompanyPromptContext[];
 }
 
+export const MAX_PROMPT_HISTORY_MESSAGES = 12;
+export const MAX_PROMPT_HISTORY_MESSAGE_CHARS = 8_000;
+export const MAX_PROMPT_HISTORY_CONTEXT_CHARS = 48_000;
+
+type PromptHistoryMessage = { role: string; content: string };
+
 export function buildSystemPrompt(
   context?: PromptContext,
-  history: Array<{ role: string; content: string }> = [],
+  history: PromptHistoryMessage[] = [],
 ): string {
   const contextBlock = context ? `\n\n${buildRuntimeContext(context, history)}` : "";
 
@@ -29,7 +35,7 @@ Use the runtime context only as scope and history for that active pass.${context
 
 function buildRuntimeContext(
   context: PromptContext,
-  history: Array<{ role: string; content: string }>,
+  history: PromptHistoryMessage[],
 ): string {
   const scopeContext =
     context.scopeType === "company" && context.defaultTickers.length > 0
@@ -58,11 +64,9 @@ ${companyCatalogContext}${historyContext}
 }
 
 function buildHistoryContext(
-  history: Array<{ role: string; content: string }>,
+  history: PromptHistoryMessage[],
 ): string {
-  const compactHistory = history
-    .filter((message) => message.role === "user" || message.role === "assistant")
-    .slice(-12);
+  const compactHistory = sanitizePromptHistory(history);
 
   if (compactHistory.length === 0) return "";
 
@@ -74,4 +78,45 @@ function buildHistoryContext(
     .join("\n\n");
 
   return `\n\nPrevious web chat context:\n${transcript}`;
+}
+
+export function sanitizePromptHistory(
+  history: PromptHistoryMessage[],
+): PromptHistoryMessage[] {
+  const compactHistory = history
+    .filter((message) => message.role === "user" || message.role === "assistant")
+    .slice(-MAX_PROMPT_HISTORY_MESSAGES);
+
+  let remainingChars = MAX_PROMPT_HISTORY_CONTEXT_CHARS;
+  const selected: PromptHistoryMessage[] = [];
+
+  for (let index = compactHistory.length - 1; index >= 0; index--) {
+    const message = compactHistory[index];
+    if (!message || remainingChars <= 0) break;
+
+    const perMessageLimit = Math.min(
+      MAX_PROMPT_HISTORY_MESSAGE_CHARS,
+      remainingChars,
+    );
+    const content = truncatePromptText(message.content, perMessageLimit);
+    if (!content) continue;
+
+    selected.unshift({
+      role: message.role,
+      content,
+    });
+    remainingChars -= content.length;
+  }
+
+  return selected;
+}
+
+function truncatePromptText(value: string, maxChars: number): string {
+  const normalized = value.trim();
+  if (!normalized || maxChars <= 0) return "";
+  if (normalized.length <= maxChars) return normalized;
+
+  const suffix = "\n... [truncated]";
+  if (maxChars <= suffix.length) return normalized.slice(0, maxChars);
+  return `${normalized.slice(0, maxChars - suffix.length).trimEnd()}${suffix}`;
 }

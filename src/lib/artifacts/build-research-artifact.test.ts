@@ -21,6 +21,49 @@ describe("buildResearchArtifacts", () => {
     expect(artifacts).toEqual([]);
   });
 
+  it("does not synthesize fallback rich blocks when fallback is disabled", () => {
+    const artifacts = buildResearchArtifacts({
+      sessionId: "session",
+      runId: "run",
+      messageId: "message",
+      finalText:
+        "Venture Global은 LNG 공급망 전반의 자산을 운영하는 기업입니다.",
+      defaultTickers: ["VG"],
+      citations: [],
+      toolCalls: [
+        {
+          id: "tool-1",
+          toolName: "krw_ontology_query",
+          argumentsJson: JSON.stringify({
+            tickers: ["VG"],
+            object_types: ["GrowthDriver"],
+          }),
+          resultSummary: null,
+          resultJson: {
+            result: JSON.stringify({
+              results: [
+                {
+                  type: "GrowthDriver",
+                  ticker: "VG",
+                  document_type: "10-K",
+                  period: "FY2025",
+                  text: "Evidence-backed claims describe modular_design_cost_advantage themes relevant to capital_expenditures.",
+                },
+              ],
+            }),
+          },
+          resultText: null,
+          startedAt: new Date(0).toISOString(),
+          finishedAt: new Date(0).toISOString(),
+          errorMessage: null,
+        },
+      ],
+      fallbackWhenMissing: false,
+    });
+
+    expect(artifacts).toEqual([]);
+  });
+
   it("uses tickers from MCP tool arguments for fallback artifact titles", () => {
     const [artifact] = buildResearchArtifacts({
       sessionId: "session",

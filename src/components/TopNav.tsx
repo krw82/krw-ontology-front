@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
 
 const navLinks = [
   { href: "/chat", label: "리서치" },
@@ -85,12 +87,73 @@ function KrwLogo() {
   );
 }
 
+interface UserProfile {
+  email: string;
+  name: string | null;
+  avatarUrl: string | null;
+}
+
+function profileFromUser(user: User | null | undefined): UserProfile | null {
+  if (!user?.email) return null;
+
+  const metadata = user.user_metadata;
+  const avatarUrl =
+    stringValue(metadata.avatar_url) ??
+    stringValue(metadata.picture) ??
+    stringValue(metadata.photo_url);
+  const name =
+    stringValue(metadata.full_name) ??
+    stringValue(metadata.name) ??
+    stringValue(metadata.display_name);
+
+  return {
+    email: user.email,
+    name,
+    avatarUrl,
+  };
+}
+
+function stringValue(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function profileInitial(profile: UserProfile): string {
+  const source = profile.name ?? profile.email;
+  return source.trim().charAt(0).toUpperCase();
+}
+
+function UserAvatar({
+  profile,
+  onAvatarError,
+}: {
+  profile: UserProfile;
+  onAvatarError: () => void;
+}) {
+  if (!profile.avatarUrl) {
+    return <span aria-hidden="true">{profileInitial(profile)}</span>;
+  }
+
+  return (
+    <Image
+      src={profile.avatarUrl}
+      alt=""
+      fill
+      className="object-cover"
+      sizes="44px"
+      referrerPolicy="no-referrer"
+      onError={onAvatarError}
+    />
+  );
+}
+
 export default function TopNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   // L-06: mobile nav toggle
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
   // M-07: useMemo to cache Supabase client
   const supabase = useMemo(() => createClient(), []);
@@ -99,13 +162,14 @@ export default function TopNav() {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        setUserEmail(session?.user?.email ?? null);
+        setUserProfile(profileFromUser(session?.user));
+        setAccountMenuOpen(false);
       }
     );
 
     // Initial check
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUserEmail(session?.user?.email ?? null);
+      setUserProfile(profileFromUser(session?.user));
     });
 
     return () => {
@@ -113,11 +177,42 @@ export default function TopNav() {
     };
   }, [supabase]);
 
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        accountMenuRef.current &&
+        event.target instanceof Node &&
+        !accountMenuRef.current.contains(event.target)
+      ) {
+        setAccountMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAccountMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [accountMenuOpen]);
+
   const handleSignOut = useCallback(async () => {
     await supabase.auth.signOut();
-    setUserEmail(null);
+    setUserProfile(null);
+    setAccountMenuOpen(false);
     router.push("/login");
   }, [supabase, router]);
+
+  const handleAvatarError = useCallback(() => {
+    setUserProfile((profile) =>
+      profile ? { ...profile, avatarUrl: null } : profile,
+    );
+  }, []);
 
   return (
     <header className="sticky top-0 z-50 h-[64px] w-full flex-shrink-0 border-b border-hairline bg-canvas">
@@ -166,18 +261,62 @@ export default function TopNav() {
           </nav>
         </div>
         <div className="flex shrink-0 items-center gap-xs sm:gap-md">
-          {userEmail ? (
-            <>
-              <span className="hidden max-w-[200px] truncate text-[14px] font-medium leading-[1.4] text-muted md:block">
-                {userEmail}
-              </span>
+          {userProfile ? (
+            <div ref={accountMenuRef} className="relative">
               <button
-                className="px-xs text-[14px] font-semibold leading-[1.15] text-body transition-colors hover:text-primary sm:px-sm"
-                onClick={handleSignOut}
+                type="button"
+                className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-hairline bg-primary-container text-[14px] font-semibold text-on-primary shadow-sm transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                aria-label={`${userProfile.name ?? userProfile.email} 계정 메뉴`}
+                aria-expanded={accountMenuOpen}
+                aria-haspopup="menu"
+                onClick={() => setAccountMenuOpen((open) => !open)}
               >
-                로그아웃
+                <UserAvatar
+                  profile={userProfile}
+                  onAvatarError={handleAvatarError}
+                />
               </button>
-            </>
+
+              {accountMenuOpen && (
+                <div
+                  className="absolute right-0 top-full z-50 mt-xs w-[260px] rounded-[16px] border border-hairline bg-canvas p-xs shadow-lg"
+                  role="menu"
+                >
+                  <div className="flex items-center gap-sm border-b border-hairline px-sm py-sm">
+                    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary-container text-[15px] font-semibold text-on-primary">
+                      <UserAvatar
+                        profile={userProfile}
+                        onAvatarError={handleAvatarError}
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      {userProfile.name && (
+                        <p className="truncate text-[14px] font-semibold leading-[1.3] text-heading">
+                          {userProfile.name}
+                        </p>
+                      )}
+                      <p className="truncate text-[13px] font-medium leading-[1.35] text-muted">
+                        {userProfile.email}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="mt-xs flex w-full items-center justify-between rounded-[12px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-subtle hover:text-primary"
+                    role="menuitem"
+                    onClick={handleSignOut}
+                  >
+                    <span>로그아웃</span>
+                    <span
+                      aria-hidden="true"
+                      className="material-symbols-outlined text-[18px]"
+                    >
+                      logout
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             <button
               className="rounded-full bg-primary-container px-sm py-xs text-[14px] font-semibold leading-[1.15] text-on-primary transition-colors duration-200 hover:bg-primary-active sm:px-base sm:text-[16px]"
