@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { KrwBrand } from "@/components/KrwBrand";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
@@ -12,80 +13,6 @@ const navLinks = [
   { href: "/chat", label: "리서치" },
   { href: "/companies", label: "회사 목록" },
 ];
-
-function KrwLogo() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-8 w-8 shrink-0 sm:h-9 sm:w-9"
-      fill="none"
-      viewBox="0 0 120 120"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <defs>
-        <linearGradient
-          id="krwGradient"
-          gradientUnits="userSpaceOnUse"
-          x1="0"
-          x2="120"
-          y1="0"
-          y2="120"
-        >
-          <stop stopColor="#4F8CFF" />
-          <stop offset="1" stopColor="#7AA8FF" />
-        </linearGradient>
-
-        <filter id="softGlow" height="200%" width="200%" x="-50%" y="-50%">
-          <feGaussianBlur result="blur" stdDeviation="12" />
-          <feColorMatrix
-            in="blur"
-            type="matrix"
-            values="
-              0 0 0 0 0.31
-              0 0 0 0 0.55
-              0 0 0 0 1
-              0 0 0 0.22 0"
-          />
-          <feBlend in="SourceGraphic" />
-        </filter>
-      </defs>
-
-      <g filter="url(#softGlow)">
-        <rect
-          fill="#FFFFFF"
-          height="120"
-          rx="28"
-          stroke="#D9E2F2"
-          strokeWidth="2"
-          width="120"
-        />
-        <path
-          d="M28 28V92"
-          stroke="url(#krwGradient)"
-          strokeLinecap="round"
-          strokeWidth="10"
-        />
-        <path
-          d="M70 30L36 61L76 92"
-          stroke="url(#krwGradient)"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="10"
-        />
-        <circle cx="84" cy="28" fill="#4F8CFF" r="5" />
-        <circle cx="92" cy="92" fill="#4F8CFF" r="5" />
-        <line
-          stroke="#4F8CFF"
-          strokeOpacity="0.4"
-          x1="84"
-          x2="92"
-          y1="28"
-          y2="92"
-        />
-      </g>
-    </svg>
-  );
-}
 
 interface UserProfile {
   email: string;
@@ -168,8 +95,8 @@ export default function TopNav() {
     );
 
     // Initial check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUserProfile(profileFromUser(session?.user));
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUserProfile(profileFromUser(user));
     });
 
     return () => {
@@ -215,11 +142,11 @@ export default function TopNav() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 h-[64px] w-full flex-shrink-0 border-b border-hairline bg-canvas">
+    <header className="sticky top-0 z-50 h-[64px] w-full flex-shrink-0 border-b border-hairline bg-canvas/95 backdrop-blur-xl">
       <div className="mx-auto flex h-full w-full max-w-[1600px] items-center justify-between gap-sm px-base sm:px-md">
         {/* L-06: Mobile hamburger menu */}
         <button
-          className="-ml-xs p-xs text-body transition-colors hover:text-primary md:hidden"
+          className="-ml-xs p-xs text-body transition-colors hover:text-tertiary md:hidden"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           aria-label="메뉴 열기"
           aria-expanded={mobileMenuOpen}
@@ -230,16 +157,7 @@ export default function TopNav() {
         </button>
 
         <div className="flex min-w-0 items-center gap-lg">
-          <Link
-            href="/companies"
-            className="flex min-w-0 items-center gap-xs text-primary"
-            aria-label="KRW Ontology 홈"
-          >
-            <KrwLogo />
-            <span className="truncate text-[18px] font-semibold leading-[1.33] tracking-tight">
-              KRW Ontology
-            </span>
-          </Link>
+          <KrwBrand href="/companies" compact />
           <nav className="ml-xl hidden h-full items-center gap-lg pt-4 md:flex">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
@@ -248,10 +166,10 @@ export default function TopNav() {
                   key={link.href}
                   href={link.href}
                   className={cn(
-                    "border-b-2 pb-4 text-[14px] font-medium leading-[1.4] transition-colors duration-200",
+                    "border-b-2 pb-4 text-[14px] font-semibold leading-[1.4] transition-colors duration-200",
                     isActive
-                      ? "text-primary border-primary font-semibold"
-                      : "text-body border-transparent hover:text-primary",
+                      ? "text-tertiary border-tertiary-container font-semibold"
+                      : "text-body border-transparent hover:text-tertiary",
                   )}
                 >
                   {link.label}
@@ -265,7 +183,7 @@ export default function TopNav() {
             <div ref={accountMenuRef} className="relative">
               <button
                 type="button"
-                className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-hairline bg-primary-container text-[14px] font-semibold text-on-primary shadow-sm transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-[8px] border border-hairline bg-surface-dark text-[14px] font-semibold text-stone-50 shadow-sm transition-colors hover:border-tertiary-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tertiary-container focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                 aria-label={`${userProfile.name ?? userProfile.email} 계정 메뉴`}
                 aria-expanded={accountMenuOpen}
                 aria-haspopup="menu"
@@ -279,11 +197,11 @@ export default function TopNav() {
 
               {accountMenuOpen && (
                 <div
-                  className="absolute right-0 top-full z-50 mt-xs w-[260px] rounded-[16px] border border-hairline bg-canvas p-xs shadow-lg"
+                  className="absolute right-0 top-full z-50 mt-xs w-[260px] rounded-[8px] border border-hairline bg-canvas p-xs shadow-lg"
                   role="menu"
                 >
                   <div className="flex items-center gap-sm border-b border-hairline px-sm py-sm">
-                    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary-container text-[15px] font-semibold text-on-primary">
+                    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-surface-dark text-[15px] font-semibold text-stone-50">
                       <UserAvatar
                         profile={userProfile}
                         onAvatarError={handleAvatarError}
@@ -291,7 +209,7 @@ export default function TopNav() {
                     </div>
                     <div className="min-w-0">
                       {userProfile.name && (
-                        <p className="truncate text-[14px] font-semibold leading-[1.3] text-heading">
+                        <p className="truncate text-[14px] font-semibold leading-[1.3] text-ink">
                           {userProfile.name}
                         </p>
                       )}
@@ -302,7 +220,7 @@ export default function TopNav() {
                   </div>
                   <button
                     type="button"
-                    className="mt-xs flex w-full items-center justify-between rounded-[12px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-subtle hover:text-primary"
+                    className="mt-xs flex w-full items-center justify-between rounded-[8px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-surface-soft hover:text-tertiary"
                     role="menuitem"
                     onClick={handleSignOut}
                   >
@@ -319,7 +237,7 @@ export default function TopNav() {
             </div>
           ) : (
             <button
-              className="rounded-full bg-primary-container px-sm py-xs text-[14px] font-semibold leading-[1.15] text-on-primary transition-colors duration-200 hover:bg-primary-active sm:px-base sm:text-[16px]"
+              className="rounded-[8px] bg-surface-dark px-sm py-xs text-[14px] font-semibold leading-[1.15] text-stone-50 transition-colors duration-200 hover:bg-primary-active sm:px-base sm:text-[16px]"
               aria-label="로그인"
               onClick={() => router.push("/login")}
             >
@@ -343,8 +261,8 @@ export default function TopNav() {
                   className={cn(
                     "text-[16px] leading-[1.5] font-medium py-sm transition-colors",
                     isActive
-                      ? "text-primary font-semibold"
-                      : "text-body hover:text-primary",
+                      ? "text-tertiary font-semibold"
+                      : "text-body hover:text-tertiary",
                   )}
                   onClick={() => setMobileMenuOpen(false)}
                 >

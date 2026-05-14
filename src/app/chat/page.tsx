@@ -159,7 +159,7 @@ function ChatContent() {
       <TopNav />
 
       {/* Main Workspace */}
-      <main id="main-content" className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 overflow-hidden">
+      <main id="main-content" className="mx-auto flex min-h-0 w-full max-w-[1280px] flex-1 overflow-hidden">
         {/* Chat Canvas */}
         <div className="relative flex min-w-0 flex-1 flex-col bg-canvas">
           {/* Chat History */}
@@ -177,8 +177,8 @@ function ChatContent() {
             {/* Ticker context indicator */}
             {contextTickers.length > 0 && (
               <div className="mx-auto mb-lg w-full max-w-3xl">
-                <span className="inline-flex max-w-full items-center gap-xs rounded-full border border-hairline bg-surface-soft px-sm py-xs text-[13px] font-medium leading-[1.4] text-body sm:px-md sm:text-[14px]">
-                  <span className="material-symbols-outlined text-[16px] text-primary">
+                <span className="inline-flex max-w-full items-center gap-xs rounded-[8px] border border-hairline bg-surface px-sm py-xs text-[13px] font-semibold leading-[1.4] text-body sm:px-md sm:text-[14px]">
+                  <span className="material-symbols-outlined text-[16px] text-tertiary-container">
                     business
                   </span>
                   <span className="shrink-0">분석 대상:</span>{" "}
@@ -193,7 +193,7 @@ function ChatContent() {
             {/* H-06: Session creation error */}
             {effectiveSessionError && (
               <div className="mx-auto max-w-3xl">
-                <div className="rounded-xl border border-error/20 bg-error-container/10 p-base text-[15px] leading-[1.5] text-error sm:p-lg sm:text-[16px]">
+                <div className="rounded-[8px] border border-error/20 bg-error-container/10 p-base text-[15px] leading-[1.5] text-error sm:p-lg sm:text-[16px]">
                   <span className="material-symbols-outlined text-[18px] mr-xs align-middle">
                     error
                   </span>
@@ -260,7 +260,7 @@ function ChatContent() {
               {chat.error && (
                 <div className="flex w-full flex-col">
                   <div className="pl-0 sm:pl-[48px]">
-                    <div className="rounded-xl border border-error/20 bg-error-container/10 p-base text-[15px] leading-[1.5] text-error sm:p-lg sm:text-[16px]">
+                    <div className="rounded-[8px] border border-error/20 bg-error-container/10 p-base text-[15px] leading-[1.5] text-error sm:p-lg sm:text-[16px]">
                       <span className="material-symbols-outlined text-[18px] mr-xs align-middle">
                         error
                       </span>
@@ -271,21 +271,59 @@ function ChatContent() {
               )}
 
               {/* Empty state */}
-              {chat.messages.length === 0 && !isStreaming && sessionId && !sessionError && (
-                <div className="flex w-full min-w-0 flex-col items-center justify-center py-xxl text-center">
-                  <div className="mb-lg flex h-14 w-14 items-center justify-center rounded-full bg-surface-soft sm:h-16 sm:w-16">
-                    <span className="material-symbols-outlined text-[28px] text-primary sm:text-[32px]">
-                      auto_awesome
-                    </span>
+              {chat.messages.length === 0 && !isStreaming && !sessionError && (
+                <div className="mx-auto grid w-full max-w-4xl gap-5 py-xxl md:grid-cols-[minmax(0,1fr)_320px]">
+                  <div className="min-w-0 rounded-[12px] border border-hairline bg-[#fffaf0] p-6 shadow-sm sm:p-8">
+                    <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-tertiary">
+                      Evidence workspace
+                    </p>
+                    <h2 className="mt-3 text-balance text-[34px] font-black leading-[1.02] text-ink sm:text-[48px]">
+                      질문하면 답변과 근거 경로가 함께 생성됩니다.
+                    </h2>
+                    <p className="mt-4 max-w-2xl text-[16px] leading-7 text-body">
+                      {contextTickers.length > 0
+                        ? `${contextTickers.join(", ")}의 공시 문장, 사업 활동, 핵심 변수 사이의 연결을 기준으로 질문하세요.`
+                        : "기업, 문서 기간, 사업 세그먼트, 리스크 변수까지 한 번에 지정해 리서치를 시작하세요."}
+                    </p>
+
+                    <div className="mt-6 grid gap-2 sm:grid-cols-3">
+                      {["10-K 원문", "Ontology nodes", "Citation rail"].map(
+                        (item) => (
+                          <div
+                            key={item}
+                            className="rounded-[8px] border border-hairline bg-canvas px-3 py-3"
+                          >
+                            <span className="material-symbols-outlined text-[20px] text-tertiary-container">
+                              verified
+                            </span>
+                            <p className="mt-2 text-[13px] font-bold leading-5 text-ink">
+                              {item}
+                            </p>
+                          </div>
+                        ),
+                      )}
+                    </div>
                   </div>
-                  <h2 className="mb-sm text-[18px] font-semibold leading-[1.33] text-ink">
-                    KRW Ontology에 질문하세요
-                  </h2>
-                  <p className="w-full min-w-[280px] max-w-[440px] whitespace-normal text-[15px] font-normal leading-[1.5] text-muted [overflow-wrap:normal] [word-break:keep-all] sm:text-[16px]">
-                    {contextTickers.length > 0
-                      ? `${contextTickers.join(", ")}의 재무 데이터, 실적, 온톨로지 분석에 대해 질문해보세요.`
-                      : "어떤 기업의 재무 데이터, 실적, 온톨로지 분석에 대해서도 질문해보세요."}
-                  </p>
+
+                  <aside className="rounded-[12px] border border-hairline bg-surface p-4 shadow-sm">
+                    <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
+                      prompt patterns
+                    </p>
+                    <div className="mt-4 space-y-3">
+                      {[
+                        "FY2025 10-K 기준으로 매출 성장 요인을 분해해줘",
+                        "핵심 리스크가 어느 사업 활동과 연결되는지 보여줘",
+                        "최근 기간의 margin driver를 citation과 함께 요약해줘",
+                      ].map((prompt) => (
+                        <div
+                          key={prompt}
+                          className="rounded-[8px] border border-hairline-soft bg-canvas px-3 py-3 text-[13px] font-semibold leading-5 text-body"
+                        >
+                          {prompt}
+                        </div>
+                      ))}
+                    </div>
+                  </aside>
                 </div>
               )}
             </div>
@@ -310,7 +348,7 @@ function ChatContent() {
             <div className="absolute bottom-[calc(92px+env(safe-area-inset-bottom))] left-1/2 z-10 -translate-x-1/2 sm:bottom-[100px]">
               <button
                 onClick={handleCancel}
-                className="flex items-center gap-xs rounded-full border border-hairline bg-surface-strong px-base py-sm text-[14px] font-medium leading-[1.4] text-body shadow-sm transition-colors hover:bg-surface-dim sm:px-lg"
+                className="flex items-center gap-xs rounded-[8px] border border-hairline bg-surface-strong px-base py-sm text-[14px] font-semibold leading-[1.4] text-body shadow-sm transition-colors hover:bg-surface-dim sm:px-lg"
                 aria-label="응답 생성 중지"
               >
                 <span className="material-symbols-outlined text-[16px]">

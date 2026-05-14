@@ -52,7 +52,7 @@ export default function RichAnswerRenderer({
         <button
           type="button"
           onClick={exportHtml}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-soft hover:text-ink"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-surface-soft hover:text-ink"
           aria-label="HTML로 내보내기"
           title="HTML로 내보내기"
         >
@@ -93,7 +93,7 @@ function RichAnswerBlockView({ block }: { block: ResearchArtifactBlock }) {
             {block.metrics.map((metric, index) => (
               <div
                 key={`${metric.label}-${index}`}
-                className="rounded-lg border border-hairline bg-surface-soft px-sm py-xs"
+                className="rounded-[8px] border border-hairline bg-surface px-sm py-xs"
               >
                 <div className="text-[12px] font-semibold uppercase leading-[1.3] tracking-normal text-muted">
                   {metric.label}
@@ -170,7 +170,7 @@ function RichAnswerBlockView({ block }: { block: ResearchArtifactBlock }) {
             {block.premises.map((premise, index) => (
               <div
                 key={`${premise.label}-${index}`}
-                className="rounded-lg bg-surface-soft px-sm py-xs"
+                className="rounded-[8px] bg-surface px-sm py-xs"
               >
                 <div className="text-[14px] font-semibold text-ink">
                   {premise.label}
@@ -222,7 +222,7 @@ function RichAnswerBlockView({ block }: { block: ResearchArtifactBlock }) {
             {block.items.map((item, index) => (
               <div
                 key={`${item.label}-${index}`}
-                className="rounded-lg bg-surface-soft px-sm py-xs"
+                className="rounded-[8px] bg-surface px-sm py-xs"
               >
                 <div className="flex flex-wrap items-center gap-xs">
                   <span className="text-[14px] font-semibold text-ink">
@@ -305,7 +305,7 @@ function RichAnswerBlockView({ block }: { block: ResearchArtifactBlock }) {
     case "evidence_chain":
       return (
         <AnswerSection title={block.title}>
-          <details className="rounded-lg bg-surface-soft px-sm py-xs">
+          <details className="rounded-[8px] bg-surface px-sm py-xs">
             <summary className="cursor-pointer text-[14px] font-semibold text-ink">
               근거 체인
             </summary>

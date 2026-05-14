@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 export interface CompanyCardData {
   ticker: string;
@@ -21,55 +22,94 @@ interface CompanyCardProps {
   company: CompanyCardData;
 }
 
+function MetaPill({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center rounded-[6px] border border-hairline bg-surface px-2 py-1 font-mono text-[11px] font-bold leading-none text-body">
+      {children}
+    </span>
+  );
+}
+
 export default function CompanyCard({ company }: CompanyCardProps) {
-  const icon = company.icon || "business";
+  const documentTypes = company.document_types?.slice(0, 3) ?? [];
+  const periods = company.periods?.slice(0, 3) ?? [];
 
   return (
-    <Link href={`/chat?ticker=${encodeURIComponent(company.ticker)}`}>
-      <article className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-hairline bg-canvas p-base transition-all hover:shadow-md sm:p-lg">
-        <div className="mb-md flex items-start justify-between gap-base">
+    <Link
+      href={`/chat?ticker=${encodeURIComponent(company.ticker)}`}
+      className="group block"
+    >
+      <article className="grid min-h-full gap-4 rounded-[8px] border border-hairline bg-[#fffaf0] p-4 shadow-sm transition-colors hover:border-tertiary-container hover:bg-[#fff4df] sm:p-5">
+        <div className="flex min-w-0 items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="text-[32px] font-normal leading-[1.11] tracking-normal text-ink transition-colors group-hover:text-primary-container sm:text-[36px]">
-              {company.ticker}
-            </h2>
-            <span className="block truncate font-mono text-[12px] font-medium leading-[1.4] text-muted">
+            <div className="flex items-center gap-2">
+              <h2 className="font-mono text-[30px] font-black leading-none tracking-[-0.02em] text-ink transition-colors group-hover:text-tertiary sm:text-[34px]">
+                {company.ticker}
+              </h2>
+              {company.latest_period && (
+                <span className="rounded-[6px] bg-surface-dark px-2 py-1 font-mono text-[11px] font-bold text-accent-yellow">
+                  {company.latest_period}
+                </span>
+              )}
+            </div>
+            <p className="mt-2 truncate text-[13px] font-bold uppercase tracking-[0.08em] text-muted">
               {company.name}
-            </span>
+            </p>
           </div>
-          <div className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-surface-strong text-ink">
-            <span className="material-symbols-outlined">{icon}</span>
-          </div>
+          <span className="material-symbols-outlined text-[22px] text-tertiary-container transition-transform group-hover:translate-x-1">
+            arrow_forward
+          </span>
         </div>
-        <p className="mb-lg flex-grow text-[15px] font-normal leading-[1.5] text-body sm:text-[16px]">
+
+        <p className="line-clamp-3 text-[15px] leading-6 text-body">
           {company.description}
         </p>
-        <div className="space-y-sm border-t border-hairline-soft pt-base">
-          {company.coverage && (
-            <div className="flex flex-col gap-xxs">
-              <span className="text-[15px] font-bold leading-[1.5] text-ink sm:text-[16px]">
-                인덱싱 범위
-              </span>
-              <p className="text-[14px] font-normal leading-[1.5] text-muted">
-                {company.coverage}
-              </p>
-            </div>
-          )}
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-[8px] border border-hairline-soft bg-canvas/75 px-3 py-3">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+              filings
+            </p>
+            <p className="mt-2 text-[22px] font-black leading-none text-ink">
+              {company.document_count ?? periods.length}
+            </p>
+          </div>
+          <div className="rounded-[8px] border border-hairline-soft bg-canvas/75 px-3 py-3">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+              document type
+            </p>
+            <p className="mt-2 truncate text-[14px] font-extrabold leading-none text-ink">
+              {documentTypes.length ? documentTypes.join(", ") : "Indexed"}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {periods.map((period) => (
+            <MetaPill key={period}>{period}</MetaPill>
+          ))}
+          {documentTypes.map((type) => (
+            <MetaPill key={type}>{type}</MetaPill>
+          ))}
+        </div>
+
+        <div className="space-y-3 border-t border-hairline-soft pt-4">
           {company.core_strength && (
-            <div className="flex flex-col gap-xxs">
-              <span className="text-[15px] font-bold leading-[1.5] text-ink sm:text-[16px]">
-                주요 사업 활동
-              </span>
-              <p className="text-[14px] font-normal leading-[1.5] text-muted">
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-tertiary">
+                business activity
+              </p>
+              <p className="mt-1 line-clamp-2 text-[13px] leading-5 text-body">
                 {company.core_strength}
               </p>
             </div>
           )}
           {company.critical_risk && (
-            <div className="flex flex-col gap-xxs">
-              <span className="text-[15px] font-bold leading-[1.5] text-ink sm:text-[16px]">
-                핵심 변수
-              </span>
-              <p className="text-[14px] font-normal leading-[1.5] text-muted">
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-error">
+                watch variable
+              </p>
+              <p className="mt-1 line-clamp-2 text-[13px] leading-5 text-body">
                 {company.critical_risk}
               </p>
             </div>

@@ -61,7 +61,7 @@ function ResearchStatusCard({
 
   return (
     <div
-      className="w-full rounded-xl border border-hairline bg-surface-soft/80 p-base shadow-sm sm:max-w-[520px] sm:p-lg"
+      className="w-full rounded-[8px] border border-hairline bg-surface p-base shadow-sm sm:max-w-[560px] sm:p-lg"
       aria-live="polite"
     >
       <div className="flex min-w-0 items-center gap-sm">
@@ -86,7 +86,7 @@ function ResearchStatusCard({
           return (
             <div
               key={step.stage}
-              className="min-w-0 rounded-lg border border-hairline bg-canvas/70 px-sm py-xs"
+              className="min-w-0 rounded-[8px] border border-hairline bg-canvas/70 px-sm py-xs"
             >
               <div className="flex min-w-0 items-center gap-xs">
                 <span
@@ -127,7 +127,7 @@ export default function ChatMessage({
   if (role === "user") {
     return (
       <div className="flex w-full flex-col items-end">
-        <div className="max-w-[92%] rounded-xl rounded-tr-sm border border-hairline bg-surface-soft p-base text-ink sm:max-w-[80%] sm:p-lg">
+        <div className="max-w-[92%] rounded-[8px] border border-hairline bg-surface p-base text-ink sm:max-w-[80%] sm:p-lg">
           <p className="whitespace-pre-wrap break-words text-[15px] font-normal leading-[1.5] sm:text-[16px]">{content}</p>
         </div>
       </div>
@@ -137,13 +137,13 @@ export default function ChatMessage({
   return (
     <div className="flex w-full flex-col">
       <div className="mb-sm flex items-start gap-sm sm:gap-md">
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary-container text-primary">
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[8px] bg-surface-dark text-accent-yellow">
           <span className="material-symbols-outlined text-[18px]">
-            auto_awesome
+            account_tree
           </span>
         </div>
-        <h2 className="mt-1 text-[17px] font-normal leading-[1.33] text-ink sm:text-[18px]">
-          Ontology Intelligence
+        <h2 className="mt-1 text-[17px] font-bold leading-[1.33] text-ink sm:text-[18px]">
+          Evidence Engine
         </h2>
       </div>
       {isStreaming ? (

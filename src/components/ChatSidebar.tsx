@@ -55,11 +55,11 @@ export default function ChatSidebar({
   }, [listSessions, sessions]);
 
   return (
-    <aside className="hidden md:flex w-[280px] shrink-0 flex-col border-r border-hairline bg-surface-soft/70">
+    <aside className="hidden md:flex w-[280px] shrink-0 flex-col border-r border-hairline bg-surface/80">
       <div className="p-md border-b border-hairline">
         <Link
           href="/chat"
-          className="flex h-10 items-center justify-center gap-xs rounded-md bg-primary-container px-md text-[14px] font-semibold text-on-primary transition-colors hover:bg-primary-active"
+          className="flex h-10 items-center justify-center gap-xs rounded-[8px] bg-surface-dark px-md text-[14px] font-bold text-stone-50 transition-colors hover:bg-primary-active"
         >
           <span className="material-symbols-outlined text-[18px]">add</span>
           새 채팅
@@ -72,7 +72,7 @@ export default function ChatSidebar({
             {Array.from({ length: 6 }).map((_, index) => (
               <div
                 key={index}
-                className="h-[72px] rounded-md bg-surface-strong animate-pulse"
+                className="h-[72px] rounded-[8px] bg-surface-strong animate-pulse"
               />
             ))}
           </div>
@@ -88,9 +88,9 @@ export default function ChatSidebar({
                   key={session.id}
                   href={buildChatSessionHref(session.id)}
                   className={[
-                    "block rounded-md border px-sm py-xs transition-colors",
+                    "block rounded-[8px] border px-sm py-xs transition-colors",
                     isActive
-                      ? "border-primary bg-primary-fixed text-on-primary-fixed"
+                      ? "border-tertiary-container bg-primary-fixed text-on-primary-fixed"
                       : "border-transparent hover:border-hairline hover:bg-surface",
                   ].join(" ")}
                 >

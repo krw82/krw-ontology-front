@@ -46,7 +46,7 @@ export default function FloatingAskBar({ selectedTicker }: FloatingAskBarProps) 
     <div className="pointer-events-none fixed bottom-[calc(16px+env(safe-area-inset-bottom))] left-1/2 z-[100] w-full max-w-[700px] -translate-x-1/2 px-base sm:top-[75%] sm:bottom-auto sm:px-md">
       <form
         onSubmit={handleSubmit}
-        className="pointer-events-auto flex items-center rounded-full border border-hairline bg-surface-strong/95 p-[4px] pl-sm shadow-lg backdrop-blur-sm transition-shadow hover:shadow-xl sm:pl-base"
+        className="pointer-events-auto flex items-center rounded-[10px] border border-hairline bg-surface/95 p-[4px] pl-sm shadow-lg backdrop-blur-sm transition-shadow hover:shadow-xl sm:pl-base"
       >
         <input
           className="min-w-0 flex-grow border-0 bg-transparent text-[15px] font-bold leading-[1.5] text-ink placeholder:text-muted-soft focus:outline-none focus:ring-0 sm:text-[16px]"
@@ -58,7 +58,7 @@ export default function FloatingAskBar({ selectedTicker }: FloatingAskBarProps) 
         />
         <button
           type="submit"
-          className="flex h-[44px] shrink-0 items-center justify-center rounded-full bg-primary-container px-base text-[15px] font-semibold leading-[1.15] text-on-primary transition-colors hover:bg-primary-active sm:px-lg sm:text-[16px]"
+          className="flex h-[44px] shrink-0 items-center justify-center rounded-[8px] bg-surface-dark px-base text-[15px] font-bold leading-[1.15] text-stone-50 transition-colors hover:bg-primary-active sm:px-lg sm:text-[16px]"
           aria-label="질문 제출"
         >
           질문

@@ -27,12 +27,12 @@
 
 @theme inline {
   /* Colors - Coinbase Institutional Style System */
-  --color-canvas: #ffffff;
-  --color-surface: #fbf8ff;
-  --color-surface-soft: #f7f7f7;
-  --color-surface-strong: #eef0f3;
-  --color-surface-dark: #0a0b0d;
-  --color-surface-dark-elevated: #16181c;
+  --color-canvas: #fffdf8;
+  --color-surface: #f7f3ea;
+  --color-surface-soft: #f0ece3;
+  --color-surface-strong: #e4ded2;
+  --color-surface-dark: #0b1020;
+  --color-surface-dark-elevated: #151827;
   --color-surface-container: #ededfb;
   --color-surface-container-low: #f3f2ff;
   --color-surface-container-lowest: #ffffff;
@@ -41,18 +41,18 @@
   --color-surface-dim: #d9d9e7;
   --color-surface-bright: #fbf8ff;
 
-  --color-ink: #0a0b0d;
-  --color-body: #5b616e;
-  --color-body-strong: #0a0b0d;
-  --color-muted: #7c828a;
-  --color-muted-soft: #a8acb3;
+  --color-ink: #111111;
+  --color-body: #4f524f;
+  --color-body-strong: #111111;
+  --color-muted: #77746d;
+  --color-muted-soft: #aaa39a;
 
-  --color-primary: #003ec7;
-  --color-primary-container: #0052ff;
-  --color-primary-active: #003ecc;
+  --color-primary: #183f8c;
+  --color-primary-container: #2358b8;
+  --color-primary-active: #12316f;
   --color-primary-disabled: #a8b8cc;
-  --color-primary-fixed: #dde1ff;
-  --color-primary-fixed-dim: #b7c4ff;
+  --color-primary-fixed: #f3eee4;
+  --color-primary-fixed-dim: #e6c98d;
 
   --color-on-primary: #ffffff;
   --color-on-primary-container: #dfe3ff;
@@ -64,8 +64,8 @@
   --color-on-secondary: #ffffff;
   --color-on-secondary-container: #5f6161;
 
-  --color-tertiary: #952200;
-  --color-tertiary-container: #bf3003;
+  --color-tertiary: #8c4f18;
+  --color-tertiary-container: #b8792e;
   --color-on-tertiary: #ffffff;
   --color-on-tertiary-container: #ffddd5;
 
@@ -74,27 +74,27 @@
   --color-on-error: #ffffff;
   --color-on-error-container: #93000a;
 
-  --color-on-surface: #191b25;
-  --color-on-surface-variant: #434656;
-  --color-on-background: #191b25;
+  --color-on-surface: #111111;
+  --color-on-surface-variant: #3d3c38;
+  --color-on-background: #111111;
   --color-inverse-surface: #2e303a;
   --color-inverse-on-surface: #f0effe;
   --color-inverse-primary: #b7c4ff;
 
-  --color-outline: #737688;
-  --color-outline-variant: #c3c5d9;
+  --color-outline: #858073;
+  --color-outline-variant: #d3cabd;
 
-  --color-hairline: #dee1e6;
-  --color-hairline-soft: #eef0f3;
+  --color-hairline: #ded6c8;
+  --color-hairline-soft: #ebe5da;
 
   --color-on-dark: #ffffff;
   --color-on-dark-soft: #a8acb3;
 
-  --color-semantic-up: #05b169;
+  --color-semantic-up: #16784a;
   --color-semantic-down: #cf202f;
-  --color-accent-yellow: #f4b000;
+  --color-accent-yellow: #e6c98d;
 
-  --color-background: #fbf8ff;
+  --color-background: #fffdf8;
 
   /* Spacing */
   --spacing-xxs: 4px;
@@ -107,23 +107,35 @@
   --spacing-xxl: 48px;
   --spacing-section: 96px;
 
+  /* Container widths - keep Tailwind max-w-* utilities distinct from spacing tokens */
+  --container-sm: 24rem;
+  --container-md: 28rem;
+  --container-lg: 32rem;
+  --container-xl: 36rem;
+  --container-2xl: 42rem;
+  --container-3xl: 48rem;
+  --container-4xl: 56rem;
+  --container-5xl: 64rem;
+  --container-7xl: 80rem;
+
   /* Border Radius */
   --radius-sm: 0.25rem;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
   --radius-pill: 9999px;
   --radius-full: 9999px;
 
   /* Font Families */
   --font-inter: "Inter", -apple-system, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-body: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", var(--font-inter);
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 body {
   background: var(--color-canvas);
   color: var(--color-on-surface);
-  font-family: var(--font-inter);
+  font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.5;
   font-weight: 400;

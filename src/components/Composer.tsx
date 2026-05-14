@@ -185,7 +185,7 @@ export default function Composer({
   };
 
   return (
-    <div className="border-t border-hairline bg-canvas px-base py-sm sm:px-lg sm:py-base">
+    <div className="border-t border-hairline bg-canvas/95 px-base py-sm backdrop-blur-xl sm:px-lg sm:py-base">
       {(attachments.length > 0 || attachmentError) && (
         <div className="mx-auto mb-xs flex max-w-3xl flex-wrap items-center gap-xs">
           {attachments.map((file) => (
@@ -218,7 +218,7 @@ export default function Composer({
           )}
         </div>
       )}
-      <div className="relative mx-auto flex max-w-3xl items-end rounded-xl border border-outline-variant bg-surface-soft p-[4px] transition-all focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+      <div className="relative mx-auto flex max-w-3xl items-end rounded-[10px] border border-outline-variant bg-surface p-[4px] transition-all focus-within:border-tertiary-container focus-within:ring-1 focus-within:ring-tertiary-container">
         <input
           ref={fileInputRef}
           className="hidden"
@@ -229,7 +229,7 @@ export default function Composer({
           disabled={disabled}
         />
         <button
-          className="mb-1 ml-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-body transition-colors hover:bg-surface-dim disabled:cursor-not-allowed disabled:opacity-50"
+          className="mb-1 ml-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[8px] text-body transition-colors hover:bg-surface-dim disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled}
           aria-label="txt 또는 md 파일 첨부"
@@ -257,7 +257,7 @@ export default function Composer({
           aria-label="메시지 입력"
         />
         <button
-          className="mb-1 mr-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary shadow-sm transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:opacity-50"
+          className="mb-1 mr-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[8px] bg-surface-dark text-stone-50 shadow-sm transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:opacity-50"
           onClick={handleSubmit}
           disabled={disabled || isOverLimit}
           aria-label="메시지 보내기"
