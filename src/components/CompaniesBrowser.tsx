@@ -22,6 +22,7 @@ export default function CompaniesBrowser({
 
   const researchAction = {
     label: "자료로 분석 시작",
+    href: "/chat",
     icon: "arrow_forward",
   };
 
@@ -60,18 +61,18 @@ export default function CompaniesBrowser({
 
               <div className="mt-4">
                 <Link
-                href="/chat"
+                  href={researchAction.href}
                   className="inline-flex min-h-[48px] w-full items-center justify-center gap-xs rounded-[8px] bg-ink px-4 py-3 text-[14px] font-extrabold leading-5 text-canvas transition-colors hover:bg-ink/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                   aria-label="자료로 분석 시작"
                 >
-                {researchAction.icon ? (
-                  <span
-                    aria-hidden="true"
-                    className="material-symbols-outlined text-[19px]"
-                  >
-                    {researchAction.icon}
-                  </span>
-                ) : null}
+                  {researchAction.icon ? (
+                    <span
+                      aria-hidden="true"
+                      className="material-symbols-outlined text-[19px]"
+                    >
+                      {researchAction.icon}
+                    </span>
+                  ) : null}
                   {researchAction.label}
                 </Link>
               </div>

@@ -21,16 +21,44 @@ function LoginContent() {
   const [error, setError] = useState<string | null>(
     initialError ? "Google 인증을 완료하지 못했습니다. 다시 시도해주세요." : null,
   );
+  const [errorVisible, setErrorVisible] = useState(false);
+  const [trustSignalsVisible, setTrustSignalsVisible] = useState(false);
+  const trustSignals = [
+    { label: "Google 인증", icon: "verified_user" },
+    { label: "RLS 보호", icon: "lock" },
+    { label: "출처 기록", icon: "history" },
+  ] as const;
   const errorRef = useRef<HTMLDivElement | null>(null);
   const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
-    if (error) errorRef.current?.focus();
+    let didUpdate = true;
+    requestAnimationFrame(() => {
+      if (!didUpdate) return;
+      const shouldShowError = Boolean(error);
+      setErrorVisible(shouldShowError);
+      if (shouldShowError) errorRef.current?.focus();
+    });
+    return () => {
+      didUpdate = false;
+    };
   }, [error]);
+
+  useEffect(() => {
+    let didMount = true;
+    requestAnimationFrame(() => {
+      if (!didMount) return;
+      setTrustSignalsVisible(true);
+    });
+    return () => {
+      didMount = false;
+    };
+  }, []);
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
+    setErrorVisible(false);
 
     try {
       const redirectTo = new URL("/auth/callback", window.location.origin);
@@ -53,10 +81,6 @@ function LoginContent() {
       <div
         aria-hidden="true"
         className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(180deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:64px_64px]"
-      />
-      <div
-        aria-hidden="true"
-        className="animate-drift absolute bottom-0 right-0 h-[60vh] w-[60vw] origin-bottom-right bg-[radial-gradient(circle_at_bottom_right,rgba(0,82,255,0.2),transparent_65%)]"
       />
 
       <header className="sticky top-0 z-50 h-[72px] w-full flex-shrink-0 border-b border-white/10 bg-surface-dark/85 backdrop-blur-xl">
@@ -88,31 +112,41 @@ function LoginContent() {
           </p>
 
           <div className="mt-6 grid max-w-2xl gap-2 sm:mt-8 sm:grid-cols-3 sm:gap-3">
-            {[
-              { label: "Google 인증", icon: "verified_user" },
-              { label: "RLS 보호", icon: "lock" },
-              { label: "출처 기록", icon: "history" },
-            ].map((item) => (
-                <div
-                  key={item.label}
-                  className="rounded-[8px] border border-white/10 bg-white/[0.05] px-4 py-3 sm:py-4"
-                >
+            {trustSignals.map((item, index) => (
+              <div
+                key={item.label}
+                className={`rounded-[8px] border border-white/10 bg-white/[0.05] px-4 py-3 transition-all duration-150 ease-out sm:py-4 ${
+                  trustSignalsVisible
+                    ? "translate-y-0 opacity-100"
+                    : "-translate-y-1 opacity-0"
+                }`}
+                style={{ transitionDelay: `${index * 60}ms` }}
+              >
+                {item.icon ? (
                   <span
                     aria-hidden="true"
                     className="material-symbols-outlined text-[20px] text-primary-fixed-dim"
                   >
                     {item.icon}
                   </span>
-                  <p className="mt-3 text-[13px] font-bold uppercase tracking-[0.08em] text-on-dark">
-                    {item.label}
-                  </p>
-                </div>
-              ))}
+                ) : null}
+                <p
+                  className={`text-[13px] font-bold uppercase tracking-[0.08em] text-on-dark ${
+                    item.icon ? "mt-3" : "mt-0"
+                  }`}
+                >
+                  {item.label}
+                </p>
+              </div>
+            ))}
           </div>
         </section>
 
         <section className="order-1 mx-auto w-full max-w-[440px] lg:order-2">
-          <div className="animate-fade-in-up rounded-[12px] border border-white/12 bg-surface-dark-elevated p-5 text-on-dark shadow-2xl shadow-black/35 opacity-0 sm:p-6" style={{ animationDelay: "150ms" }}>
+          <div
+            className="animate-fade-in-up rounded-[12px] border border-white/12 bg-surface-dark-elevated p-5 text-on-dark shadow-2xl shadow-black/35 opacity-0 sm:p-6"
+            style={{ animationDelay: "80ms", animationDuration: "150ms" }}
+          >
             <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-primary-fixed-dim">
               Account access
             </p>
@@ -132,7 +166,11 @@ function LoginContent() {
               {error && (
                 <div
                   ref={errorRef}
-                  className="rounded-[8px] border border-error/25 bg-error-container/90 p-sm text-[14px] font-semibold leading-[1.5] text-on-error-container"
+                  className={`rounded-[8px] border border-error/25 bg-error-container/90 p-sm text-[14px] font-semibold leading-[1.5] text-on-error-container transition-all duration-150 ease-out ${
+                    errorVisible
+                      ? "translate-y-0 opacity-100"
+                      : "-translate-y-1 opacity-0"
+                  }`}
                   role="alert"
                   tabIndex={-1}
                 >
@@ -144,18 +182,30 @@ function LoginContent() {
                 type="button"
                 onClick={handleGoogleSignIn}
                 disabled={loading}
-                className="flex h-[52px] w-full items-center justify-center gap-sm rounded-[8px] bg-canvas px-base text-[16px] font-extrabold leading-[1.15] text-ink transition-colors hover:bg-primary-fixed disabled:cursor-not-allowed disabled:opacity-70"
+                className="relative flex h-[52px] w-full items-center justify-center gap-sm rounded-[8px] bg-canvas px-base text-[16px] font-extrabold leading-[1.15] text-ink transition-all duration-150 ease-out hover:bg-primary-fixed active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {loading ? (
+                <span className="pointer-events-none relative h-5 w-5 shrink-0">
                   <span
                     aria-hidden="true"
-                    className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"
-                  />
-                ) : (
-                  <span className="flex h-6 w-6 items-center justify-center rounded-[6px] bg-white text-[15px] font-black text-[#4285f4]">
-                    <span aria-hidden="true">G</span>
+                    className={`absolute inset-0 transition-all duration-150 ease-out ${
+                      loading
+                        ? "opacity-0 scale-95"
+                        : "opacity-100 scale-100"
+                    }`}
+                  >
+                    <span className="flex h-full w-full items-center justify-center rounded-[6px] bg-white text-[13px] font-black leading-none text-[#4285f4]">
+                      <span aria-hidden="true">G</span>
+                    </span>
                   </span>
-                )}
+                  <span
+                    aria-hidden="true"
+                    className={`absolute inset-0 rounded-full border-2 border-primary border-t-transparent transition-all duration-150 ease-out ${
+                      loading
+                        ? "opacity-100 scale-100 animate-spin"
+                        : "opacity-0 scale-95"
+                    }`}
+                  />
+                </span>
                 {loading ? "Google로 이동 중..." : "Google로 계속하기"}
               </button>
             </div>
