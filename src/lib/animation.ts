@@ -128,20 +128,20 @@ export const staggerContainerFast: Variants = {
 /* ------------------------------------------------------------------ */
 
 export const chatMessageUser: Variants = {
-  hidden: { opacity: 0, y: 12 },
+  hidden: { opacity: 0, y: 8 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.25, ease: easeOutExpo },
+    transition: { duration: 0.14, ease: easeOutExpo },
   },
 };
 
 export const chatMessageAssistant: Variants = {
-  hidden: { opacity: 0, y: 16 },
+  hidden: { opacity: 0, y: 10 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: duration.normal, ease: easeOutExpo },
+    transition: { duration: 0.14, ease: easeOutExpo },
   },
 };
 
