@@ -2,7 +2,14 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const PLACEHOLDER_API_KEYS = new Set(["sk-placeholder", "sk-ant-..."]);
+const PLACEHOLDER_API_KEYS = new Set([
+  "",
+  "sk-placeholder",
+  "sk-ant-...",
+  "sk-ant-…",
+  "<anthropic-api-key>",
+  "<deepseek-api-key>",
+]);
 const DEFAULT_CLAUDE_CONFIG_DIR = join(homedir(), ".claude");
 
 const USER_SETTINGS_ENV_KEY_PREFIXES = ["ANTHROPIC_"];
@@ -66,10 +73,16 @@ function resolveClaudeConfigDir(env: EnvSource): string {
 }
 
 function removePlaceholderApiKey(env: EnvSource): void {
-  const apiKey = env.ANTHROPIC_API_KEY?.trim();
-  if (!apiKey || PLACEHOLDER_API_KEYS.has(apiKey)) {
-    delete env.ANTHROPIC_API_KEY;
-  }
+  removePlaceholderCredential(env, "ANTHROPIC_API_KEY");
+  removePlaceholderCredential(env, "ANTHROPIC_AUTH_TOKEN");
+}
+
+function removePlaceholderCredential(
+  env: EnvSource,
+  key: "ANTHROPIC_API_KEY" | "ANTHROPIC_AUTH_TOKEN",
+): void {
+  const value = env[key]?.trim();
+  if (!value || PLACEHOLDER_API_KEYS.has(value)) delete env[key];
 }
 
 function isAllowedUserSettingsEnvKey(key: string): boolean {

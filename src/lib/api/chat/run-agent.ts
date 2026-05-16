@@ -458,15 +458,21 @@ async function handleCompletedRun(params: CompletedRunParams) {
     structuredAnswer: structuredOutput,
     researchSynthesis,
     displayPlan,
-    fallbackWhenMissing: Boolean(researchSynthesis) && !structuredOutput,
+    fallbackWhenMissing: false,
   });
 
-  const visibleAnswer = deriveVisibleAnswer(
-    acc.fullText,
-    artifacts[0]?.title,
-    structuredOutput ? answerBlocksToMarkdown(structuredOutput.answer_blocks) : null,
-    artifacts[0]?.summary,
-  );
+  const structuredMarkdown = structuredOutput
+    ? answerBlocksToMarkdown(structuredOutput.answer_blocks)
+    : null;
+  const visibleAnswer =
+    acc.fullText.trim() ||
+    structuredMarkdown?.trim() ||
+    deriveVisibleAnswer(
+      acc.fullText,
+      artifacts[0]?.title,
+      structuredMarkdown,
+      artifacts[0]?.summary,
+    );
 
   await admin
     .from("messages")

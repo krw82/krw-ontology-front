@@ -9,7 +9,7 @@ export default async function CompaniesPage() {
   const companies = await listIndexedCompanies();
 
   return (
-    <div className="flex min-h-[100dvh] flex-col overflow-x-hidden">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <TopNav />
       <CompaniesBrowser initialCompanies={companies} />
     </div>

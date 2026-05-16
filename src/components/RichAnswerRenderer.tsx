@@ -1,8 +1,9 @@
 "use client";
 
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { staggerContainerFast, fadeInUp, easeOutExpo } from "@/lib/animation";
+import ResearchMarkdown from "@/components/ResearchMarkdown";
 import type {
   ResearchArtifact,
   ResearchArtifactBlock,
@@ -44,25 +45,40 @@ export default function RichAnswerRenderer({
   };
 
   return (
-    <div className="space-y-md">
+    <motion.div
+      className="space-y-md"
+      variants={staggerContainerFast}
+      initial="hidden"
+      animate="visible"
+    >
       {blocks.map((block, index) => (
-        <RichAnswerBlockView key={`${block.type}-${index}`} block={block} />
+        <motion.div key={getBlockKey(block, index)} variants={fadeInUp}>
+          <RichAnswerBlockView block={block} />
+        </motion.div>
       ))}
-      <div className="flex justify-end">
+      <motion.div className="flex justify-end" variants={fadeInUp}>
         <button
           type="button"
           onClick={exportHtml}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-surface-soft hover:text-ink"
+          className="inline-flex h-9 items-center gap-xs rounded-[8px] px-sm text-[13px] font-semibold text-muted transition-colors hover:bg-surface-soft hover:text-ink"
           aria-label="HTML로 내보내기"
           title="HTML로 내보내기"
         >
-          <span className="material-symbols-outlined text-[18px]">
+          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
             download
           </span>
+          HTML
         </button>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
+}
+
+function getBlockKey(block: ResearchArtifactBlock, index: number): string {
+  const title = "title" in block ? block.title : "";
+  const content = "content" in block ? block.content : "";
+  const semanticPart = slugify(title || content).slice(0, 48);
+  return semanticPart ? `${block.type}-${semanticPart}` : `${block.type}-${index}`;
 }
 
 function getDisplayBlocks(
@@ -80,11 +96,7 @@ function RichAnswerBlockView({ block }: { block: ResearchArtifactBlock }) {
   switch (block.type) {
     case "markdown":
       return (
-        <div className="prose prose-sm max-w-none text-body">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {block.content}
-          </ReactMarkdown>
-        </div>
+        <ResearchMarkdown content={block.content} />
       );
     case "metric_grid":
       return (
@@ -305,31 +317,7 @@ function RichAnswerBlockView({ block }: { block: ResearchArtifactBlock }) {
     case "evidence_chain":
       return (
         <AnswerSection title={block.title}>
-          <details className="rounded-[8px] bg-surface px-sm py-xs">
-            <summary className="cursor-pointer text-[14px] font-semibold text-ink">
-              근거 체인
-            </summary>
-            <div className="mt-sm space-y-sm">
-              {block.chains.map((chain, index) => (
-                <div
-                  key={`${chain.claim}-${index}`}
-                  className="border-l-2 border-hairline pl-sm"
-                >
-                  <div className="text-[14px] font-semibold text-ink">
-                    {chain.claim}
-                  </div>
-                  <MetaLine
-                    items={[chain.source_label, getConfidenceLabel(chain.confidence)]}
-                  />
-                  {chain.chain_steps && chain.chain_steps.length > 0 && (
-                    <p className="mt-xxs text-[13px] leading-[1.45] text-body">
-                      {chain.chain_steps.join(" → ")}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </details>
+          <AnimatedEvidenceChain chains={block.chains} />
         </AnswerSection>
       );
     case "caveat_list":
@@ -387,12 +375,68 @@ function AnswerSection({
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function AnimatedEvidenceChain({ chains }: { chains: any[] }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="rounded-[8px] bg-surface px-sm py-xs">
+      <button
+        type="button"
+        className="flex w-full cursor-pointer items-center justify-between text-[14px] font-semibold text-ink"
+        onClick={() => setIsOpen(!isOpen)}
+        aria-expanded={isOpen}
+      >
+        <span>근거 체인</span>
+        <span
+          className="material-symbols-outlined text-[18px] text-muted transition-transform"
+          style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+        >
+          expand_more
+        </span>
+      </button>
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: easeOutExpo }}
+            className="overflow-hidden"
+          >
+            <div className="mt-sm space-y-sm pb-xs">
+              {chains.map((chain, index) => (
+                <div
+                  key={`${chain.claim}-${index}`}
+                  className="border-l-2 border-hairline pl-sm"
+                >
+                  <div className="text-[14px] font-semibold text-ink">
+                    {chain.claim}
+                  </div>
+                  <MetaLine
+                    items={[chain.source_label, getConfidenceLabel(chain.confidence)]}
+                  />
+                  {chain.chain_steps && chain.chain_steps.length > 0 && (
+                    <p className="mt-xxs text-[13px] leading-[1.45] text-body">
+                      {chain.chain_steps.join(" → ")}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function DirectionPill({ direction }: { direction: string }) {
   const color =
     direction === "positive"
       ? "text-semantic-up"
       : direction === "negative"
-        ? "text-error"
+        ? "text-semantic-down"
         : "text-muted";
   return (
     <span className={`text-[12px] font-semibold ${color}`}>

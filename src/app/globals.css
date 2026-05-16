@@ -27,12 +27,12 @@
 
 @theme inline {
   /* Colors - Coinbase Institutional Style System */
-  --color-canvas: #fffdf8;
-  --color-surface: #f7f3ea;
-  --color-surface-soft: #f0ece3;
-  --color-surface-strong: #e4ded2;
-  --color-surface-dark: #0b1020;
-  --color-surface-dark-elevated: #151827;
+  --color-canvas: #ffffff;
+  --color-surface: #f4f6fa;
+  --color-surface-soft: #f8f9fb;
+  --color-surface-strong: #e9edf3;
+  --color-surface-dark: #0a0b0d;
+  --color-surface-dark-elevated: #16181c;
   --color-surface-container: #ededfb;
   --color-surface-container-low: #f3f2ff;
   --color-surface-container-lowest: #ffffff;
@@ -41,18 +41,18 @@
   --color-surface-dim: #d9d9e7;
   --color-surface-bright: #fbf8ff;
 
-  --color-ink: #111111;
-  --color-body: #4f524f;
-  --color-body-strong: #111111;
-  --color-muted: #77746d;
-  --color-muted-soft: #aaa39a;
+  --color-ink: #0a0b0d;
+  --color-body: #5b616e;
+  --color-body-strong: #0a0b0d;
+  --color-muted: #7c828a;
+  --color-muted-soft: #a8acb3;
 
-  --color-primary: #183f8c;
-  --color-primary-container: #2358b8;
-  --color-primary-active: #12316f;
+  --color-primary: #003ec7;
+  --color-primary-container: #0052ff;
+  --color-primary-active: #003ecc;
   --color-primary-disabled: #a8b8cc;
-  --color-primary-fixed: #f3eee4;
-  --color-primary-fixed-dim: #e6c98d;
+  --color-primary-fixed: #dde1ff;
+  --color-primary-fixed-dim: #b7c4ff;
 
   --color-on-primary: #ffffff;
   --color-on-primary-container: #dfe3ff;
@@ -64,8 +64,8 @@
   --color-on-secondary: #ffffff;
   --color-on-secondary-container: #5f6161;
 
-  --color-tertiary: #8c4f18;
-  --color-tertiary-container: #b8792e;
+  --color-tertiary: #952200;
+  --color-tertiary-container: #bf3003;
   --color-on-tertiary: #ffffff;
   --color-on-tertiary-container: #ffddd5;
 
@@ -74,27 +74,27 @@
   --color-on-error: #ffffff;
   --color-on-error-container: #93000a;
 
-  --color-on-surface: #111111;
-  --color-on-surface-variant: #3d3c38;
-  --color-on-background: #111111;
+  --color-on-surface: #191b25;
+  --color-on-surface-variant: #434656;
+  --color-on-background: #191b25;
   --color-inverse-surface: #2e303a;
   --color-inverse-on-surface: #f0effe;
   --color-inverse-primary: #b7c4ff;
 
-  --color-outline: #858073;
-  --color-outline-variant: #d3cabd;
+  --color-outline: #737688;
+  --color-outline-variant: #c3c5d9;
 
-  --color-hairline: #ded6c8;
-  --color-hairline-soft: #ebe5da;
+  --color-hairline: #dee1e6;
+  --color-hairline-soft: #eef0f3;
 
   --color-on-dark: #ffffff;
-  --color-on-dark-soft: #a8acb3;
+  --color-on-dark-soft: #c2c7d0;
 
-  --color-semantic-up: #16784a;
+  --color-semantic-up: #05b169;
   --color-semantic-down: #cf202f;
-  --color-accent-yellow: #e6c98d;
+  --color-accent-yellow: #f4b000;
 
-  --color-background: #fffdf8;
+  --color-background: #fbf8ff;
 
   /* Spacing */
   --spacing-xxs: 4px;
@@ -126,9 +126,18 @@
   --radius-pill: 9999px;
   --radius-full: 9999px;
 
+  /* Animation Tokens */
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+  --duration-slow: 500ms;
+  --duration-hero: 800ms;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
   /* Font Families */
   --font-inter: "Inter", -apple-system, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-body: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", var(--font-inter);
+  --font-body: var(--font-noto-sans-kr), "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", var(--font-inter);
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
@@ -188,4 +197,44 @@ body {
 *:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up var(--duration-normal) var(--ease-out-expo) forwards;
+}
+
+@keyframes drift {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(-2%, 2%) scale(1.05);
+  }
+}
+
+.animate-drift {
+  animation: drift 20s ease-in-out infinite alternate;
+}
+
+/* Reduced motion: disable all animations for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

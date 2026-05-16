@@ -3,7 +3,15 @@ node_modules
 out
 
 _workspace
-krw-ontology
+krw-ontology/.git
+krw-ontology/.venv
+krw-ontology/.venv311
+krw-ontology/.pytest_cache
+krw-ontology/.ruff_cache
+krw-ontology/.env
+krw-ontology/.env.*
+krw-ontology/**/__pycache__
+krw-ontology/**/*.pyc
 
 .git
 .claude

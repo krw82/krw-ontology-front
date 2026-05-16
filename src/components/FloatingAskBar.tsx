@@ -58,7 +58,7 @@ export default function FloatingAskBar({ selectedTicker }: FloatingAskBarProps) 
         />
         <button
           type="submit"
-          className="flex h-[44px] shrink-0 items-center justify-center rounded-[8px] bg-surface-dark px-base text-[15px] font-bold leading-[1.15] text-stone-50 transition-colors hover:bg-primary-active sm:px-lg sm:text-[16px]"
+          className="flex h-[44px] shrink-0 items-center justify-center rounded-[8px] bg-surface-dark px-base text-[15px] font-bold leading-[1.15] text-on-dark transition-colors hover:bg-primary-active sm:px-lg sm:text-[16px]"
           aria-label="질문 제출"
         >
           질문

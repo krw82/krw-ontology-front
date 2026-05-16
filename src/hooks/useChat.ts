@@ -20,6 +20,7 @@ import type {
 } from "@/types/api-contracts";
 import { getChatContentLimit } from "@/lib/chat-limits";
 import { deriveLoadedChatState } from "@/lib/chat/history-state";
+import { createClientId } from "@/lib/client-id";
 
 interface UseChatOptions {
   sessionId: string;
@@ -46,6 +47,8 @@ export interface ChatState {
   toolCalls: ToolCallState[];
   citations: ChatCitation[];
   richAnswers: ResearchArtifact[];
+  structuringMessageId: string | null;
+  runDurationsByMessageId: Record<string, number>;
   runId: string | null;
   usage: {
     input_tokens: number;
@@ -68,6 +71,8 @@ function createInitialChatState(): ChatState {
     toolCalls: [],
     citations: [],
     richAnswers: [],
+    structuringMessageId: null,
+    runDurationsByMessageId: {},
     runId: null,
     usage: null,
     release: null,
@@ -268,7 +273,7 @@ export function useChat({
             ? [
                 ...prev.messages,
                 {
-                  id: d.message_id || crypto.randomUUID(),
+                  id: d.message_id || createClientId(),
                   session_id:
                     activeSessionIdRef.current || sessionId,
                   role: "assistant" as const,
@@ -284,6 +289,12 @@ export function useChat({
             streamingContent: "",
             activity: null,
             runId: d.run_id,
+            runDurationsByMessageId: d.message_id
+              ? {
+                  ...prev.runDurationsByMessageId,
+                  [d.message_id]: d.usage.latency_ms,
+                }
+              : prev.runDurationsByMessageId,
             release: d.release,
             usage: d.usage,
             quota: d.quota,
@@ -307,7 +318,7 @@ export function useChat({
           const trimmed = prev.streamingContent.trim();
           const partialMessage: Message | null = trimmed
             ? {
-                id: crypto.randomUUID(),
+                id: createClientId(),
                 session_id: activeSessionIdRef.current || sessionId,
                 role: "assistant",
                 content: trimmed,
@@ -407,7 +418,7 @@ export function useChat({
         return;
       }
 
-      const requestId = crypto.randomUUID();
+      const requestId = createClientId();
 
       finalizedRef.current = false;
       streamingContentRef.current = "";
@@ -415,7 +426,7 @@ export function useChat({
       retryCountRef.current = 0;
 
       const userMessage: Message = {
-        id: crypto.randomUUID(),
+        id: createClientId(),
         session_id: sessionId || "pending",
         role: "user",
         content: content.trim(),
@@ -436,6 +447,7 @@ export function useChat({
         toolCalls: [],
         citations: [],
         richAnswers: [],
+        structuringMessageId: null,
         usage: null,
         release: null,
         quota: null,
@@ -517,7 +529,7 @@ export function useChat({
               const trimmed = prev.streamingContent.trim();
               const partialMessage: Message | null = trimmed
                 ? {
-                    id: crypto.randomUUID(),
+                    id: createClientId(),
                     session_id: activeSessionIdRef.current || sessionId,
                     role: "assistant",
                     content: trimmed,
@@ -557,7 +569,7 @@ export function useChat({
               messages: [
                 ...prev.messages,
                 {
-                  id: crypto.randomUUID(),
+                  id: createClientId(),
                   session_id: activeSessionIdRef.current || sessionId,
                   role: "assistant",
                   content: c,
@@ -606,6 +618,43 @@ export function useChat({
     }
   }, [sessionId]);
 
+  const structureMessage = useCallback(async (messageId: string) => {
+    if (!messageId || statusRef.current === "running") return;
+
+    setState((prev) => ({
+      ...prev,
+      error: null,
+      structuringMessageId: messageId,
+    }));
+
+    try {
+      const response = await fetch(
+        `/api/chat/messages/${messageId}/structure`,
+        { method: "POST" },
+      );
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error?.message || `구조화 요청에 실패했습니다: ${response.status}`,
+        );
+      }
+
+      const incoming = (data?.rich_answers ?? data?.artifacts ?? []) as ResearchArtifact[];
+      setState((prev) => ({
+        ...prev,
+        richAnswers: mergeRichAnswers(prev.richAnswers, incoming),
+        structuringMessageId: null,
+      }));
+    } catch (err) {
+      setState((prev) => ({
+        ...prev,
+        error: (err as Error).message,
+        structuringMessageId: null,
+      }));
+    }
+  }, []);
+
   const loadSession = useCallback(async () => {
     if (!sessionId) return;
     try {
@@ -633,6 +682,16 @@ export function useChat({
         runId: loaded.activeRunId,
         citations: (data.citations ?? []) as ChatCitation[],
         richAnswers: data.rich_answers ?? data.research_artifacts ?? [],
+        runDurationsByMessageId: Object.fromEntries(
+          (data.runs ?? [])
+            .filter(
+              (run) =>
+                run.assistant_message_id &&
+                typeof run.latency_ms === "number" &&
+                run.latency_ms > 0,
+            )
+            .map((run) => [run.assistant_message_id as string, run.latency_ms as number]),
+        ),
         ...(data.runs && data.runs.length > 0
           ? {
               usage:
@@ -711,7 +770,8 @@ export function useChat({
       sendMessage,
       cancelRun,
       loadSession,
+      structureMessage,
     }),
-    [state, sendMessage, cancelRun, loadSession]
+    [state, sendMessage, cancelRun, loadSession, structureMessage]
   );
 }

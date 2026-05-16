@@ -30,7 +30,8 @@ export function buildSystemPrompt(
 The user prompt begins with the exact Claude Code skill command for the active pass. Follow that skill.
 Use only the configured read-only KRW Ontology tools for evidence retrieval.
 Do not perform web searches or mutate local files.
-Use the runtime context only as scope and history for that active pass.${contextBlock}`;
+Use the runtime context only as scope and history for that active pass.
+Return only the final user-visible answer in Markdown. Do not include tool-use narration, hidden planning notes, or progress phrases such as "I will query", "Let me get", or "I'll check".${contextBlock}`;
 }
 
 function buildRuntimeContext(

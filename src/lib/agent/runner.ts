@@ -19,15 +19,8 @@ import {
   buildSystemPrompt,
   type CompanyPromptContext,
 } from "./system-prompt";
+import { buildResearchPassPrompt } from "./workflow";
 import {
-  buildComposerPassPrompt,
-  buildResearchPassPrompt,
-} from "./workflow";
-import {
-  DISPLAY_PLAN_OUTPUT_SCHEMA,
-  RESEARCH_SYNTHESIS_OUTPUT_SCHEMA,
-  parseDisplayPlanOutput,
-  parseDisplayPlanOutputText,
   parseResearchSynthesisOutput,
   parseResearchSynthesisOutputText,
 } from "@/lib/artifacts/display-plan";
@@ -87,6 +80,7 @@ export interface SdkDiagnostics {
   tools?: unknown;
   allowedTools?: string[];
   plugins?: unknown;
+  mcpServers?: unknown;
   slashCommands?: Array<{ name: string; description?: string }>;
   mcpServerStatus?: unknown;
   initError?: string;
@@ -135,6 +129,7 @@ export async function runAgent(
       append: systemPrompt,
     },
     plugins: [{ type: "local", path: pluginPath }],
+    mcpServers: buildKrwOntologyMcpServers(),
     tools: [],
     allowedTools: KRW_ONTOLOGY_SDK_ALLOWED_TOOLS,
     permissionMode: "bypassPermissions",
@@ -158,10 +153,6 @@ export async function runAgent(
       prompt: researchPrompt,
       sdkOptions: {
         ...baseSdkOptions,
-        outputFormat: {
-          type: "json_schema",
-          schema: RESEARCH_SYNTHESIS_OUTPUT_SCHEMA,
-        },
         ...(shouldResume
           ? { resume: options.sessionId }
           : { sessionId: options.sessionId }),
@@ -172,7 +163,7 @@ export async function runAgent(
       pluginPath,
       sendEvent,
       observedModels,
-      suppressTextDeltas: true,
+      suppressTextDeltas: false,
     });
 
     if (researchResult.status !== "completed") {
@@ -182,68 +173,22 @@ export async function runAgent(
     const researchSynthesis =
       parseResearchSynthesisOutput(researchResult.acc.structuredOutput) ??
       parseResearchSynthesisOutputText(serializePassOutput(researchResult.acc));
-    if (!researchSynthesis) {
-      if (researchResult.acc.fullText.trim()) {
-        researchResult.acc.structuredOutput = null;
-        researchResult.acc.researchSynthesisOutput = null;
-        researchResult.acc.researchSynthesisText = null;
-        return researchResult;
-      }
+    if (researchSynthesis) {
+      researchResult.acc.researchSynthesisOutput = researchSynthesis;
+      researchResult.acc.researchSynthesisText = JSON.stringify(researchSynthesis);
+    }
 
+    if (!researchResult.acc.fullText.trim()) {
       return {
         acc: researchResult.acc,
         status: "failed",
         errorCode: "claude_api_error",
         errorMessage:
-          "리서치 단계에서 화면에 표시할 수 있는 구조화 결과를 받지 못했습니다.",
+          "리서치 단계에서 화면에 표시할 답변을 받지 못했습니다.",
       };
     }
-    researchResult.acc.researchSynthesisOutput = researchSynthesis;
-    researchResult.acc.researchSynthesisText = JSON.stringify(researchSynthesis);
 
-    await sendEvent("activity_update", {
-      stage: "composing",
-      label: "답변 구성 중",
-    });
-    const composerResult = await runSdkPass({
-      passName: "composer",
-      prompt: buildComposerPassPrompt({
-        question: options.userMessage,
-        research_synthesis: researchSynthesis,
-        runtime: {
-          supports_structured_output: true,
-          language: inferRuntimeLanguage(options.userMessage),
-        },
-      }),
-      sdkOptions: {
-        ...baseSdkOptions,
-        allowedTools: [],
-        outputFormat: {
-          type: "json_schema",
-          schema: DISPLAY_PLAN_OUTPUT_SCHEMA,
-        },
-        resume: options.sessionId,
-      },
-      options,
-      requestedModel,
-      cwd,
-      pluginPath,
-      sendEvent,
-      observedModels,
-      suppressTextDeltas: true,
-    });
-
-    const displayPlan =
-      parseDisplayPlanOutput(composerResult.acc.structuredOutput) ??
-      parseDisplayPlanOutputText(serializePassOutput(composerResult.acc));
-    if (displayPlan) {
-      composerResult.acc.displayPlanOutput = displayPlan;
-    }
-
-    return {
-      ...composerResult,
-      acc: mergePassAccumulators(researchResult.acc, composerResult.acc),
-    };
+    return researchResult;
   } catch (err) {
     if (options.abortSignal?.aborted || abortController.signal.aborted) {
       return { acc, status: "cancelled" };
@@ -261,6 +206,25 @@ export async function runAgent(
   } finally {
     options.abortSignal?.removeEventListener("abort", abortHandler);
   }
+}
+
+function buildKrwOntologyMcpServers(): Options["mcpServers"] | undefined {
+  const baseUrl = process.env.MCP_BASE_URL?.trim().replace(/\/+$/, "");
+  if (!baseUrl) return undefined;
+
+  const bearerToken = process.env.MCP_BEARER_TOKEN?.trim();
+  const headers = bearerToken
+    ? { Authorization: `Bearer ${bearerToken}` }
+    : undefined;
+
+  return {
+    "krw-ontology": {
+      type: "http",
+      url: `${baseUrl}/mcp`,
+      headers,
+      alwaysLoad: true,
+    },
+  };
 }
 
 async function runSdkPass(params: {
@@ -382,30 +346,6 @@ function serializePassOutput(acc: AccumulatedRun): string {
   return acc.fullText.trim();
 }
 
-function mergePassAccumulators(
-  researchAcc: AccumulatedRun,
-  composerAcc: AccumulatedRun,
-): AccumulatedRun {
-  return {
-    ...composerAcc,
-    fullText: researchAcc.fullText,
-    structuredOutput: composerAcc.structuredOutput,
-    researchSynthesisOutput:
-      researchAcc.researchSynthesisOutput ?? researchAcc.structuredOutput,
-    researchSynthesisText:
-      researchAcc.researchSynthesisText ?? serializePassOutput(researchAcc),
-    displayPlanOutput: composerAcc.displayPlanOutput ?? composerAcc.structuredOutput,
-    toolCalls: [...researchAcc.toolCalls, ...composerAcc.toolCalls],
-    citations: [...researchAcc.citations, ...composerAcc.citations],
-    inputTokens: researchAcc.inputTokens + composerAcc.inputTokens,
-    outputTokens: researchAcc.outputTokens + composerAcc.outputTokens,
-  };
-}
-
-function inferRuntimeLanguage(userMessage: string): string {
-  return /[가-힣]/.test(userMessage) ? "ko" : "en";
-}
-
 async function reportSdkInitialization(params: {
   passName: "research" | "composer";
   sdkQuery: ReturnType<typeof query>;
@@ -440,6 +380,7 @@ async function reportSdkInitialization(params: {
     tools: sdkOptions.tools,
     allowedTools: sdkOptions.allowedTools,
     plugins: sdkOptions.plugins,
+    mcpServers: sdkOptions.mcpServers,
     observedAt: new Date().toISOString(),
   };
 
@@ -766,7 +707,12 @@ function numberValue(value: unknown): number | null {
 
 function errorCodeFromMessage(message: string): AgentRunResult["errorCode"] {
   const lower = message.toLowerCase();
-  if (lower.includes("not logged in") || lower.includes("please run /login")) {
+  if (
+    lower.includes("not logged in") ||
+    lower.includes("please run /login") ||
+    lower.includes("invalid api key") ||
+    lower.includes("authentication_failed")
+  ) {
     return "auth_required";
   }
   if (lower.includes("rate limit") || lower.includes("429")) {
@@ -784,7 +730,7 @@ function userFacingErrorMessage(
     return "현재 Claude Code 계정/API 요청 한도에 도달했습니다. 잠시 후 다시 시도하거나, 실제 ANTHROPIC_API_KEY를 설정한 뒤 서버를 재시작해주세요.";
   }
   if (code === "auth_required") {
-    return "Claude Code 인증 정보가 이 웹 앱 실행 환경에 전달되지 않았습니다. 터미널 Claude가 된다면 사용자 Claude 설정의 인증 env를 앱이 읽도록 서버를 재시작해주세요. 계속 실패하면 실제 ANTHROPIC_API_KEY를 .env.local에 설정하세요.";
+    return "Claude Code 인증 정보가 서버 실행 환경에 없거나 유효하지 않습니다. 서버에서 Claude Code 인증을 마친 뒤 앱 컨테이너가 그 실행 파일과 설정을 볼 수 있게 재시작해주세요.";
   }
   if (code === "mcp_unavailable") {
     return "온톨로지 도구 연결을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.";
@@ -867,7 +813,7 @@ function extractCitations(
   parsedResult: unknown = null,
 ) {
   try {
-    const data: unknown = parsedResult ?? JSON.parse(resultContent);
+    const data = normalizeCitationPayload(parsedResult ?? resultContent);
     if (!isRecord(data)) return;
 
     if (Array.isArray(data.results)) {
@@ -900,4 +846,26 @@ function extractCitations(
   } catch {
     // Tool result was not JSON or did not contain compact evidence bundles.
   }
+}
+
+function normalizeCitationPayload(value: unknown): unknown {
+  if (typeof value === "string") {
+    try {
+      return normalizeCitationPayload(JSON.parse(value));
+    } catch {
+      return null;
+    }
+  }
+
+  if (!isRecord(value)) return value;
+
+  if (typeof value.result === "string") {
+    try {
+      return normalizeCitationPayload(JSON.parse(value.result));
+    } catch {
+      return value;
+    }
+  }
+
+  return value;
 }

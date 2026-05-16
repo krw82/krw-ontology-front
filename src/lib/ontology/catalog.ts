@@ -18,6 +18,10 @@ type CompanyArtifactIndex = {
 };
 
 type CompanyBusinessProfile = {
+  company_name?: string;
+  legal_name?: string;
+  display_name?: string;
+  name?: string;
   business_model_summary?: string;
   sector?: string;
   primary_business_activities?: string[];
@@ -27,6 +31,7 @@ type CompanyBusinessProfile = {
 export interface IndexedCompany {
   ticker: string;
   name: string;
+  sector: string | null;
   description: string;
   latest_period: string | null;
   coverage: string;
@@ -109,6 +114,39 @@ const SECTOR_LABELS: Record<string, string> = {
   utilities: "유틸리티",
 };
 
+const FALLBACK_COMPANY_NAMES: Record<string, string> = {
+  AAPL: "Apple Inc.",
+  AMZN: "Amazon.com, Inc.",
+  AVGO: "Broadcom Inc.",
+  CLF: "Cleveland-Cliffs Inc.",
+  CPNG: "Coupang, Inc.",
+  CVX: "Chevron Corporation",
+  EMR: "Emerson Electric Co.",
+  ERII: "Energy Recovery, Inc.",
+  ETN: "Eaton Corporation plc",
+  GOOG: "Alphabet Inc.",
+  JNJ: "Johnson & Johnson",
+  LNG: "Cheniere Energy, Inc.",
+  MA: "Mastercard Incorporated",
+  META: "Meta Platforms, Inc.",
+  MSFT: "Microsoft Corporation",
+  NVDA: "NVIDIA Corporation",
+  OII: "Oceaneering International, Inc.",
+  OXY: "Occidental Petroleum Corporation",
+  PG: "The Procter & Gamble Company",
+  PLTR: "Palantir Technologies Inc.",
+  ROK: "Rockwell Automation, Inc.",
+  SLB: "SLB",
+  TSLA: "Tesla, Inc.",
+  UNH: "UnitedHealth Group Incorporated",
+  V: "Visa Inc.",
+  VG: "Venture Global, Inc.",
+  VST: "Vistra Corp.",
+  WMT: "Walmart Inc.",
+  XOM: "Exxon Mobil Corporation",
+  XYL: "Xylem Inc.",
+};
+
 function normalizeLabelKey(value: string): string {
   return value
     .trim()
@@ -126,6 +164,11 @@ function formatLabel(value: string | undefined): string {
     .replace(/\s+/g, " ")
     .trim()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function firstTextValue(...values: Array<string | undefined>): string | null {
+  const value = values.find((item) => item?.trim());
+  return value ? value.trim() : null;
 }
 
 function iconForCompany(profile: CompanyBusinessProfile | null): string {
@@ -174,13 +217,24 @@ async function buildCompany(root: string, ticker: string): Promise<IndexedCompan
     `Indexed ontology coverage for ${ticker}.`;
   const activities = profile?.primary_business_activities?.slice(0, 3) ?? [];
   const factors = profile?.key_external_factors?.slice(0, 4) ?? [];
+  const sector = profile?.sector ? formatLabel(profile.sector) : null;
+  const companyName =
+    firstTextValue(
+      profile?.company_name,
+      profile?.legal_name,
+      profile?.display_name,
+      profile?.name,
+    ) ??
+    FALLBACK_COMPANY_NAMES[ticker] ??
+    ticker;
   const coverage = `${periods.length}개 공시 인덱싱${
     documentTypes.length ? ` · ${documentTypes.join(", ")}` : ""
   }${latestPeriod ? ` · 최신 ${latestPeriod}` : ""}`;
 
   return {
     ticker,
-    name: formatLabel(profile?.sector),
+    name: companyName,
+    sector,
     description: trimSentence(description),
     latest_period: latestPeriod,
     coverage,

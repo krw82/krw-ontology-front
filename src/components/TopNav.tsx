@@ -2,17 +2,10 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Image from "next/image";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { KrwBrand } from "@/components/KrwBrand";
-import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
-
-const navLinks = [
-  { href: "/chat", label: "리서치" },
-  { href: "/companies", label: "회사 목록" },
-];
 
 interface UserProfile {
   email: string;
@@ -74,11 +67,8 @@ function UserAvatar({
 }
 
 export default function TopNav() {
-  const pathname = usePathname();
   const router = useRouter();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  // L-06: mobile nav toggle
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -143,51 +133,23 @@ export default function TopNav() {
 
   return (
     <header className="sticky top-0 z-50 h-[64px] w-full flex-shrink-0 border-b border-hairline bg-canvas/95 backdrop-blur-xl">
-      <div className="mx-auto flex h-full w-full max-w-[1600px] items-center justify-between gap-sm px-base sm:px-md">
-        {/* L-06: Mobile hamburger menu */}
-        <button
-          className="-ml-xs p-xs text-body transition-colors hover:text-tertiary md:hidden"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          aria-label="메뉴 열기"
-          aria-expanded={mobileMenuOpen}
-        >
-          <span className="material-symbols-outlined text-[24px]">
-            {mobileMenuOpen ? "close" : "menu"}
-          </span>
-        </button>
-
+      <div className="mx-auto flex h-full w-full max-w-[1600px] items-center justify-between gap-sm px-base pl-[68px] sm:px-md md:pl-md">
         <div className="flex min-w-0 items-center gap-lg">
-          <KrwBrand href="/companies" compact />
-          <nav className="ml-xl hidden h-full items-center gap-lg pt-4 md:flex">
-            {navLinks.map((link) => {
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={cn(
-                    "border-b-2 pb-4 text-[14px] font-semibold leading-[1.4] transition-colors duration-200",
-                    isActive
-                      ? "text-tertiary border-tertiary-container font-semibold"
-                      : "text-body border-transparent hover:text-tertiary",
-                  )}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
-          </nav>
+          <KrwBrand href="/" compact />
         </div>
-        <div className="flex shrink-0 items-center gap-xs sm:gap-md">
+
+        <div className="flex shrink-0 items-center justify-end gap-xs sm:gap-md">
           {userProfile ? (
             <div ref={accountMenuRef} className="relative">
               <button
                 type="button"
-                className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-[8px] border border-hairline bg-surface-dark text-[14px] font-semibold text-stone-50 shadow-sm transition-colors hover:border-tertiary-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tertiary-container focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-[8px] border border-hairline bg-surface-dark text-[14px] font-semibold text-on-dark shadow-sm transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                 aria-label={`${userProfile.name ?? userProfile.email} 계정 메뉴`}
                 aria-expanded={accountMenuOpen}
                 aria-haspopup="menu"
-                onClick={() => setAccountMenuOpen((open) => !open)}
+                onClick={() => {
+                  setAccountMenuOpen((open) => !open);
+                }}
               >
                 <UserAvatar
                   profile={userProfile}
@@ -197,11 +159,11 @@ export default function TopNav() {
 
               {accountMenuOpen && (
                 <div
-                  className="absolute right-0 top-full z-50 mt-xs w-[260px] rounded-[8px] border border-hairline bg-canvas p-xs shadow-lg"
+                  className="fixed left-base right-base top-[72px] z-50 mt-0 w-auto rounded-[8px] border border-hairline bg-canvas p-xs shadow-lg md:absolute md:left-auto md:right-0 md:top-full md:mt-xs md:w-[260px]"
                   role="menu"
                 >
                   <div className="flex items-center gap-sm border-b border-hairline px-sm py-sm">
-                    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-surface-dark text-[15px] font-semibold text-stone-50">
+                    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-surface-dark text-[15px] font-semibold text-on-dark">
                       <UserAvatar
                         profile={userProfile}
                         onAvatarError={handleAvatarError}
@@ -220,7 +182,7 @@ export default function TopNav() {
                   </div>
                   <button
                     type="button"
-                    className="mt-xs flex w-full items-center justify-between rounded-[8px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-surface-soft hover:text-tertiary"
+                    className="mt-xs flex w-full items-center justify-between rounded-[8px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-surface-soft hover:text-primary"
                     role="menuitem"
                     onClick={handleSignOut}
                   >
@@ -237,7 +199,7 @@ export default function TopNav() {
             </div>
           ) : (
             <button
-              className="rounded-[8px] bg-surface-dark px-sm py-xs text-[14px] font-semibold leading-[1.15] text-stone-50 transition-colors duration-200 hover:bg-primary-active sm:px-base sm:text-[16px]"
+              className="rounded-[8px] bg-surface-dark px-sm py-xs text-[14px] font-semibold leading-[1.15] text-on-dark transition-colors duration-200 hover:bg-primary-active sm:px-base sm:text-[16px]"
               aria-label="로그인"
               onClick={() => router.push("/login")}
             >
@@ -247,32 +209,6 @@ export default function TopNav() {
 
         </div>
       </div>
-
-      {/* L-06: Mobile dropdown menu */}
-      {mobileMenuOpen && (
-        <div className="border-t border-hairline bg-canvas px-base py-base shadow-sm md:hidden sm:px-md">
-          <nav className="flex flex-col gap-base">
-            {navLinks.map((link) => {
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={cn(
-                    "text-[16px] leading-[1.5] font-medium py-sm transition-colors",
-                    isActive
-                      ? "text-tertiary font-semibold"
-                      : "text-body hover:text-tertiary",
-                  )}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-      )}
     </header>
   );
 }

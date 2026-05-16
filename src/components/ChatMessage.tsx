@@ -1,117 +1,114 @@
 "use client";
 
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import RichAnswerRenderer from "@/components/RichAnswerRenderer";
-import type {
-  ChatCitation,
-  ResearchActivityUpdate,
-  ResearchArtifact,
-} from "@/types/api-contracts";
+import { useEffect, useState } from "react";
+import { motion } from "motion/react";
+import ResearchMarkdown from "@/components/ResearchMarkdown";
+import type { ResearchActivityUpdate } from "@/types/api-contracts";
+import { chatMessageUser, chatMessageAssistant } from "@/lib/animation";
 
 interface ChatMessageProps {
   role: "user" | "assistant";
   content: string;
   isStreaming?: boolean;
   activity?: ResearchActivityUpdate | null;
-  citations?: ChatCitation[];
-  richAnswers?: ResearchArtifact[];
-}
-
-const ACTIVITY_STEPS: Array<{
-  stage: ResearchActivityUpdate["stage"];
-  label: string;
-}> = [
-  { stage: "connecting", label: "자료 연결" },
-  { stage: "researching", label: "근거 확인" },
-  { stage: "checking_evidence", label: "근거 정리" },
-  { stage: "composing", label: "답변 구성" },
-];
-
-function stageRank(stage: ResearchActivityUpdate["stage"]): number {
-  if (stage === "preparing") return 0;
-  if (stage === "complete") return ACTIVITY_STEPS.length + 1;
-  const index = ACTIVITY_STEPS.findIndex((step) => step.stage === stage);
-  return index === -1 ? 0 : index + 1;
+  showHeader?: boolean;
+  workDurationMs?: number | null;
 }
 
 function LoadingDots({ label = "분석 준비 중" }: { label?: string }) {
   return (
-    <div className="flex items-center gap-xs text-[14px] leading-[1.4] text-muted">
+    <motion.div
+      className="flex items-center gap-xs text-[14px] leading-[1.4] text-muted"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
       <div className="flex gap-1">
         <span className="h-2 w-2 animate-bounce rounded-full bg-muted [animation-delay:-0.3s]" />
         <span className="h-2 w-2 animate-bounce rounded-full bg-muted [animation-delay:-0.15s]" />
         <span className="h-2 w-2 animate-bounce rounded-full bg-muted" />
       </div>
       <span>{label}</span>
-    </div>
+    </motion.div>
   );
 }
 
-function ResearchStatusCard({
+function formatDuration(milliseconds: number): string {
+  const totalSeconds = Math.max(0, Math.round(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes <= 0) return `${seconds}초`;
+  if (seconds === 0) return `${minutes}분`;
+  return `${minutes}분 ${seconds}초`;
+}
+
+function activityLabel(activity?: ResearchActivityUpdate | null): string {
+  switch (activity?.stage) {
+    case "connecting":
+      return "자료 연결 중";
+    case "checking_evidence":
+      return "근거 정리 중";
+    case "composing":
+      return "답변 작성 중";
+    case "complete":
+      return "작업 완료";
+    case "researching":
+    case "preparing":
+    default:
+      return "근거 확인 중";
+  }
+}
+
+function useElapsedMilliseconds(enabled: boolean): number {
+  const [startedAt] = useState(() => Date.now());
+  const [now, setNow] = useState(startedAt);
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [enabled]);
+
+  return now - startedAt;
+}
+
+function WorkMetaLine({
   activity,
+  isStreaming,
+  workDurationMs,
 }: {
   activity?: ResearchActivityUpdate | null;
+  isStreaming?: boolean;
+  workDurationMs?: number | null;
 }) {
-  const current = activity ?? {
-    stage: "preparing" as const,
-    label: "분석 준비 중",
-  };
-  const currentRank = stageRank(current.stage);
+  const elapsedMs = useElapsedMilliseconds(Boolean(isStreaming));
+  const label = isStreaming
+    ? `${activityLabel(activity)} · ${formatDuration(elapsedMs)}`
+    : workDurationMs && workDurationMs > 0
+      ? `${formatDuration(workDurationMs)} 동안 작업`
+      : null;
+
+  if (!label) return null;
 
   return (
     <div
-      className="w-full rounded-[8px] border border-hairline bg-surface p-base shadow-sm sm:max-w-[560px] sm:p-lg"
+      className="mb-md flex w-full max-w-[780px] items-center gap-xs border-b border-hairline pb-sm text-[14px] font-semibold leading-[1.4] text-muted sm:text-[15px]"
       aria-live="polite"
     >
-      <div className="flex min-w-0 items-center gap-sm">
-        <span className="material-symbols-outlined shrink-0 text-[20px] text-primary">
-          progress_activity
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-medium leading-[1.4] text-ink sm:text-[16px]">
-            분석 중 · {current.label}
-          </p>
-          <div className="mt-xs sm:hidden">
-            <LoadingDots label={current.label} />
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-base hidden grid-cols-4 gap-xs sm:grid">
-        {ACTIVITY_STEPS.map((step, index) => {
-          const rank = index + 1;
-          const isDone = currentRank > rank;
-          const isActive = current.stage === step.stage;
-          return (
-            <div
-              key={step.stage}
-              className="min-w-0 rounded-[8px] border border-hairline bg-canvas/70 px-sm py-xs"
-            >
-              <div className="flex min-w-0 items-center gap-xs">
-                <span
-                  className={[
-                    "h-2 w-2 shrink-0 rounded-full",
-                    isDone
-                      ? "bg-primary"
-                      : isActive
-                        ? "animate-pulse bg-primary"
-                        : "bg-hairline-soft",
-                  ].join(" ")}
-                />
-                <span
-                  className={[
-                    "truncate text-[13px] leading-[1.4]",
-                    isDone || isActive ? "text-body" : "text-muted",
-                  ].join(" ")}
-                >
-                  {step.label}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {isStreaming && (
+        <motion.span
+          aria-hidden="true"
+          className="h-2 w-2 shrink-0 rounded-full bg-primary"
+          animate={{ scale: [1, 1.2, 1], opacity: [0.6, 1, 0.6] }}
+          transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+        />
+      )}
+      <span>{label}</span>
     </div>
   );
 }
@@ -121,80 +118,49 @@ export default function ChatMessage({
   content,
   isStreaming,
   activity,
-  citations,
-  richAnswers,
+  showHeader = true,
+  workDurationMs,
 }: ChatMessageProps) {
   if (role === "user") {
     return (
-      <div className="flex w-full flex-col items-end">
+      <motion.div
+        className="flex w-full flex-col items-end"
+        initial="hidden"
+        animate="visible"
+        variants={chatMessageUser}
+      >
         <div className="max-w-[92%] rounded-[8px] border border-hairline bg-surface p-base text-ink sm:max-w-[80%] sm:p-lg">
           <p className="whitespace-pre-wrap break-words text-[15px] font-normal leading-[1.5] sm:text-[16px]">{content}</p>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="flex w-full flex-col">
-      <div className="mb-sm flex items-start gap-sm sm:gap-md">
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[8px] bg-surface-dark text-accent-yellow">
-          <span className="material-symbols-outlined text-[18px]">
-            account_tree
-          </span>
-        </div>
-        <h2 className="mt-1 text-[17px] font-bold leading-[1.33] text-ink sm:text-[18px]">
-          Evidence Engine
-        </h2>
-      </div>
-      {isStreaming ? (
+    <motion.div
+      className="flex w-full flex-col"
+      initial="hidden"
+      animate="visible"
+      variants={chatMessageAssistant}
+    >
+      {showHeader && (
         <div className="pl-0 sm:pl-[48px]">
-          <ResearchStatusCard activity={activity} />
-        </div>
-      ) : (
-        <div className="max-w-full space-y-md break-words pl-0 text-[15px] leading-[1.5] text-body sm:max-w-[90%] sm:pl-[48px] sm:text-[16px]">
-          {richAnswers && richAnswers.length > 0 && !isStreaming ? (
-            <div className="space-y-lg">
-              {richAnswers.map((answer) => (
-                <RichAnswerRenderer
-                  key={answer.id}
-                  answer={answer}
-                  fallbackMarkdown={content}
-                />
-              ))}
-            </div>
-          ) : content ? (
-            <div className="prose prose-sm max-w-none text-body">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {content}
-              </ReactMarkdown>
-            </div>
-          ) : null}
-          {isStreaming && <LoadingDots />}
-
-          {/* L-08: Citations rendering */}
-          {citations && citations.length > 0 && !isStreaming && (
-            <div className="mt-md border-t border-hairline pt-md">
-              <p className="mb-sm text-[14px] font-semibold leading-[1.4] text-muted">
-                참고 자료
-              </p>
-              <ul className="space-y-xs">
-                {citations.map((citation, i) => {
-                  const label = citation.ticker
-                    ? `${citation.ticker} - ${citation.document_type || "문서"}`
-                    : citation.document_type || `출처 ${i + 1}`;
-                  const detail = citation.period || citation.section || "";
-                  return (
-                    <li key={i} className="break-words text-[14px] leading-[1.4] text-muted">
-                      <span className="font-medium text-body">{label}</span>
-                      {detail && <span className="ml-xs">({detail})</span>}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
+          <WorkMetaLine
+            activity={activity}
+            isStreaming={isStreaming}
+            workDurationMs={workDurationMs}
+          />
         </div>
       )}
-    </div>
+      {isStreaming ? (
+        <div className="pl-0 sm:pl-[48px]">
+          <LoadingDots label={activityLabel(activity)} />
+        </div>
+      ) : (
+        <div className="max-w-full space-y-md break-words pl-0 text-body sm:pl-[48px]">
+          {content ? <ResearchMarkdown content={content} /> : null}
+        </div>
+      )}
+    </motion.div>
   );
 }

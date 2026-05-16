@@ -59,6 +59,14 @@ interface PluginMcpConfig {
   >;
 }
 
+interface HttpMcpHealthPayload {
+  ok?: boolean;
+  root?: string;
+  documents?: number;
+  objects?: number;
+  error?: string;
+}
+
 export function getKrwOntologyPluginPath(): string {
   const pluginPath =
     process.env.KRW_ONTOLOGY_PLUGIN_PATH || process.env.CLAUDE_PLUGIN_PATH;
@@ -79,8 +87,55 @@ async function exists(filePath: string): Promise<boolean> {
   }
 }
 
+async function checkHttpMcpHealth(
+  pluginPath: string,
+): Promise<McpHealthResult | null> {
+  const baseUrl = process.env.MCP_BASE_URL?.trim();
+  if (!baseUrl) return null;
+
+  try {
+    const response = await fetch(`${baseUrl.replace(/\/+$/, "")}/health`, {
+      cache: "no-store",
+    });
+    const payload = (await response.json().catch(() => null)) as
+      | HttpMcpHealthPayload
+      | null;
+
+    return {
+      connected: response.ok && Boolean(payload?.ok),
+      releaseId: null,
+      indexGeneratedAt: null,
+      companyCount: null,
+      documentCount:
+        typeof payload?.documents === "number" ? payload.documents : null,
+      objectCount: typeof payload?.objects === "number" ? payload.objects : null,
+      root: typeof payload?.root === "string" ? payload.root : null,
+      pluginPath,
+      error:
+        response.ok && payload?.ok
+          ? undefined
+          : payload?.error || `MCP health returned ${response.status}`,
+    };
+  } catch (err) {
+    return {
+      connected: false,
+      releaseId: null,
+      indexGeneratedAt: null,
+      companyCount: null,
+      documentCount: null,
+      objectCount: null,
+      root: null,
+      pluginPath,
+      error: err instanceof Error ? err.message : "Unknown MCP HTTP error",
+    };
+  }
+}
+
 export async function checkMcpHealth(): Promise<McpHealthResult> {
   const pluginPath = getKrwOntologyPluginPath();
+  const httpHealth = await checkHttpMcpHealth(pluginPath);
+  if (httpHealth?.connected) return httpHealth;
+
   const manifestPath = path.join(pluginPath, ".claude-plugin", "plugin.json");
   const mcpConfigPath = path.join(pluginPath, ".mcp.json");
   const requiredSkillPaths = [
@@ -113,7 +168,8 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
       await readFile(mcpConfigPath, "utf8"),
     ) as PluginMcpConfig;
     const serverConfig = mcpConfig.mcpServers?.["krw-ontology"];
-    const root = serverConfig?.env?.KRW_ONTOLOGY_ROOT ?? null;
+    const root =
+      process.env.KRW_ONTOLOGY_ROOT || serverConfig?.env?.KRW_ONTOLOGY_ROOT || null;
 
     if (!serverConfig?.command) {
       return {

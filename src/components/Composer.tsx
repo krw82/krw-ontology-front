@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   MAX_CHAT_MESSAGE_CHARS,
   MAX_CHAT_PAYLOAD_CHARS,
 } from "@/lib/chat-limits";
+import { createClientId } from "@/lib/client-id";
 
 interface ComposerProps {
   onSend: (message: string) => void;
@@ -125,7 +127,7 @@ export default function Composer({
     try {
       const loadedFiles = await Promise.all(
         files.map(async (file) => ({
-          id: crypto.randomUUID(),
+          id: createClientId(),
           name: file.name,
           content: await file.text(),
           size: file.size,
@@ -188,11 +190,17 @@ export default function Composer({
     <div className="border-t border-hairline bg-canvas/95 px-base py-sm backdrop-blur-xl sm:px-lg sm:py-base">
       {(attachments.length > 0 || attachmentError) && (
         <div className="mx-auto mb-xs flex max-w-3xl flex-wrap items-center gap-xs">
-          {attachments.map((file) => (
-            <div
-              key={file.id}
-              className="inline-flex max-w-full items-center gap-xs rounded-full border border-hairline bg-surface-soft px-sm py-xxs text-[12px] leading-[1.4] text-body"
-            >
+          <AnimatePresence>
+            {attachments.map((file) => (
+              <motion.div
+                key={file.id}
+                layout="position"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.2 }}
+                className="inline-flex max-w-full items-center gap-xs rounded-full border border-hairline bg-surface-soft px-sm py-xxs text-[12px] leading-[1.4] text-body"
+              >
               <span className="material-symbols-outlined text-[16px] text-primary">
                 description
               </span>
@@ -200,25 +208,31 @@ export default function Composer({
               <span className="text-muted-soft">{formatBytes(file.size)}</span>
               <button
                 type="button"
-                className="rounded-full p-[2px] text-muted transition-colors hover:text-ink"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-dim hover:text-ink"
                 aria-label={`${file.name} 첨부 제거`}
                 onClick={() => removeAttachment(file.id)}
                 disabled={disabled}
               >
-                <span className="material-symbols-outlined text-[16px]">
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">
                   close
                 </span>
               </button>
-            </div>
-          ))}
-          {attachmentError && (
-            <span className="text-[12px] leading-[1.4] text-error">
-              {attachmentError}
-            </span>
-          )}
+              </motion.div>
+            ))}
+            {attachmentError && (
+              <motion.span
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="text-[12px] leading-[1.4] text-error"
+              >
+                {attachmentError}
+              </motion.span>
+            )}
+          </AnimatePresence>
         </div>
       )}
-      <div className="relative mx-auto flex max-w-3xl items-end rounded-[10px] border border-outline-variant bg-surface p-[4px] transition-all focus-within:border-tertiary-container focus-within:ring-1 focus-within:ring-tertiary-container">
+      <div className="relative mx-auto flex max-w-3xl items-end rounded-[10px] border border-outline-variant bg-surface p-[4px] transition-all focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
         <input
           ref={fileInputRef}
           className="hidden"
@@ -257,7 +271,7 @@ export default function Composer({
           aria-label="메시지 입력"
         />
         <button
-          className="mb-1 mr-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[8px] bg-surface-dark text-stone-50 shadow-sm transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:opacity-50"
+          className="mb-1 mr-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[8px] bg-surface-dark text-on-dark shadow-sm transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:opacity-50"
           onClick={handleSubmit}
           disabled={disabled || isOverLimit}
           aria-label="메시지 보내기"

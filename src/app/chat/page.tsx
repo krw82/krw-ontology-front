@@ -21,7 +21,12 @@ function sanitizeError(message: string): string {
 }
 
 type CompaniesResponse = {
-  companies?: Array<{ ticker: string }>;
+  companies?: Array<{ ticker: string; name?: string | null }>;
+};
+
+type CompanyMeta = {
+  ticker: string;
+  name: string | null;
 };
 
 function ChatContent() {
@@ -33,6 +38,9 @@ function ChatContent() {
 
   const sessionId = existingSessionId;
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [companyMetaByTicker, setCompanyMetaByTicker] = useState<
+    Record<string, CompanyMeta>
+  >({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const hasLoadedRef = useRef(false);
   const cancelledRef = useRef(false);
@@ -64,6 +72,22 @@ function ChatContent() {
           data.companies?.some(
             (company) => company.ticker === normalizedTicker,
           );
+        const matchedCompany = data.companies?.find(
+          (company) => company.ticker === normalizedTicker,
+        );
+
+        if (matchedCompany && !stale && !cancelledRef.current) {
+          setCompanyMetaByTicker((current) => ({
+            ...current,
+            [normalizedTicker]: {
+              ticker: normalizedTicker,
+              name:
+                matchedCompany.name && matchedCompany.name !== normalizedTicker
+                  ? matchedCompany.name
+                  : null,
+            },
+          }));
+        }
 
         if (!isIndexed && !stale && !cancelledRef.current) {
           setSessionError(
@@ -123,24 +147,110 @@ function ChatContent() {
     }
   }, []);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [chat.activity, chat.messages, chat.streamingContent, scrollToBottom]);
-
   const isStreaming = chat.status === "running";
+  const hasConversationContent =
+    chat.messages.length > 0 ||
+    Boolean(chat.streamingContent) ||
+    isStreaming ||
+    Boolean(chat.error);
+
+  useEffect(() => {
+    if (!hasConversationContent) return;
+    const frameId = window.requestAnimationFrame(scrollToBottom);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [
+    chat.activity,
+    chat.messages.length,
+    chat.streamingContent,
+    hasConversationContent,
+    scrollToBottom,
+  ]);
+
   const contextTickers = getSessionTickers(chat.session, ticker);
+  const contextTickersKey = contextTickers.join(",");
+  const contextCompanies = contextTickers.map((contextTicker) => {
+    const normalizedTicker = contextTicker.trim().toUpperCase();
+    return (
+      companyMetaByTicker[normalizedTicker] ?? {
+        ticker: normalizedTicker,
+        name: null,
+      }
+    );
+  });
+  const contextLabel = contextCompanies
+    .map((company) =>
+      company.name ? `${company.name} (${company.ticker})` : company.ticker,
+    )
+    .join(", ");
+  const initialComposerValue = queryParam ?? undefined;
+  const sendMessage = chat.sendMessage;
+  const cancelRun = chat.cancelRun;
+
+  useEffect(() => {
+    if (contextTickers.length === 0) return;
+
+    let stale = false;
+    const missingTickers = contextTickers
+      .map((contextTicker) => contextTicker.trim().toUpperCase())
+      .filter((contextTicker) => !companyMetaByTicker[contextTicker]);
+
+    if (missingTickers.length === 0) return;
+
+    async function loadCompanyMeta() {
+      const entries = await Promise.all(
+        missingTickers.map(async (missingTicker) => {
+          try {
+            const res = await fetch(
+              `/api/companies?ticker=${encodeURIComponent(missingTicker)}`,
+              { cache: "no-store" },
+            );
+            const data = (await res.json()) as CompaniesResponse;
+            const company = data.companies?.find(
+              (item) => item.ticker === missingTicker,
+            );
+            return [
+              missingTicker,
+              {
+                ticker: missingTicker,
+                name:
+                  company?.name && company.name !== missingTicker
+                    ? company.name
+                    : null,
+              },
+            ] as const;
+          } catch {
+            return [
+              missingTicker,
+              { ticker: missingTicker, name: null },
+            ] as const;
+          }
+        }),
+      );
+
+      if (stale || cancelledRef.current) return;
+      setCompanyMetaByTicker((current) => ({
+        ...current,
+        ...Object.fromEntries(entries),
+      }));
+    }
+
+    loadCompanyMeta();
+
+    return () => {
+      stale = true;
+    };
+  }, [companyMetaByTicker, contextTickers, contextTickersKey]);
 
   const handleSend = useCallback(
     async (content: string) => {
-      await chat.sendMessage(content);
+      await sendMessage(content);
     },
-    [chat],
+    [sendMessage],
   );
 
-
   const handleCancel = useCallback(async () => {
-    await chat.cancelRun();
-  }, [chat]);
+    await cancelRun();
+  }, [cancelRun]);
 
   // Escape key to cancel streaming
   useEffect(() => {
@@ -163,12 +273,11 @@ function ChatContent() {
         {/* Chat Canvas */}
         <div className="relative flex min-w-0 flex-1 flex-col bg-canvas">
           {/* Chat History */}
-          {/* L-04: aria-live region for screen readers */}
           <div
             ref={scrollRef}
             className="flex-1 overflow-y-auto px-base pb-[calc(88px+env(safe-area-inset-bottom))] sm:px-xl sm:pb-[96px]"
-            aria-live="polite"
             aria-label="채팅 메시지"
+            aria-relevant="additions text"
             role="log"
           >
             {/* Spacer */}
@@ -177,15 +286,25 @@ function ChatContent() {
             {/* Ticker context indicator */}
             {contextTickers.length > 0 && (
               <div className="mx-auto mb-lg w-full max-w-3xl">
-                <span className="inline-flex max-w-full items-center gap-xs rounded-[8px] border border-hairline bg-surface px-sm py-xs text-[13px] font-semibold leading-[1.4] text-body sm:px-md sm:text-[14px]">
-                  <span className="material-symbols-outlined text-[16px] text-tertiary-container">
-                    business
+                <div
+                  className="inline-flex max-w-full items-center gap-2 rounded-[8px] border border-hairline bg-canvas px-3 py-2 text-[13px] leading-[1.4] shadow-sm"
+                  aria-label={`분석 대상: ${contextLabel}`}
+                >
+                  <span className="shrink-0 font-mono text-[12px] font-black tracking-[0.08em] text-primary">
+                    {contextCompanies.map((company) => company.ticker).join(", ")}
                   </span>
-                  <span className="shrink-0">분석 대상:</span>{" "}
-                  <span className="truncate font-mono font-medium text-ink">
-                    {contextTickers.join(", ")}
-                  </span>
-                </span>
+                  {contextCompanies.some((company) => company.name) && (
+                    <>
+                      <span aria-hidden="true" className="h-3 w-px bg-hairline" />
+                      <span className="truncate font-semibold text-body">
+                        {contextCompanies
+                          .map((company) => company.name)
+                          .filter(Boolean)
+                          .join(", ")}
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
             )}
 
@@ -193,8 +312,14 @@ function ChatContent() {
             {/* H-06: Session creation error */}
             {effectiveSessionError && (
               <div className="mx-auto max-w-3xl">
-                <div className="rounded-[8px] border border-error/20 bg-error-container/10 p-base text-[15px] leading-[1.5] text-error sm:p-lg sm:text-[16px]">
-                  <span className="material-symbols-outlined text-[18px] mr-xs align-middle">
+                <div
+                  className="rounded-[8px] border border-error/20 bg-error-container/10 p-base text-[15px] leading-[1.5] text-error sm:p-lg sm:text-[16px]"
+                  role="alert"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="material-symbols-outlined mr-xs text-[18px] align-middle"
+                  >
                     error
                   </span>
                   {effectiveSessionError}
@@ -209,30 +334,17 @@ function ChatContent() {
                   msg.role === "user" || msg.role === "assistant"
                 )
                 .map((msg, idx, arr) => {
-                  const isLastAssistant =
-                    msg.role === "assistant" && idx === arr.length - 1;
-                  const citations =
-                    msg.role === "assistant" && !isStreaming
-                      ? chat.citations.filter((citation) =>
-                          citation.message_id
-                            ? citation.message_id === msg.id
-                            : isLastAssistant,
-                        )
-                      : undefined;
-                  const richAnswers =
-                    msg.role === "assistant"
-                      ? chat.richAnswers.filter(
-                          (answer) => answer.message_id === msg.id,
-                        )
-                      : undefined;
-
                   return (
                     <ChatMessage
                       key={msg.id}
                       role={msg.role}
                       content={msg.content}
-                      citations={citations}
-                      richAnswers={richAnswers}
+                      showHeader={idx === 0 || arr[idx - 1]?.role !== "assistant"}
+                      workDurationMs={
+                        msg.role === "assistant"
+                          ? chat.runDurationsByMessageId[msg.id]
+                          : null
+                      }
                     />
                   );
                 })}
@@ -244,7 +356,10 @@ function ChatContent() {
                   content={chat.streamingContent}
                   isStreaming={true}
                   activity={chat.activity}
-                  citations={chat.citations}
+                  showHeader={
+                    chat.messages.length === 0 ||
+                    chat.messages[chat.messages.length - 1]?.role !== "assistant"
+                  }
                 />
               )}
               {isStreaming && !chat.streamingContent && (
@@ -253,6 +368,10 @@ function ChatContent() {
                   content=""
                   isStreaming={true}
                   activity={chat.activity}
+                  showHeader={
+                    chat.messages.length === 0 ||
+                    chat.messages[chat.messages.length - 1]?.role !== "assistant"
+                  }
                 />
               )}
 
@@ -260,8 +379,14 @@ function ChatContent() {
               {chat.error && (
                 <div className="flex w-full flex-col">
                   <div className="pl-0 sm:pl-[48px]">
-                    <div className="rounded-[8px] border border-error/20 bg-error-container/10 p-base text-[15px] leading-[1.5] text-error sm:p-lg sm:text-[16px]">
-                      <span className="material-symbols-outlined text-[18px] mr-xs align-middle">
+                    <div
+                      className="rounded-[8px] border border-error/20 bg-error-container/10 p-base text-[15px] leading-[1.5] text-error sm:p-lg sm:text-[16px]"
+                      role="alert"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="material-symbols-outlined mr-xs text-[18px] align-middle"
+                      >
                         error
                       </span>
                       {sanitizeError(chat.error)}
@@ -272,31 +397,31 @@ function ChatContent() {
 
               {/* Empty state */}
               {chat.messages.length === 0 && !isStreaming && !sessionError && (
-                <div className="mx-auto grid w-full max-w-4xl gap-5 py-xxl md:grid-cols-[minmax(0,1fr)_320px]">
-                  <div className="min-w-0 rounded-[12px] border border-hairline bg-[#fffaf0] p-6 shadow-sm sm:p-8">
-                    <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-tertiary">
+                <div className="mx-auto grid w-full max-w-4xl gap-5 py-lg sm:py-xxl md:grid-cols-[minmax(0,1fr)_320px]">
+                  <div className="min-w-0 rounded-[12px] border border-hairline bg-canvas p-5 shadow-sm sm:p-8">
+                    <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-primary">
                       Evidence workspace
                     </p>
-                    <h2 className="mt-3 text-balance text-[34px] font-black leading-[1.02] text-ink sm:text-[48px]">
+                    <h2 className="mt-3 text-balance text-[30px] font-black leading-[1.12] text-ink sm:text-[42px]">
                       질문하면 답변과 근거 경로가 함께 생성됩니다.
                     </h2>
                     <p className="mt-4 max-w-2xl text-[16px] leading-7 text-body">
                       {contextTickers.length > 0
-                        ? `${contextTickers.join(", ")}의 공시 문장, 사업 활동, 핵심 변수 사이의 연결을 기준으로 질문하세요.`
+                        ? `${contextLabel}의 공시 문장, 사업 활동, 핵심 변수 사이의 연결을 기준으로 질문하세요.`
                         : "기업, 문서 기간, 사업 세그먼트, 리스크 변수까지 한 번에 지정해 리서치를 시작하세요."}
                     </p>
 
-                    <div className="mt-6 grid gap-2 sm:grid-cols-3">
-                      {["10-K 원문", "Ontology nodes", "Citation rail"].map(
+                    <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      {["10-K 원문", "온톨로지 노드", "출처 기록"].map(
                         (item) => (
                           <div
                             key={item}
-                            className="rounded-[8px] border border-hairline bg-canvas px-3 py-3"
+                            className="min-w-0 rounded-[8px] border border-hairline bg-canvas px-2 py-3 sm:px-3"
                           >
-                            <span className="material-symbols-outlined text-[20px] text-tertiary-container">
+                            <span className="material-symbols-outlined text-[20px] text-primary-container">
                               verified
                             </span>
-                            <p className="mt-2 text-[13px] font-bold leading-5 text-ink">
+                            <p className="mt-2 text-[12px] font-bold leading-4 text-ink sm:text-[13px] sm:leading-5">
                               {item}
                             </p>
                           </div>
@@ -307,20 +432,23 @@ function ChatContent() {
 
                   <aside className="rounded-[12px] border border-hairline bg-surface p-4 shadow-sm">
                     <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
-                      prompt patterns
+                      질문 예시
                     </p>
                     <div className="mt-4 space-y-3">
                       {[
                         "FY2025 10-K 기준으로 매출 성장 요인을 분해해줘",
                         "핵심 리스크가 어느 사업 활동과 연결되는지 보여줘",
-                        "최근 기간의 margin driver를 citation과 함께 요약해줘",
+                        "최근 기간의 이익률 동인을 출처와 함께 요약해줘",
                       ].map((prompt) => (
-                        <div
+                        <button
+                          type="button"
                           key={prompt}
-                          className="rounded-[8px] border border-hairline-soft bg-canvas px-3 py-3 text-[13px] font-semibold leading-5 text-body"
+                          className="block w-full rounded-[8px] border border-hairline-soft bg-canvas px-3 py-3 text-left text-[13px] font-semibold leading-5 text-body transition-colors hover:border-primary hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+                          onClick={() => handleSend(prompt)}
+                          disabled={isStreaming || Boolean(effectiveSessionError)}
                         >
                           {prompt}
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </aside>
@@ -338,9 +466,9 @@ function ChatContent() {
                 ? "인덱스에 있는 회사만 채팅할 수 있습니다."
                 : isStreaming
                   ? "응답을 기다리는 중..."
-                  : "후속 질문이나 심층 분석을 요청하세요..."
+                  : "후속 질문을 입력하세요..."
             }
-            initialValue={queryParam ?? undefined}
+            initialValue={initialComposerValue}
           />
 
           {/* Cancel button overlay when streaming */}
@@ -351,7 +479,7 @@ function ChatContent() {
                 className="flex items-center gap-xs rounded-[8px] border border-hairline bg-surface-strong px-base py-sm text-[14px] font-semibold leading-[1.4] text-body shadow-sm transition-colors hover:bg-surface-dim sm:px-lg"
                 aria-label="응답 생성 중지"
               >
-                <span className="material-symbols-outlined text-[16px]">
+                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">
                   stop_circle
                 </span>
                 생성 중지

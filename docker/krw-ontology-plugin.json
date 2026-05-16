@@ -1,0 +1,13 @@
+{
+  "name": "krw-ontology",
+  "version": "0.1.0",
+  "description": "Source-grounded equity research ontology tools for 10-K and 10-Q evidence retrieval.",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "KRW Ontology",
+    "shortDescription": "Query source-grounded 10-K and 10-Q ontology evidence.",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Read"]
+  }
+}
