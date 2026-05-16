@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
-import { easeOutExpo, duration } from "@/lib/animation";
+import { easeOutExpo } from "@/lib/animation";
+
+const traceTransitionMs = 0.12;
+const focusTransitionMs = 0.14;
+const traceTransition = {
+  duration: traceTransitionMs,
+  ease: easeOutExpo,
+};
 
 export interface HomeTraceNode {
   id: string;
@@ -91,7 +98,7 @@ export function HomeQuestionForm() {
         boxShadow: isFocused
           ? "0 0 0 3px rgba(183, 196, 255, 0.15), 0 25px 50px -12px rgba(0, 0, 0, 0.35)"
           : "0 25px 50px -12px rgba(0, 0, 0, 0.35)",
-        transition: "border-color var(--duration-normal) var(--ease-out-expo), box-shadow var(--duration-normal) var(--ease-out-expo)",
+        transition: `border-color ${focusTransitionMs}s var(--ease-out-expo), box-shadow ${focusTransitionMs}s var(--ease-out-expo)`,
       }}
     >
       <div className="flex min-w-0 flex-1 items-center gap-3 pl-2 sm:pl-4">
@@ -117,8 +124,8 @@ export function HomeQuestionForm() {
         aria-label="질문 보내기"
         className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[8px] bg-surface-dark text-on-dark transition-all hover:bg-primary-active hover:scale-[1.04] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 sm:h-14 sm:w-14"
         style={{
-          transitionDuration: "var(--duration-fast)",
-          transitionTimingFunction: "var(--ease-spring)",
+          transitionDuration: "140ms",
+          transitionTimingFunction: "var(--ease-out-expo)",
         }}
       >
         <span aria-hidden="true" className="material-symbols-outlined text-[28px]">
@@ -180,11 +187,7 @@ export function HomeTraceExplorer({ nodes }: { nodes: HomeTraceNode[] }) {
                   layoutId="trace-highlight"
                   className="absolute inset-0 rounded-[6px] border border-primary-fixed-dim bg-white/[0.08]"
                   style={{ zIndex: -1 }}
-                  transition={{
-                    type: "spring",
-                    stiffness: 380,
-                    damping: 30,
-                  }}
+                  transition={traceTransition}
                 />
               )}
               <span className="relative hidden min-[420px]:inline">{node.label}</span>
@@ -208,13 +211,10 @@ export function HomeTraceExplorer({ nodes }: { nodes: HomeTraceNode[] }) {
           className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.06] p-3"
           aria-live="polite"
           aria-atomic="true"
-          initial={{ opacity: 0, y: 8 }}
+          initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
-          transition={{
-            duration: duration.normal,
-            ease: easeOutExpo,
-          }}
+          transition={traceTransition}
         >
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-on-dark-soft">
             {activeTrace.eyebrow}
