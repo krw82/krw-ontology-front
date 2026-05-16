@@ -85,7 +85,7 @@ function LoginContent() {
 
       <header className="sticky top-0 z-50 h-[72px] w-full flex-shrink-0 border-b border-white/10 bg-surface-dark/85 backdrop-blur-xl">
         <div className="mx-auto flex h-full w-full max-w-[1600px] items-center justify-between gap-base px-base sm:px-md">
-          <KrwBrand dark />
+          <KrwBrand dark compact />
           <Link
             href="/"
             className="rounded-[8px] border border-white/10 px-3 py-2 text-[14px] font-semibold leading-[1.4] text-on-dark-soft transition-colors hover:border-primary-fixed-dim hover:text-primary-fixed-dim"

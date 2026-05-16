@@ -2,8 +2,10 @@ import Link from "next/link";
 import { KrwBrand } from "@/components/KrwBrand";
 import {
   HomeHeaderActions,
+  HomeEvidenceCards,
   HomeQuestionForm,
   HomeTraceExplorer,
+  type HomeEvidenceCard,
   type HomeTraceNode,
 } from "@/components/HomeInteractions";
 import {
@@ -12,51 +14,60 @@ import {
   HeroEyebrow,
   WorkflowSteps,
   TraceCardEntrance,
-  EvidenceCardsStagger,
-  EvidenceCardItem,
-  InsightBlock,
   QuestionFormEntrance,
 } from "@/components/HeroSection";
 
-const evidenceCards = [
-  { label: "source", value: "10-K · FY2025", detail: "Item 1 / 사업 개요" },
-  { label: "node", value: "AWS", detail: "cloud infrastructure segment" },
-  { label: "driver", value: "Margin driver", detail: "capex, utilization, mix" },
+const evidenceCards: HomeEvidenceCard[] = [
+  {
+    id: "source",
+    label: "근거",
+    value: "보고서 문맥",
+    detail: "질문과 관련된 문장 확인",
+  },
+  {
+    id: "node",
+    label: "연결",
+    value: "사업 활동",
+    detail: "관련 맥락과 변수 연결",
+  },
+  {
+    id: "path",
+    label: "요약",
+    value: "핵심 요인",
+    detail: "근거 기반 답변 준비",
+  },
 ];
 
 const traceNodes: HomeTraceNode[] = [
   {
     id: "filing",
-    label: "10-K",
-    mobileLabel: "10-K",
-    eyebrow: "source sentence",
-    title: "FY2025 10-K · Item 1",
+    label: "근거",
+    mobileLabel: "근거",
+    eyebrow: "근거 확인",
+    title: "보고서 문맥 확인",
     detail:
-      "AWS revenue is connected to infrastructure scale, usage growth, and operating cost absorption.",
-    quote:
-      "Cloud demand and infrastructure utilization are tagged as source-backed drivers.",
+      "질문과 관련된 문장을 먼저 찾아 답변의 출발점을 고정합니다.",
+    quote: "답변은 출처가 남는 문맥에서 시작됩니다.",
   },
   {
     id: "segment",
-    label: "AWS",
-    mobileLabel: "AWS",
-    eyebrow: "ontology node",
-    title: "Business activity · Cloud Services",
+    label: "연결",
+    mobileLabel: "연결",
+    eyebrow: "맥락 연결",
+    title: "관련 맥락 연결",
     detail:
-      "The segment node keeps product activity, capex pressure, and demand signals in the same trace.",
-    quote:
-      "AWS maps the filing sentence to the cloud infrastructure activity graph.",
+      "문장과 관련된 사업 활동, 변수, 기간을 한 화면에서 이어 봅니다.",
+    quote: "각 연결은 답변을 만들기 위한 검증 가능한 단서로 유지됩니다.",
   },
   {
     id: "driver",
-    label: "Operating margin",
-    mobileLabel: "Margin",
-    eyebrow: "answer driver",
-    title: "Margin driver · Mix / utilization",
+    label: "요약",
+    mobileLabel: "요약",
+    eyebrow: "답변 준비",
+    title: "핵심 요인 정리",
     detail:
-      "The final answer is composed from the linked node, not from a detached summary paragraph.",
-    quote:
-      "Citation labels remain attached to the generated answer for audit review.",
+      "연결된 근거를 바탕으로 답변의 주요 요인을 압축합니다.",
+    quote: "최종 답변에는 검토 가능한 근거 흐름이 남습니다.",
   },
 ];
 
@@ -67,7 +78,7 @@ export default function Home() {
     <div className="min-h-[100dvh] overflow-x-hidden bg-surface-dark text-on-dark">
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-surface-dark/85 backdrop-blur-xl">
         <nav className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <KrwBrand dark />
+          <KrwBrand dark compact />
 
           <div className="hidden items-center gap-8 text-sm font-semibold text-on-dark-soft md:flex">
             <Link href="/chat" className="transition-colors hover:text-on-dark">
@@ -119,48 +130,20 @@ export default function Home() {
               <div className="flex flex-col gap-3 border-b border-hairline pb-4 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between">
                 <div className="min-w-0">
                   <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-primary">
-                    Live research trace
+                    Evidence preview
                   </p>
                   <h2 className="mt-2 text-[24px] font-black leading-[1.08]">
-                    AMZN · Cloud margin question
+                    기업 질문 분석 예시
                   </h2>
                 </div>
                 <span className="w-fit rounded-[6px] bg-surface-dark px-3 py-2 font-mono text-[12px] font-bold text-primary-fixed-dim">
-                  3 sources
+                  검증 가능
                 </span>
               </div>
 
-              <EvidenceCardsStagger>
-                {evidenceCards.map((card) => (
-                  <EvidenceCardItem key={card.label}>
-                    <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3 px-1 py-3">
-                      <span className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
-                        {card.label}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-[15px] font-extrabold text-ink">
-                          {card.value}
-                        </p>
-                        <p className="mt-1 text-[13px] leading-5 text-body">
-                          {card.detail}
-                        </p>
-                      </div>
-                    </div>
-                  </EvidenceCardItem>
-                ))}
-              </EvidenceCardsStagger>
+              <HomeEvidenceCards cards={evidenceCards} />
 
               <HomeTraceExplorer nodes={traceNodes} />
-
-              <InsightBlock>
-                <p className="text-[15px] font-bold leading-6">
-                  답변은 공시 원문과 연결된 사업 활동 노드에서 생성됩니다.
-                </p>
-                <p className="mt-2 text-[13px] leading-5 text-body">
-                  답변 카드마다 출처 라벨, 기간, 공시 섹션이 남아 검증 가능한
-                  리서치 기록으로 보관됩니다.
-                </p>
-              </InsightBlock>
             </div>
           </TraceCardEntrance>
         </section>

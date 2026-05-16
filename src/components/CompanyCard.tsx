@@ -67,13 +67,13 @@ export default function CompanyCard({
       <article className="grid gap-3 px-4 py-4 transition-[transform,color,background-color] duration-150 ease-out hover:-translate-y-[1px] hover:bg-surface 2xl:grid-cols-[116px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] 2xl:items-start active:scale-[0.995] active:bg-surface-soft">
         <div className="flex min-w-0 items-start justify-between gap-4 2xl:block">
           <div>
-            <h2 className="font-mono text-[22px] font-black leading-none text-ink transition-colors group-hover:text-primary sm:text-[24px] 2xl:text-[22px]">
+            <h2 className="font-mono text-[22px] font-black leading-none text-ink transition-colors group-hover:text-primary group-active:text-primary sm:text-[24px] 2xl:text-[22px]">
               {company.ticker}
             </h2>
           </div>
           <span
             aria-hidden="true"
-            className="material-symbols-outlined text-[22px] text-muted transition-colors group-hover:text-primary 2xl:hidden"
+            className="material-symbols-outlined text-[22px] text-muted transition-colors group-hover:text-primary group-active:text-primary 2xl:hidden"
           >
             arrow_forward
           </span>

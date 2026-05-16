@@ -7,12 +7,21 @@ import {
   MAX_CHAT_PAYLOAD_CHARS,
 } from "@/lib/chat-limits";
 import { createClientId } from "@/lib/client-id";
+import {
+  getActiveResearchLabel,
+  type ResearchToolCallStatus,
+} from "@/lib/chat/research-status";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import type { ResearchActivityUpdate } from "@/types/api-contracts";
 
 interface ComposerProps {
   onSend: (message: string) => void;
+  onCancel?: () => void | Promise<void>;
+  activity?: ResearchActivityUpdate | null;
   disabled?: boolean;
+  isGenerating?: boolean;
   placeholder?: string;
+  toolCalls?: ResearchToolCallStatus[];
   initialValue?: string;
 }
 
@@ -91,8 +100,12 @@ function composeMessage(message: string, attachments: TextAttachment[]): string 
 
 export default function Composer({
   onSend,
+  onCancel,
+  activity,
   disabled = false,
+  isGenerating = false,
   placeholder = "후속 질문이나 심층 분석을 요청하세요...",
+  toolCalls = [],
   initialValue,
 }: ComposerProps) {
   const initialDraftValue = initialValue?.trim() ? "" : (initialValue ?? "");
@@ -111,6 +124,12 @@ export default function Composer({
   const payloadLimit =
     attachments.length > 0 ? MAX_CHAT_PAYLOAD_CHARS : MAX_CHAT_MESSAGE_CHARS;
   const isOverLimit = composedLength > payloadLimit;
+  const isInputDisabled = disabled || isGenerating;
+  const canSubmit = composedLength > 0 && !isOverLimit && !isInputDisabled;
+  const generatingLabel = useMemo(
+    () => `${getActiveResearchLabel(toolCalls, activity)} 중...`,
+    [activity, toolCalls],
+  );
 
   const syncTextareaValue = useCallback((nextValue: string) => {
     setValue(nextValue);
@@ -122,12 +141,12 @@ export default function Composer({
 
   useEffect(() => {
     if (hasAutoSent.current) return;
-    if (disabled) return;
+    if (isInputDisabled) return;
     if (initialValue?.trim()) {
       hasAutoSent.current = true;
       onSend(initialValue);
     }
-  }, [disabled, initialValue, onSend]);
+  }, [isInputDisabled, initialValue, onSend]);
 
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current;
@@ -190,7 +209,7 @@ export default function Composer({
     }
 
     const message = composeMessage(latestValue, attachments);
-    if (!message.trim() || disabled) return;
+    if (!message.trim() || isInputDisabled) return;
     if (message.length > payloadLimit) {
       setAttachmentError(
         `첨부 포함 메시지는 ${payloadLimit.toLocaleString()}자를 넘을 수 없습니다.`,
@@ -215,10 +234,19 @@ export default function Composer({
     }
   };
 
+  const handlePrimaryAction = () => {
+    if (isGenerating) {
+      void onCancel?.();
+      return;
+    }
+
+    handleSubmit();
+  };
+
   return (
     <div className="border-t border-hairline bg-canvas/95 px-base py-sm backdrop-blur-xl sm:px-lg sm:py-base">
       {(attachments.length > 0 || attachmentError) && (
-        <div className="mx-auto mb-xs flex max-w-3xl flex-wrap items-center gap-xs">
+        <div className="mx-auto mb-xs flex max-w-4xl flex-wrap items-center gap-xs">
           <AnimatePresence>
             {attachments.map((file) => (
               <motion.div
@@ -240,7 +268,7 @@ export default function Composer({
                 className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-dim hover:text-ink"
                 aria-label={`${file.name} 첨부 제거`}
                 onClick={() => removeAttachment(file.id)}
-                disabled={disabled}
+                disabled={isInputDisabled}
               >
                 <span aria-hidden="true" className="material-symbols-outlined text-[16px]">
                   close
@@ -262,7 +290,7 @@ export default function Composer({
           </AnimatePresence>
         </div>
       )}
-      <div className="relative mx-auto flex max-w-3xl items-end rounded-[10px] border border-outline-variant bg-surface p-[4px] transition-all focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+      <div className="relative mx-auto flex max-w-4xl items-end rounded-[20px] border border-outline-variant bg-surface p-[5px] shadow-[0_10px_28px_rgba(10,11,13,0.08)] transition-all duration-150 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
         <input
           ref={fileInputRef}
           className="hidden"
@@ -270,12 +298,12 @@ export default function Composer({
           accept={ACCEPTED_TEXT_FILE_TYPES}
           multiple
           onChange={handleFileChange}
-          disabled={disabled}
+          disabled={isInputDisabled}
         />
         <button
-          className="mb-1 ml-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[8px] text-body transition-colors hover:bg-surface-dim disabled:cursor-not-allowed disabled:opacity-50"
+          className="mb-0.5 ml-0.5 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-body transition-colors duration-150 hover:bg-surface-dim hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
           onClick={() => fileInputRef.current?.click()}
-          disabled={disabled}
+          disabled={isInputDisabled}
           aria-label="txt 또는 md 파일 첨부"
           type="button"
         >
@@ -283,36 +311,84 @@ export default function Composer({
             attach_file
           </span>
         </button>
-        <textarea
-          ref={textareaRef}
-          className="max-h-[120px] w-full resize-none border-none bg-transparent px-xs py-sm text-[16px] font-normal leading-[1.5] text-on-surface focus:outline-none focus:ring-0 sm:px-sm sm:py-md"
-          maxLength={MAX_CHAT_MESSAGE_CHARS}
-          placeholder={placeholder}
-          rows={1}
-          style={{ minHeight: 48 }}
-          defaultValue={initialDraftValue}
-          onChange={(event) => syncTextareaValue(event.currentTarget.value)}
-          onInput={(event) => syncTextareaValue(event.currentTarget.value)}
-          onCompositionEnd={(event) =>
-            syncTextareaValue(event.currentTarget.value)
-          }
-          onKeyDown={handleKeyDown}
-          disabled={disabled}
-          aria-label="메시지 입력"
-        />
+        <div className="relative min-w-0 flex-1">
+          <textarea
+            ref={textareaRef}
+            className="max-h-[120px] w-full resize-none border-none bg-transparent px-xs py-sm text-[16px] font-medium leading-[1.5] text-on-surface placeholder:text-muted focus:outline-none focus:ring-0 disabled:cursor-not-allowed sm:px-sm sm:py-md"
+            maxLength={MAX_CHAT_MESSAGE_CHARS}
+            placeholder={isGenerating ? "" : placeholder}
+            rows={1}
+            style={{ minHeight: 48 }}
+            defaultValue={initialDraftValue}
+            onChange={(event) => syncTextareaValue(event.currentTarget.value)}
+            onInput={(event) => syncTextareaValue(event.currentTarget.value)}
+            onCompositionEnd={(event) =>
+              syncTextareaValue(event.currentTarget.value)
+            }
+            onKeyDown={handleKeyDown}
+            disabled={isInputDisabled}
+            aria-label="메시지 입력"
+          />
+          <AnimatePresence mode="wait" initial={false}>
+            {isGenerating && (
+              <motion.div
+                key={generatingLabel}
+                className="pointer-events-none absolute inset-x-xs inset-y-0 flex min-w-0 items-center text-[16px] font-bold leading-[1.5] text-muted sm:inset-x-sm"
+                initial={{ opacity: 0, y: motionConfig.y, filter: "blur(2px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, y: -motionConfig.y, filter: "blur(2px)" }}
+                transition={{ duration: motionConfig.duration, ease: motionConfig.ease }}
+              >
+                <span className="truncate">{generatingLabel}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {isGenerating && (
+            <motion.span
+              aria-hidden="true"
+              className="absolute bottom-[7px] left-xs right-xs h-px bg-primary-container/55 sm:left-sm sm:right-sm"
+              initial={{ scaleX: 0, transformOrigin: "left" }}
+              animate={{ scaleX: 1 }}
+              transition={{ duration: 1, ease: motionConfig.ease }}
+            />
+          )}
+        </div>
         <button
-          className="mb-1 mr-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[8px] bg-surface-dark text-on-dark shadow-sm transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={handleSubmit}
-          disabled={disabled || isOverLimit}
-          aria-label="메시지 보내기"
+          className="mb-0.5 mr-0.5 inline-flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary shadow-sm transition-all duration-150 hover:scale-[1.03] hover:bg-primary-active active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
+          onClick={handlePrimaryAction}
+          disabled={isGenerating ? !onCancel : !canSubmit}
+          aria-label={isGenerating ? "응답 생성 중지" : "메시지 보내기"}
           type="button"
         >
-          <span className="material-symbols-outlined text-[20px]">
-            arrow_upward
-          </span>
+          <AnimatePresence mode="wait" initial={false}>
+            {isGenerating ? (
+              <motion.span
+                key="generating"
+                initial={{ opacity: 0, scale: 0.84 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.84 }}
+                transition={{ duration: motionConfig.duration, ease: motionConfig.ease }}
+                className="relative inline-flex h-5 w-5 animate-spin rounded-full bg-[conic-gradient(from_0deg,rgba(255,255,255,0)_0deg,rgba(255,255,255,0.18)_92deg,#ffffff_170deg,#ffffff_260deg,rgba(255,255,255,0)_360deg)] p-[2px] [animation-duration:780ms]"
+              >
+                <span className="h-full w-full rounded-full bg-primary-container shadow-[inset_0_0_0_1px_rgba(255,255,255,0.22)]" />
+                <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-on-primary shadow-[0_0_8px_rgba(255,255,255,0.85)]" />
+              </motion.span>
+            ) : (
+              <motion.span
+                key="send"
+                initial={{ opacity: 0, scale: 0.84 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.84 }}
+                transition={{ duration: motionConfig.duration, ease: motionConfig.ease }}
+                className="material-symbols-outlined text-[22px]"
+              >
+                arrow_upward
+              </motion.span>
+            )}
+          </AnimatePresence>
         </button>
       </div>
-      <div className="mx-auto mt-xs flex max-w-3xl items-center justify-end">
+      <div className="mx-auto mt-xs flex max-w-4xl items-center justify-end">
         <span className="text-xs text-muted-soft">
           전체{" "}
           {composedLength.toLocaleString()}/

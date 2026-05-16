@@ -340,14 +340,25 @@ function ChatContent() {
                   msg.role === "user" || msg.role === "assistant"
                 )
                 .map((msg, idx, arr) => {
+                  const isLatestAssistantMessage =
+                    msg.role === "assistant" &&
+                    idx === arr.length - 1 &&
+                    chat.status === "completed";
+
                   return (
                     <ChatMessage
                       key={msg.id}
                       role={msg.role}
                       content={msg.content}
+                      citations={
+                        isLatestAssistantMessage ? chat.citations : undefined
+                      }
                       showHeader={idx === 0 || arr[idx - 1]?.role !== "assistant"}
+                      toolCalls={
+                        isLatestAssistantMessage ? chat.toolCalls : undefined
+                      }
                       workDurationMs={
-                        msg.role === "assistant"
+                        isLatestAssistantMessage && msg.role === "assistant"
                           ? chat.runDurationsByMessageId[msg.id]
                           : null
                       }
@@ -372,10 +383,12 @@ function ChatContent() {
                       content={chat.streamingContent}
                       isStreaming={true}
                       activity={chat.activity}
+                      citations={chat.citations}
                       showHeader={
                         chat.messages.length === 0 ||
                         chat.messages[chat.messages.length - 1]?.role !== "assistant"
                       }
+                      toolCalls={chat.toolCalls}
                     />
                   </motion.div>
                 )}
@@ -395,10 +408,12 @@ function ChatContent() {
                       content=""
                       isStreaming={true}
                       activity={chat.activity}
+                      citations={chat.citations}
                       showHeader={
                         chat.messages.length === 0 ||
                         chat.messages[chat.messages.length - 1]?.role !== "assistant"
                       }
+                      toolCalls={chat.toolCalls}
                     />
                   </motion.div>
                 )}
@@ -498,32 +513,18 @@ function ChatContent() {
           {/* M-09: Session creation loading indicator */}
           <Composer
             onSend={handleSend}
-            disabled={isStreaming || Boolean(effectiveSessionError)}
+            onCancel={handleCancel}
+            activity={chat.activity}
+            disabled={Boolean(effectiveSessionError)}
+            isGenerating={isStreaming}
             placeholder={
               effectiveSessionError
                 ? "인덱스에 있는 회사만 채팅할 수 있습니다."
-                : isStreaming
-                  ? "응답을 기다리는 중..."
-                  : "후속 질문을 입력하세요..."
+                : "후속 질문을 입력하세요..."
             }
+            toolCalls={chat.toolCalls}
             initialValue={initialComposerValue}
           />
-
-          {/* Cancel button overlay when streaming */}
-          {isStreaming && (
-            <div className="absolute bottom-[calc(92px+env(safe-area-inset-bottom))] left-1/2 z-10 -translate-x-1/2 sm:bottom-[100px]">
-              <button
-                onClick={handleCancel}
-                className="flex items-center gap-xs rounded-[8px] border border-hairline bg-surface-strong px-base py-sm text-[14px] font-semibold leading-[1.4] text-body shadow-sm transition-colors hover:bg-surface-dim sm:px-lg"
-                aria-label="응답 생성 중지"
-              >
-                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">
-                  stop_circle
-                </span>
-                생성 중지
-              </button>
-            </div>
-          )}
         </div>
       </main>
     </div>

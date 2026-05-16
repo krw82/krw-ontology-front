@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import ResearchMarkdown from "@/components/ResearchMarkdown";
-import type { ResearchActivityUpdate } from "@/types/api-contracts";
+import ResearchProgress from "@/components/ResearchProgress";
+import type { ToolCallState } from "@/hooks/useChat";
+import type {
+  ChatCitation,
+  ResearchActivityUpdate,
+} from "@/types/api-contracts";
 import { chatMessageAssistant, chatMessageUser } from "@/lib/animation";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 
@@ -12,8 +17,15 @@ interface ChatMessageProps {
   content: string;
   isStreaming?: boolean;
   activity?: ResearchActivityUpdate | null;
+  citations?: ChatCitation[];
   showHeader?: boolean;
+  toolCalls?: ToolCallState[];
   workDurationMs?: number | null;
+}
+
+interface DisplayAttachment {
+  name: string;
+  characterCount: number;
 }
 
 const statusTransition = {
@@ -27,6 +39,36 @@ const dotTransition = {
   repeatType: "loop" as const,
   ease: "easeInOut" as const,
 };
+
+const attachedFilePattern =
+  /(?:\n\n)?<attached_file\s+name="([^"]*)">\n?([\s\S]*?)\n?<\/attached_file>/g;
+
+function decodeAttachmentName(name: string): string {
+  return name
+    .replace(/&quot;/g, "\"")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+function parseUserDisplayContent(content: string): {
+  visibleText: string;
+  attachments: DisplayAttachment[];
+} {
+  const attachments: DisplayAttachment[] = [];
+  const visibleText = content
+    .replace(attachedFilePattern, (_match, rawName: string, rawContent: string) => {
+      attachments.push({
+        name: decodeAttachmentName(rawName),
+        characterCount: rawContent.trim().length,
+      });
+      return "";
+    })
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return { visibleText, attachments };
+}
 
 function useStreamingMotionOffset() {
   const prefersReducedMotion = useReducedMotion();
@@ -88,16 +130,6 @@ function LoadingDots({ label = "분석 준비 중" }: { label?: string }) {
   );
 }
 
-function formatDuration(milliseconds: number): string {
-  const totalSeconds = Math.max(0, Math.round(milliseconds / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-
-  if (minutes <= 0) return `${seconds}초`;
-  if (seconds === 0) return `${minutes}분`;
-  return `${minutes}분 ${seconds}초`;
-}
-
 function activityLabel(activity?: ResearchActivityUpdate | null): string {
   switch (activity?.stage) {
     case "connecting":
@@ -113,79 +145,6 @@ function activityLabel(activity?: ResearchActivityUpdate | null): string {
     default:
       return "근거 확인 중";
   }
-}
-
-function useElapsedMilliseconds(enabled: boolean): number {
-  const [startedAt] = useState(() => Date.now());
-  const [now, setNow] = useState(startedAt);
-
-  useEffect(() => {
-    if (!enabled) return undefined;
-
-    const timer = window.setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [enabled]);
-
-  return now - startedAt;
-}
-
-function WorkMetaLine({
-  activity,
-  isStreaming,
-  workDurationMs,
-}: {
-  activity?: ResearchActivityUpdate | null;
-  isStreaming?: boolean;
-  workDurationMs?: number | null;
-}) {
-  const elapsedMs = useElapsedMilliseconds(Boolean(isStreaming));
-  const verticalOffset = useStreamingMotionOffset();
-  const streamingLabel = activityLabel(activity);
-  const statusLabel = isStreaming
-    ? streamingLabel
-    : workDurationMs && workDurationMs > 0
-      ? `${formatDuration(workDurationMs)} 동안 작업`
-      : null;
-  const statusText = isStreaming ? `${formatDuration(elapsedMs)}` : null;
-  const statusKey = isStreaming
-    ? `${activity?.stage ?? "preparing"}:${streamingLabel}`
-    : "completed";
-
-  if (!statusLabel) return null;
-
-  return (
-    <div
-      className="mb-md flex w-full max-w-[780px] items-center gap-xs border-b border-hairline pb-sm text-[14px] font-semibold leading-[1.4] text-muted sm:text-[15px]"
-      aria-live="polite"
-    >
-      {isStreaming && (
-        <motion.span
-          aria-hidden="true"
-          className="h-2 w-2 shrink-0 rounded-full bg-primary"
-          initial={{ opacity: 0.45, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-        />
-      )}
-      <span className="inline-flex items-center gap-xs">
-        <AnimatePresence mode="wait">
-          <motion.span
-            key={statusKey}
-            initial={{ opacity: 0, y: verticalOffset }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -verticalOffset }}
-            transition={statusTransition}
-          >
-            {statusLabel}
-          </motion.span>
-        </AnimatePresence>
-        {isStreaming && statusText ? <span>· {statusText}</span> : null}
-      </span>
-    </div>
-  );
 }
 
 function splitStreamingBlocks(content: string): string[] {
@@ -232,10 +191,14 @@ export default function ChatMessage({
   content,
   isStreaming,
   activity,
+  citations,
   showHeader = true,
+  toolCalls,
   workDurationMs,
 }: ChatMessageProps) {
   if (role === "user") {
+    const { visibleText, attachments } = parseUserDisplayContent(content);
+
     return (
       <motion.div
         className="flex w-full flex-col items-end"
@@ -244,9 +207,39 @@ export default function ChatMessage({
         variants={chatMessageUser}
       >
         <div className="max-w-[92%] rounded-[8px] border border-hairline bg-surface p-base text-ink sm:max-w-[80%] sm:p-lg">
-          <p className="whitespace-pre-wrap break-words text-[15px] font-normal leading-[1.5] sm:text-[16px]">
-            {content}
-          </p>
+          {visibleText ? (
+            <p className="whitespace-pre-wrap break-words text-[15px] font-normal leading-[1.5] sm:text-[16px]">
+              {visibleText}
+            </p>
+          ) : null}
+          {attachments.length > 0 && (
+            <div
+              className={[
+                "flex max-w-full flex-wrap justify-end gap-xs",
+                visibleText ? "mt-sm" : "",
+              ].join(" ")}
+            >
+              {attachments.map((attachment, index) => (
+                <div
+                  key={`${attachment.name}-${index}`}
+                  className="inline-flex max-w-full items-center gap-xs rounded-[8px] border border-hairline bg-canvas px-sm py-xs text-[12px] font-semibold leading-none text-body"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="material-symbols-outlined text-[16px] text-primary-container"
+                  >
+                    description
+                  </span>
+                  <span className="max-w-[180px] truncate text-ink sm:max-w-[240px]">
+                    {attachment.name}
+                  </span>
+                  <span className="shrink-0 text-muted">
+                    {attachment.characterCount.toLocaleString()}자
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </motion.div>
     );
@@ -261,16 +254,22 @@ export default function ChatMessage({
     >
       {showHeader && (
         <div className="pl-0 sm:pl-[48px]">
-          <WorkMetaLine
+          <ResearchProgress
             activity={activity}
+            citations={citations}
             isStreaming={isStreaming}
+            toolCalls={toolCalls}
             workDurationMs={workDurationMs}
           />
         </div>
       )}
       {isStreaming ? (
-        <div className="pl-0 sm:pl-[48px]">
-          <LoadingDots label={activityLabel(activity)} />
+        <div className="max-w-full pl-0 text-body sm:pl-[48px]">
+          {content ? (
+            <StreamingContentBlocks content={content} />
+          ) : !showHeader ? (
+            <LoadingDots label={activityLabel(activity)} />
+          ) : null}
         </div>
       ) : (
         <div className="max-w-full pl-0 text-body sm:pl-[48px]">

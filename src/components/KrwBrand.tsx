@@ -74,14 +74,14 @@ export function KrwBrand({
         dark={dark}
         className={compact ? "h-8 w-8 shrink-0" : "h-9 w-9 shrink-0"}
       />
-      <span className="min-w-0">
-        <span className="block truncate text-[15px] font-extrabold leading-none tracking-[0.06em]">
+      <span className="flex min-w-0 flex-col justify-center">
+        <span className="block truncate text-[15px] font-extrabold leading-[1.18] tracking-[0.06em]">
           KRW Ontology
         </span>
         {!compact && (
           <span
             className={[
-              "mt-[5px] block truncate text-[11px] font-semibold leading-none tracking-[0.12em]",
+              "mt-[4px] block truncate text-[11px] font-semibold leading-[1.1] tracking-[0.12em]",
               dark ? "text-on-dark-soft" : "text-muted",
             ].join(" ")}
           >

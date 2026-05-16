@@ -25,6 +25,7 @@ export default function CompaniesBrowser({
     href: "/chat",
     icon: "arrow_forward",
   };
+  const routingSteps = ["자료", "기업 후보", "근거"];
 
   return (
     <div className="relative mx-auto flex min-h-0 w-full max-w-[1600px] flex-1">
@@ -59,6 +60,25 @@ export default function CompaniesBrowser({
                 후보와 사업 활동, 리스크, 근거 문장을 함께 찾아줍니다.
               </p>
 
+              <div
+                className="mt-4 flex min-h-10 items-center rounded-[8px] border border-hairline-soft bg-surface-soft px-3 py-2"
+                aria-label="자료 분석 흐름"
+              >
+                {routingSteps.map((step, index) => (
+                  <div key={step} className="contents">
+                    <span className="min-w-0 text-[12px] font-extrabold leading-4 text-body sm:text-[13px]">
+                      {step}
+                    </span>
+                    {index < routingSteps.length - 1 && (
+                      <span
+                        aria-hidden="true"
+                        className="mx-2 h-px flex-1 bg-hairline sm:mx-3"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+
               <div className="mt-4">
                 <Link
                   href={researchAction.href}
@@ -82,7 +102,7 @@ export default function CompaniesBrowser({
           <div className="mt-5 grid gap-3 rounded-[8px] border border-hairline bg-surface p-4 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-center">
             <div>
               <p className="text-[13px] font-extrabold leading-5 text-ink">
-                회사명으로 바로 찾기
+                티커로 바로 가기
               </p>
               <p className="mt-1 text-[13px] font-semibold leading-5 text-muted">
                 AAPL, LNG처럼 알고 있는 티커가 있을 때
@@ -109,20 +129,30 @@ export default function CompaniesBrowser({
             로컬 온톨로지 디렉터리에서 인덱싱된 회사를 찾지 못했습니다.
           </div>
         ) : (
-          <div className="mt-8 overflow-hidden rounded-[8px] border border-hairline bg-canvas">
-            <div className="hidden grid-cols-[116px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] border-b border-hairline bg-surface px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted 2xl:grid">
-              <span>ticker</span>
-              <span>company</span>
-              <span>activity</span>
-              <span>watch</span>
+          <div className="mt-8">
+            <div className="mb-3 flex items-center justify-between gap-4">
+              <p className="text-[13px] font-extrabold leading-5 text-ink">
+                목록에서 고르기
+              </p>
+              <p className="text-[12px] font-bold leading-4 text-muted">
+                {filteredCompanies.length.toLocaleString()}개 표시
+              </p>
             </div>
-            {filteredCompanies.map((company, index) => (
-              <CompanyCard
-                key={company.ticker}
-                company={company}
-                motionDelay={Math.min(index * 35, 175)}
-              />
-            ))}
+            <div className="overflow-hidden rounded-[8px] border border-hairline bg-canvas">
+              <div className="hidden grid-cols-[116px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] border-b border-hairline bg-surface px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted 2xl:grid">
+                <span>ticker</span>
+                <span>company</span>
+                <span>activity</span>
+                <span>watch</span>
+              </div>
+              {filteredCompanies.map((company, index) => (
+                <CompanyCard
+                  key={company.ticker}
+                  company={company}
+                  motionDelay={Math.min(index * 35, 175)}
+                />
+              ))}
+            </div>
           </div>
         )}
 

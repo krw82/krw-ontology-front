@@ -32,9 +32,12 @@ interface UseChatOptions {
 
 export interface ToolCallState {
   tool_call_id: string;
-  tool_name: string;
+  tool_name: MCPToolName;
   status: "running" | "completed" | "failed";
   duration_ms?: number;
+  result_summary?: string | null;
+  started_at?: number;
+  finished_at?: number;
 }
 
 export interface ChatState {
@@ -220,6 +223,7 @@ export function useChat({
               tool_call_id: d.tool_call_id,
               tool_name: d.tool_name,
               status: "running",
+              started_at: Date.now(),
             },
           ],
         }));
@@ -235,6 +239,8 @@ export function useChat({
                   ...tc,
                   status: d.error_message ? "failed" : "completed",
                   duration_ms: d.duration_ms,
+                  result_summary: d.result_summary,
+                  finished_at: Date.now(),
                 }
               : tc,
           ),

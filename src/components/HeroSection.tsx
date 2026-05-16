@@ -3,7 +3,7 @@
 import { motion } from "motion/react";
 import { easeOutExpo, staggerContainerFast } from "@/lib/animation";
 
-const fastTransition = 0.14;
+const fastTransition = 0.24;
 const fastVariant = {
   hidden: { opacity: 0, y: 10 },
   visible: {
