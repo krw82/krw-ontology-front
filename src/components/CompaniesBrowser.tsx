@@ -20,6 +20,11 @@ export default function CompaniesBrowser({
     return filterAndSortCompanies(initialCompanies, search);
   }, [initialCompanies, search]);
 
+  const researchAction = {
+    label: "자료로 분석 시작",
+    icon: "arrow_forward",
+  };
+
   return (
     <div className="relative mx-auto flex min-h-0 w-full max-w-[1600px] flex-1">
       <main className="min-h-0 w-full flex-grow overflow-y-auto px-base pb-[112px] pt-xl sm:px-md md:px-xl md:pb-[96px] md:pt-[72px]">
@@ -55,17 +60,19 @@ export default function CompaniesBrowser({
 
               <div className="mt-4">
                 <Link
-                  href="/chat"
+                href="/chat"
                   className="inline-flex min-h-[48px] w-full items-center justify-center gap-xs rounded-[8px] bg-ink px-4 py-3 text-[14px] font-extrabold leading-5 text-canvas transition-colors hover:bg-ink/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                   aria-label="자료로 분석 시작"
                 >
+                {researchAction.icon ? (
                   <span
                     aria-hidden="true"
                     className="material-symbols-outlined text-[19px]"
                   >
-                    arrow_forward
+                    {researchAction.icon}
                   </span>
-                  자료로 분석 시작
+                ) : null}
+                  {researchAction.label}
                 </Link>
               </div>
             </section>
@@ -101,15 +108,19 @@ export default function CompaniesBrowser({
             로컬 온톨로지 디렉터리에서 인덱싱된 회사를 찾지 못했습니다.
           </div>
         ) : (
-          <div className="animate-fade-in-up mt-8 overflow-hidden rounded-[8px] border border-hairline bg-canvas opacity-0" style={{ animationDelay: "150ms" }}>
+          <div className="mt-8 overflow-hidden rounded-[8px] border border-hairline bg-canvas">
             <div className="hidden grid-cols-[116px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] border-b border-hairline bg-surface px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted 2xl:grid">
               <span>ticker</span>
               <span>company</span>
               <span>activity</span>
               <span>watch</span>
             </div>
-            {filteredCompanies.map((company) => (
-              <CompanyCard key={company.ticker} company={company} />
+            {filteredCompanies.map((company, index) => (
+              <CompanyCard
+                key={company.ticker}
+                company={company}
+                motionDelay={Math.min(index * 35, 175)}
+              />
             ))}
           </div>
         )}
