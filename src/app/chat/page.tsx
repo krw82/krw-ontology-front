@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import TopNav from "@/components/TopNav";
 import ChatMessage from "@/components/ChatMessage";
 import Composer from "@/components/Composer";
@@ -153,6 +154,11 @@ function ChatContent() {
     Boolean(chat.streamingContent) ||
     isStreaming ||
     Boolean(chat.error);
+  const streamingTransition = {
+    duration: 0.14,
+    ease: [0.16, 1, 0.3, 1] as const,
+    y: 4,
+  };
 
   useEffect(() => {
     if (!hasConversationContent) return;
@@ -349,51 +355,83 @@ function ChatContent() {
                   );
                 })}
 
-              {/* Streaming response */}
-              {isStreaming && chat.streamingContent && (
-                <ChatMessage
-                  role="assistant"
-                  content={chat.streamingContent}
-                  isStreaming={true}
-                  activity={chat.activity}
-                  showHeader={
-                    chat.messages.length === 0 ||
-                    chat.messages[chat.messages.length - 1]?.role !== "assistant"
-                  }
-                />
-              )}
-              {isStreaming && !chat.streamingContent && (
-                <ChatMessage
-                  role="assistant"
-                  content=""
-                  isStreaming={true}
-                  activity={chat.activity}
-                  showHeader={
-                    chat.messages.length === 0 ||
-                    chat.messages[chat.messages.length - 1]?.role !== "assistant"
-                  }
-                />
-              )}
-
-              {/* Error */}
-              {chat.error && (
-                <div className="flex w-full flex-col">
-                  <div className="pl-0 sm:pl-[48px]">
-                    <div
-                      className="rounded-[8px] border border-error/20 bg-error-container/10 p-base text-[15px] leading-[1.5] text-error sm:p-lg sm:text-[16px]"
-                      role="alert"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="material-symbols-outlined mr-xs text-[18px] align-middle"
-                      >
-                        error
-                      </span>
-                      {sanitizeError(chat.error)}
+              <AnimatePresence mode="wait" initial={false}>
+                {isStreaming && chat.streamingContent && (
+                  <motion.div
+                    key="streaming-content"
+                    initial={{ opacity: 0, y: streamingTransition.y }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -streamingTransition.y }}
+                    transition={{
+                      duration: streamingTransition.duration,
+                      ease: streamingTransition.ease,
+                    }}
+                  >
+                    <ChatMessage
+                      role="assistant"
+                      content={chat.streamingContent}
+                      isStreaming={true}
+                      activity={chat.activity}
+                      showHeader={
+                        chat.messages.length === 0 ||
+                        chat.messages[chat.messages.length - 1]?.role !== "assistant"
+                      }
+                    />
+                  </motion.div>
+                )}
+                {isStreaming && !chat.streamingContent && (
+                  <motion.div
+                    key="streaming-loading"
+                    initial={{ opacity: 0, y: streamingTransition.y }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -streamingTransition.y }}
+                    transition={{
+                      duration: streamingTransition.duration,
+                      ease: streamingTransition.ease,
+                    }}
+                  >
+                    <ChatMessage
+                      role="assistant"
+                      content=""
+                      isStreaming={true}
+                      activity={chat.activity}
+                      showHeader={
+                        chat.messages.length === 0 ||
+                        chat.messages[chat.messages.length - 1]?.role !== "assistant"
+                      }
+                    />
+                  </motion.div>
+                )}
+                {chat.error && (
+                  <motion.div
+                    key="chat-error"
+                    initial={{ opacity: 0, y: streamingTransition.y }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -streamingTransition.y }}
+                    transition={{
+                      duration: streamingTransition.duration,
+                      ease: streamingTransition.ease,
+                    }}
+                  >
+                    <div className="flex w-full flex-col">
+                      <div className="pl-0 sm:pl-[48px]">
+                        <div
+                          className="rounded-[8px] border border-error/20 bg-error-container/10 p-base text-[15px] leading-[1.5] text-error sm:p-lg sm:text-[16px]"
+                          role="alert"
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="material-symbols-outlined mr-xs text-[18px] align-middle"
+                          >
+                            error
+                          </span>
+                          {sanitizeError(chat.error)}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Empty state */}
               {chat.messages.length === 0 && !isStreaming && !sessionError && (

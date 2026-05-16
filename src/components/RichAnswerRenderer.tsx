@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { staggerContainerFast, fadeInUp, easeOutExpo } from "@/lib/animation";
+import { easeOutExpo } from "@/lib/animation";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import ResearchMarkdown from "@/components/ResearchMarkdown";
 import type {
   ResearchArtifact,
@@ -22,10 +23,35 @@ interface RichAnswerRendererProps {
   fallbackMarkdown?: string;
 }
 
+function useRevealOffset() {
+  const reducedMotion = useReducedMotion();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia("(max-width: 640px)");
+    const sync = (query: MediaQueryList | MediaQueryListEvent) => {
+      setIsMobile(query.matches);
+    };
+
+    sync(mediaQuery);
+    mediaQuery.addEventListener("change", sync);
+
+    return () => {
+      mediaQuery.removeEventListener("change", sync);
+    };
+  }, []);
+
+  if (reducedMotion) return 0;
+  return isMobile ? 6 : 12;
+}
+
 export default function RichAnswerRenderer({
   answer,
   fallbackMarkdown,
 }: RichAnswerRendererProps) {
+  const verticalOffset = useRevealOffset();
   const blocks = getDisplayBlocks(getArtifactBlocks(answer), fallbackMarkdown);
   if (blocks.length === 0) return null;
 
@@ -45,18 +71,31 @@ export default function RichAnswerRenderer({
   };
 
   return (
-    <motion.div
-      className="space-y-md"
-      variants={staggerContainerFast}
-      initial="hidden"
-      animate="visible"
-    >
+    <motion.div className="space-y-md">
       {blocks.map((block, index) => (
-        <motion.div key={getBlockKey(block, index)} variants={fadeInUp}>
+        <motion.div
+          key={getBlockKey(block, index)}
+          initial={{ opacity: 0, y: verticalOffset }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.2,
+            delay: index * 0.02,
+            ease: easeOutExpo,
+          }}
+        >
           <RichAnswerBlockView block={block} />
         </motion.div>
       ))}
-      <motion.div className="flex justify-end" variants={fadeInUp}>
+      <motion.div
+        className="flex justify-end"
+        initial={{ opacity: 0, y: verticalOffset }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{
+          duration: 0.2,
+          delay: blocks.length * 0.02,
+          ease: easeOutExpo,
+        }}
+      >
         <button
           type="button"
           onClick={exportHtml}

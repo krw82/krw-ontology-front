@@ -7,6 +7,7 @@ import {
   MAX_CHAT_PAYLOAD_CHARS,
 } from "@/lib/chat-limits";
 import { createClientId } from "@/lib/client-id";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 interface ComposerProps {
   onSend: (message: string) => void;
@@ -52,6 +53,33 @@ function escapeAttachmentName(name: string): string {
   });
 }
 
+function useComposerMotionConfig() {
+  const reducedMotion = useReducedMotion();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia("(max-width: 640px)");
+    const sync = (query: MediaQueryList | MediaQueryListEvent) => {
+      setIsMobile(query.matches);
+    };
+
+    sync(mediaQuery);
+    mediaQuery.addEventListener("change", sync);
+
+    return () => {
+      mediaQuery.removeEventListener("change", sync);
+    };
+  }, []);
+
+  return {
+    duration: reducedMotion ? 0 : 0.16,
+    y: reducedMotion ? 0 : isMobile ? 4 : 6,
+    ease: reducedMotion ? ("linear" as const) : ([0.16, 1, 0.3, 1] as const),
+  };
+}
+
 function composeMessage(message: string, attachments: TextAttachment[]): string {
   const attachmentBlocks = attachments.map(
     (file) =>
@@ -74,6 +102,7 @@ export default function Composer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hasAutoSent = useRef(false);
+  const motionConfig = useComposerMotionConfig();
 
   const composedLength = useMemo(
     () => composeMessage(value, attachments).length,
@@ -195,10 +224,10 @@ export default function Composer({
               <motion.div
                 key={file.id}
                 layout="position"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ duration: 0.2 }}
+                initial={{ opacity: 0, y: motionConfig.y }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -motionConfig.y }}
+                transition={{ duration: motionConfig.duration, ease: motionConfig.ease }}
                 className="inline-flex max-w-full items-center gap-xs rounded-full border border-hairline bg-surface-soft px-sm py-xxs text-[12px] leading-[1.4] text-body"
               >
               <span className="material-symbols-outlined text-[16px] text-primary">
@@ -221,9 +250,10 @@ export default function Composer({
             ))}
             {attachmentError && (
               <motion.span
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                initial={{ opacity: 0, y: motionConfig.y }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -motionConfig.y }}
+                transition={{ duration: motionConfig.duration, ease: motionConfig.ease }}
                 className="text-[12px] leading-[1.4] text-error"
               >
                 {attachmentError}

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion } from "motion/react";
+import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import ResearchMarkdown from "@/components/ResearchMarkdown";
 import type { ResearchActivityUpdate } from "@/types/api-contracts";
-import { chatMessageUser, chatMessageAssistant } from "@/lib/animation";
+import { chatMessageAssistant, chatMessageUser } from "@/lib/animation";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 interface ChatMessageProps {
   role: "user" | "assistant";
@@ -15,20 +16,74 @@ interface ChatMessageProps {
   workDurationMs?: number | null;
 }
 
+const statusTransition = {
+  duration: 0.14,
+  ease: [0.16, 1, 0.3, 1] as const,
+};
+
+const dotTransition = {
+  duration: 0.9,
+  repeat: Infinity,
+  repeatType: "loop" as const,
+  ease: "easeInOut" as const,
+};
+
+function useStreamingMotionOffset() {
+  const prefersReducedMotion = useReducedMotion();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia("(max-width: 640px)");
+    const sync = (query: MediaQueryList | MediaQueryListEvent) => {
+      setIsMobile(query.matches);
+    };
+
+    sync(mediaQuery);
+    mediaQuery.addEventListener("change", sync);
+
+    return () => {
+      mediaQuery.removeEventListener("change", sync);
+    };
+  }, []);
+
+  if (prefersReducedMotion) return 0;
+  return isMobile ? 4 : 8;
+}
+
 function LoadingDots({ label = "분석 준비 중" }: { label?: string }) {
+  const verticalOffset = useStreamingMotionOffset();
+
   return (
     <motion.div
       className="flex items-center gap-xs text-[14px] leading-[1.4] text-muted"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.3 }}
+      transition={{ duration: 0.16, ease: statusTransition.ease }}
     >
       <div className="flex gap-1">
-        <span className="h-2 w-2 animate-bounce rounded-full bg-muted [animation-delay:-0.3s]" />
-        <span className="h-2 w-2 animate-bounce rounded-full bg-muted [animation-delay:-0.15s]" />
-        <span className="h-2 w-2 animate-bounce rounded-full bg-muted" />
+        {[0, 1, 2].map((index) => (
+          <motion.span
+            key={index}
+            className="h-2 w-2 rounded-full bg-muted"
+            initial={{ opacity: 0.2 }}
+            animate={{ opacity: [0.2, 1, 0.2] }}
+            transition={{ ...dotTransition, delay: index * 0.14 }}
+          />
+        ))}
       </div>
-      <span>{label}</span>
+      <AnimatePresence mode="wait">
+        <motion.span
+          key={label}
+          initial={{ opacity: 0, y: verticalOffset / 2 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -(verticalOffset / 2) }}
+          transition={statusTransition}
+        >
+          {label}
+        </motion.span>
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -87,13 +142,19 @@ function WorkMetaLine({
   workDurationMs?: number | null;
 }) {
   const elapsedMs = useElapsedMilliseconds(Boolean(isStreaming));
-  const label = isStreaming
-    ? `${activityLabel(activity)} · ${formatDuration(elapsedMs)}`
+  const verticalOffset = useStreamingMotionOffset();
+  const streamingLabel = activityLabel(activity);
+  const statusLabel = isStreaming
+    ? streamingLabel
     : workDurationMs && workDurationMs > 0
       ? `${formatDuration(workDurationMs)} 동안 작업`
       : null;
+  const statusText = isStreaming ? `${formatDuration(elapsedMs)}` : null;
+  const statusKey = isStreaming
+    ? `${activity?.stage ?? "preparing"}:${streamingLabel}`
+    : "completed";
 
-  if (!label) return null;
+  if (!statusLabel) return null;
 
   return (
     <div
@@ -104,11 +165,64 @@ function WorkMetaLine({
         <motion.span
           aria-hidden="true"
           className="h-2 w-2 shrink-0 rounded-full bg-primary"
-          animate={{ scale: [1, 1.2, 1], opacity: [0.6, 1, 0.6] }}
-          transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+          initial={{ opacity: 0.45, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
         />
       )}
-      <span>{label}</span>
+      <span className="inline-flex items-center gap-xs">
+        <AnimatePresence mode="wait">
+          <motion.span
+            key={statusKey}
+            initial={{ opacity: 0, y: verticalOffset }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -verticalOffset }}
+            transition={statusTransition}
+          >
+            {statusLabel}
+          </motion.span>
+        </AnimatePresence>
+        {isStreaming && statusText ? <span>· {statusText}</span> : null}
+      </span>
+    </div>
+  );
+}
+
+function splitStreamingBlocks(content: string): string[] {
+  const normalized = content.replace(/\r\n/g, "\n").trim();
+  if (!normalized) return [];
+
+  return normalized
+    .split(/\n{2,}/)
+    .map((section) => section.trim())
+    .filter(Boolean);
+}
+
+function StreamingContentBlocks({ content }: { content: string }) {
+  const verticalOffset = useStreamingMotionOffset();
+  const blocks = useMemo(() => splitStreamingBlocks(content), [content]);
+
+  if (blocks.length === 0) return null;
+
+  return (
+    <div className="space-y-md">
+      <AnimatePresence initial={false}>
+        {blocks.map((section, index) => (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, y: verticalOffset }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -verticalOffset }}
+            transition={{
+              duration: 0.16,
+              ease: statusTransition.ease,
+              delay: Math.min(index, 6) * 0.02,
+            }}
+          >
+            <ResearchMarkdown content={section} />
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </div>
   );
 }
@@ -130,7 +244,9 @@ export default function ChatMessage({
         variants={chatMessageUser}
       >
         <div className="max-w-[92%] rounded-[8px] border border-hairline bg-surface p-base text-ink sm:max-w-[80%] sm:p-lg">
-          <p className="whitespace-pre-wrap break-words text-[15px] font-normal leading-[1.5] sm:text-[16px]">{content}</p>
+          <p className="whitespace-pre-wrap break-words text-[15px] font-normal leading-[1.5] sm:text-[16px]">
+            {content}
+          </p>
         </div>
       </motion.div>
     );
@@ -157,8 +273,8 @@ export default function ChatMessage({
           <LoadingDots label={activityLabel(activity)} />
         </div>
       ) : (
-        <div className="max-w-full space-y-md break-words pl-0 text-body sm:pl-[48px]">
-          {content ? <ResearchMarkdown content={content} /> : null}
+        <div className="max-w-full pl-0 text-body sm:pl-[48px]">
+          {content ? <StreamingContentBlocks content={content} /> : null}
         </div>
       )}
     </motion.div>
