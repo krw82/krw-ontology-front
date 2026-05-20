@@ -86,7 +86,7 @@ export async function getOntologyRoot(): Promise<string> {
 }
 
 function periodRank(period: string): number {
-  const match = /^FY(\d{4})(?:Q(\d))?$/.exec(period);
+  const match = /^(?:FY|CY)(\d{4})(?:Q(\d))?$/.exec(period);
   if (!match) return 0;
   const year = Number(match[1]);
   const quarter = match[2] ? Number(match[2]) : 5;

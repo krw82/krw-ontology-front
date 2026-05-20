@@ -100,6 +100,10 @@ export async function runAgent(
 
   const abortHandler = () => abortController.abort();
   options.abortSignal?.addEventListener("abort", abortHandler, { once: true });
+  if (options.abortSignal?.aborted) {
+    options.abortSignal.removeEventListener("abort", abortHandler);
+    return { acc, status: "cancelled" };
+  }
 
   const promptContext = {
     scopeType: options.scopeType,

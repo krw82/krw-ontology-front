@@ -99,8 +99,11 @@ export type SourceQuality = "filing_direct" | "derived" | "estimated";
 /** Allowed MCP tool names */
 export type MCPToolName =
   | "krw_ontology_catalog"
+  | "krw_ontology_company_context"
+  | "krw_ontology_index_context"
   | "krw_ontology_topic_map"
   | "krw_ontology_query"
+  | "krw_ontology_query_context"
   | "krw_ontology_retrieve"
   | "krw_ontology_trace"
   | "krw_ontology_quality"

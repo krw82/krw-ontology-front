@@ -9,8 +9,11 @@ const KRW_ONTOLOGY_DIRECT_TOOL_PREFIX = "mcp__krw-ontology__";
 
 export const KRW_ONTOLOGY_MCP_TOOLS = [
   "krw_ontology_catalog",
+  "krw_ontology_company_context",
+  "krw_ontology_index_context",
   "krw_ontology_topic_map",
   "krw_ontology_query",
+  "krw_ontology_query_context",
   "krw_ontology_retrieve",
   "krw_ontology_trace",
   "krw_ontology_quality",
@@ -92,10 +95,13 @@ async function checkHttpMcpHealth(
 ): Promise<McpHealthResult | null> {
   const baseUrl = process.env.MCP_BASE_URL?.trim();
   if (!baseUrl) return null;
+  const bearerToken = process.env.MCP_BEARER_TOKEN?.trim();
 
   try {
     const response = await fetch(`${baseUrl.replace(/\/+$/, "")}/health`, {
       cache: "no-store",
+      headers: bearerToken ? { Authorization: `Bearer ${bearerToken}` } : undefined,
+      signal: AbortSignal.timeout(5_000),
     });
     const payload = (await response.json().catch(() => null)) as
       | HttpMcpHealthPayload
@@ -134,7 +140,21 @@ async function checkHttpMcpHealth(
 export async function checkMcpHealth(): Promise<McpHealthResult> {
   const pluginPath = getKrwOntologyPluginPath();
   const httpHealth = await checkHttpMcpHealth(pluginPath);
-  if (httpHealth?.connected) return httpHealth;
+  if (process.env.MCP_BASE_URL?.trim()) {
+    return (
+      httpHealth ?? {
+        connected: false,
+        releaseId: null,
+        indexGeneratedAt: null,
+        companyCount: null,
+        documentCount: null,
+        objectCount: null,
+        root: null,
+        pluginPath,
+        error: "MCP_BASE_URL is configured but HTTP MCP health did not run",
+      }
+    );
+  }
 
   const manifestPath = path.join(pluginPath, ".claude-plugin", "plugin.json");
   const mcpConfigPath = path.join(pluginPath, ".mcp.json");

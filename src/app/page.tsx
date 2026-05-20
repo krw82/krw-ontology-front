@@ -150,7 +150,18 @@ export default function Home() {
       </main>
 
       <footer className="relative z-10 border-t border-white/10 bg-surface-dark px-4 py-6 text-center text-xs font-bold uppercase leading-5 tracking-[0.14em] text-white/45 sm:px-6">
-        © 2026 KRW Ontology Research. Evidence-backed company intelligence.
+        <div className="flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
+          <span>
+            © 2026 KRW Ontology Research. Evidence-backed company intelligence.
+          </span>
+          <span className="hidden h-1 w-1 rounded-full bg-white/25 sm:block" />
+          <Link href="/privacy" className="transition-colors hover:text-white/80">
+            개인정보처리방침
+          </Link>
+          <Link href="/terms" className="transition-colors hover:text-white/80">
+            서비스 약관
+          </Link>
+        </div>
       </footer>
     </div>
   );

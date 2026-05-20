@@ -23,6 +23,11 @@ interface RichAnswerRendererProps {
   fallbackMarkdown?: string;
 }
 
+type EvidenceChainBlock = Extract<
+  ResearchArtifactBlock,
+  { type: "evidence_chain" }
+>;
+
 function useRevealOffset() {
   const reducedMotion = useReducedMotion();
   const [isMobile, setIsMobile] = useState(false);
@@ -414,8 +419,11 @@ function AnswerSection({
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function AnimatedEvidenceChain({ chains }: { chains: any[] }) {
+function AnimatedEvidenceChain({
+  chains,
+}: {
+  chains: EvidenceChainBlock["chains"];
+}) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (

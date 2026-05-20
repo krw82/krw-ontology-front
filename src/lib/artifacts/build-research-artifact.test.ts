@@ -3,6 +3,7 @@ import {
   buildResearchArtifacts,
   deriveVisibleAnswer,
 } from "./build-research-artifact";
+import type { DisplayPlanOutput, ResearchSynthesis } from "@/types/api-contracts";
 
 describe("buildResearchArtifacts", () => {
   it("does not persist a presentation artifact when both answer and evidence are thin", () => {
@@ -268,8 +269,8 @@ describe("buildResearchArtifacts", () => {
   });
 
   it("does not supplement canonical/display-plan artifacts with evidence-derived blocks", () => {
-    const researchSynthesis = {
-      synthesis_version: "krw-research-synthesis/v1",
+    const researchSynthesis: ResearchSynthesis = {
+      synthesis_version: "krw-research-synthesis/v1" as const,
       canonical_answer: {
         default_order: ["p1"],
         units: [
@@ -284,7 +285,7 @@ describe("buildResearchArtifacts", () => {
       },
       quality: { overall: "high" as const, warnings: [] },
     };
-    const displayPlan = {
+    const displayPlan: DisplayPlanOutput = {
       display_plan_version: "krw-display-plan/v1" as const,
       source_synthesis_version: "krw-research-synthesis/v1",
       display_plan: [

@@ -1,10 +1,25 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireEnv } from "@/lib/env";
+import { isDevAuthBypassEnabled } from "@/lib/dev-auth";
 import type { Database } from "@/types/database";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
+  const protectedPaths = ["/companies", "/chat"];
+  const isProtected = protectedPaths.some((p) =>
+    request.nextUrl.pathname.startsWith(p),
+  );
+
+  if (isDevAuthBypassEnabled()) {
+    if (request.nextUrl.pathname === "/login") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/companies";
+      return NextResponse.redirect(url);
+    }
+
+    return supabaseResponse;
+  }
 
   const supabase = createServerClient<Database>(
     requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
@@ -30,12 +45,6 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  // Protected routes - redirect to login if not authenticated
-  const protectedPaths = ["/companies", "/chat"];
-  const isProtected = protectedPaths.some((p) =>
-    request.nextUrl.pathname.startsWith(p),
-  );
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();

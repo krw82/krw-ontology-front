@@ -21,11 +21,11 @@ export default function CompaniesBrowser({
   }, [initialCompanies, search]);
 
   const researchAction = {
-    label: "자료로 분석 시작",
+    label: "질문으로 분석 시작",
     href: "/chat",
     icon: "arrow_forward",
   };
-  const routingSteps = ["자료", "기업 후보", "근거"];
+  const routingSteps = ["질문", "기업 후보", "근거"];
 
   return (
     <div className="relative mx-auto flex min-h-0 w-full max-w-[1600px] flex-1">
@@ -34,30 +34,31 @@ export default function CompaniesBrowser({
           <div className="grid w-full gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.05fr)] lg:items-start">
             <div className="min-w-0">
               <p className="text-[13px] font-extrabold leading-5 text-primary">
-                자료로 찾기
+                질문으로 시작
               </p>
               <h1 className="mt-3 max-w-3xl text-balance text-[32px] font-black leading-[1.08] tracking-normal text-ink sm:text-[44px]">
-                자료에서 기업을 찾습니다.
+                회사명을 몰라도 질문 하나로 시작합니다.
               </h1>
               <p className="mt-4 max-w-2xl text-[16px] leading-7 text-body sm:text-[18px]">
-                보고서, 논문 초록, 기사 내용을 그대로 넣어보세요. 관련
-                회사와 공시 근거를 함께 확인합니다.
+                긴 글이 아니어도 됩니다. 질문, 문장, 이슈를 입력하면 관련 기업을
+                찾아주고 근거 연결로 리서치를 바로 시작합니다.
               </p>
             </div>
 
             <section className="rounded-[8px] border border-primary/25 bg-canvas p-4 shadow-sm sm:p-5">
               <div className="min-w-0">
                 <p className="text-[12px] font-extrabold leading-5 text-primary">
-                  자료 기반 리서치
+                  엔트리 포인트
                 </p>
                 <h2 className="mt-1.5 text-[18px] font-black leading-[1.25] text-ink sm:text-[21px]">
-                  회사명을 몰라도 긴 글에서 시작합니다.
+                  긴 글, 짧은 질문 어디서든 시작합니다.
                 </h2>
               </div>
 
               <p className="mt-4 text-[14px] font-semibold leading-6 text-body">
-                보고서, 기사, 공시 문장을 분석 화면에 넣으면 관련 기업
-                후보와 사업 활동, 리스크, 근거 문장을 함께 찾아줍니다.
+                기업명, 사업 활동, 리스크 키워드만으로도 분석을 시작할 수 있습니다.
+                입력된 내용에서 기업 후보와 사업 활동, 리스크, 근거를 함께
+                정리해요.
               </p>
 
               <div
@@ -83,7 +84,7 @@ export default function CompaniesBrowser({
                 <Link
                   href={researchAction.href}
                   className="inline-flex min-h-[48px] w-full items-center justify-center gap-xs rounded-[8px] bg-ink px-4 py-3 text-[14px] font-extrabold leading-5 text-canvas transition-colors hover:bg-ink/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-                  aria-label="자료로 분석 시작"
+                  aria-label="질문으로 분석 시작"
                 >
                   {researchAction.icon ? (
                     <span
@@ -105,7 +106,7 @@ export default function CompaniesBrowser({
                 티커로 바로 가기
               </p>
               <p className="mt-1 text-[13px] font-semibold leading-5 text-muted">
-                AAPL, LNG처럼 알고 있는 티커가 있을 때
+                AAPL, NVDA처럼 알고 있는 티커가 있을 때
               </p>
             </div>
             <div className="relative w-full">

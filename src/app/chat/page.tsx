@@ -289,27 +289,37 @@ function ChatContent() {
             {/* Spacer */}
             <div className="h-xl sm:h-[96px]" />
 
-            {/* Ticker context indicator */}
+            {/* Company research context */}
             {contextTickers.length > 0 && (
               <div className="mx-auto mb-lg w-full max-w-3xl">
                 <div
-                  className="inline-flex max-w-full items-center gap-2 rounded-[8px] border border-hairline bg-canvas px-3 py-2 text-[13px] leading-[1.4] shadow-sm"
+                  className="w-full rounded-[8px] border border-hairline bg-surface px-4 py-3 shadow-sm sm:px-5"
                   aria-label={`분석 대상: ${contextLabel}`}
                 >
-                  <span className="shrink-0 font-mono text-[12px] font-black tracking-[0.08em] text-primary">
-                    {contextCompanies.map((company) => company.ticker).join(", ")}
-                  </span>
-                  {contextCompanies.some((company) => company.name) && (
-                    <>
-                      <span aria-hidden="true" className="h-3 w-px bg-hairline" />
-                      <span className="truncate font-semibold text-body">
-                        {contextCompanies
-                          .map((company) => company.name)
-                          .filter(Boolean)
-                          .join(", ")}
-                      </span>
-                    </>
-                  )}
+                  <div className="flex min-w-0 items-center">
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 items-baseline gap-2">
+                        <span className="shrink-0 font-mono text-[13px] font-black tracking-[0.08em] text-primary sm:text-[14px]">
+                          {contextCompanies
+                            .map((company) => company.ticker)
+                            .join(", ")}
+                        </span>
+                        {contextCompanies.some((company) => company.name) && (
+                          <span className="truncate text-[16px] font-extrabold leading-[1.25] text-ink sm:text-[17px]">
+                            {contextCompanies
+                              .map((company) => company.name)
+                              .filter(Boolean)
+                              .join(", ")}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 truncate text-[12px] font-semibold leading-4 text-muted sm:text-[13px]">
+                        {contextCompanies.length > 1
+                          ? "복수 기업 비교 리서치"
+                          : "기업 리서치 컨텍스트"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -452,10 +462,7 @@ function ChatContent() {
               {chat.messages.length === 0 && !isStreaming && !sessionError && (
                 <div className="mx-auto grid w-full max-w-4xl gap-5 py-lg sm:py-xxl md:grid-cols-[minmax(0,1fr)_320px]">
                   <div className="min-w-0 rounded-[12px] border border-hairline bg-canvas p-5 shadow-sm sm:p-8">
-                    <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-primary">
-                      Evidence workspace
-                    </p>
-                    <h2 className="mt-3 text-balance text-[30px] font-black leading-[1.12] text-ink sm:text-[42px]">
+                    <h2 className="text-balance text-[30px] font-black leading-[1.12] text-ink sm:text-[42px]">
                       질문하면 답변과 근거 경로가 함께 생성됩니다.
                     </h2>
                     <p className="mt-4 max-w-2xl text-[16px] leading-7 text-body">

@@ -6,6 +6,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
 import { easeOutExpo } from "@/lib/animation";
+import { DEV_AUTH_EMAIL, isDevAuthBypassEnabled } from "@/lib/dev-auth";
 
 const traceTransitionMs = 0.12;
 const focusTransitionMs = 0.14;
@@ -95,10 +96,18 @@ function useHomeDemoStep(defaultStep: HomeDemoStep = "idle") {
 }
 
 export function HomeHeaderActions() {
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const supabase = useMemo(() => createClient(), []);
+  const devAuthBypass = isDevAuthBypassEnabled();
+  const [userEmail, setUserEmail] = useState<string | null>(
+    devAuthBypass ? DEV_AUTH_EMAIL : null,
+  );
+  const supabase = useMemo(
+    () => (devAuthBypass ? null : createClient()),
+    [devAuthBypass],
+  );
 
   useEffect(() => {
+    if (!supabase) return;
+
     let isMounted = true;
 
     supabase.auth.getUser().then(({ data: { user } }) => {

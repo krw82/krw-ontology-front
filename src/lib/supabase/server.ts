@@ -1,9 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { isDevAuthBypassEnabled } from "@/lib/dev-auth";
 import { requireEnv } from "@/lib/env";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { Database } from "@/types/database";
 
 export async function createClient() {
+  if (isDevAuthBypassEnabled()) {
+    return getSupabaseAdmin();
+  }
+
   const cookieStore = await cookies();
 
   return createServerClient<Database>(

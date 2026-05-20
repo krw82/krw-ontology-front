@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -7,8 +8,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install the ontology package from the local deployment bundle.
-COPY krw-ontology /tmp/krw-ontology
+# Install the ontology Python package needed by the MCP runtime.
+COPY --from=krw-ontology-src pyproject.toml /tmp/krw-ontology/pyproject.toml
+COPY --from=krw-ontology-src src /tmp/krw-ontology/src
+COPY --from=krw-ontology-src ontology /tmp/krw-ontology/ontology
 RUN pip install --no-cache-dir /tmp/krw-ontology \
     && rm -rf /tmp/krw-ontology
 COPY docker/mcp_http_entrypoint.py /app/mcp_http_entrypoint.py

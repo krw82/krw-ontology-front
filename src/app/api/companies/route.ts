@@ -3,11 +3,20 @@ import {
   getIndexedCompany,
   listIndexedCompanies,
 } from "@/lib/ontology/catalog";
+import { getAuthUser, handleAuthError } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  let user;
+  try {
+    user = await getAuthUser();
+  } catch (err) {
+    return handleAuthError(err);
+  }
+  if (!user) return handleAuthError(new Error("No user"));
+
   const url = new URL(request.url);
   const ticker = url.searchParams.get("ticker");
   const query = url.searchParams.get("q")?.trim().toLowerCase();

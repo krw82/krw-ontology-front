@@ -13,6 +13,34 @@ function safeNextPath(value: string | null): string {
   return value;
 }
 
+function GoogleMark() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-5 w-5"
+      viewBox="0 0 533.5 544.3"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M533.5 278.4c0-18.5-1.5-37.1-4.7-55.3H272.1v104.8h147c-6.1 33.8-25.7 63.7-54.4 82.7v68h87.7c51.5-47.4 81.1-117.4 81.1-200.2z"
+        fill="#4285F4"
+      />
+      <path
+        d="M272.1 544.3c73.4 0 135.3-24.1 180.4-65.7l-87.7-68c-24.4 16.6-55.9 26-92.6 26-71 0-131.2-47.9-152.8-112.3H28.9v70.1c46.2 91.9 140.3 149.9 243.2 149.9z"
+        fill="#34A853"
+      />
+      <path
+        d="M119.3 324.3c-11.4-33.8-11.4-70.4 0-104.2V150H28.9c-38.6 76.9-38.6 167.5 0 244.4l90.4-70.1z"
+        fill="#FBBC04"
+      />
+      <path
+        d="M272.1 107.7c38.8-.6 76.3 14 104.4 40.8l77.7-77.7C405 24.6 339.7-.8 272.1 0 168.9 0 74.7 58.2 28.9 150l90.4 70.1c21.5-64.5 81.8-112.4 152.8-112.4z"
+        fill="#EA4335"
+      />
+    </svg>
+  );
+}
+
 function LoginContent() {
   const searchParams = useSearchParams();
   const initialError = searchParams.get("error") === "oauth";
@@ -22,12 +50,7 @@ function LoginContent() {
     initialError ? "Google 인증을 완료하지 못했습니다. 다시 시도해주세요." : null,
   );
   const [errorVisible, setErrorVisible] = useState(false);
-  const [trustSignalsVisible, setTrustSignalsVisible] = useState(false);
-  const trustSignals = [
-    { label: "Google 인증", icon: "verified_user" },
-    { label: "RLS 보호", icon: "lock" },
-    { label: "출처 기록", icon: "history" },
-  ] as const;
+  const trustSignals = ["Google 인증", "개인 세션 보호", "출처 기록 저장"];
   const errorRef = useRef<HTMLDivElement | null>(null);
   const supabase = useMemo(() => createClient(), []);
 
@@ -43,17 +66,6 @@ function LoginContent() {
       didUpdate = false;
     };
   }, [error]);
-
-  useEffect(() => {
-    let didMount = true;
-    requestAnimationFrame(() => {
-      if (!didMount) return;
-      setTrustSignalsVisible(true);
-    });
-    return () => {
-      didMount = false;
-    };
-  }, []);
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -97,66 +109,36 @@ function LoginContent() {
 
       <main
         id="main-content"
-        className="relative z-10 grid w-full flex-1 grid-cols-1 items-start gap-8 px-base py-lg sm:px-md lg:grid-cols-[minmax(0,1fr)_440px] lg:items-center lg:gap-10 lg:px-xl lg:py-xl"
+        className="relative z-10 grid w-full flex-1 grid-cols-1 items-start gap-6 px-base py-lg sm:px-md lg:grid-cols-[minmax(0,1fr)_440px] lg:items-center lg:gap-10 lg:px-xl lg:py-xl"
       >
-        <section className="order-2 mx-auto w-full min-w-0 max-w-3xl lg:order-1 lg:mx-0 lg:pl-8">
+        <section className="order-1 mx-auto w-full min-w-0 max-w-[720px] lg:mx-0 lg:pl-8">
           <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-primary-fixed-dim">
-            Secure research workspace
+            보안 리서치 공간
           </p>
-          <h1 className="mt-4 max-w-2xl text-balance text-[34px] font-black leading-[1.02] text-on-dark sm:text-[64px]">
-            질문과 근거를 같은 세션에 보관합니다.
+          <h1 className="mt-4 max-w-[640px] break-keep text-[34px] font-black leading-[1.04] text-on-dark sm:text-[56px]">
+            리서치 기록을 안전하게 이어갑니다.
           </h1>
-          <p className="mt-4 w-full max-w-[576px] text-[16px] leading-7 text-on-dark-soft sm:mt-5 sm:text-[17px] sm:leading-8">
-            Google 로그인 후 회사 목록, 채팅 기록, 리서치 아티팩트가 한
-            워크스페이스에 연결됩니다.
+          <p className="mt-4 w-full max-w-[540px] text-[16px] leading-7 text-on-dark-soft sm:mt-5 sm:text-[17px] sm:leading-8">
+            Google 계정으로 로그인하면 회사 목록, 채팅 기록, 리서치 결과가
+            개인 워크스페이스에 저장됩니다.
           </p>
-
-          <div className="mt-6 grid max-w-2xl gap-2 sm:mt-8 sm:grid-cols-3 sm:gap-3">
-            {trustSignals.map((item, index) => (
-              <div
-                key={item.label}
-                className={`rounded-[8px] border border-white/10 bg-white/[0.05] px-4 py-3 transition-all duration-150 ease-out sm:py-4 ${
-                  trustSignalsVisible
-                    ? "translate-y-0 opacity-100"
-                    : "-translate-y-1 opacity-0"
-                }`}
-                style={{ transitionDelay: `${index * 60}ms` }}
-              >
-                {item.icon ? (
-                  <span
-                    aria-hidden="true"
-                    className="material-symbols-outlined text-[20px] text-primary-fixed-dim"
-                  >
-                    {item.icon}
-                  </span>
-                ) : null}
-                <p
-                  className={`text-[13px] font-bold uppercase tracking-[0.08em] text-on-dark ${
-                    item.icon ? "mt-3" : "mt-0"
-                  }`}
-                >
-                  {item.label}
-                </p>
-              </div>
-            ))}
-          </div>
         </section>
 
-        <section className="order-1 mx-auto w-full max-w-[440px] lg:order-2">
+        <section className="order-2 mx-auto w-full max-w-[440px]">
           <div
             className="animate-fade-in-up rounded-[12px] border border-white/12 bg-surface-dark-elevated p-5 text-on-dark shadow-2xl shadow-black/35 opacity-0 sm:p-6"
             style={{ animationDelay: "80ms", animationDuration: "150ms" }}
           >
             <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-primary-fixed-dim">
-              Account access
+              계정 연결
             </p>
 
             <h2 className="mt-4 text-[34px] font-black leading-none">
               로그인
             </h2>
             <p className="mt-3 text-[15px] leading-6 text-on-dark-soft">
-              리서치 질문, 회사 범위, 출처 기록을 이어서 사용하려면
-              Google 계정으로 인증하세요.
+              질문과 출처 기록을 같은 세션에 보관하려면 Google 계정으로
+              인증하세요.
             </p>
             <p className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.05] px-3 py-3 text-[13px] font-semibold leading-5 text-on-dark-soft">
               인증 후 요청한 화면으로 안전하게 이동합니다.
@@ -193,9 +175,7 @@ function LoginContent() {
                         : "opacity-100 scale-100"
                     }`}
                   >
-                    <span className="flex h-full w-full items-center justify-center rounded-[6px] bg-white text-[13px] font-black leading-none text-[#4285f4]">
-                      <span aria-hidden="true">G</span>
-                    </span>
+                    <GoogleMark />
                   </span>
                   <span
                     aria-hidden="true"
@@ -208,6 +188,20 @@ function LoginContent() {
                 </span>
                 {loading ? "Google로 이동 중..." : "Google로 계속하기"}
               </button>
+
+              <ul className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-1 text-center text-[12px] font-bold leading-5 text-on-dark-soft/80">
+                {trustSignals.map((item, index) => (
+                  <li key={item} className="flex items-center gap-x-2">
+                    {index > 0 && (
+                      <span
+                        aria-hidden="true"
+                        className="h-1 w-1 rounded-full bg-primary-fixed-dim/70"
+                      />
+                    )}
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
 
@@ -218,9 +212,15 @@ function LoginContent() {
       </main>
 
       <footer className="relative z-10 border-t border-white/5 px-base py-lg text-center">
-        <p className="text-[13px] font-semibold leading-[1.5] text-on-dark-soft/70">
-          © 2026 KRW Ontology. 모든 권리 보유.
-        </p>
+        <div className="flex flex-col items-center justify-center gap-2 text-[13px] font-semibold leading-[1.5] text-on-dark-soft/70 sm:flex-row sm:gap-3">
+          <span>© 2026 KRW Ontology. 모든 권리 보유.</span>
+          <Link href="/privacy" className="transition-colors hover:text-on-dark-soft">
+            개인정보처리방침
+          </Link>
+          <Link href="/terms" className="transition-colors hover:text-on-dark-soft">
+            서비스 약관
+          </Link>
+        </div>
       </footer>
     </div>
   );

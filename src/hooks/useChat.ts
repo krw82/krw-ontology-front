@@ -98,6 +98,8 @@ function mergeRichAnswers(
 function activityForTool(toolName: MCPToolName): ResearchActivityUpdate {
   if (
     toolName === "krw_ontology_catalog" ||
+    toolName === "krw_ontology_company_context" ||
+    toolName === "krw_ontology_index_context" ||
     toolName === "krw_ontology_topic_map" ||
     toolName === "krw_ontology_plan_query"
   ) {
@@ -141,6 +143,7 @@ export function useChat({
   const lastEventIdRef = useRef<string>("");
   const retryCountRef = useRef(0);
   const activeRunIdRef = useRef<string | null>(null);
+  const activeRequestIdRef = useRef<string | null>(null);
   const activeAssistantMessageIdRef = useRef<string | null>(null);
   const activeSessionIdRef = useRef<string | null>(sessionId || null);
 
@@ -156,6 +159,7 @@ export function useChat({
 
     activeSessionIdRef.current = null;
     activeRunIdRef.current = null;
+    activeRequestIdRef.current = null;
     activeAssistantMessageIdRef.current = null;
     finalizedRef.current = false;
     streamingContentRef.current = "";
@@ -425,6 +429,7 @@ export function useChat({
       }
 
       const requestId = createClientId();
+      activeRequestIdRef.current = requestId;
 
       finalizedRef.current = false;
       streamingContentRef.current = "";
@@ -602,6 +607,9 @@ export function useChat({
         }
       } finally {
         abortRef.current = null;
+        if (activeRequestIdRef.current === requestId) {
+          activeRequestIdRef.current = null;
+        }
       }
     },
     [
@@ -618,7 +626,22 @@ export function useChat({
       abortRef.current.abort();
     }
     try {
-      await fetch(`/api/chat/${sessionId}/cancel`, { method: "POST" });
+      const runId = activeRunIdRef.current;
+      const requestId = activeRequestIdRef.current;
+      const targetSessionId = activeSessionIdRef.current || sessionId;
+
+      if (runId || requestId) {
+        await fetch("/api/chat/run/cancel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...(runId ? { run_id: runId } : {}),
+            ...(requestId ? { request_id: requestId } : {}),
+          }),
+        });
+      } else if (targetSessionId) {
+        await fetch(`/api/chat/${targetSessionId}/cancel`, { method: "POST" });
+      }
     } catch {
       // Ignore cancel errors
     }

@@ -5,6 +5,11 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { KrwBrand } from "@/components/KrwBrand";
 import { createClient } from "@/lib/supabase/client";
+import {
+  DEV_AUTH_EMAIL,
+  DEV_AUTH_NAME,
+  isDevAuthBypassEnabled,
+} from "@/lib/dev-auth";
 import type { User } from "@supabase/supabase-js";
 
 interface UserProfile {
@@ -68,15 +73,25 @@ function UserAvatar({
 
 export default function TopNav() {
   const router = useRouter();
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const devAuthBypass = isDevAuthBypassEnabled();
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() =>
+    devAuthBypass
+      ? { email: DEV_AUTH_EMAIL, name: DEV_AUTH_NAME, avatarUrl: null }
+      : null,
+  );
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
   // M-07: useMemo to cache Supabase client
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(
+    () => (devAuthBypass ? null : createClient()),
+    [devAuthBypass],
+  );
 
   // M-08: onAuthStateChange listener
   useEffect(() => {
+    if (!supabase) return;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setUserProfile(profileFromUser(session?.user));
@@ -119,6 +134,12 @@ export default function TopNav() {
   }, [accountMenuOpen]);
 
   const handleSignOut = useCallback(async () => {
+    if (!supabase) {
+      setAccountMenuOpen(false);
+      router.push("/companies");
+      return;
+    }
+
     await supabase.auth.signOut();
     setUserProfile(null);
     setAccountMenuOpen(false);

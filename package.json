@@ -5,9 +5,15 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node .next/standalone/server.js",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run lint && npm run test:unit && npm run build",
+    "docker:build:mcp": "docker build --build-context krw-ontology-src=${KRW_ONTOLOGY_SOURCE_DIR:-../krw-ontology} -f Dockerfile.mcp .",
+    "deploy:prod": "scripts/deploy-production.sh",
+    "deploy:prod:dry": "scripts/deploy-production.sh --dry-run",
     "lint": "eslint",
     "test:unit": "vitest run",
+    "test:e2e": "playwright test",
     "supabase:login": "npx supabase login",
     "supabase:orgs": "npx supabase orgs list",
     "supabase:projects": "npx supabase projects list",
@@ -29,6 +35,7 @@
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20.19.40",
     "@types/react": "^19",

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { isDevAuthBypassEnabled } from "@/lib/dev-auth";
 
 interface FloatingAskBarProps {
   selectedTicker?: string | null;
@@ -10,12 +11,18 @@ interface FloatingAskBarProps {
 
 export default function FloatingAskBar({ selectedTicker }: FloatingAskBarProps) {
   const [query, setQuery] = useState("");
-  const [visible, setVisible] = useState(false);
+  const devAuthBypass = isDevAuthBypassEnabled();
+  const [visible, setVisible] = useState(devAuthBypass);
   const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(
+    () => (devAuthBypass ? null : createClient()),
+    [devAuthBypass],
+  );
 
   // M-06: reactive auth state via onAuthStateChange
   useEffect(() => {
+    if (!supabase) return;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setVisible(!!session?.user);

@@ -19,9 +19,12 @@ export interface ResearchStep {
 
 const toolLabels: Partial<Record<MCPToolName, string>> = {
   krw_ontology_catalog: "문서 범위 확인",
+  krw_ontology_company_context: "기업 컨텍스트 확인",
+  krw_ontology_index_context: "인덱스 컨텍스트 확인",
   krw_ontology_topic_map: "관련 토픽 확인",
   krw_ontology_plan_query: "검색 범위 구성",
   krw_ontology_query: "공시 근거 검색",
+  krw_ontology_query_context: "검색 컨텍스트 확인",
   krw_ontology_retrieve: "질문 기반 근거 검색",
   krw_ontology_trace: "근거 연결 추적",
   krw_ontology_chain: "주장-근거 체인 확인",
@@ -31,9 +34,12 @@ const toolLabels: Partial<Record<MCPToolName, string>> = {
 
 const toolStepMap: Record<MCPToolName, ResearchStepId> = {
   krw_ontology_catalog: "scope",
+  krw_ontology_company_context: "scope",
+  krw_ontology_index_context: "scope",
   krw_ontology_topic_map: "scope",
   krw_ontology_plan_query: "scope",
   krw_ontology_query: "search",
+  krw_ontology_query_context: "search",
   krw_ontology_retrieve: "search",
   krw_ontology_trace: "trace",
   krw_ontology_chain: "trace",

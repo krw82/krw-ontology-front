@@ -16,7 +16,7 @@ const USER_SETTINGS_ENV_KEY_PREFIXES = ["ANTHROPIC_"];
 const USER_SETTINGS_ENV_KEYS = new Set(["API_TIMEOUT_MS"]);
 const BLOCKED_USER_SETTINGS_ENV_KEYS = new Set(["ANTHROPIC_LOG"]);
 
-type EnvSource = NodeJS.ProcessEnv;
+type EnvSource = Record<string, string | undefined>;
 
 interface ClaudeSettingsFile {
   env?: Record<string, unknown>;

@@ -7,7 +7,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${FRONT_DIR:-.}/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     networks:
@@ -21,6 +21,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
+      additional_contexts:
+        krw-ontology-src: ${KRW_ONTOLOGY_SOURCE_DIR:-../krw-ontology}
       args:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
@@ -66,6 +68,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.mcp
+      additional_contexts:
+        krw-ontology-src: ${KRW_ONTOLOGY_SOURCE_DIR:-../krw-ontology}
       args:
         KRW_ONTOLOGY_COMMIT: ${KRW_ONTOLOGY_COMMIT:-main}
     user: "0:0"
