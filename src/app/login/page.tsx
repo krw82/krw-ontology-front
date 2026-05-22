@@ -5,16 +5,10 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { KrwBrand } from "@/components/KrwBrand";
+import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
 import { createClient } from "@/lib/supabase/client";
 import { easeOutExpo } from "@/lib/animation";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
-
-function safeNextPath(value: string | null): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return "/companies";
-  }
-  return value;
-}
 
 function GoogleMark() {
   return (
@@ -48,7 +42,7 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const reducedMotion = useReducedMotion();
   const initialError = searchParams.get("error") === "oauth";
-  const nextPath = safeNextPath(searchParams.get("next"));
+  const nextPath = normalizeInternalNextPath(searchParams.get("next"));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(
     initialError ? "Google 인증을 완료하지 못했습니다. 다시 시도해주세요." : null,

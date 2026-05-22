@@ -79,4 +79,16 @@ describe("GET /auth/callback", () => {
       "http://internal.local/companies",
     );
   });
+
+  it("normalizes recursive next params before redirecting", async () => {
+    const response = await GET(
+      new Request(
+        "http://internal.local/auth/callback?code=ok&next=%2Fcompanies%3Fnext%3D%252Fcompanies%253Fnext%253D%25252Fcompanies",
+      ),
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "http://internal.local/companies",
+    );
+  });
 });

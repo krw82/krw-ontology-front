@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { KrwBrand } from "@/components/KrwBrand";
+import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
 import { createClient } from "@/lib/supabase/client";
 import { popoverMenu } from "@/lib/animation";
 import {
@@ -112,7 +113,9 @@ export default function TopNav({
     [devAuthBypass],
   );
   const query = searchParams.toString();
-  const currentPath = query ? `${pathname}?${query}` : pathname;
+  const currentPath = normalizeInternalNextPath(
+    query ? `${pathname}?${query}` : pathname,
+  );
 
   // M-08: onAuthStateChange listener
   useEffect(() => {

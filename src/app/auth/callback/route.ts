@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
+import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
 import { createClient } from "@/lib/supabase/server";
 
 const FALLBACK_NEXT_PATH = "/companies";
-const SAFE_NEXT_ORIGIN = "https://krw-ontology.local";
 const REDIRECT_ORIGIN_ENV_KEYS = [
   "AUTH_REDIRECT_ORIGIN",
   "NEXT_PUBLIC_SITE_URL",
@@ -10,19 +10,7 @@ const REDIRECT_ORIGIN_ENV_KEYS = [
 ] as const;
 
 function getSafeNextPath(value: string | null): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return FALLBACK_NEXT_PATH;
-  }
-
-  try {
-    const nextUrl = new URL(value, SAFE_NEXT_ORIGIN);
-    if (nextUrl.origin !== SAFE_NEXT_ORIGIN) {
-      return FALLBACK_NEXT_PATH;
-    }
-    return `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`;
-  } catch {
-    return FALLBACK_NEXT_PATH;
-  }
+  return normalizeInternalNextPath(value, FALLBACK_NEXT_PATH);
 }
 
 function normalizeRedirectOrigin(value: string | undefined): string | null {

@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireEnv } from "@/lib/env";
 import { isDevAuthBypassEnabled } from "@/lib/dev-auth";
+import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
 import type { Database } from "@/types/database";
 
 export async function updateSession(request: NextRequest) {
@@ -13,8 +14,10 @@ export async function updateSession(request: NextRequest) {
 
   if (isDevAuthBypassEnabled()) {
     if (request.nextUrl.pathname === "/login") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/companies";
+      const url = new URL(
+        normalizeInternalNextPath(request.nextUrl.searchParams.get("next")),
+        request.nextUrl.origin,
+      );
       return NextResponse.redirect(url);
     }
 
@@ -47,10 +50,10 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user && isProtected) {
-    const url = request.nextUrl.clone();
-    const nextPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
-    url.pathname = "/login";
-    url.search = "";
+    const url = new URL("/login", request.nextUrl.origin);
+    const nextPath = normalizeInternalNextPath(
+      `${request.nextUrl.pathname}${request.nextUrl.search}`,
+    );
     url.searchParams.set("next", nextPath);
     return NextResponse.redirect(url);
   }
