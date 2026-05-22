@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion } from "motion/react";
 import { easeOutExpo, listRow } from "@/lib/animation";
+import { trackClientEventSilently } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 export interface CompanyCardData {
@@ -74,9 +75,18 @@ export default function CompanyCard({
       className="border-b border-hairline-soft last:border-b-0"
     >
       <Link
-        href={`/chat?ticker=${encodeURIComponent(company.ticker)}`}
+        href={`/companies/${encodeURIComponent(company.ticker)}`}
+        onClick={() => {
+          trackClientEventSilently("company_selected", {
+            ticker: company.ticker,
+            company_name: company.name,
+            sector: company.sector ?? null,
+            source: "companies_list",
+            destination: "company_landing",
+          });
+        }}
         className="group block cursor-pointer"
-        aria-label={`${accessibleSummary}. 이 회사 리서치 채팅 열기`}
+        aria-label={`${accessibleSummary}. 이 회사 리서치 페이지 열기`}
       >
         <article className="grid gap-3 px-4 py-4 transition-[transform,color,background-color] duration-150 ease-out hover:-translate-y-[1px] hover:bg-surface 2xl:grid-cols-[116px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] 2xl:items-start active:scale-[0.995] active:bg-surface-soft">
           <div className="flex min-w-0 items-start justify-between gap-4 2xl:block">

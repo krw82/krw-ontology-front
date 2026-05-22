@@ -63,6 +63,7 @@ export type ErrorCode =
   | "mcp_error"
   | "claude_api_error"
   | "claude_rate_limited"
+  | "rate_limited"
   | "validation_error"
   | "internal_error";
 
@@ -83,6 +84,7 @@ const VALID_ERROR_CODES: ReadonlySet<string> = new Set<ErrorCode>([
   "mcp_error",
   "claude_api_error",
   "claude_rate_limited",
+  "rate_limited",
   "validation_error",
   "internal_error",
 ]);

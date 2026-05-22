@@ -11,6 +11,7 @@ import { useChat } from "@/hooks/useChat";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { getSessionTickers, buildChatSessionHref } from "@/lib/chat/history-state";
 import { getSuggestedPromptsForTickers } from "@/lib/chat/suggested-prompts";
+import { trackClientEventSilently } from "@/lib/analytics/client";
 
 function sanitizeError(message: string): string {
   // Strip stack traces and internal details
@@ -56,6 +57,8 @@ function ChatContent() {
   const hasLoadedRef = useRef(false);
   const cancelledRef = useRef(false);
   const lastRefreshedRunIdRef = useRef<string | null>(null);
+  const quotaAlertTrackedRef = useRef<string | null>(null);
+  const prefilledQuestionTrackedRef = useRef<string | null>(null);
   const { entitlement, refresh: refreshEntitlement } = useEntitlement();
 
   // H-07: cleanup on unmount to prevent race condition
@@ -170,6 +173,7 @@ function ChatContent() {
   }, []);
 
   const isStreaming = chat.status === "running";
+  const isQuotaBlocked = entitlement?.usage.can_run === false;
   const hasConversationContent =
     chat.messages.length > 0 ||
     Boolean(chat.streamingContent) ||
@@ -242,6 +246,26 @@ function ChatContent() {
   const initialComposerValue = queryParam ?? undefined;
   const sendMessage = chat.sendMessage;
   const cancelRun = chat.cancelRun;
+
+  useEffect(() => {
+    const trimmedQuery = queryParam?.trim();
+    if (!trimmedQuery) return;
+
+    const eventKey = `${trimmedQuery}:${contextTickersKey || "global"}`;
+    if (prefilledQuestionTrackedRef.current === eventKey) return;
+    prefilledQuestionTrackedRef.current = eventKey;
+
+    const analyticsTickers = contextTickersKey
+      ? contextTickersKey.split(",").filter(Boolean)
+      : [];
+
+    trackClientEventSilently("question_prefilled", {
+      source: "url_query",
+      ticker: analyticsTickers[0] ?? null,
+      tickers: analyticsTickers,
+      question_length: trimmedQuery.length,
+    });
+  }, [contextTickersKey, queryParam]);
 
   useEffect(() => {
     if (chat.messages.length > 0 || isStreaming || effectiveSessionError) {
@@ -326,6 +350,22 @@ function ChatContent() {
     [sendMessage],
   );
 
+  async function handlePromptSend(
+    prompt: string,
+    source: "empty_state" | "follow_up",
+  ) {
+    const analyticsTickers = contextTickersKey
+      ? contextTickersKey.split(",").filter(Boolean)
+      : [];
+    trackClientEventSilently("starter_question_clicked", {
+      source,
+      ticker: analyticsTickers[0] ?? null,
+      tickers: analyticsTickers,
+      prompt,
+    });
+    await sendMessage(prompt);
+  }
+
   const handleCancel = useCallback(async () => {
     await cancelRun();
   }, [cancelRun]);
@@ -340,6 +380,25 @@ function ChatContent() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [chat.status, handleCancel]);
+
+  useEffect(() => {
+    const alertLevel = entitlement?.usage.alert_level;
+    if (!alertLevel || alertLevel === "ok") return;
+
+    const eventKey = `${entitlement.plan.key}:${entitlement.usage.period_start}:${alertLevel}:${entitlement.usage.questions_used}`;
+    if (quotaAlertTrackedRef.current === eventKey) return;
+    quotaAlertTrackedRef.current = eventKey;
+
+    trackClientEventSilently(
+      alertLevel === "blocked" ? "usage_limit_reached" : "usage_warning_shown",
+      {
+        plan: entitlement.plan.key,
+        questions_used: entitlement.usage.questions_used,
+        questions_limit: entitlement.usage.questions_limit,
+        percent_used: entitlement.usage.percent_used,
+      },
+    );
+  }, [entitlement]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -431,6 +490,16 @@ function ChatContent() {
                         isLatestAssistantMessage && msg.role === "assistant"
                           ? chat.runDurationsByMessageId[msg.id]
                           : null
+                      }
+                      followUpPrompts={
+                        isLatestAssistantMessage ? suggestedPrompts : undefined
+                      }
+                      onFollowUpClick={
+                        isLatestAssistantMessage
+                          ? (prompt) => {
+                              void handlePromptSend(prompt, "follow_up");
+                            }
+                          : undefined
                       }
                     />
                   );
@@ -561,7 +630,9 @@ function ChatContent() {
                                 ? "text-ink"
                                 : "text-body hover:bg-surface-soft hover:text-ink"
                             }`}
-                            onClick={() => handleSend(prompt)}
+                            onClick={() => {
+                              void handlePromptSend(prompt, "empty_state");
+                            }}
                             onFocus={() => setActivePromptIndex(index)}
                             onMouseEnter={() => setActivePromptIndex(index)}
                             disabled={
@@ -621,16 +692,32 @@ function ChatContent() {
             </div>
           </div>
 
+          {isQuotaBlocked && entitlement && (
+            <div className="border-t border-hairline bg-canvas px-base py-sm sm:px-lg">
+              <div className="mx-auto max-w-4xl rounded-[8px] border border-error/20 bg-error-container/10 px-base py-sm text-[13px] font-semibold leading-5 text-error">
+                <span
+                  aria-hidden="true"
+                  className="material-symbols-outlined mr-xs text-[18px] align-middle"
+                >
+                  lock
+                </span>
+                {entitlement.upgrade.title} {entitlement.upgrade.message}
+              </div>
+            </div>
+          )}
+
           {/* M-09: Session creation loading indicator */}
           <Composer
             onSend={handleSend}
             onCancel={handleCancel}
             activity={chat.activity}
-            disabled={Boolean(effectiveSessionError)}
+            disabled={Boolean(effectiveSessionError) || isQuotaBlocked}
             isGenerating={isStreaming}
             placeholder={
               effectiveSessionError
                 ? "인덱스에 있는 회사만 채팅할 수 있습니다."
+                : isQuotaBlocked
+                  ? "이번 달 질문 한도에 도달했습니다."
                 : "기업에 대해 질문하세요..."
             }
             toolCalls={chat.toolCalls}

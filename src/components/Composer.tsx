@@ -13,6 +13,7 @@ import {
   getActiveResearchLabel,
   type ResearchToolCallStatus,
 } from "@/lib/chat/research-status";
+import { trackClientEventSilently } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import type { ResearchActivityUpdate } from "@/types/api-contracts";
 import type { EntitlementStatus } from "@/types/entitlement";
@@ -114,13 +115,13 @@ export default function Composer({
   initialValue,
   entitlement = null,
 }: ComposerProps) {
-  const initialDraftValue = initialValue?.trim() ? "" : (initialValue ?? "");
+  const initialDraftValue = initialValue ?? "";
   const [value, setValue] = useState(initialDraftValue);
   const [attachments, setAttachments] = useState<TextAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const hasAutoSent = useRef(false);
+  const lastInitialValueRef = useRef(initialDraftValue);
   const motionConfig = useComposerMotionConfig();
 
   const composedLength = useMemo(
@@ -146,13 +147,13 @@ export default function Composer({
   }, [value]);
 
   useEffect(() => {
-    if (hasAutoSent.current) return;
-    if (isInputDisabled) return;
-    if (initialValue?.trim()) {
-      hasAutoSent.current = true;
-      onSend(initialValue);
-    }
-  }, [isInputDisabled, initialValue, onSend]);
+    const nextInitialValue = initialValue ?? "";
+    if (lastInitialValueRef.current === nextInitialValue) return;
+
+    lastInitialValueRef.current = nextInitialValue;
+    setValue(nextInitialValue);
+    setAttachmentError(null);
+  }, [initialValue]);
 
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current;
@@ -175,6 +176,12 @@ export default function Composer({
     const invalidFile = files.find((file) => !isAcceptedTextFile(file));
     if (invalidFile) {
       setAttachmentError("txt 또는 md 파일만 첨부할 수 있습니다.");
+      trackClientEventSilently("attachment_rejected", {
+        reason: "unsupported_type",
+        file_name: invalidFile.name,
+        file_type: invalidFile.type || null,
+        file_size: invalidFile.size,
+      });
       return;
     }
 
@@ -182,6 +189,11 @@ export default function Composer({
       setAttachmentError(
         `첨부 파일은 최대 ${MAX_CHAT_ATTACHMENT_COUNT}개까지 보낼 수 있습니다.`,
       );
+      trackClientEventSilently("attachment_rejected", {
+        reason: "too_many_files",
+        incoming_count: files.length,
+        existing_count: attachments.length,
+      });
       return;
     }
 
@@ -192,6 +204,12 @@ export default function Composer({
       setAttachmentError(
         `첨부 파일 하나는 ${formatBytes(MAX_CHAT_ATTACHMENT_BYTES)}를 넘을 수 없습니다.`,
       );
+      trackClientEventSilently("attachment_rejected", {
+        reason: "file_too_large",
+        file_name: oversizedFile.name,
+        file_type: oversizedFile.type || null,
+        file_size: oversizedFile.size,
+      });
       return;
     }
 
@@ -211,12 +229,26 @@ export default function Composer({
         setAttachmentError(
           `첨부 포함 메시지는 ${MAX_CHAT_PAYLOAD_CHARS.toLocaleString()}자를 넘을 수 없습니다.`,
         );
+        trackClientEventSilently("attachment_rejected", {
+          reason: "payload_too_large",
+          incoming_count: files.length,
+          total_characters: nextMessage.length,
+        });
         return;
       }
 
       setAttachments(nextAttachments);
+      trackClientEventSilently("attachment_added", {
+        file_count: loadedFiles.length,
+        total_file_count: nextAttachments.length,
+        total_bytes: nextAttachments.reduce((sum, file) => sum + file.size, 0),
+      });
     } catch {
       setAttachmentError("파일을 읽지 못했습니다.");
+      trackClientEventSilently("attachment_rejected", {
+        reason: "read_failed",
+        incoming_count: files.length,
+      });
     }
   };
 
@@ -327,7 +359,8 @@ export default function Composer({
           className="mb-0.5 ml-0.5 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-body transition-colors duration-150 hover:bg-surface-dim hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
           onClick={() => fileInputRef.current?.click()}
           disabled={isInputDisabled}
-          aria-label="txt 또는 md 파일 첨부"
+          aria-label="txt 또는 md 파일 첨부. PDF는 현재 지원하지 않습니다."
+          title="txt 또는 md 파일 첨부. PDF는 현재 지원하지 않습니다."
           type="button"
         >
           <span className="material-symbols-outlined text-[20px]">
@@ -342,7 +375,7 @@ export default function Composer({
             placeholder={isGenerating ? "" : placeholder}
             rows={1}
             style={{ minHeight: 48 }}
-            defaultValue={initialDraftValue}
+            value={value}
             onChange={(event) => syncTextareaValue(event.currentTarget.value)}
             onInput={(event) => syncTextareaValue(event.currentTarget.value)}
             onCompositionEnd={(event) =>
@@ -412,7 +445,12 @@ export default function Composer({
         </button>
       </div>
       <div className="mx-auto mt-xs flex max-w-4xl items-center justify-between gap-sm">
-        <UsageStatus entitlement={entitlement} />
+        <div className="min-w-0">
+          <UsageStatus entitlement={entitlement} />
+          <p className="mt-1 hidden text-[11px] font-semibold leading-4 text-muted-soft sm:block">
+            txt/md 첨부 가능 · PDF는 현재 지원하지 않습니다.
+          </p>
+        </div>
         <span className="text-xs text-muted-soft">
           전체{" "}
           {composedLength.toLocaleString()}/

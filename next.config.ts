@@ -5,6 +5,9 @@ const isDevelopment = process.env.NODE_ENV === "development";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  ...(process.env.NEXT_DIST_DIR
+    ? { distDir: process.env.NEXT_DIST_DIR }
+    : {}),
   poweredByHeader: false,
   allowedDevOrigins: isDevelopment ? ["127.0.0.1", "192.168.10.52"] : [],
   images: {

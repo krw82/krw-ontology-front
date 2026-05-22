@@ -96,6 +96,41 @@ export interface UsageDailyRow extends Record<string, unknown> {
   estimated_cost_usd: number;
 }
 
+export interface UserEntitlementRow extends Record<string, unknown> {
+  user_id: string;
+  plan_key: "free" | "pro" | "power" | "beta" | "internal";
+  status: "active" | "paused" | "cancelled";
+  current_period_start: string;
+  current_period_end: string;
+  provider_customer_id: string | null;
+  provider_subscription_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UsageEventRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  request_id: string;
+  run_id: string | null;
+  usage_kind: "question";
+  quantity: number;
+  estimated_cost_usd: number;
+  period_start: string;
+  period_end: string;
+  metadata: Json;
+  occurred_at: string;
+}
+
+export interface UsagePeriodCounterRow extends Record<string, unknown> {
+  user_id: string;
+  period_start: string;
+  period_end: string;
+  question_count: number;
+  estimated_cost_usd: number;
+  updated_at: string;
+}
+
 export interface ConcurrencyLeaseRow extends Record<string, unknown> {
   id: string;
   run_id: string;
@@ -133,6 +168,15 @@ export interface ResearchArtifactRow extends Record<string, unknown> {
   created_at: string;
 }
 
+export interface RateLimitCounterRow extends Record<string, unknown> {
+  key: string;
+  bucket: string;
+  window_start: string;
+  count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface MessageShareRow extends Record<string, unknown> {
   id: string;
   token: string;
@@ -145,6 +189,48 @@ export interface MessageShareRow extends Record<string, unknown> {
   tickers: string[] | null;
   created_at: string;
   revoked_at: string | null;
+}
+
+export interface AnalyticsEventRow extends Record<string, unknown> {
+  id: string;
+  user_id: string | null;
+  anonymous_id: string | null;
+  event_name:
+    | "page_viewed"
+    | "cta_clicked"
+    | "home_cta_clicked"
+    | "signup_started"
+    | "login_completed"
+    | "company_selected"
+    | "question_prefilled"
+    | "starter_question_clicked"
+    | "question_submitted"
+    | "answer_completed"
+    | "answer_failed"
+    | "citation_opened"
+    | "share_created"
+    | "session_renamed"
+    | "session_deleted"
+    | "attachment_added"
+    | "attachment_rejected"
+    | "usage_warning_shown"
+    | "usage_limit_reached"
+    | "quota_warning_shown"
+    | "quota_blocked"
+    | "upgrade_clicked"
+    | "subscription_started";
+  properties: Json;
+  path: string | null;
+  referrer: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
+  utm_term: string | null;
+  session_id: string | null;
+  message_id: string | null;
+  run_id: string | null;
+  created_at: string;
 }
 
 // Supabase Database type for createClient generic
@@ -267,6 +353,53 @@ export interface Database {
           referencedColumns: string[];
         }>;
       };
+      user_entitlements: {
+        Row: UserEntitlementRow;
+        Insert: Omit<UserEntitlementRow, "created_at" | "updated_at"> & {
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<UserEntitlementRow, "user_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      usage_events: {
+        Row: UsageEventRow;
+        Insert: Omit<UsageEventRow, "id" | "occurred_at" | "usage_kind" | "quantity" | "metadata"> & {
+          id?: string;
+          usage_kind?: "question";
+          quantity?: number;
+          metadata?: Json;
+          occurred_at?: string;
+        };
+        Update: Partial<Omit<UsageEventRow, "id" | "user_id" | "request_id">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      usage_period_counters: {
+        Row: UsagePeriodCounterRow;
+        Insert: Omit<UsagePeriodCounterRow, "updated_at"> & {
+          updated_at?: string;
+        };
+        Update: Partial<Omit<UsagePeriodCounterRow, "user_id" | "period_start" | "period_end">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
       concurrency_leases: {
         Row: ConcurrencyLeaseRow;
         Insert: Omit<ConcurrencyLeaseRow, "id" | "acquired_at"> & {
@@ -313,6 +446,35 @@ export interface Database {
           referencedColumns: string[];
         }>;
       };
+      rate_limit_counters: {
+        Row: RateLimitCounterRow;
+        Insert: Omit<
+          RateLimitCounterRow,
+          "created_at" | "updated_at" | "count"
+        > & {
+          count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<RateLimitCounterRow, "key" | "bucket" | "window_start">>;
+        Relationships: [];
+      };
+      analytics_events: {
+        Row: AnalyticsEventRow;
+        Insert: Omit<AnalyticsEventRow, "id" | "created_at" | "properties"> & {
+          id?: string;
+          properties?: Json;
+          created_at?: string;
+        };
+        Update: Partial<Omit<AnalyticsEventRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -323,6 +485,21 @@ export interface Database {
           p_cost: number;
         };
         Returns: undefined;
+      };
+      record_usage_event: {
+        Args: {
+          p_user_id: string;
+          p_request_id: string;
+          p_run_id: string | null;
+          p_period_start: string;
+          p_period_end: string;
+          p_cost: number;
+        };
+        Returns: Array<{
+          inserted: boolean;
+          question_count: number;
+          estimated_cost_usd: number;
+        }>;
       };
       try_acquire_lease: {
         Args: {
@@ -336,6 +513,20 @@ export interface Database {
           p_global_limit: number;
         };
         Returns: Array<{ id: string }>;
+      };
+      increment_rate_limit: {
+        Args: {
+          p_key: string;
+          p_bucket: string;
+          p_window_start: string;
+          p_window_seconds: number;
+          p_limit: number;
+        };
+        Returns: Array<{
+          allowed: boolean;
+          current_count: number;
+          retry_after_seconds: number;
+        }>;
       };
     };
     Enums: Record<string, string>;

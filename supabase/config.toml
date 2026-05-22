@@ -67,12 +67,11 @@ sql_paths = ["./seed.sql"]
 [db.network_restrictions]
 # Enable management of network restrictions.
 enabled = false
-# List of IPv4 CIDR blocks allowed to connect to the database.
-# Defaults to allow all IPv4 connections. Set empty array to block all IPs.
-allowed_cidrs = ["0.0.0.0/0"]
-# List of IPv6 CIDR blocks allowed to connect to the database.
-# Defaults to allow all IPv6 connections. Set empty array to block all IPs.
-allowed_cidrs_v6 = ["::/0"]
+# Production should enable this in Supabase hosted settings and allow only
+# operator/VPC egress IPs. Keep the declarative list closed by default so it
+# cannot accidentally publish a 0.0.0.0/0 allow-list.
+allowed_cidrs = []
+allowed_cidrs_v6 = []
 
 # Uncomment to reject non-secure connections to the database.
 # [db.ssl_enforcement]
@@ -151,11 +150,11 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "http://34.64.248.187"
+site_url = "https://krwontology.com"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 external_url = "https://deaumgysfwfcctzhbaxb.supabase.co/auth/v1"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["http://34.64.248.187", "http://34.64.248.187/auth/callback", "http://localhost:3000", "http://localhost:3000/auth/callback", "http://127.0.0.1:3000", "http://127.0.0.1:3000/auth/callback"]
+additional_redirect_urls = ["https://krwontology.com", "https://krwontology.com/auth/callback", "https://www.krwontology.com", "https://www.krwontology.com/auth/callback", "http://localhost:3000", "http://localhost:3000/auth/callback", "http://127.0.0.1:3000", "http://127.0.0.1:3000/auth/callback"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.

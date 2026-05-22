@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
 import { createClient } from "@/lib/supabase/server";
 
@@ -43,8 +44,16 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      await recordAnalyticsEventFromRequest(request, {
+        eventName: "login_completed",
+        userId: data?.user?.id ?? null,
+        properties: {
+          next_path: next,
+          provider: "google",
+        },
+      });
       return NextResponse.redirect(new URL(next, redirectOrigin));
     }
   }

@@ -21,10 +21,6 @@ import {
   type CompanyPromptContext,
 } from "./system-prompt";
 import { buildResearchPassPrompt } from "./workflow";
-import {
-  parseResearchSynthesisOutput,
-  parseResearchSynthesisOutputText,
-} from "@/lib/artifacts/display-plan";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { readIntEnv } from "@/lib/env";
 import {
@@ -198,14 +194,6 @@ export async function runAgent(
       return researchResult;
     }
 
-    const researchSynthesis =
-      parseResearchSynthesisOutput(researchResult.acc.structuredOutput) ??
-      parseResearchSynthesisOutputText(serializePassOutput(researchResult.acc));
-    if (researchSynthesis) {
-      researchResult.acc.researchSynthesisOutput = researchSynthesis;
-      researchResult.acc.researchSynthesisText = JSON.stringify(researchSynthesis);
-    }
-
     if (!researchResult.acc.fullText.trim()) {
       return {
         acc: researchResult.acc,
@@ -352,14 +340,6 @@ async function runSdkPass(params: {
       errorMessage: userFacingErrorMessage(errorCode, rawErrorMessage),
     };
   }
-}
-
-function serializePassOutput(acc: AccumulatedRun): string {
-  if (acc.structuredOutput !== null && acc.structuredOutput !== undefined) {
-    return JSON.stringify(acc.structuredOutput, null, 2);
-  }
-
-  return acc.fullText.trim();
 }
 
 async function reportSdkInitialization(params: {

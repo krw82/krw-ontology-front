@@ -24,12 +24,27 @@ describe("agent permission boundary", () => {
   });
 
   it("denies legacy direct MCP and arbitrary tool names", async () => {
-    await expect(
-      canUseTool("mcp__krw-ontology__krw_ontology_query"),
-    ).resolves.toMatchObject({ behavior: "deny" });
-    await expect(canUseTool("Bash")).resolves.toMatchObject({
-      behavior: "deny",
-    });
+    const deniedToolNames = [
+      "mcp__krw-ontology__krw_ontology_query",
+      "mcp__plugin_krw-ontology_krw-ontology__krw_ontology_delete",
+      "mcp__plugin_krw-ontology_other__krw_ontology_query",
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
+      "MultiEdit",
+      "WebFetch",
+      "WebSearch",
+      "NotebookEdit",
+      "TodoWrite",
+    ];
+
+    for (const toolName of deniedToolNames) {
+      await expect(canUseTool(toolName)).resolves.toMatchObject({
+        behavior: "deny",
+      });
+      expect(isKrwOntologySdkTool(toolName)).toBe(false);
+    }
 
     expect(isKrwOntologySdkTool("mcp__krw-ontology__krw_ontology_query")).toBe(
       false,

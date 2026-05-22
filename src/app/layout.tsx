@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Noto_Sans_KR } from "next/font/google";
 import { Suspense } from "react";
+import AnalyticsBootstrap from "@/components/analytics/AnalyticsBootstrap";
 import AppShell from "@/components/AppShell";
+import { getSiteOrigin, SITE_DESCRIPTION, SITE_NAME } from "@/lib/marketing/site";
 import "./globals.css";
 
 const inter = Inter({
@@ -24,10 +26,21 @@ const notoSansKr = Noto_Sans_KR({
 });
 
 export const metadata: Metadata = {
-  applicationName: "KRW Ontology",
-  title: "KRW Ontology",
-  description:
-    "KRW Ontology가 제공하는 근거 기반 기업 리서치와 데이터 분석.",
+  metadataBase: new URL(getSiteOrigin()),
+  applicationName: SITE_NAME,
+  title: {
+    default: `${SITE_NAME} | 근거가 보이는 기업 분석 AI`,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  keywords: [
+    "기업 리서치 AI",
+    "미국 주식 공시 분석",
+    "10-K 분석",
+    "10-Q 분석",
+    "공시 근거",
+    "투자 thesis check",
+  ],
   icons: {
     apple: [
       {
@@ -39,8 +52,21 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "KRW Ontology",
+    title: SITE_NAME,
     statusBarStyle: "default",
+  },
+  openGraph: {
+    title: `${SITE_NAME} | 근거가 보이는 기업 분석 AI`,
+    description: SITE_DESCRIPTION,
+    url: getSiteOrigin(),
+    siteName: SITE_NAME,
+    locale: "ko_KR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: `${SITE_NAME} | 근거가 보이는 기업 분석 AI`,
+    description: SITE_DESCRIPTION,
   },
 };
 
@@ -59,6 +85,7 @@ export default function RootLayout({
       className={`${inter.variable} ${jetbrainsMono.variable} ${notoSansKr.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-canvas text-on-surface">
+        <AnalyticsBootstrap />
         {/* L-05: Skip to content link for accessibility */}
         <a
           href="#main-content"

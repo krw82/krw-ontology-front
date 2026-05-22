@@ -28,7 +28,7 @@ export function buildContentSecurityPolicy({
     "img-src 'self' data: blob: https://lh3.googleusercontent.com",
     "font-src 'self' data:",
     "style-src 'self' 'unsafe-inline'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
     `connect-src ${
       isDevelopment
         ? developmentConnectSources.join(" ")

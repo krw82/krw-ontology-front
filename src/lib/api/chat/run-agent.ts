@@ -1,7 +1,13 @@
 import type { NextRequest } from "next/server";
+import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { tryAcquireLease, releaseLease, startLeaseHeartbeat } from "@/lib/concurrency/lease";
-import { recordUsage, getQuotaStatus, estimateCost } from "@/lib/concurrency/quota";
+import {
+  recordUsage,
+  getQuotaStatus,
+  estimateCost,
+  checkQuota,
+} from "@/lib/concurrency/quota";
 import { registerRun, cleanupRun } from "@/lib/agent/abort-manager";
 import { runAgent } from "@/lib/agent/runner";
 import type { SdkDiagnostics } from "@/lib/agent/runner";
@@ -14,35 +20,12 @@ import type { McpHealthResult } from "@/lib/agent/mcp-client";
 import type { QuotaCheckResult } from "@/lib/concurrency/quota";
 import type { ResolvedSession } from "./resolve-session";
 import type { HistoryResult } from "./fetch-history";
-import {
-  buildResearchArtifacts,
-  deriveVisibleAnswer,
-} from "@/lib/artifacts/build-research-artifact";
-import { toResearchArtifact } from "@/lib/artifacts/db";
-import {
-  parseResearchAgentOutput,
-  parseResearchAgentOutputText,
-} from "@/lib/artifacts/schema";
-import {
-  compileDisplayPlanAnswer,
-  parseDisplayPlanOutput,
-  parseDisplayPlanOutputText,
-  parseResearchSynthesisOutput,
-  parseResearchSynthesisOutputText,
-} from "@/lib/artifacts/display-plan";
 import type {
   AgentRunRow,
   Json,
   MessageRow,
-  ResearchArtifactRow,
 } from "@/types/database";
-import type {
-  DisplayPlanOutput,
-  ResearchAgentOutput,
-  ResearchArtifact,
-  ResearchSynthesis,
-  StreamingCitation,
-} from "@/types/api-contracts";
+import type { StreamingCitation } from "@/types/api-contracts";
 import { toErrorCode } from "@/types/api-contracts";
 import { readIntEnv } from "@/lib/env";
 import {
@@ -180,6 +163,19 @@ export function executeRun(params: RunAgentParams): Response {
             error_message: "응답 메시지를 만들지 못했습니다.",
           })
           .eq("id", runId);
+        await recordAnalyticsEvent({
+          eventName: "answer_failed",
+          userId: session.userId,
+          sessionId: session.id,
+          runId,
+          properties: {
+            scope_type: session.scopeType,
+            ticker: session.defaultTickers[0] ?? null,
+            tickers: session.defaultTickers,
+            error_code: "internal_error",
+            failure_stage: "assistant_message_create",
+          },
+        });
         await sendEvent("error", {
           run_id: runId,
           error_code: "internal_error",
@@ -269,6 +265,7 @@ export function executeRun(params: RunAgentParams): Response {
             result,
             mcpHealth,
             quota,
+            requestId,
             session,
             userId: session.userId,
             sendEvent,
@@ -284,6 +281,8 @@ export function executeRun(params: RunAgentParams): Response {
               errorCode: "lease_expired",
               errorMessage: RUN_TIMEOUT_MESSAGE,
             },
+            session,
+            userId: session.userId,
             sendEvent,
           });
         } else if (result.status === "cancelled") {
@@ -302,6 +301,8 @@ export function executeRun(params: RunAgentParams): Response {
             assistantMessageId,
             finishedAt,
             result,
+            session,
+            userId: session.userId,
             sendEvent,
           });
         }
@@ -327,6 +328,20 @@ export function executeRun(params: RunAgentParams): Response {
             content: publicMessage,
           })
           .eq("id", assistantMessageId);
+
+        await recordAnalyticsEvent({
+          eventName: "answer_failed",
+          userId: session.userId,
+          sessionId: session.id,
+          messageId: assistantMessageId,
+          runId,
+          properties: {
+            scope_type: session.scopeType,
+            ticker: session.defaultTickers[0] ?? null,
+            tickers: session.defaultTickers,
+            error_code: "internal_error",
+          },
+        });
 
         try {
           await sendEvent("error", {
@@ -544,7 +559,6 @@ export async function streamPersistedRunEvents(params: {
 
     if (run.status === "completed") {
       await sendPersistedDoneEvent({
-        admin,
         sendEvent,
         userId,
         run,
@@ -679,23 +693,21 @@ async function loadPersistedAssistantMessage(
 }
 
 async function sendPersistedDoneEvent(params: {
-  admin: ReturnType<typeof getSupabaseAdmin>;
   sendEvent: (event: string, data: unknown) => Promise<void>;
   userId: string;
   run: PersistedRun;
   message: PersistedAssistantMessage | null;
 }) {
-  const { admin, sendEvent, userId, run, message } = params;
+  const { sendEvent, userId, run, message } = params;
   const estimatedCost = Number(run.estimated_cost_usd ?? 0);
   const quota = await getQuotaStatusForPersistedRun(userId, estimatedCost);
-  const artifacts = await loadRunArtifacts(admin, run.id);
 
   await sendEvent("done", {
     run_id: run.id,
     message_id: message?.id ?? run.assistant_message_id ?? "",
     content: message?.content ?? "",
-    rich_answers: artifacts,
-    artifacts,
+    rich_answers: [],
+    artifacts: [],
     release: {
       ontology_release_id: run.ontology_release_id ?? "",
       index_generated_at: run.index_generated_at ?? "",
@@ -718,43 +730,16 @@ async function getQuotaStatusForPersistedRun(
   userId: string,
   estimatedCost: number,
 ) {
-  const quota = await getQuotaStatusFromAdmin(userId);
+  const quota = await checkQuota(userId);
   return getQuotaStatus(
     Math.max(0, quota.questionsUsed - 1),
     Math.max(0, quota.costUsed - estimatedCost),
     estimatedCost,
+    {
+      questionsLimit: quota.questionsLimit,
+      costLimit: quota.costLimit,
+    },
   );
-}
-
-async function getQuotaStatusFromAdmin(userId: string): Promise<QuotaCheckResult> {
-  const today = new Date().toISOString().split("T")[0];
-  const admin = getSupabaseAdmin();
-  const { data } = await admin
-    .from("usage_daily")
-    .select("question_count, estimated_cost_usd")
-    .eq("user_id", userId)
-    .eq("date", today)
-    .maybeSingle<{ question_count: number; estimated_cost_usd: number }>();
-
-  return {
-    allowed: true,
-    questionsUsed: data?.question_count ?? 0,
-    costUsed: Number(data?.estimated_cost_usd ?? 0),
-  };
-}
-
-async function loadRunArtifacts(
-  admin: ReturnType<typeof getSupabaseAdmin>,
-  runId: string,
-): Promise<ResearchArtifact[]> {
-  const { data } = await admin
-    .from("research_artifacts")
-    .select("*")
-    .eq("run_id", runId)
-    .order("created_at", { ascending: true })
-    .returns<ResearchArtifactRow[]>();
-
-  return (data ?? []).map(toResearchArtifact);
 }
 
 // --- Helper functions for each terminal state ---
@@ -955,49 +940,16 @@ interface CompletedRunParams {
   result: { acc: AccumulatedRun };
   mcpHealth: McpHealthResult;
   quota: QuotaCheckResult;
+  requestId: string;
   session: ResolvedSession;
   userId: string;
   sendEvent: (event: string, data: unknown) => Promise<void>;
 }
 
 async function handleCompletedRun(params: CompletedRunParams) {
-  const { admin, runId, assistantMessageId, finishedAt, runStartedAt, result, mcpHealth, quota, session, userId, sendEvent } = params;
+  const { admin, runId, assistantMessageId, finishedAt, runStartedAt, result, mcpHealth, quota, requestId, session, userId, sendEvent } = params;
   const { acc } = result;
-  const researchSynthesis =
-    parseResearchSynthesisOutput(acc.researchSynthesisOutput) ??
-    parseResearchSynthesisOutputText(acc.researchSynthesisText ?? "");
-  const displayPlan =
-    parseDisplayPlanOutput(acc.displayPlanOutput ?? acc.structuredOutput) ??
-    parseDisplayPlanOutputText(acc.fullText);
-  const structuredOutput =
-    compileDisplayPlanAnswer(researchSynthesis, displayPlan) ??
-    parseResearchAgentOutput(acc.structuredOutput) ??
-    parseResearchAgentOutputText(acc.fullText);
-
-  const artifacts = await persistResearchArtifacts({
-    admin,
-    session,
-    runId,
-    assistantMessageId,
-    acc,
-    structuredAnswer: structuredOutput,
-    researchSynthesis,
-    displayPlan,
-    fallbackWhenMissing: false,
-  });
-
-  const structuredMarkdown = structuredOutput
-    ? answerBlocksToMarkdown(structuredOutput.answer_blocks)
-    : null;
-  const visibleAnswer =
-    acc.fullText.trim() ||
-    structuredMarkdown?.trim() ||
-    deriveVisibleAnswer(
-      acc.fullText,
-      artifacts[0]?.title,
-      structuredMarkdown,
-      artifacts[0]?.summary,
-    );
+  const visibleAnswer = acc.fullText.trim();
 
   await admin
     .from("messages")
@@ -1024,16 +976,36 @@ async function handleCompletedRun(params: CompletedRunParams) {
     })
     .eq("id", runId);
 
-  // Record daily usage
-  await recordUsage(userId, estimatedCost);
+  // Record usage in legacy daily analytics and monthly entitlement counters.
+  await recordUsage(userId, estimatedCost, { requestId, runId });
+
+  await recordAnalyticsEvent({
+    eventName: "answer_completed",
+    userId,
+    sessionId: session.id,
+    messageId: assistantMessageId,
+    runId,
+    properties: {
+      scope_type: session.scopeType,
+      ticker: session.defaultTickers[0] ?? null,
+      tickers: session.defaultTickers,
+      duration_ms: latencyMs,
+      citation_count: acc.citations.length,
+      artifact_count: 0,
+      artifact_created: false,
+      input_tokens: acc.inputTokens,
+      output_tokens: acc.outputTokens,
+      estimated_cost_usd: estimatedCost,
+    },
+  });
 
   // Send done event
   await sendEvent("done", {
     run_id: runId,
     message_id: assistantMessageId,
     content: visibleAnswer,
-    rich_answers: artifacts,
-    artifacts,
+    rich_answers: [],
+    artifacts: [],
     release: {
       ontology_release_id: mcpHealth.releaseId ?? "",
       index_generated_at: mcpHealth.indexGeneratedAt ?? "",
@@ -1048,95 +1020,11 @@ async function handleCompletedRun(params: CompletedRunParams) {
       estimated_cost_usd: estimatedCost,
       latency_ms: latencyMs,
     },
-    quota: getQuotaStatus(quota.questionsUsed, quota.costUsed, estimatedCost),
+    quota: getQuotaStatus(quota.questionsUsed, quota.costUsed, estimatedCost, {
+      questionsLimit: quota.questionsLimit,
+      costLimit: quota.costLimit,
+    }),
   });
-}
-
-async function persistResearchArtifacts(params: {
-  admin: ReturnType<typeof getSupabaseAdmin>;
-  session: ResolvedSession;
-  runId: string;
-  assistantMessageId: string;
-  acc: AccumulatedRun;
-  structuredAnswer?: ResearchAgentOutput | null;
-  researchSynthesis?: ResearchSynthesis | null;
-  displayPlan?: DisplayPlanOutput | null;
-  fallbackWhenMissing: boolean;
-}): Promise<ResearchArtifact[]> {
-  const {
-    admin,
-    session,
-    runId,
-    assistantMessageId,
-    acc,
-    structuredAnswer,
-    researchSynthesis,
-    displayPlan,
-    fallbackWhenMissing,
-  } = params;
-  const drafts = buildResearchArtifacts({
-    sessionId: session.id,
-    runId,
-    messageId: assistantMessageId,
-    finalText: acc.fullText,
-    defaultTickers: session.defaultTickers,
-    toolCalls: acc.toolCalls,
-    citations: acc.citations,
-    structuredAnswer,
-    researchSynthesis,
-    displayPlan,
-    fallbackWhenMissing,
-  });
-
-  if (drafts.length === 0) return [];
-
-  const { data, error } = await admin
-    .from("research_artifacts")
-    .insert(
-      drafts.map((artifact) => ({
-        session_id: artifact.session_id,
-        run_id: artifact.run_id,
-        message_id: artifact.message_id,
-        artifact_version: artifact.artifact_version,
-        artifact_type: artifact.artifact_type,
-        title: artifact.title,
-        summary: artifact.summary,
-        tickers: artifact.tickers,
-        source_scope: jsonForDb(artifact.source_scope),
-        answer_alignment: jsonForDb(artifact.answer_alignment),
-        artifact_json: jsonForDb(artifact.artifact_json),
-        blocks_json: jsonForDb(artifact.blocks_json) ?? [],
-        evidence_refs: jsonForDb(artifact.evidence_refs),
-        quality_json: jsonForDb(artifact.quality_json),
-        source_json: jsonForDb(artifact.source_json),
-        html_snapshot: artifact.html_snapshot,
-      })),
-    )
-    .select("*")
-    .returns<ResearchArtifactRow[]>();
-
-  if (error || !data) {
-    console.warn("[research-artifacts] failed to persist", {
-      runId,
-      error: error?.message,
-    });
-    return [];
-  }
-
-  return data.map(toResearchArtifact);
-}
-
-function answerBlocksToMarkdown(blocks: ResearchAgentOutput["answer_blocks"]): string {
-  return blocks
-    .filter(
-      (
-        block,
-      ): block is Extract<ResearchAgentOutput["answer_blocks"][number], { type: "markdown" }> =>
-        block.type === "markdown",
-    )
-    .map((block) => block.content.trim())
-    .filter(Boolean)
-    .join("\n\n");
 }
 
 function jsonForDb(value: unknown): Json | null {
@@ -1194,11 +1082,13 @@ interface FailedRunParams {
   assistantMessageId: string;
   finishedAt: string;
   result: { acc: AccumulatedRun; errorCode?: string; errorMessage?: string };
+  session: ResolvedSession;
+  userId: string;
   sendEvent: (event: string, data: unknown) => Promise<void>;
 }
 
 async function handleFailedRun(params: FailedRunParams) {
-  const { admin, runId, assistantMessageId, finishedAt, result, sendEvent } = params;
+  const { admin, runId, assistantMessageId, finishedAt, result, session, userId, sendEvent } = params;
   const errorCode = toErrorCode(result.errorCode || "claude_api_error");
   const rawErrorMessage = result.errorMessage || publicErrorMessage(errorCode);
   const publicMessage = publicAgentErrorMessage({ code: errorCode });
@@ -1220,6 +1110,22 @@ async function handleFailedRun(params: FailedRunParams) {
       status: "failed",
     })
     .eq("id", assistantMessageId);
+
+  await recordAnalyticsEvent({
+    eventName: "answer_failed",
+    userId,
+    sessionId: session.id,
+    messageId: assistantMessageId,
+    runId,
+    properties: {
+      scope_type: session.scopeType,
+      ticker: session.defaultTickers[0] ?? null,
+      tickers: session.defaultTickers,
+      error_code: errorCode,
+      output_length: result.acc.fullText.length,
+      tool_call_count: result.acc.toolCalls.length,
+    },
+  });
 
   await sendEvent("error", {
     run_id: runId,

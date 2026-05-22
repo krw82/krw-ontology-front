@@ -26,12 +26,19 @@ function mockSupabaseOk() {
 function mockMcpOk() {
   vi.mocked(checkMcpHealth).mockResolvedValue({
     connected: true,
+    staticOk: true,
+    commandOk: true,
+    liveOk: true,
+    sqliteOk: true,
     releaseId: "rel-20260521",
     indexGeneratedAt: "2026-05-21T00:00:00.000Z",
     companyCount: 10,
     documentCount: 20,
     objectCount: 30,
+    toolCount: 12,
+    tools: ["krw_ontology_query"],
     root: "/srv/private-ontology-root",
+    indexPath: "/srv/private-ontology-root/indexes/agent_index.sqlite",
     pluginPath: "/app/krw-ontology/plugins/krw-ontology",
   });
 }
@@ -85,6 +92,9 @@ describe("GET /api/healthz/deep", () => {
     expect(body.status).toBe("ok");
     expect(body.checks.mcp.root).toBe("/srv/private-ontology-root");
     expect(body.checks.mcp.release_id).toBe("rel-20260521");
+    expect(body.checks.mcp.live_ok).toBe(true);
+    expect(body.checks.mcp.sqlite_ok).toBe(true);
+    expect(body.checks.mcp.tool_count).toBe(12);
     expect(getSupabaseAdmin).toHaveBeenCalledOnce();
     expect(checkMcpHealth).toHaveBeenCalledOnce();
   });

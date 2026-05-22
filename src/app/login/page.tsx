@@ -6,6 +6,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { KrwBrand } from "@/components/KrwBrand";
 import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
+import { trackClientEventWithTimeout } from "@/lib/analytics/client";
 import { createClient } from "@/lib/supabase/client";
 import { easeOutExpo } from "@/lib/animation";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
@@ -76,6 +77,10 @@ function LoginContent() {
     try {
       const redirectTo = new URL("/auth/callback", window.location.origin);
       redirectTo.searchParams.set("next", nextPath);
+      await trackClientEventWithTimeout("signup_started", {
+        provider: "google",
+        next_path: nextPath,
+      });
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -158,7 +163,7 @@ function LoginContent() {
               ease: easeOutExpo,
             }}
           >
-            내 리서치 공간으로 들어가기
+            무료 베타로 기업 분석 시작
           </motion.h1>
           <motion.p
             className="mt-4 text-[15px] leading-6 text-body sm:text-[16px] sm:leading-7"
@@ -170,8 +175,8 @@ function LoginContent() {
               ease: easeOutExpo,
             }}
           >
-            선택한 회사와 채팅 기록을 이어서 확인하려면 Google로
-            로그인하세요.
+            카드 등록 없이 Google 계정으로 시작합니다. 선택한 회사,
+            질문 기록, 월간 무료 사용량을 안전하게 이어서 확인할 수 있습니다.
           </motion.p>
 
           <motion.div
@@ -224,11 +229,11 @@ function LoginContent() {
                   }`}
                 />
               </span>
-              {loading ? "Google로 이동 중..." : "Google로 계속하기"}
+              {loading ? "Google로 이동 중..." : "Google로 무료 시작"}
             </motion.button>
 
             <p className="text-center text-[13px] font-semibold leading-5 text-muted">
-              로그인 후 이전 화면으로 돌아갑니다.
+              무료 베타 · 카드 불필요 · 로그인 후 이전 화면으로 돌아갑니다.
             </p>
           </motion.div>
         </motion.section>

@@ -7,10 +7,8 @@ import type {
   ChatSessionRow,
   CitationRow,
   MessageRow,
-  ResearchArtifactRow,
   ToolCallRow,
 } from "@/types/database";
-import { toResearchArtifact } from "@/lib/artifacts/db";
 
 function notFoundError(message: string) {
   return Response.json(
@@ -73,9 +71,7 @@ export async function GET(
   const runIds = (runs ?? [])
     .map((run) => run.id)
     .filter((id): id is string => Boolean(id));
-  const messageIds = (messages ?? []).map((message) => message.id);
-
-  const [{ data: toolCalls }, { data: citations }, { data: researchArtifacts }] =
+  const [{ data: toolCalls }, { data: citations }] =
     await Promise.all([
       runIds.length > 0
         ? supabase
@@ -97,19 +93,7 @@ export async function GET(
             .order("id", { ascending: true })
             .returns<CitationRow[]>()
         : Promise.resolve({ data: [] as CitationRow[] }),
-      messageIds.length > 0
-        ? supabase
-            .from("research_artifacts")
-            .select(
-              "id, session_id, run_id, message_id, artifact_version, artifact_type, title, summary, tickers, source_scope, answer_alignment, artifact_json, blocks_json, evidence_refs, quality_json, source_json, html_snapshot, created_at",
-            )
-            .in("message_id", messageIds)
-            .order("created_at", { ascending: true })
-            .returns<ResearchArtifactRow[]>()
-        : Promise.resolve({ data: [] as ResearchArtifactRow[] }),
     ]);
-
-  const richAnswers = (researchArtifacts ?? []).map(toResearchArtifact);
 
   return Response.json({
     session,
@@ -117,7 +101,7 @@ export async function GET(
     runs: runs ?? [],
     tool_calls: toolCalls ?? [],
     citations: citations ?? [],
-    rich_answers: richAnswers,
-    research_artifacts: richAnswers,
+    rich_answers: [],
+    research_artifacts: [],
   });
 }

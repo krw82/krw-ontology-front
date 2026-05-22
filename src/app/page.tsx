@@ -1,8 +1,10 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { KrwBrand } from "@/components/KrwBrand";
 import {
   HomeHeaderActions,
   HomeEvidenceCards,
+  HomePrimaryCtas,
   HomeQuestionForm,
   HomeTraceExplorer,
   type HomeEvidenceCard,
@@ -16,6 +18,14 @@ import {
   TraceCardEntrance,
   QuestionFormEntrance,
 } from "@/components/HeroSection";
+import { absoluteUrl, pageMetadata, SITE_NAME } from "@/lib/marketing/site";
+
+export const metadata: Metadata = pageMetadata({
+  title: "근거가 보이는 기업 분석 AI",
+  description:
+    "미국 상장기업 공시에서 답의 단서를 찾고, 실적 변화·리스크·사업 흐름을 근거와 함께 정리합니다.",
+  path: "/",
+});
 
 const evidenceCards: HomeEvidenceCard[] = [
   {
@@ -73,9 +83,39 @@ const traceNodes: HomeTraceNode[] = [
 
 const workflowSteps = ["회사 질문", "단서 찾기", "근거 정리"];
 
+const browseLinks = [
+  { href: "/use-cases/filing-analysis", label: "유스케이스" },
+  { href: "/questions/revenue-growth", label: "질문 템플릿" },
+  { href: "/pricing", label: "가격" },
+] as const;
+
 export default function Home() {
+  const webApplicationJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: SITE_NAME,
+    applicationCategory: "FinanceApplication",
+    operatingSystem: "Web",
+    url: absoluteUrl("/"),
+    description:
+      "공시 원문 근거를 따라가며 미국 상장기업의 실적 변화, 리스크, 사업 흐름을 확인하는 기업 리서치 AI.",
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "KRW",
+      description: "무료 베타 플랜",
+    },
+  };
+
   return (
     <div className="min-h-[100dvh] overflow-x-hidden bg-canvas text-ink">
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(webApplicationJsonLd),
+        }}
+      />
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-hairline bg-canvas/95 backdrop-blur-xl">
         <nav className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <KrwBrand compact />
@@ -89,6 +129,15 @@ export default function Home() {
               className="transition-colors hover:text-ink"
             >
               회사 목록
+            </Link>
+            <Link
+              href="/use-cases/filing-analysis"
+              className="transition-colors hover:text-ink"
+            >
+              유스케이스
+            </Link>
+            <Link href="/pricing" className="transition-colors hover:text-ink">
+              가격
             </Link>
           </div>
 
@@ -117,6 +166,34 @@ export default function Home() {
               근거를 바탕으로 정리합니다. 실적 변화, 리스크, 사업 흐름을
               더 쉽게 확인하세요.
             </HeroSubtext>
+
+            <HomePrimaryCtas />
+
+            <nav
+              className="mt-5 border-y border-hairline md:hidden"
+              aria-label="공개 페이지 둘러보기"
+            >
+              {browseLinks.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="group flex min-h-11 items-center justify-between gap-sm border-b border-hairline py-3 text-[14px] font-extrabold leading-5 text-ink transition-colors last:border-b-0 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                >
+                  <span className="flex min-w-0 items-center gap-sm">
+                    <span className="font-mono text-[12px] font-black leading-5 text-primary">
+                      {String(browseLinks.indexOf(item) + 1).padStart(2, "0")}
+                    </span>
+                    <span className="truncate">{item.label}</span>
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className="material-symbols-outlined shrink-0 text-[18px] text-muted transition-colors group-hover:text-primary"
+                  >
+                    arrow_forward
+                  </span>
+                </Link>
+              ))}
+            </nav>
 
             <QuestionFormEntrance>
               <HomeQuestionForm />

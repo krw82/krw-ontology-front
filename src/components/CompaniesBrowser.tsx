@@ -91,7 +91,10 @@ export default function CompaniesBrowser({
 
   return (
     <div className="relative mx-auto flex min-h-0 w-full max-w-[1600px] flex-1">
-      <main className="min-h-0 w-full flex-grow overflow-y-auto px-base pb-[112px] pt-xl sm:px-md md:px-xl md:pb-[96px] md:pt-[72px]">
+      <main
+        id="main-content"
+        className="min-h-0 w-full flex-grow overflow-y-auto px-base pb-[112px] pt-xl sm:px-md md:px-xl md:pb-[96px] md:pt-[72px]"
+      >
         <header className="border-b border-hairline pb-8">
           <div className="w-full">
             <div className="min-w-0 max-w-3xl">

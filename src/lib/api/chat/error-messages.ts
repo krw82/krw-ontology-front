@@ -9,8 +9,8 @@ const PUBLIC_ERROR_MESSAGES: Record<ErrorCode, string> = {
   forbidden: "이 작업을 할 권한이 없습니다.",
   active_run_exists: "이미 응답을 생성 중입니다.",
   no_active_run: "진행 중인 응답이 없습니다.",
-  quota_exceeded: "오늘 사용할 수 있는 질문 수를 모두 사용했습니다.",
-  cost_cap_exceeded: "오늘 사용할 수 있는 분석 한도에 도달했습니다.",
+  quota_exceeded: "이번 달 사용할 수 있는 질문 수를 모두 사용했습니다.",
+  cost_cap_exceeded: "사용할 수 있는 분석 한도에 도달했습니다.",
   concurrency_limit: "현재 요청이 많습니다. 잠시 후 다시 시도해주세요.",
   lease_expired: "분석 시간이 초과되었습니다. 다시 시도해주세요.",
   cancelled: "응답 생성을 취소했습니다.",
@@ -18,6 +18,7 @@ const PUBLIC_ERROR_MESSAGES: Record<ErrorCode, string> = {
   mcp_error: "온톨로지 도구 실행 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
   claude_api_error: "에이전트 실행 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
   claude_rate_limited: "현재 모델 요청 한도에 도달했습니다. 잠시 후 다시 시도해주세요.",
+  rate_limited: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
   validation_error: "요청 형식이 올바르지 않습니다.",
   internal_error: "요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.",
 };

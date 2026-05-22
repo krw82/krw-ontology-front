@@ -557,11 +557,11 @@ describe("deriveVisibleAnswer", () => {
   it("does not repeat summary sentences as bullets", () => {
     expect(
       deriveVisibleAnswer(
-        "AMZN FY2025 10-K 기준 종합 분석을 구조화된 아티팩트로 정리했습니다. 핵심은 AWS가 전체 영업이익의 57%를 차지하는 최대 이익 엔진입니다.",
+        "AMZN FY2025 10-K 기준 종합 분석을 리서치 노트로 정리했습니다. 핵심은 AWS가 전체 영업이익의 57%를 차지하는 최대 이익 엔진입니다.",
         "AMZN Research Brief",
       ),
     ).toBe(
-      "**AMZN Research Brief**\nAMZN FY2025 10-K 기준 종합 분석을 구조화된 아티팩트로 정리했습니다. 핵심은 AWS가 전체 영업이익의 57%를 차지하는 최대 이익 엔진입니다.",
+      "**AMZN Research Brief**\nAMZN FY2025 10-K 기준 종합 분석을 리서치 노트로 정리했습니다. 핵심은 AWS가 전체 영업이익의 57%를 차지하는 최대 이익 엔진입니다.",
     );
   });
 
@@ -571,10 +571,10 @@ describe("deriveVisibleAnswer", () => {
         "아티팩트 생성 완료.",
         "AMZN Research Brief",
         null,
-        "AMZN FY2025 10-K 기준으로 사업 구조와 핵심 재무 포인트를 구조화했습니다.",
+        "AMZN FY2025 10-K 기준으로 사업 구조와 핵심 재무 포인트를 정리했습니다.",
       ),
     ).toBe(
-      "**AMZN Research Brief**\nAMZN FY2025 10-K 기준으로 사업 구조와 핵심 재무 포인트를 구조화했습니다.",
+      "**AMZN Research Brief**\nAMZN FY2025 10-K 기준으로 사업 구조와 핵심 재무 포인트를 정리했습니다.",
     );
   });
 

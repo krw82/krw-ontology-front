@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import { getAuthUser, forbiddenError, handleAuthError } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
@@ -67,6 +68,19 @@ export async function POST(
     const existing = await findExistingActiveShare(message.id);
     const share = existing ?? (await createMessageShare({ userId: user.id, message, session }));
     const shareUrl = `/share/${encodeURIComponent(share.token)}`;
+
+    await recordAnalyticsEventFromRequest(request, {
+      eventName: "share_created",
+      userId: user.id,
+      sessionId: session.id,
+      messageId: message.id,
+      properties: {
+        reused_existing_share: Boolean(existing),
+        scope_type: session.scope_type,
+        ticker: session.default_tickers?.[0] ?? null,
+        tickers: session.default_tickers ?? [],
+      },
+    });
 
     return Response.json({
       token: share.token,

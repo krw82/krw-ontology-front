@@ -1,7 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { readFloatEnv, readIntEnv } from "@/lib/env";
-import type { UsageDailyRow } from "@/types/database";
+import { getEntitlementStatus } from "@/lib/billing/entitlement";
+import { getCurrentMonthlyBillingPeriod } from "@/lib/billing/period";
+import type { EntitlementStatus } from "@/types/entitlement";
 
 const DAILY_QUESTION_LIMIT = readIntEnv("DAILY_USER_QUESTION_LIMIT", 20, {
   min: 1,
@@ -28,40 +29,63 @@ export interface QuotaCheckResult {
   reason?: "quota_exceeded" | "cost_cap_exceeded" | "internal_error";
   questionsUsed: number;
   costUsed: number;
+  questionsLimit: number;
+  costLimit: number;
+  entitlement?: EntitlementStatus;
 }
 
 export async function checkQuota(userId: string): Promise<QuotaCheckResult> {
-  const today = new Date().toISOString().split("T")[0];
-  const supabase = await createClient();
+  try {
+    const entitlement = await getEntitlementStatus(userId);
+    const questionsUsed = entitlement.usage.questions_used;
+    const questionsLimit = entitlement.usage.questions_limit;
 
-  const { data, error } = await supabase
-    .from("usage_daily")
-    .select("question_count, estimated_cost_usd")
-    .eq("user_id", userId)
-    .eq("date", today)
-    .single<UsageDailyRow>();
+    if (!entitlement.usage.can_run) {
+      return {
+        allowed: false,
+        reason: "quota_exceeded",
+        questionsUsed,
+        costUsed: 0,
+        questionsLimit,
+        costLimit: DAILY_COST_CAP,
+        entitlement,
+      };
+    }
 
-  if (error && error.code !== "PGRST116") {
-    return { allowed: false, reason: "internal_error", questionsUsed: 0, costUsed: 0 };
+    return {
+      allowed: true,
+      questionsUsed,
+      costUsed: 0,
+      questionsLimit,
+      costLimit: DAILY_COST_CAP,
+      entitlement,
+    };
+  } catch {
+    return {
+      allowed: false,
+      reason: "internal_error",
+      questionsUsed: 0,
+      costUsed: 0,
+      questionsLimit: 0,
+      costLimit: DAILY_COST_CAP,
+    };
   }
-
-  const questionsUsed = data?.question_count ?? 0;
-  const costUsed = data?.estimated_cost_usd ?? 0;
-
-  if (questionsUsed >= DAILY_QUESTION_LIMIT) {
-    return { allowed: false, reason: "quota_exceeded", questionsUsed, costUsed };
-  }
-
-  if (costUsed >= DAILY_COST_CAP) {
-    return { allowed: false, reason: "cost_cap_exceeded", questionsUsed, costUsed };
-  }
-
-  return { allowed: true, questionsUsed, costUsed };
 }
 
 export async function recordUsage(
   userId: string,
-  estimatedCostUsd: number
+  estimatedCostUsd: number,
+  params: { requestId?: string; runId?: string } = {},
+) {
+  await Promise.all([
+    recordDailyUsage(userId, estimatedCostUsd),
+    recordMonthlyUsage(userId, estimatedCostUsd, params),
+  ]);
+}
+
+async function recordDailyUsage(
+  userId: string,
+  estimatedCostUsd: number,
 ) {
   const today = new Date().toISOString().split("T")[0];
   const admin = getSupabaseAdmin();
@@ -113,18 +137,46 @@ export async function recordUsage(
   }
 }
 
+async function recordMonthlyUsage(
+  userId: string,
+  estimatedCostUsd: number,
+  params: { requestId?: string; runId?: string },
+) {
+  if (!params.requestId) return;
+
+  const period = getCurrentMonthlyBillingPeriod();
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.rpc("record_usage_event", {
+    p_user_id: userId,
+    p_request_id: params.requestId,
+    p_run_id: params.runId ?? null,
+    p_period_start: period.start,
+    p_period_end: period.end,
+    p_cost: estimatedCostUsd,
+  });
+
+  if (!error) return;
+
+  console.warn("[quota] Failed to record monthly usage", {
+    code: error.code,
+    message: error.message,
+  });
+}
+
 export function getQuotaStatus(
   questionsUsed: number,
   costUsed: number,
-  newCostUsd?: number
+  newCostUsd?: number,
+  limits: { questionsLimit?: number; costLimit?: number } = {},
 ) {
   const totalCost = costUsed + (newCostUsd ?? 0);
+  const questionsLimit = limits.questionsLimit ?? DAILY_QUESTION_LIMIT;
   return {
     questions_used_today: questionsUsed + 1,
-    questions_limit: DAILY_QUESTION_LIMIT,
+    questions_limit: questionsLimit,
     cost_used_today_usd: totalCost,
-    cost_limit_usd: DAILY_COST_CAP,
-    remaining_questions: Math.max(0, DAILY_QUESTION_LIMIT - questionsUsed - 1),
+    cost_limit_usd: limits.costLimit ?? DAILY_COST_CAP,
+    remaining_questions: Math.max(0, questionsLimit - questionsUsed - 1),
   };
 }
 

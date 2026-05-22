@@ -11,6 +11,7 @@ import type {
   ResearchActivityUpdate,
 } from "@/types/api-contracts";
 import { chatMessageAssistant, chatMessageUser } from "@/lib/animation";
+import { trackClientEventSilently } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 interface ChatMessageProps {
@@ -25,6 +26,8 @@ interface ChatMessageProps {
   runStartedAt?: string | null;
   messageId?: string;
   createdAt?: string;
+  followUpPrompts?: readonly string[];
+  onFollowUpClick?: (prompt: string) => void;
 }
 
 interface DisplayAttachment {
@@ -298,6 +301,171 @@ function MessageActions({
   );
 }
 
+function citationKey(citation: ChatCitation, index: number): string {
+  return [
+    citation.id,
+    citation.object_id,
+    citation.ticker,
+    citation.period,
+    citation.section,
+    index,
+  ]
+    .filter(Boolean)
+    .join(":");
+}
+
+function citationLabel(citation: ChatCitation): string {
+  return [
+    citation.ticker,
+    citation.period,
+    citation.document_type,
+    citation.section,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function compactEvidenceText(citation: ChatCitation): string {
+  const text = citation.quote_text || citation.claim_text || "근거 문장을 확인했습니다.";
+  const normalized = text.replace(/\s+/g, " ").trim();
+  return normalized.length > 220
+    ? `${normalized.slice(0, 219).trimEnd()}...`
+    : normalized;
+}
+
+function EvidenceSummary({
+  citations,
+  messageId,
+}: {
+  citations?: ChatCitation[];
+  messageId?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const visibleCitations = useMemo(() => {
+    const seen = new Set<string>();
+    return (citations ?? [])
+      .filter((citation) => {
+        const key = [
+          citation.object_id,
+          citation.quote_text,
+          citation.claim_text,
+          citation.ticker,
+          citation.period,
+        ].join(":");
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 4);
+  }, [citations]);
+
+  if (visibleCitations.length === 0) return null;
+
+  const handleToggle = () => {
+    const nextOpen = !open;
+    setOpen(nextOpen);
+    if (nextOpen) {
+      trackClientEventSilently("citation_opened", {
+        message_id: messageId ?? null,
+        citation_count: citations?.length ?? visibleCitations.length,
+        tickers: Array.from(
+          new Set(
+            visibleCitations
+              .map((citation) => citation.ticker)
+              .filter((ticker): ticker is string => Boolean(ticker)),
+          ),
+        ),
+      });
+    }
+  };
+
+  return (
+    <div className="mt-md rounded-[8px] border border-hairline bg-surface-soft">
+      <button
+        type="button"
+        onClick={handleToggle}
+        className="flex w-full items-center justify-between gap-sm px-sm py-sm text-left text-[13px] font-extrabold leading-5 text-ink transition-colors hover:bg-surface"
+        aria-expanded={open}
+      >
+        <span className="inline-flex min-w-0 items-center gap-xs">
+          <span
+            aria-hidden="true"
+            className="material-symbols-outlined text-[18px] text-primary"
+          >
+            fact_check
+          </span>
+          <span>근거 {visibleCitations.length.toLocaleString()}개 확인</span>
+        </span>
+        <span
+          aria-hidden="true"
+          className="material-symbols-outlined text-[18px] text-muted"
+        >
+          {open ? "expand_less" : "expand_more"}
+        </span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.16, ease: statusTransition.ease }}
+            className="overflow-hidden border-t border-hairline"
+          >
+            <div className="divide-y divide-hairline-soft">
+              {visibleCitations.map((citation, index) => (
+                <div
+                  key={citationKey(citation, index)}
+                  className="px-sm py-sm"
+                >
+                  <p className="font-mono text-[11px] font-bold uppercase leading-4 tracking-[0.08em] text-muted">
+                    {citationLabel(citation) || "Filing evidence"}
+                  </p>
+                  <p className="mt-1 text-[13px] font-medium leading-5 text-body">
+                    {compactEvidenceText(citation)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function FollowUpPrompts({
+  prompts,
+  onSelect,
+}: {
+  prompts?: readonly string[];
+  onSelect?: (prompt: string) => void;
+}) {
+  const visiblePrompts = (prompts ?? []).slice(0, 3);
+  if (!onSelect || visiblePrompts.length === 0) return null;
+
+  return (
+    <div className="mt-md flex flex-wrap gap-xs">
+      {visiblePrompts.map((prompt) => (
+        <button
+          key={prompt}
+          type="button"
+          onClick={() => onSelect(prompt)}
+          className="inline-flex max-w-full items-center gap-xs rounded-[8px] border border-hairline bg-canvas px-sm py-xs text-left text-[12px] font-bold leading-5 text-body transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <span className="min-w-0 truncate">{prompt}</span>
+          <span
+            aria-hidden="true"
+            className="material-symbols-outlined shrink-0 text-[16px]"
+          >
+            arrow_forward
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function activityLabel(activity?: ResearchActivityUpdate | null): string {
   switch (activity?.stage) {
     case "connecting":
@@ -366,6 +534,8 @@ export default function ChatMessage({
   runStartedAt,
   messageId,
   createdAt,
+  followUpPrompts,
+  onFollowUpClick,
 }: ChatMessageProps) {
   if (role === "user") {
     const { visibleText, attachments } = parseUserDisplayContent(content);
@@ -452,6 +622,11 @@ export default function ChatMessage({
       ) : (
         <div className="max-w-full pl-0 text-body sm:pl-[48px]">
           {content ? <StreamingContentBlocks content={content} /> : null}
+          <EvidenceSummary citations={citations} messageId={messageId} />
+          <FollowUpPrompts
+            prompts={followUpPrompts}
+            onSelect={onFollowUpClick}
+          />
           {messageId && createdAt ? (
             <MessageActions messageId={messageId} createdAt={createdAt} />
           ) : null}

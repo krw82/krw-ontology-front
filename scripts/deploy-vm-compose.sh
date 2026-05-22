@@ -31,6 +31,9 @@ FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 ONTOLOGY_SOURCE_DIR=${KRW_ONTOLOGY_SOURCE_DIR:-"$HOME/krw-ontology"}
 ENV_FILE=${ENV_FILE:-"$FRONT_DIR/.env"}
 COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-krw-ontology-front}
+EXPECTED_CLAUDE_CODE_VERSION=${EXPECTED_CLAUDE_CODE_VERSION:-2.1.141}
+EXPECTED_NODE_CLAUDE_AGENT_SDK_VERSION=${EXPECTED_NODE_CLAUDE_AGENT_SDK_VERSION:-0.2.141}
+EXPECTED_PY_CLAUDE_AGENT_SDK_VERSION=${EXPECTED_PY_CLAUDE_AGENT_SDK_VERSION:-0.2.85}
 
 require_path() {
   if [ ! -e "$1" ]; then
@@ -165,6 +168,34 @@ docker compose \
   --project-name "$COMPOSE_PROJECT_NAME" \
   --env-file "$ENV_FILE" \
   -f "$BUILD_CONTEXT/docker-compose.yml" \
+  exec -T web sh -lc '
+    set -eu
+    claude_version=$(/usr/local/bin/claude-prod --version 2>&1)
+    node_sdk_version=$(node -p "require(\"@anthropic-ai/claude-agent-sdk/package.json\").version")
+    py_sdk_version=$(/opt/krw-ontology-venv/bin/python -c "import importlib.metadata as m; print(m.version(\"claude-agent-sdk\"))")
+
+    case "$claude_version" in
+      *"'"$EXPECTED_CLAUDE_CODE_VERSION"'"*) ;;
+      *) echo "Claude Code version mismatch: expected '"$EXPECTED_CLAUDE_CODE_VERSION"', got $claude_version" >&2; exit 1 ;;
+    esac
+    test "$node_sdk_version" = "'"$EXPECTED_NODE_CLAUDE_AGENT_SDK_VERSION"'" || {
+      echo "Node Claude Agent SDK mismatch: expected '"$EXPECTED_NODE_CLAUDE_AGENT_SDK_VERSION"', got $node_sdk_version" >&2
+      exit 1
+    }
+    test "$py_sdk_version" = "'"$EXPECTED_PY_CLAUDE_AGENT_SDK_VERSION"'" || {
+      echo "Python Claude Agent SDK mismatch: expected '"$EXPECTED_PY_CLAUDE_AGENT_SDK_VERSION"', got $py_sdk_version" >&2
+      exit 1
+    }
+
+    echo "OK Claude Code: $claude_version"
+    echo "OK Node Claude Agent SDK: $node_sdk_version"
+    echo "OK Python Claude Agent SDK: $py_sdk_version"
+  '
+
+docker compose \
+  --project-name "$COMPOSE_PROJECT_NAME" \
+  --env-file "$ENV_FILE" \
+  -f "$BUILD_CONTEXT/docker-compose.yml" \
   exec -T web python3 - <<'PY'
 import json
 import os
@@ -188,7 +219,18 @@ if not command.exists() or not os.access(command, os.X_OK):
 if not index_path.exists():
     raise SystemExit(f"Ontology agent index not found: {index_path}")
 
+from krw_ontology.mcp_server.server import health_payload
+
+payload, status = health_payload(root=str(root))
+if status != 200 or not payload.get("ok"):
+    raise SystemExit(f"MCP live health failed: status={status} payload={payload}")
+if payload.get("documents", 0) < 1 or payload.get("objects", 0) < 1:
+    raise SystemExit(f"MCP live health returned empty index counts: {payload}")
+if "krw_ontology_query" not in payload.get("tools", []):
+    raise SystemExit(f"MCP live health did not expose krw_ontology_query: {payload}")
+
 print(f"OK Claude agent cwd: {agent_cwd}")
 print(f"OK plugin MCP command: {command}")
 print(f"OK ontology index: {index_path}")
+print(f"OK MCP live health: documents={payload.get('documents')} objects={payload.get('objects')} tools={len(payload.get('tools', []))}")
 PY

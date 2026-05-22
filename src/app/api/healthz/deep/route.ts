@@ -46,12 +46,19 @@ async function checkMcp(): Promise<CheckResult> {
     return {
       ok: health.connected,
       error: health.error,
+      static_ok: health.staticOk,
+      command_ok: health.commandOk,
+      live_ok: health.liveOk,
+      sqlite_ok: health.sqliteOk,
       root: health.root,
+      index_path: health.indexPath,
       release_id: health.releaseId,
       index_generated_at: health.indexGeneratedAt,
       company_count: health.companyCount,
       document_count: health.documentCount,
       object_count: health.objectCount,
+      tool_count: health.toolCount,
+      tools: health.tools,
     };
   } catch (err) {
     return {

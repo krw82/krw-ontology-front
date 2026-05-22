@@ -1,0 +1,2 @@
+-- Intentionally empty.
+-- Keep this file present because supabase/config.toml enables db.seed for local resets.

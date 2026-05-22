@@ -14,7 +14,7 @@ function errorResponse(
 }
 
 /**
- * Checks the daily quota for the user.
+ * Checks the current plan quota for the user.
  * Returns the quota result on success, or an error Response.
  */
 export async function checkQuotaStep(
@@ -42,8 +42,8 @@ export async function checkQuotaStep(
         429,
         quota.reason ?? "quota_exceeded",
         quota.reason === "quota_exceeded"
-          ? "Daily question limit exceeded"
-          : "Daily cost cap exceeded",
+          ? "Monthly question limit exceeded"
+          : "Cost cap exceeded",
         requestId
       ),
     };

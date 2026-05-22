@@ -7,7 +7,6 @@ import {
   sanitizePromptHistory,
 } from "./system-prompt";
 import {
-  buildComposerPassPrompt,
   buildResearchPassPrompt,
 } from "./workflow";
 
@@ -21,22 +20,15 @@ describe("buildSystemPrompt", () => {
     expect(prompt).not.toContain("Match the user's latest message language");
   });
 
-  it("builds explicit two-pass skill prompts outside the system prompt", () => {
-    expect(buildResearchPassPrompt("아마존 알려줘")).toBe(
+  it("builds a Markdown-only research skill prompt outside the system prompt", () => {
+    const researchPrompt = buildResearchPassPrompt("아마존 알려줘");
+
+    expect(researchPrompt).toContain(
       "/krw-ontology:krw-ontology-research 아마존 알려줘",
     );
-    const composerPrompt = buildComposerPassPrompt({
-      question: "아마존 알려줘",
-      research_synthesis: { synthesis_version: "krw-research-synthesis/v1" },
-      runtime: { supports_structured_output: true, language: "ko" },
-    });
-
-    expect(composerPrompt).toContain("/krw-ontology:krw-ontology-answer-composer ");
-    expect(JSON.parse(composerPrompt.split(" ").slice(1).join(" "))).toEqual({
-      question: "아마존 알려줘",
-      research_synthesis: { synthesis_version: "krw-research-synthesis/v1" },
-      runtime: { supports_structured_output: true, language: "ko" },
-    });
+    expect(researchPrompt).toContain("Markdown 본문만 작성합니다");
+    expect(researchPrompt).toContain("구조화 JSON은 만들지 않습니다");
+    expect(researchPrompt).not.toContain("krw-ontology-answer-composer");
   });
 
   it("limits prompt history count and size before adding it to the system prompt", () => {

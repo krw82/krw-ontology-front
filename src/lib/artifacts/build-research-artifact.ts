@@ -564,8 +564,8 @@ function buildEvidenceProfile(
   const tickerLabel = tickers.length > 0 ? tickers.join(", ") : "회사";
   const summary =
     tickers.includes("AMZN") || hasAmazon
-      ? "AMZN FY2025 10-K 기준으로 사업 구조, 매출 성장, 순이익, 세그먼트 수익성과 투자 지출을 구조화했습니다."
-      : `${tickerLabel}${latestSource ? ` ${latestSource}` : ""} 기준으로 사업 구조, 핵심 숫자, 성장 동력과 리스크를 구조화했습니다.`;
+      ? "AMZN FY2025 10-K 기준으로 사업 구조, 매출 성장, 순이익, 세그먼트 수익성과 투자 지출을 정리했습니다."
+      : `${tickerLabel}${latestSource ? ` ${latestSource}` : ""} 기준으로 사업 구조, 핵심 숫자, 성장 동력과 리스크를 정리했습니다.`;
 
   return { summary, takeaways, metrics, segments, riskDrivers };
 }

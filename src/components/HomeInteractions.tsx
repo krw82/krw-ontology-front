@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
 import { easeOutExpo } from "@/lib/animation";
+import { trackClientEventSilently } from "@/lib/analytics/client";
 import { DEV_AUTH_EMAIL, isDevAuthBypassEnabled } from "@/lib/dev-auth";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 
@@ -157,9 +158,52 @@ export function HomeHeaderActions() {
       )}
       <Link
         href="/companies"
+        onClick={() => {
+          trackClientEventSilently("cta_clicked", {
+            cta_id: "home_header_start",
+            cta_label: "무료로 시작",
+            surface: "home_header",
+            destination: "/companies",
+          });
+        }}
         className="rounded-[8px] bg-surface-dark px-4 py-2 text-sm font-extrabold text-on-dark transition-colors hover:bg-primary-active"
       >
-        회사 목록
+        무료로 시작
+      </Link>
+    </div>
+  );
+}
+
+export function HomePrimaryCtas() {
+  return (
+    <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <Link
+        href="/companies"
+        onClick={() => {
+          trackClientEventSilently("cta_clicked", {
+            cta_id: "home_hero_primary",
+            cta_label: "무료로 첫 분석 시작",
+            surface: "home_hero_primary",
+            destination: "/companies",
+          });
+        }}
+        className="inline-flex min-h-12 items-center justify-center rounded-[8px] bg-surface-dark px-5 py-3 text-[15px] font-extrabold leading-5 text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+      >
+        무료로 첫 분석 시작
+      </Link>
+      <Link
+        href="/chat"
+        onClick={() => {
+          trackClientEventSilently("cta_clicked", {
+            cta_id: "home_hero_secondary",
+            cta_label: "질문으로 바로 시작",
+            surface: "home_hero_secondary",
+            destination: "/chat",
+          });
+        }}
+        className="inline-flex min-h-12 items-center justify-center rounded-[8px] border border-hairline bg-canvas px-5 py-3 text-[15px] font-extrabold leading-5 text-ink transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+      >
+        질문으로 바로 시작
       </Link>
     </div>
   );

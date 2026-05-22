@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { checkMcpHealth } from "@/lib/agent/mcp-client";
 import type { McpHealthResult } from "@/lib/agent/mcp-client";
+import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { AgentRunRow, ChatSessionRow } from "@/types/database";
@@ -11,12 +12,17 @@ import {
   fetchHistory,
   executeRun,
 } from "@/lib/api/chat";
+import {
+  checkChatRunRateLimit,
+  getClientIp,
+} from "@/lib/api/chat/rate-limit";
 import { streamPersistedRunResponse } from "@/lib/api/chat/run-agent";
 
 // --- MCP health cache ---
 
 let mcpHealthCache: { result: McpHealthResult; timestamp: number } | null = null;
 const MCP_HEALTH_TTL = 30_000;
+const ATTACHED_FILE_TAG_PATTERN = /<attached_file\s+name="[^"]*">/g;
 
 async function getCachedMcpHealth(): Promise<McpHealthResult> {
   if (mcpHealthCache && Date.now() - mcpHealthCache.timestamp < MCP_HEALTH_TTL) {
@@ -61,12 +67,21 @@ export async function POST(request: NextRequest) {
     }), existingRun.session_id);
   }
 
-  // 3. Check daily quota before creating a new session/message.
+  // 3. Check durable request rate limits before spending quota or starting work.
+  const rateLimitResult = await checkChatRunRateLimit({
+    userId,
+    requestId: request_id,
+    ip: getClientIp(request.headers),
+    sessionId: body.session_id ?? null,
+  });
+  if (!rateLimitResult.ok) return rateLimitResult.response;
+
+  // 4. Check monthly plan quota before creating a new session/message.
   const quotaResult = await checkQuotaStep(userId, request_id);
   if (!quotaResult.ok) return quotaResult.response;
   const quota = quotaResult.quota;
 
-  // 4. Check MCP health (cached for 30s) before creating a new session/message.
+  // 5. Check MCP health (cached for 30s) before creating a new session/message.
   let mcpHealth: McpHealthResult;
   try {
     mcpHealth = await getCachedMcpHealth();
@@ -82,7 +97,7 @@ export async function POST(request: NextRequest) {
     return errorResponse(503, "mcp_unavailable", "온톨로지 도구에 연결할 수 없습니다.", request_id);
   }
 
-  // 5. Resolve session (lookup + ownership check)
+  // 6. Resolve session (lookup + ownership check)
   const sessionIdResult = await getOrCreateSessionId(body, userId, request_id);
   if (!sessionIdResult.ok) return sessionIdResult.response;
 
@@ -94,11 +109,11 @@ export async function POST(request: NextRequest) {
   if (!sessionResult.ok) return sessionResult.response;
   const session = sessionResult.session;
 
-  // 6. Save user message idempotently & fetch history
+  // 7. Save user message idempotently & fetch history
   const historyResult = await fetchHistory(session.id, content, request_id);
   if (!historyResult.ok) return historyResult.response;
 
-  // 7. A duplicate can arrive while the first request is between session/message
+  // 8. A duplicate can arrive while the first request is between session/message
   // creation and run acquisition. Re-check before starting the agent.
   const existingRunAfterMessage = await findExistingRunForRequest(request_id, userId);
   if (existingRunAfterMessage) {
@@ -110,7 +125,22 @@ export async function POST(request: NextRequest) {
     }), existingRunAfterMessage.session_id);
   }
 
-  // 8. Acquire lease, run agent, stream results
+  await recordAnalyticsEventFromRequest(request, {
+    eventName: "question_submitted",
+    userId,
+    sessionId: session.id,
+    messageId: historyResult.result.userMessageId,
+    properties: {
+      scope_type: session.scopeType,
+      ticker: session.defaultTickers[0] ?? null,
+      tickers: session.defaultTickers,
+      question_length: content.length,
+      attachment_count: countAttachedFiles(content),
+      source_surface: body.scope_type === "company" ? "ticker_chat" : "chat",
+    },
+  });
+
+  // 9. Acquire lease, run agent, stream results
   return withSessionHeader(executeRun({
     request,
     session,
@@ -232,4 +262,8 @@ async function getOrCreateSessionId(
   }
 
   return { ok: true, sessionId: session.id };
+}
+
+function countAttachedFiles(content: string): number {
+  return content.match(ATTACHED_FILE_TAG_PATTERN)?.length ?? 0;
 }

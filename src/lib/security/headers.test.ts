@@ -18,6 +18,7 @@ describe("security headers", () => {
     expect(contentSecurityPolicy).toContain("https://*.supabase.co");
     expect(contentSecurityPolicy).toContain("upgrade-insecure-requests");
     expect(contentSecurityPolicy).not.toContain("http://localhost:*");
+    expect(contentSecurityPolicy).not.toContain("'unsafe-eval'");
 
     const headers = await nextConfig.headers?.();
 
@@ -40,6 +41,7 @@ describe("security headers", () => {
     expect(developmentCsp).toContain("http://localhost:*");
     expect(developmentCsp).toContain("http://127.0.0.1:*");
     expect(developmentCsp).toContain("ws://localhost:*");
+    expect(developmentCsp).toContain("'unsafe-eval'");
     expect(developmentCsp).not.toContain("upgrade-insecure-requests");
     expect(developmentHeaders).not.toContainEqual(
       expect.objectContaining({ key: "Strict-Transport-Security" }),

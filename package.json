@@ -19,15 +19,21 @@
     "lint": "eslint",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:public": "playwright test --grep \"public pages\"",
+    "test:e2e:auth": "playwright test --grep \"dev auth bypass\"",
+    "test:e2e:api": "playwright test --grep \"protected API\"",
+    "test:e2e:reuse": "PLAYWRIGHT_REUSE_SERVER=1 playwright test",
+    "verify:sdk-freeze": "node scripts/verify-sdk-freeze.mjs",
     "supabase:login": "npx supabase login",
     "supabase:orgs": "npx supabase orgs list",
     "supabase:projects": "npx supabase projects list",
     "supabase:link": "npx supabase link",
     "supabase:db:push:dry": "npx supabase db push --dry-run",
-    "supabase:db:push": "npx supabase db push"
+    "supabase:db:push": "npx supabase db push",
+    "supabase:schema:smoke": "node scripts/supabase-schema-smoke.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.141",
+    "@anthropic-ai/claude-agent-sdk": "0.2.141",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
     "clsx": "^2.1.1",

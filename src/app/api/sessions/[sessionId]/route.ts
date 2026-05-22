@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import { forbiddenError, getAuthUser, handleAuthError } from "@/lib/auth";
 import { isPlainObject, isUuid } from "@/lib/api/validation";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -113,11 +114,23 @@ export async function PATCH(
     return errorResponse(500, "internal_error", "채팅 이름을 저장하지 못했습니다.");
   }
 
+  await recordAnalyticsEventFromRequest(request, {
+    eventName: "session_renamed",
+    userId: user.id,
+    sessionId,
+    properties: {
+      title_length: title.length,
+      scope_type: session.scope_type,
+      ticker: session.default_tickers?.[0] ?? null,
+      tickers: session.default_tickers ?? [],
+    },
+  });
+
   return Response.json({ session });
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> },
 ) {
   const { sessionId } = await params;
@@ -160,6 +173,15 @@ export async function DELETE(
     .update({ revoked_at: deletedAt })
     .eq("source_session_id", sessionId)
     .is("revoked_at", null);
+
+  await recordAnalyticsEventFromRequest(request, {
+    eventName: "session_deleted",
+    userId: user.id,
+    sessionId,
+    properties: {
+      deleted_at: deletedAt,
+    },
+  });
 
   return Response.json({
     success: true,

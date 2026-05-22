@@ -14,7 +14,6 @@ import type {
   ErrorCode,
   GetChatSessionResponse,
   Session,
-  ResearchArtifact,
   ResearchActivityUpdate,
   MCPToolName,
 } from "@/types/api-contracts";
@@ -50,8 +49,6 @@ export interface ChatState {
   activity: ResearchActivityUpdate | null;
   toolCalls: ToolCallState[];
   citations: ChatCitation[];
-  richAnswers: ResearchArtifact[];
-  structuringMessageId: string | null;
   runDurationsByMessageId: Record<string, number>;
   runId: string | null;
   runStartedAt: string | null;
@@ -75,8 +72,6 @@ function createInitialChatState(): ChatState {
     activity: null,
     toolCalls: [],
     citations: [],
-    richAnswers: [],
-    structuringMessageId: null,
     runDurationsByMessageId: {},
     runId: null,
     runStartedAt: null,
@@ -84,18 +79,6 @@ function createInitialChatState(): ChatState {
     release: null,
     quota: null,
   };
-}
-
-function mergeRichAnswers(
-  current: ResearchArtifact[],
-  incoming: ResearchArtifact[],
-): ResearchArtifact[] {
-  if (incoming.length === 0) return current;
-  const byId = new Map(current.map((artifact) => [artifact.id, artifact]));
-  for (const artifact of incoming) {
-    byId.set(artifact.id, artifact);
-  }
-  return Array.from(byId.values());
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -311,8 +294,6 @@ export function useChat({
             latency_ms: number;
           };
           quota: QuotaStatus;
-          rich_answers?: ResearchArtifact[];
-          artifacts?: ResearchArtifact[];
         };
         finalizedRef.current = true;
         activeRunIdRef.current = d.run_id;
@@ -364,10 +345,6 @@ export function useChat({
             release: d.release,
             usage: d.usage,
             quota: d.quota,
-            richAnswers: mergeRichAnswers(
-              prev.richAnswers,
-              d.rich_answers ?? d.artifacts ?? [],
-            ),
             status: "completed",
           };
         });
@@ -529,7 +506,6 @@ export function useChat({
             : undefined,
         })),
         citations: (data.citations ?? []) as ChatCitation[],
-        richAnswers: data.rich_answers ?? data.research_artifacts ?? [],
         runDurationsByMessageId: Object.fromEntries(
           (data.runs ?? [])
             .filter(
@@ -777,8 +753,6 @@ export function useChat({
         },
         toolCalls: [],
         citations: [],
-        richAnswers: [],
-        structuringMessageId: null,
         runId: null,
         runStartedAt: null,
         usage: null,
@@ -942,43 +916,6 @@ export function useChat({
     }
   }, [sessionId]);
 
-  const structureMessage = useCallback(async (messageId: string) => {
-    if (!messageId || statusRef.current === "running") return;
-
-    setState((prev) => ({
-      ...prev,
-      error: null,
-      structuringMessageId: messageId,
-    }));
-
-    try {
-      const response = await fetch(
-        `/api/chat/messages/${messageId}/structure`,
-        { method: "POST" },
-      );
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(
-          data?.error?.message || `구조화 요청에 실패했습니다: ${response.status}`,
-        );
-      }
-
-      const incoming = (data?.rich_answers ?? data?.artifacts ?? []) as ResearchArtifact[];
-      setState((prev) => ({
-        ...prev,
-        richAnswers: mergeRichAnswers(prev.richAnswers, incoming),
-        structuringMessageId: null,
-      }));
-    } catch (err) {
-      setState((prev) => ({
-        ...prev,
-        error: (err as Error).message,
-        structuringMessageId: null,
-      }));
-    }
-  }, []);
-
   const loadSession = useCallback(async () => {
     if (!sessionId) return;
     await syncSessionFromServer(sessionId);
@@ -1034,8 +971,7 @@ export function useChat({
       sendMessage,
       cancelRun,
       loadSession,
-      structureMessage,
     }),
-    [state, sendMessage, cancelRun, loadSession, structureMessage]
+    [state, sendMessage, cancelRun, loadSession]
   );
 }

@@ -1,11 +1,13 @@
-export type EntitlementPlanKey = "beta";
+export type EntitlementPlanKey = "free" | "pro" | "power" | "beta" | "internal";
+
+export type EntitlementAlertLevel = "ok" | "warning" | "blocked";
 
 export interface EntitlementFeature {
   key:
     | "evidence_research"
     | "evidence_path"
     | "share_links"
-    | "html_export"
+    | "markdown_answer"
     | "company_compare"
     | "priority_queue";
   label: string;
@@ -14,14 +16,16 @@ export interface EntitlementFeature {
 }
 
 export interface EntitlementUsage {
-  period: "daily";
+  period: "monthly";
   period_label: string;
+  period_start: string;
+  period_end: string;
   questions_used: number;
   questions_limit: number;
   remaining_questions: number;
-  cost_used_usd: number;
-  cost_limit_usd: number;
   percent_used: number;
+  alert_level: EntitlementAlertLevel;
+  can_run: boolean;
   resets_at: string;
 }
 
@@ -38,5 +42,7 @@ export interface EntitlementStatus {
     label: string;
     href: string;
     enabled: boolean;
+    title: string;
+    message: string;
   };
 }

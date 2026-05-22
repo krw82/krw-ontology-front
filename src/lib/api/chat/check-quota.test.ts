@@ -23,6 +23,8 @@ describe("checkQuotaStep", () => {
       allowed: true,
       questionsUsed: 2,
       costUsed: 0.5,
+      questionsLimit: 10,
+      costLimit: 5,
     });
 
     const result = await checkQuotaStep("user-1", "req-1");
@@ -38,6 +40,8 @@ describe("checkQuotaStep", () => {
       reason: "internal_error",
       questionsUsed: 0,
       costUsed: 0,
+      questionsLimit: 0,
+      costLimit: 5,
     });
 
     const result = await checkQuotaStep("user-1", "req-1");
@@ -58,8 +62,10 @@ describe("checkQuotaStep", () => {
     vi.mocked(checkQuota).mockResolvedValue({
       allowed: false,
       reason: "quota_exceeded",
-      questionsUsed: 20,
+      questionsUsed: 10,
       costUsed: 1,
+      questionsLimit: 10,
+      costLimit: 5,
     });
 
     const result = await checkQuotaStep("user-1", "req-1");
@@ -70,7 +76,7 @@ describe("checkQuotaStep", () => {
     expect(await json(result.response)).toMatchObject({
       error: {
         code: "quota_exceeded",
-        message: "Daily question limit exceeded",
+        message: "Monthly question limit exceeded",
       },
     });
   });
