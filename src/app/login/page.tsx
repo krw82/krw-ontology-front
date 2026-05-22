@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { motion } from "motion/react";
 import { KrwBrand } from "@/components/KrwBrand";
 import { createClient } from "@/lib/supabase/client";
+import { easeOutExpo } from "@/lib/animation";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 function safeNextPath(value: string | null): string {
   if (!value || !value.startsWith("/") || value.startsWith("//")) {
@@ -43,6 +46,7 @@ function GoogleMark() {
 
 function LoginContent() {
   const searchParams = useSearchParams();
+  const reducedMotion = useReducedMotion();
   const initialError = searchParams.get("error") === "oauth";
   const nextPath = safeNextPath(searchParams.get("next"));
   const [loading, setLoading] = useState(false);
@@ -50,9 +54,12 @@ function LoginContent() {
     initialError ? "Google 인증을 완료하지 못했습니다. 다시 시도해주세요." : null,
   );
   const [errorVisible, setErrorVisible] = useState(false);
-  const trustSignals = ["Google 인증", "개인 세션 보호", "출처 기록 저장"];
   const errorRef = useRef<HTMLDivElement | null>(null);
   const supabase = useMemo(() => createClient(), []);
+  const entranceTransition = {
+    duration: reducedMotion ? 0 : 0.22,
+    ease: easeOutExpo,
+  };
 
   useEffect(() => {
     let didUpdate = true;
@@ -89,135 +96,157 @@ function LoginContent() {
   };
 
   return (
-    <div className="relative flex min-h-[100dvh] flex-col overflow-x-hidden bg-surface-dark text-on-dark">
+    <div className="relative flex min-h-[100dvh] flex-col overflow-x-hidden bg-canvas text-ink">
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(180deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:64px_64px]"
+        className="absolute inset-0 bg-[linear-gradient(90deg,rgba(10,11,13,0.04)_1px,transparent_1px),linear-gradient(180deg,rgba(10,11,13,0.04)_1px,transparent_1px)] bg-[size:64px_64px]"
       />
 
-      <header className="sticky top-0 z-50 h-[72px] w-full flex-shrink-0 border-b border-white/10 bg-surface-dark/85 backdrop-blur-xl">
-        <div className="mx-auto flex h-full w-full max-w-[1600px] items-center justify-between gap-base px-base sm:px-md">
-          <KrwBrand dark compact />
-          <Link
-            href="/"
-            className="rounded-[8px] border border-white/10 px-3 py-2 text-[14px] font-semibold leading-[1.4] text-on-dark-soft transition-colors hover:border-primary-fixed-dim hover:text-primary-fixed-dim"
-          >
-            홈
-          </Link>
+      <header className="sticky top-0 z-50 h-[72px] w-full flex-shrink-0 border-b border-hairline bg-canvas/95 backdrop-blur-xl">
+        <div className="mx-auto flex h-full w-full max-w-[1600px] items-center px-base sm:px-md">
+          <KrwBrand compact />
         </div>
       </header>
 
       <main
         id="main-content"
-        className="relative z-10 grid w-full flex-1 grid-cols-1 items-start gap-6 px-base py-lg sm:px-md lg:grid-cols-[minmax(0,1fr)_440px] lg:items-center lg:gap-10 lg:px-xl lg:py-xl"
+        className="relative z-10 flex w-full flex-1 items-center justify-center px-base py-xl sm:px-md lg:px-xl"
       >
-        <section className="order-1 mx-auto w-full min-w-0 max-w-[720px] lg:mx-0 lg:pl-8">
-          <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-primary-fixed-dim">
-            보안 리서치 공간
-          </p>
-          <h1 className="mt-4 max-w-[640px] break-keep text-[34px] font-black leading-[1.04] text-on-dark sm:text-[56px]">
-            리서치 기록을 안전하게 이어갑니다.
-          </h1>
-          <p className="mt-4 w-full max-w-[540px] text-[16px] leading-7 text-on-dark-soft sm:mt-5 sm:text-[17px] sm:leading-8">
-            Google 계정으로 로그인하면 회사 목록, 채팅 기록, 리서치 결과가
-            개인 워크스페이스에 저장됩니다.
-          </p>
-        </section>
-
-        <section className="order-2 mx-auto w-full max-w-[440px]">
-          <div
-            className="animate-fade-in-up rounded-[12px] border border-white/12 bg-surface-dark-elevated p-5 text-on-dark shadow-2xl shadow-black/35 opacity-0 sm:p-6"
-            style={{ animationDelay: "80ms", animationDuration: "150ms" }}
+        {!reducedMotion && (
+          <motion.svg
+            aria-hidden="true"
+            className="pointer-events-none absolute left-1/2 top-1/2 z-0 h-[340px] w-[min(720px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-visible text-primary"
+            fill="none"
+            viewBox="0 0 720 340"
           >
-            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-primary-fixed-dim">
-              계정 연결
-            </p>
+            <motion.path
+              d="M90 170 C190 92 306 104 360 170 C414 236 530 248 630 170"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeWidth="1.5"
+              initial={{ opacity: 0, pathLength: 0 }}
+              animate={{ opacity: [0, 0.28, 0], pathLength: [0, 1, 1] }}
+              transition={{
+                duration: 1.15,
+                ease: easeOutExpo,
+                times: [0, 0.72, 1],
+              }}
+            />
+            <motion.circle
+              cx="360"
+              cy="170"
+              r="3"
+              fill="currentColor"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: [0, 0.38, 0], scale: [0.8, 1, 0.9] }}
+              transition={{
+                duration: 0.72,
+                delay: 0.45,
+                ease: easeOutExpo,
+              }}
+            />
+          </motion.svg>
+        )}
 
-            <h2 className="mt-4 text-[34px] font-black leading-none">
-              로그인
-            </h2>
-            <p className="mt-3 text-[15px] leading-6 text-on-dark-soft">
-              질문과 출처 기록을 같은 세션에 보관하려면 Google 계정으로
-              인증하세요.
-            </p>
-            <p className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.05] px-3 py-3 text-[13px] font-semibold leading-5 text-on-dark-soft">
-              인증 후 요청한 화면으로 안전하게 이동합니다.
-            </p>
+        <motion.section
+          className="relative z-10 w-full max-w-[480px] rounded-[12px] border border-hairline bg-canvas p-6 text-ink shadow-[0_18px_48px_rgba(10,11,13,0.12)] sm:p-8"
+          initial={reducedMotion ? false : { opacity: 0, y: 12, scale: 0.985 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ ...entranceTransition, duration: reducedMotion ? 0 : 0.32 }}
+        >
+          <motion.h1
+            className="break-keep text-[31px] font-black leading-[1.08] text-ink sm:text-[40px]"
+            initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: reducedMotion ? 0 : 0.28,
+              delay: reducedMotion ? 0 : 0.06,
+              ease: easeOutExpo,
+            }}
+          >
+            내 리서치 공간으로 들어가기
+          </motion.h1>
+          <motion.p
+            className="mt-4 text-[15px] leading-6 text-body sm:text-[16px] sm:leading-7"
+            initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: reducedMotion ? 0 : 0.28,
+              delay: reducedMotion ? 0 : 0.12,
+              ease: easeOutExpo,
+            }}
+          >
+            선택한 회사와 채팅 기록을 이어서 확인하려면 Google로
+            로그인하세요.
+          </motion.p>
 
-            <div className="mt-6 space-y-md">
-              {error && (
-                <div
-                  ref={errorRef}
-                  className={`rounded-[8px] border border-error/25 bg-error-container/90 p-sm text-[14px] font-semibold leading-[1.5] text-on-error-container transition-all duration-150 ease-out ${
-                    errorVisible
-                      ? "translate-y-0 opacity-100"
-                      : "-translate-y-1 opacity-0"
-                  }`}
-                  role="alert"
-                  tabIndex={-1}
-                >
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={loading}
-                className="relative flex h-[52px] w-full items-center justify-center gap-sm rounded-[8px] bg-canvas px-base text-[16px] font-extrabold leading-[1.15] text-ink transition-all duration-150 ease-out hover:bg-primary-fixed active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-70"
+          <motion.div
+            className="mt-7 space-y-md"
+            initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: reducedMotion ? 0 : 0.28,
+              delay: reducedMotion ? 0 : 0.18,
+              ease: easeOutExpo,
+            }}
+          >
+            {error && (
+              <div
+                ref={errorRef}
+                className={`rounded-[8px] border border-error/25 bg-error-container/90 p-sm text-[14px] font-semibold leading-[1.5] text-on-error-container transition-all duration-150 ease-out ${
+                  errorVisible
+                    ? "translate-y-0 opacity-100"
+                    : "-translate-y-1 opacity-0"
+                }`}
+                role="alert"
+                tabIndex={-1}
               >
-                <span className="pointer-events-none relative h-5 w-5 shrink-0">
-                  <span
-                    aria-hidden="true"
-                    className={`absolute inset-0 transition-all duration-150 ease-out ${
-                      loading
-                        ? "opacity-0 scale-95"
-                        : "opacity-100 scale-100"
-                    }`}
-                  >
-                    <GoogleMark />
-                  </span>
-                  <span
-                    aria-hidden="true"
-                    className={`absolute inset-0 rounded-full border-2 border-primary border-t-transparent transition-all duration-150 ease-out ${
-                      loading
-                        ? "opacity-100 scale-100 animate-spin"
-                        : "opacity-0 scale-95"
-                    }`}
-                  />
+                {error}
+              </div>
+            )}
+
+            <motion.button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+              whileTap={reducedMotion || loading ? undefined : { scale: 0.985 }}
+              className={`relative flex h-[52px] w-full items-center justify-center gap-sm rounded-[8px] border px-base text-[16px] font-extrabold leading-[1.15] text-ink shadow-[0_8px_20px_rgba(10,11,13,0.08)] transition-all duration-150 ease-out hover:border-primary hover:bg-primary-fixed disabled:cursor-not-allowed disabled:opacity-70 ${
+                loading ? "border-primary bg-primary-fixed" : "border-hairline bg-canvas"
+              }`}
+            >
+              <span className="pointer-events-none relative h-5 w-5 shrink-0">
+                <span
+                  aria-hidden="true"
+                  className={`absolute inset-0 transition-all duration-150 ease-out ${
+                    loading ? "opacity-0 scale-95" : "opacity-100 scale-100"
+                  }`}
+                >
+                  <GoogleMark />
                 </span>
-                {loading ? "Google로 이동 중..." : "Google로 계속하기"}
-              </button>
+                <span
+                  aria-hidden="true"
+                  className={`absolute inset-0 rounded-full border-2 border-primary border-t-transparent transition-all duration-150 ease-out ${
+                    loading ? "opacity-100 scale-100 animate-spin" : "opacity-0 scale-95"
+                  }`}
+                />
+              </span>
+              {loading ? "Google로 이동 중..." : "Google로 계속하기"}
+            </motion.button>
 
-              <ul className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-1 text-center text-[12px] font-bold leading-5 text-on-dark-soft/80">
-                {trustSignals.map((item, index) => (
-                  <li key={item} className="flex items-center gap-x-2">
-                    {index > 0 && (
-                      <span
-                        aria-hidden="true"
-                        className="h-1 w-1 rounded-full bg-primary-fixed-dim/70"
-                      />
-                    )}
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          <p className="mt-lg text-center text-[13px] font-semibold leading-[1.5] text-on-dark-soft">
-            KRW Ontology · 근거 기반 기업 리서치
-          </p>
-        </section>
+            <p className="text-center text-[13px] font-semibold leading-5 text-muted">
+              로그인 후 이전 화면으로 돌아갑니다.
+            </p>
+          </motion.div>
+        </motion.section>
       </main>
 
-      <footer className="relative z-10 border-t border-white/5 px-base py-lg text-center">
-        <div className="flex flex-col items-center justify-center gap-2 text-[13px] font-semibold leading-[1.5] text-on-dark-soft/70 sm:flex-row sm:gap-3">
+      <footer className="relative z-10 border-t border-hairline bg-canvas px-base py-lg text-center">
+        <div className="flex flex-col items-center justify-center gap-2 text-[13px] font-semibold leading-[1.5] text-muted sm:flex-row sm:gap-3">
           <span>© 2026 KRW Ontology. 모든 권리 보유.</span>
-          <Link href="/privacy" className="transition-colors hover:text-on-dark-soft">
+          <Link href="/privacy" className="transition-colors hover:text-ink">
             개인정보처리방침
           </Link>
-          <Link href="/terms" className="transition-colors hover:text-on-dark-soft">
+          <Link href="/terms" className="transition-colors hover:text-ink">
             서비스 약관
           </Link>
         </div>
@@ -230,8 +259,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-[100dvh] items-center justify-center bg-surface-dark text-on-dark">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary-fixed-dim border-t-transparent" />
+        <div className="flex min-h-[100dvh] items-center justify-center bg-canvas text-ink">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
       }
     >

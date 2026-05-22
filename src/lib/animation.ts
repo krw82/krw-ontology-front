@@ -99,6 +99,36 @@ export const scaleIn: Variants = {
   },
 };
 
+export const popoverMenu: Variants = {
+  hidden: { opacity: 0, y: -4, scale: 0.98 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: duration.fast, ease: easeOutExpo },
+  },
+  exit: {
+    opacity: 0,
+    y: -4,
+    scale: 0.98,
+    transition: { duration: 0.12, ease: easeOutQuart },
+  },
+};
+
+export const listRow: Variants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.16, ease: easeOutExpo },
+  },
+  exit: {
+    opacity: 0,
+    y: -6,
+    transition: { duration: 0.12, ease: easeOutQuart },
+  },
+};
+
 /* ------------------------------------------------------------------ */
 /*  Stagger containers                                                 */
 /* ------------------------------------------------------------------ */

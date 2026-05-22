@@ -75,6 +75,7 @@ describe("chat history state", () => {
     expect(state.status).toBe("running");
     expect(state.activeRunId).toBe("run-1");
     expect(state.activeAssistantMessageId).toBe("assistant-1");
+    expect(state.activeRunStartedAt).toBe("2026-05-12T00:00:01.000Z");
     expect(state.streamingContent).toBe("작성 중");
     expect(state.messages.map((message) => message.id)).toEqual(["user-1"]);
   });
@@ -101,6 +102,7 @@ describe("chat history state", () => {
     const state = deriveLoadedChatState(messages, runs);
 
     expect(state.status).toBe("completed");
+    expect(state.activeRunStartedAt).toBeNull();
     expect(state.streamingContent).toBe("");
     expect(state.messages).toHaveLength(1);
   });

@@ -5,6 +5,7 @@ export interface LoadedChatState {
   streamingContent: string;
   activeRunId: string | null;
   activeAssistantMessageId: string | null;
+  activeRunStartedAt: string | null;
   status: RunStatus | "idle";
 }
 
@@ -49,6 +50,7 @@ export function deriveLoadedChatState(
       streamingContent: "",
       activeRunId: latestRun?.id ?? null,
       activeAssistantMessageId: latestRun?.assistant_message_id ?? null,
+      activeRunStartedAt: null,
       status: latestRun?.status ?? "idle",
     };
   }
@@ -65,6 +67,7 @@ export function deriveLoadedChatState(
     streamingContent: streamingAssistant?.content ?? "",
     activeRunId: latestRun.id,
     activeAssistantMessageId: streamingAssistant?.id ?? latestRun.assistant_message_id,
+    activeRunStartedAt: latestRun.started_at,
     status: "running",
   };
 }

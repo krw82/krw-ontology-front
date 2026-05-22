@@ -26,6 +26,8 @@ export interface AccumulatedRun {
   outputTokens: number;
 }
 
+export type AccumulatedToolCall = AccumulatedRun["toolCalls"][number];
+
 export function createAccumulator(): AccumulatedRun {
   return {
     fullText: "",
@@ -66,7 +68,7 @@ export function startToolCall(
   toolName: MCPToolName,
   args: Record<string, unknown>
 ) {
-  acc.toolCalls.push({
+  const toolCall: AccumulatedToolCall = {
     id,
     toolName,
     argumentsJson: JSON.stringify(args),
@@ -76,7 +78,9 @@ export function startToolCall(
     startedAt: new Date().toISOString(),
     finishedAt: null,
     errorMessage: null,
-  });
+  };
+  acc.toolCalls.push(toolCall);
+  return toolCall;
 }
 
 export function endToolCall(
@@ -101,7 +105,9 @@ export function endToolCall(
     }
     tc.finishedAt = now.toISOString();
     tc.errorMessage = errorMessage;
+    return tc;
   }
+  return null;
 }
 
 export function addCitation(acc: AccumulatedRun, citation: StreamingCitation) {

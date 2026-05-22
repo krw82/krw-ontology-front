@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import EvidenceGraphPreview from "@/components/EvidenceGraphPreview";
 import ResearchMarkdown from "@/components/ResearchMarkdown";
 import ResearchProgress from "@/components/ResearchProgress";
 import type { ToolCallState } from "@/hooks/useChat";
@@ -21,6 +22,9 @@ interface ChatMessageProps {
   showHeader?: boolean;
   toolCalls?: ToolCallState[];
   workDurationMs?: number | null;
+  runStartedAt?: string | null;
+  messageId?: string;
+  createdAt?: string;
 }
 
 interface DisplayAttachment {
@@ -130,6 +134,170 @@ function LoadingDots({ label = "분석 준비 중" }: { label?: string }) {
   );
 }
 
+function formatMessageTime(createdAt: string): string {
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.setAttribute("readonly", "");
+    textArea.style.position = "fixed";
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.opacity = "0";
+
+    document.body.appendChild(textArea);
+    textArea.select();
+    textArea.setSelectionRange(0, text.length);
+
+    try {
+      return document.execCommand("copy");
+    } catch {
+      return false;
+    } finally {
+      document.body.removeChild(textArea);
+    }
+  }
+}
+
+async function createPublicShareUrl(messageId: string): Promise<string> {
+  const response = await fetch(
+    `/api/share/messages/${encodeURIComponent(messageId)}`,
+    {
+      method: "POST",
+      headers: { Accept: "application/json" },
+    },
+  );
+  const data = (await response.json().catch(() => null)) as {
+    share_url?: string;
+    url?: string;
+    error?: { message?: string };
+  } | null;
+
+  if (!response.ok) {
+    throw new Error(data?.error?.message || "공유 링크를 만들지 못했습니다.");
+  }
+
+  const shareUrl = data?.share_url || data?.url;
+  if (!shareUrl) throw new Error("공유 링크를 만들지 못했습니다.");
+
+  return new URL(shareUrl, window.location.origin).toString();
+}
+
+function MessageActions({
+  messageId,
+  createdAt,
+}: {
+  messageId: string;
+  createdAt: string;
+}) {
+  const [shareState, setShareState] = useState<
+    "idle" | "sharing" | "shared" | "failed"
+  >("idle");
+  const formattedTime = useMemo(() => formatMessageTime(createdAt), [createdAt]);
+
+  useEffect(() => {
+    if (shareState !== "shared" && shareState !== "failed") return;
+    const timeoutId = window.setTimeout(() => setShareState("idle"), 1400);
+    return () => window.clearTimeout(timeoutId);
+  }, [shareState]);
+
+  const handleShare = useCallback(async () => {
+    if (shareState === "sharing") return;
+
+    setShareState("sharing");
+    let shareUrl = "";
+
+    try {
+      shareUrl = await createPublicShareUrl(messageId);
+      const shareData: ShareData = {
+        title: "KRW Ontology",
+        url: shareUrl,
+      };
+      const useNativeShare =
+        Boolean(navigator.share) &&
+        (navigator.maxTouchPoints > 0 ||
+          window.matchMedia("(pointer: coarse)").matches) &&
+        (!navigator.canShare || navigator.canShare(shareData));
+
+      if (useNativeShare) {
+        await navigator.share(shareData);
+        setShareState("shared");
+      } else {
+        const copied = await copyTextToClipboard(shareUrl);
+        setShareState(copied ? "shared" : "failed");
+      }
+    } catch (error) {
+      if ((error as DOMException).name === "AbortError") {
+        setShareState("idle");
+        return;
+      }
+      const copied = shareUrl ? await copyTextToClipboard(shareUrl) : false;
+      setShareState(copied ? "shared" : "failed");
+    }
+  }, [messageId, shareState]);
+
+  if (!formattedTime) return null;
+
+  const iconName =
+    shareState === "shared"
+      ? "check"
+      : shareState === "failed"
+        ? "error"
+        : shareState === "sharing"
+          ? "progress_activity"
+          : "ios_share";
+  const shareLabel =
+    shareState === "shared"
+      ? "공유 링크 복사됨"
+      : shareState === "failed"
+        ? "공유 링크 생성 실패"
+        : shareState === "sharing"
+          ? "공유 링크 생성 중"
+          : "답변 공유";
+
+  return (
+    <div className="mt-sm flex items-center gap-xs text-[13px] leading-none text-muted">
+      <button
+        type="button"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-70"
+        aria-label={shareLabel}
+        disabled={shareState === "sharing"}
+        onClick={handleShare}
+      >
+        <span
+          aria-hidden="true"
+          className={[
+            "material-symbols-outlined text-[18px]",
+            shareState === "sharing" ? "animate-spin" : "",
+          ].join(" ")}
+        >
+          {iconName}
+        </span>
+      </button>
+      <time dateTime={createdAt}>{formattedTime}</time>
+      <span className="sr-only" aria-live="polite">
+        {shareState === "shared"
+          ? "공유 링크가 복사되었습니다."
+          : shareState === "failed"
+            ? "공유 링크를 만들지 못했습니다."
+            : ""}
+      </span>
+    </div>
+  );
+}
+
 function activityLabel(activity?: ResearchActivityUpdate | null): string {
   switch (activity?.stage) {
     case "connecting":
@@ -195,6 +363,9 @@ export default function ChatMessage({
   showHeader = true,
   toolCalls,
   workDurationMs,
+  runStartedAt,
+  messageId,
+  createdAt,
 }: ChatMessageProps) {
   if (role === "user") {
     const { visibleText, attachments } = parseUserDisplayContent(content);
@@ -247,6 +418,7 @@ export default function ChatMessage({
 
   return (
     <motion.div
+      id={messageId ? `message-${messageId}` : undefined}
       className="flex w-full flex-col"
       initial="hidden"
       animate="visible"
@@ -260,20 +432,29 @@ export default function ChatMessage({
             isStreaming={isStreaming}
             toolCalls={toolCalls}
             workDurationMs={workDurationMs}
+            runStartedAt={runStartedAt}
           />
         </div>
       )}
       {isStreaming ? (
         <div className="max-w-full pl-0 text-body sm:pl-[48px]">
+          <EvidenceGraphPreview
+            activity={activity}
+            citations={citations}
+            toolCalls={toolCalls}
+          />
           {content ? (
             <StreamingContentBlocks content={content} />
-          ) : !showHeader ? (
+          ) : !toolCalls?.length && !citations?.length ? (
             <LoadingDots label={activityLabel(activity)} />
           ) : null}
         </div>
       ) : (
         <div className="max-w-full pl-0 text-body sm:pl-[48px]">
           {content ? <StreamingContentBlocks content={content} /> : null}
+          {messageId && createdAt ? (
+            <MessageActions messageId={messageId} createdAt={createdAt} />
+          ) : null}
         </div>
       )}
     </motion.div>

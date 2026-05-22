@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Noto_Sans_KR } from "next/font/google";
 import { Suspense } from "react";
 import AppShell from "@/components/AppShell";
@@ -24,9 +24,28 @@ const notoSansKr = Noto_Sans_KR({
 });
 
 export const metadata: Metadata = {
+  applicationName: "KRW Ontology",
   title: "KRW Ontology",
   description:
     "KRW Ontology가 제공하는 근거 기반 기업 리서치와 데이터 분석.",
+  icons: {
+    apple: [
+      {
+        url: "/icons/apple-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "KRW Ontology",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#003ec7",
 };
 
 export default function RootLayout({

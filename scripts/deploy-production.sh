@@ -221,6 +221,6 @@ gcloud compute ssh "$GCP_INSTANCE" \
   --command="$REMOTE_COMMAND"
 
 echo "Checking production health..."
-curl -fsS https://krwontology.com/api/healthz/deep >/dev/null
-curl -fsS https://www.krwontology.com/api/healthz/deep >/dev/null
+curl -fsS https://krwontology.com/api/healthz >/dev/null
+curl -fsS https://www.krwontology.com/api/healthz >/dev/null
 echo "Production health checks passed."

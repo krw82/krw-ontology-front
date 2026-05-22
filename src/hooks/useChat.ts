@@ -34,6 +34,7 @@ export interface ToolCallState {
   tool_call_id: string;
   tool_name: MCPToolName;
   status: "running" | "completed" | "failed";
+  arguments?: Record<string, unknown>;
   duration_ms?: number;
   result_summary?: string | null;
   started_at?: number;
@@ -53,6 +54,7 @@ export interface ChatState {
   structuringMessageId: string | null;
   runDurationsByMessageId: Record<string, number>;
   runId: string | null;
+  runStartedAt: string | null;
   usage: {
     input_tokens: number;
     output_tokens: number;
@@ -77,6 +79,7 @@ function createInitialChatState(): ChatState {
     structuringMessageId: null,
     runDurationsByMessageId: {},
     runId: null,
+    runStartedAt: null,
     usage: null,
     release: null,
     quota: null,
@@ -93,6 +96,14 @@ function mergeRichAnswers(
     byId.set(artifact.id, artifact);
   }
   return Array.from(byId.values());
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value),
+  );
 }
 
 function activityForTool(toolName: MCPToolName): ResearchActivityUpdate {
@@ -127,6 +138,10 @@ function activityForTool(toolName: MCPToolName): ResearchActivityUpdate {
   };
 }
 
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export function useChat({
   sessionId,
   scopeType = "global",
@@ -141,11 +156,13 @@ export function useChat({
   const finalizedRef = useRef(false);
   const streamingContentRef = useRef("");
   const lastEventIdRef = useRef<string>("");
-  const retryCountRef = useRef(0);
   const activeRunIdRef = useRef<string | null>(null);
   const activeRequestIdRef = useRef<string | null>(null);
   const activeAssistantMessageIdRef = useRef<string | null>(null);
   const activeSessionIdRef = useRef<string | null>(sessionId || null);
+  const sendInFlightRef = useRef(false);
+  const sessionSyncRequestedRef = useRef(false);
+  const streamGenerationRef = useRef(0);
 
   useEffect(() => {
     statusRef.current = state.status;
@@ -153,10 +170,24 @@ export function useChat({
 
   useEffect(() => {
     if (sessionId) {
+      const previousSessionId = activeSessionIdRef.current;
+      if (previousSessionId && previousSessionId !== sessionId) {
+        abortRef.current?.abort();
+        streamGenerationRef.current += 1;
+        activeRunIdRef.current = null;
+        activeRequestIdRef.current = null;
+        activeAssistantMessageIdRef.current = null;
+        finalizedRef.current = true;
+        streamingContentRef.current = "";
+        lastEventIdRef.current = "";
+        sessionSyncRequestedRef.current = false;
+      }
       activeSessionIdRef.current = sessionId;
       return;
     }
 
+    abortRef.current?.abort();
+    streamGenerationRef.current += 1;
     activeSessionIdRef.current = null;
     activeRunIdRef.current = null;
     activeRequestIdRef.current = null;
@@ -164,7 +195,7 @@ export function useChat({
     finalizedRef.current = false;
     streamingContentRef.current = "";
     lastEventIdRef.current = "";
-    retryCountRef.current = 0;
+    sessionSyncRequestedRef.current = false;
     setState(createInitialChatState());
   }, [sessionId]);
 
@@ -175,8 +206,14 @@ export function useChat({
           run_id: string;
           message_id: string;
           session_id?: string;
+          request_id?: string;
+          started_at?: string;
         };
-        if (!sessionId && d.session_id) {
+        if (
+          !sessionId &&
+          d.session_id &&
+          activeSessionIdRef.current !== d.session_id
+        ) {
           activeSessionIdRef.current = d.session_id;
           onSessionCreated?.(d.session_id);
         }
@@ -189,6 +226,7 @@ export function useChat({
             session_id: d.session_id ?? message.session_id,
           })),
           runId: d.run_id,
+          runStartedAt: d.started_at ?? new Date().toISOString(),
           activity: {
             stage: "preparing",
             label: "분석 준비 중",
@@ -227,7 +265,8 @@ export function useChat({
               tool_call_id: d.tool_call_id,
               tool_name: d.tool_name,
               status: "running",
-              started_at: Date.now(),
+              arguments: d.arguments,
+              started_at: d.started_at ? Date.parse(d.started_at) : Date.now(),
             },
           ],
         }));
@@ -277,28 +316,45 @@ export function useChat({
         };
         finalizedRef.current = true;
         activeRunIdRef.current = d.run_id;
+        activeRequestIdRef.current = null;
+        sessionSyncRequestedRef.current = false;
         setState((prev) => {
           const finalContent = (d.content ?? prev.streamingContent).trim();
-          const newMessages = finalContent
-            ? [
-                ...prev.messages,
-                {
-                  id: d.message_id || createClientId(),
-                  session_id:
-                    activeSessionIdRef.current || sessionId,
-                  role: "assistant" as const,
-                  content: finalContent,
-                  status: "completed" as const,
-                  created_at: new Date().toISOString(),
-                },
-              ]
-            : prev.messages;
+          let newMessages = prev.messages;
+          if (finalContent) {
+            const messageId = d.message_id || createClientId();
+            const existingIndex = prev.messages.findIndex(
+              (message) => message.id === messageId,
+            );
+            const completedMessage: Message = {
+              id: messageId,
+              session_id: activeSessionIdRef.current || sessionId,
+              role: "assistant",
+              content: finalContent,
+              status: "completed",
+              created_at:
+                existingIndex >= 0
+                  ? prev.messages[existingIndex].created_at
+                  : new Date().toISOString(),
+              updated_at:
+                existingIndex >= 0
+                  ? prev.messages[existingIndex].updated_at
+                  : undefined,
+            };
+            newMessages =
+              existingIndex >= 0
+                ? prev.messages.map((message, index) =>
+                    index === existingIndex ? completedMessage : message,
+                  )
+                : [...prev.messages, completedMessage];
+          }
           return {
             ...prev,
             messages: newMessages,
             streamingContent: "",
             activity: null,
             runId: d.run_id,
+            runStartedAt: null,
             runDurationsByMessageId: d.message_id
               ? {
                   ...prev.runDurationsByMessageId,
@@ -317,6 +373,60 @@ export function useChat({
         });
         break;
       }
+      case "state_sync": {
+        const d = data as {
+          session_id: string;
+          run_id?: string | null;
+          status: RunStatus | "idle";
+          reason?: string;
+        };
+        if (
+          d.session_id &&
+          activeSessionIdRef.current &&
+          activeSessionIdRef.current !== d.session_id
+        ) {
+          break;
+        }
+
+        sessionSyncRequestedRef.current = true;
+        if (d.run_id) activeRunIdRef.current = d.run_id;
+
+        if (d.status !== "running" && d.status !== "pending") {
+          finalizedRef.current = true;
+          activeRunIdRef.current = null;
+          activeAssistantMessageIdRef.current = null;
+          activeRequestIdRef.current = null;
+          streamingContentRef.current = "";
+        }
+
+        setState((prev) => ({
+          ...prev,
+          status:
+            d.status === "pending"
+              ? "running"
+              : d.status === "idle"
+                ? "idle"
+                : d.status,
+          activity:
+            d.status === "running" || d.status === "pending"
+              ? {
+                  stage: "preparing",
+                  label: "분석 상태 복원 중",
+                }
+              : null,
+          streamingContent:
+            d.status === "running" || d.status === "pending"
+              ? prev.streamingContent
+              : "",
+          runId: d.run_id ?? null,
+          runStartedAt:
+            d.status === "running" || d.status === "pending"
+              ? prev.runStartedAt
+              : null,
+          error: d.status === "failed" ? prev.error : null,
+        }));
+        break;
+      }
       case "error": {
         const d = data as {
           run_id: string;
@@ -324,6 +434,7 @@ export function useChat({
           error_message: string;
         };
         finalizedRef.current = true;
+        activeRunIdRef.current = d.run_id || null;
         setState((prev) => {
           const trimmed = prev.streamingContent.trim();
           const partialMessage: Message | null = trimmed
@@ -342,6 +453,7 @@ export function useChat({
             error: d.error_message,
             streamingContent: "",
             activity: null,
+            runStartedAt: null,
             messages: partialMessage
               ? [...prev.messages, partialMessage]
               : prev.messages,
@@ -351,18 +463,123 @@ export function useChat({
       }
       case "cancelled": {
         finalizedRef.current = true;
+        activeRunIdRef.current = null;
+        activeRequestIdRef.current = null;
+        activeAssistantMessageIdRef.current = null;
+        streamingContentRef.current = "";
         setState((prev) => ({
           ...prev,
           status: "cancelled",
           activity: null,
+          runStartedAt: null,
+          streamingContent: "",
         }));
         break;
       }
     }
   }, [onSessionCreated, sessionId]);
 
+  const syncSessionFromServer = useCallback(async (targetSessionId: string) => {
+    try {
+      const res = await fetch(`/api/chat/${encodeURIComponent(targetSessionId)}`);
+      if (!res.ok) return false;
+      const data: GetChatSessionResponse = await res.json();
+      if (activeSessionIdRef.current !== targetSessionId) return false;
+
+      const loaded = deriveLoadedChatState(data.messages || [], data.runs || []);
+      finalizedRef.current = loaded.status !== "running";
+      activeRunIdRef.current = loaded.activeRunId;
+      activeAssistantMessageIdRef.current = loaded.activeAssistantMessageId;
+      streamingContentRef.current = loaded.streamingContent;
+      sessionSyncRequestedRef.current = false;
+
+      setState((prev) => ({
+        ...prev,
+        session: data.session,
+        messages: loaded.messages,
+        status: loaded.status,
+        error: null,
+        activity:
+          loaded.status === "running"
+            ? {
+                stage: "preparing",
+                label: "분석 상태 복원 중",
+              }
+            : null,
+        streamingContent: loaded.streamingContent,
+        runId: loaded.activeRunId,
+        runStartedAt: loaded.activeRunStartedAt,
+        toolCalls: (data.tool_calls ?? []).map((toolCall) => ({
+          tool_call_id: toolCall.tool_use_id ?? toolCall.id,
+          tool_name: toolCall.tool_name,
+          status: toolCall.error_message
+            ? "failed"
+            : toolCall.finished_at
+              ? "completed"
+              : "running",
+          arguments: isPlainObject(toolCall.arguments_json)
+            ? toolCall.arguments_json
+            : undefined,
+          result_summary: toolCall.result_summary,
+          started_at: toolCall.started_at
+            ? new Date(toolCall.started_at).getTime()
+            : undefined,
+          finished_at: toolCall.finished_at
+            ? new Date(toolCall.finished_at).getTime()
+            : undefined,
+        })),
+        citations: (data.citations ?? []) as ChatCitation[],
+        richAnswers: data.rich_answers ?? data.research_artifacts ?? [],
+        runDurationsByMessageId: Object.fromEntries(
+          (data.runs ?? [])
+            .filter(
+              (run) =>
+                run.assistant_message_id &&
+                typeof run.latency_ms === "number" &&
+                run.latency_ms > 0,
+            )
+            .map((run) => [
+              run.assistant_message_id as string,
+              run.latency_ms as number,
+            ]),
+        ),
+        ...(data.runs && data.runs.length > 0
+          ? {
+              usage:
+                data.runs[data.runs.length - 1].input_tokens != null
+                  ? {
+                      input_tokens:
+                        data.runs[data.runs.length - 1].input_tokens ?? 0,
+                      output_tokens:
+                        data.runs[data.runs.length - 1].output_tokens ?? 0,
+                      estimated_cost_usd:
+                        data.runs[data.runs.length - 1].estimated_cost_usd ?? 0,
+                      latency_ms:
+                        data.runs[data.runs.length - 1].latency_ms ?? 0,
+                    }
+                  : prev.usage,
+            }
+          : {}),
+      }));
+
+      return true;
+    } catch {
+      if (activeSessionIdRef.current !== targetSessionId) return false;
+      setState((prev) => ({ ...prev, error: "채팅을 불러오지 못했습니다." }));
+      return false;
+    }
+  }, []);
+
   const readStream = useCallback(
-    async (response: Response): Promise<boolean> => {
+    async (
+      response: Response,
+      context?: {
+        sessionId?: string | null;
+        runId?: string | null;
+        requestId?: string | null;
+        generation?: number;
+      },
+    ): Promise<boolean> => {
       const reader = response.body?.getReader();
       if (!reader) throw new Error("응답 스트림을 열지 못했습니다.");
 
@@ -370,6 +587,31 @@ export function useChat({
       let buffer = "";
 
       while (true) {
+        if (
+          context?.generation != null &&
+          streamGenerationRef.current !== context.generation
+        ) {
+          await reader.cancel().catch(() => undefined);
+          return false;
+        }
+
+        if (
+          context?.requestId &&
+          activeRequestIdRef.current &&
+          activeRequestIdRef.current !== context.requestId
+        ) {
+          await reader.cancel().catch(() => undefined);
+          return false;
+        }
+
+        if (
+          context?.sessionId &&
+          activeSessionIdRef.current !== context.sessionId
+        ) {
+          await reader.cancel().catch(() => undefined);
+          return false;
+        }
+
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -403,6 +645,15 @@ export function useChat({
           if (eventType && dataLines.length > 0) {
             try {
               const data = JSON.parse(dataLines.join("\n"));
+              if (
+                eventType !== "state_sync" &&
+                context?.runId &&
+                isPlainObject(data) &&
+                typeof data.run_id === "string" &&
+                data.run_id !== context.runId
+              ) {
+                continue;
+              }
               handleSSEEvent(eventType, data);
             } catch {
               // Ignore parse errors for incomplete data
@@ -411,14 +662,77 @@ export function useChat({
         }
       }
 
+      if (sessionSyncRequestedRef.current && context?.sessionId) {
+        await syncSessionFromServer(context.sessionId);
+      }
+
       return finalizedRef.current;
     },
-    [handleSSEEvent],
+    [handleSSEEvent, syncSessionFromServer],
+  );
+
+  const reconnectUntilFinalized = useCallback(
+    async (
+      targetSessionId: string,
+      targetRunId: string,
+      signal: AbortSignal,
+      generation: number,
+    ): Promise<boolean> => {
+      let attempts = 0;
+
+      while (!finalizedRef.current && !signal.aborted) {
+        if (streamGenerationRef.current !== generation) {
+          return false;
+        }
+
+        if (
+          activeSessionIdRef.current !== targetSessionId
+        ) {
+          return false;
+        }
+
+        try {
+          const reconnectParams = new URLSearchParams({
+            session_id: targetSessionId,
+            run_id: targetRunId,
+            last_event_id: lastEventIdRef.current,
+            content_length: String(streamingContentRef.current.length),
+          });
+          const response = await fetch(
+            `/api/chat/run/reconnect?${reconnectParams}`,
+            { signal },
+          );
+
+          if (response.ok) {
+            const didFinalize = await readStream(response, {
+              sessionId: targetSessionId,
+              runId: targetRunId,
+              generation,
+            });
+            if (didFinalize) return true;
+          }
+        } catch (err) {
+          if ((err as Error).name === "AbortError") return false;
+        }
+
+        attempts += 1;
+        await delay(Math.min(5000, 1000 + attempts * 500));
+      }
+
+      return finalizedRef.current;
+    },
+    [readStream],
   );
 
   const sendMessage = useCallback(
     async (content: string) => {
-      if (!content.trim() || statusRef.current === "running") return;
+      if (
+        !content.trim() ||
+        statusRef.current === "running" ||
+        sendInFlightRef.current
+      ) {
+        return;
+      }
       const contentLimit = getChatContentLimit(content);
       if (content.length > contentLimit) {
         setState((prev) => ({
@@ -429,12 +743,18 @@ export function useChat({
       }
 
       const requestId = createClientId();
+      sendInFlightRef.current = true;
+      statusRef.current = "running";
       activeRequestIdRef.current = requestId;
+      streamGenerationRef.current += 1;
+      const generation = streamGenerationRef.current;
 
       finalizedRef.current = false;
       streamingContentRef.current = "";
       lastEventIdRef.current = "";
-      retryCountRef.current = 0;
+      activeRunIdRef.current = null;
+      activeAssistantMessageIdRef.current = null;
+      sessionSyncRequestedRef.current = false;
 
       const userMessage: Message = {
         id: createClientId(),
@@ -459,6 +779,8 @@ export function useChat({
         citations: [],
         richAnswers: [],
         structuringMessageId: null,
+        runId: null,
+        runStartedAt: null,
         usage: null,
         release: null,
         quota: null,
@@ -466,9 +788,6 @@ export function useChat({
 
       const abortController = new AbortController();
       abortRef.current = abortController;
-
-      const MAX_RETRIES = 3;
-      const RETRY_BASE_DELAY_MS = 1000;
 
       try {
         const response = await fetch("/api/chat/run", {
@@ -495,114 +814,70 @@ export function useChat({
           );
         }
 
-        const wasFinalized = await readStream(response);
-
-        // If stream ended without a "done"/"error"/"cancelled" event, attempt reconnect
-        if (!wasFinalized && !abortController.signal.aborted) {
-          let reconnected = false;
-
-          while (retryCountRef.current < MAX_RETRIES && !finalizedRef.current) {
-            retryCountRef.current++;
-            const delay = RETRY_BASE_DELAY_MS * retryCountRef.current;
-            await new Promise((r) => setTimeout(r, delay));
-
-            if (finalizedRef.current || abortController.signal.aborted) break;
-            if (!activeRunIdRef.current) break;
-
-            try {
-              const reconnectParams = new URLSearchParams({
-                session_id: activeSessionIdRef.current || sessionId,
-                run_id: activeRunIdRef.current ?? "",
-                last_event_id: lastEventIdRef.current,
-                content_length: String(streamingContentRef.current.length),
-              });
-              const retryResp = await fetch(
-                `/api/chat/run/reconnect?${reconnectParams}`,
-                { signal: abortController.signal },
-              );
-
-              if (!retryResp.ok) continue;
-
-              const retryFinalized = await readStream(retryResp);
-              if (retryFinalized) {
-                reconnected = true;
-                break;
-              }
-            } catch {
-              // Retry failed, continue to next attempt
-            }
-          }
-
-          if (!reconnected && !finalizedRef.current) {
-            // Final fallback: save partial content as message
-            setState((prev) => {
-              if (prev.status !== "running") return prev;
-              const trimmed = prev.streamingContent.trim();
-              const partialMessage: Message | null = trimmed
-                ? {
-                    id: createClientId(),
-                    session_id: activeSessionIdRef.current || sessionId,
-                    role: "assistant",
-                    content: trimmed,
-                    status: "completed",
-                    created_at: new Date().toISOString(),
-                  }
-                : null;
-              return {
-                ...prev,
-                messages: partialMessage
-                  ? [...prev.messages, partialMessage]
-                  : prev.messages,
-                streamingContent: "",
-                activity: null,
-                status: "completed",
-              };
-            });
-          }
+        const responseSessionId = response.headers.get("x-chat-session-id");
+        if (!sessionId && responseSessionId) {
+          activeSessionIdRef.current = responseSessionId;
+          onSessionCreated?.(responseSessionId);
+          setState((prev) => ({
+            ...prev,
+            messages: prev.messages.map((message) => ({
+              ...message,
+              session_id:
+                message.session_id === "pending"
+                  ? responseSessionId
+                  : message.session_id,
+            })),
+          }));
         }
 
-        // Finalization fallback: only if "done" was never received and no partial saved
-        if (!finalizedRef.current) {
-          setState((prev) => {
-            if (prev.status === "failed") return prev;
-            if (prev.status !== "running") return prev;
-            const c = prev.streamingContent.trim();
-            if (!c) {
+        const wasFinalized = await readStream(response, {
+          sessionId: responseSessionId || sessionId || null,
+          requestId,
+          generation,
+        });
+
+        // If the transport ends early, keep reconnecting until the server sends
+        // an explicit terminal event. A closed SSE connection is not completion.
+        if (!wasFinalized && !abortController.signal.aborted) {
+          const runId = activeRunIdRef.current;
+          const targetSessionId = activeSessionIdRef.current || sessionId;
+
+          if (runId && targetSessionId) {
+            setState((prev) => {
+              if (prev.status !== "running") return prev;
               return {
                 ...prev,
-                streamingContent: "",
-                activity: null,
-                status: "completed",
-              };
-            }
-            return {
-              ...prev,
-              messages: [
-                ...prev.messages,
-                {
-                  id: createClientId(),
-                  session_id: activeSessionIdRef.current || sessionId,
-                  role: "assistant",
-                  content: c,
-                  status: "completed",
-                  created_at: new Date().toISOString(),
+                activity: {
+                  stage: "preparing",
+                  label: "분석 상태 복원 중",
                 },
-              ],
-              streamingContent: "",
-              activity: null,
-              status: "completed",
-            };
-          });
+              };
+            });
+            await reconnectUntilFinalized(
+              targetSessionId,
+              runId,
+              abortController.signal,
+              generation,
+            );
+          } else if (!finalizedRef.current) {
+            throw new Error("실행 정보를 확인하지 못했습니다. 다시 시도해주세요.");
+          }
         }
       } catch (err) {
         if ((err as Error).name === "AbortError") {
-          setState((prev) => ({ ...prev, status: "cancelled", activity: null }));
+          setState((prev) => ({
+            ...prev,
+            status: "cancelled",
+            activity: null,
+            runStartedAt: null,
+          }));
         } else {
           setState((prev) => ({
             ...prev,
             status: "failed",
             error: (err as Error).message,
             activity: null,
+            runStartedAt: null,
           }));
         }
       } finally {
@@ -610,11 +885,14 @@ export function useChat({
         if (activeRequestIdRef.current === requestId) {
           activeRequestIdRef.current = null;
         }
+        sendInFlightRef.current = false;
       }
     },
     [
       defaultDocumentTypes,
       defaultTickers,
+      onSessionCreated,
+      reconnectUntilFinalized,
       readStream,
       scopeType,
       sessionId,
@@ -622,14 +900,31 @@ export function useChat({
   );
 
   const cancelRun = useCallback(async () => {
+    const runId = activeRunIdRef.current;
+    const requestId = activeRequestIdRef.current;
+    const targetSessionId = activeSessionIdRef.current || sessionId;
+
     if (abortRef.current) {
       abortRef.current.abort();
     }
-    try {
-      const runId = activeRunIdRef.current;
-      const requestId = activeRequestIdRef.current;
-      const targetSessionId = activeSessionIdRef.current || sessionId;
 
+    streamGenerationRef.current += 1;
+    finalizedRef.current = true;
+    activeRunIdRef.current = null;
+    activeRequestIdRef.current = null;
+    activeAssistantMessageIdRef.current = null;
+    streamingContentRef.current = "";
+    sessionSyncRequestedRef.current = false;
+    setState((prev) => ({
+      ...prev,
+      status: "cancelled",
+      activity: null,
+      streamingContent: "",
+      runId: null,
+      runStartedAt: null,
+    }));
+
+    try {
       if (runId || requestId) {
         await fetch("/api/chat/run/cancel", {
           method: "POST",
@@ -686,63 +981,8 @@ export function useChat({
 
   const loadSession = useCallback(async () => {
     if (!sessionId) return;
-    try {
-      const res = await fetch(`/api/chat/${sessionId}`);
-      if (!res.ok) return;
-      const data: GetChatSessionResponse = await res.json();
-      const loaded = deriveLoadedChatState(data.messages || [], data.runs || []);
-      finalizedRef.current = loaded.status !== "running";
-      activeRunIdRef.current = loaded.activeRunId;
-      activeAssistantMessageIdRef.current = loaded.activeAssistantMessageId;
-      streamingContentRef.current = loaded.streamingContent;
-      setState((prev) => ({
-        ...prev,
-        session: data.session,
-        messages: loaded.messages,
-        status: loaded.status,
-        activity:
-          loaded.status === "running"
-            ? {
-                stage: "preparing",
-                label: "분석 상태 복원 중",
-              }
-            : null,
-        streamingContent: loaded.streamingContent,
-        runId: loaded.activeRunId,
-        citations: (data.citations ?? []) as ChatCitation[],
-        richAnswers: data.rich_answers ?? data.research_artifacts ?? [],
-        runDurationsByMessageId: Object.fromEntries(
-          (data.runs ?? [])
-            .filter(
-              (run) =>
-                run.assistant_message_id &&
-                typeof run.latency_ms === "number" &&
-                run.latency_ms > 0,
-            )
-            .map((run) => [run.assistant_message_id as string, run.latency_ms as number]),
-        ),
-        ...(data.runs && data.runs.length > 0
-          ? {
-              usage:
-                data.runs[data.runs.length - 1].input_tokens != null
-                  ? {
-                      input_tokens:
-                        data.runs[data.runs.length - 1].input_tokens ?? 0,
-                      output_tokens:
-                        data.runs[data.runs.length - 1].output_tokens ?? 0,
-                      estimated_cost_usd:
-                        data.runs[data.runs.length - 1].estimated_cost_usd ?? 0,
-                      latency_ms:
-                        data.runs[data.runs.length - 1].latency_ms ?? 0,
-                    }
-                  : prev.usage,
-            }
-          : {}),
-      }));
-    } catch {
-      setState((prev) => ({ ...prev, error: "채팅을 불러오지 못했습니다." }));
-    }
-  }, [sessionId]);
+    await syncSessionFromServer(sessionId);
+  }, [sessionId, syncSessionFromServer]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -753,22 +993,17 @@ export function useChat({
     abortRef.current = abortController;
     finalizedRef.current = false;
     activeRunIdRef.current = state.runId;
+    streamGenerationRef.current += 1;
+    const generation = streamGenerationRef.current;
 
     const reconnect = async () => {
       try {
-        const reconnectParams = new URLSearchParams({
-          session_id: sessionId,
-          run_id: state.runId ?? "",
-          last_event_id: lastEventIdRef.current,
-          content_length: String(streamingContentRef.current.length),
-        });
-        const response = await fetch(
-          `/api/chat/run/reconnect?${reconnectParams}`,
-          { signal: abortController.signal },
+        await reconnectUntilFinalized(
+          sessionId,
+          state.runId ?? "",
+          abortController.signal,
+          generation,
         );
-        if (response.ok) {
-          await readStream(response);
-        }
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
           setState((prev) => ({
@@ -791,7 +1026,7 @@ export function useChat({
         abortRef.current = null;
       }
     };
-  }, [readStream, sessionId, state.runId, state.status]);
+  }, [reconnectUntilFinalized, sessionId, state.runId, state.status]);
 
   return useMemo(
     () => ({

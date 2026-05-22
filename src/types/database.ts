@@ -12,9 +12,11 @@ export interface ChatSessionRow extends Record<string, unknown> {
   user_id: string;
   title: string;
   claude_session_id: string | null;
+  client_request_id: string | null;
   scope_type: "global" | "company";
   default_tickers: string[] | null;
   default_document_types: string[] | null;
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +27,7 @@ export interface MessageRow extends Record<string, unknown> {
   role: "user" | "assistant" | "system";
   content: string;
   status: "pending" | "streaming" | "completed" | "failed";
+  request_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -130,14 +133,33 @@ export interface ResearchArtifactRow extends Record<string, unknown> {
   created_at: string;
 }
 
+export interface MessageShareRow extends Record<string, unknown> {
+  id: string;
+  token: string;
+  owner_user_id: string;
+  source_session_id: string;
+  source_message_id: string;
+  title: string;
+  answer_content: string;
+  answer_created_at: string;
+  tickers: string[] | null;
+  created_at: string;
+  revoked_at: string | null;
+}
+
 // Supabase Database type for createClient generic
 export interface Database {
   public: {
     Tables: {
       chat_sessions: {
         Row: ChatSessionRow;
-        Insert: Omit<ChatSessionRow, "id" | "created_at" | "updated_at"> & {
+        Insert: Omit<
+          ChatSessionRow,
+          "id" | "created_at" | "updated_at" | "client_request_id" | "deleted_at"
+        > & {
           id?: string;
+          client_request_id?: string | null;
+          deleted_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -152,8 +174,12 @@ export interface Database {
       };
       messages: {
         Row: MessageRow;
-        Insert: Omit<MessageRow, "id" | "created_at" | "updated_at"> & {
+        Insert: Omit<
+          MessageRow,
+          "id" | "created_at" | "updated_at" | "request_id"
+        > & {
           id?: string;
+          request_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -263,6 +289,22 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<Omit<ResearchArtifactRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      message_shares: {
+        Row: MessageShareRow;
+        Insert: Omit<MessageShareRow, "id" | "created_at" | "revoked_at"> & {
+          id?: string;
+          created_at?: string;
+          revoked_at?: string | null;
+        };
+        Update: Partial<Omit<MessageShareRow, "id" | "created_at">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];

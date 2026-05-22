@@ -5,6 +5,12 @@ import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { createClient } from "@/lib/supabase/server";
 import type { CreateSessionRequest } from "@/types/api-contracts";
 import type { ChatSessionRow, MessageRow, AgentRunRow } from "@/types/database";
+import {
+  isOptionalStringArray,
+  isPlainObject,
+  normalizeStringList,
+  parsePositiveIntParam,
+} from "@/lib/api/validation";
 
 export async function GET(request: NextRequest) {
   let user;
@@ -17,22 +23,24 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient();
   const url = new URL(request.url);
-  const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
-  const limit = Math.min(
-    50,
-    Math.max(1, parseInt(url.searchParams.get("limit") || "20", 10))
-  );
+  const page = parsePositiveIntParam(url.searchParams.get("page"), 1);
+  const limit = parsePositiveIntParam(url.searchParams.get("limit"), 20, {
+    max: 50,
+  });
   const offset = (page - 1) * limit;
 
   const {
     data: sessions,
     error,
+    count,
   } = await supabase
     .from("chat_sessions")
     .select(
-      "id, title, scope_type, default_tickers, created_at, updated_at"
+      "id, title, scope_type, default_tickers, created_at, updated_at",
+      { count: "exact" },
     )
     .eq("user_id", user.id)
+    .is("deleted_at", null)
     .order("updated_at", { ascending: false })
     .range(offset, offset + limit - 1)
     .returns<ChatSessionRow[]>();
@@ -106,7 +114,7 @@ export async function GET(request: NextRequest) {
 
   return Response.json({
     sessions: summaries,
-    total: summaries.length,
+    total: count ?? summaries.length,
     page,
     limit,
   });
@@ -121,9 +129,9 @@ export async function POST(request: NextRequest) {
   }
   if (!user) return handleAuthError(new Error("No user"));
 
-  let body: CreateSessionRequest;
+  let parsedBody: unknown;
   try {
-    body = await request.json();
+    parsedBody = await request.json();
   } catch {
     return Response.json(
       { error: { code: "validation_error" as const, message: "Invalid JSON body" } },
@@ -131,9 +139,65 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (!isPlainObject(parsedBody)) {
+    return Response.json(
+      { error: { code: "validation_error" as const, message: "Request body must be an object" } },
+      { status: 400 },
+    );
+  }
+
+  const {
+    title: rawTitle,
+    scope_type,
+    default_tickers,
+    default_document_types,
+  } = parsedBody;
+
+  if (scope_type !== "global" && scope_type !== "company") {
+    return Response.json(
+      { error: { code: "validation_error" as const, message: "scope_type must be global or company" } },
+      { status: 400 },
+    );
+  }
+
+  if (rawTitle !== undefined && typeof rawTitle !== "string") {
+    return Response.json(
+      { error: { code: "validation_error" as const, message: "title must be a string" } },
+      { status: 400 },
+    );
+  }
+
+  if (!isOptionalStringArray(default_tickers)) {
+    return Response.json(
+      { error: { code: "validation_error" as const, message: "default_tickers must be an array of strings" } },
+      { status: 400 },
+    );
+  }
+
+  if (!isOptionalStringArray(default_document_types)) {
+    return Response.json(
+      { error: { code: "validation_error" as const, message: "default_document_types must be an array of strings" } },
+      { status: 400 },
+    );
+  }
+
+  const normalizedTickers = Array.from(
+    new Set(
+      normalizeStringList(default_tickers).map((ticker) => ticker.toUpperCase()),
+    ),
+  );
+  const normalizedDocumentTypes = normalizeStringList(default_document_types);
+  const normalizedTitle = rawTitle?.trim();
+  const body: CreateSessionRequest = {
+    scope_type,
+    ...(normalizedTitle ? { title: normalizedTitle } : {}),
+    default_tickers: normalizedTickers,
+    default_document_types: normalizedDocumentTypes,
+  };
+
   if (
     body.scope_type === "company" &&
-    (!body.default_tickers || body.default_tickers.length === 0)
+    normalizedTickers.length === 0
   ) {
     return Response.json(
       {
@@ -146,10 +210,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (body.scope_type === "company" && body.default_tickers) {
-    const normalizedTickers = body.default_tickers.map((ticker) =>
-      ticker.trim().toUpperCase(),
-    );
+  if (body.scope_type === "company") {
     const indexedCompanies = await Promise.all(
       normalizedTickers.map((ticker) => getIndexedCompany(ticker)),
     );
@@ -172,13 +233,13 @@ export async function POST(request: NextRequest) {
     body.default_tickers = normalizedTickers;
   }
 
-  const title =
+  const sessionTitle =
     body.title ||
     (body.scope_type === "company" && body.default_tickers
       ? `리서치: ${body.default_tickers.join(", ")}`
       : "새 채팅");
 
-  if (title.length > 200) {
+  if (sessionTitle.length > 200) {
     return Response.json(
       {
         error: {
@@ -195,7 +256,7 @@ export async function POST(request: NextRequest) {
     .from("chat_sessions")
     .insert({
       user_id: user.id,
-      title,
+      title: sessionTitle,
       scope_type: body.scope_type,
       default_tickers: body.default_tickers ?? [],
       default_document_types: body.default_document_types ?? [],

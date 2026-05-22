@@ -24,11 +24,23 @@ export async function checkQuotaStep(
   const quota = await checkQuotaImpl(userId);
 
   if (!quota.allowed) {
+    if (quota.reason === "internal_error") {
+      return {
+        ok: false,
+        response: errorResponse(
+          500,
+          "internal_error",
+          "사용량 정보를 확인하지 못했습니다.",
+          requestId,
+        ),
+      };
+    }
+
     return {
       ok: false,
       response: errorResponse(
         429,
-        quota.reason!,
+        quota.reason ?? "quota_exceeded",
         quota.reason === "quota_exceeded"
           ? "Daily question limit exceeded"
           : "Daily cost cap exceeded",

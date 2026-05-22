@@ -3,6 +3,7 @@ import { getAuthUser, handleAuthError, forbiddenError } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { buildResearchArtifacts } from "@/lib/artifacts/build-research-artifact";
 import { toResearchArtifact } from "@/lib/artifacts/db";
+import { isUuid } from "@/lib/api/validation";
 import type { AccumulatedRun } from "@/lib/agent/stream-handler";
 import type {
   AgentRunRow,
@@ -40,6 +41,10 @@ export async function POST(
 ) {
   const { messageId } = await params;
 
+  if (!isUuid(messageId)) {
+    return validationError("메시지 ID 형식이 올바르지 않습니다.");
+  }
+
   let user;
   try {
     user = await getAuthUser();
@@ -68,6 +73,7 @@ export async function POST(
     .from("chat_sessions")
     .select("*")
     .eq("id", message.session_id)
+    .is("deleted_at", null)
     .single<ChatSessionRow>();
 
   if (sessionError || !session) {

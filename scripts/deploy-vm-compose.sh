@@ -119,4 +119,42 @@ docker compose \
   --project-name "$COMPOSE_PROJECT_NAME" \
   --env-file "$ENV_FILE" \
   -f "$BUILD_CONTEXT/docker-compose.yml" \
-  up -d --build "$@"
+  up -d --build --remove-orphans "$@"
+
+docker compose \
+  --project-name "$COMPOSE_PROJECT_NAME" \
+  --env-file "$ENV_FILE" \
+  -f "$BUILD_CONTEXT/docker-compose.yml" \
+  exec -T web /usr/local/bin/claude-prod --version
+
+docker compose \
+  --project-name "$COMPOSE_PROJECT_NAME" \
+  --env-file "$ENV_FILE" \
+  -f "$BUILD_CONTEXT/docker-compose.yml" \
+  exec -T web python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+plugin_path = Path(os.environ["KRW_ONTOLOGY_PLUGIN_PATH"])
+agent_cwd = Path(os.environ["CLAUDE_AGENT_CWD"])
+mcp_config_path = plugin_path / ".mcp.json"
+mcp_config = json.loads(mcp_config_path.read_text())
+server_config = mcp_config["mcpServers"]["krw-ontology"]
+command = Path(server_config["command"])
+root = Path(os.environ.get("KRW_ONTOLOGY_ROOT") or server_config["env"]["KRW_ONTOLOGY_ROOT"])
+index_path = root / "indexes" / "agent_index.sqlite"
+
+if not agent_cwd.is_absolute():
+    raise SystemExit(f"CLAUDE_AGENT_CWD must be absolute: {agent_cwd}")
+if not agent_cwd.exists() or not os.access(agent_cwd, os.W_OK | os.X_OK):
+    raise SystemExit(f"CLAUDE_AGENT_CWD is not writable: {agent_cwd}")
+if not command.exists() or not os.access(command, os.X_OK):
+    raise SystemExit(f"MCP stdio command is not executable: {command}")
+if not index_path.exists():
+    raise SystemExit(f"Ontology agent index not found: {index_path}")
+
+print(f"OK Claude agent cwd: {agent_cwd}")
+print(f"OK plugin MCP command: {command}")
+print(f"OK ontology index: {index_path}")
+PY

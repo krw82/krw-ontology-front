@@ -4,6 +4,7 @@ import { readdir, readFile } from "fs/promises";
 import path from "path";
 
 import { getKrwOntologyPluginPath } from "@/lib/agent/mcp-client";
+import { normalizeTicker } from "@/lib/ontology/ticker";
 
 type CompanyArtifactIndex = {
   ticker?: string;
@@ -42,10 +43,6 @@ export interface IndexedCompany {
   document_types: string[];
   periods: string[];
   generated_at: string | null;
-}
-
-function normalizeTicker(ticker: string): string {
-  return ticker.trim().toUpperCase();
 }
 
 async function readJsonFile<T>(filePath: string): Promise<T | null> {
@@ -262,6 +259,7 @@ export async function listIndexedCompanies(): Promise<IndexedCompany[]> {
   const tickers = entries
     .filter((entry) => entry.isDirectory())
     .map((entry) => normalizeTicker(entry.name))
+    .filter((ticker): ticker is string => Boolean(ticker))
     .sort();
   const companies = await Promise.all(
     tickers.map((ticker) => buildCompany(root, ticker)),

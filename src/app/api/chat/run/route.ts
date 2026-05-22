@@ -2,8 +2,8 @@ import { NextRequest } from "next/server";
 import { checkMcpHealth } from "@/lib/agent/mcp-client";
 import type { McpHealthResult } from "@/lib/agent/mcp-client";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
-import { createClient } from "@/lib/supabase/server";
-import type { ChatSessionRow } from "@/types/database";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import type { AgentRunRow, ChatSessionRow } from "@/types/database";
 import {
   validateRequest,
   resolveSession,
@@ -11,6 +11,7 @@ import {
   fetchHistory,
   executeRun,
 } from "@/lib/api/chat";
+import { streamPersistedRunResponse } from "@/lib/api/chat/run-agent";
 
 // --- MCP health cache ---
 
@@ -48,7 +49,40 @@ export async function POST(request: NextRequest) {
 
   const { content, request_id } = body;
 
-  // 2. Resolve session (lookup + ownership check)
+  // 2. Idempotency: a browser retry with the same request_id must not create
+  // another session/message/run. Reattach to the existing run instead.
+  const existingRun = await findExistingRunForRequest(request_id, userId);
+  if (existingRun) {
+    return withSessionHeader(streamPersistedRunResponse({
+      userId,
+      sessionId: existingRun.session_id,
+      runId: existingRun.id,
+      requestId: request_id,
+    }), existingRun.session_id);
+  }
+
+  // 3. Check daily quota before creating a new session/message.
+  const quotaResult = await checkQuotaStep(userId, request_id);
+  if (!quotaResult.ok) return quotaResult.response;
+  const quota = quotaResult.quota;
+
+  // 4. Check MCP health (cached for 30s) before creating a new session/message.
+  let mcpHealth: McpHealthResult;
+  try {
+    mcpHealth = await getCachedMcpHealth();
+  } catch {
+    return errorResponse(
+      503,
+      "mcp_unavailable",
+      "온톨로지 도구에 연결할 수 없습니다.",
+      request_id,
+    );
+  }
+  if (!mcpHealth.connected) {
+    return errorResponse(503, "mcp_unavailable", "온톨로지 도구에 연결할 수 없습니다.", request_id);
+  }
+
+  // 5. Resolve session (lookup + ownership check)
   const sessionIdResult = await getOrCreateSessionId(body, userId, request_id);
   if (!sessionIdResult.ok) return sessionIdResult.response;
 
@@ -60,23 +94,24 @@ export async function POST(request: NextRequest) {
   if (!sessionResult.ok) return sessionResult.response;
   const session = sessionResult.session;
 
-  // 3. Check daily quota
-  const quotaResult = await checkQuotaStep(userId, request_id);
-  if (!quotaResult.ok) return quotaResult.response;
-  const quota = quotaResult.quota;
-
-  // 4. Check MCP health (cached for 30s)
-  const mcpHealth = await getCachedMcpHealth();
-  if (!mcpHealth.connected) {
-    return errorResponse(503, "mcp_unavailable", "온톨로지 도구에 연결할 수 없습니다.", request_id);
-  }
-
-  // 5. Save user message & fetch history
+  // 6. Save user message idempotently & fetch history
   const historyResult = await fetchHistory(session.id, content, request_id);
   if (!historyResult.ok) return historyResult.response;
 
-  // 6. Acquire lease, run agent, stream results
-  return executeRun({
+  // 7. A duplicate can arrive while the first request is between session/message
+  // creation and run acquisition. Re-check before starting the agent.
+  const existingRunAfterMessage = await findExistingRunForRequest(request_id, userId);
+  if (existingRunAfterMessage) {
+    return withSessionHeader(streamPersistedRunResponse({
+      userId,
+      sessionId: existingRunAfterMessage.session_id,
+      runId: existingRunAfterMessage.id,
+      requestId: request_id,
+    }), existingRunAfterMessage.session_id);
+  }
+
+  // 8. Acquire lease, run agent, stream results
+  return withSessionHeader(executeRun({
     request,
     session,
     content,
@@ -84,7 +119,35 @@ export async function POST(request: NextRequest) {
     history: historyResult.result,
     quota,
     mcpHealth,
-  });
+  }), session.id);
+}
+
+function withSessionHeader(response: Response, sessionId: string): Response {
+  response.headers.set("X-Chat-Session-Id", sessionId);
+  return response;
+}
+
+async function findExistingRunForRequest(
+  requestId: string,
+  userId: string,
+): Promise<Pick<AgentRunRow, "id" | "session_id"> | null> {
+  const admin = getSupabaseAdmin();
+  const { data: run } = await admin
+    .from("agent_runs")
+    .select("id, session_id")
+    .eq("request_id", requestId)
+    .maybeSingle<Pick<AgentRunRow, "id" | "session_id">>();
+
+  if (!run) return null;
+
+  const { data: session } = await admin
+    .from("chat_sessions")
+    .select("id, user_id")
+    .eq("id", run.session_id)
+    .is("deleted_at", null)
+    .maybeSingle<Pick<ChatSessionRow, "id" | "user_id">>();
+
+  return session?.user_id === userId ? run : null;
 }
 
 async function getOrCreateSessionId(
@@ -126,18 +189,35 @@ async function getOrCreateSessionId(
       ? `리서치: ${defaultTickers.join(", ")}`
       : "새 채팅";
 
-  const supabase = await createClient();
-  const { data: session, error } = await supabase
+  const admin = getSupabaseAdmin();
+  const insertPayload = {
+    user_id: userId,
+    title,
+    scope_type: scopeType,
+    default_tickers: defaultTickers,
+    default_document_types: body.default_document_types ?? [],
+    client_request_id: requestId,
+  };
+
+  const { data: session, error } = await admin
     .from("chat_sessions")
-    .insert({
-      user_id: userId,
-      title,
-      scope_type: scopeType,
-      default_tickers: defaultTickers,
-      default_document_types: body.default_document_types ?? [],
-    })
+    .insert(insertPayload)
     .select("id")
-    .single<ChatSessionRow>();
+    .single<Pick<ChatSessionRow, "id">>();
+
+  if (error?.code === "23505") {
+    const { data: existingSession } = await admin
+      .from("chat_sessions")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("client_request_id", requestId)
+      .is("deleted_at", null)
+      .maybeSingle<Pick<ChatSessionRow, "id">>();
+
+    if (existingSession?.id) {
+      return { ok: true, sessionId: existingSession.id };
+    }
+  }
 
   if (error || !session) {
     return {

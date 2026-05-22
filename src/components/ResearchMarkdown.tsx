@@ -9,6 +9,44 @@ interface ResearchMarkdownProps {
   className?: string;
 }
 
+const SAFE_LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+const SAFE_IMAGE_PROTOCOLS = new Set(["http:", "https:"]);
+const UNSAFE_URL_CHARACTERS = /[\u0000-\u001F\u007F]/;
+
+function getSafeMarkdownUrl(
+  value: unknown,
+  allowedProtocols: Set<string>,
+): string | undefined {
+  if (typeof value !== "string") return undefined;
+
+  const trimmed = value?.trim();
+  if (!trimmed || UNSAFE_URL_CHARACTERS.test(trimmed)) return undefined;
+
+  if (trimmed.startsWith("#")) return trimmed;
+  if (trimmed.startsWith("/")) {
+    return trimmed.startsWith("//") ? undefined : trimmed;
+  }
+
+  try {
+    const url = new URL(trimmed);
+    return allowedProtocols.has(url.protocol) ? trimmed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function getSafeMarkdownHref(
+  href: unknown,
+): string | undefined {
+  return getSafeMarkdownUrl(href, SAFE_LINK_PROTOCOLS);
+}
+
+export function getSafeMarkdownImageSrc(
+  src: unknown,
+): string | undefined {
+  return getSafeMarkdownUrl(src, SAFE_IMAGE_PROTOCOLS);
+}
+
 const RESEARCH_MARKDOWN_COMPONENTS = {
   h1: ({ children }) => (
     <h1 className="mb-sm mt-lg text-[24px] font-black leading-[1.16] tracking-normal text-ink first:mt-0 sm:text-[30px]">
@@ -54,16 +92,23 @@ const RESEARCH_MARKDOWN_COMPONENTS = {
     <strong className="font-extrabold text-ink">{children}</strong>
   ),
   em: ({ children }) => <em className="text-body">{children}</em>,
-  a: ({ children, href }) => (
-    <a
-      className="font-semibold text-primary underline decoration-primary/30 underline-offset-4 transition-colors hover:decoration-primary"
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-    >
-      {children}
-    </a>
-  ),
+  a: ({ children, href }) => {
+    const safeHref = getSafeMarkdownHref(href);
+    if (!safeHref) {
+      return <span className="font-semibold text-ink">{children}</span>;
+    }
+
+    return (
+      <a
+        className="font-semibold text-primary underline decoration-primary/30 underline-offset-4 transition-colors hover:decoration-primary"
+        href={safeHref}
+        target="_blank"
+        rel="noreferrer"
+      >
+        {children}
+      </a>
+    );
+  },
   blockquote: ({ children }) => (
     <blockquote className="my-md border-l-[3px] border-primary/45 pl-sm text-body [&>p]:my-0">
       {children}
@@ -98,14 +143,19 @@ const RESEARCH_MARKDOWN_COMPONENTS = {
     </td>
   ),
   hr: () => <hr className="my-lg border-hairline" />,
-  img: ({ src, alt }) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      className="my-md h-auto max-w-full rounded-[8px] border border-hairline"
-      src={src ?? ""}
-      alt={alt ?? ""}
-    />
-  ),
+  img: ({ src, alt }) => {
+    const safeSrc = getSafeMarkdownImageSrc(src);
+    if (!safeSrc) return null;
+
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        className="my-md h-auto max-w-full rounded-[8px] border border-hairline"
+        src={safeSrc}
+        alt={alt ?? ""}
+      />
+    );
+  },
   input: ({ checked, type }) => (
     <input
       className="mr-2 align-middle accent-primary"

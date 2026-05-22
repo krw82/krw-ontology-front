@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import { checkMcpHealth } from "@/lib/agent/mcp-client";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -9,6 +10,19 @@ type CheckResult = {
   error?: string;
   [key: string]: unknown;
 };
+
+function safeCompare(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
+function isAuthorized(request: Request): boolean {
+  const internalKey = request.headers.get("x-internal-key") ?? "";
+  const expectedKey = process.env.INTERNAL_API_KEY ?? "";
+  return Boolean(expectedKey) && safeCompare(internalKey, expectedKey);
+}
 
 async function checkSupabase(): Promise<CheckResult> {
   try {
@@ -47,7 +61,14 @@ async function checkMcp(): Promise<CheckResult> {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  if (!isAuthorized(request)) {
+    return Response.json(
+      { error: { code: "forbidden", message: "Unauthorized" } },
+      { status: 403 },
+    );
+  }
+
   const [supabase, mcp] = await Promise.all([checkSupabase(), checkMcp()]);
   const ok = supabase.ok && mcp.ok;
 

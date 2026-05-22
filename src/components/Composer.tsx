@@ -104,7 +104,7 @@ export default function Composer({
   activity,
   disabled = false,
   isGenerating = false,
-  placeholder = "후속 질문이나 심층 분석을 요청하세요...",
+  placeholder = "기업에 대해 질문하세요...",
   toolCalls = [],
   initialValue,
 }: ComposerProps) {

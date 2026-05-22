@@ -1,12 +1,20 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { readFloatEnv, readIntEnv } from "@/lib/env";
 import type { UsageDailyRow } from "@/types/database";
 
-const DAILY_QUESTION_LIMIT = parseInt(
-  process.env.DAILY_USER_QUESTION_LIMIT || "20",
-  10
-);
-const DAILY_COST_CAP = parseFloat(process.env.DAILY_COST_CAP_USD || "5.00");
+const DAILY_QUESTION_LIMIT = readIntEnv("DAILY_USER_QUESTION_LIMIT", 20, {
+  min: 1,
+});
+const DAILY_COST_CAP = readFloatEnv("DAILY_COST_CAP_USD", 5.0, {
+  min: 0,
+});
+const INPUT_COST_PER_1M = readFloatEnv("INPUT_COST_PER_MILLION", 3.0, {
+  min: 0,
+});
+const OUTPUT_COST_PER_1M = readFloatEnv("OUTPUT_COST_PER_MILLION", 15.0, {
+  min: 0,
+});
 
 export interface QuotaCheckResult {
   allowed: boolean;
@@ -114,7 +122,8 @@ export function getQuotaStatus(
 }
 
 export function estimateCost(inputTokens: number, outputTokens: number): number {
-  const inputCostPer1M = Number(process.env.INPUT_COST_PER_MILLION || 3.0);
-  const outputCostPer1M = Number(process.env.OUTPUT_COST_PER_MILLION || 15.0);
-  return (inputTokens / 1_000_000) * inputCostPer1M + (outputTokens / 1_000_000) * outputCostPer1M;
+  return (
+    (inputTokens / 1_000_000) * INPUT_COST_PER_1M +
+    (outputTokens / 1_000_000) * OUTPUT_COST_PER_1M
+  );
 }

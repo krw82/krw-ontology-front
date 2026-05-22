@@ -1,11 +1,11 @@
 import "server-only";
 
+import { constants } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 
 const KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX =
   "mcp__plugin_krw-ontology_krw-ontology__";
-const KRW_ONTOLOGY_DIRECT_TOOL_PREFIX = "mcp__krw-ontology__";
 
 export const KRW_ONTOLOGY_MCP_TOOLS = [
   "krw_ontology_catalog",
@@ -22,19 +22,15 @@ export const KRW_ONTOLOGY_MCP_TOOLS = [
   "krw_ontology_chain",
 ] as const;
 
-export const KRW_ONTOLOGY_SDK_ALLOWED_TOOLS = KRW_ONTOLOGY_MCP_TOOLS.flatMap(
-  (toolName) => [
-    `${KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX}${toolName}`,
-    `${KRW_ONTOLOGY_DIRECT_TOOL_PREFIX}${toolName}`,
-  ],
+export const KRW_ONTOLOGY_SDK_ALLOWED_TOOLS = KRW_ONTOLOGY_MCP_TOOLS.map(
+  (toolName) => `${KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX}${toolName}`,
 );
 
 const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 
 export function isKrwOntologySdkTool(toolName: string): boolean {
-  const bareName = toolName.includes("__")
-    ? toolName.split("__").at(-1)
-    : toolName;
+  if (!toolName.startsWith(KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX)) return false;
+  const bareName = toolName.slice(KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX.length);
 
   return Boolean(bareName && KRW_ONTOLOGY_MCP_TOOL_SET.has(bareName));
 }
@@ -62,14 +58,6 @@ interface PluginMcpConfig {
   >;
 }
 
-interface HttpMcpHealthPayload {
-  ok?: boolean;
-  root?: string;
-  documents?: number;
-  objects?: number;
-  error?: string;
-}
-
 export function getKrwOntologyPluginPath(): string {
   const pluginPath =
     process.env.KRW_ONTOLOGY_PLUGIN_PATH || process.env.CLAUDE_PLUGIN_PATH;
@@ -90,72 +78,19 @@ async function exists(filePath: string): Promise<boolean> {
   }
 }
 
-async function checkHttpMcpHealth(
-  pluginPath: string,
-): Promise<McpHealthResult | null> {
-  const baseUrl = process.env.MCP_BASE_URL?.trim();
-  if (!baseUrl) return null;
-  const bearerToken = process.env.MCP_BEARER_TOKEN?.trim();
+async function isExecutable(command: string): Promise<boolean> {
+  if (!path.isAbsolute(command)) return true;
 
   try {
-    const response = await fetch(`${baseUrl.replace(/\/+$/, "")}/health`, {
-      cache: "no-store",
-      headers: bearerToken ? { Authorization: `Bearer ${bearerToken}` } : undefined,
-      signal: AbortSignal.timeout(5_000),
-    });
-    const payload = (await response.json().catch(() => null)) as
-      | HttpMcpHealthPayload
-      | null;
-
-    return {
-      connected: response.ok && Boolean(payload?.ok),
-      releaseId: null,
-      indexGeneratedAt: null,
-      companyCount: null,
-      documentCount:
-        typeof payload?.documents === "number" ? payload.documents : null,
-      objectCount: typeof payload?.objects === "number" ? payload.objects : null,
-      root: typeof payload?.root === "string" ? payload.root : null,
-      pluginPath,
-      error:
-        response.ok && payload?.ok
-          ? undefined
-          : payload?.error || `MCP health returned ${response.status}`,
-    };
-  } catch (err) {
-    return {
-      connected: false,
-      releaseId: null,
-      indexGeneratedAt: null,
-      companyCount: null,
-      documentCount: null,
-      objectCount: null,
-      root: null,
-      pluginPath,
-      error: err instanceof Error ? err.message : "Unknown MCP HTTP error",
-    };
+    await access(command, constants.X_OK);
+    return true;
+  } catch {
+    return false;
   }
 }
 
 export async function checkMcpHealth(): Promise<McpHealthResult> {
   const pluginPath = getKrwOntologyPluginPath();
-  const httpHealth = await checkHttpMcpHealth(pluginPath);
-  if (process.env.MCP_BASE_URL?.trim()) {
-    return (
-      httpHealth ?? {
-        connected: false,
-        releaseId: null,
-        indexGeneratedAt: null,
-        companyCount: null,
-        documentCount: null,
-        objectCount: null,
-        root: null,
-        pluginPath,
-        error: "MCP_BASE_URL is configured but HTTP MCP health did not run",
-      }
-    );
-  }
-
   const manifestPath = path.join(pluginPath, ".claude-plugin", "plugin.json");
   const mcpConfigPath = path.join(pluginPath, ".mcp.json");
   const requiredSkillPaths = [
@@ -202,6 +137,20 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
         root,
         pluginPath,
         error: "KRW Ontology MCP server command is missing",
+      };
+    }
+
+    if (!(await isExecutable(serverConfig.command))) {
+      return {
+        connected: false,
+        releaseId: null,
+        indexGeneratedAt: null,
+        companyCount: null,
+        documentCount: null,
+        objectCount: null,
+        root,
+        pluginPath,
+        error: `KRW Ontology MCP server command is not executable: ${serverConfig.command}`,
       };
     }
 

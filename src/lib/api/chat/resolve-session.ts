@@ -36,6 +36,7 @@ export async function resolveSession(
     .from("chat_sessions")
     .select("id, user_id, scope_type, default_tickers, default_document_types")
     .eq("id", sessionId)
+    .is("deleted_at", null)
     .single<ChatSessionRow>();
 
   if (sessionError || !session) {

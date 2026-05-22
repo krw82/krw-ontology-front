@@ -21,7 +21,13 @@ krw-ontology/**/*.pyc
 
 .git
 .claude
+.codex/
+.playwright-cli/
+.playwright-mcp/
 .DS_Store
+.supabase-prod-db-password
+output/
+/*.png
 
 *.md
 !README.md

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
 import {
   getSessionInfo,
   query,
@@ -14,7 +16,6 @@ import {
   isKrwOntologySdkTool,
 } from "./mcp-client";
 import { buildClaudeAgentEnv } from "./env";
-import { requireEnv } from "@/lib/env";
 import {
   buildSystemPrompt,
   type CompanyPromptContext,
@@ -25,6 +26,7 @@ import {
   parseResearchSynthesisOutputText,
 } from "@/lib/artifacts/display-plan";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
+import { readIntEnv } from "@/lib/env";
 import {
   createAccumulator,
   createSSEWriter,
@@ -34,12 +36,14 @@ import {
   addCitation,
   setUsage,
   type AccumulatedRun,
+  type AccumulatedToolCall,
   type StreamWriter,
 } from "./stream-handler";
-import type { MCPToolName, DocumentType } from "@/types/api-contracts";
+import type { MCPToolName, DocumentType, StreamingCitation } from "@/types/api-contracts";
 
 const MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const DEFAULT_MAX_TURNS = 20;
+const DEFAULT_AGENT_WORKSPACE_DIR = ".agent-workspace";
 
 export interface AgentRunOptions {
   sessionId: string;
@@ -51,6 +55,9 @@ export interface AgentRunOptions {
   abortSignal?: AbortSignal;
   onSdkDiagnostics?: (diagnostics: SdkDiagnostics) => Promise<void>;
   onTextDelta?: (delta: string, fullText: string) => Promise<void>;
+  onToolCallStart?: (toolCall: AccumulatedToolCall) => Promise<void>;
+  onToolCallEnd?: (toolCall: AccumulatedToolCall) => Promise<void>;
+  onCitation?: (citation: StreamingCitation) => Promise<void>;
 }
 
 export interface AgentRunResult {
@@ -68,14 +75,30 @@ interface ToolResultRecord {
   json: unknown;
 }
 
+async function resolveClaudeAgentCwd(): Promise<string> {
+  const configured = process.env.CLAUDE_AGENT_CWD?.trim();
+  const cwd = configured || path.join(process.cwd(), DEFAULT_AGENT_WORKSPACE_DIR);
+
+  if (!path.isAbsolute(cwd)) {
+    throw new Error(
+      `CLAUDE_AGENT_CWD must be an absolute path when set: ${cwd}`,
+    );
+  }
+
+  await mkdir(cwd, { recursive: true });
+  return cwd;
+}
+
 export interface SdkDiagnostics {
   passName?: "research" | "composer";
   requestedModel?: string;
   observedModels?: string[];
   cwd?: string;
+  defaultTickers?: string[];
   pluginPath?: string;
   promptPreview?: string;
   permissionMode?: string;
+  scopeType?: "global" | "company";
   settingSources?: string[];
   tools?: unknown;
   allowedTools?: string[];
@@ -95,7 +118,7 @@ export async function runAgent(
   const { sendEvent } = createSSEWriter(streamWriter);
   const acc = createAccumulator();
   const pluginPath = getKrwOntologyPluginPath();
-  const cwd = requireEnv("CLAUDE_AGENT_CWD");
+  const cwd = await resolveClaudeAgentCwd();
   const abortController = new AbortController();
 
   const abortHandler = () => abortController.abort();
@@ -133,14 +156,15 @@ export async function runAgent(
       append: systemPrompt,
     },
     plugins: [{ type: "local", path: pluginPath }],
-    mcpServers: buildKrwOntologyMcpServers(),
     tools: [],
     allowedTools: KRW_ONTOLOGY_SDK_ALLOWED_TOOLS,
     permissionMode: "bypassPermissions",
     allowDangerouslySkipPermissions: true,
     canUseTool,
     settingSources: ["project"],
-    maxTurns: Number(process.env.CLAUDE_AGENT_MAX_TURNS ?? DEFAULT_MAX_TURNS),
+    maxTurns: readIntEnv("CLAUDE_AGENT_MAX_TURNS", DEFAULT_MAX_TURNS, {
+      min: 1,
+    }),
     includePartialMessages: false,
     abortController,
     env: buildClaudeAgentEnv(),
@@ -212,25 +236,6 @@ export async function runAgent(
   }
 }
 
-function buildKrwOntologyMcpServers(): Options["mcpServers"] | undefined {
-  const baseUrl = process.env.MCP_BASE_URL?.trim().replace(/\/+$/, "");
-  if (!baseUrl) return undefined;
-
-  const bearerToken = process.env.MCP_BEARER_TOKEN?.trim();
-  const headers = bearerToken
-    ? { Authorization: `Bearer ${bearerToken}` }
-    : undefined;
-
-  return {
-    "krw-ontology": {
-      type: "http",
-      url: `${baseUrl}/mcp`,
-      headers,
-      alwaysLoad: true,
-    },
-  };
-}
-
 async function runSdkPass(params: {
   passName: "research" | "composer";
   prompt: string;
@@ -293,11 +298,18 @@ async function runSdkPass(params: {
         openToolCalls,
         sendEvent,
         onTextDelta: options.onTextDelta,
+        onToolCallStart: options.onToolCallStart,
+        onToolCallEnd: options.onToolCallEnd,
+        onCitation: options.onCitation,
+        passName,
         suppressTextDeltas,
       });
 
       if (message.type === "result") {
-        closeOpenToolCalls(acc, openToolCalls);
+        const closedToolCalls = closeOpenToolCalls(acc, openToolCalls, passName);
+        for (const toolCall of closedToolCalls) {
+          await options.onToolCallEnd?.(toolCall);
+        }
 
         if (message.subtype === "success") {
           acc.structuredOutput = message.structured_output ?? null;
@@ -377,9 +389,11 @@ async function reportSdkInitialization(params: {
     passName,
     requestedModel,
     cwd,
+    defaultTickers: options.defaultTickers,
     pluginPath,
     promptPreview: prompt.slice(0, 500),
     permissionMode: sdkOptions.permissionMode,
+    scopeType: options.scopeType,
     settingSources: sdkOptions.settingSources,
     tools: sdkOptions.tools,
     allowedTools: sdkOptions.allowedTools,
@@ -456,6 +470,10 @@ async function consumeSdkMessage(params: {
   openToolCalls: Set<string>;
   sendEvent: (event: Parameters<ReturnType<typeof createSSEWriter>["sendEvent"]>[0], data: unknown) => Promise<void>;
   onTextDelta?: (delta: string, fullText: string) => Promise<void>;
+  onToolCallStart?: (toolCall: AccumulatedToolCall) => Promise<void>;
+  onToolCallEnd?: (toolCall: AccumulatedToolCall) => Promise<void>;
+  onCitation?: (citation: StreamingCitation) => Promise<void>;
+  passName: "research" | "composer";
   suppressTextDeltas?: boolean;
 }) {
   const {
@@ -464,6 +482,10 @@ async function consumeSdkMessage(params: {
     openToolCalls,
     sendEvent,
     onTextDelta,
+    onToolCallStart,
+    onToolCallEnd,
+    onCitation,
+    passName,
     suppressTextDeltas,
   } = params;
 
@@ -489,11 +511,13 @@ async function consumeSdkMessage(params: {
 
         if (!openToolCalls.has(toolCallId)) {
           openToolCalls.add(toolCallId);
-          startToolCall(acc, toolCallId, toolName, input);
+          const toolCall = startToolCall(acc, toolCallId, toolName, input);
+          await onToolCallStart?.(toolCall);
           await sendEvent("tool_call_start", {
             tool_call_id: toolCallId,
             tool_name: toolName,
             arguments: input,
+            started_at: toolCall.startedAt,
           });
         }
       }
@@ -506,7 +530,7 @@ async function consumeSdkMessage(params: {
         toolResult.toolUseId !== null && openToolCalls.has(toolResult.toolUseId);
 
       if (toolResult.toolUseId) {
-        endToolCall(
+        const toolCall = endToolCall(
           acc,
           toolResult.toolUseId,
           summarizeToolResult(toolResult.text),
@@ -514,6 +538,9 @@ async function consumeSdkMessage(params: {
           toolResult.json,
           toolResult.text,
         );
+        if (toolCall) {
+          await onToolCallEnd?.(toolCall);
+        }
 
         if (wasOpen) {
           openToolCalls.delete(toolResult.toolUseId);
@@ -523,13 +550,16 @@ async function consumeSdkMessage(params: {
             error_message: null,
             duration_ms: toolCallDurationMs(acc, toolResult.toolUseId),
           });
+          logToolDuration(acc, toolResult.toolUseId, passName, "completed");
         }
       }
 
       const prevCitationCount = acc.citations.length;
       extractCitations(acc, toolResult.text, toolResult.json);
       for (let i = prevCitationCount; i < acc.citations.length; i++) {
-        await sendEvent("citation", acc.citations[i]);
+        const citation = acc.citations[i];
+        await onCitation?.(citation);
+        await sendEvent("citation", citation);
       }
     }
   }
@@ -540,11 +570,13 @@ async function consumeSdkMessage(params: {
 
     if (!openToolCalls.has(message.tool_use_id)) {
       openToolCalls.add(message.tool_use_id);
-      startToolCall(acc, message.tool_use_id, toolName, {});
+      const toolCall = startToolCall(acc, message.tool_use_id, toolName, {});
+      await onToolCallStart?.(toolCall);
       await sendEvent("tool_call_start", {
         tool_call_id: message.tool_use_id,
         tool_name: toolName,
         arguments: {},
+        started_at: toolCall.startedAt,
       });
     }
   }
@@ -553,13 +585,17 @@ async function consumeSdkMessage(params: {
     for (const toolUseId of message.preceding_tool_use_ids) {
       if (!openToolCalls.has(toolUseId)) continue;
       openToolCalls.delete(toolUseId);
-      endToolCall(acc, toolUseId, message.summary, null);
+      const toolCall = endToolCall(acc, toolUseId, message.summary, null);
+      if (toolCall) {
+        await onToolCallEnd?.(toolCall);
+      }
       await sendEvent("tool_call_end", {
         tool_call_id: toolUseId,
         result_summary: message.summary.slice(0, 2000),
         error_message: null,
         duration_ms: toolCallDurationMs(acc, toolUseId),
       });
+      logToolDuration(acc, toolUseId, passName, "completed");
     }
   }
 }
@@ -643,17 +679,100 @@ function normalizeMcpToolName(name: unknown): MCPToolName | null {
 function closeOpenToolCalls(
   acc: AccumulatedRun,
   openToolCalls: Set<string>,
+  passName: "research" | "composer",
 ) {
+  const closed: AccumulatedToolCall[] = [];
   for (const toolCallId of openToolCalls) {
-    endToolCall(acc, toolCallId, "Completed by Claude Agent SDK", null);
+    const toolCall = endToolCall(acc, toolCallId, "Completed by Claude Agent SDK", null);
+    if (toolCall) {
+      closed.push(toolCall);
+    }
+    logToolDuration(acc, toolCallId, passName, "closed");
   }
   openToolCalls.clear();
+  return closed;
 }
 
 function toolCallDurationMs(acc: AccumulatedRun, toolCallId: string): number {
   const toolCall = acc.toolCalls.find((tc) => tc.id === toolCallId);
   if (!toolCall) return 0;
   return Date.now() - new Date(toolCall.startedAt).getTime();
+}
+
+function logToolDuration(
+  acc: AccumulatedRun,
+  toolCallId: string,
+  passName: "research" | "composer",
+  status: "completed" | "closed",
+) {
+  const toolCall = acc.toolCalls.find((tc) => tc.id === toolCallId);
+  if (!toolCall) return;
+
+  const durationMs = toolCallDurationMs(acc, toolCallId);
+  console.info("[krw-ontology:mcp-tool-duration]", {
+    args: summarizeToolArguments(toolCall.argumentsJson),
+    duration_ms: durationMs,
+    duration_s: Number((durationMs / 1000).toFixed(3)),
+    pass: passName,
+    status,
+    tool_call_id: toolCallId,
+    tool_name: toolCall.toolName,
+  });
+}
+
+const SAFE_TOOL_ARGUMENT_KEYS = [
+  "ticker",
+  "tickers",
+  "topic",
+  "topics",
+  "object_type",
+  "object_types",
+  "period_policy",
+  "period",
+  "periods",
+  "document_type",
+  "document_types",
+] as const;
+
+function summarizeToolArguments(
+  argumentsJson: string,
+): Record<string, unknown> | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(argumentsJson);
+  } catch {
+    return undefined;
+  }
+
+  if (!isRecord(parsed)) return undefined;
+
+  const summary: Record<string, unknown> = {};
+  for (const key of SAFE_TOOL_ARGUMENT_KEYS) {
+    if (!(key in parsed)) continue;
+    const value = summarizeToolArgumentValue(parsed[key]);
+    if (value !== undefined) summary[key] = value;
+  }
+
+  return Object.keys(summary).length > 0 ? summary : undefined;
+}
+
+function summarizeToolArgumentValue(value: unknown): unknown {
+  if (typeof value === "string") return truncateLogValue(value);
+  if (typeof value === "number" || typeof value === "boolean") return value;
+  if (Array.isArray(value)) {
+    return value
+      .map(summarizeToolArgumentValue)
+      .filter((item) => item !== undefined)
+      .slice(0, 8);
+  }
+  return undefined;
+}
+
+function truncateLogValue(value: string): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized.length > 120
+    ? `${normalized.slice(0, 117).trimEnd()}...`
+    : normalized;
 }
 
 function usageFromSdkMessage(message: SDKMessage): {

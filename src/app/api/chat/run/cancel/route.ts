@@ -3,6 +3,7 @@ import { abortRun } from "@/lib/agent/abort-manager";
 import { releaseLease } from "@/lib/concurrency/lease";
 import { getAuthUser, handleAuthError, forbiddenError } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { isPlainObject, isUuid } from "@/lib/api/validation";
 import type { AgentRunRow, ChatSessionRow } from "@/types/database";
 
 type CancelRunRow = Pick<
@@ -83,12 +84,20 @@ export async function POST(request: NextRequest) {
   }
   if (!user) return handleAuthError(new Error("No user"));
 
-  const body = (await request.json().catch(() => null)) as CancelRequestBody | null;
+  const parsedBody = await request.json().catch(() => null);
+  if (!isPlainObject(parsedBody)) {
+    return validationError("요청 본문 형식이 올바르지 않습니다.");
+  }
+
+  const body = parsedBody as CancelRequestBody;
   const runId = typeof body?.run_id === "string" ? body.run_id.trim() : "";
   const requestId =
     typeof body?.request_id === "string" ? body.request_id.trim() : "";
   if (!runId && !requestId) {
     return validationError("run_id 또는 request_id가 필요합니다.");
+  }
+  if (runId && !isUuid(runId)) {
+    return validationError("run_id 형식이 올바르지 않습니다.");
   }
 
   const admin = getSupabaseAdmin();
@@ -100,6 +109,7 @@ export async function POST(request: NextRequest) {
     .from("chat_sessions")
     .select("id, user_id")
     .eq("id", run.session_id)
+    .is("deleted_at", null)
     .single<CancelSessionRow>();
 
   if (!session) return notFoundError("채팅을 찾지 못했습니다.");

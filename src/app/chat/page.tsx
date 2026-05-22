@@ -3,12 +3,13 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import TopNav from "@/components/TopNav";
 import ChatMessage from "@/components/ChatMessage";
 import Composer from "@/components/Composer";
 import { useChat } from "@/hooks/useChat";
 import { getSessionTickers, buildChatSessionHref } from "@/lib/chat/history-state";
+import { getSuggestedPromptsForTickers } from "@/lib/chat/suggested-prompts";
 
 function sanitizeError(message: string): string {
   // Strip stack traces and internal details
@@ -22,13 +23,20 @@ function sanitizeError(message: string): string {
 }
 
 type CompaniesResponse = {
-  companies?: Array<{ ticker: string; name?: string | null }>;
+  companies?: Array<{
+    ticker: string;
+    name?: string | null;
+    sector?: string | null;
+  }>;
 };
 
 type CompanyMeta = {
   ticker: string;
   name: string | null;
+  sector: string | null;
 };
+
+const promptCycleIntervalMs = 2200;
 
 function ChatContent() {
   const router = useRouter();
@@ -42,6 +50,7 @@ function ChatContent() {
   const [companyMetaByTicker, setCompanyMetaByTicker] = useState<
     Record<string, CompanyMeta>
   >({});
+  const [activePromptIndex, setActivePromptIndex] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const hasLoadedRef = useRef(false);
   const cancelledRef = useRef(false);
@@ -86,6 +95,7 @@ function ChatContent() {
                 matchedCompany.name && matchedCompany.name !== normalizedTicker
                   ? matchedCompany.name
                   : null,
+              sector: matchedCompany.sector ?? null,
             },
           }));
         }
@@ -172,6 +182,20 @@ function ChatContent() {
     scrollToBottom,
   ]);
 
+  useEffect(() => {
+    if (!sessionId || chat.messages.length === 0) return;
+    const hash = window.location.hash.slice(1);
+    if (!hash.startsWith("message-")) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      document.getElementById(hash)?.scrollIntoView({
+        block: "center",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [chat.messages.length, sessionId]);
+
   const contextTickers = getSessionTickers(chat.session, ticker);
   const contextTickersKey = contextTickers.join(",");
   const contextCompanies = contextTickers.map((contextTicker) => {
@@ -180,6 +204,7 @@ function ChatContent() {
       companyMetaByTicker[normalizedTicker] ?? {
         ticker: normalizedTicker,
         name: null,
+        sector: null,
       }
     );
   });
@@ -188,9 +213,44 @@ function ChatContent() {
       company.name ? `${company.name} (${company.ticker})` : company.ticker,
     )
     .join(", ");
+  const contextTickerText = contextCompanies
+    .map((company) => company.ticker)
+    .join(" / ");
+  const contextNameText = contextCompanies
+    .map((company) => company.name)
+    .filter((name): name is string => Boolean(name))
+    .join(", ");
+  const contextSectorText = Array.from(
+    new Set(
+      contextCompanies
+        .map((company) => company.sector)
+        .filter((sector): sector is string => Boolean(sector)),
+    ),
+  ).join(" / ");
+  const suggestedPrompts = getSuggestedPromptsForTickers(contextTickers);
   const initialComposerValue = queryParam ?? undefined;
   const sendMessage = chat.sendMessage;
   const cancelRun = chat.cancelRun;
+
+  useEffect(() => {
+    if (chat.messages.length > 0 || isStreaming || effectiveSessionError) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setActivePromptIndex(
+        (currentIndex) => (currentIndex + 1) % suggestedPrompts.length,
+      );
+    }, promptCycleIntervalMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    activePromptIndex,
+    chat.messages.length,
+    effectiveSessionError,
+    isStreaming,
+    suggestedPrompts.length,
+  ]);
 
   useEffect(() => {
     if (contextTickers.length === 0) return;
@@ -222,12 +282,13 @@ function ChatContent() {
                   company?.name && company.name !== missingTicker
                     ? company.name
                     : null,
+                sector: company?.sector ?? null,
               },
             ] as const;
           } catch {
             return [
               missingTicker,
-              { ticker: missingTicker, name: null },
+              { ticker: missingTicker, name: null, sector: null },
             ] as const;
           }
         }),
@@ -291,35 +352,19 @@ function ChatContent() {
 
             {/* Company research context */}
             {contextTickers.length > 0 && (
-              <div className="mx-auto mb-lg w-full max-w-3xl">
+              <div className="mx-auto mb-base w-full max-w-3xl">
                 <div
-                  className="w-full rounded-[8px] border border-hairline bg-surface px-4 py-3 shadow-sm sm:px-5"
+                  className="max-w-full"
                   aria-label={`분석 대상: ${contextLabel}`}
                 >
-                  <div className="flex min-w-0 items-center">
-                    <div className="min-w-0">
-                      <div className="flex min-w-0 items-baseline gap-2">
-                        <span className="shrink-0 font-mono text-[13px] font-black tracking-[0.08em] text-primary sm:text-[14px]">
-                          {contextCompanies
-                            .map((company) => company.ticker)
-                            .join(", ")}
-                        </span>
-                        {contextCompanies.some((company) => company.name) && (
-                          <span className="truncate text-[16px] font-extrabold leading-[1.25] text-ink sm:text-[17px]">
-                            {contextCompanies
-                              .map((company) => company.name)
-                              .filter(Boolean)
-                              .join(", ")}
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-1 truncate text-[12px] font-semibold leading-4 text-muted sm:text-[13px]">
-                        {contextCompanies.length > 1
-                          ? "복수 기업 비교 리서치"
-                          : "기업 리서치 컨텍스트"}
-                      </p>
-                    </div>
-                  </div>
+                  <p className="font-mono text-[14px] font-black leading-5 tracking-[0.08em] text-primary sm:text-[15px]">
+                    {contextTickerText}
+                  </p>
+                  <p className="mt-0.5 truncate text-[12px] font-bold leading-5 text-muted sm:text-[13px]">
+                    {[contextNameText || "기업 리서치", contextSectorText]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
                 </div>
               </div>
             )}
@@ -360,6 +405,10 @@ function ChatContent() {
                       key={msg.id}
                       role={msg.role}
                       content={msg.content}
+                      messageId={msg.role === "assistant" ? msg.id : undefined}
+                      createdAt={
+                        msg.role === "assistant" ? msg.created_at : undefined
+                      }
                       citations={
                         isLatestAssistantMessage ? chat.citations : undefined
                       }
@@ -394,6 +443,7 @@ function ChatContent() {
                       isStreaming={true}
                       activity={chat.activity}
                       citations={chat.citations}
+                      runStartedAt={chat.runStartedAt}
                       showHeader={
                         chat.messages.length === 0 ||
                         chat.messages[chat.messages.length - 1]?.role !== "assistant"
@@ -419,6 +469,7 @@ function ChatContent() {
                       isStreaming={true}
                       activity={chat.activity}
                       citations={chat.citations}
+                      runStartedAt={chat.runStartedAt}
                       showHeader={
                         chat.messages.length === 0 ||
                         chat.messages[chat.messages.length - 1]?.role !== "assistant"
@@ -460,58 +511,100 @@ function ChatContent() {
 
               {/* Empty state */}
               {chat.messages.length === 0 && !isStreaming && !sessionError && (
-                <div className="mx-auto grid w-full max-w-4xl gap-5 py-lg sm:py-xxl md:grid-cols-[minmax(0,1fr)_320px]">
-                  <div className="min-w-0 rounded-[12px] border border-hairline bg-canvas p-5 shadow-sm sm:p-8">
-                    <h2 className="text-balance text-[30px] font-black leading-[1.12] text-ink sm:text-[42px]">
-                      질문하면 답변과 근거 경로가 함께 생성됩니다.
-                    </h2>
-                    <p className="mt-4 max-w-2xl text-[16px] leading-7 text-body">
+                <div className="mx-auto grid w-full max-w-4xl gap-7 py-lg sm:py-xxl md:grid-cols-[minmax(0,1fr)_320px] md:items-start">
+                  <motion.div
+                    className="min-w-0 border-b border-hairline-soft pb-6 md:border-b-0 md:pb-0 md:pr-6"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.24, ease: "easeOut" }}
+                  >
+                    <h2 className="text-balance text-[24px] font-black leading-[1.16] text-ink sm:text-[38px]">
                       {contextTickers.length > 0
-                        ? `${contextLabel}의 공시 문장, 사업 활동, 핵심 변수 사이의 연결을 기준으로 질문하세요.`
-                        : "기업, 문서 기간, 사업 세그먼트, 리스크 변수까지 한 번에 지정해 리서치를 시작하세요."}
+                        ? `${contextTickerText}에서 무엇을 확인할까요?`
+                        : "무엇을 확인할까요?"}
+                    </h2>
+                    <p className="mt-4 max-w-2xl text-[15px] leading-7 text-body sm:text-[16px]">
+                      {contextTickers.length > 0
+                        ? "매출 변화, 마진 흐름, 리스크 요인을 회사 보고서 기준으로 정리합니다."
+                        : "기업, 기간, 사업 흐름을 함께 적어 리서치를 시작하세요."}
                     </p>
+                  </motion.div>
 
-                    <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                      {["10-K 원문", "온톨로지 노드", "출처 기록"].map(
-                        (item) => (
-                          <div
-                            key={item}
-                            className="min-w-0 rounded-[8px] border border-hairline bg-canvas px-2 py-3 sm:px-3"
+                  <motion.div
+                    className="space-y-1"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.24, delay: 0.06, ease: "easeOut" }}
+                  >
+                    <LayoutGroup id="empty-state-prompts">
+                      {suggestedPrompts.map((prompt, index) => {
+                        const isActivePrompt = index === activePromptIndex;
+
+                        return (
+                          <motion.button
+                            type="button"
+                            key={prompt}
+                            layout
+                            className={`group relative flex w-full items-center gap-3 overflow-hidden rounded-[10px] px-3 py-3 text-left text-[14px] font-semibold leading-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60 ${
+                              isActivePrompt
+                                ? "text-ink"
+                                : "text-body hover:bg-surface-soft hover:text-ink"
+                            }`}
+                            onClick={() => handleSend(prompt)}
+                            onFocus={() => setActivePromptIndex(index)}
+                            onMouseEnter={() => setActivePromptIndex(index)}
+                            disabled={
+                              isStreaming || Boolean(effectiveSessionError)
+                            }
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{
+                              duration: 0.2,
+                              delay: 0.1 + index * 0.04,
+                              ease: "easeOut",
+                            }}
                           >
-                            <span className="material-symbols-outlined text-[20px] text-primary-container">
-                              verified
+                            {isActivePrompt && (
+                              <motion.span
+                                layoutId="empty-state-prompt-active"
+                                aria-hidden="true"
+                                className="absolute inset-0 rounded-[10px] bg-surface"
+                                transition={{
+                                  duration: 0.36,
+                                  ease: [0.16, 1, 0.3, 1],
+                                }}
+                              />
+                            )}
+                            <span className="relative z-10 shrink-0 font-mono text-[13px] font-black leading-6 text-muted">
+                              {index + 1}.
                             </span>
-                            <p className="mt-2 text-[12px] font-bold leading-4 text-ink sm:text-[13px] sm:leading-5">
-                              {item}
-                            </p>
-                          </div>
-                        ),
-                      )}
-                    </div>
-                  </div>
-
-                  <aside className="rounded-[12px] border border-hairline bg-surface p-4 shadow-sm">
-                    <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
-                      질문 예시
-                    </p>
-                    <div className="mt-4 space-y-3">
-                      {[
-                        "FY2025 10-K 기준으로 매출 성장 요인을 분해해줘",
-                        "핵심 리스크가 어느 사업 활동과 연결되는지 보여줘",
-                        "최근 기간의 이익률 동인을 출처와 함께 요약해줘",
-                      ].map((prompt) => (
-                        <button
-                          type="button"
-                          key={prompt}
-                          className="block w-full rounded-[8px] border border-hairline-soft bg-canvas px-3 py-3 text-left text-[13px] font-semibold leading-5 text-body transition-colors hover:border-primary hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
-                          onClick={() => handleSend(prompt)}
-                          disabled={isStreaming || Boolean(effectiveSessionError)}
-                        >
-                          {prompt}
-                        </button>
-                      ))}
-                    </div>
-                  </aside>
+                            <span className="relative z-10 min-w-0 flex-1">
+                              {prompt}
+                            </span>
+                            <AnimatePresence initial={false} mode="popLayout">
+                              {isActivePrompt && (
+                                <motion.span
+                                  key="active-prompt-arrow"
+                                  layoutId="empty-state-prompt-arrow"
+                                  aria-hidden="true"
+                                  className="material-symbols-outlined relative z-10 shrink-0 text-[18px] text-muted transition-colors group-hover:text-primary"
+                                  initial={{ opacity: 0, x: -3 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  exit={{ opacity: 0, x: 3 }}
+                                  transition={{
+                                    duration: 0.22,
+                                    ease: "easeOut",
+                                  }}
+                                >
+                                  arrow_forward
+                                </motion.span>
+                              )}
+                            </AnimatePresence>
+                          </motion.button>
+                        );
+                      })}
+                    </LayoutGroup>
+                  </motion.div>
                 </div>
               )}
             </div>
@@ -527,7 +620,7 @@ function ChatContent() {
             placeholder={
               effectiveSessionError
                 ? "인덱스에 있는 회사만 채팅할 수 있습니다."
-                : "후속 질문을 입력하세요..."
+                : "기업에 대해 질문하세요..."
             }
             toolCalls={chat.toolCalls}
             initialValue={initialComposerValue}

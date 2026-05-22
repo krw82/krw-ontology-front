@@ -3,6 +3,7 @@ import { getAuthUser, handleAuthError, forbiddenError } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { abortRun } from "@/lib/agent/abort-manager";
+import { isUuid } from "@/lib/api/validation";
 import type { ChatSessionRow, AgentRunRow } from "@/types/database";
 
 function notFoundError(message: string) {
@@ -18,6 +19,10 @@ export async function POST(
 ) {
   const { sessionId } = await params;
 
+  if (!isUuid(sessionId)) {
+    return notFoundError("채팅을 찾지 못했습니다.");
+  }
+
   let user;
   try {
     user = await getAuthUser();
@@ -32,6 +37,7 @@ export async function POST(
     .from("chat_sessions")
     .select("user_id")
     .eq("id", sessionId)
+    .is("deleted_at", null)
     .single<ChatSessionRow>();
 
   if (!session) {

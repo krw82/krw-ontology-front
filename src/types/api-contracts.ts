@@ -40,6 +40,7 @@ export type StreamingEventType =
   | "tool_call_end"
   | "activity_update"
   | "citation"
+  | "state_sync"
   | "done"
   | "error"
   | "cancelled";
@@ -56,6 +57,8 @@ export type ErrorCode =
   | "quota_exceeded"
   | "cost_cap_exceeded"
   | "concurrency_limit"
+  | "lease_expired"
+  | "cancelled"
   | "mcp_unavailable"
   | "mcp_error"
   | "claude_api_error"
@@ -74,6 +77,8 @@ const VALID_ERROR_CODES: ReadonlySet<string> = new Set<ErrorCode>([
   "quota_exceeded",
   "cost_cap_exceeded",
   "concurrency_limit",
+  "lease_expired",
+  "cancelled",
   "mcp_unavailable",
   "mcp_error",
   "claude_api_error",
@@ -135,6 +140,7 @@ export interface Session {
   scope_type: SessionScopeType;
   default_tickers: string[];
   default_document_types: string[];
+  deleted_at?: string | null;
   readonly created_at: string;
   readonly updated_at: string;
 }
@@ -238,6 +244,7 @@ export interface StreamingToolCallStart {
   tool_call_id: string;
   tool_name: MCPToolName;
   arguments: Record<string, unknown>;
+  started_at?: string;
 }
 
 /** Tool call completion during streaming */
@@ -653,6 +660,8 @@ export interface StreamingRunStartedEvent extends StreamingEventBase {
     run_id: string;
     message_id: string;
     session_id: string;
+    request_id?: string;
+    started_at?: string;
   };
 }
 
@@ -678,6 +687,17 @@ export interface StreamingActivityUpdateEvent extends StreamingEventBase {
 export interface StreamingCitationEvent extends StreamingEventBase {
   event: "citation";
   data: StreamingCitation;
+}
+
+/** Server-side session state reconciliation after reconnect races */
+export interface StreamingStateSyncEvent extends StreamingEventBase {
+  event: "state_sync";
+  data: {
+    session_id: string;
+    run_id?: string | null;
+    status: RunStatus | "idle";
+    reason?: "stale_run" | "poll_timeout" | "session_synced";
+  };
 }
 
 /** Run completed successfully */
@@ -727,6 +747,7 @@ export type StreamingEvent =
   | StreamingToolCallEndEvent
   | StreamingActivityUpdateEvent
   | StreamingCitationEvent
+  | StreamingStateSyncEvent
   | StreamingDoneEvent
   | StreamingErrorEvent
   | StreamingCancelledEvent;
@@ -759,6 +780,11 @@ export interface CreateSessionRequest {
   scope_type: SessionScopeType;
   default_tickers?: string[];           // required when scope_type is "company"
   default_document_types?: string[];
+}
+
+/** PATCH /api/sessions/[sessionId] request body */
+export interface UpdateSessionRequest {
+  title: string;
 }
 
 // ============================================================
@@ -805,6 +831,18 @@ export interface ListSessionsResponse {
 /** POST /api/sessions response */
 export interface CreateSessionResponse {
   session: Session;
+}
+
+/** PATCH /api/sessions/[sessionId] response */
+export interface UpdateSessionResponse {
+  session: Session;
+}
+
+/** DELETE /api/sessions/[sessionId] response */
+export interface DeleteSessionResponse {
+  success: true;
+  session_id: string;
+  deleted_at: string;
 }
 
 /** GET /healthz response */

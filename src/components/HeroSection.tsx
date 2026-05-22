@@ -36,7 +36,7 @@ interface HeroHeadingProps {
 export function HeroHeading({ lines, accentLine, trailingLines = [] }: HeroHeadingProps) {
   return (
     <motion.h1
-      className="max-w-4xl text-balance text-[44px] font-black leading-[1.12] tracking-normal text-on-dark min-[390px]:text-[48px] sm:text-[64px] sm:leading-[1.08] lg:text-[84px]"
+      className="max-w-4xl text-balance text-[44px] font-black leading-[1.12] tracking-normal text-ink min-[390px]:text-[48px] sm:text-[64px] sm:leading-[1.08] lg:text-[84px]"
       initial="hidden"
       animate="visible"
       variants={headingContainer}
@@ -50,7 +50,7 @@ export function HeroHeading({ lines, accentLine, trailingLines = [] }: HeroHeadi
           {line}
         </motion.span>
       ))}
-      <motion.span className="block text-primary-fixed-dim" variants={fastVariant}>
+      <motion.span className="block text-primary" variants={fastVariant}>
         {accentLine}
       </motion.span>
       {trailingLines.map((line, lineIdx) => (
@@ -69,7 +69,7 @@ export function HeroHeading({ lines, accentLine, trailingLines = [] }: HeroHeadi
 export function HeroSubtext({ children }: { children: React.ReactNode }) {
   return (
     <motion.p
-      className="mt-6 max-w-2xl text-pretty text-[17px] leading-8 text-on-dark-soft sm:text-[20px]"
+      className="mt-6 max-w-2xl text-pretty text-[17px] leading-8 text-body sm:text-[20px]"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: fastTransition, ease: easeOutExpo, delay: 0.05 }}
@@ -86,7 +86,7 @@ export function HeroSubtext({ children }: { children: React.ReactNode }) {
 export function HeroEyebrow({ children }: { children: React.ReactNode }) {
   return (
     <motion.p
-      className="mb-6 font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-primary-fixed-dim"
+      className="mb-6 font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-primary"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: fastTransition, ease: easeOutExpo }}
@@ -103,7 +103,7 @@ export function HeroEyebrow({ children }: { children: React.ReactNode }) {
 export function WorkflowSteps({ steps }: { steps: string[] }) {
   return (
     <motion.ol
-      className="mt-8 flex max-w-3xl flex-col gap-2 border-l border-white/15 pl-4 text-[13px] font-bold text-on-dark-soft min-[520px]:flex-row min-[520px]:gap-5 min-[520px]:border-l-0 min-[520px]:pl-0"
+      className="mt-8 flex max-w-3xl flex-col gap-2 border-l border-hairline pl-4 text-[13px] font-bold text-muted min-[520px]:flex-row min-[520px]:gap-5 min-[520px]:border-l-0 min-[520px]:pl-0"
       aria-label="리서치 작업 흐름"
       variants={staggerContainerFast}
       initial="hidden"
@@ -125,7 +125,7 @@ export function WorkflowSteps({ steps }: { steps: string[] }) {
             },
           }}
         >
-          <span className="mr-2 font-mono text-[12px] text-primary-fixed-dim">
+          <span className="mr-2 font-mono text-[12px] text-primary">
             0{index + 1}
           </span>
           {step}

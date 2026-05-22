@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:20-alpine AS base
+FROM node:20-bookworm-slim AS base
 
 # Dependencies stage
 FROM base AS deps
@@ -24,9 +24,24 @@ RUN npm run build
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV PATH="/opt/krw-ontology-venv/bin:${PATH}"
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    python3 \
+    python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=krw-ontology-src pyproject.toml /tmp/krw-ontology/pyproject.toml
+COPY --from=krw-ontology-src src /tmp/krw-ontology/src
+COPY --from=krw-ontology-src ontology /tmp/krw-ontology/ontology
+RUN python3 -m venv /opt/krw-ontology-venv \
+    && /opt/krw-ontology-venv/bin/pip install --no-cache-dir /tmp/krw-ontology \
+    && rm -rf /tmp/krw-ontology
 
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
@@ -37,9 +52,27 @@ COPY --from=deps --chown=nextjs:nodejs /app/node_modules/@anthropic-ai ./node_mo
 COPY --from=krw-ontology-src --chown=nextjs:nodejs plugins/krw-ontology ./krw-ontology/plugins/krw-ontology
 COPY --from=builder --chown=nextjs:nodejs /app/docker/claude-prod /usr/local/bin/claude-prod
 
-RUN chmod 755 /usr/local/bin/claude-prod \
-    && mkdir -p .next/cache /home/nextjs/.claude-prod \
-    && chown -R nextjs:nodejs .next /home/nextjs/.claude-prod
+RUN chmod 755 /usr/local/bin/claude-prod
+
+RUN <<'EOF'
+set -eu
+cat > ./krw-ontology/plugins/krw-ontology/.mcp.json <<'JSON'
+{
+  "mcpServers": {
+    "krw-ontology": {
+      "command": "/opt/krw-ontology-venv/bin/krw-ontology-mcp",
+      "args": [],
+      "env": {
+        "KRW_ONTOLOGY_ROOT": "/srv/krw-ontology-data/current"
+      }
+    }
+  }
+}
+JSON
+chown nextjs:nodejs ./krw-ontology/plugins/krw-ontology/.mcp.json
+mkdir -p .next/cache /app/agent-workspace /home/nextjs/.claude-prod
+chown -R nextjs:nodejs .next /app/agent-workspace /home/nextjs/.claude-prod
+EOF
 
 USER nextjs
 

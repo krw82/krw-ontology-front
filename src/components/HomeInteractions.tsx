@@ -1,15 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
 import { easeOutExpo } from "@/lib/animation";
 import { DEV_AUTH_EMAIL, isDevAuthBypassEnabled } from "@/lib/dev-auth";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 const traceTransitionMs = 0.12;
-const focusTransitionMs = 0.14;
 const demoStepEvent = "krw-home-demo-step";
 const traceTransition = {
   duration: traceTransitionMs,
@@ -47,27 +46,27 @@ const demoTimeline: Array<{
     icon: "search",
     duration: 1400,
   },
-      {
-        step: "source",
-    label: "근거 문맥 확인 중",
+  {
+    step: "source",
+    label: "답변 단서 확인 중",
     icon: "description",
     duration: 1050,
   },
   {
     step: "node",
-    label: "사업 활동 노드 연결 중",
+    label: "사업 흐름 연결 중",
     icon: "hub",
     duration: 1050,
   },
   {
     step: "path",
-    label: "근거 경로 생성 중",
+    label: "답변 근거 정리 중",
     icon: "route",
     duration: 1050,
   },
   {
     step: "complete",
-    label: "근거 그래프 준비 완료",
+    label: "근거 기반 답변 준비 완료",
     icon: "check_circle",
     duration: 1250,
   },
@@ -100,6 +99,7 @@ export function HomeHeaderActions() {
   const [userEmail, setUserEmail] = useState<string | null>(
     devAuthBypass ? DEV_AUTH_EMAIL : null,
   );
+  const [authChecked, setAuthChecked] = useState(devAuthBypass);
   const supabase = useMemo(
     () => (devAuthBypass ? null : createClient()),
     [devAuthBypass],
@@ -110,13 +110,23 @@ export function HomeHeaderActions() {
 
     let isMounted = true;
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (isMounted) setUserEmail(user?.email ?? null);
-    });
+    supabase.auth
+      .getUser()
+      .then(({ data: { user } }) => {
+        if (isMounted) setUserEmail(user?.email ?? null);
+      })
+      .catch(() => {
+        if (isMounted) setUserEmail(null);
+      })
+      .finally(() => {
+        if (isMounted) setAuthChecked(true);
+      });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
+      setAuthChecked(true);
       setUserEmail(session?.user.email ?? null);
     });
 
@@ -129,48 +139,37 @@ export function HomeHeaderActions() {
   return (
     <div className="flex min-w-0 items-center gap-3">
       {userEmail ? (
-        <span className="hidden max-w-[180px] truncate text-sm font-semibold text-on-dark-soft sm:inline">
+        <span className="hidden max-w-[180px] truncate text-sm font-semibold text-muted sm:inline">
           {userEmail}
         </span>
-      ) : (
+      ) : authChecked ? (
         <Link
           href="/login"
-          className="hidden rounded-[8px] border border-white/15 px-4 py-2 text-sm font-semibold text-on-dark transition-colors hover:border-primary-fixed-dim hover:text-primary-fixed-dim sm:inline-flex"
+          className="hidden rounded-[8px] border border-hairline px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-primary hover:text-primary sm:inline-flex"
         >
           로그인
         </Link>
+      ) : (
+        <span
+          aria-hidden="true"
+          className="hidden h-10 w-[74px] rounded-[8px] bg-surface sm:inline-flex"
+        />
       )}
       <Link
         href="/companies"
-        className="rounded-[8px] bg-primary-fixed px-4 py-2 text-sm font-extrabold text-on-primary-fixed transition-colors hover:bg-primary-fixed-dim"
+        className="rounded-[8px] bg-surface-dark px-4 py-2 text-sm font-extrabold text-on-dark transition-colors hover:bg-primary-active"
       >
-        {userEmail ? "회사 목록" : "시작하기"}
+        회사 목록
       </Link>
     </div>
   );
 }
 
 export function HomeQuestionForm() {
-  const router = useRouter();
-  const [isFocused, setIsFocused] = useState(false);
   const [demoStep, setDemoStep] = useState<HomeDemoStep>("idle");
   const activeDemo =
     demoTimeline.find((item) => item.step === demoStep) ?? demoTimeline[0];
   const isResolving = demoStep !== "idle";
-  const exampleQuery = "AMZN 클라우드 이익률";
-
-  const startResearch = (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed) return;
-
-    const params = new URLSearchParams({ query: trimmed });
-    router.push(`/chat?${params.toString()}`);
-  };
-
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    startResearch(exampleQuery);
-  };
 
   useEffect(() => {
     let index = 0;
@@ -190,23 +189,16 @@ export function HomeQuestionForm() {
   }, []);
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="mt-8 flex w-full max-w-3xl items-center gap-2 rounded-[14px] border bg-canvas p-2 shadow-2xl sm:mt-10 sm:gap-3"
+    <div
+      className="mt-8 flex w-full max-w-3xl items-center gap-2 rounded-[14px] border bg-canvas p-2 shadow-[0_10px_28px_rgba(10,11,13,0.08)] sm:mt-10 sm:gap-3"
       style={{
-        borderColor: isFocused ? "rgba(183, 196, 255, 0.5)" : "rgba(255, 255, 255, 0.15)",
-        boxShadow: isFocused
-          ? "0 0 0 3px rgba(183, 196, 255, 0.15), 0 25px 50px -12px rgba(0, 0, 0, 0.35)"
-          : "0 25px 50px -12px rgba(0, 0, 0, 0.35)",
-        transition: `border-color ${focusTransitionMs}s var(--ease-out-expo), box-shadow ${focusTransitionMs}s var(--ease-out-expo)`,
+        borderColor: "var(--color-outline-variant)",
       }}
+      aria-label="기업 분석 예시"
     >
-      <button
-        type="submit"
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-[10px] pl-2 text-left outline-none transition-colors hover:bg-surface-soft focus-visible:ring-2 focus-visible:ring-primary sm:min-h-14 sm:pl-4"
-        aria-label={`${activeDemo.label}. 채팅에서 분석 시작`}
+      <div
+        className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-[10px] pl-2 text-left sm:min-h-14 sm:pl-4"
+        aria-live="polite"
       >
         <AnimatePresence mode="wait" initial={false}>
           <motion.span
@@ -236,6 +228,7 @@ export function HomeQuestionForm() {
           </AnimatePresence>
           {isResolving && (
             <motion.span
+              key={`${activeDemo.step}-progress`}
               aria-hidden="true"
               className="absolute bottom-0 left-0 h-px bg-primary-container/55"
               initial={{ width: "0%" }}
@@ -244,11 +237,10 @@ export function HomeQuestionForm() {
             />
           )}
         </span>
-      </button>
-      <button
-        type="submit"
-        aria-label="채팅에서 예시 질문으로 분석 시작"
-        className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-primary-fixed text-on-primary-fixed transition-all hover:bg-primary-fixed-dim hover:scale-[1.04] active:scale-[0.98] sm:h-14 sm:w-14"
+      </div>
+      <span
+        aria-hidden="true"
+        className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-primary-fixed text-on-primary-fixed sm:h-14 sm:w-14"
         style={{
           transitionDuration: "140ms",
           transitionTimingFunction: "var(--ease-out-expo)",
@@ -281,8 +273,8 @@ export function HomeQuestionForm() {
             </motion.span>
           )}
         </AnimatePresence>
-      </button>
-    </form>
+      </span>
+    </div>
   );
 }
 
@@ -315,13 +307,25 @@ export function HomeEvidenceCards({ cards }: { cards: HomeEvidenceCard[] }) {
                 transition: { duration: 0.24, ease: easeOutExpo },
               },
             }}
-            className="-mx-2 grid grid-cols-[88px_minmax(0,1fr)] gap-3 rounded-[8px] px-3 py-3 transition-colors duration-150"
+            className="relative -mx-2 grid grid-cols-[88px_minmax(0,1fr)] gap-3 rounded-[8px] px-3 py-3 transition-colors duration-150"
             style={{
               backgroundColor: isActive
                 ? "rgba(221, 225, 255, 0.52)"
                 : "transparent",
             }}
           >
+            <AnimatePresence initial={false}>
+              {isActive && (
+                <motion.span
+                  aria-hidden="true"
+                  className="absolute bottom-3 left-0 top-3 w-[2px] rounded-full bg-primary"
+                  initial={{ opacity: 0, scaleY: 0.4 }}
+                  animate={{ opacity: 1, scaleY: 1 }}
+                  exit={{ opacity: 0, scaleY: 0.4 }}
+                  transition={{ duration: 0.16, ease: easeOutExpo }}
+                />
+              )}
+            </AnimatePresence>
             <span
               className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] transition-colors duration-150"
               style={{
@@ -349,6 +353,7 @@ export function HomeEvidenceCards({ cards }: { cards: HomeEvidenceCard[] }) {
 
 export function HomeTraceExplorer({ nodes }: { nodes: HomeTraceNode[] }) {
   const demoStep = useHomeDemoStep();
+  const reducedMotion = useReducedMotion();
   const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null);
   const traceIdByStep: Partial<Record<HomeDemoStep, string>> = {
     source: "filing",
@@ -364,26 +369,30 @@ export function HomeTraceExplorer({ nodes }: { nodes: HomeTraceNode[] }) {
     (demoTraceId && nodes.some((node) => node.id === demoTraceId)
       ? demoTraceId
       : undefined) ??
-    nodes[1]?.id ??
     nodes[0]?.id;
   const activeTrace =
     nodes.find((node) => node.id === activeTraceId) ?? nodes[0];
 
   if (!activeTrace) return null;
 
+  const activeTraceIndex = Math.max(
+    nodes.findIndex((node) => node.id === activeTrace.id),
+    0,
+  );
+
   return (
-    <div className="mt-5 rounded-[8px] bg-surface-dark p-4 text-on-dark">
+    <div className="mt-5 rounded-[8px] border border-hairline bg-surface p-4 text-ink">
       <div className="mb-4 flex items-center justify-between">
-        <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-on-dark-soft">
+        <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
           근거 흐름
         </p>
-        <p className="text-[12px] font-semibold text-primary-fixed-dim">
-          검증 가능
+        <p className="text-[12px] font-semibold text-primary">
+          근거 기반
         </p>
       </div>
       <div
         className="relative grid grid-cols-[minmax(56px,1fr)_24px_minmax(56px,1fr)_24px_minmax(88px,1.25fr)] items-center gap-1.5 sm:grid-cols-[1fr_32px_1fr_32px_1fr] sm:gap-2"
-        aria-label="온톨로지 경로 선택"
+        aria-label="근거 흐름 선택"
         role="group"
       >
         {nodes.map((node, index) => (
@@ -392,20 +401,20 @@ export function HomeTraceExplorer({ nodes }: { nodes: HomeTraceNode[] }) {
               type="button"
               onClick={() => setSelectedTraceId(node.id)}
               aria-pressed={activeTrace.id === node.id}
-              className="relative min-w-0 whitespace-nowrap rounded-[6px] border px-2 py-4 text-center text-[12px] font-bold leading-4 transition-colors sm:px-3 sm:text-[13px]"
+              className="relative min-w-0 overflow-hidden whitespace-nowrap rounded-[6px] border px-2 py-4 text-center text-[12px] font-bold leading-4 transition-colors sm:px-3 sm:text-[13px]"
               style={{
                 borderColor:
                   activeTrace.id === node.id
-                    ? "var(--color-primary-fixed-dim)"
-                    : "rgba(255, 255, 255, 0.1)",
+                    ? "var(--color-primary)"
+                    : "var(--color-hairline)",
                 backgroundColor:
                   activeTrace.id === node.id
-                    ? "rgba(255, 255, 255, 0.14)"
-                    : "rgba(255, 255, 255, 0.06)",
+                    ? "var(--color-primary-fixed)"
+                    : "var(--color-canvas)",
                 color:
                   activeTrace.id === node.id
-                    ? "var(--color-primary-fixed-dim)"
-                    : "var(--color-on-dark)",
+                    ? "var(--color-on-primary-fixed)"
+                    : "var(--color-ink)",
                 transitionDuration: "var(--duration-fast)",
               }}
             >
@@ -413,8 +422,7 @@ export function HomeTraceExplorer({ nodes }: { nodes: HomeTraceNode[] }) {
               {activeTrace.id === node.id && (
                 <motion.span
                   layoutId="trace-highlight"
-                  className="absolute inset-0 rounded-[6px] border border-primary-fixed-dim bg-white/[0.08]"
-                  style={{ zIndex: -1 }}
+                  className="pointer-events-none absolute inset-0 rounded-[6px] border border-primary bg-primary-fixed/70"
                   transition={traceTransition}
                 />
               )}
@@ -422,12 +430,28 @@ export function HomeTraceExplorer({ nodes }: { nodes: HomeTraceNode[] }) {
               <span className="relative min-[420px]:hidden">{node.mobileLabel}</span>
             </button>
             {index < nodes.length - 1 && (
-              <span
+              <motion.span
                 aria-hidden="true"
-                className="material-symbols-outlined text-center text-[18px] text-primary-fixed-dim"
+                className="material-symbols-outlined text-center text-[18px]"
+                animate={{
+                  color:
+                    activeTraceIndex > index
+                      ? "var(--color-primary)"
+                      : "var(--color-outline-variant)",
+                  x:
+                    !reducedMotion &&
+                    demoStep !== "idle" &&
+                    activeTraceIndex === index + 1
+                      ? [0, 3, 0]
+                      : 0,
+                }}
+                transition={{
+                  duration: reducedMotion ? 0 : 0.2,
+                  ease: easeOutExpo,
+                }}
               >
                 arrow_forward
-              </span>
+              </motion.span>
             )}
           </div>
         ))}
@@ -436,7 +460,7 @@ export function HomeTraceExplorer({ nodes }: { nodes: HomeTraceNode[] }) {
       <AnimatePresence mode="wait">
         <motion.div
           key={activeTrace.id}
-          className="mt-4 rounded-[8px] border border-white/10 bg-white/[0.06] p-3"
+          className="mt-4 rounded-[8px] border border-hairline bg-canvas p-3"
           aria-live="polite"
           aria-atomic="true"
           initial={{ opacity: 0, y: 6 }}
@@ -444,16 +468,16 @@ export function HomeTraceExplorer({ nodes }: { nodes: HomeTraceNode[] }) {
           exit={{ opacity: 0, y: -6 }}
           transition={traceTransition}
         >
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-on-dark-soft">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
             {activeTrace.eyebrow}
           </p>
-          <p className="mt-2 text-[14px] font-extrabold leading-5 text-on-dark">
+          <p className="mt-2 text-[14px] font-extrabold leading-5 text-ink">
             {activeTrace.title}
           </p>
-          <p className="mt-2 text-[12px] leading-5 text-on-dark-soft">
+          <p className="mt-2 text-[12px] leading-5 text-body">
             {activeTrace.detail}
           </p>
-          <p className="mt-3 border-l border-primary-fixed-dim pl-3 text-[12px] font-semibold leading-5 text-primary-fixed-dim">
+          <p className="mt-3 border-l border-primary pl-3 text-[12px] font-semibold leading-5 text-primary">
             {activeTrace.quote}
           </p>
         </motion.div>

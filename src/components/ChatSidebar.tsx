@@ -1,11 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import type { FormEvent } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { buildChatSessionHref } from "@/lib/chat/history-state";
 import { useSessions } from "@/hooks/useSessions";
-import { sidebarPanel, sidebarBackdrop } from "@/lib/animation";
+import {
+  easeOutExpo,
+  popoverMenu,
+  sidebarPanel,
+  sidebarBackdrop,
+} from "@/lib/animation";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
+import type { SessionSummary } from "@/types/api-contracts";
 
 interface ChatSidebarProps {
   activeSessionId: string | null;
@@ -16,7 +25,12 @@ interface SidebarContentProps {
   activeSessionId: string | null;
   loading: boolean;
   sessions: ReturnType<typeof useSessions>["sessions"];
+  mutatingSessionId: ReturnType<typeof useSessions>["mutatingSessionId"];
+  mutationError: ReturnType<typeof useSessions>["mutationError"];
+  renameSession: ReturnType<typeof useSessions>["renameSession"];
+  deleteSession: ReturnType<typeof useSessions>["deleteSession"];
   onNavigate?: () => void;
+  onDeleteActiveSession?: () => void;
 }
 
 function formatRelativeDate(value: string): string {
@@ -41,7 +55,16 @@ export default function ChatSidebar({
   activeSessionId,
   refreshSignal,
 }: ChatSidebarProps) {
-  const { sessions, loading, listSessions } = useSessions();
+  const router = useRouter();
+  const {
+    sessions,
+    loading,
+    mutatingSessionId,
+    mutationError,
+    listSessions,
+    renameSession,
+    deleteSession,
+  } = useSessions();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -54,7 +77,6 @@ export default function ChatSidebar({
         session.latest_run_status === "running" ||
         session.latest_run_status === "pending",
     );
-
     if (!hasRunningSession) return;
 
     const intervalId = window.setInterval(() => {
@@ -79,7 +101,7 @@ export default function ChatSidebar({
     <>
       <button
         type="button"
-        className="fixed left-base top-[10px] z-[70] inline-flex h-11 w-11 items-center justify-center rounded-[8px] text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas md:hidden"
+        className="fixed left-base top-[14px] z-[70] inline-flex h-11 w-11 items-center justify-center rounded-[8px] text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas md:hidden"
         aria-label="채팅 기록 열기"
         aria-expanded={mobileOpen}
         aria-controls="mobile-chat-sidebar"
@@ -115,25 +137,33 @@ export default function ChatSidebar({
               exit="exit"
               variants={sidebarPanel}
             >
-            <div className="flex h-[64px] items-center justify-between border-b border-hairline px-md">
-              <p className="text-[15px] font-extrabold text-ink">채팅 기록</p>
-              <button
-                type="button"
-                className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-surface hover:text-ink"
-                aria-label="채팅 기록 닫기"
-                onClick={() => setMobileOpen(false)}
-              >
-                <span aria-hidden="true" className="material-symbols-outlined text-[20px]">
-                  close
-                </span>
-              </button>
-            </div>
-            <SidebarContent
-              activeSessionId={activeSessionId}
-              loading={loading}
-              sessions={sessions}
-              onNavigate={() => setMobileOpen(false)}
-            />
+              <div className="flex h-[64px] items-center justify-between border-b border-hairline px-md">
+                <p className="text-[15px] font-extrabold text-ink">채팅 기록</p>
+                <button
+                  type="button"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-surface hover:text-ink"
+                  aria-label="채팅 기록 닫기"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <span aria-hidden="true" className="material-symbols-outlined text-[20px]">
+                    close
+                  </span>
+                </button>
+              </div>
+              <SidebarContent
+                activeSessionId={activeSessionId}
+                loading={loading}
+                sessions={sessions}
+                mutatingSessionId={mutatingSessionId}
+                mutationError={mutationError}
+                renameSession={renameSession}
+                deleteSession={deleteSession}
+                onNavigate={() => setMobileOpen(false)}
+                onDeleteActiveSession={() => {
+                  setMobileOpen(false);
+                  router.replace("/chat");
+                }}
+              />
             </motion.aside>
           </div>
         )}
@@ -144,6 +174,11 @@ export default function ChatSidebar({
           activeSessionId={activeSessionId}
           loading={loading}
           sessions={sessions}
+          mutatingSessionId={mutatingSessionId}
+          mutationError={mutationError}
+          renameSession={renameSession}
+          deleteSession={deleteSession}
+          onDeleteActiveSession={() => router.replace("/chat")}
         />
       </aside>
     </>
@@ -154,8 +189,87 @@ function SidebarContent({
   activeSessionId,
   loading,
   sessions,
+  mutatingSessionId,
+  mutationError,
+  renameSession,
+  deleteSession,
   onNavigate,
+  onDeleteActiveSession,
 }: SidebarContentProps) {
+  const reducedMotion = useReducedMotion();
+  const menuRootRef = useRef<HTMLDivElement | null>(null);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [pendingDeleteSession, setPendingDeleteSession] =
+    useState<SessionSummary | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!menuOpenId) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        menuRootRef.current &&
+        event.target instanceof Node &&
+        !menuRootRef.current.contains(event.target)
+      ) {
+        setMenuOpenId(null);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpenId(null);
+        setEditingSessionId(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menuOpenId]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timeoutId = window.setTimeout(() => setNotice(null), 3200);
+    return () => window.clearTimeout(timeoutId);
+  }, [notice]);
+
+  const beginRename = (session: SessionSummary) => {
+    setMenuOpenId(null);
+    setEditingSessionId(session.id);
+    setEditingTitle(session.title || "새 채팅");
+  };
+
+  const cancelRename = () => {
+    setEditingSessionId(null);
+    setEditingTitle("");
+  };
+
+  const handleRenameSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingSessionId) return;
+    const updated = await renameSession(editingSessionId, editingTitle);
+    if (!updated) return;
+    setNotice("채팅 이름을 저장했습니다.");
+    cancelRename();
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!pendingDeleteSession) return;
+    const deletingActiveSession = pendingDeleteSession.id === activeSessionId;
+    const result = await deleteSession(pendingDeleteSession.id);
+    if (!result) return;
+    setNotice("채팅을 삭제했습니다.");
+    setPendingDeleteSession(null);
+    if (deletingActiveSession) {
+      onDeleteActiveSession?.();
+    }
+  };
+
   return (
     <>
       <div className="border-b border-hairline p-md">
@@ -171,7 +285,20 @@ function SidebarContent({
         </Link>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-sm">
+      <div ref={menuRootRef} className="flex-1 overflow-y-auto p-sm">
+        {(mutationError || notice) && (
+          <div
+            className={[
+              "mb-sm rounded-[8px] border px-sm py-xs text-[12px] font-semibold leading-[1.45]",
+              mutationError
+                ? "border-error-container bg-error-container/30 text-on-error-container"
+                : "border-hairline bg-canvas text-body",
+            ].join(" ")}
+            role={mutationError ? "alert" : "status"}
+          >
+            {mutationError || notice}
+          </div>
+        )}
         {loading && sessions.length === 0 ? (
           <div className="space-y-xs">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -181,6 +308,10 @@ function SidebarContent({
               />
             ))}
           </div>
+        ) : sessions.length === 0 ? (
+          <div className="rounded-[8px] border border-dashed border-hairline bg-canvas px-sm py-md text-[13px] font-semibold leading-[1.45] text-muted">
+            저장된 채팅이 없습니다.
+          </div>
         ) : (
           <nav className="space-y-xs" aria-label="채팅 기록">
             {sessions.map((session) => {
@@ -189,54 +320,325 @@ function SidebarContent({
                 session.latest_run_status === "running" ||
                 session.latest_run_status === "pending";
               return (
-                <motion.div
+                <SessionRow
                   key={session.id}
-                  layout="position"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, ease: "easeOut" }}
-                >
-                  <Link
-                    href={buildChatSessionHref(session.id)}
-                    className={[
-                      "block rounded-[8px] border px-sm py-xs transition-colors",
-                      isActive
-                        ? "border-primary bg-primary-fixed text-on-primary-fixed"
-                        : "border-transparent hover:border-hairline hover:bg-surface",
-                    ].join(" ")}
-                    onClick={onNavigate}
-                  >
-                    <div className="flex items-start justify-between gap-xs">
-                      <div className="min-w-0">
-                        <p className="truncate text-[14px] font-semibold leading-[1.4] text-ink">
-                          {session.title || "새 채팅"}
-                        </p>
-                        <p className="mt-xxs line-clamp-2 text-[12px] leading-[1.35] text-muted">
-                          {session.last_message_preview || "아직 메시지가 없습니다."}
-                        </p>
-                      </div>
-                      {isRunning && (
-                        <span
-                          className="mt-[2px] h-2 w-2 shrink-0 rounded-full bg-primary-container"
-                          aria-label="응답 생성 중"
-                        />
-                      )}
-                    </div>
-                    <div className="mt-xs flex items-center justify-between gap-xs text-[11px] leading-[1.3] text-muted-soft">
-                      <span>{formatRelativeDate(session.updated_at)}</span>
-                      {session.default_tickers.length > 0 && (
-                        <span className="truncate font-mono">
-                          {session.default_tickers.join(", ")}
-                        </span>
-                      )}
-                    </div>
-                  </Link>
-                </motion.div>
+                  session={session}
+                  isActive={isActive}
+                  isRunning={isRunning}
+                  isMenuOpen={menuOpenId === session.id}
+                  isEditing={editingSessionId === session.id}
+                  isBusy={mutatingSessionId === session.id}
+                  editingTitle={editingTitle}
+                  reducedMotion={reducedMotion}
+                  onNavigate={onNavigate}
+                  onMenuToggle={() =>
+                    setMenuOpenId((current) =>
+                      current === session.id ? null : session.id,
+                    )
+                  }
+                  onRename={() => beginRename(session)}
+                  onDelete={() => {
+                    setMenuOpenId(null);
+                    setPendingDeleteSession(session);
+                  }}
+                  onCancelRename={cancelRename}
+                  onEditingTitleChange={setEditingTitle}
+                  onRenameSubmit={handleRenameSubmit}
+                />
               );
             })}
           </nav>
         )}
       </div>
+      <DeleteSessionDialog
+        session={pendingDeleteSession}
+        isDeleting={
+          Boolean(pendingDeleteSession) &&
+          mutatingSessionId === pendingDeleteSession?.id
+        }
+        onCancel={() => setPendingDeleteSession(null)}
+        onConfirm={handleDeleteConfirm}
+      />
     </>
+  );
+}
+
+function SessionRow({
+  session,
+  isActive,
+  isRunning,
+  isMenuOpen,
+  isEditing,
+  isBusy,
+  editingTitle,
+  reducedMotion,
+  onNavigate,
+  onMenuToggle,
+  onRename,
+  onDelete,
+  onCancelRename,
+  onEditingTitleChange,
+  onRenameSubmit,
+}: {
+  session: SessionSummary;
+  isActive: boolean;
+  isRunning: boolean;
+  isMenuOpen: boolean;
+  isEditing: boolean;
+  isBusy: boolean;
+  editingTitle: string;
+  reducedMotion: boolean;
+  onNavigate?: () => void;
+  onMenuToggle: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+  onCancelRename: () => void;
+  onEditingTitleChange: (value: string) => void;
+  onRenameSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <motion.div
+      layout="position"
+      initial={{ opacity: 0, y: reducedMotion ? 0 : 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: reducedMotion ? 0 : 0.18,
+        ease: easeOutExpo,
+        layout: { duration: reducedMotion ? 0 : 0.16 },
+      }}
+      className="group relative"
+    >
+      {isActive && (
+        <span
+          aria-hidden="true"
+          className="absolute bottom-2 left-0 top-2 z-10 w-[3px] rounded-r-full bg-primary"
+        />
+      )}
+
+      {isEditing ? (
+        <form
+          className="rounded-[8px] border border-primary bg-canvas p-xs shadow-sm"
+          onSubmit={onRenameSubmit}
+        >
+          <label className="sr-only" htmlFor={`session-title-${session.id}`}>
+            채팅 이름
+          </label>
+          <input
+            id={`session-title-${session.id}`}
+            className="h-9 w-full rounded-[6px] border border-hairline bg-surface-soft px-xs text-[13px] font-semibold leading-[1.35] text-ink outline-none transition-colors focus:border-primary"
+            value={editingTitle}
+            maxLength={200}
+            autoFocus
+            onChange={(event) => onEditingTitleChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") onCancelRename();
+            }}
+          />
+          <div className="mt-xs flex items-center justify-end gap-xxs">
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-[6px] text-muted transition-colors hover:bg-surface hover:text-ink"
+              aria-label="이름 변경 취소"
+              onClick={onCancelRename}
+              disabled={isBusy}
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
+                close
+              </span>
+            </button>
+            <button
+              type="submit"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-[6px] bg-surface-dark text-on-dark transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:bg-primary-disabled"
+              aria-label="이름 저장"
+              disabled={isBusy}
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
+                check
+              </span>
+            </button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <Link
+            href={buildChatSessionHref(session.id)}
+            className={[
+              "block rounded-[8px] border py-xs pl-sm pr-10 transition-colors",
+              isActive
+                ? "border-primary bg-primary-fixed text-on-primary-fixed"
+                : "border-transparent hover:border-hairline hover:bg-canvas",
+            ].join(" ")}
+            onClick={onNavigate}
+          >
+            <div className="flex items-start justify-between gap-xs">
+              <div className="min-w-0">
+                <p className="truncate text-[14px] font-semibold leading-[1.4] text-ink">
+                  {session.title || "새 채팅"}
+                </p>
+                <p className="mt-xxs line-clamp-2 text-[12px] leading-[1.35] text-muted">
+                  {session.last_message_preview || "아직 메시지가 없습니다."}
+                </p>
+              </div>
+              {isRunning && (
+                <span
+                  className="relative mt-[3px] h-2.5 w-2.5 shrink-0"
+                  aria-label="응답 생성 중"
+                >
+                  <span className="absolute inset-[1px] rounded-full bg-primary-container" />
+                  {!reducedMotion && (
+                    <motion.span
+                      aria-hidden="true"
+                      className="absolute inset-0 rounded-full border border-primary-container"
+                      animate={{ opacity: [0.48, 0], scale: [1, 2.2] }}
+                      transition={{
+                        duration: 1.2,
+                        repeat: Infinity,
+                        ease: "easeOut",
+                      }}
+                    />
+                  )}
+                </span>
+              )}
+            </div>
+            <div className="mt-xs flex items-center justify-between gap-xs text-[11px] leading-[1.3] text-muted-soft">
+              <span>{formatRelativeDate(session.updated_at)}</span>
+              {session.default_tickers.length > 0 && (
+                <span className="truncate font-mono">
+                  {session.default_tickers.join(", ")}
+                </span>
+              )}
+            </div>
+          </Link>
+
+          <button
+            type="button"
+            className={[
+              "absolute right-1.5 top-1.5 z-20 inline-flex h-8 w-8 items-center justify-center rounded-[6px] border border-transparent bg-canvas/80 text-muted shadow-sm backdrop-blur transition-all hover:border-hairline hover:bg-canvas hover:text-ink focus-visible:opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100",
+              isActive || isMenuOpen ? "md:opacity-100" : "",
+            ].join(" ")}
+            aria-label={`${session.title || "새 채팅"} 메뉴`}
+            aria-haspopup="menu"
+            aria-expanded={isMenuOpen}
+            onClick={onMenuToggle}
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
+              more_horiz
+            </span>
+          </button>
+
+          <AnimatePresence initial={false}>
+            {isMenuOpen && (
+              <motion.div
+                className="absolute right-1.5 top-10 z-30 w-[168px] rounded-[8px] border border-hairline bg-canvas p-xxs shadow-lg"
+                role="menu"
+                variants={popoverMenu}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                style={{ transformOrigin: "top right" }}
+              >
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-[6px] px-xs py-xs text-left text-[13px] font-semibold text-body transition-colors hover:bg-surface-soft hover:text-ink"
+                  role="menuitem"
+                  onClick={onRename}
+                  disabled={isBusy}
+                >
+                  <span>이름 변경</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[17px]">
+                    edit
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="mt-xxs flex w-full items-center justify-between rounded-[6px] px-xs py-xs text-left text-[13px] font-semibold text-error transition-colors hover:bg-error-container/35"
+                  role="menuitem"
+                  onClick={onDelete}
+                  disabled={isBusy || isRunning}
+                  title={isRunning ? "응답 생성 중에는 삭제할 수 없습니다." : undefined}
+                >
+                  <span>{isRunning ? "실행 중" : "삭제"}</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[17px]">
+                    delete
+                  </span>
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
+      )}
+    </motion.div>
+  );
+}
+
+function DeleteSessionDialog({
+  session,
+  isDeleting,
+  onCancel,
+  onConfirm,
+}: {
+  session: SessionSummary | null;
+  isDeleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {session && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/20 p-base">
+          <motion.div
+            className="w-full max-w-[360px] rounded-[8px] border border-hairline bg-canvas p-md shadow-xl"
+            initial={{ opacity: 0, y: 8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.98 }}
+            transition={{ duration: 0.16, ease: easeOutExpo }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-session-title"
+          >
+            <div className="flex items-start gap-sm">
+              <span
+                aria-hidden="true"
+                className="material-symbols-outlined mt-[1px] text-[22px] text-error"
+              >
+                delete
+              </span>
+              <div className="min-w-0">
+                <h2
+                  id="delete-session-title"
+                  className="text-[16px] font-extrabold leading-[1.35] text-ink"
+                >
+                  채팅을 삭제할까요?
+                </h2>
+                <p className="mt-xs text-[13px] font-medium leading-[1.55] text-body">
+                  목록에서 숨겨집니다. 이 작업은 현재 화면에서 바로 되돌릴 수 없습니다.
+                </p>
+                <p className="mt-xs truncate rounded-[6px] bg-surface px-xs py-xxs text-[12px] font-semibold text-muted">
+                  {session.title || "새 채팅"}
+                </p>
+              </div>
+            </div>
+            <div className="mt-md flex justify-end gap-xs">
+              <button
+                type="button"
+                className="inline-flex h-10 items-center rounded-[8px] border border-hairline bg-canvas px-sm text-[14px] font-bold text-body transition-colors hover:bg-surface"
+                onClick={onCancel}
+                disabled={isDeleting}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="inline-flex h-10 items-center rounded-[8px] bg-error px-sm text-[14px] font-bold text-on-error transition-colors hover:bg-on-error-container disabled:cursor-not-allowed disabled:bg-primary-disabled"
+                onClick={onConfirm}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "삭제 중" : "삭제"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }

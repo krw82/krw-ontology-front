@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getAuthUser, handleAuthError, forbiddenError } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { isUuid } from "@/lib/api/validation";
 import type {
   AgentRunRow,
   ChatSessionRow,
@@ -24,6 +25,10 @@ export async function GET(
 ) {
   const { sessionId } = await params;
 
+  if (!isUuid(sessionId)) {
+    return notFoundError("채팅을 찾지 못했습니다.");
+  }
+
   let user;
   try {
     user = await getAuthUser();
@@ -38,6 +43,7 @@ export async function GET(
     .from("chat_sessions")
     .select("*")
     .eq("id", sessionId)
+    .is("deleted_at", null)
     .single<ChatSessionRow>();
 
   if (error || !session) {
