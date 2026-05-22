@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
+  MAX_CHAT_ATTACHMENT_BYTES,
+  MAX_CHAT_ATTACHMENT_COUNT,
   MAX_CHAT_MESSAGE_CHARS,
   MAX_CHAT_PAYLOAD_CHARS,
 } from "@/lib/chat-limits";
@@ -169,6 +171,23 @@ export default function Composer({
     const invalidFile = files.find((file) => !isAcceptedTextFile(file));
     if (invalidFile) {
       setAttachmentError("txt 또는 md 파일만 첨부할 수 있습니다.");
+      return;
+    }
+
+    if (attachments.length + files.length > MAX_CHAT_ATTACHMENT_COUNT) {
+      setAttachmentError(
+        `첨부 파일은 최대 ${MAX_CHAT_ATTACHMENT_COUNT}개까지 보낼 수 있습니다.`,
+      );
+      return;
+    }
+
+    const oversizedFile = files.find(
+      (file) => file.size > MAX_CHAT_ATTACHMENT_BYTES,
+    );
+    if (oversizedFile) {
+      setAttachmentError(
+        `첨부 파일 하나는 ${formatBytes(MAX_CHAT_ATTACHMENT_BYTES)}를 넘을 수 없습니다.`,
+      );
       return;
     }
 

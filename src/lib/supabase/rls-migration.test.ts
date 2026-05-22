@@ -10,10 +10,15 @@ const leaseReadMigrationPath = join(
   process.cwd(),
   "supabase/migrations/20260514045627_lock_concurrency_lease_reads.sql",
 );
+const softDeleteRlsMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260522004000_soft_delete_rls.sql",
+);
 
 describe("harden chat RLS migration", () => {
   const migration = readFileSync(migrationPath, "utf8");
   const leaseReadMigration = readFileSync(leaseReadMigrationPath, "utf8");
+  const softDeleteRlsMigration = readFileSync(softDeleteRlsMigrationPath, "utf8");
 
   it("revokes direct client writes from server-owned chat tables", () => {
     expect(migration).toContain("REVOKE INSERT, UPDATE, DELETE ON TABLE");
@@ -53,5 +58,15 @@ describe("harden chat RLS migration", () => {
       "REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLE concurrency_leases",
     );
     expect(leaseReadMigration).toContain("FROM anon, authenticated, PUBLIC");
+  });
+
+  it("hides soft-deleted sessions from child-table ownership checks", () => {
+    expect(softDeleteRlsMigration).toContain(
+      "CREATE OR REPLACE FUNCTION session_owner",
+    );
+    expect(softDeleteRlsMigration).toContain("AND deleted_at IS NULL");
+    expect(softDeleteRlsMigration).toContain("sessions_select_own");
+    expect(softDeleteRlsMigration).toContain("sessions_update_own");
+    expect(softDeleteRlsMigration).toContain("sessions_delete_own");
   });
 });

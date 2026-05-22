@@ -1,5 +1,7 @@
 export const MAX_CHAT_MESSAGE_CHARS = 20_000;
 export const MAX_CHAT_PAYLOAD_CHARS = 120_000;
+export const MAX_CHAT_ATTACHMENT_COUNT = 5;
+export const MAX_CHAT_ATTACHMENT_BYTES = 96_000;
 
 export function getChatContentLimit(content: string): number {
   return content.includes("<attached_file name=")

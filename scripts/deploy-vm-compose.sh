@@ -63,6 +63,40 @@ if [ "$SKILL_COUNT" -lt 1 ]; then
   exit 1
 fi
 
+require_env_value() {
+  key="$1"
+  value=$(
+    awk -F= -v key="$key" '
+      $0 !~ /^[[:space:]]*#/ && $1 == key {
+        sub(/^[^=]*=/, "")
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+        gsub(/^"|"$/, "")
+        gsub(/^'\''|'\''$/, "")
+        print
+      }
+    ' "$ENV_FILE" | tail -n 1
+  )
+  if [ -z "$value" ]; then
+    echo "Missing required environment value in $ENV_FILE: $key" >&2
+    exit 1
+  fi
+}
+
+for key in \
+  ANTHROPIC_API_KEY \
+  NEXT_PUBLIC_SUPABASE_URL \
+  NEXT_PUBLIC_SUPABASE_ANON_KEY \
+  NEXT_PUBLIC_SITE_URL \
+  NEXT_PUBLIC_APP_URL \
+  AUTH_REDIRECT_ORIGIN \
+  SUPABASE_URL \
+  SUPABASE_ANON_KEY \
+  SUPABASE_SERVICE_ROLE_KEY \
+  INTERNAL_API_KEY
+do
+  require_env_value "$key"
+done
+
 BUILD_CONTEXT=$(mktemp -d "${TMPDIR:-/tmp}/krw-ontology-front-build.XXXXXX")
 cleanup() {
   rm -rf "$BUILD_CONTEXT"

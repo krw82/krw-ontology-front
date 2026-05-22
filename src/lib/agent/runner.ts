@@ -429,7 +429,7 @@ async function reportSdkInitialization(params: {
   await options.onSdkDiagnostics(diagnostics);
 }
 
-async function canUseTool(
+export async function canUseTool(
   toolName: string,
 ): Promise<PermissionResult> {
   if (isKrwOntologySdkTool(toolName)) {

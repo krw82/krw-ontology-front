@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
+import { MAX_CHAT_ATTACHMENT_BYTES } from "@/lib/chat/attachments";
 import { validateRequest } from "./validate-request";
 
 vi.mock("@/lib/auth", () => ({
@@ -116,6 +117,70 @@ describe("validateRequest", () => {
     expect(getAuthUser).not.toHaveBeenCalled();
   });
 
+  it("rejects unsupported file attachment extensions on the server", async () => {
+    const result = await validateRequest(
+      makeRequest({
+        content:
+          "please read\n\n<attached_file name=\"filing.pdf\">\ntext\n</attached_file>",
+        request_id: "req-1",
+      }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.response.status).toBe(400);
+    expect(await json(result.response)).toMatchObject({
+      error: {
+        code: "validation_error",
+        message: "txt 또는 md 파일만 첨부할 수 있습니다.",
+      },
+      request_id: "req-1",
+    });
+    expect(getAuthUser).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed attachment markers on the server", async () => {
+    const result = await validateRequest(
+      makeRequest({
+        content: "hello\n\n<attached_file name=\"note.md\">\nmissing close",
+        request_id: "req-1",
+      }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.response.status).toBe(400);
+    expect(await json(result.response)).toMatchObject({
+      error: {
+        code: "validation_error",
+        message: "첨부 파일 형식이 올바르지 않습니다.",
+      },
+    });
+    expect(getAuthUser).not.toHaveBeenCalled();
+  });
+
+  it("rejects oversized individual attachments on the server", async () => {
+    const result = await validateRequest(
+      makeRequest({
+        content: `<attached_file name=\"note.md\">\n${"a".repeat(
+          MAX_CHAT_ATTACHMENT_BYTES + 1,
+        )}\n</attached_file>`,
+        request_id: "req-1",
+      }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.response.status).toBe(400);
+    expect(await json(result.response)).toMatchObject({
+      error: {
+        code: "validation_error",
+        message: `첨부 파일 하나는 ${MAX_CHAT_ATTACHMENT_BYTES.toLocaleString()}바이트를 넘을 수 없습니다.`,
+      },
+    });
+    expect(getAuthUser).not.toHaveBeenCalled();
+  });
+
   it("returns normalized body and authenticated user for valid input", async () => {
     const result = await validateRequest(
       makeRequest({
@@ -137,6 +202,19 @@ describe("validateRequest", () => {
       default_tickers: ["AAPL"],
       default_document_types: ["10-K"],
     });
+  });
+
+  it("accepts valid markdown attachments after server-side validation", async () => {
+    const result = await validateRequest(
+      makeRequest({
+        content: "summarize\n\n<attached_file name=\"note.md\">\n# Memo\n</attached_file>",
+        request_id: "req-1",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.body.content).toContain("<attached_file name=\"note.md\">");
   });
 
   it("passes the normalized request id to auth errors", async () => {

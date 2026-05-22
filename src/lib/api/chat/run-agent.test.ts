@@ -232,4 +232,31 @@ describe("streamPersistedRunEvents", () => {
       ]),
     );
   });
+
+  it("does not stream raw persisted agent errors to the browser", async () => {
+    const run = makeRun({
+      status: "failed",
+      error_code: "claude_api_error",
+      error_message: "stack trace: secret=/srv/claude-prod/token",
+    });
+    const io = createWriter();
+    const admin = createFakeAdmin({ runs: [run] });
+
+    await streamPersistedRunEvents({
+      admin,
+      writer: io.writer,
+      encoder: new TextEncoder(),
+      runId: run.id,
+      sessionId: run.session_id,
+      userId: "user-1",
+    });
+
+    const errorEvent = io.events().find((event) => event.event === "error");
+    expect(errorEvent?.data).toMatchObject({
+      run_id: run.id,
+      error_code: "claude_api_error",
+      error_message: "에이전트 실행 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+    });
+    expect(JSON.stringify(errorEvent?.data)).not.toContain("secret=");
+  });
 });

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import type { ChatRunRequest, ErrorCode } from "@/types/api-contracts";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
+import { validateChatAttachments } from "@/lib/chat/attachments";
 import { getChatContentLimit } from "@/lib/chat-limits";
 import {
   isOptionalStringArray,
@@ -150,6 +151,18 @@ export async function validateRequest(
 
   const normalizedDefaultTickers = normalizeStringList(default_tickers);
   const normalizedDefaultDocumentTypes = normalizeStringList(default_document_types);
+  const attachmentValidation = validateChatAttachments(content);
+  if (!attachmentValidation.ok) {
+    return {
+      ok: false,
+      response: errorResponse(
+        400,
+        "validation_error",
+        attachmentValidation.message,
+        normalizedRequestId,
+      ),
+    };
+  }
 
   const body: ChatRunRequest = {
     content,

@@ -155,6 +155,12 @@ export async function DELETE(
     return errorResponse(500, "internal_error", "채팅을 삭제하지 못했습니다.");
   }
 
+  await getSupabaseAdmin()
+    .from("message_shares")
+    .update({ revoked_at: deletedAt })
+    .eq("source_session_id", sessionId)
+    .is("revoked_at", null);
+
   return Response.json({
     success: true,
     session_id: sessionId,

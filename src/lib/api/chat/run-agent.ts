@@ -45,6 +45,10 @@ import type {
 } from "@/types/api-contracts";
 import { toErrorCode } from "@/types/api-contracts";
 import { readIntEnv } from "@/lib/env";
+import {
+  publicAgentErrorMessage,
+  publicErrorMessage,
+} from "@/lib/api/chat/error-messages";
 
 const EXISTING_RUN_POLL_INTERVAL_MS = 800;
 const EXISTING_RUN_MAX_POLL_MS = 120_000;
@@ -137,12 +141,7 @@ export function executeRun(params: RunAgentParams): Response {
         await sendEvent("error", {
           run_id: "",
           error_code: toErrorCode(leaseResult.reason ?? "internal_error"),
-          error_message:
-            leaseResult.reason === "active_run_exists"
-              ? "Session already has an active run"
-              : leaseResult.reason === "concurrency_limit"
-                ? "Global concurrent run limit reached"
-                : "Could not acquire run lease",
+          error_message: publicErrorMessage(leaseResult.reason ?? "internal_error"),
         });
         controller.close();
         return;
@@ -308,8 +307,9 @@ export function executeRun(params: RunAgentParams): Response {
         }
       } catch (err) {
         const finishedAt = new Date().toISOString();
-        const errorMessage =
+        const rawErrorMessage =
           err instanceof Error ? err.message : "Internal error";
+        const publicMessage = publicErrorMessage("internal_error");
 
         await admin
           .from("agent_runs")
@@ -317,14 +317,14 @@ export function executeRun(params: RunAgentParams): Response {
             status: "failed",
             finished_at: finishedAt,
             error_code: "internal_error",
-            error_message: errorMessage,
+            error_message: rawErrorMessage,
           })
           .eq("id", runId);
         await admin
           .from("messages")
           .update({
             status: "failed",
-            content: errorMessage,
+            content: publicMessage,
           })
           .eq("id", assistantMessageId);
 
@@ -332,7 +332,7 @@ export function executeRun(params: RunAgentParams): Response {
           await sendEvent("error", {
             run_id: runId,
             error_code: "internal_error",
-            error_message: errorMessage,
+            error_message: publicMessage,
           });
         } catch {
           // Stream may already be closed
@@ -554,10 +554,11 @@ export async function streamPersistedRunEvents(params: {
     }
 
     if (run.status === "failed") {
+      const errorCode = toErrorCode(run.error_code ?? "claude_api_error");
       await sendEvent("error", {
         run_id: run.id,
-        error_code: toErrorCode(run.error_code ?? "claude_api_error"),
-        error_message: run.error_message || "실행에 실패했습니다.",
+        error_code: errorCode,
+        error_message: publicErrorMessage(errorCode),
       });
       return;
     }
@@ -1198,29 +1199,31 @@ interface FailedRunParams {
 
 async function handleFailedRun(params: FailedRunParams) {
   const { admin, runId, assistantMessageId, finishedAt, result, sendEvent } = params;
-  const errorMessage = result.errorMessage || "실행에 실패했습니다.";
+  const errorCode = toErrorCode(result.errorCode || "claude_api_error");
+  const rawErrorMessage = result.errorMessage || publicErrorMessage(errorCode);
+  const publicMessage = publicAgentErrorMessage({ code: errorCode });
 
   await admin
     .from("agent_runs")
     .update({
       status: "failed",
       finished_at: finishedAt,
-      error_code: result.errorCode || "claude_api_error",
-      error_message: errorMessage,
+      error_code: errorCode,
+      error_message: rawErrorMessage,
     })
     .eq("id", runId);
 
   await admin
     .from("messages")
     .update({
-      content: errorMessage,
+      content: publicMessage,
       status: "failed",
     })
     .eq("id", assistantMessageId);
 
   await sendEvent("error", {
     run_id: runId,
-    error_code: result.errorCode || "claude_api_error",
-    error_message: errorMessage,
+    error_code: errorCode,
+    error_message: publicMessage,
   });
 }
