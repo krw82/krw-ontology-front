@@ -60,8 +60,10 @@ export async function updateSession(request: NextRequest) {
 
   // Redirect authenticated users away from login
   if (user && request.nextUrl.pathname === "/login") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/companies";
+    const url = new URL(
+      normalizeInternalNextPath(request.nextUrl.searchParams.get("next")),
+      request.nextUrl.origin,
+    );
     return NextResponse.redirect(url);
   }
 

@@ -79,15 +79,6 @@ function UserAvatar({
   );
 }
 
-function isProtectedPath(pathname: string): boolean {
-  return (
-    pathname === "/chat" ||
-    pathname.startsWith("/chat/") ||
-    pathname === "/companies" ||
-    pathname.startsWith("/companies/")
-  );
-}
-
 export default function TopNav({
   initialUserProfile,
 }: TopNavProps = {}) {
@@ -150,13 +141,6 @@ export default function TopNav({
       subscription.unsubscribe();
     };
   }, [supabase]);
-
-  useEffect(() => {
-    if (!authChecked || userProfile || devAuthBypass) return;
-    if (!isProtectedPath(pathname)) return;
-
-    router.replace(`/login?next=${encodeURIComponent(currentPath)}`);
-  }, [authChecked, currentPath, devAuthBypass, pathname, router, userProfile]);
 
   useEffect(() => {
     if (!accountMenuOpen) return;
