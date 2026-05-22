@@ -1,9 +1,12 @@
 import type { NextConfig } from "next";
-import { securityHeaders } from "./src/lib/security/headers";
+import { buildSecurityHeaders } from "./src/lib/security/headers";
+
+const isDevelopment = process.env.NODE_ENV === "development";
 
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  allowedDevOrigins: isDevelopment ? ["127.0.0.1", "192.168.10.52"] : [],
   images: {
     remotePatterns: [
       {
@@ -17,7 +20,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/:path*",
-        headers: [...securityHeaders],
+        headers: buildSecurityHeaders({ isDevelopment }),
       },
     ];
   },
