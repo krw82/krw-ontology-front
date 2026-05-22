@@ -15,6 +15,8 @@ import {
 } from "@/lib/chat/research-status";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import type { ResearchActivityUpdate } from "@/types/api-contracts";
+import type { EntitlementStatus } from "@/types/entitlement";
+import UsageStatus from "./UsageStatus";
 
 interface ComposerProps {
   onSend: (message: string) => void;
@@ -25,6 +27,7 @@ interface ComposerProps {
   placeholder?: string;
   toolCalls?: ResearchToolCallStatus[];
   initialValue?: string;
+  entitlement?: EntitlementStatus | null;
 }
 
 interface TextAttachment {
@@ -109,6 +112,7 @@ export default function Composer({
   placeholder = "기업에 대해 질문하세요...",
   toolCalls = [],
   initialValue,
+  entitlement = null,
 }: ComposerProps) {
   const initialDraftValue = initialValue?.trim() ? "" : (initialValue ?? "");
   const [value, setValue] = useState(initialDraftValue);
@@ -407,7 +411,8 @@ export default function Composer({
           </AnimatePresence>
         </button>
       </div>
-      <div className="mx-auto mt-xs flex max-w-4xl items-center justify-end">
+      <div className="mx-auto mt-xs flex max-w-4xl items-center justify-between gap-sm">
+        <UsageStatus entitlement={entitlement} />
         <span className="text-xs text-muted-soft">
           전체{" "}
           {composedLength.toLocaleString()}/

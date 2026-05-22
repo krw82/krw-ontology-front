@@ -16,6 +16,13 @@ const OUTPUT_COST_PER_1M = readFloatEnv("OUTPUT_COST_PER_MILLION", 15.0, {
   min: 0,
 });
 
+export function getQuotaLimits() {
+  return {
+    dailyQuestionLimit: DAILY_QUESTION_LIMIT,
+    dailyCostCapUsd: DAILY_COST_CAP,
+  };
+}
+
 export interface QuotaCheckResult {
   allowed: boolean;
   reason?: "quota_exceeded" | "cost_cap_exceeded" | "internal_error";

@@ -6,9 +6,11 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { KrwBrand } from "@/components/KrwBrand";
+import UsageStatus from "@/components/UsageStatus";
 import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
 import { createClient } from "@/lib/supabase/client";
 import { popoverMenu } from "@/lib/animation";
+import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   DEV_AUTH_EMAIL,
   DEV_AUTH_NAME,
@@ -97,6 +99,7 @@ export default function TopNav({
   );
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
+  const { entitlement } = useEntitlement(Boolean(userProfile));
 
   // M-07: useMemo to cache Supabase client
   const supabase = useMemo(
@@ -246,6 +249,14 @@ export default function TopNav({
                         </p>
                       </div>
                     </div>
+                    <Link
+                      href="/settings/billing"
+                      className="mt-xs block rounded-[8px] transition-colors hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      role="menuitem"
+                      onClick={() => setAccountMenuOpen(false)}
+                    >
+                      <UsageStatus entitlement={entitlement} variant="menu" />
+                    </Link>
                     <button
                       type="button"
                       className="mt-xs flex w-full items-center justify-between rounded-[8px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-surface-soft hover:text-primary"

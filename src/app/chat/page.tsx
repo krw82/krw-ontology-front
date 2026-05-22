@@ -8,6 +8,7 @@ import TopNav from "@/components/TopNav";
 import ChatMessage from "@/components/ChatMessage";
 import Composer from "@/components/Composer";
 import { useChat } from "@/hooks/useChat";
+import { useEntitlement } from "@/hooks/useEntitlement";
 import { getSessionTickers, buildChatSessionHref } from "@/lib/chat/history-state";
 import { getSuggestedPromptsForTickers } from "@/lib/chat/suggested-prompts";
 
@@ -54,6 +55,8 @@ function ChatContent() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const hasLoadedRef = useRef(false);
   const cancelledRef = useRef(false);
+  const lastRefreshedRunIdRef = useRef<string | null>(null);
+  const { entitlement, refresh: refreshEntitlement } = useEntitlement();
 
   // H-07: cleanup on unmount to prevent race condition
   useEffect(() => {
@@ -134,6 +137,14 @@ function ChatContent() {
     defaultTickers: ticker ? [ticker.trim().toUpperCase()] : [],
     onSessionCreated: handleSessionCreated,
   });
+
+  useEffect(() => {
+    if (chat.status !== "completed" && chat.status !== "failed") return;
+    if (!chat.runId || lastRefreshedRunIdRef.current === chat.runId) return;
+
+    lastRefreshedRunIdRef.current = chat.runId;
+    void refreshEntitlement();
+  }, [chat.runId, chat.status, refreshEntitlement]);
 
   // H-08: stable loadSession via ref-based guard
   const loadSessionRef = useRef(chat.loadSession);
@@ -624,6 +635,7 @@ function ChatContent() {
             }
             toolCalls={chat.toolCalls}
             initialValue={initialComposerValue}
+            entitlement={entitlement}
           />
         </div>
       </main>
