@@ -171,7 +171,17 @@ docker compose \
   exec -T web sh -lc '
     set -eu
     claude_version=$(/usr/local/bin/claude-prod --version 2>&1)
-    node_sdk_version=$(node -p "require(\"@anthropic-ai/claude-agent-sdk/package.json\").version")
+    node_sdk_version=$(
+      node -e "
+        const fs = require('fs');
+        const path = require.resolve('@anthropic-ai/claude-agent-sdk');
+        const marker = '/node_modules/@anthropic-ai/claude-agent-sdk/';
+        const index = path.indexOf(marker);
+        if (index < 0) throw new Error('unexpected sdk path: ' + path);
+        const packagePath = path.slice(0, index + marker.length) + 'package.json';
+        process.stdout.write(JSON.parse(fs.readFileSync(packagePath, 'utf8')).version);
+      "
+    )
     py_sdk_version=$(/opt/krw-ontology-venv/bin/python -c "import importlib.metadata as m; print(m.version(\"claude-agent-sdk\"))")
 
     case "$claude_version" in
