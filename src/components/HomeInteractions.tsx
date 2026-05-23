@@ -191,20 +191,6 @@ export function HomePrimaryCtas() {
       >
         무료로 첫 분석 시작
       </Link>
-      <Link
-        href="/chat"
-        onClick={() => {
-          trackClientEventSilently("cta_clicked", {
-            cta_id: "home_hero_secondary",
-            cta_label: "질문으로 바로 시작",
-            surface: "home_hero_secondary",
-            destination: "/chat",
-          });
-        }}
-        className="inline-flex min-h-12 items-center justify-center rounded-[8px] border border-hairline bg-canvas px-5 py-3 text-[15px] font-extrabold leading-5 text-ink transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-      >
-        질문으로 바로 시작
-      </Link>
     </div>
   );
 }
@@ -362,7 +348,7 @@ export function HomeEvidenceCards({ cards }: { cards: HomeEvidenceCard[] }) {
               {isActive && (
                 <motion.span
                   aria-hidden="true"
-                  className="absolute bottom-3 left-0 top-3 w-[2px] rounded-full bg-primary"
+                  className="home-evidence-active-rail absolute bottom-3 left-0 top-3 w-[2px] rounded-full bg-primary"
                   initial={{ opacity: 0, scaleY: 0.4 }}
                   animate={{ opacity: 1, scaleY: 1 }}
                   exit={{ opacity: 0, scaleY: 0.4 }}
@@ -425,7 +411,8 @@ export function HomeTraceExplorer({ nodes }: { nodes: HomeTraceNode[] }) {
   );
 
   return (
-    <div className="mt-5 rounded-[8px] border border-hairline bg-surface p-4 text-ink">
+    <div className="home-trace-card relative mt-5 overflow-hidden rounded-[8px] border border-hairline bg-surface p-4 text-ink">
+      <span className="home-trace-scan" aria-hidden="true" />
       <div className="mb-4 flex items-center justify-between">
         <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
           근거 흐름
@@ -476,7 +463,7 @@ export function HomeTraceExplorer({ nodes }: { nodes: HomeTraceNode[] }) {
             {index < nodes.length - 1 && (
               <motion.span
                 aria-hidden="true"
-                className="material-symbols-outlined text-center text-[18px]"
+                className="home-trace-edge material-symbols-outlined text-center text-[18px]"
                 animate={{
                   color:
                     activeTraceIndex > index
@@ -504,7 +491,7 @@ export function HomeTraceExplorer({ nodes }: { nodes: HomeTraceNode[] }) {
       <AnimatePresence mode="wait">
         <motion.div
           key={activeTrace.id}
-          className="mt-4 rounded-[8px] border border-hairline bg-canvas p-3"
+          className="home-trace-panel mt-4 rounded-[8px] border border-hairline bg-canvas p-3"
           aria-live="polite"
           aria-atomic="true"
           initial={{ opacity: 0, y: 6 }}

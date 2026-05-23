@@ -13,6 +13,7 @@ import {
 interface ValidatedRequest {
   body: ChatRunRequest;
   userId: string;
+  userEmail: string | null;
 }
 
 function errorResponse(
@@ -211,5 +212,5 @@ export async function validateRequest(
     return { ok: false, response: handleAuthError(new Error("No user"), normalizedRequestId) };
   }
 
-  return { ok: true, data: { body, userId: user.id } };
+  return { ok: true, data: { body, userId: user.id, userEmail: user.email ?? null } };
 }

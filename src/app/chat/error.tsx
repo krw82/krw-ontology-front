@@ -4,7 +4,7 @@ function sanitizeError(message: string): string {
   const cleaned = message.split("\n")[0];
   const lower = cleaned.toLowerCase();
   if (lower.includes("rate limit") || lower.includes("429")) {
-    return "현재 Claude Code 계정/API 요청 한도에 도달했습니다. 잠시 후 다시 시도하거나, 실제 ANTHROPIC_API_KEY를 설정한 뒤 서버를 재시작해주세요.";
+    return "현재 KRW-AI 계정/API 요청 한도에 도달했습니다. 잠시 후 다시 시도하거나, 실제 ANTHROPIC_API_KEY를 설정한 뒤 서버를 재시작해주세요.";
   }
   if (cleaned.length > 200) return cleaned.slice(0, 200) + "...";
   return cleaned;

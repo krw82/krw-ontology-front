@@ -7,14 +7,9 @@ const relatedLinks = [
     description: "분석할 기업을 고릅니다.",
   },
   {
-    href: "/use-cases/filing-analysis",
-    label: "유스케이스",
-    description: "공시 분석 흐름을 봅니다.",
-  },
-  {
-    href: "/questions/revenue-growth",
-    label: "질문 템플릿",
-    description: "바로 쓸 질문을 확인합니다.",
+    href: "/questions",
+    label: "질문 그래프",
+    description: "Apple 질문 흐름에서 바로 시작합니다.",
   },
   {
     href: "/pricing",

@@ -73,6 +73,18 @@ const checks = [
     table: "rate_limit_counters",
     select: "key,bucket,window_start,count",
   },
+  {
+    table: "usage_budget_balances",
+    select: "user_id,period_kind,period_start,settled_cost_usd,reserved_cost_usd",
+  },
+  {
+    table: "run_budgets",
+    select: "id,user_id,request_id,status,reserved_cost_usd",
+  },
+  {
+    table: "usage_ledger",
+    select: "id,user_id,request_id,entry_type,amount_usd",
+  },
 ];
 
 for (const check of checks) {
@@ -107,5 +119,27 @@ if (rpcError) {
 
 await supabase.from("rate_limit_counters").delete().eq("key", smokeKey);
 console.log("OK schema: increment_rate_limit RPC");
+
+const zeroUuid = "00000000-0000-0000-0000-000000000000";
+const { error: reserveRpcError } = await supabase.rpc("reserve_execution_budget", {
+  p_user_id: zeroUuid,
+  p_request_id: `schema-smoke:${Date.now()}`,
+  p_monthly_period_start: new Date(Date.UTC(2099, 0, 1)).toISOString(),
+  p_monthly_period_end: new Date(Date.UTC(2099, 1, 1)).toISOString(),
+  p_daily_period_start: new Date(Date.UTC(2099, 0, 1)).toISOString(),
+  p_daily_period_end: new Date(Date.UTC(2099, 0, 2)).toISOString(),
+  p_monthly_budget_usd: 0,
+  p_daily_budget_usd: 0,
+  p_reserve_cost_usd: 1,
+  p_expires_at: new Date(Date.now() + 60_000).toISOString(),
+});
+
+if (reserveRpcError && reserveRpcError.code !== "23503") {
+  console.error(
+    `Schema smoke failed for reserve_execution_budget RPC: ${reserveRpcError.message}`,
+  );
+  process.exit(1);
+}
+console.log("OK schema: reserve_execution_budget RPC");
 
 console.log("Supabase schema smoke test passed.");

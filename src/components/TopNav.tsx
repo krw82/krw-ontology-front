@@ -26,6 +26,8 @@ export interface TopNavUserProfile {
 
 interface TopNavProps {
   initialUserProfile?: TopNavUserProfile | null;
+  brandHref?: string;
+  brandAriaLabel?: string;
 }
 
 function profileFromUser(user: User | null | undefined): TopNavUserProfile | null {
@@ -83,6 +85,8 @@ function UserAvatar({
 
 export default function TopNav({
   initialUserProfile,
+  brandHref = "/",
+  brandAriaLabel,
 }: TopNavProps = {}) {
   const router = useRouter();
   const pathname = usePathname();
@@ -193,7 +197,11 @@ export default function TopNav({
     <header className="sticky top-0 z-50 h-[72px] w-full flex-shrink-0 border-b border-hairline bg-canvas/95 backdrop-blur-xl md:h-[64px]">
       <div className="mx-auto flex h-full w-full max-w-[1600px] items-center justify-between gap-sm px-base pl-[72px] sm:px-md md:pl-md">
         <div className="flex min-w-0 items-center gap-lg">
-          <KrwBrand href="/companies" compact />
+          <KrwBrand
+            href={brandHref}
+            compact
+            ariaLabel={brandAriaLabel}
+          />
         </div>
 
         <div className="flex shrink-0 items-center justify-end gap-xs sm:gap-md">

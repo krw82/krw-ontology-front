@@ -10,14 +10,22 @@ interface UsageStatusProps {
 
 function usageLabel(entitlement: EntitlementStatus | null): string {
   if (!entitlement) return "사용량 확인 중";
+  if (entitlement.usage.unlimited) return "무제한";
 
-  return `${entitlement.usage.remaining_questions.toLocaleString()}회 남음`;
+  return `분석 크레딧 ${entitlement.usage.remaining_analysis_credits.toLocaleString()}개 남음`;
 }
 
 function usageDetail(entitlement: EntitlementStatus | null): string {
   if (!entitlement) return "오늘 리서치 사용량을 불러오는 중입니다.";
+  if (entitlement.usage.unlimited) {
+    return `${entitlement.usage.run_count.toLocaleString()}회 실행 · 한도 없음`;
+  }
 
-  return `${entitlement.usage.questions_used.toLocaleString()}/${entitlement.usage.questions_limit.toLocaleString()}회 사용`;
+  const usedCredits =
+    entitlement.usage.analysis_credits_used +
+    entitlement.usage.analysis_credits_reserved;
+
+  return `${entitlement.usage.period_label} ${usedCredits.toLocaleString()} / ${entitlement.usage.analysis_credits_limit.toLocaleString()} 크레딧 사용 · ${entitlement.usage.run_count.toLocaleString()}회 실행`;
 }
 
 export default function UsageStatus({
@@ -74,7 +82,7 @@ export default function UsageStatus({
           </div>
         )}
         <p className="mt-sm text-[13px] font-medium leading-5 text-muted">
-          월간 사용량은 현재 플랜 쿼터 기준으로 표시됩니다.
+          {entitlement?.usage.period_label ?? "현재"} 사용량은 현재 플랜 분석 크레딧 기준으로 표시됩니다. 복잡한 분석은 더 많은 크레딧을 사용할 수 있습니다.
         </p>
       </div>
     );

@@ -3,7 +3,11 @@ import TopNav from "@/components/TopNav";
 import UsageStatus from "@/components/UsageStatus";
 import { getAuthUser } from "@/lib/auth";
 import { getEntitlementStatus } from "@/lib/billing/entitlement";
-import { listPublicBillingPlans } from "@/lib/billing/plans";
+import {
+  getBillingPlanAnalysisCredits,
+  getBillingPlanLimitLabel,
+  listPublicBillingPlans,
+} from "@/lib/billing/plans";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +36,7 @@ export default async function BillingSettingsPage() {
           stringValue(metadata?.photo_url),
       }
     : null;
-  const entitlement = await getEntitlementStatus(user.id);
+  const entitlement = await getEntitlementStatus(user.id, user.email ?? null);
   const plans = listPublicBillingPlans();
   const enabledFeatures = entitlement.features.filter((feature) => feature.enabled);
   const upcomingFeatures = entitlement.features.filter(
@@ -55,7 +59,7 @@ export default async function BillingSettingsPage() {
               플랜과 사용량
             </h1>
             <p className="mt-4 max-w-2xl text-[16px] leading-7 text-body sm:text-[18px]">
-              현재 베타 쿼터, 포함된 기능, 준비 중인 플랜 항목을 한곳에서
+              현재 베타 크레딧, 포함된 기능, 준비 중인 플랜 항목을 한곳에서
               확인합니다.
             </p>
           </header>
@@ -68,7 +72,7 @@ export default async function BillingSettingsPage() {
             <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h2 className="text-[16px] font-black leading-6 text-ink">
-                  월간 플랜
+                  베타 사용량과 플랜
                 </h2>
                 <p className="mt-1 text-[13px] font-medium leading-5 text-muted">
                   결제 연동 전에도 내부 권한 모델은 이 기준으로 동작합니다.
@@ -107,9 +111,9 @@ export default async function BillingSettingsPage() {
                       )}
                     </div>
                     <p className="mt-sm text-[22px] font-black leading-7 text-ink">
-                      {plan.monthlyQuestionLimit.toLocaleString()}
+                      {getBillingPlanAnalysisCredits(plan).toLocaleString()}{" "}
                       <span className="ml-1 text-[12px] font-bold text-muted">
-                        질문/월
+                        {getBillingPlanLimitLabel(plan)}
                       </span>
                     </p>
                     <p className="mt-sm text-[12px] font-medium leading-5 text-muted">

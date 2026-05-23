@@ -2,13 +2,17 @@ import type { Metadata } from "next";
 import MarketingCtaLink from "@/components/MarketingCtaLink";
 import PublicRelatedLinks from "@/components/PublicRelatedLinks";
 import PublicTopNav from "@/components/PublicTopNav";
-import { listPublicBillingPlans } from "@/lib/billing/plans";
+import {
+  getBillingPlanAnalysisCredits,
+  getBillingPlanLimitLabel,
+  listPublicBillingPlans,
+} from "@/lib/billing/plans";
 import { pageMetadata } from "@/lib/marketing/site";
 
 export const metadata: Metadata = pageMetadata({
   title: "가격과 무료 베타 플랜",
   description:
-    "KRW Ontology의 무료 베타, Pro, Power 플랜의 월간 질문 한도와 사용 범위를 확인하세요.",
+    "KRW Ontology의 무료 베타, Pro, Power 플랜의 분석 크레딧과 사용 범위를 확인하세요.",
   path: "/pricing",
 });
 
@@ -31,7 +35,7 @@ export default function PricingPage() {
               먼저 무료로 근거 기반 분석을 확인하세요.
             </h1>
             <p className="mt-4 max-w-3xl text-[16px] leading-7 text-body sm:text-[18px]">
-              현재는 결제 없이 무료 베타로 운영합니다. 내부 플랜과 월간
+              현재는 결제 없이 무료 베타로 운영합니다. 내부 플랜과
               사용량 모델은 아래 기준으로 동작하며, 유료 결제는 정식 오픈
               전에 별도로 안내합니다.
             </p>
@@ -76,10 +80,10 @@ export default function PricingPage() {
                       </span>
                     )}
                   </div>
-                  <p className="mt-5 text-[34px] font-black leading-none text-ink">
-                    {plan.monthlyQuestionLimit.toLocaleString()}
-                    <span className="ml-1 text-[13px] font-bold leading-5 text-muted">
-                      질문/월
+                  <p className="mt-5 text-[32px] font-black leading-[1.05] text-ink">
+                    {getBillingPlanAnalysisCredits(plan).toLocaleString()}{" "}
+                    <span className="ml-1 align-baseline text-[13px] font-bold leading-5 text-muted">
+                      {getBillingPlanLimitLabel(plan)}
                     </span>
                   </p>
                   <p className="mt-4 text-[14px] font-medium leading-6 text-body">
@@ -110,8 +114,8 @@ export default function PricingPage() {
             </h2>
             <div className="mt-4 grid gap-4 md:grid-cols-3">
               <Principle
-                title="가치 기준은 질문 수"
-                body="사용자가 더 많은 회사를 반복 분석할수록 가치가 커지므로 월간 질문 수를 기본 value metric으로 둡니다."
+                title="가치 기준은 분석 크레딧"
+                body="질문마다 공시 검색 범위와 답변 생성량이 다르므로, 실제 제한은 단순 질문 수가 아니라 분석 크레딧을 기준으로 둡니다."
               />
               <Principle
                 title="먼저 가치를 확인"
@@ -119,7 +123,7 @@ export default function PricingPage() {
               />
               <Principle
                 title="무리한 차단 없음"
-                body="80%에서는 부드럽게 알리고, 100%에서만 다음 분석을 제한해 사용자가 맥락을 잃지 않게 합니다."
+                body="80%에서는 부드럽게 알리고, 남은 크레딧이 기본 분석 1회보다 낮을 때만 다음 분석을 제한합니다."
               />
             </div>
           </section>

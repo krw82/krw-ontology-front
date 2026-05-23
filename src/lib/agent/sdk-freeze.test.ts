@@ -6,7 +6,7 @@ const EXPECTED_NODE_SDK = "0.2.141";
 const EXPECTED_PYTHON_SDK = "0.2.85";
 const repoRoot = process.cwd();
 
-describe("Claude Agent SDK freeze", () => {
+describe("KRW-AI Agent SDK freeze", () => {
   it("pins the frontend SDK exactly instead of using semver ranges", () => {
     const packageJson = JSON.parse(
       readFileSync(path.join(repoRoot, "package.json"), "utf8"),

@@ -3,22 +3,24 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { AnimatePresence, LayoutGroup, motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import TopNav from "@/components/TopNav";
 import ChatMessage from "@/components/ChatMessage";
 import Composer from "@/components/Composer";
+import SuggestedPromptActions from "@/components/SuggestedPromptActions";
 import { useChat } from "@/hooks/useChat";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { getSessionTickers, buildChatSessionHref } from "@/lib/chat/history-state";
-import { getSuggestedPromptsForTickers } from "@/lib/chat/suggested-prompts";
+import { getSuggestedPromptsForTickers } from "@/lib/companies/landing-copy";
 import { trackClientEventSilently } from "@/lib/analytics/client";
+import { findQuestionTopic } from "@/lib/marketing/site";
 
 function sanitizeError(message: string): string {
   // Strip stack traces and internal details
   const cleaned = message.split("\n")[0];
   const lower = cleaned.toLowerCase();
   if (lower.includes("rate limit") || lower.includes("429")) {
-    return "현재 Claude Code 계정/API 요청 한도에 도달했습니다. 잠시 후 다시 시도하거나, 실제 ANTHROPIC_API_KEY를 설정한 뒤 서버를 재시작해주세요.";
+    return "현재 KRW-AI 계정/API 요청 한도에 도달했습니다. 잠시 후 다시 시도하거나, 실제 ANTHROPIC_API_KEY를 설정한 뒤 서버를 재시작해주세요.";
   }
   if (cleaned.length > 200) return cleaned.slice(0, 200) + "...";
   return cleaned;
@@ -38,13 +40,13 @@ type CompanyMeta = {
   sector: string | null;
 };
 
-const promptCycleIntervalMs = 2200;
-
 function ChatContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const ticker = searchParams.get("ticker");
   const queryParam = searchParams.get("query");
+  const templateId = searchParams.get("templateId");
+  const templateTopic = templateId ? findQuestionTopic(templateId) : null;
   const existingSessionId = searchParams.get("sessionId");
 
   const sessionId = existingSessionId;
@@ -52,12 +54,11 @@ function ChatContent() {
   const [companyMetaByTicker, setCompanyMetaByTicker] = useState<
     Record<string, CompanyMeta>
   >({});
-  const [activePromptIndex, setActivePromptIndex] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const hasLoadedRef = useRef(false);
   const cancelledRef = useRef(false);
   const lastRefreshedRunIdRef = useRef<string | null>(null);
-  const quotaAlertTrackedRef = useRef<string | null>(null);
+  const budgetAlertTrackedRef = useRef<string | null>(null);
   const prefilledQuestionTrackedRef = useRef<string | null>(null);
   const { entitlement, refresh: refreshEntitlement } = useEntitlement();
 
@@ -173,7 +174,7 @@ function ChatContent() {
   }, []);
 
   const isStreaming = chat.status === "running";
-  const isQuotaBlocked = entitlement?.usage.can_run === false;
+  const isBudgetBlocked = entitlement?.usage.can_run === false;
   const hasConversationContent =
     chat.messages.length > 0 ||
     Boolean(chat.streamingContent) ||
@@ -243,15 +244,26 @@ function ChatContent() {
     ),
   ).join(" / ");
   const suggestedPrompts = getSuggestedPromptsForTickers(contextTickers);
-  const initialComposerValue = queryParam ?? undefined;
+  const queryValue = queryParam?.trim() || null;
+  const templateQuestion =
+    templateTopic &&
+    ticker?.trim().toUpperCase() === templateTopic.questionChain.ticker
+      ? templateTopic.questionChain.primaryQuestion
+      : (templateTopic?.question ?? null);
+  const initialComposerValue = queryValue ?? templateQuestion ?? undefined;
+  const prefillSource = queryValue
+    ? "url_query"
+    : templateTopic
+      ? "template_id"
+      : null;
   const sendMessage = chat.sendMessage;
   const cancelRun = chat.cancelRun;
 
   useEffect(() => {
-    const trimmedQuery = queryParam?.trim();
-    if (!trimmedQuery) return;
+    const trimmedQuestion = initialComposerValue?.trim();
+    if (!trimmedQuestion || !prefillSource) return;
 
-    const eventKey = `${trimmedQuery}:${contextTickersKey || "global"}`;
+    const eventKey = `${prefillSource}:${templateTopic?.slug ?? "custom"}:${trimmedQuestion}:${contextTickersKey || "global"}`;
     if (prefilledQuestionTrackedRef.current === eventKey) return;
     prefilledQuestionTrackedRef.current = eventKey;
 
@@ -260,32 +272,13 @@ function ChatContent() {
       : [];
 
     trackClientEventSilently("question_prefilled", {
-      source: "url_query",
+      source: prefillSource,
+      template_id: templateTopic?.slug ?? null,
       ticker: analyticsTickers[0] ?? null,
       tickers: analyticsTickers,
-      question_length: trimmedQuery.length,
+      question_length: trimmedQuestion.length,
     });
-  }, [contextTickersKey, queryParam]);
-
-  useEffect(() => {
-    if (chat.messages.length > 0 || isStreaming || effectiveSessionError) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setActivePromptIndex(
-        (currentIndex) => (currentIndex + 1) % suggestedPrompts.length,
-      );
-    }, promptCycleIntervalMs);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [
-    activePromptIndex,
-    chat.messages.length,
-    effectiveSessionError,
-    isStreaming,
-    suggestedPrompts.length,
-  ]);
+  }, [contextTickersKey, initialComposerValue, prefillSource, templateTopic?.slug]);
 
   useEffect(() => {
     if (contextTickers.length === 0) return;
@@ -385,16 +378,17 @@ function ChatContent() {
     const alertLevel = entitlement?.usage.alert_level;
     if (!alertLevel || alertLevel === "ok") return;
 
-    const eventKey = `${entitlement.plan.key}:${entitlement.usage.period_start}:${alertLevel}:${entitlement.usage.questions_used}`;
-    if (quotaAlertTrackedRef.current === eventKey) return;
-    quotaAlertTrackedRef.current = eventKey;
+    const eventKey = `${entitlement.plan.key}:${entitlement.usage.period_start}:${alertLevel}:${entitlement.usage.budget_used_usd}:${entitlement.usage.budget_reserved_usd}`;
+    if (budgetAlertTrackedRef.current === eventKey) return;
+    budgetAlertTrackedRef.current = eventKey;
 
     trackClientEventSilently(
       alertLevel === "blocked" ? "usage_limit_reached" : "usage_warning_shown",
       {
         plan: entitlement.plan.key,
-        questions_used: entitlement.usage.questions_used,
-        questions_limit: entitlement.usage.questions_limit,
+        budget_used_usd: entitlement.usage.budget_used_usd,
+        budget_reserved_usd: entitlement.usage.budget_reserved_usd,
+        budget_limit_usd: entitlement.usage.budget_limit_usd,
         percent_used: entitlement.usage.percent_used,
       },
     );
@@ -403,7 +397,10 @@ function ChatContent() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* Top Nav */}
-      <TopNav />
+      <TopNav
+        brandHref="/companies"
+        brandAriaLabel="회사 목록으로 이동"
+      />
 
       {/* Main Workspace */}
       <main id="main-content" className="mx-auto flex min-h-0 w-full max-w-[1280px] flex-1 overflow-hidden">
@@ -490,16 +487,6 @@ function ChatContent() {
                         isLatestAssistantMessage && msg.role === "assistant"
                           ? chat.runDurationsByMessageId[msg.id]
                           : null
-                      }
-                      followUpPrompts={
-                        isLatestAssistantMessage ? suggestedPrompts : undefined
-                      }
-                      onFollowUpClick={
-                        isLatestAssistantMessage
-                          ? (prompt) => {
-                              void handlePromptSend(prompt, "follow_up");
-                            }
-                          : undefined
                       }
                     />
                   );
@@ -611,88 +598,25 @@ function ChatContent() {
                   </motion.div>
 
                   <motion.div
-                    className="space-y-1"
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.24, delay: 0.06, ease: "easeOut" }}
                   >
-                    <LayoutGroup id="empty-state-prompts">
-                      {suggestedPrompts.map((prompt, index) => {
-                        const isActivePrompt = index === activePromptIndex;
-
-                        return (
-                          <motion.button
-                            type="button"
-                            key={prompt}
-                            layout
-                            className={`group relative flex w-full items-center gap-3 overflow-hidden rounded-[10px] px-3 py-3 text-left text-[14px] font-semibold leading-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60 ${
-                              isActivePrompt
-                                ? "text-ink"
-                                : "text-body hover:bg-surface-soft hover:text-ink"
-                            }`}
-                            onClick={() => {
-                              void handlePromptSend(prompt, "empty_state");
-                            }}
-                            onFocus={() => setActivePromptIndex(index)}
-                            onMouseEnter={() => setActivePromptIndex(index)}
-                            disabled={
-                              isStreaming || Boolean(effectiveSessionError)
-                            }
-                            initial={{ opacity: 0, y: 6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{
-                              duration: 0.2,
-                              delay: 0.1 + index * 0.04,
-                              ease: "easeOut",
-                            }}
-                          >
-                            {isActivePrompt && (
-                              <motion.span
-                                layoutId="empty-state-prompt-active"
-                                aria-hidden="true"
-                                className="absolute inset-0 rounded-[10px] bg-surface"
-                                transition={{
-                                  duration: 0.36,
-                                  ease: [0.16, 1, 0.3, 1],
-                                }}
-                              />
-                            )}
-                            <span className="relative z-10 shrink-0 font-mono text-[13px] font-black leading-6 text-muted">
-                              {index + 1}.
-                            </span>
-                            <span className="relative z-10 min-w-0 flex-1">
-                              {prompt}
-                            </span>
-                            <AnimatePresence initial={false} mode="popLayout">
-                              {isActivePrompt && (
-                                <motion.span
-                                  key="active-prompt-arrow"
-                                  layoutId="empty-state-prompt-arrow"
-                                  aria-hidden="true"
-                                  className="material-symbols-outlined relative z-10 shrink-0 text-[18px] text-muted transition-colors group-hover:text-primary"
-                                  initial={{ opacity: 0, x: -3 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  exit={{ opacity: 0, x: 3 }}
-                                  transition={{
-                                    duration: 0.22,
-                                    ease: "easeOut",
-                                  }}
-                                >
-                                  arrow_forward
-                                </motion.span>
-                              )}
-                            </AnimatePresence>
-                          </motion.button>
-                        );
-                      })}
-                    </LayoutGroup>
+                    <SuggestedPromptActions
+                      prompts={suggestedPrompts}
+                      groupId="empty-state-prompts"
+                      disabled={isStreaming || Boolean(effectiveSessionError)}
+                      onSelect={(prompt) => {
+                        void handlePromptSend(prompt, "empty_state");
+                      }}
+                    />
                   </motion.div>
                 </div>
               )}
             </div>
           </div>
 
-          {isQuotaBlocked && entitlement && (
+          {isBudgetBlocked && entitlement && (
             <div className="border-t border-hairline bg-canvas px-base py-sm sm:px-lg">
               <div className="mx-auto max-w-4xl rounded-[8px] border border-error/20 bg-error-container/10 px-base py-sm text-[13px] font-semibold leading-5 text-error">
                 <span
@@ -711,13 +635,13 @@ function ChatContent() {
             onSend={handleSend}
             onCancel={handleCancel}
             activity={chat.activity}
-            disabled={Boolean(effectiveSessionError) || isQuotaBlocked}
+            disabled={Boolean(effectiveSessionError) || isBudgetBlocked}
             isGenerating={isStreaming}
             placeholder={
               effectiveSessionError
                 ? "인덱스에 있는 회사만 채팅할 수 있습니다."
-                : isQuotaBlocked
-                  ? "이번 달 질문 한도에 도달했습니다."
+                : isBudgetBlocked
+                  ? "분석 크레딧을 모두 사용했습니다."
                 : "기업에 대해 질문하세요..."
             }
             toolCalls={chat.toolCalls}

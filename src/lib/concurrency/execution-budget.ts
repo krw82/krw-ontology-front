@@ -1,0 +1,270 @@
+import { getEntitlementStatus } from "@/lib/billing/entitlement";
+import { getCurrentDailyBillingPeriod, getCurrentMonthlyBillingPeriod } from "@/lib/billing/period";
+import { budgetUsdToAnalysisCredits, getBillingPlan } from "@/lib/billing/plans";
+import { readFloatEnv } from "@/lib/env";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import type { EntitlementStatus } from "@/types/entitlement";
+import type { Json } from "@/types/database";
+
+const INPUT_COST_PER_1M = readFloatEnv("INPUT_COST_PER_MILLION", 3.0, {
+  min: 0,
+});
+const OUTPUT_COST_PER_1M = readFloatEnv("OUTPUT_COST_PER_MILLION", 15.0, {
+  min: 0,
+});
+
+export interface ExecutionBudgetCheckResult {
+  allowed: boolean;
+  reason?: "cost_cap_exceeded" | "internal_error";
+  reservationId?: string | null;
+  budgetUsedUsd: number;
+  budgetReservedUsd: number;
+  budgetLimitUsd: number;
+  dailyBudgetUsedUsd: number;
+  dailyBudgetReservedUsd: number;
+  dailyBudgetLimitUsd: number;
+  reserveCostUsd: number;
+  runCount: number;
+  entitlement?: EntitlementStatus;
+}
+
+function roundUsd(value: number): number {
+  return Math.round(Math.max(0, Number.isFinite(value) ? value : 0) * 1_000_000) / 1_000_000;
+}
+
+function creditLimit(budgetUsd: number): number {
+  return budgetUsdToAnalysisCredits(budgetUsd, "floor");
+}
+
+function usedCredits(budgetUsd: number): number {
+  return budgetUsdToAnalysisCredits(budgetUsd, "ceil");
+}
+
+function remainingCredits(budgetUsd: number): number {
+  return budgetUsdToAnalysisCredits(budgetUsd, "floor");
+}
+
+export async function checkExecutionBudget(
+  userId: string,
+  userEmail?: string | null,
+): Promise<ExecutionBudgetCheckResult> {
+  try {
+    const entitlement = await getEntitlementStatus(userId, userEmail);
+    const usage = entitlement.usage;
+
+    return {
+      allowed: usage.can_run,
+      reason: usage.can_run ? undefined : "cost_cap_exceeded",
+      budgetUsedUsd: usage.budget_used_usd,
+      budgetReservedUsd: usage.budget_reserved_usd,
+      budgetLimitUsd: usage.budget_limit_usd,
+      dailyBudgetUsedUsd: usage.daily_budget_used_usd,
+      dailyBudgetReservedUsd: usage.daily_budget_reserved_usd,
+      dailyBudgetLimitUsd: usage.daily_budget_limit_usd,
+      reserveCostUsd: usage.unlimited ? 0 : usage.per_run_reserve_usd,
+      runCount: usage.run_count,
+      entitlement,
+    };
+  } catch {
+    return {
+      allowed: false,
+      reason: "internal_error",
+      budgetUsedUsd: 0,
+      budgetReservedUsd: 0,
+      budgetLimitUsd: 0,
+      dailyBudgetUsedUsd: 0,
+      dailyBudgetReservedUsd: 0,
+      dailyBudgetLimitUsd: 0,
+      reserveCostUsd: 0,
+      runCount: 0,
+    };
+  }
+}
+
+export async function reserveExecutionBudget(
+  userId: string,
+  requestId: string,
+  userEmail?: string | null,
+): Promise<ExecutionBudgetCheckResult> {
+  const budget = await checkExecutionBudget(userId, userEmail);
+  if (!budget.allowed || !budget.entitlement) return budget;
+  if (budget.entitlement.usage.unlimited) return budget;
+
+  const plan = getBillingPlan(budget.entitlement.plan.key);
+  const monthlyPeriod = getCurrentMonthlyBillingPeriod();
+  const dailyPeriod = getCurrentDailyBillingPeriod();
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.rpc("reserve_execution_budget", {
+    p_user_id: userId,
+    p_request_id: requestId,
+    p_monthly_period_start: monthlyPeriod.start,
+    p_monthly_period_end: monthlyPeriod.end,
+    p_daily_period_start: dailyPeriod.start,
+    p_daily_period_end: dailyPeriod.end,
+    p_monthly_budget_usd: plan.monthlyBudgetUsd,
+    p_daily_budget_usd: plan.dailyBudgetUsd,
+    p_reserve_cost_usd: plan.perRunReserveUsd,
+    p_expires_at: new Date(Date.now() + 30 * 60_000).toISOString(),
+  });
+
+  if (error) {
+    return {
+      ...budget,
+      allowed: false,
+      reason: "internal_error",
+    };
+  }
+
+  const result = data?.[0];
+  if (!result?.allowed) {
+    return {
+      ...budget,
+      allowed: false,
+      reason: "cost_cap_exceeded",
+      budgetUsedUsd: Number(result?.monthly_used_usd ?? budget.budgetUsedUsd),
+      budgetReservedUsd: Number(result?.monthly_reserved_usd ?? budget.budgetReservedUsd),
+      budgetLimitUsd: Number(result?.monthly_limit_usd ?? budget.budgetLimitUsd),
+      dailyBudgetUsedUsd: Number(result?.daily_used_usd ?? budget.dailyBudgetUsedUsd),
+      dailyBudgetReservedUsd: Number(result?.daily_reserved_usd ?? budget.dailyBudgetReservedUsd),
+      dailyBudgetLimitUsd: Number(result?.daily_limit_usd ?? budget.dailyBudgetLimitUsd),
+    };
+  }
+
+  return {
+    ...budget,
+    allowed: true,
+    reservationId: result.reservation_id,
+    budgetUsedUsd: Number(result.monthly_used_usd),
+    budgetReservedUsd: Number(result.monthly_reserved_usd),
+    budgetLimitUsd: Number(result.monthly_limit_usd),
+    dailyBudgetUsedUsd: Number(result.daily_used_usd),
+    dailyBudgetReservedUsd: Number(result.daily_reserved_usd),
+    dailyBudgetLimitUsd: Number(result.daily_limit_usd),
+    reserveCostUsd: plan.perRunReserveUsd,
+  };
+}
+
+export async function attachExecutionBudgetRun(
+  userId: string,
+  requestId: string,
+  runId: string,
+) {
+  const { error } = await getSupabaseAdmin().rpc("attach_execution_budget_run", {
+    p_user_id: userId,
+    p_request_id: requestId,
+    p_run_id: runId,
+  });
+  if (error) {
+    console.warn("[execution-budget] Failed to attach run", {
+      code: error.code,
+      message: error.message,
+    });
+  }
+}
+
+export async function settleExecutionBudget(
+  userId: string,
+  requestId: string,
+  runId: string | null,
+  actualCostUsd: number,
+  terminalStatus: string,
+  metadata: Json = {},
+) {
+  const { error } = await getSupabaseAdmin().rpc("settle_execution_budget", {
+    p_user_id: userId,
+    p_request_id: requestId,
+    p_run_id: runId,
+    p_actual_cost_usd: roundUsd(actualCostUsd),
+    p_terminal_status: terminalStatus,
+    p_metadata: metadata,
+  });
+  if (error) {
+    console.warn("[execution-budget] Failed to settle budget", {
+      code: error.code,
+      message: error.message,
+    });
+  }
+}
+
+export async function releaseExecutionBudget(
+  userId: string,
+  requestId: string,
+  runId: string | null,
+  reason: string,
+) {
+  const { error } = await getSupabaseAdmin().rpc("release_execution_budget", {
+    p_user_id: userId,
+    p_request_id: requestId,
+    p_run_id: runId,
+    p_reason: reason,
+  });
+  if (error) {
+    console.warn("[execution-budget] Failed to release budget", {
+      code: error.code,
+      message: error.message,
+    });
+  }
+}
+
+export function getExecutionBudgetStatus(
+  budget: Pick<
+    ExecutionBudgetCheckResult,
+    | "budgetUsedUsd"
+    | "budgetReservedUsd"
+    | "budgetLimitUsd"
+    | "dailyBudgetUsedUsd"
+    | "dailyBudgetReservedUsd"
+    | "dailyBudgetLimitUsd"
+    | "reserveCostUsd"
+    | "runCount"
+  >,
+  settledCostUsd = 0,
+) {
+  const used = roundUsd(budget.budgetUsedUsd + settledCostUsd);
+  const reserved = roundUsd(
+    Math.max(0, budget.budgetReservedUsd - budget.reserveCostUsd),
+  );
+  const dailyUsed = roundUsd(budget.dailyBudgetUsedUsd + settledCostUsd);
+  const dailyReserved = roundUsd(
+    Math.max(0, budget.dailyBudgetReservedUsd - budget.reserveCostUsd),
+  );
+  const percentUsed =
+    budget.budgetLimitUsd > 0
+      ? Math.min(100, Math.round(((used + reserved) / budget.budgetLimitUsd) * 100))
+      : 100;
+
+  return {
+    budget_used_usd: used,
+    budget_reserved_usd: reserved,
+    budget_limit_usd: budget.budgetLimitUsd,
+    remaining_budget_usd: roundUsd(
+      Math.max(0, budget.budgetLimitUsd - used - reserved),
+    ),
+    daily_budget_used_usd: dailyUsed,
+    daily_budget_reserved_usd: dailyReserved,
+    daily_budget_limit_usd: budget.dailyBudgetLimitUsd,
+    per_run_reserve_usd: budget.reserveCostUsd,
+    analysis_credits_used: usedCredits(used),
+    analysis_credits_reserved: usedCredits(reserved),
+    analysis_credits_limit: creditLimit(budget.budgetLimitUsd),
+    remaining_analysis_credits: remainingCredits(
+      Math.max(0, budget.budgetLimitUsd - used - reserved),
+    ),
+    daily_analysis_credits_used: usedCredits(dailyUsed),
+    daily_analysis_credits_reserved: usedCredits(dailyReserved),
+    daily_analysis_credits_limit: creditLimit(budget.dailyBudgetLimitUsd),
+    per_run_analysis_credits: usedCredits(budget.reserveCostUsd),
+    run_count: budget.runCount + (settledCostUsd > 0 ? 1 : 0),
+    percent_used: percentUsed,
+    can_run:
+      budget.budgetLimitUsd - used - reserved >= budget.reserveCostUsd &&
+      budget.dailyBudgetLimitUsd - dailyUsed - dailyReserved >= budget.reserveCostUsd,
+  };
+}
+
+export function estimateCost(inputTokens: number, outputTokens: number): number {
+  return (
+    (inputTokens / 1_000_000) * INPUT_COST_PER_1M +
+    (outputTokens / 1_000_000) * OUTPUT_COST_PER_1M
+  );
+}

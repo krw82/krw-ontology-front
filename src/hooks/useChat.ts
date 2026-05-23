@@ -9,7 +9,7 @@ import type {
   ChatCitation,
   StreamingToolCallStart,
   StreamingToolCallEnd,
-  QuotaStatus,
+  ExecutionBudgetStatus,
   ReleaseMetadata,
   ErrorCode,
   GetChatSessionResponse,
@@ -59,7 +59,7 @@ export interface ChatState {
     latency_ms: number;
   } | null;
   release: ReleaseMetadata | null;
-  quota: QuotaStatus | null;
+  executionBudget: ExecutionBudgetStatus | null;
 }
 
 function createInitialChatState(): ChatState {
@@ -77,7 +77,7 @@ function createInitialChatState(): ChatState {
     runStartedAt: null,
     usage: null,
     release: null,
-    quota: null,
+    executionBudget: null,
   };
 }
 
@@ -293,7 +293,7 @@ export function useChat({
             estimated_cost_usd: number;
             latency_ms: number;
           };
-          quota: QuotaStatus;
+          execution_budget: ExecutionBudgetStatus;
         };
         finalizedRef.current = true;
         activeRunIdRef.current = d.run_id;
@@ -344,7 +344,7 @@ export function useChat({
               : prev.runDurationsByMessageId,
             release: d.release,
             usage: d.usage,
-            quota: d.quota,
+            executionBudget: d.execution_budget,
             status: "completed",
           };
         });
@@ -757,7 +757,7 @@ export function useChat({
         runStartedAt: null,
         usage: null,
         release: null,
-        quota: null,
+        executionBudget: null,
       }));
 
       const abortController = new AbortController();

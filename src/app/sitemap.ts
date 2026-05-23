@@ -1,9 +1,5 @@
 import type { MetadataRoute } from "next";
-import {
-  absoluteUrl,
-  QUESTION_TOPIC_PAGES,
-  USE_CASE_PAGES,
-} from "@/lib/marketing/site";
+import { absoluteUrl, QUESTION_TOPIC_PAGES } from "@/lib/marketing/site";
 import { listIndexedCompanies } from "@/lib/ontology/catalog";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -35,6 +31,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     },
     {
+      url: absoluteUrl("/questions"),
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.78,
+    },
+    {
       url: absoluteUrl("/privacy"),
       lastModified: now,
       changeFrequency: "yearly",
@@ -57,12 +59,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: now,
       changeFrequency: "monthly" as const,
       priority: 0.65,
-    })),
-    ...USE_CASE_PAGES.map((useCase) => ({
-      url: absoluteUrl(`/use-cases/${useCase.slug}`),
-      lastModified: now,
-      changeFrequency: "monthly" as const,
-      priority: 0.72,
     })),
   ];
 }

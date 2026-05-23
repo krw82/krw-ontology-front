@@ -4,8 +4,7 @@ import MarketingCtaLink from "@/components/MarketingCtaLink";
 
 const navItems = [
   { href: "/companies", label: "회사 목록" },
-  { href: "/use-cases/filing-analysis", label: "유스케이스" },
-  { href: "/questions/revenue-growth", label: "질문 템플릿" },
+  { href: "/questions", label: "질문 그래프" },
   { href: "/pricing", label: "가격" },
 ] as const;
 

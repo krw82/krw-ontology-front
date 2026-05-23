@@ -39,6 +39,7 @@ import type { MCPToolName, DocumentType, StreamingCitation } from "@/types/api-c
 
 const MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const DEFAULT_MAX_TURNS = 20;
+const DEFAULT_MAX_TOOL_CALLS = 18;
 const DEFAULT_AGENT_WORKSPACE_DIR = ".agent-workspace";
 
 export interface AgentRunOptions {
@@ -211,7 +212,7 @@ export async function runAgent(
     }
 
     const rawErrorMessage =
-      err instanceof Error ? err.message : "Unknown Claude Agent SDK error";
+      err instanceof Error ? err.message : "Unknown KRW-AI Agent SDK error";
     const errorCode = errorCodeFromMessage(rawErrorMessage);
     return {
       acc,
@@ -251,6 +252,9 @@ async function runSdkPass(params: {
   const acc = createAccumulator();
   const openToolCalls = new Set<string>();
   let finalResult: AgentRunResult | null = null;
+  const maxToolCalls = readIntEnv("AGENT_MAX_TOOL_CALLS", DEFAULT_MAX_TOOL_CALLS, {
+    min: 1,
+  });
 
   try {
     const sdkQuery = query({ prompt, options: sdkOptions });
@@ -293,6 +297,16 @@ async function runSdkPass(params: {
         suppressTextDeltas,
       });
 
+      if (acc.toolCalls.length > maxToolCalls) {
+        finalResult = {
+          acc,
+          status: "failed",
+          errorCode: "cost_cap_exceeded",
+          errorMessage: "분석 도구 호출 한도에 도달했습니다.",
+        };
+        break;
+      }
+
       if (message.type === "result") {
         const closedToolCalls = closeOpenToolCalls(acc, openToolCalls, passName);
         for (const toolCall of closedToolCalls) {
@@ -312,7 +326,7 @@ async function runSdkPass(params: {
           const rawErrorMessage =
             Array.isArray(message.errors) && message.errors.length > 0
               ? message.errors.join("\n")
-              : "Claude Agent SDK execution failed";
+              : "KRW-AI Agent SDK execution failed";
           const errorCode = errorCodeFromMessage(rawErrorMessage);
           finalResult = {
             acc,
@@ -331,7 +345,7 @@ async function runSdkPass(params: {
     }
 
     const rawErrorMessage =
-      err instanceof Error ? err.message : "Unknown Claude Agent SDK error";
+      err instanceof Error ? err.message : "Unknown KRW-AI Agent SDK error";
     const errorCode = errorCodeFromMessage(rawErrorMessage);
     return {
       acc,
@@ -663,7 +677,7 @@ function closeOpenToolCalls(
 ) {
   const closed: AccumulatedToolCall[] = [];
   for (const toolCallId of openToolCalls) {
-    const toolCall = endToolCall(acc, toolCallId, "Completed by Claude Agent SDK", null);
+    const toolCall = endToolCall(acc, toolCallId, "Completed by KRW-AI Agent SDK", null);
     if (toolCall) {
       closed.push(toolCall);
     }
@@ -830,17 +844,17 @@ function userFacingErrorMessage(
   rawMessage: string,
 ): string {
   if (code === "claude_rate_limited") {
-    return "현재 Claude Code 계정/API 요청 한도에 도달했습니다. 잠시 후 다시 시도하거나, 실제 ANTHROPIC_API_KEY를 설정한 뒤 서버를 재시작해주세요.";
+    return "현재 KRW-AI 계정/API 요청 한도에 도달했습니다. 잠시 후 다시 시도하거나, 실제 ANTHROPIC_API_KEY를 설정한 뒤 서버를 재시작해주세요.";
   }
   if (code === "auth_required") {
-    return "Claude Code 인증 정보가 서버 실행 환경에 없거나 유효하지 않습니다. 서버에서 Claude Code 인증을 마친 뒤 앱 컨테이너가 그 실행 파일과 설정을 볼 수 있게 재시작해주세요.";
+    return "KRW-AI 인증 정보가 서버 실행 환경에 없거나 유효하지 않습니다. 서버에서 KRW-AI 인증을 마친 뒤 앱 컨테이너가 그 실행 파일과 설정을 볼 수 있게 재시작해주세요.";
   }
   if (code === "mcp_unavailable") {
     return "온톨로지 도구 연결을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.";
   }
 
   if (process.env.NODE_ENV !== "production") {
-    console.warn("[claude-agent-sdk] execution failed", rawMessage);
+    console.warn("[krw-ai-agent-sdk] execution failed", rawMessage);
   }
   return "에이전트 실행 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
 }

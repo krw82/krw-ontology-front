@@ -266,7 +266,7 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
       return {
         ...baseHealthResult(pluginPath),
         connected: false,
-        error: "KRW Ontology Claude plugin workflow files are incomplete",
+        error: "KRW Ontology KRW-AI plugin workflow files are incomplete",
       };
     }
 

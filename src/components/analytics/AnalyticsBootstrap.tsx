@@ -10,8 +10,8 @@ function pageTypeFromPath(pathname: string): string {
   if (pathname === "/") return "home";
   if (pathname === "/companies") return "company_index";
   if (pathname.startsWith("/companies/")) return "company_landing";
-  if (pathname.startsWith("/questions/")) return "question_template";
-  if (pathname.startsWith("/use-cases/")) return "use_case";
+  if (pathname === "/questions") return "question_graph_index";
+  if (pathname.startsWith("/questions/")) return "question_graph";
   if (pathname === "/pricing") return "pricing";
   if (pathname === "/login") return "login";
   if (pathname.startsWith("/chat")) return "chat";
@@ -25,8 +25,8 @@ function isPublicMarketingPath(pathname: string): boolean {
     pathname === "/" ||
     pathname === "/companies" ||
     pathname.startsWith("/companies/") ||
+    pathname === "/questions" ||
     pathname.startsWith("/questions/") ||
-    pathname.startsWith("/use-cases/") ||
     pathname === "/pricing" ||
     pathname === "/privacy" ||
     pathname === "/terms"

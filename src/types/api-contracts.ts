@@ -618,7 +618,7 @@ export interface ReleaseMetadata {
 }
 
 // ============================================================
-// Usage / Quota Types
+// Usage / Execution Budget Types
 // ============================================================
 
 /** Daily usage tracking record */
@@ -629,13 +629,27 @@ export interface UsageDaily {
   estimated_cost_usd: number;
 }
 
-/** Current user quota status (returned alongside responses) */
-export interface QuotaStatus {
-  questions_used_today: number;
-  questions_limit: number;
-  cost_used_today_usd: number;
-  cost_limit_usd: number;
-  remaining_questions: number;
+/** Current execution budget status (returned alongside responses) */
+export interface ExecutionBudgetStatus {
+  budget_used_usd: number;
+  budget_reserved_usd: number;
+  budget_limit_usd: number;
+  remaining_budget_usd: number;
+  daily_budget_used_usd: number;
+  daily_budget_reserved_usd: number;
+  daily_budget_limit_usd: number;
+  per_run_reserve_usd: number;
+  analysis_credits_used: number;
+  analysis_credits_reserved: number;
+  analysis_credits_limit: number;
+  remaining_analysis_credits: number;
+  daily_analysis_credits_used: number;
+  daily_analysis_credits_reserved: number;
+  daily_analysis_credits_limit: number;
+  per_run_analysis_credits: number;
+  run_count: number;
+  percent_used: number;
+  can_run: boolean;
 }
 
 // ============================================================
@@ -718,7 +732,7 @@ export interface StreamingDoneEvent extends StreamingEventBase {
       estimated_cost_usd: number;
       latency_ms: number;
     };
-    quota: QuotaStatus;
+    execution_budget: ExecutionBudgetStatus;
   };
 }
 
@@ -986,11 +1000,11 @@ export interface WebContainerEnv {
   KRW_ONTOLOGY_PLUGIN_PATH: string;
   WEB_COMMIT: string;
   KRW_ONTOLOGY_COMMIT: string;
-  DAILY_USER_QUESTION_LIMIT: string;    // "20"
   GLOBAL_CONCURRENT_RUN_LIMIT: string;  // "5"
-  DAILY_COST_CAP_USD: string;           // "5.00"
   CLAUDE_MODEL: string;                 // "claude-sonnet-4-6"
   CLAUDE_AGENT_MAX_TURNS: string;        // "20"
+  AGENT_MAX_TOOL_CALLS: string;          // "18"
+  AGENT_MAX_TOOL_RESULT_CHARS: string;   // "100000"
   LEASE_TIMEOUT_MINUTES: string;        // "5"
 }
 

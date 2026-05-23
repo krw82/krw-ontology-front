@@ -1,13 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
 import type {
+  UsageBudgetBalanceRow,
   UsageDailyRow,
   UsagePeriodCounterRow,
   UserEntitlementRow,
 } from "@/types/database";
 import type { EntitlementStatus } from "@/types/entitlement";
 import { buildEntitlementStatus } from "./entitlement-model";
-import { getCurrentMonthlyBillingPeriod } from "./period";
-import { DEFAULT_PLAN_KEY, resolvePlanKey } from "./plans";
+import { getCurrentBillingPeriod } from "./period";
+import { DEFAULT_PLAN_KEY, getBillingPlan, resolvePlanKey } from "./plans";
+
+const DEFAULT_ADMIN_EMAILS = ["admin1@example.com"];
 
 function isMissingRelationError(error: { code?: string; message?: string }) {
   return (
@@ -19,16 +22,35 @@ function isMissingRelationError(error: { code?: string; message?: string }) {
 
 export async function getEntitlementStatus(
   userId: string,
+  userEmail?: string | null,
 ): Promise<EntitlementStatus> {
-  const period = getCurrentMonthlyBillingPeriod();
-  const planKey = await loadPlanKey(userId);
-  const questionsUsed = await loadMonthlyQuestionCount(userId, period);
+  const isAdmin = isAdminEntitlementEmail(userEmail);
+  const planKey = isAdmin ? "internal" : await loadPlanKey(userId);
+  const plan = getBillingPlan(planKey);
+  const period = getCurrentBillingPeriod(plan.budgetPeriod);
+  const dailyPeriod = getCurrentBillingPeriod("daily");
+  const budget = await loadExecutionBudgetSnapshot(userId, period, dailyPeriod);
 
   return buildEntitlementStatus({
     planKey,
-    questionsUsed,
+    budgetUsedUsd: budget.monthly.settledCostUsd,
+    budgetReservedUsd: budget.monthly.reservedCostUsd,
+    dailyBudgetUsedUsd: budget.daily.settledCostUsd,
+    dailyBudgetReservedUsd: budget.daily.reservedCostUsd,
+    runCount: budget.monthly.runCount,
     period,
+    status: isAdmin ? "admin" : undefined,
   });
+}
+
+export function isAdminEntitlementEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const normalizedEmail = email.trim().toLowerCase();
+  const configuredEmails = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  return new Set([...DEFAULT_ADMIN_EMAILS, ...configuredEmails]).has(normalizedEmail);
 }
 
 async function loadPlanKey(userId: string) {
@@ -81,4 +103,108 @@ async function loadMonthlyQuestionCount(
     (total, row) => total + (row.question_count ?? 0),
     0,
   );
+}
+
+async function loadDailyQuestionCount(
+  userId: string,
+  period: { start: string },
+) {
+  const supabase = await createClient();
+  const date = period.start.slice(0, 10);
+  const { data, error } = await supabase
+    .from("usage_daily")
+    .select("question_count")
+    .eq("user_id", userId)
+    .eq("date", date)
+    .maybeSingle<Pick<UsageDailyRow, "question_count">>();
+
+  if (error) throw new Error("Failed to load daily usage");
+  return data?.question_count ?? 0;
+}
+
+interface BudgetSnapshotPart {
+  settledCostUsd: number;
+  reservedCostUsd: number;
+  runCount: number;
+}
+
+async function loadExecutionBudgetSnapshot(
+  userId: string,
+  monthlyPeriod: { start: string; end: string },
+  dailyPeriod: { start: string; end: string },
+) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("usage_budget_balances")
+    .select(
+      "period_kind, period_start, settled_cost_usd, reserved_cost_usd, run_count",
+    )
+    .eq("user_id", userId)
+    .in("period_kind", ["monthly", "daily"])
+    .in("period_start", [monthlyPeriod.start, dailyPeriod.start])
+    .returns<
+      Pick<
+        UsageBudgetBalanceRow,
+        | "period_kind"
+        | "period_start"
+        | "settled_cost_usd"
+        | "reserved_cost_usd"
+        | "run_count"
+      >[]
+    >();
+
+  if (!error) {
+    const monthly = data?.find(
+      (row) =>
+        row.period_kind === "monthly" &&
+        row.period_start === monthlyPeriod.start,
+    );
+    const daily = data?.find(
+      (row) =>
+        row.period_kind === "daily" &&
+        row.period_start === dailyPeriod.start,
+    );
+
+    return {
+      monthly: balancePart(monthly),
+      daily: balancePart(daily),
+    };
+  }
+
+  if (!isMissingRelationError(error)) {
+    throw new Error("Failed to load execution budget usage");
+  }
+
+  const [monthlyRuns, dailyRuns] = await Promise.all([
+    loadMonthlyQuestionCount(userId, monthlyPeriod),
+    loadDailyQuestionCount(userId, dailyPeriod),
+  ]);
+
+  return {
+    monthly: {
+      settledCostUsd: 0,
+      reservedCostUsd: 0,
+      runCount: monthlyRuns,
+    },
+    daily: {
+      settledCostUsd: 0,
+      reservedCostUsd: 0,
+      runCount: dailyRuns,
+    },
+  };
+}
+
+function balancePart(
+  row:
+    | Pick<
+        UsageBudgetBalanceRow,
+        "settled_cost_usd" | "reserved_cost_usd" | "run_count"
+      >
+    | undefined,
+): BudgetSnapshotPart {
+  return {
+    settledCostUsd: Number(row?.settled_cost_usd ?? 0),
+    reservedCostUsd: Number(row?.reserved_cost_usd ?? 0),
+    runCount: Number(row?.run_count ?? 0),
+  };
 }

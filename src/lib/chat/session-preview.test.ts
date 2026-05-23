@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { buildSessionPreview } from "./session-preview";
 
 describe("buildSessionPreview", () => {
-  it("hides raw Claude login errors from the sidebar", () => {
+  it("hides raw KRW-AI login errors from the sidebar", () => {
     expect(
       buildSessionPreview({
-        content: "Claude Code returned an error result: Not logged in · Please run /login",
+        content: "KRW-AI returned an error result: Not logged in · Please run /login",
         status: "completed",
       }),
-    ).toBe("Claude Code 인증이 필요합니다.");
+    ).toBe("KRW-AI 인증이 필요합니다.");
   });
 
   it("uses a generic preview for failed messages", () => {

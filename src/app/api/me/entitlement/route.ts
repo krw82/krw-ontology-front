@@ -15,7 +15,7 @@ export async function GET() {
   if (!user) return handleAuthError(new Error("No user"));
 
   try {
-    const entitlement = await getEntitlementStatus(user.id);
+    const entitlement = await getEntitlementStatus(user.id, user.email ?? null);
     return Response.json({ entitlement });
   } catch {
     return Response.json(

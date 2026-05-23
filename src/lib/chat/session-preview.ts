@@ -10,7 +10,7 @@ export function buildSessionPreview(
   }
 
   if (AUTH_ERROR_PATTERNS.some((pattern) => pattern.test(message.content))) {
-    return "Claude Code 인증이 필요합니다.";
+    return "KRW-AI 인증이 필요합니다.";
   }
 
   return message.content.replace(/\s+/g, " ").trim().slice(0, 100);

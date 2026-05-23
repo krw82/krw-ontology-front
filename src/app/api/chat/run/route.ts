@@ -8,7 +8,7 @@ import type { AgentRunRow, ChatSessionRow } from "@/types/database";
 import {
   validateRequest,
   resolveSession,
-  checkQuotaStep,
+  reserveBudgetStep,
   fetchHistory,
   executeRun,
 } from "@/lib/api/chat";
@@ -17,6 +17,7 @@ import {
   getClientIp,
 } from "@/lib/api/chat/rate-limit";
 import { streamPersistedRunResponse } from "@/lib/api/chat/run-agent";
+import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
 
 // --- MCP health cache ---
 
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
   // 1. Validate request & authenticate
   const validation = await validateRequest(request);
   if (!validation.ok) return validation.response;
-  const { body, userId } = validation.data;
+  const { body, userId, userEmail } = validation.data;
 
   const { content, request_id } = body;
 
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
     }), existingRun.session_id);
   }
 
-  // 3. Check durable request rate limits before spending quota or starting work.
+  // 3. Check durable request rate limits before reserving budget or starting work.
   const rateLimitResult = await checkChatRunRateLimit({
     userId,
     requestId: request_id,
@@ -76,12 +77,7 @@ export async function POST(request: NextRequest) {
   });
   if (!rateLimitResult.ok) return rateLimitResult.response;
 
-  // 4. Check monthly plan quota before creating a new session/message.
-  const quotaResult = await checkQuotaStep(userId, request_id);
-  if (!quotaResult.ok) return quotaResult.response;
-  const quota = quotaResult.quota;
-
-  // 5. Check MCP health (cached for 30s) before creating a new session/message.
+  // 4. Check MCP health (cached for 30s) before reserving execution budget.
   let mcpHealth: McpHealthResult;
   try {
     mcpHealth = await getCachedMcpHealth();
@@ -97,21 +93,35 @@ export async function POST(request: NextRequest) {
     return errorResponse(503, "mcp_unavailable", "온톨로지 도구에 연결할 수 없습니다.", request_id);
   }
 
+  // 5. Reserve execution budget before creating durable chat work.
+  const budgetResult = await reserveBudgetStep(userId, request_id, userEmail);
+  if (!budgetResult.ok) return budgetResult.response;
+  const budget = budgetResult.budget;
+
   // 6. Resolve session (lookup + ownership check)
   const sessionIdResult = await getOrCreateSessionId(body, userId, request_id);
-  if (!sessionIdResult.ok) return sessionIdResult.response;
+  if (!sessionIdResult.ok) {
+    await releaseExecutionBudget(userId, request_id, null, "session_resolve_failed");
+    return sessionIdResult.response;
+  }
 
   const sessionResult = await resolveSession(
     sessionIdResult.sessionId,
     userId,
     request_id,
   );
-  if (!sessionResult.ok) return sessionResult.response;
+  if (!sessionResult.ok) {
+    await releaseExecutionBudget(userId, request_id, null, "session_forbidden");
+    return sessionResult.response;
+  }
   const session = sessionResult.session;
 
   // 7. Save user message idempotently & fetch history
   const historyResult = await fetchHistory(session.id, content, request_id);
-  if (!historyResult.ok) return historyResult.response;
+  if (!historyResult.ok) {
+    await releaseExecutionBudget(userId, request_id, null, "history_fetch_failed");
+    return historyResult.response;
+  }
 
   // 8. A duplicate can arrive while the first request is between session/message
   // creation and run acquisition. Re-check before starting the agent.
@@ -147,7 +157,7 @@ export async function POST(request: NextRequest) {
     content,
     requestId: request_id,
     history: historyResult.result,
-    quota,
+    budget,
     mcpHealth,
   }), session.id);
 }

@@ -84,8 +84,8 @@ const traceNodes: HomeTraceNode[] = [
 const workflowSteps = ["회사 질문", "단서 찾기", "근거 정리"];
 
 const browseLinks = [
-  { href: "/use-cases/filing-analysis", label: "유스케이스" },
-  { href: "/questions/revenue-growth", label: "질문 템플릿" },
+  { href: "/questions", label: "질문 예시" },
+  { href: "/companies", label: "회사 목록" },
   { href: "/pricing", label: "가격" },
 ] as const;
 
@@ -130,11 +130,8 @@ export default function Home() {
             >
               회사 목록
             </Link>
-            <Link
-              href="/use-cases/filing-analysis"
-              className="transition-colors hover:text-ink"
-            >
-              유스케이스
+            <Link href="/questions" className="transition-colors hover:text-ink">
+              질문 그래프
             </Link>
             <Link href="/pricing" className="transition-colors hover:text-ink">
               가격

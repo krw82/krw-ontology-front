@@ -3,11 +3,13 @@ import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { tryAcquireLease, releaseLease, startLeaseHeartbeat } from "@/lib/concurrency/lease";
 import {
-  recordUsage,
-  getQuotaStatus,
+  attachExecutionBudgetRun,
+  releaseExecutionBudget,
+  settleExecutionBudget,
+  getExecutionBudgetStatus,
   estimateCost,
-  checkQuota,
-} from "@/lib/concurrency/quota";
+  checkExecutionBudget,
+} from "@/lib/concurrency/execution-budget";
 import { registerRun, cleanupRun } from "@/lib/agent/abort-manager";
 import { runAgent } from "@/lib/agent/runner";
 import type { SdkDiagnostics } from "@/lib/agent/runner";
@@ -17,7 +19,7 @@ import type {
   StreamWriter,
 } from "@/lib/agent/stream-handler";
 import type { McpHealthResult } from "@/lib/agent/mcp-client";
-import type { QuotaCheckResult } from "@/lib/concurrency/quota";
+import type { ExecutionBudgetCheckResult } from "@/lib/concurrency/execution-budget";
 import type { ResolvedSession } from "./resolve-session";
 import type { HistoryResult } from "./fetch-history";
 import type {
@@ -46,7 +48,7 @@ export interface RunAgentParams {
   content: string;
   requestId: string;
   history: HistoryResult;
-  quota: QuotaCheckResult;
+  budget: ExecutionBudgetCheckResult;
   mcpHealth: McpHealthResult;
 }
 
@@ -62,7 +64,7 @@ export function executeRun(params: RunAgentParams): Response {
     content,
     requestId,
     history,
-    quota,
+    budget,
     mcpHealth,
   } = params;
 
@@ -120,6 +122,12 @@ export function executeRun(params: RunAgentParams): Response {
 
         // Clean up user message since run won't proceed
         await admin.from("messages").delete().eq("id", history.userMessageId);
+        await releaseExecutionBudget(
+          session.userId,
+          requestId,
+          null,
+          leaseResult.reason ?? "lease_not_acquired",
+        );
 
         await sendEvent("error", {
           run_id: "",
@@ -131,6 +139,7 @@ export function executeRun(params: RunAgentParams): Response {
       }
 
       const runId = leaseResult.runId;
+      await attachExecutionBudgetRun(session.userId, requestId, runId);
       const { data: runStart } = await admin
         .from("agent_runs")
         .select("started_at")
@@ -181,6 +190,12 @@ export function executeRun(params: RunAgentParams): Response {
           error_code: "internal_error",
           error_message: "응답 메시지를 만들지 못했습니다.",
         });
+        await releaseExecutionBudget(
+          session.userId,
+          requestId,
+          runId,
+          "assistant_message_create_failed",
+        );
         await releaseLease(runId);
         cleanupRun(runId);
         controller.close();
@@ -264,7 +279,7 @@ export function executeRun(params: RunAgentParams): Response {
             runStartedAt,
             result,
             mcpHealth,
-            quota,
+            budget,
             requestId,
             session,
             userId: session.userId,
@@ -283,6 +298,7 @@ export function executeRun(params: RunAgentParams): Response {
             },
             session,
             userId: session.userId,
+            requestId,
             sendEvent,
           });
         } else if (result.status === "cancelled") {
@@ -292,6 +308,8 @@ export function executeRun(params: RunAgentParams): Response {
             assistantMessageId,
             finishedAt,
             result,
+            userId: session.userId,
+            requestId,
             sendEvent,
           });
         } else {
@@ -303,6 +321,7 @@ export function executeRun(params: RunAgentParams): Response {
             result,
             session,
             userId: session.userId,
+            requestId,
             sendEvent,
           });
         }
@@ -342,6 +361,13 @@ export function executeRun(params: RunAgentParams): Response {
             error_code: "internal_error",
           },
         });
+
+        await releaseExecutionBudget(
+          session.userId,
+          requestId,
+          runId,
+          "internal_error",
+        );
 
         try {
           await sendEvent("error", {
@@ -529,7 +555,7 @@ export async function streamPersistedRunEvents(params: {
       });
     }
 
-    run = await expirePersistedRunIfNeeded(admin, run);
+    run = await expirePersistedRunIfNeeded(admin, run, userId);
 
     const message = run.assistant_message_id
       ? await loadPersistedAssistantMessage(admin, run.assistant_message_id)
@@ -604,6 +630,7 @@ const PERSISTED_RUN_SELECT =
 async function expirePersistedRunIfNeeded(
   admin: ReturnType<typeof getSupabaseAdmin>,
   run: PersistedRun,
+  userId: string,
 ): Promise<PersistedRun> {
   if (
     run.status !== "pending" &&
@@ -639,6 +666,8 @@ async function expirePersistedRunIfNeeded(
       .eq("id", run.assistant_message_id)
       .in("status", ["pending", "streaming"]);
   }
+
+  await releaseExecutionBudget(userId, run.request_id, run.id, "lease_expired");
 
   return {
     ...run,
@@ -700,7 +729,7 @@ async function sendPersistedDoneEvent(params: {
 }) {
   const { sendEvent, userId, run, message } = params;
   const estimatedCost = Number(run.estimated_cost_usd ?? 0);
-  const quota = await getQuotaStatusForPersistedRun(userId, estimatedCost);
+  const executionBudget = await getExecutionBudgetStatusForPersistedRun(userId);
 
   await sendEvent("done", {
     run_id: run.id,
@@ -722,24 +751,13 @@ async function sendPersistedDoneEvent(params: {
       estimated_cost_usd: estimatedCost,
       latency_ms: run.latency_ms ?? 0,
     },
-    quota,
+    execution_budget: executionBudget,
   });
 }
 
-async function getQuotaStatusForPersistedRun(
-  userId: string,
-  estimatedCost: number,
-) {
-  const quota = await checkQuota(userId);
-  return getQuotaStatus(
-    Math.max(0, quota.questionsUsed - 1),
-    Math.max(0, quota.costUsed - estimatedCost),
-    estimatedCost,
-    {
-      questionsLimit: quota.questionsLimit,
-      costLimit: quota.costLimit,
-    },
-  );
+async function getExecutionBudgetStatusForPersistedRun(userId: string) {
+  const budget = await checkExecutionBudget(userId);
+  return getExecutionBudgetStatus(budget);
 }
 
 // --- Helper functions for each terminal state ---
@@ -939,7 +957,7 @@ interface CompletedRunParams {
   runStartedAt: string;
   result: { acc: AccumulatedRun };
   mcpHealth: McpHealthResult;
-  quota: QuotaCheckResult;
+  budget: ExecutionBudgetCheckResult;
   requestId: string;
   session: ResolvedSession;
   userId: string;
@@ -947,7 +965,7 @@ interface CompletedRunParams {
 }
 
 async function handleCompletedRun(params: CompletedRunParams) {
-  const { admin, runId, assistantMessageId, finishedAt, runStartedAt, result, mcpHealth, quota, requestId, session, userId, sendEvent } = params;
+  const { admin, runId, assistantMessageId, finishedAt, runStartedAt, result, mcpHealth, budget, requestId, session, userId, sendEvent } = params;
   const { acc } = result;
   const visibleAnswer = acc.fullText.trim();
 
@@ -976,8 +994,11 @@ async function handleCompletedRun(params: CompletedRunParams) {
     })
     .eq("id", runId);
 
-  // Record usage in legacy daily analytics and monthly entitlement counters.
-  await recordUsage(userId, estimatedCost, { requestId, runId });
+  await settleExecutionBudget(userId, requestId, runId, estimatedCost, "completed", {
+    input_tokens: acc.inputTokens,
+    output_tokens: acc.outputTokens,
+    tool_call_count: acc.toolCalls.length,
+  });
 
   await recordAnalyticsEvent({
     eventName: "answer_completed",
@@ -1020,10 +1041,7 @@ async function handleCompletedRun(params: CompletedRunParams) {
       estimated_cost_usd: estimatedCost,
       latency_ms: latencyMs,
     },
-    quota: getQuotaStatus(quota.questionsUsed, quota.costUsed, estimatedCost, {
-      questionsLimit: quota.questionsLimit,
-      costLimit: quota.costLimit,
-    }),
+    execution_budget: getExecutionBudgetStatus(budget, estimatedCost),
   });
 }
 
@@ -1046,11 +1064,13 @@ interface CancelledRunParams {
   assistantMessageId: string;
   finishedAt: string;
   result: { acc: AccumulatedRun };
+  userId: string;
+  requestId: string;
   sendEvent: (event: string, data: unknown) => Promise<void>;
 }
 
 async function handleCancelledRun(params: CancelledRunParams) {
-  const { admin, runId, assistantMessageId, finishedAt, result, sendEvent } = params;
+  const { admin, runId, assistantMessageId, finishedAt, result, userId, requestId, sendEvent } = params;
 
   await admin
     .from("messages")
@@ -1070,6 +1090,13 @@ async function handleCancelledRun(params: CancelledRunParams) {
     })
     .eq("id", runId);
 
+  const estimatedCost = estimateCost(result.acc.inputTokens, result.acc.outputTokens);
+  await settleExecutionBudget(userId, requestId, runId, estimatedCost, "cancelled", {
+    input_tokens: result.acc.inputTokens,
+    output_tokens: result.acc.outputTokens,
+    tool_call_count: result.acc.toolCalls.length,
+  });
+
   await sendEvent("cancelled", {
     run_id: runId,
     message_id: assistantMessageId,
@@ -1084,11 +1111,12 @@ interface FailedRunParams {
   result: { acc: AccumulatedRun; errorCode?: string; errorMessage?: string };
   session: ResolvedSession;
   userId: string;
+  requestId: string;
   sendEvent: (event: string, data: unknown) => Promise<void>;
 }
 
 async function handleFailedRun(params: FailedRunParams) {
-  const { admin, runId, assistantMessageId, finishedAt, result, session, userId, sendEvent } = params;
+  const { admin, runId, assistantMessageId, finishedAt, result, session, userId, requestId, sendEvent } = params;
   const errorCode = toErrorCode(result.errorCode || "claude_api_error");
   const rawErrorMessage = result.errorMessage || publicErrorMessage(errorCode);
   const publicMessage = publicAgentErrorMessage({ code: errorCode });
@@ -1125,6 +1153,14 @@ async function handleFailedRun(params: FailedRunParams) {
       output_length: result.acc.fullText.length,
       tool_call_count: result.acc.toolCalls.length,
     },
+  });
+
+  const estimatedCost = estimateCost(result.acc.inputTokens, result.acc.outputTokens);
+  await settleExecutionBudget(userId, requestId, runId, estimatedCost, errorCode, {
+    input_tokens: result.acc.inputTokens,
+    output_tokens: result.acc.outputTokens,
+    tool_call_count: result.acc.toolCalls.length,
+    output_length: result.acc.fullText.length,
   });
 
   await sendEvent("error", {

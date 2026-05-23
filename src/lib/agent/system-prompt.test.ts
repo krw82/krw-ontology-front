@@ -14,7 +14,7 @@ describe("buildSystemPrompt", () => {
   it("keeps orchestration out of the system prompt", () => {
     const prompt = buildSystemPrompt();
 
-    expect(prompt).toContain("exact Claude Code skill command");
+    expect(prompt).toContain("exact KRW-AI skill command");
     expect(prompt).not.toContain("krw-ontology-web-answer");
     expect(prompt).not.toContain("answer_blocks");
     expect(prompt).not.toContain("Match the user's latest message language");

@@ -1,6 +1,44 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/concurrency/execution-budget", () => ({
+  attachExecutionBudgetRun: vi.fn(),
+  releaseExecutionBudget: vi.fn(),
+  settleExecutionBudget: vi.fn(),
+  checkExecutionBudget: vi.fn().mockResolvedValue({
+    allowed: true,
+    budgetUsedUsd: 0,
+    budgetReservedUsd: 0,
+    budgetLimitUsd: 2,
+    dailyBudgetUsedUsd: 0,
+    dailyBudgetReservedUsd: 0,
+    dailyBudgetLimitUsd: 0.5,
+    reserveCostUsd: 0.25,
+    runCount: 0,
+  }),
+  getExecutionBudgetStatus: vi.fn(() => ({
+    budget_used_usd: 0,
+    budget_reserved_usd: 0,
+    budget_limit_usd: 2,
+    remaining_budget_usd: 2,
+    daily_budget_used_usd: 0,
+    daily_budget_reserved_usd: 0,
+    daily_budget_limit_usd: 0.5,
+    per_run_reserve_usd: 0.25,
+    analysis_credits_used: 0,
+    analysis_credits_reserved: 0,
+    analysis_credits_limit: 2000,
+    remaining_analysis_credits: 2000,
+    daily_analysis_credits_used: 0,
+    daily_analysis_credits_reserved: 0,
+    daily_analysis_credits_limit: 500,
+    per_run_analysis_credits: 250,
+    run_count: 0,
+    percent_used: 0,
+    can_run: true,
+  })),
+  estimateCost: vi.fn(() => 0),
+}));
 
 import { streamPersistedRunEvents } from "./run-agent";
 import type { StreamWriter } from "@/lib/agent/stream-handler";

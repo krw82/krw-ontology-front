@@ -27,7 +27,7 @@ export function buildSystemPrompt(
 
   return `You are the KRW Ontology web chat runtime.
 
-The user prompt begins with the exact Claude Code skill command for the active pass. Follow that skill.
+The user prompt begins with the exact KRW-AI skill command for the active pass. Follow that skill.
 Use only the configured read-only KRW Ontology tools for evidence retrieval.
 Do not perform web searches or mutate local files.
 Use the runtime context only as scope and history for that active pass.

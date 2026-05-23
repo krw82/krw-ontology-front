@@ -1,0 +1,216 @@
+import Link from "next/link";
+import type { CSSProperties } from "react";
+import {
+  buildQuestionChatHref,
+  type QuestionChainNode,
+  type QuestionTopicPage,
+} from "@/lib/marketing/site";
+
+interface QuestionChainGraphProps {
+  topic: QuestionTopicPage;
+}
+
+function AnswerHint({ value }: { value?: string }) {
+  if (!value) return null;
+
+  return (
+    <div className="mt-3 border-t border-hairline pt-3">
+      <p className="font-mono text-[10px] font-black uppercase leading-4 tracking-[0.14em] text-muted">
+        분기 기준
+      </p>
+      <p className="mt-1 text-[12px] font-semibold leading-5 text-muted">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function QuestionNode({
+  node,
+  topic,
+  index,
+  isEntry,
+  animationDelay = 0,
+}: {
+  node: QuestionChainNode;
+  topic: QuestionTopicPage;
+  index: number;
+  isEntry?: boolean;
+  animationDelay?: number;
+}) {
+  const motionStyle = {
+    animationDelay: `${animationDelay}ms`,
+  } satisfies CSSProperties;
+  const content = (
+    <>
+      <div className="grid grid-cols-[34px_minmax(0,1fr)] gap-3">
+        <span
+          className={[
+            "border-r border-hairline pr-3 pt-0.5 font-mono text-[11px] font-black leading-5",
+            isEntry ? "text-primary" : "text-muted",
+          ].join(" ")}
+        >
+          {String(index + 1).padStart(2, "0")}
+        </span>
+        <span className="min-w-0">
+          <span
+            className={[
+              "block text-[14px] font-black leading-5 text-ink",
+              isEntry ? "group-hover:text-primary" : "",
+            ].join(" ")}
+          >
+            {node.title}
+          </span>
+          <span className="mt-1 block text-[12px] font-semibold leading-5 text-body">
+            {node.question}
+          </span>
+          {isEntry && (
+            <span className="mt-2 block font-mono text-[10px] font-black uppercase leading-4 tracking-[0.14em] text-muted group-hover:text-primary">
+              질문 시작
+            </span>
+          )}
+        </span>
+      </div>
+      <AnswerHint value={node.answerHint} />
+    </>
+  );
+
+  if (!isEntry) {
+    return (
+      <div
+        className="question-chain-node block rounded-[8px] border border-transparent bg-canvas px-3 py-3"
+        style={motionStyle}
+      >
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={buildQuestionChatHref(topic, {
+        ticker: topic.questionChain.ticker,
+        question: node.question,
+      })}
+      className="question-chain-node question-chain-entry group block rounded-[8px] border border-primary bg-surface px-3 py-3 transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+      style={motionStyle}
+    >
+      {content}
+    </Link>
+  );
+}
+
+export default function QuestionChainGraph({ topic }: QuestionChainGraphProps) {
+  const chain = topic.questionChain;
+  const totalNodeCount = chain.stages.reduce(
+    (sum, stage) => sum + stage.nodes.length,
+    0,
+  );
+  const stageStartIndexes = chain.stages.map((_, stageIndex) =>
+    chain.stages
+      .slice(0, stageIndex)
+      .reduce((sum, stage) => sum + stage.nodes.length, 0),
+  );
+
+  return (
+    <section
+      className="rounded-[8px] border border-hairline bg-canvas p-base sm:p-lg"
+      aria-label={`${chain.companyName} 질문 체인`}
+    >
+      <div className="flex flex-col gap-3 border-b border-hairline pb-5 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="font-mono text-[11px] font-black uppercase leading-5 tracking-[0.16em] text-primary">
+            {chain.ticker} question chain
+          </p>
+          <h2 className="mt-2 text-[24px] font-black leading-8 text-ink sm:text-[30px]">
+            {chain.title}
+          </h2>
+          <p className="mt-3 max-w-3xl text-[14px] font-medium leading-6 text-body sm:text-[15px]">
+            {chain.description}
+          </p>
+        </div>
+        <p className="font-mono text-[12px] font-black leading-5 text-muted">
+          {chain.stages.length} stages · {totalNodeCount} questions
+        </p>
+      </div>
+
+      <div className="mt-6 hidden lg:block">
+        <div
+          className="grid gap-3"
+          style={{
+            gridTemplateColumns: `repeat(${chain.stages.length}, minmax(0, 1fr))`,
+          }}
+        >
+          {chain.stages.map((stage, stageIndex) => (
+            <div
+              key={stage.id}
+              className="question-chain-stage question-chain-stage-desktop relative min-w-0 border-l border-hairline pl-4"
+              style={{ animationDelay: `${stageIndex * 90}ms` }}
+            >
+              <div className="pb-3">
+                <p className="font-mono text-[11px] font-black uppercase leading-5 tracking-[0.16em] text-primary">
+                  {String(stageIndex + 1).padStart(2, "0")}
+                </p>
+                <h3 className="mt-1 text-[15px] font-black leading-5 text-ink">
+                  {stage.label}
+                </h3>
+                <p className="mt-1 text-[12px] font-semibold leading-5 text-muted">
+                  {stage.nodes.length}개 질문
+                </p>
+              </div>
+              <div className="space-y-2 border-t border-hairline pt-2">
+                {stage.nodes.map((node, index) => {
+                  const absoluteIndex = stageStartIndexes[stageIndex] + index;
+                  return (
+                    <QuestionNode
+                      key={node.id}
+                      node={node}
+                      topic={topic}
+                      index={absoluteIndex}
+                      isEntry={stageIndex === 0 && absoluteIndex === 0}
+                      animationDelay={120 + stageIndex * 90 + index * 35}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-6 space-y-6 lg:hidden">
+        {chain.stages.map((stage, stageIndex) => (
+          <div
+            key={stage.id}
+            className="question-chain-stage"
+            style={{ animationDelay: `${stageIndex * 80}ms` }}
+          >
+            <div className="border-b border-hairline pb-2">
+              <p className="font-mono text-[11px] font-black uppercase leading-5 tracking-[0.16em] text-primary">
+                {String(stageIndex + 1).padStart(2, "0")}
+              </p>
+              <h3 className="font-mono text-[11px] font-black uppercase leading-5 tracking-[0.14em] text-primary">
+                {stage.label}
+              </h3>
+            </div>
+            <div className="mt-2 space-y-2">
+              {stage.nodes.map((node, index) => {
+                const absoluteIndex = stageStartIndexes[stageIndex] + index;
+                return (
+                  <QuestionNode
+                    key={node.id}
+                    node={node}
+                    topic={topic}
+                    index={absoluteIndex}
+                    isEntry={stageIndex === 0 && absoluteIndex === 0}
+                    animationDelay={100 + stageIndex * 80 + index * 35}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}

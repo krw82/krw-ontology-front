@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import PublicTopNav from "@/components/PublicTopNav";
+import TopNav from "@/components/TopNav";
+import SuggestedPromptActions from "@/components/SuggestedPromptActions";
+import { getAuthUser } from "@/lib/auth";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { normalizeTicker } from "@/lib/ontology/ticker";
-import { getSuggestedPromptsForTickers } from "@/lib/chat/suggested-prompts";
+import {
+  getCompanyLandingCopyForTicker,
+  getSuggestedPromptsForTickers,
+} from "@/lib/companies/landing-copy";
 import { absoluteUrl, pageMetadata, SITE_NAME } from "@/lib/marketing/site";
 
 export const runtime = "nodejs";
@@ -18,6 +23,10 @@ function chatHref(ticker: string, query?: string): string {
   const params = new URLSearchParams({ ticker });
   if (query) params.set("query", query);
   return `/chat?${params.toString()}`;
+}
+
+function stringValue(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 export async function generateMetadata({
@@ -36,10 +45,13 @@ export async function generateMetadata({
     });
   }
 
+  const copy = getCompanyLandingCopyForTicker(company.ticker);
+  const displayCompany = { ...company, ...copy };
+
   return pageMetadata({
-    title: `${company.ticker} 공시 기반 기업 분석`,
-    description: `${company.name} (${company.ticker})의 실적 변화, 리스크, 사업 활동을 공시 근거 기반으로 질문해보세요.`,
-    path: `/companies/${company.ticker}`,
+    title: `${displayCompany.ticker} 공시 기반 기업 분석`,
+    description: `${displayCompany.name} (${displayCompany.ticker})의 실적 변화, 리스크, 사업 활동을 공시 근거 기반으로 질문해보세요.`,
+    path: `/companies/${displayCompany.ticker}`,
   });
 }
 
@@ -48,16 +60,38 @@ export default async function CompanyLandingPage({
 }: CompanyPageProps) {
   const { ticker: rawTicker } = await params;
   const ticker = normalizeTicker(rawTicker);
-  const company = ticker ? await getIndexedCompany(ticker) : null;
+  const [company, user] = await Promise.all([
+    ticker ? getIndexedCompany(ticker) : Promise.resolve(null),
+    getAuthUser().catch(() => null),
+  ]);
 
   if (!company) notFound();
 
+  const metadata = user?.user_metadata;
+  const initialUserProfile = user?.email
+    ? {
+        email: user.email,
+        name:
+          stringValue(metadata?.full_name) ??
+          stringValue(metadata?.name) ??
+          stringValue(metadata?.display_name),
+        avatarUrl:
+          stringValue(metadata?.avatar_url) ??
+          stringValue(metadata?.picture) ??
+          stringValue(metadata?.photo_url),
+      }
+    : null;
+
   const prompts = getSuggestedPromptsForTickers([company.ticker]);
+  const promptHrefs = prompts.map((prompt) => chatHref(company.ticker, prompt));
+  const copy = getCompanyLandingCopyForTicker(company.ticker);
+  const displayCompany = { ...company, ...copy };
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebPage",
-    name: `${company.ticker} 공시 기반 기업 분석`,
-    url: absoluteUrl(`/companies/${company.ticker}`),
+    name: `${displayCompany.ticker} 공시 기반 기업 분석`,
+    url: absoluteUrl(`/companies/${displayCompany.ticker}`),
     isPartOf: {
       "@type": "WebSite",
       name: SITE_NAME,
@@ -65,8 +99,8 @@ export default async function CompanyLandingPage({
     },
     about: {
       "@type": "Organization",
-      name: company.name,
-      tickerSymbol: company.ticker,
+      name: displayCompany.name,
+      tickerSymbol: displayCompany.ticker,
     },
   };
 
@@ -77,7 +111,7 @@ export default async function CompanyLandingPage({
         suppressHydrationWarning
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <PublicTopNav />
+      <TopNav initialUserProfile={initialUserProfile} />
       <main
         id="main-content"
         className="min-h-0 flex-1 overflow-y-auto px-base pb-[112px] pt-xl sm:px-md md:px-xl md:pb-[96px] md:pt-[72px]"
@@ -88,28 +122,28 @@ export default async function CompanyLandingPage({
               회사 목록
             </Link>
             <span className="mx-2 text-outline-variant">/</span>
-            <span className="text-ink">{company.ticker}</span>
+            <span className="text-ink">{displayCompany.ticker}</span>
           </nav>
 
           <header className="border-b border-hairline pb-8">
             <p className="font-mono text-[14px] font-black leading-5 tracking-[0.08em] text-primary">
-              {company.ticker}
+              {displayCompany.ticker}
             </p>
             <h1 className="mt-3 max-w-4xl text-balance text-[34px] font-black leading-[1.08] tracking-normal text-ink sm:text-[48px]">
-              {company.name} 공시 기반 리서치
+              {displayCompany.name} 공시 기반 리서치
             </h1>
             <p className="mt-4 max-w-3xl text-[16px] leading-7 text-body sm:text-[18px]">
-              {company.description}
+              {displayCompany.description}
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <Link
-                href={chatHref(company.ticker)}
+                href={chatHref(displayCompany.ticker)}
                 className="inline-flex min-h-12 items-center justify-center rounded-[8px] bg-surface-dark px-5 py-3 text-[15px] font-extrabold leading-5 text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
-                {company.ticker} 무료 분석 시작
+                {displayCompany.ticker} 무료 분석 시작
               </Link>
               <Link
-                href={chatHref(company.ticker, prompts[0])}
+                href={chatHref(displayCompany.ticker, prompts[0])}
                 className="inline-flex min-h-12 items-center justify-center rounded-[8px] border border-hairline bg-canvas px-5 py-3 text-[15px] font-extrabold leading-5 text-ink transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
                 추천 질문 입력
@@ -117,56 +151,45 @@ export default async function CompanyLandingPage({
             </div>
           </header>
 
-          <section className="grid gap-4 border-b border-hairline py-8 md:grid-cols-3">
-            <FactBlock label="커버리지" value={company.coverage ?? "공시 인덱싱"} />
-            <FactBlock label="섹터" value={company.sector ?? "인덱싱된 기업"} />
-            <FactBlock
-              label="최신 기간"
-              value={company.latest_period ?? "기간 정보 확인 중"}
-            />
-          </section>
-
-          <section className="grid gap-8 py-8 md:grid-cols-[minmax(0,1fr)_320px]">
-            <div>
-              <h2 className="text-[22px] font-black leading-7 text-ink">
-                바로 물어볼 수 있는 질문
-              </h2>
-              <div className="mt-4 divide-y divide-hairline rounded-[8px] border border-hairline bg-canvas">
-                {prompts.map((prompt) => (
-                  <Link
-                    key={prompt}
-                    href={chatHref(company.ticker, prompt)}
-                    className="group flex items-center justify-between gap-sm px-base py-sm text-[14px] font-bold leading-6 text-body transition-colors hover:bg-surface hover:text-ink"
-                  >
-                    <span className="min-w-0">{prompt}</span>
-                    <span
-                      aria-hidden="true"
-                      className="material-symbols-outlined shrink-0 text-[18px] text-muted transition-colors group-hover:text-primary"
-                    >
-                      arrow_forward
-                    </span>
-                  </Link>
-                ))}
+          <section className="border-b border-hairline pt-8 pb-3">
+            <div className="grid gap-6 md:grid-cols-[180px_minmax(0,1fr)] md:items-start">
+              <div>
+                <p className="font-mono text-[11px] font-black uppercase tracking-[0.16em] text-primary">
+                  분석 범위
+                </p>
+                <h2 className="mt-2 text-[22px] font-black leading-7 text-ink">
+                  리서치 초점
+                </h2>
               </div>
-            </div>
-
-            <aside className="rounded-[8px] border border-hairline bg-surface p-base">
-              <h2 className="text-[16px] font-black leading-6 text-ink">
-                분석 전에 확인할 범위
-              </h2>
-              <dl className="mt-4 space-y-sm">
-                <DetailRow label="사업 활동" value={company.core_strength ?? "회사별 사업 활동 인덱스 확인"} />
-                <DetailRow label="추적 변수" value={company.critical_risk ?? "리스크 변수 인덱스 확인"} />
-                <DetailRow
-                  label="문서 유형"
+              <div className="divide-y divide-hairline border-t border-hairline">
+                <ScopeRow
+                  index="01"
+                  label="사업 활동"
                   value={
-                    company.document_types?.length
-                      ? company.document_types.join(", ")
-                      : "10-K, 10-Q"
+                    displayCompany.core_strength ??
+                    "회사별 사업 활동 인덱스 확인"
                   }
                 />
-              </dl>
-            </aside>
+                <ScopeRow
+                  index="02"
+                  label="추적 변수"
+                  value={
+                    displayCompany.critical_risk ??
+                    "리스크 변수 인덱스 확인"
+                  }
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className="pt-3 pb-8">
+            <div>
+              <SuggestedPromptActions
+                prompts={prompts}
+                groupId={`company-prompts-${displayCompany.ticker}`}
+                hrefs={promptHrefs}
+              />
+            </div>
           </section>
         </div>
       </main>
@@ -174,28 +197,28 @@ export default async function CompanyLandingPage({
   );
 }
 
-function FactBlock({ label, value }: { label: string; value: string }) {
+function ScopeRow({
+  index,
+  label,
+  value,
+}: {
+  index: string;
+  label: string;
+  value: string;
+}) {
   return (
-    <div>
-      <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
-        {label}
-      </p>
-      <p className="mt-2 text-[15px] font-extrabold leading-6 text-ink">
+    <div className="grid gap-2 py-4 sm:grid-cols-[96px_minmax(0,1fr)] sm:gap-5">
+      <div className="flex items-baseline gap-2">
+        <span className="font-mono text-[12px] font-black leading-none text-primary">
+          {index}
+        </span>
+        <span className="text-[13px] font-extrabold leading-5 text-muted">
+          {label}
+        </span>
+      </div>
+      <p className="whitespace-pre-line text-[15px] font-extrabold leading-7 text-ink">
         {value}
       </p>
-    </div>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
-        {label}
-      </dt>
-      <dd className="mt-1 text-[13px] font-medium leading-5 text-body">
-        {value}
-      </dd>
     </div>
   );
 }

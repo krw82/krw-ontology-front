@@ -131,6 +131,52 @@ export interface UsagePeriodCounterRow extends Record<string, unknown> {
   updated_at: string;
 }
 
+export interface UsageBudgetBalanceRow extends Record<string, unknown> {
+  user_id: string;
+  period_kind: "daily" | "monthly";
+  period_start: string;
+  period_end: string;
+  settled_cost_usd: number;
+  reserved_cost_usd: number;
+  released_cost_usd: number;
+  run_count: number;
+  updated_at: string;
+}
+
+export interface RunBudgetRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  request_id: string;
+  run_id: string | null;
+  monthly_period_start: string;
+  monthly_period_end: string;
+  daily_period_start: string;
+  daily_period_end: string;
+  reserved_cost_usd: number;
+  settled_cost_usd: number;
+  status: "reserved" | "running" | "settled" | "released" | "expired";
+  reason: string | null;
+  metadata: Json;
+  expires_at: string;
+  created_at: string;
+  settled_at: string | null;
+}
+
+export interface UsageLedgerRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  run_budget_id: string | null;
+  run_id: string | null;
+  request_id: string;
+  period_kind: "daily" | "monthly";
+  period_start: string;
+  period_end: string;
+  entry_type: "reservation" | "settlement" | "release" | "adjustment" | "expiry";
+  amount_usd: number;
+  metadata: Json;
+  created_at: string;
+}
+
 export interface ConcurrencyLeaseRow extends Record<string, unknown> {
   id: string;
   run_id: string;
@@ -400,6 +446,65 @@ export interface Database {
           referencedColumns: string[];
         }>;
       };
+      usage_budget_balances: {
+        Row: UsageBudgetBalanceRow;
+        Insert: Omit<
+          UsageBudgetBalanceRow,
+          | "settled_cost_usd"
+          | "reserved_cost_usd"
+          | "released_cost_usd"
+          | "run_count"
+          | "updated_at"
+        > & {
+          settled_cost_usd?: number;
+          reserved_cost_usd?: number;
+          released_cost_usd?: number;
+          run_count?: number;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Omit<
+            UsageBudgetBalanceRow,
+            "user_id" | "period_kind" | "period_start" | "period_end"
+          >
+        >;
+        Relationships: [];
+      };
+      run_budgets: {
+        Row: RunBudgetRow;
+        Insert: Omit<
+          RunBudgetRow,
+          | "id"
+          | "run_id"
+          | "settled_cost_usd"
+          | "status"
+          | "reason"
+          | "metadata"
+          | "created_at"
+          | "settled_at"
+        > & {
+          id?: string;
+          run_id?: string | null;
+          settled_cost_usd?: number;
+          status?: RunBudgetRow["status"];
+          reason?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          settled_at?: string | null;
+        };
+        Update: Partial<Omit<RunBudgetRow, "id" | "user_id" | "request_id" | "created_at">>;
+        Relationships: [];
+      };
+      usage_ledger: {
+        Row: UsageLedgerRow;
+        Insert: Omit<UsageLedgerRow, "id" | "created_at" | "metadata"> & {
+          id?: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: Partial<Omit<UsageLedgerRow, "id" | "created_at">>;
+        Relationships: [];
+      };
       concurrency_leases: {
         Row: ConcurrencyLeaseRow;
         Insert: Omit<ConcurrencyLeaseRow, "id" | "acquired_at"> & {
@@ -499,6 +604,67 @@ export interface Database {
           inserted: boolean;
           question_count: number;
           estimated_cost_usd: number;
+        }>;
+      };
+      reserve_execution_budget: {
+        Args: {
+          p_user_id: string;
+          p_request_id: string;
+          p_monthly_period_start: string;
+          p_monthly_period_end: string;
+          p_daily_period_start: string;
+          p_daily_period_end: string;
+          p_monthly_budget_usd: number;
+          p_daily_budget_usd: number;
+          p_reserve_cost_usd: number;
+          p_expires_at: string;
+        };
+        Returns: Array<{
+          allowed: boolean;
+          reason: string | null;
+          reservation_id: string | null;
+          monthly_used_usd: number;
+          monthly_reserved_usd: number;
+          monthly_limit_usd: number;
+          daily_used_usd: number;
+          daily_reserved_usd: number;
+          daily_limit_usd: number;
+        }>;
+      };
+      attach_execution_budget_run: {
+        Args: {
+          p_user_id: string;
+          p_request_id: string;
+          p_run_id: string;
+        };
+        Returns: undefined;
+      };
+      settle_execution_budget: {
+        Args: {
+          p_user_id: string;
+          p_request_id: string;
+          p_run_id: string | null;
+          p_actual_cost_usd: number;
+          p_terminal_status: string;
+          p_metadata: Json;
+        };
+        Returns: Array<{
+          settled: boolean;
+          reservation_id: string | null;
+          settled_cost_usd: number;
+        }>;
+      };
+      release_execution_budget: {
+        Args: {
+          p_user_id: string;
+          p_request_id: string;
+          p_run_id: string | null;
+          p_reason: string;
+        };
+        Returns: Array<{
+          released: boolean;
+          reservation_id: string | null;
+          released_cost_usd: number;
         }>;
       };
       try_acquire_lease: {

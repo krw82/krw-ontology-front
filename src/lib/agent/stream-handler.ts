@@ -3,6 +3,11 @@ import type {
   StreamingCitation,
   MCPToolName,
 } from "@/types/api-contracts";
+import { readIntEnv } from "@/lib/env";
+
+const MAX_TOOL_RESULT_CHARS = readIntEnv("AGENT_MAX_TOOL_RESULT_CHARS", 100_000, {
+  min: 1_000,
+});
 
 export interface AccumulatedRun {
   fullText: string;
@@ -101,7 +106,7 @@ export function endToolCall(
       tc.resultJson = resultJson;
     }
     if (resultText !== undefined) {
-      tc.resultText = resultText ? resultText.slice(0, 100_000) : null;
+      tc.resultText = resultText ? resultText.slice(0, MAX_TOOL_RESULT_CHARS) : null;
     }
     tc.finishedAt = now.toISOString();
     tc.errorMessage = errorMessage;

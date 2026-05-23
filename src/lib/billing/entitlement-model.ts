@@ -1,19 +1,45 @@
 import type { EntitlementStatus } from "@/types/entitlement";
 import {
+  budgetUsdToAnalysisCredits,
+  getBillingPlanBaseRunCredits,
   getBillingPlan,
   type BillingPlan,
 } from "./plans";
 import type { BillingPeriod } from "./period";
-import type { EntitlementPlanKey } from "@/types/entitlement";
+import type {
+  EntitlementAccessStatus,
+  EntitlementPlanKey,
+} from "@/types/entitlement";
 
 export interface EntitlementUsageInput {
   planKey: EntitlementPlanKey;
-  questionsUsed: number;
+  budgetUsedUsd: number;
+  budgetReservedUsd: number;
+  dailyBudgetUsedUsd: number;
+  dailyBudgetReservedUsd: number;
+  runCount: number;
   period: BillingPeriod;
+  status?: EntitlementAccessStatus;
 }
 
 function clampUsage(value: number): number {
   return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function roundUsd(value: number): number {
+  return Math.round(clampUsage(value) * 100) / 100;
+}
+
+function creditLimit(budgetUsd: number): number {
+  return budgetUsdToAnalysisCredits(budgetUsd, "floor");
+}
+
+function usedCredits(budgetUsd: number): number {
+  return budgetUsdToAnalysisCredits(budgetUsd, "ceil");
+}
+
+function remainingCredits(budgetUsd: number): number {
+  return budgetUsdToAnalysisCredits(budgetUsd, "floor");
 }
 
 function featureEnabled(plan: BillingPlan, feature: string): boolean {
@@ -27,11 +53,24 @@ function featureEnabled(plan: BillingPlan, feature: string): boolean {
   return true;
 }
 
-function upgradeCopy(percentUsed: number) {
+function upgradeCopy(
+  percentUsed: number,
+  usageLabel: string,
+  status: EntitlementAccessStatus,
+) {
+  if (status === "admin") {
+    return {
+      enabled: false,
+      title: "관리자 계정입니다.",
+      message: "분석 크레딧 한도가 적용되지 않습니다.",
+      label: "플랜 확인",
+    };
+  }
+
   if (percentUsed >= 100) {
     return {
       enabled: true,
-      title: "이번 달 질문 한도를 모두 사용했습니다.",
+      title: `${usageLabel} 분석 크레딧을 모두 사용했습니다.`,
       message: "플랜을 올리면 더 많은 기업 리서치를 계속 실행할 수 있습니다.",
       label: "플랜 확인",
     };
@@ -40,8 +79,8 @@ function upgradeCopy(percentUsed: number) {
   if (percentUsed >= 80) {
     return {
       enabled: true,
-      title: "이번 달 질문 한도에 가까워졌습니다.",
-      message: "남은 질문 수를 확인하고 필요한 경우 상위 플랜을 준비하세요.",
+      title: `${usageLabel} 분석 크레딧 한도에 가까워졌습니다.`,
+      message: "남은 크레딧을 확인하고 필요한 경우 상위 플랜을 준비하세요.",
       label: "플랜 확인",
     };
   }
@@ -56,19 +95,56 @@ function upgradeCopy(percentUsed: number) {
 
 export function buildEntitlementStatus({
   planKey,
-  questionsUsed,
+  budgetUsedUsd,
+  budgetReservedUsd,
+  dailyBudgetUsedUsd,
+  dailyBudgetReservedUsd,
+  runCount,
   period,
+  status,
 }: EntitlementUsageInput): EntitlementStatus {
   const plan = getBillingPlan(planKey);
-  const used = clampUsage(questionsUsed);
-  const questionLimit = Math.max(1, Math.floor(plan.monthlyQuestionLimit));
-  const remaining = Math.max(0, questionLimit - used);
-  const percentUsed = Math.min(100, Math.round((used / questionLimit) * 100));
+  const used = roundUsd(budgetUsedUsd);
+  const reserved = roundUsd(budgetReservedUsd);
+  const dailyUsed = roundUsd(dailyBudgetUsedUsd);
+  const dailyReserved = roundUsd(dailyBudgetReservedUsd);
+  const accessStatus =
+    status ?? (plan.key === "beta" ? "beta" : "standard");
+  const unlimited = accessStatus === "admin";
+  const budgetLimit = unlimited
+    ? Number.MAX_SAFE_INTEGER
+    : Math.max(0.01, plan.monthlyBudgetUsd);
+  const dailyBudgetLimit = unlimited
+    ? Number.MAX_SAFE_INTEGER
+    : Math.max(0.01, plan.dailyBudgetUsd);
+  const effectiveBudgetUsed = used + reserved;
+  const effectiveDailyBudgetUsed = dailyUsed + dailyReserved;
+  const remaining = unlimited
+    ? Number.MAX_SAFE_INTEGER
+    : roundUsd(Math.max(0, budgetLimit - effectiveBudgetUsed));
+  const percentUsed = unlimited
+    ? 0
+    : Math.min(100, Math.round((effectiveBudgetUsed / budgetLimit) * 100));
+  const canRun =
+    unlimited ||
+    (remaining >= plan.perRunReserveUsd &&
+      dailyBudgetLimit - effectiveDailyBudgetUsed >= plan.perRunReserveUsd);
   const alertLevel =
-    percentUsed >= 100 ? "blocked" : percentUsed >= 80 ? "warning" : "ok";
-  const upgrade = upgradeCopy(percentUsed);
+    !unlimited && !canRun
+      ? "blocked"
+      : !unlimited && percentUsed >= 80
+        ? "warning"
+        : "ok";
+  const upgrade = upgradeCopy(percentUsed, period.label, accessStatus);
+  const analysisCreditLimit = unlimited
+    ? Number.MAX_SAFE_INTEGER
+    : creditLimit(budgetLimit);
+  const dailyAnalysisCreditLimit = unlimited
+    ? Number.MAX_SAFE_INTEGER
+    : creditLimit(dailyBudgetLimit);
 
   return {
+    status: accessStatus,
     plan: {
       key: plan.key,
       label: plan.label,
@@ -76,16 +152,43 @@ export function buildEntitlementStatus({
       description: plan.description,
     },
     usage: {
-      period: "monthly",
+      period: plan.budgetPeriod,
       period_label: period.label,
       period_start: period.start,
       period_end: period.end,
-      questions_used: used,
-      questions_limit: questionLimit,
-      remaining_questions: remaining,
+      budget_used_usd: used,
+      budget_reserved_usd: reserved,
+      budget_limit_usd: budgetLimit,
+      remaining_budget_usd: remaining,
+      daily_budget_used_usd: dailyUsed,
+      daily_budget_reserved_usd: dailyReserved,
+      daily_budget_limit_usd: dailyBudgetLimit,
+      per_run_reserve_usd: plan.perRunReserveUsd,
+      analysis_credits_used: unlimited
+        ? 0
+        : usedCredits(used),
+      analysis_credits_reserved: unlimited
+        ? 0
+        : usedCredits(reserved),
+      analysis_credits_limit: analysisCreditLimit,
+      remaining_analysis_credits: unlimited
+        ? Number.MAX_SAFE_INTEGER
+        : remainingCredits(remaining),
+      daily_analysis_credits_used: unlimited
+        ? 0
+        : usedCredits(dailyUsed),
+      daily_analysis_credits_reserved: unlimited
+        ? 0
+        : usedCredits(dailyReserved),
+      daily_analysis_credits_limit: dailyAnalysisCreditLimit,
+      per_run_analysis_credits: unlimited
+        ? 0
+        : getBillingPlanBaseRunCredits(plan),
+      run_count: Math.floor(clampUsage(runCount)),
       percent_used: percentUsed,
       alert_level: alertLevel,
-      can_run: remaining > 0,
+      can_run: canRun,
+      unlimited,
       resets_at: period.end,
     },
     features: [

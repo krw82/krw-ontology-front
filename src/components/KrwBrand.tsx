@@ -1,8 +1,8 @@
+import Image from "next/image";
 import Link from "next/link";
 
 interface KrwMarkProps {
   className?: string;
-  dark?: boolean;
 }
 
 interface KrwBrandProps {
@@ -10,47 +10,25 @@ interface KrwBrandProps {
   dark?: boolean;
   compact?: boolean;
   className?: string;
+  ariaLabel?: string;
 }
 
-export function KrwMark({ className = "h-9 w-9", dark = false }: KrwMarkProps) {
+export function KrwMark({ className = "h-9 w-9" }: KrwMarkProps) {
   return (
-    <svg
+    <span
       aria-hidden="true"
-      className={className}
-      fill="none"
-      viewBox="0 0 120 120"
-      xmlns="http://www.w3.org/2000/svg"
+      className={`relative block overflow-hidden rounded-[8px] ${className}`}
     >
-      <rect
-        width="120"
-        height="120"
-        rx="24"
-        fill={dark ? "#16181C" : "#FFFFFF"}
-        stroke={dark ? "#303744" : "#DDE1FF"}
-        strokeWidth="4"
+      <Image
+        src="/krw-logo.svg"
+        alt=""
+        fill
+        sizes="36px"
+        className="object-contain"
+        priority={false}
+        unoptimized
       />
-      <path
-        d="M28 28V92"
-        stroke={dark ? "#B7C4FF" : "#0052FF"}
-        strokeLinecap="round"
-        strokeWidth="9"
-      />
-      <path
-        d="M72 29L38 60L78 91"
-        stroke={dark ? "#B7C4FF" : "#0052FF"}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="9"
-      />
-      <path
-        d="M86 30V90"
-        stroke={dark ? "#5F7DFF" : "#B7C4FF"}
-        strokeLinecap="round"
-        strokeWidth="7"
-      />
-      <circle cx="86" cy="30" r="5" fill={dark ? "#DDE1FF" : "#0052FF"} />
-      <circle cx="86" cy="90" r="5" fill={dark ? "#DDE1FF" : "#0052FF"} />
-    </svg>
+    </span>
   );
 }
 
@@ -59,6 +37,7 @@ export function KrwBrand({
   dark = false,
   compact = false,
   className = "",
+  ariaLabel = "KRW Ontology 홈",
 }: KrwBrandProps) {
   return (
     <Link
@@ -68,10 +47,9 @@ export function KrwBrand({
         dark ? "text-on-dark" : "text-ink",
         className,
       ].join(" ")}
-      aria-label="KRW Ontology 홈"
+      aria-label={ariaLabel}
     >
       <KrwMark
-        dark={dark}
         className={compact ? "h-8 w-8 shrink-0" : "h-9 w-9 shrink-0"}
       />
       <span className="flex min-w-0 flex-col justify-center">
