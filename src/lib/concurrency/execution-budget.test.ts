@@ -129,7 +129,7 @@ describe("execution budget", () => {
         p_user_id: "user-1",
         p_request_id: "req-1",
         p_monthly_budget_usd: 2,
-        p_daily_budget_usd: 0.5,
+        p_daily_budget_usd: 2,
         p_reserve_cost_usd: 0.25,
       }),
     );

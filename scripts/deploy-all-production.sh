@@ -16,9 +16,10 @@ Order:
 By default the script refuses to deploy when local migrations are not already
 applied. Pass --apply-migrations to run `supabase db push` before the smoke test.
 
-On the current small VM, data deployment normally needs --replace-remote-data
-because the disk cannot hold the old 25GB data release and a new one at once.
-That flag stops web and removes old data releases before streaming the new data.
+Data deployment uses a tar.zst release archive uploaded to GCS. The VM downloads,
+verifies, extracts, then atomically switches /srv/krw-ontology-data/current.
+Use --replace-remote-data only when the VM disk cannot hold the old release,
+compressed archive, and new release side by side.
 EOF
 }
 

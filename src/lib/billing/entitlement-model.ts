@@ -1,6 +1,7 @@
 import type { EntitlementStatus } from "@/types/entitlement";
 import {
   budgetUsdToAnalysisCredits,
+  getEffectiveDailyBudgetUsd,
   getBillingPlanBaseRunCredits,
   getBillingPlan,
   type BillingPlan,
@@ -116,7 +117,7 @@ export function buildEntitlementStatus({
     : Math.max(0.01, plan.monthlyBudgetUsd);
   const dailyBudgetLimit = unlimited
     ? Number.MAX_SAFE_INTEGER
-    : Math.max(0.01, plan.dailyBudgetUsd);
+    : Math.max(0.01, getEffectiveDailyBudgetUsd(plan));
   const effectiveBudgetUsed = used + reserved;
   const effectiveDailyBudgetUsed = dailyUsed + dailyReserved;
   const remaining = unlimited

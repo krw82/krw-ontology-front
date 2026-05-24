@@ -10,7 +10,7 @@ export interface BillingPlan {
   description: string;
   budgetPeriod: EntitlementUsagePeriod;
   monthlyBudgetUsd: number;
-  dailyBudgetUsd: number;
+  dailyBudgetUsd: number | null;
   perRunReserveUsd: number;
   sortOrder: number;
   public: boolean;
@@ -31,7 +31,7 @@ export const BILLING_PLANS: Record<EntitlementPlanKey, BillingPlan> = {
     description: "개인 테스트와 가벼운 기업 리서치용 기본 분석 크레딧",
     budgetPeriod: "monthly",
     monthlyBudgetUsd: 2,
-    dailyBudgetUsd: 0.5,
+    dailyBudgetUsd: null,
     perRunReserveUsd: 0.25,
     sortOrder: 10,
     public: true,
@@ -43,7 +43,7 @@ export const BILLING_PLANS: Record<EntitlementPlanKey, BillingPlan> = {
     description: "정기적으로 기업 리서치를 수행하는 사용자를 위한 분석 크레딧",
     budgetPeriod: "monthly",
     monthlyBudgetUsd: 20,
-    dailyBudgetUsd: 3,
+    dailyBudgetUsd: null,
     perRunReserveUsd: 0.5,
     sortOrder: 20,
     public: true,
@@ -55,7 +55,7 @@ export const BILLING_PLANS: Record<EntitlementPlanKey, BillingPlan> = {
     description: "여러 기업과 주제를 반복 확인하는 고사용량 분석 크레딧",
     budgetPeriod: "monthly",
     monthlyBudgetUsd: 60,
-    dailyBudgetUsd: 10,
+    dailyBudgetUsd: null,
     perRunReserveUsd: 1,
     sortOrder: 30,
     public: true,
@@ -67,7 +67,7 @@ export const BILLING_PLANS: Record<EntitlementPlanKey, BillingPlan> = {
     description: "정식 과금 전 품질과 분석 크레딧 정책을 검증하는 무료 베타 플랜",
     budgetPeriod: "monthly",
     monthlyBudgetUsd: 5,
-    dailyBudgetUsd: 1,
+    dailyBudgetUsd: null,
     perRunReserveUsd: 0.25,
     sortOrder: 5,
     public: false,
@@ -79,7 +79,7 @@ export const BILLING_PLANS: Record<EntitlementPlanKey, BillingPlan> = {
     description: "운영 검증과 장애 대응을 위한 내부 플랜",
     budgetPeriod: "monthly",
     monthlyBudgetUsd: 500,
-    dailyBudgetUsd: 100,
+    dailyBudgetUsd: null,
     perRunReserveUsd: 1,
     sortOrder: 1,
     public: false,
@@ -111,6 +111,10 @@ export function budgetUsdToAnalysisCredits(
 
 export function getBillingPlanAnalysisCredits(plan: BillingPlan): number {
   return Math.max(1, budgetUsdToAnalysisCredits(plan.monthlyBudgetUsd, "floor"));
+}
+
+export function getEffectiveDailyBudgetUsd(plan: BillingPlan): number {
+  return plan.dailyBudgetUsd ?? plan.monthlyBudgetUsd;
 }
 
 export function getBillingPlanBaseRunCredits(plan: BillingPlan): number {

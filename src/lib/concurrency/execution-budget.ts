@@ -1,6 +1,10 @@
 import { getEntitlementStatus } from "@/lib/billing/entitlement";
 import { getCurrentDailyBillingPeriod, getCurrentMonthlyBillingPeriod } from "@/lib/billing/period";
-import { budgetUsdToAnalysisCredits, getBillingPlan } from "@/lib/billing/plans";
+import {
+  budgetUsdToAnalysisCredits,
+  getEffectiveDailyBudgetUsd,
+  getBillingPlan,
+} from "@/lib/billing/plans";
 import { readFloatEnv } from "@/lib/env";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { EntitlementStatus } from "@/types/entitlement";
@@ -91,6 +95,7 @@ export async function reserveExecutionBudget(
   if (budget.entitlement.usage.unlimited) return budget;
 
   const plan = getBillingPlan(budget.entitlement.plan.key);
+  const dailyBudgetUsd = getEffectiveDailyBudgetUsd(plan);
   const monthlyPeriod = getCurrentMonthlyBillingPeriod();
   const dailyPeriod = getCurrentDailyBillingPeriod();
   const admin = getSupabaseAdmin();
@@ -102,7 +107,7 @@ export async function reserveExecutionBudget(
     p_daily_period_start: dailyPeriod.start,
     p_daily_period_end: dailyPeriod.end,
     p_monthly_budget_usd: plan.monthlyBudgetUsd,
-    p_daily_budget_usd: plan.dailyBudgetUsd,
+    p_daily_budget_usd: dailyBudgetUsd,
     p_reserve_cost_usd: plan.perRunReserveUsd,
     p_expires_at: new Date(Date.now() + 30 * 60_000).toISOString(),
   });

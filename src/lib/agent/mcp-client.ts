@@ -30,7 +30,7 @@ export const KRW_ONTOLOGY_SDK_ALLOWED_TOOLS = KRW_ONTOLOGY_MCP_TOOLS.map(
 
 const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const execFileAsync = promisify(execFile);
-const DEFAULT_MCP_HEALTH_TIMEOUT_MS = 8_000;
+const DEFAULT_MCP_HEALTH_TIMEOUT_MS = 30_000;
 
 export function isKrwOntologySdkTool(toolName: string): boolean {
   if (!toolName.startsWith(KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX)) return false;

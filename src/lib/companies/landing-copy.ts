@@ -1,3 +1,8 @@
+import {
+  APPLE_RESEARCH_PROFILE,
+  type CompanyResearchProfile,
+} from "@/lib/companies/research-profiles";
+
 export type SuggestedPromptSet = readonly string[];
 
 export interface CompanyLandingUiCopy {
@@ -15,18 +20,20 @@ export interface CompanyLandingUiCopy {
   suggested_prompts?: SuggestedPromptSet;
 }
 
+function companyResearchProfileToLandingCopy(
+  profile: CompanyResearchProfile,
+): CompanyLandingUiCopy {
+  return {
+    sector: profile.sectorKo,
+    core_strength: `리서치 초점: ${profile.researchFocus.join(", ")}`,
+    critical_risk: `리스크 변수: ${profile.riskVariables.join(", ")}`,
+    description: profile.description,
+    suggested_prompts: profile.suggestedPrompts,
+  };
+}
+
 const COMPANY_LANDING_UI_COPY: Record<string, CompanyLandingUiCopy> = {
-  "AAPL": {
-    sector: "기술",
-    core_strength: "핵심 성장 동력: iPhone 매출, Services 매출, Mac·iPad·Wearables 매출 믹스",
-    critical_risk: "주요 리스크 요인: 중국 수요, 앱스토어 규제, 관세·공급망",
-    description: "Apple은 iPhone과 Services를 중심으로 매출을 만들고, 제품 교체 주기와 서비스 생태계가 실적 흐름을 좌우합니다.",
-    suggested_prompts: [
-      "Apple은 어떤 제품과 서비스로 돈을 벌고, 최근 공시에서 매출이 어떻게 나뉘는지 정리해줘.",
-      "iPhone과 Services 매출 비중은 어떻게 달라졌고, 성장률 차이는 무엇인지 비교해줘.",
-      "Services 성장은 구독, 라이선스, 광고, 결제 생태계 중 어디에서 오는지 근거를 찾아줘.",
-    ],
-  },
+  "AAPL": companyResearchProfileToLandingCopy(APPLE_RESEARCH_PROFILE),
   "ABBV": {
     sector: "제약",
     core_strength: "핵심 성장 동력: 제품 및 서비스 매출, 부채 관리, 인수 및 라이선스",
@@ -435,7 +442,11 @@ function parseListField(value?: string): string[] {
     .replace(/^핵심 성장 동력:\s*/, "")
     .replace(/^핵심 성장 동력\s*:\s*/, "")
     .replace(/^주요 리스크 요인:\s*/, "")
-    .replace(/^주요 리스크 요인\s*:\s*/, "");
+    .replace(/^주요 리스크 요인\s*:\s*/, "")
+    .replace(/^리서치 초점:\s*/, "")
+    .replace(/^리서치 초점\s*:\s*/, "")
+    .replace(/^리스크 변수:\s*/, "")
+    .replace(/^리스크 변수\s*:\s*/, "");
 
   if (normalized.includes("\n") || normalized.includes(";")) {
     return normalized

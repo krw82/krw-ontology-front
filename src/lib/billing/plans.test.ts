@@ -13,19 +13,19 @@ describe("billing plans", () => {
     expect(getBillingPlan("free")).toMatchObject({
       budgetPeriod: "monthly",
       monthlyBudgetUsd: 2,
-      dailyBudgetUsd: 0.5,
+      dailyBudgetUsd: null,
       perRunReserveUsd: 0.25,
     });
     expect(getBillingPlan("pro")).toMatchObject({
       budgetPeriod: "monthly",
       monthlyBudgetUsd: 20,
-      dailyBudgetUsd: 3,
+      dailyBudgetUsd: null,
       perRunReserveUsd: 0.5,
     });
     expect(getBillingPlan("power")).toMatchObject({
       budgetPeriod: "monthly",
       monthlyBudgetUsd: 60,
-      dailyBudgetUsd: 10,
+      dailyBudgetUsd: null,
       perRunReserveUsd: 1,
     });
   });

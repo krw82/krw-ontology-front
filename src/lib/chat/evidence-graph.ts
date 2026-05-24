@@ -378,8 +378,8 @@ export function buildEvidenceGraphPreview(
 
   addNode(nodes, seen, {
     id: companyNodeId,
-    label: ticker ?? "Research",
-    detail: ticker ? "company context" : "research context",
+    label: "Ontology Context",
+    detail: "research scope",
     kind: "company",
   });
 
