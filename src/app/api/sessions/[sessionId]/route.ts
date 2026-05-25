@@ -54,7 +54,7 @@ async function hasActiveRun(sessionId: string): Promise<boolean> {
     .from("agent_runs")
     .select("id, status")
     .eq("session_id", sessionId)
-    .in("status", ["pending", "running"])
+    .in("status", ["pending", "queued", "running"])
     .limit(1)
     .returns<ActiveRunRow[]>();
 

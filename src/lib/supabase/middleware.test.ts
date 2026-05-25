@@ -60,4 +60,21 @@ describe("updateSession auth redirects", () => {
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("http://localhost/companies");
   });
+
+  it("routes misplaced OAuth codes through the callback handler", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.example");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon");
+    process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS = "0";
+
+    const response = await updateSession(
+      new NextRequest("http://localhost/?code=oauth-code&next=%2Fchat"),
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost/auth/callback?code=oauth-code&next=%2Fchat",
+    );
+    expect(createServerClient).not.toHaveBeenCalled();
+  });
 });

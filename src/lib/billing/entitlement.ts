@@ -6,11 +6,11 @@ import type {
   UserEntitlementRow,
 } from "@/types/database";
 import type { EntitlementStatus } from "@/types/entitlement";
+import { isAdminEntitlementEmail } from "./admin-emails";
 import { buildEntitlementStatus } from "./entitlement-model";
 import { getCurrentBillingPeriod } from "./period";
-import { DEFAULT_PLAN_KEY, getBillingPlan, resolvePlanKey } from "./plans";
-
-const DEFAULT_ADMIN_EMAILS = ["admin1@example.com"];
+import { getBillingPlanFromStore } from "./plan-store";
+import { DEFAULT_PLAN_KEY, resolvePlanKey } from "./plans";
 
 function isMissingRelationError(error: { code?: string; message?: string }) {
   return (
@@ -26,13 +26,14 @@ export async function getEntitlementStatus(
 ): Promise<EntitlementStatus> {
   const isAdmin = isAdminEntitlementEmail(userEmail);
   const planKey = isAdmin ? "internal" : await loadPlanKey(userId);
-  const plan = getBillingPlan(planKey);
+  const plan = await getBillingPlanFromStore(planKey);
   const period = getCurrentBillingPeriod(plan.budgetPeriod);
   const dailyPeriod = getCurrentBillingPeriod("daily");
   const budget = await loadExecutionBudgetSnapshot(userId, period, dailyPeriod);
 
   return buildEntitlementStatus({
     planKey,
+    plan,
     budgetUsedUsd: budget.monthly.settledCostUsd,
     budgetReservedUsd: budget.monthly.reservedCostUsd,
     dailyBudgetUsedUsd: budget.daily.settledCostUsd,
@@ -43,15 +44,7 @@ export async function getEntitlementStatus(
   });
 }
 
-export function isAdminEntitlementEmail(email?: string | null): boolean {
-  if (!email) return false;
-  const normalizedEmail = email.trim().toLowerCase();
-  const configuredEmails = (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-  return new Set([...DEFAULT_ADMIN_EMAILS, ...configuredEmails]).has(normalizedEmail);
-}
+export { isAdminEntitlementEmail };
 
 async function loadPlanKey(userId: string) {
   const supabase = await createClient();

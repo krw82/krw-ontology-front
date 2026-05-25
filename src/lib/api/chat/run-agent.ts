@@ -30,6 +30,7 @@ import type {
 import type { StreamingCitation } from "@/types/api-contracts";
 import { toErrorCode } from "@/types/api-contracts";
 import { readIntEnv } from "@/lib/env";
+import type { ResearchMode } from "@/lib/research-mode";
 import {
   publicAgentErrorMessage,
   publicErrorMessage,
@@ -50,6 +51,7 @@ export interface RunAgentParams {
   history: HistoryResult;
   budget: ExecutionBudgetCheckResult;
   mcpHealth: McpHealthResult;
+  researchMode?: ResearchMode;
 }
 
 /**
@@ -253,6 +255,7 @@ export function executeRun(params: RunAgentParams): Response {
             scopeType: session.scopeType,
             defaultTickers: session.defaultTickers,
             defaultDocumentTypes: session.defaultDocumentTypes,
+            researchMode: params.researchMode,
             history: history.history,
             abortSignal: streamAbortController!.signal,
             onSdkDiagnostics: recordSdkDiagnostics,

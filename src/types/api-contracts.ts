@@ -18,10 +18,12 @@
 /** Agent run lifecycle states */
 export type RunStatus =
   | "pending"
+  | "queued"
   | "running"
   | "completed"
   | "failed"
-  | "cancelled";
+  | "cancelled"
+  | "expired";
 
 /** Chat message role */
 export type MessageRole = "user" | "assistant" | "system";
@@ -56,6 +58,7 @@ export type ErrorCode =
   | "no_active_run"
   | "quota_exceeded"
   | "cost_cap_exceeded"
+  | "tool_budget_exceeded"
   | "concurrency_limit"
   | "lease_expired"
   | "cancelled"
@@ -77,6 +80,7 @@ const VALID_ERROR_CODES: ReadonlySet<string> = new Set<ErrorCode>([
   "no_active_run",
   "quota_exceeded",
   "cost_cap_exceeded",
+  "tool_budget_exceeded",
   "concurrency_limit",
   "lease_expired",
   "cancelled",
@@ -259,6 +263,7 @@ export interface StreamingToolCallEnd {
 
 export type ResearchActivityStage =
   | "preparing"
+  | "queued"
   | "connecting"
   | "researching"
   | "checking_evidence"
@@ -777,6 +782,7 @@ export interface ChatRunRequest {
   session_id?: string;
   content: string;            // 1-20000 chars, or 120000 when text attachments are included
   request_id: string;         // client-generated UUID
+  research_mode?: "fast" | "standard" | "deep";
   scope_type?: SessionScopeType;
   default_tickers?: string[];
   default_document_types?: string[];

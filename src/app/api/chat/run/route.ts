@@ -10,13 +10,13 @@ import {
   resolveSession,
   reserveBudgetStep,
   fetchHistory,
-  executeRun,
 } from "@/lib/api/chat";
 import {
   checkChatRunRateLimit,
   getClientIp,
 } from "@/lib/api/chat/rate-limit";
-import { streamPersistedRunResponse } from "@/lib/api/chat/run-agent";
+import { enqueueAgentRun } from "@/lib/agent/job-queue";
+import { streamAgentRunEventsResponse } from "@/lib/agent/run-events";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
 
 // --- MCP health cache ---
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   // another session/message/run. Reattach to the existing run instead.
   const existingRun = await findExistingRunForRequest(request_id, userId);
   if (existingRun) {
-    return withSessionHeader(streamPersistedRunResponse({
+    return withSessionHeader(streamAgentRunEventsResponse({
       userId,
       sessionId: existingRun.session_id,
       runId: existingRun.id,
@@ -93,10 +93,9 @@ export async function POST(request: NextRequest) {
     return errorResponse(503, "mcp_unavailable", "온톨로지 도구에 연결할 수 없습니다.", request_id);
   }
 
-  // 5. Reserve execution budget before creating durable chat work.
+  // 5. Open an execution-budget record before creating durable chat work.
   const budgetResult = await reserveBudgetStep(userId, request_id, userEmail);
   if (!budgetResult.ok) return budgetResult.response;
-  const budget = budgetResult.budget;
 
   // 6. Resolve session (lookup + ownership check)
   const sessionIdResult = await getOrCreateSessionId(body, userId, request_id);
@@ -127,7 +126,7 @@ export async function POST(request: NextRequest) {
   // creation and run acquisition. Re-check before starting the agent.
   const existingRunAfterMessage = await findExistingRunForRequest(request_id, userId);
   if (existingRunAfterMessage) {
-    return withSessionHeader(streamPersistedRunResponse({
+    return withSessionHeader(streamAgentRunEventsResponse({
       userId,
       sessionId: existingRunAfterMessage.session_id,
       runId: existingRunAfterMessage.id,
@@ -146,19 +145,61 @@ export async function POST(request: NextRequest) {
       tickers: session.defaultTickers,
       question_length: content.length,
       attachment_count: countAttachedFiles(content),
+      research_mode: body.research_mode,
       source_surface: body.scope_type === "company" ? "ticker_chat" : "chat",
     },
   });
 
-  // 9. Acquire lease, run agent, stream results
-  return withSessionHeader(executeRun({
-    request,
+  // 9. Queue durable agent work. The HTTP response only streams persisted
+  // run events; Claude Agent SDK execution is owned by agent-worker.
+  const model = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
+  const enqueueResult = await enqueueAgentRun({
     session,
-    content,
     requestId: request_id,
     history: historyResult.result,
-    budget,
+    model,
     mcpHealth,
+    researchMode: body.research_mode,
+  });
+
+  if (!enqueueResult.ok) {
+    if (enqueueResult.reason === "duplicate_request" && enqueueResult.runId) {
+      return withSessionHeader(streamAgentRunEventsResponse({
+        userId,
+        sessionId: session.id,
+        runId: enqueueResult.runId,
+        requestId: request_id,
+      }), session.id);
+    }
+
+    await releaseExecutionBudget(
+      userId,
+      request_id,
+      enqueueResult.runId ?? null,
+      enqueueResult.reason,
+    );
+    await getSupabaseAdmin()
+      .from("messages")
+      .delete()
+      .eq("id", historyResult.result.userMessageId);
+
+    return errorResponse(
+      enqueueResult.reason === "active_run_exists" ? 409 : 500,
+      enqueueResult.reason === "active_run_exists"
+        ? "active_run_exists"
+        : "internal_error",
+      enqueueResult.reason === "active_run_exists"
+        ? "이미 응답을 생성 중입니다."
+        : "분석 작업을 대기열에 넣지 못했습니다.",
+      request_id,
+    );
+  }
+
+  return withSessionHeader(streamAgentRunEventsResponse({
+    userId,
+    sessionId: session.id,
+    runId: enqueueResult.runId,
+    requestId: request_id,
   }), session.id);
 }
 

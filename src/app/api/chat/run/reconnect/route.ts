@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { forbiddenError, getAuthUser, handleAuthError } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { streamPersistedRunResponse } from "@/lib/api/chat/run-agent";
+import { streamAgentRunEventsResponse } from "@/lib/agent/run-events";
 import { isUuid, parseNonNegativeIntParam } from "@/lib/api/validation";
 import type { ChatSessionRow } from "@/types/database";
 
@@ -19,10 +19,10 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const sessionId = url.searchParams.get("session_id");
   const runId = url.searchParams.get("run_id");
-  const contentLength = parseNonNegativeIntParam(
-    url.searchParams.get("content_length"),
+  const lastEventId = parseNonNegativeIntParam(
+    url.searchParams.get("last_event_id"),
     0,
-    { max: 120_000 },
+    { max: Number.MAX_SAFE_INTEGER },
   );
 
   if (!sessionId) {
@@ -68,10 +68,10 @@ export async function GET(request: NextRequest) {
     return forbiddenError("이 채팅에 접근할 권한이 없습니다.");
   }
 
-  return streamPersistedRunResponse({
+  return streamAgentRunEventsResponse({
     userId: user.id,
     sessionId,
     runId,
-    initialContentLength: contentLength,
+    lastEventId,
   });
 }

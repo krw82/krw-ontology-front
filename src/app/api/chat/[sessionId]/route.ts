@@ -62,10 +62,10 @@ export async function GET(
   const { data: runs } = await supabase
     .from("agent_runs")
     .select(
-      "id, status, model, assistant_message_id, started_at, finished_at, latency_ms, input_tokens, output_tokens, estimated_cost_usd, ontology_release_id, index_generated_at, error_code, error_message"
+      "id, status, model, assistant_message_id, queued_at, started_at, finished_at, latency_ms, input_tokens, output_tokens, estimated_cost_usd, ontology_release_id, index_generated_at, error_code, error_message"
     )
     .eq("session_id", sessionId)
-    .order("started_at", { ascending: true })
+    .order("queued_at", { ascending: true, nullsFirst: true })
     .returns<Partial<AgentRunRow>[]>();
 
   const runIds = (runs ?? [])
@@ -98,7 +98,10 @@ export async function GET(
   return Response.json({
     session,
     messages: messages ?? [],
-    runs: runs ?? [],
+    runs: (runs ?? []).map((run) => ({
+      ...run,
+      started_at: run.started_at ?? run.queued_at ?? null,
+    })),
     tool_calls: toolCalls ?? [],
     citations: citations ?? [],
     rich_answers: [],

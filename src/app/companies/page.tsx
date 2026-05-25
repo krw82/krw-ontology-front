@@ -2,6 +2,7 @@ import TopNav from "@/components/TopNav";
 import CompaniesBrowser from "@/components/CompaniesBrowser";
 import { getAuthUser } from "@/lib/auth";
 import { listIndexedCompanies } from "@/lib/ontology/catalog";
+import { getCompanyLandingCopyForTicker } from "@/lib/companies/landing-copy";
 import { pageMetadata } from "@/lib/marketing/site";
 import type { Metadata } from "next";
 
@@ -23,6 +24,10 @@ export default async function CompaniesPage() {
     listIndexedCompanies(),
     getAuthUser().catch(() => null),
   ]);
+  const displayCompanies = companies.map((company) => ({
+    ...company,
+    ...getCompanyLandingCopyForTicker(company.ticker),
+  }));
   const metadata = user?.user_metadata;
   const initialUserProfile = user?.email
     ? {
@@ -40,8 +45,12 @@ export default async function CompaniesPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <TopNav initialUserProfile={initialUserProfile} />
-      <CompaniesBrowser initialCompanies={companies} />
+      <TopNav
+        initialUserProfile={initialUserProfile}
+        brandHref="/"
+        brandAriaLabel="홈으로 이동"
+      />
+      <CompaniesBrowser initialCompanies={displayCompanies} />
     </div>
   );
 }

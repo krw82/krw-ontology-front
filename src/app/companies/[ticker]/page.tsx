@@ -47,10 +47,12 @@ export async function generateMetadata({
 
   const copy = getCompanyLandingCopyForTicker(company.ticker);
   const displayCompany = { ...company, ...copy };
+  const companyNameKo = displayCompany.companyNameKo;
+  const companyTitleName = companyNameKo ?? displayCompany.name;
 
   return pageMetadata({
-    title: `${displayCompany.ticker} 공시 기반 기업 분석`,
-    description: `${displayCompany.name} (${displayCompany.ticker})의 실적 변화, 리스크, 사업 활동을 공시 근거 기반으로 질문해보세요.`,
+    title: `${companyTitleName} 공시 기반 기업 분석`,
+    description: `${displayCompany.name}${companyNameKo ? ` · ${companyNameKo}` : ""} (${displayCompany.ticker})의 실적 변화, 리스크, 사업 활동을 공시 근거 기반으로 질문해보세요.`,
     path: `/companies/${displayCompany.ticker}`,
   });
 }
@@ -86,11 +88,13 @@ export default async function CompanyLandingPage({
   const promptHrefs = prompts.map((prompt) => chatHref(company.ticker, prompt));
   const copy = getCompanyLandingCopyForTicker(company.ticker);
   const displayCompany = { ...company, ...copy };
+  const companyNameKo = displayCompany.companyNameKo;
+  const companyTitleName = companyNameKo ?? displayCompany.name;
 
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebPage",
-    name: `${displayCompany.ticker} 공시 기반 기업 분석`,
+    name: `${companyTitleName} 공시 기반 기업 분석`,
     url: absoluteUrl(`/companies/${displayCompany.ticker}`),
     isPartOf: {
       "@type": "WebSite",
@@ -111,7 +115,11 @@ export default async function CompanyLandingPage({
         suppressHydrationWarning
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <TopNav initialUserProfile={initialUserProfile} />
+      <TopNav
+        initialUserProfile={initialUserProfile}
+        brandHref="/companies"
+        brandAriaLabel="회사 목록으로 이동"
+      />
       <main
         id="main-content"
         className="min-h-0 flex-1 overflow-y-auto px-base pb-[112px] pt-xl sm:px-md md:px-xl md:pb-[96px] md:pt-[72px]"
@@ -122,15 +130,15 @@ export default async function CompanyLandingPage({
               회사 목록
             </Link>
             <span className="mx-2 text-outline-variant">/</span>
-            <span className="text-ink">{displayCompany.ticker}</span>
+            <span className="text-ink">{companyTitleName}</span>
           </nav>
 
           <header className="border-b border-hairline pb-8">
             <p className="font-mono text-[14px] font-black leading-5 tracking-[0.08em] text-primary">
-              {displayCompany.ticker}
+              {displayCompany.name}
             </p>
             <h1 className="mt-3 max-w-4xl text-balance text-[34px] font-black leading-[1.08] tracking-normal text-ink sm:text-[48px]">
-              {displayCompany.name} 공시 기반 리서치
+              {companyTitleName} 공시 기반 리서치
             </h1>
             <p className="mt-4 max-w-3xl text-[16px] leading-7 text-body sm:text-[18px]">
               {displayCompany.description}
@@ -158,7 +166,7 @@ export default async function CompanyLandingPage({
                   분석 범위
                 </p>
                 <h2 className="mt-2 text-[22px] font-black leading-7 text-ink">
-                  리서치 초점
+                  {companyTitleName} 리서치 초점
                 </h2>
               </div>
               <div className="divide-y divide-hairline border-t border-hairline">

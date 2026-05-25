@@ -3,9 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/dev-with-worker.mjs",
+    "dev:web": "next dev",
+    "dev:worker": "npm run build:worker && node scripts/start-worker.mjs",
+    "build": "next build && npm run build:worker",
+    "build:worker": "esbuild src/worker/agent-worker.ts --bundle --platform=node --target=node20 --format=esm --packages=external --alias:server-only=./src/worker/server-only-shim.ts --outfile=.worker/agent-worker.mjs",
     "start": "node .next/standalone/server.js",
+    "start:worker": "node .worker/agent-worker.mjs",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run test:unit && npm run build",
     "docker:build:mcp": "docker build --build-context krw-ontology-src=${KRW_ONTOLOGY_SOURCE_DIR:-../krw-ontology} -f Dockerfile.mcp .",
@@ -43,7 +47,8 @@
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
@@ -51,6 +56,8 @@
     "@types/node": "^20.19.40",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^0.28.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",

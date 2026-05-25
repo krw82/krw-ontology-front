@@ -75,6 +75,7 @@ export default function ChatSidebar({
     const hasRunningSession = sessions.some(
       (session) =>
         session.latest_run_status === "running" ||
+        session.latest_run_status === "queued" ||
         session.latest_run_status === "pending",
     );
     if (!hasRunningSession) return;
@@ -318,6 +319,7 @@ function SidebarContent({
               const isActive = session.id === activeSessionId;
               const isRunning =
                 session.latest_run_status === "running" ||
+                session.latest_run_status === "queued" ||
                 session.latest_run_status === "pending";
               return (
                 <SessionRow

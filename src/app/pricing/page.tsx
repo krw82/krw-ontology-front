@@ -5,8 +5,8 @@ import PublicTopNav from "@/components/PublicTopNav";
 import {
   getBillingPlanAnalysisCredits,
   getBillingPlanLimitLabel,
-  listPublicBillingPlans,
 } from "@/lib/billing/plans";
+import { listPublicBillingPlansFromStore } from "@/lib/billing/plan-store";
 import { pageMetadata } from "@/lib/marketing/site";
 
 export const metadata: Metadata = pageMetadata({
@@ -16,8 +16,8 @@ export const metadata: Metadata = pageMetadata({
   path: "/pricing",
 });
 
-export default function PricingPage() {
-  const plans = listPublicBillingPlans();
+export default async function PricingPage() {
+  const plans = await listPublicBillingPlansFromStore();
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-canvas text-ink">
@@ -123,7 +123,7 @@ export default function PricingPage() {
               />
               <Principle
                 title="무리한 차단 없음"
-                body="80%에서는 부드럽게 알리고, 남은 크레딧이 기본 분석 1회보다 낮을 때만 다음 분석을 제한합니다."
+                body="80%에서는 부드럽게 알리고, 크레딧이 남아 있으면 마지막 분석까지 실행합니다. 한도를 넘는 비용은 남은 크레딧까지만 차감합니다."
               />
             </div>
           </section>

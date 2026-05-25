@@ -40,8 +40,22 @@ export interface AgentRunRow extends Record<string, unknown> {
   request_id: string;
   claude_session_id: string | null;
   model: string;
-  status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  status:
+    | "pending"
+    | "queued"
+    | "running"
+    | "completed"
+    | "failed"
+    | "cancelled"
+    | "expired";
   lease_expires_at: string | null;
+  queued_at: string | null;
+  claimed_at: string | null;
+  heartbeat_at: string | null;
+  worker_id: string | null;
+  cancel_requested_at: string | null;
+  retry_count: number;
+  max_retries: number;
   started_at: string | null;
   finished_at: string | null;
   latency_ms: number | null;
@@ -57,6 +71,14 @@ export interface AgentRunRow extends Record<string, unknown> {
   error_code: string | null;
   error_message: string | null;
   sdk_diagnostics: Json | null;
+}
+
+export interface AgentRunEventRow extends Record<string, unknown> {
+  id: number;
+  run_id: string;
+  event_type: string;
+  payload: Json;
+  created_at: string;
 }
 
 export interface ToolCallRow extends Record<string, unknown> {
@@ -104,6 +126,25 @@ export interface UserEntitlementRow extends Record<string, unknown> {
   current_period_end: string;
   provider_customer_id: string | null;
   provider_subscription_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingPlanRow extends Record<string, unknown> {
+  key: "free" | "pro" | "power" | "beta" | "internal";
+  label: string;
+  status_label: string;
+  description: string;
+  budget_period: "daily" | "monthly";
+  monthly_analysis_credits: number | null;
+  daily_analysis_credits: number | null;
+  monthly_budget_usd: number | null;
+  daily_budget_usd: number | null;
+  per_run_analysis_credits: number;
+  per_run_reserve_usd: number;
+  unlimited: boolean;
+  sort_order: number;
+  is_public: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -360,6 +401,21 @@ export interface Database {
           referencedColumns: string[];
         }>;
       };
+      agent_run_events: {
+        Row: AgentRunEventRow;
+        Insert: Omit<AgentRunEventRow, "id" | "created_at"> & {
+          id?: number;
+          created_at?: string;
+        };
+        Update: Partial<Omit<AgentRunEventRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
       tool_calls: {
         Row: ToolCallRow;
         Insert: Omit<ToolCallRow, "id"> & { id?: string };
@@ -413,6 +469,15 @@ export interface Database {
           referencedRelation: string;
           referencedColumns: string[];
         }>;
+      };
+      billing_plans: {
+        Row: BillingPlanRow;
+        Insert: Omit<BillingPlanRow, "created_at" | "updated_at"> & {
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<BillingPlanRow, "key" | "created_at">>;
+        Relationships: [];
       };
       usage_events: {
         Row: UsageEventRow;
@@ -679,6 +744,22 @@ export interface Database {
           p_global_limit: number;
         };
         Returns: Array<{ id: string }>;
+      };
+      claim_agent_run: {
+        Args: {
+          p_worker_id: string;
+          p_lease_seconds: number;
+          p_global_limit: number;
+        };
+        Returns: Array<{ id: string }>;
+      };
+      heartbeat_agent_run: {
+        Args: {
+          p_run_id: string;
+          p_worker_id: string;
+          p_lease_seconds: number;
+        };
+        Returns: boolean;
       };
       increment_rate_limit: {
         Args: {

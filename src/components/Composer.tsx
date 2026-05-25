@@ -13,11 +13,10 @@ import {
   getActiveResearchLabel,
   type ResearchToolCallStatus,
 } from "@/lib/chat/research-status";
+import type { ResearchMode } from "@/lib/research-mode";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import type { ResearchActivityUpdate } from "@/types/api-contracts";
-import type { EntitlementStatus } from "@/types/entitlement";
-import UsageStatus from "./UsageStatus";
 
 interface ComposerProps {
   onSend: (message: string) => void;
@@ -28,7 +27,9 @@ interface ComposerProps {
   placeholder?: string;
   toolCalls?: ResearchToolCallStatus[];
   initialValue?: string;
-  entitlement?: EntitlementStatus | null;
+  draftResetKey?: number;
+  researchMode?: ResearchMode;
+  onResearchModeChange?: (mode: ResearchMode) => void;
 }
 
 interface TextAttachment {
@@ -113,15 +114,18 @@ export default function Composer({
   placeholder = "기업에 대해 질문하세요...",
   toolCalls = [],
   initialValue,
-  entitlement = null,
+  draftResetKey = 0,
 }: ComposerProps) {
   const initialDraftValue = initialValue ?? "";
   const [value, setValue] = useState(initialDraftValue);
   const [attachments, setAttachments] = useState<TextAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [isToolsOpen, setIsToolsOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const toolsRef = useRef<HTMLDivElement>(null);
   const lastInitialValueRef = useRef(initialDraftValue);
+  const lastDraftResetKeyRef = useRef(draftResetKey);
   const motionConfig = useComposerMotionConfig();
 
   const composedLength = useMemo(
@@ -155,6 +159,20 @@ export default function Composer({
     setAttachmentError(null);
   }, [initialValue]);
 
+  useEffect(() => {
+    if (lastDraftResetKeyRef.current === draftResetKey) return;
+
+    lastDraftResetKeyRef.current = draftResetKey;
+    lastInitialValueRef.current = "";
+    setValue("");
+    setAttachments([]);
+    setAttachmentError(null);
+    if (textareaRef.current) {
+      textareaRef.current.value = "";
+      textareaRef.current.style.height = "auto";
+    }
+  }, [draftResetKey]);
+
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -165,6 +183,29 @@ export default function Composer({
   useEffect(() => {
     adjustHeight();
   }, [value, adjustHeight]);
+
+  useEffect(() => {
+    if (!isToolsOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (toolsRef.current?.contains(target)) return;
+      setIsToolsOpen(false);
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsToolsOpen(false);
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [isToolsOpen]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -298,6 +339,11 @@ export default function Composer({
     handleSubmit();
   };
 
+  const openFilePicker = () => {
+    setIsToolsOpen(false);
+    fileInputRef.current?.click();
+  };
+
   return (
     <div className="border-t border-hairline bg-canvas/95 px-base py-sm backdrop-blur-xl sm:px-lg sm:py-base">
       {(attachments.length > 0 || attachmentError) && (
@@ -355,18 +401,101 @@ export default function Composer({
           onChange={handleFileChange}
           disabled={isInputDisabled}
         />
-        <button
-          className="mb-0.5 ml-0.5 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-body transition-colors duration-150 hover:bg-surface-dim hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isInputDisabled}
-          aria-label="txt 또는 md 파일 첨부. PDF는 현재 지원하지 않습니다."
-          title="txt 또는 md 파일 첨부. PDF는 현재 지원하지 않습니다."
-          type="button"
-        >
-          <span className="material-symbols-outlined text-[20px]">
-            attach_file
-          </span>
-        </button>
+        <div ref={toolsRef} className="relative -translate-y-[2px] flex-shrink-0 self-center">
+          <button
+            className={[
+              "ml-0.5 inline-flex h-11 w-11 items-center justify-center rounded-full border transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40",
+              isToolsOpen
+                ? "border-primary bg-surface text-primary shadow-[0_0_0_3px_rgba(0,82,255,0.10)]"
+                : "border-transparent text-body hover:bg-surface-dim hover:text-ink",
+            ].join(" ")}
+            onClick={() => setIsToolsOpen((open) => !open)}
+            disabled={isInputDisabled}
+            aria-label="입력 도구 열기"
+            aria-expanded={isToolsOpen}
+            aria-haspopup="menu"
+            type="button"
+          >
+            <span className="material-symbols-outlined text-[24px] leading-none">
+              add
+            </span>
+          </button>
+
+          <AnimatePresence>
+            {isToolsOpen && (
+              <motion.div
+                key="composer-tools"
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                transition={{ duration: motionConfig.duration, ease: motionConfig.ease }}
+                className="absolute bottom-[calc(100%+10px)] left-0 z-30 w-[282px] overflow-hidden rounded-[18px] border border-hairline bg-surface/98 p-3 text-ink shadow-[0_18px_48px_rgba(10,11,13,0.16)] backdrop-blur-xl"
+                role="menu"
+                aria-label="입력 도구"
+              >
+                <button
+                  type="button"
+                  className="flex min-h-11 w-full items-center gap-3 rounded-[10px] px-2 text-left text-[15px] font-extrabold leading-5 text-ink transition-colors hover:bg-surface-dim"
+                  onClick={openFilePicker}
+                  role="menuitem"
+	                >
+	                  <span aria-hidden="true" className="material-symbols-outlined text-[22px] text-primary">
+	                    attach_file
+	                  </span>
+	                  <span>파일 첨부</span>
+	                  <span className="ml-auto text-[11px] font-bold text-muted">
+	                    txt/md
+	                  </span>
+	                </button>
+
+	                <div className="mt-2 border-t border-hairline pt-3">
+	                  <div className="grid gap-1" aria-label="분석 모드">
+	                    <button
+	                      type="button"
+	                      disabled
+	                      className="flex min-h-[56px] w-full cursor-not-allowed items-center justify-between gap-3 rounded-[10px] px-2.5 py-2 text-left text-muted opacity-60"
+	                      role="menuitem"
+	                      aria-disabled="true"
+	                    >
+	                      <span className="min-w-0">
+	                        <span className="block text-[14px] font-extrabold leading-5">
+	                          패스트 모드
+	                        </span>
+	                        <span className="mt-0.5 block text-[12px] font-semibold leading-4 text-muted-soft">
+	                          빠른 요약은 준비 중입니다.
+	                        </span>
+	                      </span>
+	                      <span className="rounded-full bg-surface-dim px-2 py-1 text-[11px] font-extrabold leading-none text-muted">
+	                        준비중
+	                      </span>
+	                    </button>
+
+	                    <button
+	                      type="button"
+	                      className="flex min-h-[56px] w-full items-center justify-between gap-3 rounded-[10px] bg-primary-container/12 px-2.5 py-2 text-left text-primary transition-colors hover:bg-primary-container/16"
+	                      onClick={() => setIsToolsOpen(false)}
+	                      role="menuitem"
+	                      aria-current="true"
+	                    >
+	                      <span className="min-w-0">
+	                        <span className="block text-[14px] font-extrabold leading-5">
+	                          스탠다드 모드
+	                        </span>
+	                        <span className="mt-0.5 block text-[12px] font-semibold leading-4 text-primary/75">
+	                          공시 근거를 충분히 확인해 답변합니다.
+	                        </span>
+	                      </span>
+	                      <span aria-hidden="true" className="material-symbols-outlined flex-shrink-0 text-[18px]">
+	                        check
+	                      </span>
+	                    </button>
+	                  </div>
+	                </div>
+
+	              </motion.div>
+	            )}
+	          </AnimatePresence>
+	        </div>
         <div className="relative min-w-0 flex-1">
           <textarea
             ref={textareaRef}
@@ -443,19 +572,6 @@ export default function Composer({
             )}
           </AnimatePresence>
         </button>
-      </div>
-      <div className="mx-auto mt-xs flex max-w-4xl items-center justify-between gap-sm">
-        <div className="min-w-0">
-          <UsageStatus entitlement={entitlement} />
-          <p className="mt-1 hidden text-[11px] font-semibold leading-4 text-muted-soft sm:block">
-            txt/md 첨부 가능 · PDF는 현재 지원하지 않습니다.
-          </p>
-        </div>
-        <span className="text-xs text-muted-soft">
-          전체{" "}
-          {composedLength.toLocaleString()}/
-          {payloadLimit.toLocaleString()}
-        </span>
       </div>
     </div>
   );

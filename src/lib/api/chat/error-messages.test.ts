@@ -2,18 +2,12 @@ import { describe, expect, it } from "vitest";
 import { publicErrorMessage } from "./error-messages";
 
 describe("publicErrorMessage", () => {
-  it("maps known operational errors to Korean user-facing copy", () => {
-    expect(publicErrorMessage("concurrency_limit")).toBe(
-      "현재 요청이 많습니다. 잠시 후 다시 시도해주세요.",
+  it("keeps execution credit exhaustion separate from tool budget limits", () => {
+    expect(publicErrorMessage("cost_cap_exceeded")).toContain(
+      "분석 크레딧",
     );
-    expect(publicErrorMessage("lease_expired")).toBe(
-      "분석 시간이 초과되었습니다. 다시 시도해주세요.",
-    );
-  });
-
-  it("does not echo unknown internal error codes", () => {
-    expect(publicErrorMessage("stack trace: secret=abc")).toBe(
-      "요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.",
+    expect(publicErrorMessage("tool_budget_exceeded")).toBe(
+      "답변 생성 중 문제가 발생했습니다. 같은 질문으로 다시 시도하거나 범위를 조금 좁혀주세요.",
     );
   });
 });

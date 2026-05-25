@@ -79,9 +79,9 @@ export async function GET(request: NextRequest) {
 
     const { data: runs } = await supabase
       .from("agent_runs")
-      .select("session_id, status, started_at")
+      .select("session_id, status, queued_at, started_at")
       .in("session_id", sessionIds)
-      .order("started_at", { ascending: false })
+      .order("queued_at", { ascending: false, nullsFirst: false })
       .returns<AgentRunRow[]>();
 
     if (runs) {
@@ -109,6 +109,7 @@ export async function GET(request: NextRequest) {
       (summary) =>
         summary.last_message_at !== null ||
         summary.latest_run_status === "running" ||
+        summary.latest_run_status === "queued" ||
         summary.latest_run_status === "pending",
     );
 

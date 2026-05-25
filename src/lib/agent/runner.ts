@@ -1,5 +1,6 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import {
@@ -24,6 +25,14 @@ import { buildResearchPassPrompt } from "./workflow";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { readIntEnv } from "@/lib/env";
 import {
+  buildResearchModePrompt,
+  getAllowedMcpToolsForResearchMode,
+  getResearchModeToolBudget,
+  normalizeResearchMode,
+  type ResearchMode,
+  type ResearchModeToolBudget,
+} from "@/lib/research-mode";
+import {
   createAccumulator,
   createSSEWriter,
   addToken,
@@ -39,8 +48,9 @@ import type { MCPToolName, DocumentType, StreamingCitation } from "@/types/api-c
 
 const MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const DEFAULT_MAX_TURNS = 20;
-const DEFAULT_MAX_TOOL_CALLS = 18;
 const DEFAULT_AGENT_WORKSPACE_DIR = ".agent-workspace";
+const TOOL_BUDGET_EXCEEDED = "tool_budget_exceeded";
+const COMPOSE_EVIDENCE_CHAR_LIMIT = 18_000;
 
 export interface AgentRunOptions {
   sessionId: string;
@@ -48,6 +58,7 @@ export interface AgentRunOptions {
   scopeType: "global" | "company";
   defaultTickers: string[];
   defaultDocumentTypes: string[];
+  researchMode?: ResearchMode;
   history?: Array<{ role: string; content: string }>;
   abortSignal?: AbortSignal;
   onSdkDiagnostics?: (diagnostics: SdkDiagnostics) => Promise<void>;
@@ -70,6 +81,30 @@ interface ToolResultRecord {
   toolUseId: string | null;
   text: string;
   json: unknown;
+}
+
+type ToolBudgetViolationKind =
+  | "max_tool_calls"
+  | "query_context"
+  | "query"
+  | "retrieve"
+  | "trace_chain"
+  | "compare";
+
+interface ToolBudgetUsage {
+  total: number;
+  queryContext: number;
+  query: number;
+  retrieve: number;
+  traceChain: number;
+  compare: number;
+}
+
+interface ToolBudgetViolation {
+  kind: ToolBudgetViolationKind;
+  attemptedTool: MCPToolName;
+  usage: ToolBudgetUsage;
+  remaining: ToolBudgetUsage;
 }
 
 async function resolveClaudeAgentCwd(): Promise<string> {
@@ -99,6 +134,8 @@ export interface SdkDiagnostics {
   settingSources?: string[];
   tools?: unknown;
   allowedTools?: string[];
+  researchMode?: ResearchMode;
+  toolBudget?: ResearchModeToolBudget;
   plugins?: unknown;
   mcpServers?: unknown;
   slashCommands?: Array<{ name: string; description?: string }>;
@@ -117,6 +154,8 @@ export async function runAgent(
   const pluginPath = getKrwOntologyPluginPath();
   const cwd = await resolveClaudeAgentCwd();
   const abortController = new AbortController();
+  const researchMode = normalizeResearchMode(options.researchMode);
+  const toolBudget = getResearchModeToolBudget(researchMode);
 
   const abortHandler = () => abortController.abort();
   options.abortSignal?.addEventListener("abort", abortHandler, { once: true });
@@ -139,7 +178,11 @@ export async function runAgent(
     promptContext,
     shouldResume ? [] : (options.history ?? []),
   );
-  const researchPrompt = buildResearchPassPrompt(options.userMessage);
+  const researchPrompt = [
+    buildResearchPassPrompt(options.userMessage),
+    buildResearchModePrompt(researchMode),
+  ].join("\n\n");
+  const allowedTools = allowedSdkToolsForResearchMode(researchMode);
 
   const requestedModel = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
   const baseSdkOptions: Options = {
@@ -154,7 +197,7 @@ export async function runAgent(
     },
     plugins: [{ type: "local", path: pluginPath }],
     tools: [],
-    allowedTools: KRW_ONTOLOGY_SDK_ALLOWED_TOOLS,
+    allowedTools,
     permissionMode: "bypassPermissions",
     allowDangerouslySkipPermissions: true,
     canUseTool,
@@ -189,7 +232,53 @@ export async function runAgent(
       sendEvent,
       observedModels,
       suppressTextDeltas: false,
+      researchMode,
+      toolBudget,
     });
+
+    if (isRecoverableResearchStop(researchResult)) {
+      await sendEvent("activity_update", {
+        stage: "composing",
+        label: "답변 작성 중",
+      });
+
+      const composeResult = await runSdkPass({
+        passName: "composer",
+        prompt: buildComposeOnlyPrompt({
+          userQuestion: options.userMessage,
+          researchMode,
+          researchAcc: researchResult.acc,
+          stopReason: researchResult.errorMessage ?? researchResult.errorCode ?? null,
+        }),
+        sdkOptions: {
+          ...baseSdkOptions,
+          allowedTools: [],
+          sessionId: randomUUID(),
+        },
+        options,
+        requestedModel,
+        cwd,
+        pluginPath,
+        sendEvent,
+        observedModels,
+        suppressTextDeltas: false,
+        researchMode,
+        toolBudget,
+        disableTools: true,
+      });
+
+      const mergedAcc = mergeAccumulatedRuns(researchResult.acc, composeResult.acc);
+      if (composeResult.status === "completed" && mergedAcc.fullText.trim()) {
+        return { ...composeResult, acc: mergedAcc };
+      }
+      if (isRecoverableResearchStop(composeResult)) {
+        return {
+          acc: ensureFallbackAnswer(mergedAcc, options.userMessage),
+          status: "completed",
+        };
+      }
+      return { ...composeResult, acc: mergedAcc };
+    }
 
     if (researchResult.status !== "completed") {
       return researchResult;
@@ -236,6 +325,9 @@ async function runSdkPass(params: {
   sendEvent: ReturnType<typeof createSSEWriter>["sendEvent"];
   observedModels: Set<string>;
   suppressTextDeltas: boolean;
+  researchMode: ResearchMode;
+  toolBudget: ResearchModeToolBudget;
+  disableTools?: boolean;
 }): Promise<AgentRunResult> {
   const {
     passName,
@@ -248,16 +340,29 @@ async function runSdkPass(params: {
     sendEvent,
     observedModels,
     suppressTextDeltas,
+    researchMode,
+    toolBudget,
+    disableTools = false,
   } = params;
   const acc = createAccumulator();
   const openToolCalls = new Set<string>();
   let finalResult: AgentRunResult | null = null;
-  const maxToolCalls = readIntEnv("AGENT_MAX_TOOL_CALLS", DEFAULT_MAX_TOOL_CALLS, {
-    min: 1,
-  });
+  const maxToolCalls = Math.min(
+    readIntEnv("AGENT_MAX_TOOL_CALLS", toolBudget.maxToolCalls, { min: 1 }),
+    toolBudget.maxToolCalls,
+  );
 
   try {
-    const sdkQuery = query({ prompt, options: sdkOptions });
+    const passCanUseTool = disableTools
+      ? denyMcpToolsDuringCompose
+      : createToolPermissionGuard(acc, researchMode, toolBudget);
+    const sdkQuery = query({
+      prompt,
+      options: {
+        ...sdkOptions,
+        canUseTool: passCanUseTool,
+      },
+    });
     await reportSdkInitialization({
       passName,
       sdkQuery,
@@ -266,7 +371,12 @@ async function runSdkPass(params: {
       cwd,
       pluginPath,
       prompt,
-      sdkOptions,
+      sdkOptions: {
+        ...sdkOptions,
+        canUseTool: passCanUseTool,
+      },
+      researchMode,
+      toolBudget,
     });
 
     for await (const message of sdkQuery) {
@@ -301,8 +411,19 @@ async function runSdkPass(params: {
         finalResult = {
           acc,
           status: "failed",
-          errorCode: "cost_cap_exceeded",
+          errorCode: TOOL_BUDGET_EXCEEDED,
           errorMessage: "분석 도구 호출 한도에 도달했습니다.",
+        };
+        break;
+      }
+
+      const budgetViolation = toolBudgetViolation(acc.toolCalls, toolBudget);
+      if (budgetViolation) {
+        finalResult = {
+          acc,
+          status: "failed",
+          errorCode: TOOL_BUDGET_EXCEEDED,
+          errorMessage: `분석 도구 호출 한도에 도달했습니다. (${describeToolBudgetViolation(budgetViolation)})`,
         };
         break;
       }
@@ -356,6 +477,99 @@ async function runSdkPass(params: {
   }
 }
 
+function isRecoverableResearchStop(result: AgentRunResult): boolean {
+  return result.status === "failed" && result.errorCode === TOOL_BUDGET_EXCEEDED;
+}
+
+async function denyMcpToolsDuringCompose(): Promise<PermissionResult> {
+  return {
+    behavior: "deny",
+    message: "Research is complete; compose the final answer without more tools.",
+  };
+}
+
+function mergeAccumulatedRuns(
+  researchAcc: AccumulatedRun,
+  composeAcc: AccumulatedRun,
+): AccumulatedRun {
+  return {
+    ...composeAcc,
+    fullText: composeAcc.fullText || researchAcc.fullText,
+    toolCalls: [...researchAcc.toolCalls, ...composeAcc.toolCalls],
+    citations: [...researchAcc.citations, ...composeAcc.citations],
+    inputTokens: researchAcc.inputTokens + composeAcc.inputTokens,
+    outputTokens: researchAcc.outputTokens + composeAcc.outputTokens,
+  };
+}
+
+function ensureFallbackAnswer(
+  acc: AccumulatedRun,
+  userQuestion: string,
+): AccumulatedRun {
+  if (acc.fullText.trim()) return acc;
+  const question = userQuestion.trim() || "요청하신 질문";
+  addToken(
+    acc,
+    [
+      `${question}에 대해 현재 확인된 근거를 기준으로 정리합니다.`,
+      "",
+      "확인된 자료 범위 안에서는 핵심 사업 항목과 관련 매출 동인을 중심으로 답변할 수 있습니다. 더 세부적인 원문 근거 추적이 필요하면 깊은 리서치로 확장할 수 있습니다.",
+    ].join("\n"),
+  );
+  return acc;
+}
+
+function buildComposeOnlyPrompt(params: {
+  userQuestion: string;
+  researchMode: ResearchMode;
+  researchAcc: AccumulatedRun;
+  stopReason: string | null;
+}): string {
+  const evidence = summarizeToolEvidence(params.researchAcc);
+  return [
+    "Compose-only final answer pass.",
+    "Write the final user-facing answer in Korean Markdown.",
+    "Do not call any tools.",
+    "Do not mention internal tool budgets, tool limits, errors, retries, research modes, or failed searches.",
+    "Do not use the phrase '공시자료 기반 한계'.",
+    "Use CY labels for user-facing periods; do not write FY labels unless fiscal wording is essential as a short parenthetical note.",
+    "If exact numeric values are not present in the collected evidence, do not invent numbers and do not use placeholders. Answer qualitatively from supported evidence.",
+    "Use the collected evidence below as the only factual basis.",
+    "",
+    `User question: ${params.userQuestion}`,
+    `Internal stop reason, not user-facing: ${params.stopReason ?? "research budget stop"}`,
+    `Research mode, not user-facing: ${params.researchMode}`,
+    "",
+    "Collected evidence:",
+    evidence || "No structured tool evidence was captured. Provide the safest concise answer from the conversation context.",
+  ].join("\n");
+}
+
+function summarizeToolEvidence(acc: AccumulatedRun): string {
+  const chunks: string[] = [];
+  for (const [index, toolCall] of acc.toolCalls.entries()) {
+    if (toolCall.errorMessage) continue;
+    const args = toolCall.argumentsJson || "{}";
+    const result =
+      toolCall.resultText ||
+      (typeof toolCall.resultSummary === "string" ? toolCall.resultSummary : "");
+    if (!result.trim()) continue;
+    chunks.push(
+      [
+        `Tool ${index + 1}: ${toolCall.toolName}`,
+        `Arguments: ${args}`,
+        "Result:",
+        result,
+      ].join("\n"),
+    );
+  }
+
+  const joined = chunks.join("\n\n---\n\n");
+  return joined.length > COMPOSE_EVIDENCE_CHAR_LIMIT
+    ? `${joined.slice(0, COMPOSE_EVIDENCE_CHAR_LIMIT)}\n\n[Evidence truncated for compose pass.]`
+    : joined;
+}
+
 async function reportSdkInitialization(params: {
   passName: "research" | "composer";
   sdkQuery: ReturnType<typeof query>;
@@ -365,6 +579,8 @@ async function reportSdkInitialization(params: {
   pluginPath: string;
   prompt: string;
   sdkOptions: Options;
+  researchMode: ResearchMode;
+  toolBudget: ResearchModeToolBudget;
 }) {
   const {
     passName,
@@ -375,6 +591,8 @@ async function reportSdkInitialization(params: {
     pluginPath,
     prompt,
     sdkOptions,
+    researchMode,
+    toolBudget,
   } = params;
 
   if (!options.onSdkDiagnostics) return;
@@ -391,6 +609,8 @@ async function reportSdkInitialization(params: {
     settingSources: sdkOptions.settingSources,
     tools: sdkOptions.tools,
     allowedTools: sdkOptions.allowedTools,
+    researchMode,
+    toolBudget,
     plugins: sdkOptions.plugins,
     mcpServers: sdkOptions.mcpServers,
     observedAt: new Date().toISOString(),
@@ -425,15 +645,452 @@ async function reportSdkInitialization(params: {
 
 export async function canUseTool(
   toolName: string,
+  input: Record<string, unknown> = {},
 ): Promise<PermissionResult> {
   if (isKrwOntologySdkTool(toolName)) {
-    return { behavior: "allow" };
+    const mcpToolName = normalizeMcpToolName(toolName);
+    return allowWithFullResponseDetailDowngrade(mcpToolName, input);
   }
 
   return {
     behavior: "deny",
     message: "Only read-only KRW Ontology MCP tools are allowed in web chat.",
   };
+}
+
+function allowedSdkToolsForResearchMode(mode: ResearchMode): string[] {
+  const allowedMcpTools = new Set(getAllowedMcpToolsForResearchMode(mode));
+  return KRW_ONTOLOGY_SDK_ALLOWED_TOOLS.filter((toolName) => {
+    const mcpToolName = normalizeMcpToolName(toolName);
+    return Boolean(mcpToolName && allowedMcpTools.has(mcpToolName));
+  });
+}
+
+function createToolPermissionGuard(
+  acc: AccumulatedRun,
+  mode: ResearchMode,
+  budget: ResearchModeToolBudget,
+) {
+  return async (
+    toolName: string,
+    input: Record<string, unknown> = {},
+  ): Promise<PermissionResult> => {
+    if (!isKrwOntologySdkTool(toolName)) {
+      return {
+        behavior: "deny",
+        message: "Only read-only KRW Ontology MCP tools are allowed in web chat.",
+      };
+    }
+
+    const mcpToolName = normalizeMcpToolName(toolName);
+    if (!mcpToolName) {
+      return {
+        behavior: "deny",
+        message: "Unknown KRW Ontology MCP tool.",
+      };
+    }
+
+    const allowedMcpTools = new Set(getAllowedMcpToolsForResearchMode(mode));
+    if (!allowedMcpTools.has(mcpToolName)) {
+      return {
+        behavior: "deny",
+        message: `Research mode ${mode} does not allow ${mcpToolName}.`,
+      };
+    }
+
+    const queryContextCalls = countToolCalls(acc.toolCalls, "krw_ontology_query_context");
+    if (queryContextCalls === 0 && mcpToolName !== "krw_ontology_query_context") {
+      return {
+        behavior: "deny",
+        message: "Call krw_ontology_query_context first before using follow-up tools.",
+      };
+    }
+
+    const researchStatePolicy = toolPolicyFromLatestQueryContext(acc);
+    if (researchStatePolicy?.blockedTools.has(mcpToolName)) {
+      return {
+        behavior: "deny",
+        message: `query_context research state says not to call ${mcpToolName}.`,
+      };
+    }
+    if (
+      researchStatePolicy &&
+      !researchStatePolicy.allowedTools.has(mcpToolName) &&
+      mcpToolName !== "krw_ontology_query_context"
+    ) {
+      return {
+        behavior: "deny",
+        message:
+          researchStatePolicy.reason ||
+          `query_context research state does not allow ${mcpToolName}.`,
+      };
+    }
+
+    const projectedCalls = [...acc.toolCalls, { toolName: mcpToolName }];
+    const violation = toolBudgetViolation(
+      projectedCalls as Array<Pick<AccumulatedToolCall, "toolName">>,
+      budget,
+      mcpToolName,
+    );
+    if (violation) {
+      return {
+        behavior: "deny",
+        message: buildToolBudgetDenyMessage(violation),
+      };
+    }
+
+    return allowWithFullResponseDetailDowngrade(mcpToolName, input);
+  };
+}
+
+const RESPONSE_DETAIL_TOOL_SET = new Set<MCPToolName>([
+  "krw_ontology_query",
+  "krw_ontology_retrieve",
+  "krw_ontology_compare",
+]);
+
+function downgradeFullResponseDetailInput(
+  mcpToolName: MCPToolName | null,
+  input: Record<string, unknown>,
+): Record<string, unknown> | null {
+  if (!mcpToolName || !RESPONSE_DETAIL_TOOL_SET.has(mcpToolName)) return null;
+  if (input.response_detail !== "full") return null;
+  return {
+    ...input,
+    response_detail: "compact",
+  };
+}
+
+function allowWithFullResponseDetailDowngrade(
+  mcpToolName: MCPToolName | null,
+  input: Record<string, unknown>,
+): PermissionResult {
+  const updatedInput = downgradeFullResponseDetailInput(mcpToolName, input);
+  if (updatedInput) {
+    return {
+      behavior: "allow",
+      updatedInput,
+    };
+  }
+  return { behavior: "allow" };
+}
+
+function toolBudgetViolation(
+  toolCalls: Array<Pick<AccumulatedToolCall, "toolName">>,
+  budget: ResearchModeToolBudget,
+  attemptedTool?: MCPToolName,
+): ToolBudgetViolation | null {
+  const usage = toolBudgetUsage(toolCalls);
+  const remaining = remainingToolBudget(usage, budget);
+  const attempted =
+    attemptedTool ?? toolCalls.at(-1)?.toolName ?? "krw_ontology_query_context";
+
+  if (usage.total > budget.maxToolCalls) {
+    return {
+      kind: "max_tool_calls",
+      attemptedTool: attempted,
+      usage,
+      remaining,
+    };
+  }
+  if (usage.queryContext > budget.queryContext) {
+    return {
+      kind: "query_context",
+      attemptedTool: attempted,
+      usage,
+      remaining,
+    };
+  }
+  if (usage.query > budget.query) {
+    return {
+      kind: "query",
+      attemptedTool: attempted,
+      usage,
+      remaining,
+    };
+  }
+  if (usage.retrieve > budget.retrieve) {
+    return {
+      kind: "retrieve",
+      attemptedTool: attempted,
+      usage,
+      remaining,
+    };
+  }
+  if (usage.compare > budget.compare) {
+    return {
+      kind: "compare",
+      attemptedTool: attempted,
+      usage,
+      remaining,
+    };
+  }
+
+  if (usage.traceChain > budget.traceChain) {
+    return {
+      kind: "trace_chain",
+      attemptedTool: attempted,
+      usage,
+      remaining,
+    };
+  }
+
+  return null;
+}
+
+function toolBudgetUsage(
+  toolCalls: Array<Pick<AccumulatedToolCall, "toolName">>,
+): ToolBudgetUsage {
+  return {
+    total: toolCalls.length,
+    queryContext: countToolCalls(toolCalls, "krw_ontology_query_context"),
+    query: countToolCalls(toolCalls, "krw_ontology_query"),
+    retrieve: countToolCalls(toolCalls, "krw_ontology_retrieve"),
+    traceChain:
+      countToolCalls(toolCalls, "krw_ontology_trace") +
+      countToolCalls(toolCalls, "krw_ontology_chain"),
+    compare: countToolCalls(toolCalls, "krw_ontology_compare"),
+  };
+}
+
+function remainingToolBudget(
+  usage: ToolBudgetUsage,
+  budget: ResearchModeToolBudget,
+): ToolBudgetUsage {
+  return {
+    total: Math.max(0, budget.maxToolCalls - usage.total),
+    queryContext: Math.max(0, budget.queryContext - usage.queryContext),
+    query: Math.max(0, budget.query - usage.query),
+    retrieve: Math.max(0, budget.retrieve - usage.retrieve),
+    traceChain: Math.max(0, budget.traceChain - usage.traceChain),
+    compare: Math.max(0, budget.compare - usage.compare),
+  };
+}
+
+function hasRemainingToolBudget(
+  violation: ToolBudgetViolation,
+  bucket: keyof ToolBudgetUsage,
+): boolean {
+  return violation.remaining.total > 0 && violation.remaining[bucket] > 0;
+}
+
+function buildToolBudgetDenyMessage(
+  violation: ToolBudgetViolation,
+): string {
+  const finalAnswerGuidance =
+    "Otherwise write the final Korean Markdown answer from the evidence already collected.";
+
+  if (violation.kind === "max_tool_calls") {
+    return [
+      "No more KRW Ontology MCP tools can be called in this run.",
+      "Do not call another tool.",
+      "Write the final Korean Markdown answer from the evidence already collected.",
+    ].join(" ");
+  }
+
+  if (violation.kind === "compare") {
+    return [
+      "The krw_ontology_compare limit for this run has been reached.",
+      "Do not call krw_ontology_compare again.",
+      "Use existing comparison evidence.",
+      hasRemainingToolBudget(violation, "query")
+        ? "If one narrow missing fact remains, use one targeted krw_ontology_query."
+        : null,
+      finalAnswerGuidance,
+    ].filter(Boolean).join(" ");
+  }
+
+  if (violation.kind === "query") {
+    return [
+      "The krw_ontology_query limit for this run has been reached.",
+      "Do not call krw_ontology_query again.",
+      "Use the existing research evidence.",
+      hasRemainingToolBudget(violation, "traceChain")
+        ? "If a specific existing claim needs verification, use one krw_ontology_trace or krw_ontology_chain call."
+        : null,
+      finalAnswerGuidance,
+    ].filter(Boolean).join(" ");
+  }
+
+  if (violation.kind === "trace_chain") {
+    return [
+      "The trace/chain limit for this run has been reached.",
+      "Do not call krw_ontology_trace or krw_ontology_chain again.",
+      "Use existing traced evidence and write the final Korean Markdown answer.",
+    ].join(" ");
+  }
+
+  if (violation.kind === "retrieve") {
+    return [
+      "The krw_ontology_retrieve limit for this run has been reached.",
+      "Do not call krw_ontology_retrieve again.",
+      "Use query_context, query, trace, and chain evidence already collected.",
+      hasRemainingToolBudget(violation, "query")
+        ? "If one narrow missing fact remains, use one targeted krw_ontology_query."
+        : null,
+      finalAnswerGuidance,
+    ].filter(Boolean).join(" ");
+  }
+
+  return [
+    "The krw_ontology_query_context limit for this run has been reached.",
+    "Do not call krw_ontology_query_context again.",
+    "Use the existing research state.",
+    hasRemainingToolBudget(violation, "query")
+      ? "If one narrow missing fact remains, use one targeted krw_ontology_query."
+      : null,
+    finalAnswerGuidance,
+  ].filter(Boolean).join(" ");
+}
+
+function describeToolBudgetViolation(
+  violation: ToolBudgetViolation,
+): string {
+  return `${violation.kind}:${violation.attemptedTool}`;
+}
+
+function countToolCalls(
+  toolCalls: Array<Pick<AccumulatedToolCall, "toolName">>,
+  toolName: MCPToolName,
+): number {
+  return toolCalls.filter((toolCall) => toolCall.toolName === toolName).length;
+}
+
+function toolPolicyFromLatestQueryContext(acc: AccumulatedRun): {
+  allowedTools: Set<MCPToolName>;
+  blockedTools: Set<MCPToolName>;
+  reason: string | null;
+} | null {
+  const queryContextCall = [...acc.toolCalls]
+    .reverse()
+    .find((toolCall) => toolCall.toolName === "krw_ontology_query_context");
+  if (!queryContextCall?.resultJson && !queryContextCall?.resultText) return null;
+
+  const payload = coerceRecord(
+    queryContextCall.resultJson,
+    queryContextCall.resultText,
+  );
+  if (!payload) return null;
+
+  const agentAutonomy =
+    coerceRecord(payload.agent_autonomy) ||
+    coerceRecord(getNested(payload, ["kernel", "agent_autonomy"])) ||
+    coerceRecord(getNested(payload, ["research_pack", "agent_autonomy"]));
+  const kernel = coerceRecord(payload.kernel);
+  const status = stringValue(payload.research_status) || stringValue(kernel?.status);
+  const allowedRaw =
+    arrayValue(agentAutonomy?.allowed_next_tools) ||
+    arrayValue(kernel?.allowed_next_tools) ||
+    arrayValue(getNested(payload, ["context_policy", "allowed_next_tools"]));
+  const doNotCallRaw =
+    arrayValue(agentAutonomy?.do_not_call) ||
+    arrayValue(kernel?.do_not_call) ||
+    arrayValue(getNested(payload, ["context_policy", "do_not_call"]));
+  const mayContinue = agentAutonomy?.may_continue_research;
+  const blockedTools = new Set<MCPToolName>();
+
+  for (const item of doNotCallRaw ?? []) {
+    for (const mappedTool of mcpToolsFromPolicyValue(item)) {
+      blockedTools.add(mappedTool);
+    }
+  }
+
+  if (mayContinue === false) {
+    return {
+      allowedTools: new Set<MCPToolName>(),
+      blockedTools,
+      reason: "query_context says the research state is sufficient; answer without more MCP calls.",
+    };
+  }
+
+  if (!allowedRaw) {
+    return null;
+  }
+
+  const allowedTools = new Set<MCPToolName>();
+  for (const item of allowedRaw) {
+    for (const mappedTool of mcpToolsFromPolicyValue(item)) {
+      allowedTools.add(mappedTool);
+    }
+  }
+
+  if (
+    allowedTools.size === 0 &&
+    (status === "sufficient_for_default_answer" ||
+      status === "out_of_scope_for_filing_ontology")
+  ) {
+    return {
+      allowedTools,
+      blockedTools,
+      reason: "query_context says the research state is sufficient; answer without more MCP calls.",
+    };
+  }
+
+  return {
+    allowedTools,
+    blockedTools,
+    reason: null,
+  };
+}
+
+function mcpToolsFromPolicyValue(value: unknown): MCPToolName[] {
+  if (typeof value !== "string") return [];
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return [];
+
+  const direct = normalizeMcpToolName(normalized);
+  if (direct) return [direct];
+
+  if (normalized === "trace") return ["krw_ontology_trace"];
+  if (normalized === "chain") return ["krw_ontology_chain"];
+  if (normalized === "query") return ["krw_ontology_query"];
+  if (normalized === "retrieve" || normalized === "broad_retrieve") {
+    return ["krw_ontology_retrieve"];
+  }
+  if (normalized === "compare") return ["krw_ontology_compare"];
+  if (normalized === "quality") return ["krw_ontology_quality"];
+  if (normalized === "catalog") return ["krw_ontology_catalog"];
+  if (normalized === "company_context") return ["krw_ontology_company_context"];
+  if (normalized === "index_context") return ["krw_ontology_index_context"];
+  if (normalized === "topic_map") return ["krw_ontology_topic_map"];
+  if (normalized === "plan_query") return ["krw_ontology_plan_query"];
+
+  return [];
+}
+
+function coerceRecord(
+  value: unknown,
+  fallbackText?: string | null,
+): Record<string, unknown> | null {
+  if (isRecord(value)) return value;
+  if (!fallbackText) return null;
+
+  try {
+    const parsed = JSON.parse(fallbackText);
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function getNested(
+  value: Record<string, unknown>,
+  pathParts: string[],
+): unknown {
+  let current: unknown = value;
+  for (const part of pathParts) {
+    if (!isRecord(current)) return undefined;
+    current = current[part];
+  }
+  return current;
+}
+
+function arrayValue(value: unknown): unknown[] | null {
+  return Array.isArray(value) ? value : null;
+}
+
+function stringValue(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
 }
 
 async function getCompanyPromptContexts(
@@ -501,7 +1158,9 @@ async function consumeSdkMessage(params: {
 
         const toolCallId =
           typeof block.id === "string" ? block.id : crypto.randomUUID();
-        const input = isRecord(block.input) ? block.input : {};
+        const rawInput = isRecord(block.input) ? block.input : {};
+        const input =
+          downgradeFullResponseDetailInput(toolName, rawInput) ?? rawInput;
 
         if (!openToolCalls.has(toolCallId)) {
           openToolCalls.add(toolCallId);
@@ -824,6 +1483,18 @@ function numberValue(value: unknown): number | null {
 
 function errorCodeFromMessage(message: string): AgentRunResult["errorCode"] {
   const lower = message.toLowerCase();
+  if (
+    lower.includes(TOOL_BUDGET_EXCEEDED) ||
+    lower.includes("tool budget") ||
+    lower.includes("budget exceeded") ||
+    lower.includes("limit for this run has been reached") ||
+    lower.includes("no more krw ontology mcp tools") ||
+    lower.includes("max tool calls") ||
+    lower.includes("query calls") ||
+    lower.includes("trace/chain calls")
+  ) {
+    return TOOL_BUDGET_EXCEEDED;
+  }
   if (
     lower.includes("not logged in") ||
     lower.includes("please run /login") ||

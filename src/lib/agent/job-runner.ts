@@ -1,0 +1,1038 @@
+import { recordAnalyticsEvent } from "@/lib/analytics/server";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { checkMcpHealth } from "@/lib/agent/mcp-client";
+import { runAgent, type SdkDiagnostics } from "@/lib/agent/runner";
+import type {
+  AccumulatedRun,
+  AccumulatedToolCall,
+  StreamWriter,
+} from "@/lib/agent/stream-handler";
+import {
+  appendAgentRunEvent,
+  createAgentRunEventWriter,
+} from "@/lib/agent/run-events";
+import {
+  budgetUsdToAnalysisCredits,
+  getEffectiveDailyBudgetUsd,
+  resolvePlanKey,
+} from "@/lib/billing/plans";
+import { getBillingPlanFromStore } from "@/lib/billing/plan-store";
+import { heartbeatAgentRun } from "@/lib/agent/job-queue";
+import { getCurrentBillingPeriod } from "@/lib/billing/period";
+import { readIntEnv } from "@/lib/env";
+import { isAdminEntitlementEmail } from "@/lib/billing/admin-emails";
+import {
+  publicAgentErrorMessage,
+  publicErrorMessage,
+} from "@/lib/api/chat/error-messages";
+import { MAX_PROMPT_HISTORY_MESSAGES } from "@/lib/agent/system-prompt";
+import type {
+  AgentRunRow,
+  ChatSessionRow,
+  Json,
+  MessageRow,
+  UsageBudgetBalanceRow,
+  UserEntitlementRow,
+} from "@/types/database";
+import type {
+  DocumentType,
+  StreamingCitation,
+} from "@/types/api-contracts";
+import { toErrorCode } from "@/types/api-contracts";
+import {
+  normalizeResearchMode,
+  type ResearchMode,
+} from "@/lib/research-mode";
+
+const HEARTBEAT_INTERVAL_MS = readIntEnv("LEASE_HEARTBEAT_INTERVAL_MS", 60_000, {
+  min: 1_000,
+});
+const CANCEL_POLL_INTERVAL_MS = readIntEnv("AGENT_CANCEL_POLL_INTERVAL_MS", 1000, {
+  min: 250,
+});
+const AGENT_RUN_HARD_TIMEOUT_MS =
+  readIntEnv("AGENT_RUN_HARD_TIMEOUT_MINUTES", 15, { min: 1 }) * 60_000;
+const RUN_TIMEOUT_MESSAGE =
+  "분석 시간이 초과되었습니다. 다시 시도해주세요.";
+const INPUT_COST_PER_1M = Number.parseFloat(
+  process.env.INPUT_COST_PER_MILLION ?? "3.0",
+);
+const OUTPUT_COST_PER_1M = Number.parseFloat(
+  process.env.OUTPUT_COST_PER_MILLION ?? "15.0",
+);
+
+type SupabaseAdmin = ReturnType<typeof getSupabaseAdmin>;
+
+interface AgentJob {
+  run: Pick<
+    AgentRunRow,
+    | "id"
+    | "session_id"
+    | "user_message_id"
+    | "assistant_message_id"
+    | "request_id"
+    | "started_at"
+  >;
+  session: Pick<
+    ChatSessionRow,
+    "id" | "user_id" | "scope_type" | "default_tickers" | "default_document_types"
+  >;
+  userMessage: Pick<MessageRow, "id" | "content">;
+  assistantMessageId: string;
+  history: Array<{ role: string; content: string }>;
+  researchMode: ResearchMode;
+}
+
+export async function runAgentJob(runId: string, workerId: string) {
+  const admin = getSupabaseAdmin();
+  const job = await loadAgentJob(admin, runId);
+
+  if (!job) {
+    console.warn("[agent-worker] job not found", { runId });
+    return;
+  }
+
+  const runStartedAt = job.run.started_at ?? new Date().toISOString();
+  const abortController = new AbortController();
+  let hardTimedOut = false;
+  const eventWriter = createAgentRunEventWriter(admin, runId);
+  const sendEvent = async (
+    event: Parameters<typeof appendAgentRunEvent>[2],
+    payload: unknown,
+  ) => {
+    await appendAgentRunEvent(admin, runId, event, payload);
+  };
+
+  const stopHeartbeat = startHeartbeat(runId, workerId, abortController);
+  const stopCancelPolling = startCancelPolling(
+    admin,
+    runId,
+    abortController,
+  );
+  const hardTimeout = setTimeout(() => {
+    hardTimedOut = true;
+    abortController.abort();
+  }, AGENT_RUN_HARD_TIMEOUT_MS);
+  (hardTimeout as { unref?: () => void }).unref?.();
+
+  try {
+    await admin
+      .from("messages")
+      .update({ status: "streaming" })
+      .eq("id", job.assistantMessageId);
+
+    await sendEvent("activity_update", {
+      stage: "preparing",
+      label: "분석 준비 중",
+    });
+
+    const mcpHealth = await checkMcpHealth();
+    if (!mcpHealth.connected) {
+      await handleFailedJob({
+        admin,
+        job,
+        runStartedAt,
+        result: {
+          acc: emptyAccumulatedRun(),
+          errorCode: "mcp_unavailable",
+          errorMessage: "MCP unavailable",
+        },
+        sendEvent,
+      });
+      return;
+    }
+
+    await admin
+      .from("agent_runs")
+      .update({
+        ontology_release_id: mcpHealth.releaseId,
+        index_generated_at: mcpHealth.indexGeneratedAt,
+        company_count: mcpHealth.companyCount,
+        document_count: mcpHealth.documentCount,
+      })
+      .eq("id", runId);
+
+    const persistPartialText = createPartialMessagePersister(
+      admin,
+      job.assistantMessageId,
+    );
+    const persistRunRecords = createRunRecordPersister(
+      admin,
+      runId,
+      job.assistantMessageId,
+    );
+    const recordSdkDiagnostics = createSdkDiagnosticsRecorder(admin, runId);
+
+    const result = await runAgent(
+      {
+        sessionId: job.session.id,
+        userMessage: job.userMessage.content,
+        scopeType: job.session.scope_type,
+        defaultTickers: job.session.default_tickers ?? [],
+        defaultDocumentTypes:
+          (job.session.default_document_types ?? []) as DocumentType[],
+        history: job.history,
+        researchMode: job.researchMode,
+        abortSignal: abortController.signal,
+        onSdkDiagnostics: recordSdkDiagnostics,
+        onTextDelta: persistPartialText,
+        onToolCallStart: persistRunRecords.persistToolCallStart,
+        onToolCallEnd: persistRunRecords.persistToolCallEnd,
+        onCitation: persistRunRecords.persistCitation,
+      },
+      eventWriter as StreamWriter,
+    );
+
+    await eventWriter.flush();
+    await persistPartialText.flush();
+    await persistRunRecords.backfill(result.acc);
+    await persistRunRecords.flush();
+
+    if (result.status === "completed") {
+      await handleCompletedJob({
+        admin,
+        job,
+        runStartedAt,
+        result,
+        release: {
+          ontology_release_id: mcpHealth.releaseId ?? "",
+          index_generated_at: mcpHealth.indexGeneratedAt ?? "",
+          company_count: mcpHealth.companyCount ?? 0,
+          document_count: mcpHealth.documentCount ?? 0,
+        },
+        sendEvent,
+      });
+      return;
+    }
+
+    if (result.status === "cancelled" && hardTimedOut) {
+      await handleFailedJob({
+        admin,
+        job,
+        runStartedAt,
+        result: {
+          acc: result.acc,
+          errorCode: "lease_expired",
+          errorMessage: RUN_TIMEOUT_MESSAGE,
+        },
+        sendEvent,
+      });
+      return;
+    }
+
+    if (result.status === "cancelled") {
+      await handleCancelledJob({
+        admin,
+        job,
+        result,
+        sendEvent,
+      });
+      return;
+    }
+
+    await handleFailedJob({
+      admin,
+      job,
+      runStartedAt,
+      result,
+      sendEvent,
+    });
+  } catch (err) {
+    const rawErrorMessage =
+      err instanceof Error ? err.message : "Internal worker error";
+    await handleFailedJob({
+      admin,
+      job,
+      runStartedAt,
+      result: {
+        acc: emptyAccumulatedRun(),
+        errorCode: "internal_error",
+        errorMessage: rawErrorMessage,
+      },
+      sendEvent,
+    });
+  } finally {
+    clearTimeout(hardTimeout);
+    stopHeartbeat();
+    stopCancelPolling();
+  }
+}
+
+async function loadAgentJob(
+  admin: SupabaseAdmin,
+  runId: string,
+): Promise<AgentJob | null> {
+  const { data: run } = await admin
+    .from("agent_runs")
+    .select("id, session_id, user_message_id, assistant_message_id, request_id, started_at")
+    .eq("id", runId)
+    .maybeSingle<AgentJob["run"]>();
+
+  if (!run?.assistant_message_id) return null;
+
+  const [
+    { data: session },
+    { data: userMessage },
+    { data: previousMessages },
+    { data: runStartedEvent },
+  ] =
+    await Promise.all([
+      admin
+        .from("chat_sessions")
+        .select("id, user_id, scope_type, default_tickers, default_document_types")
+        .eq("id", run.session_id)
+        .is("deleted_at", null)
+        .maybeSingle<AgentJob["session"]>(),
+      admin
+        .from("messages")
+        .select("id, content")
+        .eq("id", run.user_message_id)
+        .maybeSingle<AgentJob["userMessage"]>(),
+      admin
+        .from("messages")
+        .select("role, content")
+        .eq("session_id", run.session_id)
+        .eq("status", "completed")
+        .neq("id", run.user_message_id)
+        .in("role", ["user", "assistant"])
+        .order("created_at", { ascending: false })
+        .limit(MAX_PROMPT_HISTORY_MESSAGES)
+        .returns<Array<{ role: string; content: string }>>(),
+      admin
+        .from("agent_run_events")
+        .select("payload")
+        .eq("run_id", runId)
+        .eq("event_type", "run_started")
+        .order("id", { ascending: true })
+        .limit(1)
+        .maybeSingle<{ payload: Json }>(),
+    ]);
+
+  if (!session || !userMessage) return null;
+  const startedPayload = isRecord(runStartedEvent?.payload)
+    ? runStartedEvent.payload
+    : {};
+
+  return {
+    run,
+    session,
+    userMessage,
+    assistantMessageId: run.assistant_message_id,
+    history: [...(previousMessages ?? [])].reverse(),
+    researchMode: normalizeResearchMode(startedPayload.research_mode),
+  };
+}
+
+function startHeartbeat(
+  runId: string,
+  workerId: string,
+  abortController: AbortController,
+) {
+  const interval = setInterval(async () => {
+    const ok = await heartbeatAgentRun(runId, workerId);
+    if (!ok) abortController.abort();
+  }, HEARTBEAT_INTERVAL_MS);
+  (interval as { unref?: () => void }).unref?.();
+
+  return () => clearInterval(interval);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function startCancelPolling(
+  admin: SupabaseAdmin,
+  runId: string,
+  abortController: AbortController,
+) {
+  const interval = setInterval(async () => {
+    const { data } = await admin
+      .from("agent_runs")
+      .select("cancel_requested_at, status")
+      .eq("id", runId)
+      .maybeSingle<{ cancel_requested_at: string | null; status: string }>();
+
+    if (data?.cancel_requested_at || data?.status === "cancelled") {
+      abortController.abort();
+    }
+  }, CANCEL_POLL_INTERVAL_MS);
+  (interval as { unref?: () => void }).unref?.();
+
+  return () => clearInterval(interval);
+}
+
+function createSdkDiagnosticsRecorder(
+  admin: SupabaseAdmin,
+  runId: string,
+): ((diagnostics: SdkDiagnostics) => Promise<void>) | undefined {
+  if (
+    process.env.CLAUDE_SDK_DIAGNOSTICS !== "1" &&
+    process.env.NODE_ENV !== "development" &&
+    process.env.WEB_COMMIT !== "dev"
+  ) {
+    return undefined;
+  }
+
+  let mergedDiagnostics: Record<string, unknown> = {};
+
+  return async (diagnostics: SdkDiagnostics) => {
+    mergedDiagnostics = {
+      ...mergedDiagnostics,
+      ...diagnostics,
+      observedModels:
+        diagnostics.observedModels ??
+        (mergedDiagnostics.observedModels as string[] | undefined),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await admin
+      .from("agent_runs")
+      .update({ sdk_diagnostics: mergedDiagnostics })
+      .eq("id", runId);
+  };
+}
+
+function createPartialMessagePersister(
+  admin: SupabaseAdmin,
+  messageId: string,
+) {
+  const MIN_INTERVAL_MS = 750;
+  let latestText = "";
+  let lastPersistedText = "";
+  let lastPersistAt = 0;
+  let pending: Promise<void> = Promise.resolve();
+
+  const persist = async (force = false) => {
+    if (!force && Date.now() - lastPersistAt < MIN_INTERVAL_MS) return;
+    if (latestText === lastPersistedText) return;
+
+    const textToPersist = latestText;
+    lastPersistedText = textToPersist;
+    lastPersistAt = Date.now();
+
+    pending = pending.then(async () => {
+      await admin
+        .from("messages")
+        .update({
+          content: textToPersist,
+          status: "streaming",
+        })
+        .eq("id", messageId);
+    });
+
+    await pending;
+  };
+
+  const callback = async (_delta: string, fullText: string) => {
+    latestText = fullText;
+    await persist(false);
+  };
+
+  callback.flush = async () => {
+    await persist(true);
+    await pending;
+  };
+
+  return callback;
+}
+
+function createRunRecordPersister(
+  admin: SupabaseAdmin,
+  runId: string,
+  assistantMessageId: string,
+) {
+  let pending: Promise<void> = Promise.resolve();
+
+  const enqueue = (label: string, task: () => Promise<void>) => {
+    pending = pending
+      .then(task)
+      .catch((error) => {
+        console.warn(`[agent-worker] failed to persist ${label}`, {
+          runId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+    return pending;
+  };
+
+  const persistToolCall = async (toolCall: AccumulatedToolCall) => {
+    const payload = {
+      run_id: runId,
+      tool_use_id: toolCall.id,
+      tool_name: toolCall.toolName,
+      arguments_json: parseJsonStringForDb(toolCall.argumentsJson) ?? {},
+      result_summary: toolCall.resultSummary,
+      result_json: jsonForDb(toolCall.resultJson),
+      result_text: toolCall.resultText,
+      started_at: toolCall.startedAt,
+      finished_at: toolCall.finishedAt,
+      error_message: toolCall.errorMessage,
+    };
+
+    const { data: existing } = await admin
+      .from("tool_calls")
+      .select("id")
+      .eq("run_id", runId)
+      .eq("tool_use_id", toolCall.id)
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+
+    if (existing?.id) {
+      await admin.from("tool_calls").update(payload).eq("id", existing.id);
+      return;
+    }
+
+    await admin.from("tool_calls").insert(payload);
+  };
+
+  const persistCitation = async (citation: StreamingCitation) => {
+    await admin.from("citations").insert({
+      message_id: assistantMessageId,
+      run_id: runId,
+      object_id: citation.object_id,
+      ticker: citation.ticker,
+      document_type: citation.document_type,
+      period: citation.period,
+      section: citation.section,
+      quote_text: citation.quote_text,
+      claim_text: citation.claim_text,
+      evidence_grade: citation.evidence_grade,
+      source_quality: citation.source_quality,
+      trace_json: jsonForDb(citation.trace_json),
+    });
+  };
+
+  return {
+    persistToolCallStart: (toolCall: AccumulatedToolCall) =>
+      enqueue("tool_call_start", () => persistToolCall(toolCall)),
+    persistToolCallEnd: (toolCall: AccumulatedToolCall) =>
+      enqueue("tool_call_end", () => persistToolCall(toolCall)),
+    persistCitation: (citation: StreamingCitation) =>
+      enqueue("citation", () => persistCitation(citation)),
+    backfill: (acc: AccumulatedRun) =>
+      enqueue("snapshot", async () => {
+        for (const toolCall of acc.toolCalls) {
+          await persistToolCall(toolCall);
+        }
+
+        if (acc.citations.length === 0) return;
+
+        const { count, error } = await admin
+          .from("citations")
+          .select("id", { count: "exact", head: true })
+          .eq("run_id", runId);
+
+        if (error || (count ?? 0) > 0) return;
+
+        for (const citation of acc.citations) {
+          await persistCitation(citation);
+        }
+      }),
+    flush: async () => {
+      await pending;
+    },
+  };
+}
+
+async function handleCompletedJob(params: {
+  admin: SupabaseAdmin;
+  job: AgentJob;
+  runStartedAt: string;
+  result: { acc: AccumulatedRun };
+  release: {
+    ontology_release_id: string;
+    index_generated_at: string;
+    company_count: number;
+    document_count: number;
+  };
+  sendEvent: (event: Parameters<typeof appendAgentRunEvent>[2], payload: unknown) => Promise<void>;
+}) {
+  const { admin, job, runStartedAt, result, release, sendEvent } = params;
+  const { acc } = result;
+  const visibleAnswer = normalizeUserFacingPeriodLabels(acc.fullText.trim());
+  const answerVerifier = buildAnswerVerifierDiagnostics(
+    job.userMessage.content,
+    visibleAnswer,
+    acc,
+    job.researchMode,
+  );
+  const estimatedCost = estimateCost(acc.inputTokens, acc.outputTokens);
+  const finishedAt = new Date().toISOString();
+  const latencyMs = Date.now() - new Date(runStartedAt).getTime();
+
+  await admin
+    .from("messages")
+    .update({
+      content: visibleAnswer,
+      status: "completed",
+    })
+    .eq("id", job.assistantMessageId);
+
+  await admin
+    .from("agent_runs")
+    .update({
+      status: "completed",
+      finished_at: finishedAt,
+      input_tokens: acc.inputTokens,
+      output_tokens: acc.outputTokens,
+      estimated_cost_usd: estimatedCost,
+      latency_ms: latencyMs,
+      lease_expires_at: null,
+    })
+    .eq("id", job.run.id);
+
+  await settleExecutionBudgetForWorker(
+    job.session.user_id,
+    job.run.request_id,
+    job.run.id,
+    estimatedCost,
+    "completed",
+    {
+      input_tokens: acc.inputTokens,
+      output_tokens: acc.outputTokens,
+      tool_call_count: acc.toolCalls.length,
+      answer_verifier: answerVerifier,
+    },
+  );
+
+  await recordAnalyticsEvent({
+    eventName: "answer_completed",
+    userId: job.session.user_id,
+    sessionId: job.session.id,
+    messageId: job.assistantMessageId,
+    runId: job.run.id,
+    properties: {
+      scope_type: job.session.scope_type,
+      ticker: job.session.default_tickers?.[0] ?? null,
+      tickers: job.session.default_tickers ?? [],
+      duration_ms: latencyMs,
+      citation_count: acc.citations.length,
+      artifact_count: 0,
+      artifact_created: false,
+      input_tokens: acc.inputTokens,
+      output_tokens: acc.outputTokens,
+      estimated_cost_usd: estimatedCost,
+      research_mode: job.researchMode,
+      answer_verifier_flags: answerVerifier.flags,
+    },
+  });
+
+  await sendEvent("done", {
+    run_id: job.run.id,
+    message_id: job.assistantMessageId,
+    content: visibleAnswer,
+    rich_answers: [],
+    artifacts: [],
+    release: {
+      ...release,
+      krw_ontology_commit: process.env.KRW_ONTOLOGY_COMMIT || "dev",
+      web_commit: process.env.WEB_COMMIT || "dev",
+    },
+    usage: {
+      input_tokens: acc.inputTokens,
+      output_tokens: acc.outputTokens,
+      estimated_cost_usd: estimatedCost,
+      latency_ms: latencyMs,
+    },
+    execution_budget: await loadExecutionBudgetStatus(job.session.user_id),
+    answer_diagnostics: answerVerifier,
+  });
+}
+
+function normalizeUserFacingPeriodLabels(answer: string): string {
+  return answer.replace(
+    /\bFY\s?(20\d{2})(?:\s?Q([1-4]))?\b/gi,
+    (_match, year: string, quarter: string | undefined) =>
+      `CY${year}${quarter ? `Q${quarter}` : ""}`,
+  );
+}
+
+function buildAnswerVerifierDiagnostics(
+  question: string,
+  answer: string,
+  acc: AccumulatedRun,
+  researchMode: ResearchMode,
+) {
+  const flags: string[] = [];
+  const latestRequested = /최근|latest|recent|최근\s*분기|latest quarter/i.test(question);
+  const fyLabelUsed = /\bFY\s?20\d{2}\b/i.test(answer);
+  const internalTermLeak = /\b(research_pack|kernel|object_id|trace_status|metric_lineage|agent_autonomy|allowed_next_tools)\b/i.test(answer);
+  const latestQuarterMentioned = /\b(10-q|quarter|q[1-4]|분기|3개월|six months|three months)\b/i.test(answer);
+  const retrieveCount = acc.toolCalls.filter((tool) => tool.toolName === "krw_ontology_retrieve").length;
+  const queryContextCount = acc.toolCalls.filter((tool) => tool.toolName === "krw_ontology_query_context").length;
+  const traceChainCount = acc.toolCalls.filter(
+    (tool) => tool.toolName === "krw_ontology_trace" || tool.toolName === "krw_ontology_chain",
+  ).length;
+
+  if (fyLabelUsed) flags.push("fy_label_used");
+  if (internalTermLeak) flags.push("internal_term_leak");
+  if (latestRequested && !latestQuarterMentioned) flags.push("latest_question_without_quarter_context");
+  if (researchMode !== "deep" && retrieveCount > 0) flags.push("retrieve_used_outside_deep");
+  if (researchMode === "fast" && traceChainCount > 0) flags.push("fast_mode_trace_or_chain_used");
+  if (queryContextCount === 0 && /krw|apple|aapl|msft|amzn|meta|jpm|bac/i.test(question)) {
+    flags.push("missing_query_context_first_pass");
+  }
+
+  return {
+    version: "answer_verifier_v0.1",
+    research_mode: researchMode,
+    flags,
+    checks: {
+      fy_label_used: fyLabelUsed,
+      internal_term_leak: internalTermLeak,
+      latest_requested: latestRequested,
+      latest_quarter_mentioned: latestQuarterMentioned,
+      retrieve_count: retrieveCount,
+      query_context_count: queryContextCount,
+      trace_chain_count: traceChainCount,
+      tool_call_count: acc.toolCalls.length,
+      answer_char_count: answer.length,
+      question_char_count: question.length,
+    },
+  };
+}
+
+async function handleCancelledJob(params: {
+  admin: SupabaseAdmin;
+  job: AgentJob;
+  result: { acc: AccumulatedRun };
+  sendEvent: (event: Parameters<typeof appendAgentRunEvent>[2], payload: unknown) => Promise<void>;
+}) {
+  const { admin, job, result, sendEvent } = params;
+  const finishedAt = new Date().toISOString();
+  const estimatedCost = estimateCost(result.acc.inputTokens, result.acc.outputTokens);
+
+  await admin
+    .from("messages")
+    .update({
+      content: result.acc.fullText || "",
+      status: "failed",
+    })
+    .eq("id", job.assistantMessageId);
+
+  await admin
+    .from("agent_runs")
+    .update({
+      status: "cancelled",
+      finished_at: finishedAt,
+      error_code: "cancelled",
+      lease_expires_at: null,
+    })
+    .eq("id", job.run.id);
+
+  await settleExecutionBudgetForWorker(
+    job.session.user_id,
+    job.run.request_id,
+    job.run.id,
+    estimatedCost,
+    "cancelled",
+    {
+      input_tokens: result.acc.inputTokens,
+      output_tokens: result.acc.outputTokens,
+      tool_call_count: result.acc.toolCalls.length,
+    },
+  );
+
+  await sendEvent("cancelled", {
+    run_id: job.run.id,
+    message_id: job.assistantMessageId,
+  });
+}
+
+async function handleFailedJob(params: {
+  admin: SupabaseAdmin;
+  job: AgentJob;
+  runStartedAt: string;
+  result: { acc: AccumulatedRun; errorCode?: string; errorMessage?: string };
+  sendEvent: (event: Parameters<typeof appendAgentRunEvent>[2], payload: unknown) => Promise<void>;
+}) {
+  const { admin, job, result, sendEvent } = params;
+  const errorCode = toErrorCode(result.errorCode || "claude_api_error");
+  const rawErrorMessage = result.errorMessage || publicErrorMessage(errorCode);
+  const publicMessage = publicAgentErrorMessage({ code: errorCode });
+  const finishedAt = new Date().toISOString();
+  const estimatedCost = estimateCost(result.acc.inputTokens, result.acc.outputTokens);
+
+  await admin
+    .from("agent_runs")
+    .update({
+      status: errorCode === "lease_expired" ? "expired" : "failed",
+      finished_at: finishedAt,
+      error_code: errorCode,
+      error_message: rawErrorMessage,
+      input_tokens: result.acc.inputTokens,
+      output_tokens: result.acc.outputTokens,
+      estimated_cost_usd: estimatedCost,
+      lease_expires_at: null,
+    })
+    .eq("id", job.run.id);
+
+  await admin
+    .from("messages")
+    .update({
+      content: publicMessage,
+      status: "failed",
+    })
+    .eq("id", job.assistantMessageId);
+
+  await recordAnalyticsEvent({
+    eventName: "answer_failed",
+    userId: job.session.user_id,
+    sessionId: job.session.id,
+    messageId: job.assistantMessageId,
+    runId: job.run.id,
+    properties: {
+      scope_type: job.session.scope_type,
+      ticker: job.session.default_tickers?.[0] ?? null,
+      tickers: job.session.default_tickers ?? [],
+      error_code: errorCode,
+      output_length: result.acc.fullText.length,
+      tool_call_count: result.acc.toolCalls.length,
+    },
+  });
+
+  if (estimatedCost > 0) {
+    await settleExecutionBudgetForWorker(
+      job.session.user_id,
+      job.run.request_id,
+      job.run.id,
+      estimatedCost,
+      errorCode,
+      {
+        input_tokens: result.acc.inputTokens,
+        output_tokens: result.acc.outputTokens,
+        tool_call_count: result.acc.toolCalls.length,
+        output_length: result.acc.fullText.length,
+      },
+    );
+  } else {
+    await releaseExecutionBudgetForWorker(
+      job.session.user_id,
+      job.run.request_id,
+      job.run.id,
+      errorCode,
+    );
+  }
+
+  await sendEvent("error", {
+    run_id: job.run.id,
+    error_code: errorCode,
+    error_message: publicMessage,
+  });
+}
+
+async function loadExecutionBudgetStatus(userId: string) {
+  const admin = getSupabaseAdmin();
+  const planKey = await loadPlanKey(admin, userId);
+  const plan = await getBillingPlanFromStore(planKey);
+  const monthlyPeriod = getCurrentBillingPeriod(plan.budgetPeriod);
+  const dailyPeriod = getCurrentBillingPeriod("daily");
+  const [monthly, daily] = await Promise.all([
+    loadBudgetBalance(admin, userId, "monthly", monthlyPeriod.start, monthlyPeriod.end),
+    loadBudgetBalance(admin, userId, "daily", dailyPeriod.start, dailyPeriod.end),
+  ]);
+
+  const budgetLimitUsd = plan.monthlyBudgetUsd;
+  const dailyBudgetLimitUsd = getEffectiveDailyBudgetUsd(plan);
+  const remainingBudgetUsd = Math.max(
+    0,
+    budgetLimitUsd - monthly.settledCostUsd - monthly.reservedCostUsd,
+  );
+  const remainingDailyBudgetUsd = Math.max(
+    0,
+    dailyBudgetLimitUsd - daily.settledCostUsd - daily.reservedCostUsd,
+  );
+  const percentUsed =
+    budgetLimitUsd > 0
+      ? Math.min(
+          100,
+          Math.round(
+            ((monthly.settledCostUsd + monthly.reservedCostUsd) /
+              budgetLimitUsd) *
+              100,
+          ),
+        )
+      : 100;
+
+  return {
+    budget_used_usd: roundUsd(monthly.settledCostUsd),
+    budget_reserved_usd: roundUsd(monthly.reservedCostUsd),
+    budget_limit_usd: budgetLimitUsd,
+    remaining_budget_usd: roundUsd(remainingBudgetUsd),
+    daily_budget_used_usd: roundUsd(daily.settledCostUsd),
+    daily_budget_reserved_usd: roundUsd(daily.reservedCostUsd),
+    daily_budget_limit_usd: dailyBudgetLimitUsd,
+    per_run_reserve_usd: 0,
+    analysis_credits_used: budgetUsdToAnalysisCredits(monthly.settledCostUsd, "ceil"),
+    analysis_credits_reserved: budgetUsdToAnalysisCredits(monthly.reservedCostUsd, "ceil"),
+    analysis_credits_limit: budgetUsdToAnalysisCredits(budgetLimitUsd, "floor"),
+    remaining_analysis_credits: budgetUsdToAnalysisCredits(remainingBudgetUsd, "floor"),
+    daily_analysis_credits_used: budgetUsdToAnalysisCredits(daily.settledCostUsd, "ceil"),
+    daily_analysis_credits_reserved: budgetUsdToAnalysisCredits(daily.reservedCostUsd, "ceil"),
+    daily_analysis_credits_limit: budgetUsdToAnalysisCredits(dailyBudgetLimitUsd, "floor"),
+    per_run_analysis_credits: 0,
+    run_count: monthly.runCount,
+    percent_used: percentUsed,
+    can_run:
+      budgetUsdToAnalysisCredits(remainingBudgetUsd, "floor") > 0 &&
+      budgetUsdToAnalysisCredits(remainingDailyBudgetUsd, "floor") > 0,
+  };
+}
+
+async function settleExecutionBudgetForWorker(
+  userId: string,
+  requestId: string,
+  runId: string | null,
+  actualCostUsd: number,
+  terminalStatus: string,
+  metadata: Json = {},
+) {
+  const { error } = await getSupabaseAdmin().rpc("settle_execution_budget", {
+    p_user_id: userId,
+    p_request_id: requestId,
+    p_run_id: runId,
+    p_actual_cost_usd: roundUsd(actualCostUsd),
+    p_terminal_status: terminalStatus,
+    p_metadata: metadata,
+  });
+  if (error) {
+    console.warn("[agent-worker] failed to settle execution budget", {
+      code: error.code,
+      message: error.message,
+    });
+  }
+}
+
+async function releaseExecutionBudgetForWorker(
+  userId: string,
+  requestId: string,
+  runId: string | null,
+  reason: string,
+) {
+  const { error } = await getSupabaseAdmin().rpc("release_execution_budget", {
+    p_user_id: userId,
+    p_request_id: requestId,
+    p_run_id: runId,
+    p_reason: reason,
+  });
+  if (error) {
+    console.warn("[agent-worker] failed to release execution budget", {
+      code: error.code,
+      message: error.message,
+    });
+  }
+}
+
+function estimateCost(inputTokens: number, outputTokens: number): number {
+  const inputCost = Number.isFinite(INPUT_COST_PER_1M)
+    ? INPUT_COST_PER_1M
+    : 3.0;
+  const outputCost = Number.isFinite(OUTPUT_COST_PER_1M)
+    ? OUTPUT_COST_PER_1M
+    : 15.0;
+  return (inputTokens / 1_000_000) * inputCost + (outputTokens / 1_000_000) * outputCost;
+}
+
+function roundUsd(value: number): number {
+  return Math.round(Math.max(0, Number.isFinite(value) ? value : 0) * 1_000_000) / 1_000_000;
+}
+
+async function loadPlanKey(admin: SupabaseAdmin, userId: string) {
+  const { data } = await admin
+    .from("user_entitlements")
+    .select("plan_key, status")
+    .eq("user_id", userId)
+    .maybeSingle<Pick<UserEntitlementRow, "plan_key" | "status">>();
+
+  if (!data || data.status !== "active") {
+    const email = await loadUserEmailForAdminCheck(admin, userId);
+    return isAdminEntitlementEmail(email) ? "internal" : resolvePlanKey(null);
+  }
+  return resolvePlanKey(data.plan_key);
+}
+
+async function loadUserEmailForAdminCheck(
+  admin: SupabaseAdmin,
+  userId: string,
+): Promise<string | null> {
+  const authAdmin = (
+    admin as SupabaseAdmin & {
+      auth?: {
+        admin?: {
+          getUserById?: (
+            id: string,
+          ) => Promise<{
+            data?: { user?: { email?: string | null } | null } | null;
+            error?: unknown;
+          }>;
+        };
+      };
+    }
+  ).auth?.admin;
+
+  if (!authAdmin?.getUserById) return null;
+
+  try {
+    const { data, error } = await authAdmin.getUserById(userId);
+    if (error) return null;
+    return data?.user?.email ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function loadBudgetBalance(
+  admin: SupabaseAdmin,
+  userId: string,
+  periodKind: "daily" | "monthly",
+  periodStart: string,
+  periodEnd: string,
+) {
+  const { data } = await admin
+    .from("usage_budget_balances")
+    .select("settled_cost_usd, reserved_cost_usd, run_count")
+    .eq("user_id", userId)
+    .eq("period_kind", periodKind)
+    .eq("period_start", periodStart)
+    .eq("period_end", periodEnd)
+    .maybeSingle<
+      Pick<
+        UsageBudgetBalanceRow,
+        "settled_cost_usd" | "reserved_cost_usd" | "run_count"
+      >
+    >();
+
+  return {
+    settledCostUsd: Number(data?.settled_cost_usd ?? 0),
+    reservedCostUsd: Number(data?.reserved_cost_usd ?? 0),
+    runCount: Number(data?.run_count ?? 0),
+  };
+}
+
+function emptyAccumulatedRun(): AccumulatedRun {
+  return {
+    fullText: "",
+    structuredOutput: null,
+    researchSynthesisOutput: null,
+    researchSynthesisText: null,
+    displayPlanOutput: null,
+    toolCalls: [],
+    citations: [],
+    inputTokens: 0,
+    outputTokens: 0,
+  };
+}
+
+function jsonForDb(value: unknown): Json | null {
+  if (value === undefined || value === null) return null;
+  return JSON.parse(JSON.stringify(value)) as Json;
+}
+
+function parseJsonStringForDb(value: string): Json {
+  try {
+    return jsonForDb(JSON.parse(value)) ?? {};
+  } catch {
+    return value;
+  }
+}

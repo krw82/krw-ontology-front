@@ -80,6 +80,41 @@ describe("chat history state", () => {
     expect(state.messages.map((message) => message.id)).toEqual(["user-1"]);
   });
 
+  it("treats queued runs as active so reconnect can attach before the worker starts", () => {
+    const messages: Message[] = [
+      {
+        ...baseMessage,
+        id: "user-1",
+        role: "user",
+        content: "AAPL 분석해줘",
+        status: "completed",
+      },
+      {
+        ...baseMessage,
+        id: "assistant-1",
+        role: "assistant",
+        content: "",
+        status: "pending",
+      },
+    ];
+    const runs: AgentRunSummary[] = [
+      {
+        ...baseRun,
+        id: "run-1",
+        status: "queued",
+        assistant_message_id: "assistant-1",
+      },
+    ];
+
+    const state = deriveLoadedChatState(messages, runs);
+
+    expect(state.status).toBe("running");
+    expect(state.activeRunId).toBe("run-1");
+    expect(state.activeAssistantMessageId).toBe("assistant-1");
+    expect(state.streamingContent).toBe("");
+    expect(state.messages.map((message) => message.id)).toEqual(["user-1"]);
+  });
+
   it("keeps completed assistant messages in visible history", () => {
     const messages: Message[] = [
       {

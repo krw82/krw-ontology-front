@@ -3,6 +3,7 @@ export type CompanySortMode = "relevance" | "ticker";
 export interface CompanySearchRecord {
   ticker: string;
   name: string;
+  companyNameKo?: string;
   sector?: string | null;
   description: string;
   coverage?: string | null;
@@ -23,6 +24,7 @@ export function filterAndSortCompanies<T extends CompanySearchRecord>(
       [
         company.ticker,
         company.name,
+        company.companyNameKo ?? "",
         company.sector ?? "",
         company.description,
         company.coverage ?? "",

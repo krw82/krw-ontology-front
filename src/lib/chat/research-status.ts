@@ -72,6 +72,8 @@ export function getResearchActivityLabel(
   activity?: ResearchActivityUpdate | null,
 ): string {
   switch (activity?.stage) {
+    case "queued":
+      return "분석 대기";
     case "connecting":
       return "자료 연결";
     case "checking_evidence":

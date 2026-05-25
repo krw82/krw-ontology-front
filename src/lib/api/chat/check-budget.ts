@@ -17,8 +17,8 @@ function errorResponse(
 }
 
 /**
- * Reserves execution budget before an agent run can start. The reservation is
- * idempotent by request_id at the database layer.
+ * Opens an idempotent execution-budget record before an agent run can start.
+ * Credits are charged after completion and capped at the remaining balance.
  */
 export async function reserveBudgetStep(
   userId: string,

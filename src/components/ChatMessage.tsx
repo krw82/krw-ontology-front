@@ -300,6 +300,8 @@ function MessageActions({
 
 function activityLabel(activity?: ResearchActivityUpdate | null): string {
   switch (activity?.stage) {
+    case "queued":
+      return "분석 대기 중";
     case "connecting":
       return "자료 연결 중";
     case "checking_evidence":

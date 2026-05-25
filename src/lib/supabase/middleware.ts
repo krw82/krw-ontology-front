@@ -11,6 +11,19 @@ export async function updateSession(request: NextRequest) {
   const isProtected = protectedPaths.some((p) =>
     request.nextUrl.pathname.startsWith(p),
   );
+  const hasOAuthCode = request.nextUrl.searchParams.has("code");
+
+  if (
+    hasOAuthCode &&
+    request.nextUrl.pathname !== "/auth/callback" &&
+    (request.nextUrl.pathname === "/" || request.nextUrl.pathname === "/login")
+  ) {
+    const url = new URL("/auth/callback", request.nextUrl.origin);
+    request.nextUrl.searchParams.forEach((value, key) => {
+      url.searchParams.append(key, value);
+    });
+    return NextResponse.redirect(url);
+  }
 
   if (isDevAuthBypassEnabled()) {
     if (request.nextUrl.pathname === "/login") {

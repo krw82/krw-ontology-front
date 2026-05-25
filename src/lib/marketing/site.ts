@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { APPLE_QUESTION_CHAINS } from "@/lib/companies/research-profiles";
+import { APPLE_QUESTION_CHAINS } from "@/lib/companies/landing-copy";
 
 export const SITE_NAME = "KRW Ontology";
 export const DEFAULT_SITE_ORIGIN = "https://krwontology.com";

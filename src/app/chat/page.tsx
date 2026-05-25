@@ -10,6 +10,7 @@ import Composer from "@/components/Composer";
 import SuggestedPromptActions from "@/components/SuggestedPromptActions";
 import { useChat } from "@/hooks/useChat";
 import { useEntitlement } from "@/hooks/useEntitlement";
+import { useResearchModePreference } from "@/hooks/useResearchModePreference";
 import { getSessionTickers, buildChatSessionHref } from "@/lib/chat/history-state";
 import { getSuggestedPromptsForTickers } from "@/lib/companies/landing-copy";
 import { trackClientEventSilently } from "@/lib/analytics/client";
@@ -61,6 +62,8 @@ function ChatContent() {
   const budgetAlertTrackedRef = useRef<string | null>(null);
   const prefilledQuestionTrackedRef = useRef<string | null>(null);
   const { entitlement, refresh: refreshEntitlement } = useEntitlement();
+  const [researchMode, setResearchMode] = useResearchModePreference(sessionId);
+  const [composerDraftResetKey, setComposerDraftResetKey] = useState(0);
 
   // H-07: cleanup on unmount to prevent race condition
   useEffect(() => {
@@ -139,6 +142,7 @@ function ChatContent() {
     sessionId: sessionId ?? "",
     scopeType: ticker ? "company" : "global",
     defaultTickers: ticker ? [ticker.trim().toUpperCase()] : [],
+    researchMode,
     onSessionCreated: handleSessionCreated,
   });
 
@@ -259,6 +263,18 @@ function ChatContent() {
   const sendMessage = chat.sendMessage;
   const cancelRun = chat.cancelRun;
 
+  const clearComposerPrefillParams = useCallback(() => {
+    if (!queryParam && !templateId) return;
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete("query");
+    nextParams.delete("templateId");
+    const nextQuery = nextParams.toString();
+    router.replace(`/chat${nextQuery ? `?${nextQuery}` : ""}`, {
+      scroll: false,
+    });
+  }, [queryParam, router, searchParams, templateId]);
+
   useEffect(() => {
     const trimmedQuestion = initialComposerValue?.trim();
     if (!trimmedQuestion || !prefillSource) return;
@@ -338,9 +354,10 @@ function ChatContent() {
 
   const handleSend = useCallback(
     async (content: string) => {
+      clearComposerPrefillParams();
       await sendMessage(content);
     },
-    [sendMessage],
+    [clearComposerPrefillParams, sendMessage],
   );
 
   async function handlePromptSend(
@@ -356,6 +373,8 @@ function ChatContent() {
       tickers: analyticsTickers,
       prompt,
     });
+    clearComposerPrefillParams();
+    setComposerDraftResetKey((current) => current + 1);
     await sendMessage(prompt);
   }
 
@@ -646,7 +665,9 @@ function ChatContent() {
             }
             toolCalls={chat.toolCalls}
             initialValue={initialComposerValue}
-            entitlement={entitlement}
+            draftResetKey={composerDraftResetKey}
+            researchMode={researchMode}
+            onResearchModeChange={setResearchMode}
           />
         </div>
       </main>

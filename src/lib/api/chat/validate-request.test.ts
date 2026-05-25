@@ -201,7 +201,44 @@ describe("validateRequest", () => {
       scope_type: "company",
       default_tickers: ["AAPL"],
       default_document_types: ["10-K"],
+      research_mode: "deep",
     });
+  });
+
+  it("normalizes missing or invalid research mode to deep", async () => {
+    const missingResult = await validateRequest(
+      makeRequest({
+        content: "hello",
+        request_id: "req-1",
+      }),
+    );
+    const invalidResult = await validateRequest(
+      makeRequest({
+        content: "hello",
+        request_id: "req-2",
+        research_mode: "slow",
+      }),
+    );
+
+    expect(missingResult.ok).toBe(true);
+    expect(invalidResult.ok).toBe(true);
+    if (!missingResult.ok || !invalidResult.ok) return;
+    expect(missingResult.data.body.research_mode).toBe("deep");
+    expect(invalidResult.data.body.research_mode).toBe("deep");
+  });
+
+  it("accepts explicit research modes", async () => {
+    const result = await validateRequest(
+      makeRequest({
+        content: "hello",
+        request_id: "req-1",
+        research_mode: "deep",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.body.research_mode).toBe("deep");
   });
 
   it("accepts valid markdown attachments after server-side validation", async () => {

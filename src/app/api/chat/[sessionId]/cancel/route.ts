@@ -3,6 +3,9 @@ import { getAuthUser, handleAuthError, forbiddenError } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { abortRun } from "@/lib/agent/abort-manager";
+import { requestAgentRunCancel } from "@/lib/agent/job-queue";
+import { appendAgentRunEvent } from "@/lib/agent/run-events";
+import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
 import { isUuid } from "@/lib/api/validation";
 import type { ChatSessionRow, AgentRunRow } from "@/types/database";
 
@@ -53,7 +56,7 @@ export async function POST(
     .from("agent_runs")
     .select("id, status")
     .eq("session_id", sessionId)
-    .in("status", ["pending", "running"])
+    .in("status", ["pending", "queued", "running"])
     .returns<AgentRunRow[]>();
 
   if (!activeRuns || activeRuns.length === 0) {
@@ -65,13 +68,43 @@ export async function POST(
 
   const run = activeRuns[0];
 
-  // F-HI-01: Only abort the run. Stream handler owns all cleanup
-  // (DB status update, lease release, unregisterRun).
+  const admin = getSupabaseAdmin();
+  const cancelResult = await requestAgentRunCancel(run.id);
   abortRun(run.id);
 
-  // Give the stream handler a brief window to react to the abort signal
-  // before responding. This prevents a new run from starting before the
-  // old stream has begun its cleanup sequence.
+  if (cancelResult.status === "queued" || cancelResult.status === "pending") {
+    await admin
+      .from("agent_runs")
+      .update({
+        status: "cancelled",
+        finished_at: new Date().toISOString(),
+        error_code: "cancelled",
+      })
+      .eq("id", run.id)
+      .in("status", ["pending", "queued"]);
+
+    if (cancelResult.assistantMessageId) {
+      await admin
+        .from("messages")
+        .update({ status: "failed", content: "" })
+        .eq("id", cancelResult.assistantMessageId);
+    }
+
+    if (cancelResult.requestId) {
+      await releaseExecutionBudget(
+        user.id,
+        cancelResult.requestId,
+        run.id,
+        "cancelled",
+      );
+    }
+
+    await appendAgentRunEvent(admin, run.id, "cancelled", {
+      run_id: run.id,
+      message_id: cancelResult.assistantMessageId,
+    });
+  }
+
   await new Promise((resolve) => setTimeout(resolve, 100));
 
   return Response.json({ success: true, run_id: run.id });

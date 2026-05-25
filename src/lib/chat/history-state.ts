@@ -42,7 +42,9 @@ export function deriveLoadedChatState(
     .sort((a, b) => a.started_at.localeCompare(b.started_at))
     .at(-1);
   const isActiveRun =
-    latestRun?.status === "pending" || latestRun?.status === "running";
+    latestRun?.status === "pending" ||
+    latestRun?.status === "queued" ||
+    latestRun?.status === "running";
 
   if (!isActiveRun || !latestRun) {
     return {

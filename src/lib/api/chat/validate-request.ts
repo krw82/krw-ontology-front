@@ -9,6 +9,7 @@ import {
   isUuid,
   normalizeStringList,
 } from "@/lib/api/validation";
+import { normalizeResearchMode } from "@/lib/research-mode";
 
 interface ValidatedRequest {
   body: ChatRunRequest;
@@ -55,6 +56,7 @@ export async function validateRequest(
   const {
     content,
     request_id,
+    research_mode,
     session_id,
     scope_type,
     default_tickers,
@@ -74,6 +76,7 @@ export async function validateRequest(
   }
 
   const normalizedRequestId = request_id.trim();
+  const normalizedResearchMode = normalizeResearchMode(research_mode);
   if (content.trim().length === 0 || !normalizedRequestId) {
     return {
       ok: false,
@@ -168,6 +171,7 @@ export async function validateRequest(
   const body: ChatRunRequest = {
     content,
     request_id: normalizedRequestId,
+    research_mode: normalizedResearchMode,
     ...(session_id ? { session_id } : {}),
     ...(scope_type ? { scope_type } : {}),
     ...(default_tickers ? { default_tickers: normalizedDefaultTickers } : {}),

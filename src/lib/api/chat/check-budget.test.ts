@@ -18,17 +18,17 @@ describe("reserveBudgetStep", () => {
     vi.clearAllMocks();
   });
 
-  it("returns reserved execution budget when allowed", async () => {
+  it("returns an opened execution budget record when allowed", async () => {
     vi.mocked(reserveExecutionBudget).mockResolvedValue({
       allowed: true,
       reservationId: "reservation-1",
       budgetUsedUsd: 0.5,
-      budgetReservedUsd: 0.25,
-      budgetLimitUsd: 2,
+      budgetReservedUsd: 0,
+      budgetLimitUsd: 20,
       dailyBudgetUsedUsd: 0.1,
-      dailyBudgetReservedUsd: 0.25,
-      dailyBudgetLimitUsd: 0.5,
-      reserveCostUsd: 0.25,
+      dailyBudgetReservedUsd: 0,
+      dailyBudgetLimitUsd: 20,
+      reserveCostUsd: 0,
       runCount: 2,
     });
 
@@ -71,13 +71,13 @@ describe("reserveBudgetStep", () => {
     vi.mocked(reserveExecutionBudget).mockResolvedValue({
       allowed: false,
       reason: "cost_cap_exceeded",
-      budgetUsedUsd: 2,
+      budgetUsedUsd: 20,
       budgetReservedUsd: 0,
-      budgetLimitUsd: 2,
-      dailyBudgetUsedUsd: 0.5,
+      budgetLimitUsd: 20,
+      dailyBudgetUsedUsd: 20,
       dailyBudgetReservedUsd: 0,
-      dailyBudgetLimitUsd: 0.5,
-      reserveCostUsd: 0.25,
+      dailyBudgetLimitUsd: 20,
+      reserveCostUsd: 0,
       runCount: 8,
     });
 

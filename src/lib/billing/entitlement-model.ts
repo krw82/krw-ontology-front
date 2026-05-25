@@ -2,7 +2,6 @@ import type { EntitlementStatus } from "@/types/entitlement";
 import {
   budgetUsdToAnalysisCredits,
   getEffectiveDailyBudgetUsd,
-  getBillingPlanBaseRunCredits,
   getBillingPlan,
   type BillingPlan,
 } from "./plans";
@@ -14,6 +13,7 @@ import type {
 
 export interface EntitlementUsageInput {
   planKey: EntitlementPlanKey;
+  plan?: BillingPlan;
   budgetUsedUsd: number;
   budgetReservedUsd: number;
   dailyBudgetUsedUsd: number;
@@ -96,6 +96,7 @@ function upgradeCopy(
 
 export function buildEntitlementStatus({
   planKey,
+  plan: providedPlan,
   budgetUsedUsd,
   budgetReservedUsd,
   dailyBudgetUsedUsd,
@@ -104,14 +105,14 @@ export function buildEntitlementStatus({
   period,
   status,
 }: EntitlementUsageInput): EntitlementStatus {
-  const plan = getBillingPlan(planKey);
+  const plan = providedPlan ?? getBillingPlan(planKey);
   const used = roundUsd(budgetUsedUsd);
   const reserved = roundUsd(budgetReservedUsd);
   const dailyUsed = roundUsd(dailyBudgetUsedUsd);
   const dailyReserved = roundUsd(dailyBudgetReservedUsd);
   const accessStatus =
     status ?? (plan.key === "beta" ? "beta" : "standard");
-  const unlimited = accessStatus === "admin";
+  const unlimited = accessStatus === "admin" || plan.unlimited;
   const budgetLimit = unlimited
     ? Number.MAX_SAFE_INTEGER
     : Math.max(0.01, plan.monthlyBudgetUsd);
@@ -123,13 +124,15 @@ export function buildEntitlementStatus({
   const remaining = unlimited
     ? Number.MAX_SAFE_INTEGER
     : roundUsd(Math.max(0, budgetLimit - effectiveBudgetUsed));
+  const dailyRemaining = unlimited
+    ? Number.MAX_SAFE_INTEGER
+    : roundUsd(Math.max(0, dailyBudgetLimit - effectiveDailyBudgetUsed));
   const percentUsed = unlimited
     ? 0
     : Math.min(100, Math.round((effectiveBudgetUsed / budgetLimit) * 100));
   const canRun =
     unlimited ||
-    (remaining >= plan.perRunReserveUsd &&
-      dailyBudgetLimit - effectiveDailyBudgetUsed >= plan.perRunReserveUsd);
+    (remainingCredits(remaining) > 0 && remainingCredits(dailyRemaining) > 0);
   const alertLevel =
     !unlimited && !canRun
       ? "blocked"
@@ -139,10 +142,10 @@ export function buildEntitlementStatus({
   const upgrade = upgradeCopy(percentUsed, period.label, accessStatus);
   const analysisCreditLimit = unlimited
     ? Number.MAX_SAFE_INTEGER
-    : creditLimit(budgetLimit);
+    : plan.monthlyAnalysisCredits;
   const dailyAnalysisCreditLimit = unlimited
     ? Number.MAX_SAFE_INTEGER
-    : creditLimit(dailyBudgetLimit);
+    : (plan.dailyAnalysisCredits ?? creditLimit(dailyBudgetLimit));
 
   return {
     status: accessStatus,
@@ -184,7 +187,7 @@ export function buildEntitlementStatus({
       daily_analysis_credits_limit: dailyAnalysisCreditLimit,
       per_run_analysis_credits: unlimited
         ? 0
-        : getBillingPlanBaseRunCredits(plan),
+        : budgetUsdToAnalysisCredits(plan.perRunReserveUsd, "ceil"),
       run_count: Math.floor(clampUsage(runCount)),
       percent_used: percentUsed,
       alert_level: alertLevel,

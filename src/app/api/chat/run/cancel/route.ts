@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { abortRun } from "@/lib/agent/abort-manager";
-import { releaseLease } from "@/lib/concurrency/lease";
+import { requestAgentRunCancel } from "@/lib/agent/job-queue";
+import { appendAgentRunEvent } from "@/lib/agent/run-events";
+import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
 import { getAuthUser, handleAuthError, forbiddenError } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isPlainObject, isUuid } from "@/lib/api/validation";
@@ -117,7 +119,11 @@ export async function POST(request: NextRequest) {
     return forbiddenError("이 채팅에 접근할 권한이 없습니다.");
   }
 
-  if (run.status !== "pending" && run.status !== "running") {
+  if (
+    run.status !== "pending" &&
+    run.status !== "queued" &&
+    run.status !== "running"
+  ) {
     return Response.json({
       success: true,
       run_id: run.id,
@@ -126,9 +132,10 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  const cancelResult = await requestAgentRunCancel(run.id);
   const aborted = abortRun(run.id);
 
-  if (!aborted) {
+  if (cancelResult.status === "queued" || cancelResult.status === "pending") {
     await admin
       .from("agent_runs")
       .update({
@@ -137,8 +144,28 @@ export async function POST(request: NextRequest) {
         error_code: "cancelled",
       })
       .eq("id", run.id)
-      .in("status", ["pending", "running"]);
-    await releaseLease(run.id);
+      .in("status", ["pending", "queued"]);
+
+    if (cancelResult.assistantMessageId) {
+      await admin
+        .from("messages")
+        .update({ status: "failed", content: "" })
+        .eq("id", cancelResult.assistantMessageId);
+    }
+
+    if (cancelResult.requestId) {
+      await releaseExecutionBudget(
+        user.id,
+        cancelResult.requestId,
+        run.id,
+        "cancelled",
+      );
+    }
+
+    await appendAgentRunEvent(admin, run.id, "cancelled", {
+      run_id: run.id,
+      message_id: cancelResult.assistantMessageId,
+    });
   }
 
   await new Promise((resolve) => setTimeout(resolve, 100));

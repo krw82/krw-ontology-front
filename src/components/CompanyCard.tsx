@@ -9,6 +9,7 @@ import { useReducedMotion } from "@/hooks/useReducedMotion";
 export interface CompanyCardData {
   ticker: string;
   name: string;
+  companyNameKo?: string;
   sector?: string | null;
   description: string;
   latest_period?: string | null;
@@ -49,9 +50,14 @@ export default function CompanyCard({
     : null;
   const companyLabel =
     company.name && company.name !== company.ticker ? company.name : "";
+  const companyNameKo = company.companyNameKo?.trim();
+  const secondaryLabel = [companyNameKo, company.sector]
+    .filter(Boolean)
+    .join(" · ");
   const accessibleSummary = [
     company.ticker,
     company.name && company.name !== company.ticker ? company.name : null,
+    companyNameKo,
     company.sector ? `${company.sector} 섹터` : null,
     company.coverage,
     coreStrength,
@@ -111,9 +117,9 @@ export default function CompanyCard({
             ) : (
               <span aria-hidden="true" className="block h-5" />
             )}
-            {company.sector && (
+            {secondaryLabel && (
               <p className="mt-1 truncate text-[12px] font-semibold leading-4 text-muted">
-                {company.sector}
+                {secondaryLabel}
               </p>
             )}
             <p className="mt-1 line-clamp-2 text-[13px] leading-5 text-muted 2xl:hidden">

@@ -20,12 +20,17 @@ import type {
 import { getChatContentLimit } from "@/lib/chat-limits";
 import { deriveLoadedChatState } from "@/lib/chat/history-state";
 import { createClientId } from "@/lib/client-id";
+import {
+  DEFAULT_RESEARCH_MODE,
+  type ResearchMode,
+} from "@/lib/research-mode";
 
 interface UseChatOptions {
   sessionId: string;
   scopeType?: "global" | "company";
   defaultTickers?: string[];
   defaultDocumentTypes?: string[];
+  researchMode?: ResearchMode;
   onSessionCreated?: (sessionId: string) => void;
 }
 
@@ -130,6 +135,7 @@ export function useChat({
   scopeType = "global",
   defaultTickers = [],
   defaultDocumentTypes = [],
+  researchMode = DEFAULT_RESEARCH_MODE,
   onSessionCreated,
 }: UseChatOptions) {
   const [state, setState] = useState<ChatState>(() => createInitialChatState());
@@ -368,7 +374,12 @@ export function useChat({
         sessionSyncRequestedRef.current = true;
         if (d.run_id) activeRunIdRef.current = d.run_id;
 
-        if (d.status !== "running" && d.status !== "pending") {
+        const isActiveStatus =
+          d.status === "queued" ||
+          d.status === "running" ||
+          d.status === "pending";
+
+        if (!isActiveStatus) {
           finalizedRef.current = true;
           activeRunIdRef.current = null;
           activeAssistantMessageIdRef.current = null;
@@ -379,25 +390,25 @@ export function useChat({
         setState((prev) => ({
           ...prev,
           status:
-            d.status === "pending"
+            d.status === "pending" || d.status === "queued"
               ? "running"
               : d.status === "idle"
                 ? "idle"
                 : d.status,
           activity:
-            d.status === "running" || d.status === "pending"
+            isActiveStatus
               ? {
-                  stage: "preparing",
-                  label: "분석 상태 복원 중",
+                  stage: d.status === "queued" ? "queued" : "preparing",
+                  label:
+                    d.status === "queued"
+                      ? "분석 대기 중"
+                      : "분석 상태 복원 중",
                 }
               : null,
-          streamingContent:
-            d.status === "running" || d.status === "pending"
-              ? prev.streamingContent
-              : "",
+          streamingContent: isActiveStatus ? prev.streamingContent : "",
           runId: d.run_id ?? null,
           runStartedAt:
-            d.status === "running" || d.status === "pending"
+            isActiveStatus
               ? prev.runStartedAt
               : null,
           error: d.status === "failed" ? prev.error : null,
@@ -774,6 +785,7 @@ export function useChat({
             ...(sessionId ? { session_id: sessionId } : {}),
             content: content.trim(),
             request_id: requestId,
+            research_mode: researchMode,
             scope_type: scopeType,
             default_tickers: defaultTickers,
             default_document_types: defaultDocumentTypes,
@@ -868,6 +880,7 @@ export function useChat({
       onSessionCreated,
       reconnectUntilFinalized,
       readStream,
+      researchMode,
       scopeType,
       sessionId,
     ],

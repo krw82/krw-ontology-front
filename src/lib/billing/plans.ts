@@ -9,9 +9,13 @@ export interface BillingPlan {
   statusLabel: string;
   description: string;
   budgetPeriod: EntitlementUsagePeriod;
+  monthlyAnalysisCredits: number;
+  dailyAnalysisCredits: number | null;
   monthlyBudgetUsd: number;
   dailyBudgetUsd: number | null;
   perRunReserveUsd: number;
+  perRunAnalysisCredits: number;
+  unlimited: boolean;
   sortOrder: number;
   public: boolean;
 }
@@ -30,9 +34,13 @@ export const BILLING_PLANS: Record<EntitlementPlanKey, BillingPlan> = {
     statusLabel: "무료",
     description: "개인 테스트와 가벼운 기업 리서치용 기본 분석 크레딧",
     budgetPeriod: "monthly",
-    monthlyBudgetUsd: 2,
+    monthlyAnalysisCredits: 20_000,
+    dailyAnalysisCredits: null,
+    monthlyBudgetUsd: 20,
     dailyBudgetUsd: null,
-    perRunReserveUsd: 0.25,
+    perRunReserveUsd: 0,
+    perRunAnalysisCredits: 0,
+    unlimited: false,
     sortOrder: 10,
     public: true,
   },
@@ -42,9 +50,13 @@ export const BILLING_PLANS: Record<EntitlementPlanKey, BillingPlan> = {
     statusLabel: "개인 분석",
     description: "정기적으로 기업 리서치를 수행하는 사용자를 위한 분석 크레딧",
     budgetPeriod: "monthly",
-    monthlyBudgetUsd: 20,
+    monthlyAnalysisCredits: 200_000,
+    dailyAnalysisCredits: null,
+    monthlyBudgetUsd: 200,
     dailyBudgetUsd: null,
-    perRunReserveUsd: 0.5,
+    perRunReserveUsd: 0,
+    perRunAnalysisCredits: 0,
+    unlimited: false,
     sortOrder: 20,
     public: true,
   },
@@ -54,9 +66,13 @@ export const BILLING_PLANS: Record<EntitlementPlanKey, BillingPlan> = {
     statusLabel: "고빈도 분석",
     description: "여러 기업과 주제를 반복 확인하는 고사용량 분석 크레딧",
     budgetPeriod: "monthly",
-    monthlyBudgetUsd: 60,
+    monthlyAnalysisCredits: 600_000,
+    dailyAnalysisCredits: null,
+    monthlyBudgetUsd: 600,
     dailyBudgetUsd: null,
-    perRunReserveUsd: 1,
+    perRunReserveUsd: 0,
+    perRunAnalysisCredits: 0,
+    unlimited: false,
     sortOrder: 30,
     public: true,
   },
@@ -66,9 +82,13 @@ export const BILLING_PLANS: Record<EntitlementPlanKey, BillingPlan> = {
     statusLabel: "운영 전 테스트",
     description: "정식 과금 전 품질과 분석 크레딧 정책을 검증하는 무료 베타 플랜",
     budgetPeriod: "monthly",
-    monthlyBudgetUsd: 5,
+    monthlyAnalysisCredits: 50_000,
+    dailyAnalysisCredits: null,
+    monthlyBudgetUsd: 50,
     dailyBudgetUsd: null,
-    perRunReserveUsd: 0.25,
+    perRunReserveUsd: 0,
+    perRunAnalysisCredits: 0,
+    unlimited: false,
     sortOrder: 5,
     public: false,
   },
@@ -78,9 +98,13 @@ export const BILLING_PLANS: Record<EntitlementPlanKey, BillingPlan> = {
     statusLabel: "내부 운영",
     description: "운영 검증과 장애 대응을 위한 내부 플랜",
     budgetPeriod: "monthly",
-    monthlyBudgetUsd: 500,
+    monthlyAnalysisCredits: Number.MAX_SAFE_INTEGER,
+    dailyAnalysisCredits: null,
+    monthlyBudgetUsd: Number.MAX_SAFE_INTEGER,
     dailyBudgetUsd: null,
-    perRunReserveUsd: 1,
+    perRunReserveUsd: 0,
+    perRunAnalysisCredits: 0,
+    unlimited: true,
     sortOrder: 1,
     public: false,
   },
@@ -110,15 +134,17 @@ export function budgetUsdToAnalysisCredits(
 }
 
 export function getBillingPlanAnalysisCredits(plan: BillingPlan): number {
-  return Math.max(1, budgetUsdToAnalysisCredits(plan.monthlyBudgetUsd, "floor"));
+  if (plan.unlimited) return Number.MAX_SAFE_INTEGER;
+  return Math.max(1, plan.monthlyAnalysisCredits);
 }
 
 export function getEffectiveDailyBudgetUsd(plan: BillingPlan): number {
+  if (plan.unlimited) return Number.MAX_SAFE_INTEGER;
   return plan.dailyBudgetUsd ?? plan.monthlyBudgetUsd;
 }
 
 export function getBillingPlanBaseRunCredits(plan: BillingPlan): number {
-  return Math.max(1, budgetUsdToAnalysisCredits(plan.perRunReserveUsd, "ceil"));
+  return plan.perRunAnalysisCredits;
 }
 
 export function getBillingPlan(planKey: EntitlementPlanKey): BillingPlan {

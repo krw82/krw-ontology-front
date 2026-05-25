@@ -6,8 +6,8 @@ import { getEntitlementStatus } from "@/lib/billing/entitlement";
 import {
   getBillingPlanAnalysisCredits,
   getBillingPlanLimitLabel,
-  listPublicBillingPlans,
 } from "@/lib/billing/plans";
+import { listPublicBillingPlansFromStore } from "@/lib/billing/plan-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +37,7 @@ export default async function BillingSettingsPage() {
       }
     : null;
   const entitlement = await getEntitlementStatus(user.id, user.email ?? null);
-  const plans = listPublicBillingPlans();
+  const plans = await listPublicBillingPlansFromStore();
   const enabledFeatures = entitlement.features.filter((feature) => feature.enabled);
   const upcomingFeatures = entitlement.features.filter(
     (feature) => !feature.enabled,

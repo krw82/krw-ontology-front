@@ -3,8 +3,8 @@ import { getCurrentDailyBillingPeriod, getCurrentMonthlyBillingPeriod } from "@/
 import {
   budgetUsdToAnalysisCredits,
   getEffectiveDailyBudgetUsd,
-  getBillingPlan,
 } from "@/lib/billing/plans";
+import { getBillingPlanFromStore } from "@/lib/billing/plan-store";
 import { readFloatEnv } from "@/lib/env";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { EntitlementStatus } from "@/types/entitlement";
@@ -65,7 +65,7 @@ export async function checkExecutionBudget(
       dailyBudgetUsedUsd: usage.daily_budget_used_usd,
       dailyBudgetReservedUsd: usage.daily_budget_reserved_usd,
       dailyBudgetLimitUsd: usage.daily_budget_limit_usd,
-      reserveCostUsd: usage.unlimited ? 0 : usage.per_run_reserve_usd,
+      reserveCostUsd: 0,
       runCount: usage.run_count,
       entitlement,
     };
@@ -94,7 +94,8 @@ export async function reserveExecutionBudget(
   if (!budget.allowed || !budget.entitlement) return budget;
   if (budget.entitlement.usage.unlimited) return budget;
 
-  const plan = getBillingPlan(budget.entitlement.plan.key);
+  const plan = await getBillingPlanFromStore(budget.entitlement.plan.key);
+  if (plan.unlimited) return budget;
   const dailyBudgetUsd = getEffectiveDailyBudgetUsd(plan);
   const monthlyPeriod = getCurrentMonthlyBillingPeriod();
   const dailyPeriod = getCurrentDailyBillingPeriod();
@@ -108,7 +109,7 @@ export async function reserveExecutionBudget(
     p_daily_period_end: dailyPeriod.end,
     p_monthly_budget_usd: plan.monthlyBudgetUsd,
     p_daily_budget_usd: dailyBudgetUsd,
-    p_reserve_cost_usd: plan.perRunReserveUsd,
+    p_reserve_cost_usd: 0,
     p_expires_at: new Date(Date.now() + 30 * 60_000).toISOString(),
   });
 
@@ -145,7 +146,7 @@ export async function reserveExecutionBudget(
     dailyBudgetUsedUsd: Number(result.daily_used_usd),
     dailyBudgetReservedUsd: Number(result.daily_reserved_usd),
     dailyBudgetLimitUsd: Number(result.daily_limit_usd),
-    reserveCostUsd: plan.perRunReserveUsd,
+    reserveCostUsd: 0,
   };
 }
 
@@ -225,11 +226,26 @@ export function getExecutionBudgetStatus(
   >,
   settledCostUsd = 0,
 ) {
-  const used = roundUsd(budget.budgetUsedUsd + settledCostUsd);
+  const monthlyAvailable = Math.max(
+    0,
+    budget.budgetLimitUsd - budget.budgetUsedUsd - budget.budgetReservedUsd,
+  );
+  const dailyAvailable = Math.max(
+    0,
+    budget.dailyBudgetLimitUsd -
+      budget.dailyBudgetUsedUsd -
+      budget.dailyBudgetReservedUsd,
+  );
+  const billedCostUsd = Math.min(
+    roundUsd(settledCostUsd),
+    monthlyAvailable,
+    dailyAvailable,
+  );
+  const used = roundUsd(budget.budgetUsedUsd + billedCostUsd);
   const reserved = roundUsd(
     Math.max(0, budget.budgetReservedUsd - budget.reserveCostUsd),
   );
-  const dailyUsed = roundUsd(budget.dailyBudgetUsedUsd + settledCostUsd);
+  const dailyUsed = roundUsd(budget.dailyBudgetUsedUsd + billedCostUsd);
   const dailyReserved = roundUsd(
     Math.max(0, budget.dailyBudgetReservedUsd - budget.reserveCostUsd),
   );
@@ -262,8 +278,9 @@ export function getExecutionBudgetStatus(
     run_count: budget.runCount + (settledCostUsd > 0 ? 1 : 0),
     percent_used: percentUsed,
     can_run:
-      budget.budgetLimitUsd - used - reserved >= budget.reserveCostUsd &&
-      budget.dailyBudgetLimitUsd - dailyUsed - dailyReserved >= budget.reserveCostUsd,
+      remainingCredits(budget.budgetLimitUsd - used - reserved) > 0 &&
+      remainingCredits(budget.dailyBudgetLimitUsd - dailyUsed - dailyReserved) >
+        0,
   };
 }
 

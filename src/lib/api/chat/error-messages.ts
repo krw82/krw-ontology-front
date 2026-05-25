@@ -11,6 +11,8 @@ const PUBLIC_ERROR_MESSAGES: Record<ErrorCode, string> = {
   no_active_run: "진행 중인 응답이 없습니다.",
   quota_exceeded: "사용할 수 있는 분석 크레딧을 모두 사용했습니다.",
   cost_cap_exceeded: "사용할 수 있는 분석 크레딧을 모두 사용했습니다.",
+  tool_budget_exceeded:
+    "답변 생성 중 문제가 발생했습니다. 같은 질문으로 다시 시도하거나 범위를 조금 좁혀주세요.",
   concurrency_limit: "현재 요청이 많습니다. 잠시 후 다시 시도해주세요.",
   lease_expired: "분석 시간이 초과되었습니다. 다시 시도해주세요.",
   cancelled: "응답 생성을 취소했습니다.",

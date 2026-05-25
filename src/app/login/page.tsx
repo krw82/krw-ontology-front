@@ -50,6 +50,7 @@ function LoginContent() {
   );
   const [errorVisible, setErrorVisible] = useState(false);
   const errorRef = useRef<HTMLDivElement | null>(null);
+  const oauthInFlightRef = useRef(false);
   const supabase = useMemo(() => createClient(), []);
   const entranceTransition = {
     duration: reducedMotion ? 0 : 0.22,
@@ -70,6 +71,8 @@ function LoginContent() {
   }, [error]);
 
   const handleGoogleSignIn = async () => {
+    if (oauthInFlightRef.current) return;
+    oauthInFlightRef.current = true;
     setLoading(true);
     setError(null);
     setErrorVisible(false);
@@ -89,6 +92,7 @@ function LoginContent() {
       });
       if (authError) throw authError;
     } catch {
+      oauthInFlightRef.current = false;
       setError("Google 로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
       setLoading(false);
     }
@@ -208,6 +212,7 @@ function LoginContent() {
               type="button"
               onClick={handleGoogleSignIn}
               disabled={loading}
+              aria-busy={loading}
               whileTap={reducedMotion || loading ? undefined : { scale: 0.985 }}
               className={`relative flex h-[52px] w-full items-center justify-center gap-sm rounded-[8px] border px-base text-[16px] font-extrabold leading-[1.15] text-ink shadow-[0_8px_20px_rgba(10,11,13,0.08)] transition-all duration-150 ease-out hover:border-primary hover:bg-primary-fixed disabled:cursor-not-allowed disabled:opacity-70 ${
                 loading ? "border-primary bg-primary-fixed" : "border-hairline bg-canvas"
