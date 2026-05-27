@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
   MAX_CHAT_ATTACHMENT_BYTES,
@@ -91,6 +98,11 @@ function useComposerMotionConfig() {
 
   return {
     duration: reducedMotion ? 0 : 0.16,
+    isMobile,
+    overlayTransition: { duration: reducedMotion ? 0 : 0.18 },
+    sheetTransition: reducedMotion
+      ? ({ duration: 0 } as const)
+      : ({ type: "spring", stiffness: 440, damping: 38, mass: 0.9 } as const),
     y: reducedMotion ? 0 : isMobile ? 4 : 6,
     ease: reducedMotion ? ("linear" as const) : ([0.16, 1, 0.3, 1] as const),
   };
@@ -121,9 +133,11 @@ export default function Composer({
   const [attachments, setAttachments] = useState<TextAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
+  const [isClientReady, setIsClientReady] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toolsRef = useRef<HTMLDivElement>(null);
+  const toolsSheetRef = useRef<HTMLDivElement>(null);
   const lastInitialValueRef = useRef(initialDraftValue);
   const lastDraftResetKeyRef = useRef(draftResetKey);
   const motionConfig = useComposerMotionConfig();
@@ -149,6 +163,14 @@ export default function Composer({
   const readTextareaValue = useCallback(() => {
     return textareaRef.current?.value ?? value;
   }, [value]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setIsClientReady(true);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
   useEffect(() => {
     const nextInitialValue = initialValue ?? "";
@@ -191,6 +213,7 @@ export default function Composer({
       const target = event.target;
       if (!(target instanceof Node)) return;
       if (toolsRef.current?.contains(target)) return;
+      if (toolsSheetRef.current?.contains(target)) return;
       setIsToolsOpen(false);
     };
 
@@ -206,6 +229,20 @@ export default function Composer({
       window.removeEventListener("keydown", handleEscape);
     };
   }, [isToolsOpen]);
+
+  useEffect(() => {
+    if (!isToolsOpen || !motionConfig.isMobile) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const previousOverscroll = document.documentElement.style.overscrollBehavior;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overscrollBehavior = "none";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.documentElement.style.overscrollBehavior = previousOverscroll;
+    };
+  }, [isToolsOpen, motionConfig.isMobile]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -344,6 +381,154 @@ export default function Composer({
     fileInputRef.current?.click();
   };
 
+  const renderToolsContent = (variant: "popover" | "sheet") => {
+    const isSheet = variant === "sheet";
+    const itemBase = isSheet
+      ? "flex w-full items-center gap-3 rounded-[14px] px-3 py-3.5 text-left transition-colors active:bg-surface-dim"
+      : "flex min-h-11 w-full items-center gap-3 rounded-[10px] px-2 text-left text-[15px] font-extrabold leading-5 text-ink transition-colors hover:bg-surface-dim";
+    const titleClass = isSheet
+      ? "block text-[17px] font-extrabold leading-6 text-ink"
+      : "";
+    const descriptionClass = isSheet
+      ? "mt-0.5 block text-[13px] font-semibold leading-5 text-muted"
+      : "sr-only";
+
+    return (
+      <div className={isSheet ? "grid gap-2" : ""} role="menu" aria-label="입력 도구">
+        <button
+          type="button"
+          className={itemBase}
+          onClick={openFilePicker}
+          role="menuitem"
+        >
+          {!isSheet && (
+            <span
+              aria-hidden="true"
+              className="material-symbols-outlined text-[22px] text-primary"
+            >
+              attach_file
+            </span>
+          )}
+          <span className="min-w-0">
+            <span className={titleClass || undefined}>파일 첨부</span>
+            <span className={descriptionClass}>txt/md 문서를 질문에 함께 보냅니다.</span>
+          </span>
+          {!isSheet && (
+            <span className="ml-auto rounded-full bg-surface-dim px-2 py-1 text-[11px] font-extrabold leading-none text-muted">
+              txt/md
+            </span>
+          )}
+        </button>
+
+        <div className={isSheet ? "mt-3 border-t border-hairline pt-3" : "mt-2 border-t border-hairline pt-3"}>
+          <div className="grid gap-1.5" aria-label="분석 모드">
+            <button
+              type="button"
+              disabled
+              className={[
+                isSheet
+                  ? "flex w-full cursor-not-allowed items-center gap-3 rounded-[14px] px-3 py-3.5 text-left text-muted opacity-55"
+                  : "flex min-h-[56px] w-full cursor-not-allowed items-center justify-between gap-3 rounded-[10px] px-2.5 py-2 text-left text-muted opacity-60",
+              ].join(" ")}
+              role="menuitem"
+              aria-disabled="true"
+            >
+              <span className="min-w-0">
+                <span className={isSheet ? "block text-[17px] font-extrabold leading-6" : "block text-[14px] font-extrabold leading-5"}>
+                  패스트 모드
+                </span>
+                <span className={isSheet ? "mt-0.5 block text-[13px] font-semibold leading-5 text-muted-soft" : "mt-0.5 block text-[12px] font-semibold leading-4 text-muted-soft"}>
+                  빠른 요약은 준비 중입니다.
+                </span>
+              </span>
+              <span className="ml-auto rounded-full bg-surface-dim px-2 py-1 text-[11px] font-extrabold leading-none text-muted">
+                준비중
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className={[
+                isSheet
+                  ? "flex w-full items-center gap-3 rounded-[14px] bg-primary-container/10 px-3 py-3.5 text-left text-primary transition-colors active:bg-primary-container/14"
+                  : "flex min-h-[56px] w-full items-center justify-between gap-3 rounded-[10px] bg-primary-container/12 px-2.5 py-2 text-left text-primary transition-colors hover:bg-primary-container/16",
+              ].join(" ")}
+              onClick={() => setIsToolsOpen(false)}
+              role="menuitem"
+              aria-current="true"
+            >
+              <span className="min-w-0">
+                <span className={isSheet ? "block text-[17px] font-extrabold leading-6" : "block text-[14px] font-extrabold leading-5"}>
+                  스탠다드 모드
+                </span>
+                <span className={isSheet ? "mt-0.5 block text-[13px] font-semibold leading-5 text-primary/75" : "mt-0.5 block text-[12px] font-semibold leading-4 text-primary/75"}>
+                  공시 근거를 충분히 확인해 답변합니다.
+                </span>
+              </span>
+              <span
+                aria-hidden="true"
+                className="material-symbols-outlined ml-auto flex-shrink-0 text-[20px]"
+              >
+                check
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const mobileToolsSheet =
+    isClientReady && typeof document !== "undefined"
+      ? createPortal(
+          <AnimatePresence>
+            {isToolsOpen && motionConfig.isMobile && (
+              <motion.div
+                key="composer-tools-mobile"
+                className="fixed inset-0 z-[140] flex items-end sm:hidden"
+                role="presentation"
+              >
+                <motion.button
+                  type="button"
+                  aria-label="입력 도구 닫기"
+                  className="absolute inset-0 bg-ink/24"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={motionConfig.overlayTransition}
+                  onClick={() => setIsToolsOpen(false)}
+                />
+                <motion.div
+                  ref={toolsSheetRef}
+                  className="relative z-10 w-full overflow-hidden rounded-t-[28px] border-t border-hairline bg-canvas text-ink shadow-[0_-18px_54px_rgba(10,11,13,0.18)]"
+                  initial={{ y: "102%" }}
+                  animate={{ y: 0 }}
+                  exit={{ y: "102%" }}
+                  transition={motionConfig.sheetTransition}
+                  drag={motionConfig.isMobile ? "y" : false}
+                  dragConstraints={{ top: 0, bottom: 0 }}
+                  dragElastic={{ top: 0, bottom: 0.18 }}
+                  onDragEnd={(_, info) => {
+                    if (info.offset.y > 72 || info.velocity.y > 620) {
+                      setIsToolsOpen(false);
+                    }
+                  }}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="입력 도구"
+                >
+                  <div className="mx-auto mt-2 h-1.5 w-11 rounded-full bg-outline-variant" />
+                  <div className="max-h-[min(76dvh,620px)] overflow-y-auto px-base pb-[calc(env(safe-area-inset-bottom)+20px)] pt-md">
+                    {renderToolsContent("sheet")}
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )
+      : null;
+
   return (
     <div className="border-t border-hairline bg-canvas/95 px-base py-sm backdrop-blur-xl sm:px-lg sm:py-base">
       {(attachments.length > 0 || attachmentError) && (
@@ -413,7 +598,7 @@ export default function Composer({
             disabled={isInputDisabled}
             aria-label="입력 도구 열기"
             aria-expanded={isToolsOpen}
-            aria-haspopup="menu"
+            aria-haspopup={motionConfig.isMobile ? "dialog" : "menu"}
             type="button"
           >
             <span className="material-symbols-outlined text-[24px] leading-none">
@@ -422,80 +607,22 @@ export default function Composer({
           </button>
 
           <AnimatePresence>
-            {isToolsOpen && (
+            {isToolsOpen && !motionConfig.isMobile && (
               <motion.div
                 key="composer-tools"
                 initial={{ opacity: 0, y: 8, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
                 transition={{ duration: motionConfig.duration, ease: motionConfig.ease }}
-                className="absolute bottom-[calc(100%+10px)] left-0 z-30 w-[282px] overflow-hidden rounded-[18px] border border-hairline bg-surface/98 p-3 text-ink shadow-[0_18px_48px_rgba(10,11,13,0.16)] backdrop-blur-xl"
+                className="absolute bottom-[calc(100%+10px)] left-0 z-30 w-[282px] overflow-hidden rounded-[18px] border border-hairline bg-canvas p-3 text-ink shadow-[0_18px_48px_rgba(10,11,13,0.16)]"
                 role="menu"
                 aria-label="입력 도구"
               >
-                <button
-                  type="button"
-                  className="flex min-h-11 w-full items-center gap-3 rounded-[10px] px-2 text-left text-[15px] font-extrabold leading-5 text-ink transition-colors hover:bg-surface-dim"
-                  onClick={openFilePicker}
-                  role="menuitem"
-	                >
-	                  <span aria-hidden="true" className="material-symbols-outlined text-[22px] text-primary">
-	                    attach_file
-	                  </span>
-	                  <span>파일 첨부</span>
-	                  <span className="ml-auto text-[11px] font-bold text-muted">
-	                    txt/md
-	                  </span>
-	                </button>
-
-	                <div className="mt-2 border-t border-hairline pt-3">
-	                  <div className="grid gap-1" aria-label="분석 모드">
-	                    <button
-	                      type="button"
-	                      disabled
-	                      className="flex min-h-[56px] w-full cursor-not-allowed items-center justify-between gap-3 rounded-[10px] px-2.5 py-2 text-left text-muted opacity-60"
-	                      role="menuitem"
-	                      aria-disabled="true"
-	                    >
-	                      <span className="min-w-0">
-	                        <span className="block text-[14px] font-extrabold leading-5">
-	                          패스트 모드
-	                        </span>
-	                        <span className="mt-0.5 block text-[12px] font-semibold leading-4 text-muted-soft">
-	                          빠른 요약은 준비 중입니다.
-	                        </span>
-	                      </span>
-	                      <span className="rounded-full bg-surface-dim px-2 py-1 text-[11px] font-extrabold leading-none text-muted">
-	                        준비중
-	                      </span>
-	                    </button>
-
-	                    <button
-	                      type="button"
-	                      className="flex min-h-[56px] w-full items-center justify-between gap-3 rounded-[10px] bg-primary-container/12 px-2.5 py-2 text-left text-primary transition-colors hover:bg-primary-container/16"
-	                      onClick={() => setIsToolsOpen(false)}
-	                      role="menuitem"
-	                      aria-current="true"
-	                    >
-	                      <span className="min-w-0">
-	                        <span className="block text-[14px] font-extrabold leading-5">
-	                          스탠다드 모드
-	                        </span>
-	                        <span className="mt-0.5 block text-[12px] font-semibold leading-4 text-primary/75">
-	                          공시 근거를 충분히 확인해 답변합니다.
-	                        </span>
-	                      </span>
-	                      <span aria-hidden="true" className="material-symbols-outlined flex-shrink-0 text-[18px]">
-	                        check
-	                      </span>
-	                    </button>
-	                  </div>
-	                </div>
-
-	              </motion.div>
-	            )}
-	          </AnimatePresence>
-	        </div>
+                {renderToolsContent("popover")}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
         <div className="relative min-w-0 flex-1">
           <textarea
             ref={textareaRef}
@@ -505,6 +632,7 @@ export default function Composer({
             rows={1}
             style={{ minHeight: 48 }}
             value={value}
+            data-client-ready={isClientReady ? "true" : "false"}
             onChange={(event) => syncTextareaValue(event.currentTarget.value)}
             onInput={(event) => syncTextareaValue(event.currentTarget.value)}
             onCompositionEnd={(event) =>
@@ -573,6 +701,7 @@ export default function Composer({
           </AnimatePresence>
         </button>
       </div>
+      {mobileToolsSheet}
     </div>
   );
 }
