@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import type { MouseEvent } from "react";
 import { motion } from "motion/react";
 import { easeOutExpo, listRow } from "@/lib/animation";
-import { trackClientEventSilently } from "@/lib/analytics/client";
+import { trackClientEventWithTimeout } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 export interface CompanyCardData {
@@ -41,6 +43,7 @@ export default function CompanyCard({
   company,
   motionDelay = 0,
 }: CompanyCardProps) {
+  const router = useRouter();
   const reducedMotion = useReducedMotion();
   const coreStrength = company.core_strength
     ? readableText(company.core_strength)
@@ -82,14 +85,33 @@ export default function CompanyCard({
     >
       <Link
         href={`/companies/${encodeURIComponent(company.ticker)}`}
-        onClick={() => {
-          trackClientEventSilently("company_selected", {
+        onClick={(event) => {
+          const destination = `/companies/${encodeURIComponent(company.ticker)}`;
+          const shouldNavigateAfterTracking =
+            shouldHandleClientNavigation(event);
+          if (shouldNavigateAfterTracking) {
+            event.preventDefault();
+          }
+
+          const tracking = trackClientEventWithTimeout("cta_clicked", {
+            cta_id: "company_card",
+            cta_label: company.ticker,
+            surface: "companies_index",
+            source_surface: "companies_index",
+            destination,
             ticker: company.ticker,
             company_name: company.name,
             sector: company.sector ?? null,
-            source: "companies_list",
-            destination: "company_landing",
           });
+
+          if (shouldNavigateAfterTracking) {
+            void tracking.finally(() => {
+              router.push(destination);
+            });
+            return;
+          }
+
+          void tracking;
         }}
         className="group block cursor-pointer"
         aria-label={`${accessibleSummary}. 이 회사 리서치 페이지 열기`}
@@ -137,5 +159,17 @@ export default function CompanyCard({
         </article>
       </Link>
     </motion.div>
+  );
+}
+
+function shouldHandleClientNavigation(
+  event: MouseEvent<HTMLAnchorElement>,
+): boolean {
+  return (
+    event.button === 0 &&
+    !event.metaKey &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.shiftKey
   );
 }

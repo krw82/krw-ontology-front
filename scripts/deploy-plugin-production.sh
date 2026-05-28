@@ -5,9 +5,12 @@ usage() {
   cat <<'EOF'
 Usage: scripts/deploy-plugin-production.sh [--dry-run]
 
-Sync only ~/krw-ontology to the production VM and rebuild/restart the web
-container. In the current deployment, the web image bakes the Claude plugin and
-the stdio MCP Python package, so plugin/MCP changes require a web rebuild.
+Legacy GCP plugin sync. The canonical production plugin/MCP runtime is now the
+Mac worker. Use `npm run deploy:plugin` for normal plugin/MCP/skill changes.
+
+This script only keeps the VM copy fresh for web image compatibility and
+rebuilds/restarts the web container. It intentionally does not start the GCP
+agent-worker.
 
 Environment:
   KRW_ONTOLOGY_SOURCE_DIR  Defaults to $HOME/krw-ontology
@@ -146,7 +149,7 @@ rsync -a --delete \
   "\$ONTOLOGY_STAGE/" "\$REMOTE_ONTOLOGY_DIR/"
 
 cd "\$REMOTE_FRONT_DIR"
-KRW_ONTOLOGY_SOURCE_DIR="\$REMOTE_ONTOLOGY_DIR" scripts/deploy-vm-compose.sh
+KRW_ONTOLOGY_SOURCE_DIR="\$REMOTE_ONTOLOGY_DIR" scripts/deploy-vm-compose.sh web
 docker compose --project-name krw-ontology-front --env-file .env ps
 EOF
 )

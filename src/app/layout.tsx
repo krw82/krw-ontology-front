@@ -6,6 +6,8 @@ import AppShell from "@/components/AppShell";
 import { getSiteOrigin, SITE_DESCRIPTION, SITE_NAME } from "@/lib/marketing/site";
 import "./globals.css";
 
+const googleSiteVerification = process.env.GOOGLE_SITE_VERIFICATION?.trim();
+
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
@@ -42,6 +44,21 @@ export const metadata: Metadata = {
     "투자 thesis check",
   ],
   icons: {
+    icon: [
+      {
+        url: "/favicon.ico",
+        sizes: "any",
+      },
+      {
+        url: "/krw-logo.svg",
+        type: "image/svg+xml",
+      },
+      {
+        url: "/icons/icon-192.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+    ],
     apple: [
       {
         url: "/icons/apple-icon.png",
@@ -68,6 +85,13 @@ export const metadata: Metadata = {
     title: `${SITE_NAME} | 근거가 보이는 기업 분석 AI`,
     description: SITE_DESCRIPTION,
   },
+  ...(googleSiteVerification
+    ? {
+        verification: {
+          google: googleSiteVerification,
+        },
+      }
+    : {}),
 };
 
 export const viewport: Viewport = {

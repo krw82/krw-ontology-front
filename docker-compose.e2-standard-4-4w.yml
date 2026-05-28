@@ -1,0 +1,47 @@
+services:
+  web:
+    cpus: "1.0"
+    mem_limit: 2g
+    memswap_limit: 2g
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=http://host.docker.internal:54321
+      - SUPABASE_URL=http://host.docker.internal:54321
+      - KRW_ONTOLOGY_ROOT=/srv/krw-ontology-data/current
+      - CLAUDE_CONFIG_DIR=/home/nextjs/.claude-prod
+      - GLOBAL_CONCURRENT_RUN_LIMIT=4
+      - AGENT_RUN_HARD_TIMEOUT_MINUTES=8
+      - LEASE_TIMEOUT_MINUTES=12
+      - LEASE_HEARTBEAT_INTERVAL_MS=30000
+      - AGENT_MAX_TOOL_CALLS=24
+      - AGENT_MAX_TOOL_RESULT_CHARS=80000
+    volumes:
+      - ~/krw-ontology-front/.docker-krw-ontology-data-root:/srv/krw-ontology-data
+      - ~/krw-ontology-data:/srv/krw-ontology-data/current:ro
+      - ~/.claude-krw:/home/nextjs/.claude-prod
+
+  agent-worker:
+    cpus: "0.7"
+    mem_limit: 2600m
+    memswap_limit: 2600m
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=http://host.docker.internal:54321
+      - SUPABASE_URL=http://host.docker.internal:54321
+      - KRW_ONTOLOGY_ROOT=/srv/krw-ontology-data/current
+      - CLAUDE_CONFIG_DIR=/home/nextjs/.claude-prod
+      - GLOBAL_CONCURRENT_RUN_LIMIT=4
+      - AGENT_RUN_HARD_TIMEOUT_MINUTES=8
+      - LEASE_TIMEOUT_MINUTES=12
+      - LEASE_HEARTBEAT_INTERVAL_MS=30000
+      - AGENT_MAX_TOOL_CALLS=24
+      - AGENT_MAX_TOOL_RESULT_CHARS=80000
+    volumes:
+      - ~/krw-ontology-front/.docker-krw-ontology-data-root:/srv/krw-ontology-data
+      - ~/krw-ontology-data:/srv/krw-ontology-data/current:ro
+      - ~/.claude-krw:/home/nextjs/.claude-prod
+
+  reverse-proxy:
+    cpus: "0.2"
+    mem_limit: 256m
+    memswap_limit: 256m

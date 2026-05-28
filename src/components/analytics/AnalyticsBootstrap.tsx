@@ -5,33 +5,7 @@ import {
   bootstrapAnalyticsContext,
   trackClientEventSilently,
 } from "@/lib/analytics/client";
-
-function pageTypeFromPath(pathname: string): string {
-  if (pathname === "/") return "home";
-  if (pathname === "/companies") return "company_index";
-  if (pathname.startsWith("/companies/")) return "company_landing";
-  if (pathname === "/questions") return "question_graph_index";
-  if (pathname.startsWith("/questions/")) return "question_graph";
-  if (pathname === "/pricing") return "pricing";
-  if (pathname === "/login") return "login";
-  if (pathname.startsWith("/chat")) return "chat";
-  if (pathname.startsWith("/share/")) return "shared_answer";
-  if (pathname.startsWith("/settings")) return "settings";
-  return "other";
-}
-
-function isPublicMarketingPath(pathname: string): boolean {
-  return (
-    pathname === "/" ||
-    pathname === "/companies" ||
-    pathname.startsWith("/companies/") ||
-    pathname === "/questions" ||
-    pathname.startsWith("/questions/") ||
-    pathname === "/pricing" ||
-    pathname === "/privacy" ||
-    pathname === "/terms"
-  );
-}
+import { buildAnalyticsPageProperties } from "@/lib/analytics/page-context";
 
 let lastTrackedPageViewKey: string | null = null;
 
@@ -47,10 +21,7 @@ export default function AnalyticsBootstrap() {
       lastTrackedPageViewKey = eventKey;
 
       trackClientEventSilently("page_viewed", {
-        page_path: pagePath,
-        page_search: pageSearch || null,
-        page_type: pageTypeFromPath(pagePath),
-        is_public: isPublicMarketingPath(pagePath),
+        ...buildAnalyticsPageProperties(pagePath, pageSearch),
       });
     };
 

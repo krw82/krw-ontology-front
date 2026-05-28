@@ -5,6 +5,7 @@ import {
   findQuestionTopic,
   findUseCase,
   getQuestionTopicGroups,
+  pageMetadata,
   QUESTION_TOPIC_PAGES,
   USE_CASE_PAGES,
 } from "./site";
@@ -74,17 +75,31 @@ describe("marketing site content model", () => {
     const useCase = USE_CASE_PAGES[0];
 
     expect(buildQuestionChatHref(topic)).toBe(
-      `/chat?templateId=${topic.slug}`,
+      `/chat/new?templateId=${topic.slug}`,
     );
     expect(buildQuestionChatHref(topic, { ticker: "aapl" })).toContain(
       "ticker=AAPL",
     );
     expect(buildQuestionChatHref(topic, { question: "custom question" })).toBe(
-      `/chat?templateId=${topic.slug}&query=custom+question`,
+      `/chat/new?templateId=${topic.slug}&query=custom+question`,
     );
 
     const useCaseHref = buildUseCaseChatHref(useCase);
     expect(useCaseHref).toContain(`useCase=${useCase.slug}`);
     expect(useCaseHref).toContain("query=");
+  });
+
+  it("builds noindex metadata for non-search utility pages", () => {
+    const metadata = pageMetadata({
+      title: "질문 그래프",
+      path: "/questions",
+      noIndex: true,
+    });
+
+    expect(metadata.alternates?.canonical).toContain("/questions");
+    expect(metadata.robots).toMatchObject({
+      index: false,
+      follow: false,
+    });
   });
 });

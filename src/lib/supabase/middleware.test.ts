@@ -77,4 +77,41 @@ describe("updateSession auth redirects", () => {
     );
     expect(createServerClient).not.toHaveBeenCalled();
   });
+
+  it("allows anonymous access to company SEO pages", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.example");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon");
+    process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS = "0";
+    mockAuthUser(null);
+
+    const indexResponse = await updateSession(
+      new NextRequest("http://localhost/companies"),
+    );
+    const detailResponse = await updateSession(
+      new NextRequest("http://localhost/companies/AAPL"),
+    );
+
+    expect(indexResponse.status).toBe(200);
+    expect(indexResponse.headers.get("location")).toBeNull();
+    expect(detailResponse.status).toBe(200);
+    expect(detailResponse.headers.get("location")).toBeNull();
+  });
+
+  it("still redirects anonymous chat requests to login", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.example");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon");
+    process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS = "0";
+    mockAuthUser(null);
+
+    const response = await updateSession(
+      new NextRequest("http://localhost/chat/new?ticker=AAPL"),
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost/login?next=%2Fchat%2Fnew%3Fticker%3DAAPL",
+    );
+  });
 });

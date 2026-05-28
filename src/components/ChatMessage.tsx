@@ -334,7 +334,7 @@ function StreamingContentBlocks({ content }: { content: string }) {
   if (blocks.length === 0) return null;
 
   return (
-    <div className="space-y-md">
+    <div className="space-y-lg">
       <AnimatePresence initial={false}>
         {blocks.map((section, index) => (
           <motion.div
@@ -348,12 +348,16 @@ function StreamingContentBlocks({ content }: { content: string }) {
               delay: Math.min(index, 6) * 0.02,
             }}
           >
-            <ResearchMarkdown content={section} />
+            <ResearchMarkdown content={section} normalizePlainText={false} />
           </motion.div>
         ))}
       </AnimatePresence>
     </div>
   );
+}
+
+function CompletedAssistantContent({ content }: { content: string }) {
+  return <ResearchMarkdown content={content} />;
 }
 
 export default function ChatMessage({
@@ -453,7 +457,7 @@ export default function ChatMessage({
         </div>
       ) : (
         <div className="max-w-full pl-0 text-body sm:pl-[48px]">
-          {content ? <StreamingContentBlocks content={content} /> : null}
+          {content ? <CompletedAssistantContent content={content} /> : null}
           {messageId && createdAt ? (
             <MessageActions messageId={messageId} createdAt={createdAt} />
           ) : null}

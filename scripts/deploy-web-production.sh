@@ -73,6 +73,7 @@ echo "Remote ontology used for build: $REMOTE_ONTOLOGY_DIR"
     --exclude './.next' \
     --exclude './node_modules' \
     --exclude './out' \
+    --exclude './output' \
     --exclude './.claude' \
     --exclude './.codex' \
     --exclude './.playwright-mcp' \
@@ -138,7 +139,7 @@ ln -s ../krw-ontology "\$REMOTE_FRONT_DIR/krw-ontology"
 
 chmod +x "\$REMOTE_FRONT_DIR/scripts/deploy-vm-compose.sh"
 cd "\$REMOTE_FRONT_DIR"
-KRW_ONTOLOGY_SOURCE_DIR="\$REMOTE_ONTOLOGY_DIR" scripts/deploy-vm-compose.sh
+KRW_ONTOLOGY_SOURCE_DIR="\$REMOTE_ONTOLOGY_DIR" scripts/deploy-vm-compose.sh web
 docker compose --project-name krw-ontology-front --env-file .env ps
 EOF
 )

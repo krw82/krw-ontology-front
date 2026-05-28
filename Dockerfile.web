@@ -18,8 +18,10 @@ WORKDIR /app
 
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ARG GOOGLE_SITE_VERIFICATION
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV GOOGLE_SITE_VERIFICATION=$GOOGLE_SITE_VERIFICATION
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -70,7 +72,7 @@ cat > ./krw-ontology/plugins/krw-ontology/.mcp.json <<'JSON'
       "command": "/opt/krw-ontology-venv/bin/krw-ontology-mcp",
       "args": [],
       "env": {
-        "KRW_ONTOLOGY_ROOT": "/srv/krw-ontology-data/current"
+        "KRW_ONTOLOGY_ENV": "prod"
       }
     }
   }

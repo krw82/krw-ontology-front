@@ -26,6 +26,16 @@ if [ "${1:-}" = "--dry-run" ]; then
   shift
 fi
 
+VALIDATE_AGENT_WORKER=1
+if [ "$#" -gt 0 ]; then
+  VALIDATE_AGENT_WORKER=0
+  for compose_arg in "$@"; do
+    if [ "$compose_arg" = "agent-worker" ]; then
+      VALIDATE_AGENT_WORKER=1
+    fi
+  done
+fi
+
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 ONTOLOGY_SOURCE_DIR=${KRW_ONTOLOGY_SOURCE_DIR:-"$HOME/krw-ontology"}
@@ -111,6 +121,7 @@ rsync -a --delete \
   --exclude '/.next/' \
   --exclude '/node_modules/' \
   --exclude '/out/' \
+  --exclude '/output/' \
   --exclude '/.claude/' \
   --exclude '/.codex/' \
   --exclude '/.playwright-mcp/' \
@@ -217,8 +228,7 @@ mcp_config_path = plugin_path / ".mcp.json"
 mcp_config = json.loads(mcp_config_path.read_text())
 server_config = mcp_config["mcpServers"]["krw-ontology"]
 command = Path(server_config["command"])
-root = Path(os.environ.get("KRW_ONTOLOGY_ROOT") or server_config["env"]["KRW_ONTOLOGY_ROOT"])
-index_path = root / "indexes" / "agent_index.sqlite"
+server_env = server_config.get("env", {})
 
 if not agent_cwd.is_absolute():
     raise SystemExit(f"CLAUDE_AGENT_CWD must be absolute: {agent_cwd}")
@@ -226,21 +236,62 @@ if not agent_cwd.exists() or not os.access(agent_cwd, os.W_OK | os.X_OK):
     raise SystemExit(f"CLAUDE_AGENT_CWD is not writable: {agent_cwd}")
 if not command.exists() or not os.access(command, os.X_OK):
     raise SystemExit(f"MCP stdio command is not executable: {command}")
-if not index_path.exists():
-    raise SystemExit(f"Ontology agent index not found: {index_path}")
-
-from krw_ontology.mcp_server.server import health_payload
-
-payload, status = health_payload(root=str(root))
-if status != 200 or not payload.get("ok"):
-    raise SystemExit(f"MCP live health failed: status={status} payload={payload}")
-if payload.get("documents", 0) < 1 or payload.get("objects", 0) < 1:
-    raise SystemExit(f"MCP live health returned empty index counts: {payload}")
-if "krw_ontology_query" not in payload.get("tools", []):
-    raise SystemExit(f"MCP live health did not expose krw_ontology_query: {payload}")
+for key in ("KRW_ONTOLOGY_RELEASE_ROOT", "KRW_ONTOLOGY_ROOT", "KRW_ONTOLOGY_INDEX_PATH"):
+    if os.environ.get(key) or server_env.get(key):
+        raise SystemExit(f"GCP web must not be configured with local ontology data: {key}")
 
 print(f"OK Claude agent cwd: {agent_cwd}")
 print(f"OK plugin MCP command: {command}")
-print(f"OK ontology index: {index_path}")
-print(f"OK MCP live health: documents={payload.get('documents')} objects={payload.get('objects')} tools={len(payload.get('tools', []))}")
+print("OK web ontology data boundary: Supabase catalog only")
 PY
+
+if [ "$VALIDATE_AGENT_WORKER" = "1" ]; then
+  for i in $(seq 1 30); do
+    worker_container=$(
+      docker compose \
+        --project-name "$COMPOSE_PROJECT_NAME" \
+        --env-file "$ENV_FILE" \
+        -f "$BUILD_CONTEXT/docker-compose.yml" \
+        ps -q agent-worker
+    )
+    if [ -n "$worker_container" ] && [ "$(docker inspect --format '{{.State.Status}}' "$worker_container")" = "running" ]; then
+      health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$worker_container")
+      if [ "$health" = "healthy" ] || [ "$health" = "none" ]; then
+        break
+      fi
+    fi
+    if [ "$i" -eq 30 ]; then
+      echo "agent-worker did not become healthy" >&2
+      docker compose \
+        --project-name "$COMPOSE_PROJECT_NAME" \
+        --env-file "$ENV_FILE" \
+        -f "$BUILD_CONTEXT/docker-compose.yml" \
+        ps >&2
+      exit 1
+    fi
+    sleep 2
+  done
+
+  docker compose \
+    --project-name "$COMPOSE_PROJECT_NAME" \
+    --env-file "$ENV_FILE" \
+    -f "$BUILD_CONTEXT/docker-compose.yml" \
+    exec -T agent-worker node - <<'NODE'
+const fs = require("fs");
+const required = [
+  ".worker/agent-worker.mjs",
+  `${process.env.KRW_ONTOLOGY_ROOT}/indexes/agent_index.sqlite`,
+  `${process.env.KRW_ONTOLOGY_PLUGIN_PATH}/.mcp.json`,
+];
+for (const path of required) {
+  fs.accessSync(path, fs.constants.R_OK);
+}
+console.log(JSON.stringify({
+  worker: "ok",
+  root: process.env.KRW_ONTOLOGY_ROOT,
+  plugin: process.env.KRW_ONTOLOGY_PLUGIN_PATH,
+}));
+NODE
+else
+  echo "Skipping agent-worker validation; compose target excludes agent-worker."
+fi

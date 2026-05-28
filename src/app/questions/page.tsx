@@ -16,6 +16,7 @@ export const metadata: Metadata = pageMetadata({
   description:
     "매출 성장, 마진 변화, 리스크 요인, 세그먼트 성과, 현금흐름, 투자 thesis 점검을 Apple 질문 그래프로 시작합니다.",
   path: "/questions",
+  noIndex: true,
 });
 
 export default function QuestionsIndexPage() {

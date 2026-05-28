@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import { createClient } from "@/lib/supabase/server";
 import { GET } from "./route";
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(),
+}));
+vi.mock("@/lib/analytics/server", () => ({
+  recordAnalyticsEventFromRequest: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
 const ORIGINAL_AUTH_REDIRECT_ORIGIN = process.env.AUTH_REDIRECT_ORIGIN;
@@ -13,7 +17,11 @@ const ORIGINAL_NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL;
 function mockSuccessfulExchange() {
   vi.mocked(createClient).mockResolvedValue({
     auth: {
-      exchangeCodeForSession: vi.fn().mockResolvedValue({ error: null }),
+      exchangeCodeForSession: vi.fn().mockResolvedValue({
+        data: { user: { id: "user-1" } },
+        error: null,
+      }),
+      getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
     },
   } as unknown as Awaited<ReturnType<typeof createClient>>);
 }
@@ -24,6 +32,7 @@ describe("GET /auth/callback", () => {
     delete process.env.NEXT_PUBLIC_SITE_URL;
     delete process.env.NEXT_PUBLIC_APP_URL;
     vi.clearAllMocks();
+    vi.mocked(recordAnalyticsEventFromRequest).mockResolvedValue({ ok: true });
     mockSuccessfulExchange();
   });
 
@@ -89,6 +98,85 @@ describe("GET /auth/callback", () => {
 
     expect(response.headers.get("location")).toBe(
       "http://internal.local/companies",
+    );
+  });
+
+  it("reports OAuth provider errors without trying code exchange", async () => {
+    const exchangeCodeForSession = vi.fn();
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        exchangeCodeForSession,
+        getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
+      },
+    } as unknown as Awaited<ReturnType<typeof createClient>>);
+
+    const response = await GET(
+      new Request(
+        "http://internal.local/auth/callback?error=access_denied&error_description=Denied",
+      ),
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "http://internal.local/login?error=oauth&reason=provider",
+    );
+    expect(exchangeCodeForSession).not.toHaveBeenCalled();
+  });
+
+  it("falls back to an existing session when code exchange is retried", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        exchangeCodeForSession: vi.fn().mockResolvedValue({
+          data: null,
+          error: { message: "auth code already used" },
+        }),
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "user-1" } },
+          error: null,
+        }),
+      },
+    } as unknown as Awaited<ReturnType<typeof createClient>>);
+
+    const response = await GET(
+      new Request("http://internal.local/auth/callback?code=used&next=/chat"),
+    );
+
+    expect(response.headers.get("location")).toBe("http://internal.local/chat");
+  });
+
+  it("redirects authenticated callback re-entry without showing an OAuth error", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        exchangeCodeForSession: vi.fn(),
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "user-1" } },
+          error: null,
+        }),
+      },
+    } as unknown as Awaited<ReturnType<typeof createClient>>);
+
+    const response = await GET(
+      new Request("http://internal.local/auth/callback?next=/companies"),
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "http://internal.local/companies",
+    );
+  });
+
+  it("uses a reasoned login redirect when callback has no code and no session", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        exchangeCodeForSession: vi.fn(),
+        getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
+      },
+    } as unknown as Awaited<ReturnType<typeof createClient>>);
+
+    const response = await GET(
+      new Request("http://internal.local/auth/callback?next=/companies"),
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "http://internal.local/login?error=oauth&reason=missing_code",
     );
   });
 });

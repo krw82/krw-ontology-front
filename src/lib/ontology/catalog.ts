@@ -1,33 +1,13 @@
 import "server-only";
 
-import { readdir, readFile } from "fs/promises";
-import path from "path";
-
-import { getKrwOntologyPluginPath } from "@/lib/agent/mcp-client";
+import { getOntologyEnv, type OntologyEnv } from "@/lib/env";
 import { normalizeTicker } from "@/lib/ontology/ticker";
-
-type CompanyArtifactIndex = {
-  ticker?: string;
-  generated_at?: string;
-  documents?: Record<
-    string,
-    {
-      document_type?: string;
-      doc_type_key?: string;
-    }
-  >;
-};
-
-type CompanyBusinessProfile = {
-  company_name?: string;
-  legal_name?: string;
-  display_name?: string;
-  name?: string;
-  business_model_summary?: string;
-  sector?: string;
-  primary_business_activities?: string[];
-  key_external_factors?: string[];
-};
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import type {
+  Json,
+  OntologyCatalogReleaseRow,
+  OntologyCompanyRow,
+} from "@/types/database";
 
 export interface IndexedCompany {
   ticker: string;
@@ -45,56 +25,7 @@ export interface IndexedCompany {
   generated_at: string | null;
 }
 
-async function readJsonFile<T>(filePath: string): Promise<T | null> {
-  try {
-    return JSON.parse(await readFile(filePath, "utf8")) as T;
-  } catch {
-    return null;
-  }
-}
-
-async function readFirstJsonl<T>(filePath: string): Promise<T | null> {
-  try {
-    const content = await readFile(filePath, "utf8");
-    const line = content.split(/\r?\n/).find(Boolean);
-    return line ? (JSON.parse(line) as T) : null;
-  } catch {
-    return null;
-  }
-}
-
-async function resolveRootFromPlugin(): Promise<string | null> {
-  const pluginPath = getKrwOntologyPluginPath();
-  const mcpConfig = await readJsonFile<{
-    mcpServers?: Record<string, { env?: Record<string, string> }>;
-  }>(path.join(pluginPath, ".mcp.json"));
-
-  return (
-    mcpConfig?.mcpServers?.["krw-ontology"]?.env?.KRW_ONTOLOGY_ROOT ?? null
-  );
-}
-
-export async function getOntologyRoot(): Promise<string> {
-  const root = process.env.KRW_ONTOLOGY_ROOT || (await resolveRootFromPlugin());
-  if (!root) {
-    throw new Error("Missing required environment variable: KRW_ONTOLOGY_ROOT");
-  }
-  return root;
-}
-
-function periodRank(period: string): number {
-  const match = /^(?:FY|CY)(\d{4})(?:Q(\d))?$/.exec(period);
-  if (!match) return 0;
-  const year = Number(match[1]);
-  const quarter = match[2] ? Number(match[2]) : 5;
-  return year * 10 + quarter;
-}
-
-function trimSentence(text: string, maxLength = 260): string {
-  const normalized = text.replace(/\s+/g, " ").trim();
-  if (normalized.length <= maxLength) return normalized;
-  return `${normalized.slice(0, maxLength - 1).trimEnd()}...`;
-}
+type UnknownRecord = Record<string, unknown>;
 
 const SECTOR_LABELS: Record<string, string> = {
   consumer: "소비재",
@@ -144,6 +75,20 @@ const FALLBACK_COMPANY_NAMES: Record<string, string> = {
   XYL: "Xylem Inc.",
 };
 
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringValue(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function stringArrayValue(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+    : [];
+}
+
 function normalizeLabelKey(value: string): string {
   return value
     .trim()
@@ -152,8 +97,8 @@ function normalizeLabelKey(value: string): string {
     .toLowerCase();
 }
 
-function formatLabel(value: string | undefined): string {
-  if (!value) return "인덱싱된 기업";
+function formatLabel(value: string | null | undefined): string | null {
+  if (!value) return null;
   const sectorLabel = SECTOR_LABELS[normalizeLabelKey(value)];
   if (sectorLabel) return sectorLabel;
   return value
@@ -163,15 +108,20 @@ function formatLabel(value: string | undefined): string {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function firstTextValue(...values: Array<string | undefined>): string | null {
-  const value = values.find((item) => item?.trim());
-  return value ? value.trim() : null;
+function trimSentence(text: string, maxLength = 260): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 1).trimEnd()}...`;
 }
 
-function iconForCompany(profile: CompanyBusinessProfile | null): string {
+function iconForCompany(row: OntologyCompanyRow): string {
+  const company = isRecord(row.company_json) ? row.company_json : {};
+  const coverage = isRecord(row.coverage_json) ? row.coverage_json : {};
   const haystack = [
-    profile?.sector,
-    ...(profile?.primary_business_activities ?? []),
+    row.sector,
+    row.description,
+    stringArrayValue(company.primary_business_activities).join(" "),
+    stringArrayValue(coverage.document_types).join(" "),
   ]
     .join(" ")
     .toLowerCase();
@@ -188,84 +138,91 @@ function iconForCompany(profile: CompanyBusinessProfile | null): string {
   return "business";
 }
 
-async function buildCompany(root: string, ticker: string): Promise<IndexedCompany | null> {
-  const companyRoot = path.join(root, "companies", ticker);
-  const indexPath = path.join(companyRoot, "indexes", "company_artifact_index.json");
-  const artifactIndex = await readJsonFile<CompanyArtifactIndex>(indexPath);
-  if (!artifactIndex?.documents) return null;
-
-  const periods = Object.keys(artifactIndex.documents).sort(
-    (a, b) => periodRank(b) - periodRank(a),
-  );
-  const latestPeriod = periods[0] ?? null;
-  const documentTypes = Array.from(
-    new Set(
-      periods
-        .map((period) => artifactIndex.documents?.[period]?.document_type)
-        .filter((value): value is string => Boolean(value)),
-    ),
-  ).sort();
-  const profile = await readFirstJsonl<CompanyBusinessProfile>(
-    path.join(companyRoot, "context", "company_business_profiles.jsonl"),
-  );
-
-  const description =
-    profile?.business_model_summary ||
-    `Indexed ontology coverage for ${ticker}.`;
-  const activities = profile?.primary_business_activities?.slice(0, 3) ?? [];
-  const factors = profile?.key_external_factors?.slice(0, 4) ?? [];
-  const sector = profile?.sector ? formatLabel(profile.sector) : null;
-  const companyName =
-    firstTextValue(
-      profile?.company_name,
-      profile?.legal_name,
-      profile?.display_name,
-      profile?.name,
-    ) ??
-    FALLBACK_COMPANY_NAMES[ticker] ??
-    ticker;
-  const coverage = `${periods.length}개 공시 인덱싱${
-    documentTypes.length ? ` · ${documentTypes.join(", ")}` : ""
+function buildCoverage(row: OntologyCompanyRow): string {
+  const latestPeriod = row.latest_period;
+  const documentCount = row.document_count || row.periods.length;
+  return `${documentCount}개 공시 인덱싱${
+    row.document_types.length ? ` · ${row.document_types.join(", ")}` : ""
   }${latestPeriod ? ` · 최신 ${latestPeriod}` : ""}`;
+}
+
+function textListFromJson(json: Json, key: string): string | undefined {
+  if (!isRecord(json)) return undefined;
+  const values = stringArrayValue(json[key]);
+  return values.length ? values.join(", ") : undefined;
+}
+
+function companyFromRow(row: OntologyCompanyRow): IndexedCompany {
+  const company = isRecord(row.company_json) ? row.company_json : {};
+  const name =
+    row.name ||
+    stringValue(company.name) ||
+    FALLBACK_COMPANY_NAMES[row.ticker] ||
+    row.ticker;
+  const description =
+    row.description ||
+    stringValue(company.description) ||
+    `Indexed ontology coverage for ${row.ticker}.`;
 
   return {
-    ticker,
-    name: companyName,
-    sector,
+    ticker: row.ticker,
+    name,
+    sector: formatLabel(row.sector),
     description: trimSentence(description),
-    latest_period: latestPeriod,
-    coverage,
-    core_strength: activities.length ? activities.join(", ") : undefined,
-    critical_risk: factors.length ? factors.join(", ") : undefined,
-    icon: iconForCompany(profile),
-    document_count: periods.length,
-    document_types: documentTypes,
-    periods,
-    generated_at: artifactIndex.generated_at ?? null,
+    latest_period: row.latest_period,
+    coverage: buildCoverage(row),
+    core_strength:
+      textListFromJson(row.company_json, "primary_business_activities") ??
+      textListFromJson(row.coverage_json, "core_strengths"),
+    critical_risk:
+      textListFromJson(row.company_json, "key_external_factors") ??
+      textListFromJson(row.coverage_json, "critical_risks"),
+    icon: iconForCompany(row),
+    document_count: row.document_count,
+    document_types: row.document_types,
+    periods: row.periods,
+    generated_at: row.generated_at,
   };
 }
 
+export async function getActiveOntologyCatalogRelease(
+  env: OntologyEnv = getOntologyEnv(),
+): Promise<OntologyCatalogReleaseRow | null> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("ontology_catalog_releases")
+    .select(
+      "env, release_id, active, format, generated_at, release_created_at, index_generated_at, company_count, document_count, index_document_count, object_count, manifest_json, summary_json, source_json, catalog_json, created_at, updated_at",
+    )
+    .eq("env", env)
+    .eq("active", true)
+    .maybeSingle<OntologyCatalogReleaseRow>();
+
+  if (error) {
+    throw new Error(`Failed to read active ontology catalog release: ${error.message}`);
+  }
+  return data ?? null;
+}
+
 export async function listIndexedCompanies(): Promise<IndexedCompany[]> {
-  const root = await getOntologyRoot();
-  let entries;
-  try {
-    entries = await readdir(path.join(root, "companies"), {
-      withFileTypes: true,
-    });
-  } catch {
-    return [];
+  const env = getOntologyEnv();
+  const release = await getActiveOntologyCatalogRelease(env);
+  if (!release) return [];
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("ontology_companies")
+    .select(
+      "env, release_id, ticker, name, sector, description, latest_period, document_count, document_types, periods, coverage_json, documents_json, company_json, generated_at, created_at, updated_at",
+    )
+    .eq("env", env)
+    .eq("release_id", release.release_id)
+    .order("ticker", { ascending: true })
+    .returns<OntologyCompanyRow[]>();
+
+  if (error) {
+    throw new Error(`Failed to read ontology catalog companies: ${error.message}`);
   }
 
-  const tickers = entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => normalizeTicker(entry.name))
-    .filter((ticker): ticker is string => Boolean(ticker))
-    .sort();
-  const companies = await Promise.all(
-    tickers.map((ticker) => buildCompany(root, ticker)),
-  );
-
-  return companies.filter((company): company is IndexedCompany => Boolean(company));
+  return (data ?? []).map(companyFromRow);
 }
 
 export async function getIndexedCompany(
@@ -273,6 +230,23 @@ export async function getIndexedCompany(
 ): Promise<IndexedCompany | null> {
   const normalized = normalizeTicker(ticker);
   if (!normalized) return null;
-  const root = await getOntologyRoot();
-  return buildCompany(root, normalized);
+
+  const env = getOntologyEnv();
+  const release = await getActiveOntologyCatalogRelease(env);
+  if (!release) return null;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("ontology_companies")
+    .select(
+      "env, release_id, ticker, name, sector, description, latest_period, document_count, document_types, periods, coverage_json, documents_json, company_json, generated_at, created_at, updated_at",
+    )
+    .eq("env", env)
+    .eq("release_id", release.release_id)
+    .eq("ticker", normalized)
+    .maybeSingle<OntologyCompanyRow>();
+
+  if (error) {
+    throw new Error(`Failed to read ontology catalog company ${normalized}: ${error.message}`);
+  }
+  return data ? companyFromRow(data) : null;
 }

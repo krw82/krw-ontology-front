@@ -31,7 +31,9 @@ import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { runAgentJob } from "./job-runner";
 
-function createRunnerAdmin() {
+function createRunnerAdmin(params: {
+  openToolCalls?: Array<{ id: string; error_message: string | null }>;
+} = {}) {
   const updates: Array<{
     table: string;
     payload: Record<string, unknown>;
@@ -116,6 +118,10 @@ function createRunnerAdmin() {
               return query;
             },
             maybeSingle() {
+              if (table === "tool_calls") {
+                return Promise.resolve({ data: null, error: null });
+              }
+
               const candidates =
                 table === "agent_runs"
                   ? rows.agent_runs
@@ -143,6 +149,12 @@ function createRunnerAdmin() {
               return Promise.resolve({ data: row, error: null });
             },
             returns() {
+              if (table === "tool_calls") {
+                return Promise.resolve({
+                  data: params.openToolCalls ?? [],
+                  error: null,
+                });
+              }
               return Promise.resolve({ data: [], error: null });
             },
           };
@@ -168,7 +180,11 @@ describe("agent job runner", () => {
       commandOk: true,
       liveOk: false,
       sqliteOk: true,
+      env: "dev",
       releaseId: null,
+      manifestPath: null,
+      manifestValid: false,
+      agentIndexSchemaVersion: null,
       indexGeneratedAt: null,
       companyCount: null,
       documentCount: null,
@@ -178,6 +194,7 @@ describe("agent job runner", () => {
       root: "/srv/krw-ontology-data/current",
       indexPath: "/srv/krw-ontology-data/current/indexes/agent_index.sqlite",
       pluginPath: "/srv/krw-ontology/plugins/krw-ontology",
+      releaseMetadata: null,
       error: "MCP unavailable",
     });
   });
@@ -246,6 +263,89 @@ describe("agent job runner", () => {
         sessionId: "session-1",
         runId: "run-1",
       }),
+    );
+  });
+
+  it("closes open tool calls when a worker failure makes the run terminal", async () => {
+    const fake = createRunnerAdmin({
+      openToolCalls: [{ id: "tool-open-1", error_message: null }],
+    });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+
+    await runAgentJob("run-1", "worker-1");
+
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: "tool_calls",
+          payload: expect.objectContaining({
+            finished_at: expect.any(String),
+            error_message:
+              "Run failed before tool result was received: MCP unavailable",
+          }),
+          filters: { id: "tool-open-1" },
+        }),
+      ]),
+    );
+  });
+
+  it("marks a stuck SDK run expired before the worker lease expires", async () => {
+    vi.useFakeTimers();
+    const fake = createRunnerAdmin();
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+    vi.mocked(checkMcpHealth).mockResolvedValue({
+      connected: true,
+      staticOk: true,
+      commandOk: true,
+      liveOk: true,
+      sqliteOk: true,
+      env: "dev",
+      releaseId: "release-1",
+      manifestPath: "/srv/krw-ontology-data/current/manifest.json",
+      manifestValid: true,
+      agentIndexSchemaVersion: "agent_index_v1",
+      indexGeneratedAt: "2026-05-25T00:00:00.000Z",
+      companyCount: 10,
+      documentCount: 20,
+      objectCount: 30,
+      toolCount: 12,
+      tools: ["krw_ontology_query_context"],
+      root: "/srv/krw-ontology-data/current",
+      indexPath: "/srv/krw-ontology-data/current/indexes/agent_index.sqlite",
+      pluginPath: "/srv/krw-ontology/plugins/krw-ontology",
+      releaseMetadata: {
+        env: "dev",
+        release_id: "release-1",
+        manifest_valid: true,
+      },
+    });
+    vi.mocked(runAgent).mockReturnValue(new Promise(() => undefined));
+
+    const job = runAgentJob("run-1", "worker-1");
+    await vi.advanceTimersByTimeAsync(6 * 60 * 1000 + 1);
+    await job;
+    vi.useRealTimers();
+
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: "agent_runs",
+          payload: expect.objectContaining({
+            status: "expired",
+            error_code: "lease_expired",
+            error_message: "분석 시간이 초과되었습니다. 다시 시도해주세요.",
+            lease_expires_at: null,
+          }),
+          filters: { id: "run-1" },
+        }),
+        expect.objectContaining({
+          table: "messages",
+          payload: expect.objectContaining({
+            status: "failed",
+          }),
+          filters: { id: "assistant-message-1" },
+        }),
+      ]),
     );
   });
 });

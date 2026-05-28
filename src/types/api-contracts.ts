@@ -63,6 +63,7 @@ export type ErrorCode =
   | "lease_expired"
   | "cancelled"
   | "mcp_unavailable"
+  | "worker_unavailable"
   | "mcp_error"
   | "claude_api_error"
   | "claude_rate_limited"
@@ -85,6 +86,7 @@ const VALID_ERROR_CODES: ReadonlySet<string> = new Set<ErrorCode>([
   "lease_expired",
   "cancelled",
   "mcp_unavailable",
+  "worker_unavailable",
   "mcp_error",
   "claude_api_error",
   "claude_rate_limited",
@@ -201,8 +203,19 @@ export interface AgentRun {
   estimated_cost_usd: number | null;
   web_commit: string;
   krw_ontology_commit: string;
+  ontology_env: "dev" | "staging" | "prod";
+  worker_env?: "dev" | "staging" | "prod" | null;
   ontology_release_id: string | null;
   index_generated_at: string | null;
+  company_count: number | null;
+  document_count: number | null;
+  object_count: number | null;
+  ontology_root?: string | null;
+  index_path?: string | null;
+  manifest_path?: string | null;
+  manifest_valid?: boolean | null;
+  agent_index_schema_version?: string | null;
+  ontology_manifest?: Record<string, unknown> | null;
   error_code: ErrorCode | null;
   error_message: string | null;
   sdk_diagnostics: Record<string, unknown> | null;
@@ -220,8 +233,16 @@ export interface AgentRunSummary {
   input_tokens: number | null;
   output_tokens: number | null;
   estimated_cost_usd: number | null;
+  ontology_env?: "dev" | "staging" | "prod";
   ontology_release_id: string | null;
   index_generated_at: string | null;
+  company_count?: number | null;
+  document_count?: number | null;
+  object_count?: number | null;
+  index_path?: string | null;
+  manifest_path?: string | null;
+  manifest_valid?: boolean | null;
+  agent_index_schema_version?: string | null;
   error_code: ErrorCode | null;
   error_message?: string | null;
 }
@@ -604,20 +625,31 @@ export interface ResearchArtifact extends ResearchArtifactEnvelope {
 /** Ontology release metadata */
 export interface OntologyRelease {
   readonly id: string;
+  env?: "dev" | "staging" | "prod";
   release_path: string;
   krw_ontology_commit: string;
   index_generated_at: string;
   company_count: number;
   document_count: number;
+  object_count?: number;
+  manifest_path?: string;
+  manifest_valid?: boolean;
+  agent_index_schema_version?: string;
   readonly created_at: string;
 }
 
 /** Release metadata embedded in run completion events */
 export interface ReleaseMetadata {
   ontology_release_id: string;
+  ontology_env?: "dev" | "staging" | "prod";
   index_generated_at: string;
   company_count: number;
   document_count: number;
+  object_count?: number;
+  index_path?: string;
+  manifest_path?: string;
+  manifest_valid?: boolean;
+  agent_index_schema_version?: string;
   krw_ontology_commit: string;
   web_commit: string;
 }
@@ -876,11 +908,22 @@ export interface HealthzResponse {
 /** GET /internal/mcp-health response */
 export interface McpHealthResponse {
   mcp_connected: boolean;
+  ontology_env: "dev" | "staging" | "prod" | null;
   ontology_release_id: string | null;
+  manifest_path: string | null;
+  manifest_valid: boolean;
+  agent_index_schema_version: string | null;
   index_generated_at: string | null;
   company_count: number | null;
   document_count: number | null;
+  object_count: number | null;
+  index_path: string | null;
   krw_ontology_commit: string;
+  worker_id?: string;
+  worker_status?: "idle" | "running" | "stopped" | "unhealthy";
+  worker_last_seen_at?: string;
+  catalog_release_id?: string;
+  error?: string;
 }
 
 // ============================================================
@@ -890,10 +933,13 @@ export interface McpHealthResponse {
 /** MCP health endpoint response shape */
 export interface McpServiceHealth {
   status: "ok" | "error";
+  env?: "dev" | "staging" | "prod";
   release_id: string;
+  manifest_valid?: boolean;
   index_generated_at: string;
   company_count: number;
   document_count: number;
+  object_count?: number;
   package_version: string;
 }
 
@@ -1011,7 +1057,7 @@ export interface WebContainerEnv {
   CLAUDE_AGENT_MAX_TURNS: string;        // "20"
   AGENT_MAX_TOOL_CALLS: string;          // "18"
   AGENT_MAX_TOOL_RESULT_CHARS: string;   // "100000"
-  LEASE_TIMEOUT_MINUTES: string;        // "5"
+  LEASE_TIMEOUT_MINUTES: string;        // "10"
 }
 
 /** Environment variables required by optional standalone MCP container */

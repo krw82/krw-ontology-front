@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.krwontology.mcp-server</string>
+
+  <key>WorkingDirectory</key>
+  <string>__FRONT_DIR__</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>__FRONT_DIR__/scripts/start-mcp-server-production.sh</string>
+    <string>--env-file</string>
+    <string>__ENV_FILE__</string>
+  </array>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>Nice</key>
+  <integer>__NICE__</integer>
+
+  <key>StandardOutPath</key>
+  <string>__FRONT_DIR__/logs/launchd-mcp-server.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>__FRONT_DIR__/logs/launchd-mcp-server.err.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>NODE_ENV</key>
+    <string>production</string>
+  </dict>
+</dict>
+</plist>

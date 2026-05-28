@@ -13,6 +13,10 @@ import {
   parseUtmContext,
   serializeUtmContext,
 } from "@/lib/analytics/utm";
+import {
+  buildAnalyticsPageProperties,
+  getAnalyticsDeviceType,
+} from "@/lib/analytics/page-context";
 
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 const TRACK_TIMEOUT_MS = 800;
@@ -57,10 +61,19 @@ export async function trackClientEvent(
   if (typeof window === "undefined") return;
 
   const anonymousId = getOrCreateAnalyticsAnonymousId();
+  const commonProperties = buildAnalyticsPageProperties(
+    window.location.pathname,
+    window.location.search,
+  );
+  const mergedProperties = {
+    ...commonProperties,
+    device_type: getAnalyticsDeviceType(),
+    ...properties,
+  };
   const body = {
     event_name: eventName,
     anonymous_id: anonymousId,
-    properties,
+    properties: mergedProperties,
     path: `${window.location.pathname}${window.location.search}`,
     referrer: document.referrer || null,
     utm: getStoredUtmContext(),

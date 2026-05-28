@@ -1,0 +1,38 @@
+{
+  "name": "krw-ontology",
+  "version": "0.1.0",
+  "description": "Filing-grounded equity research workflow with bounded MCP research, ResearchState packs, selected trace/chain expansion, and Korean Markdown synthesis.",
+  "author": {
+    "name": "Jeong Woncheol",
+    "email": "local@example.com",
+    "url": "file://~/krw-ontology"
+  },
+  "homepage": "file://~/krw-ontology",
+  "repository": "file://~/krw-ontology",
+  "license": "UNLICENSED",
+  "keywords": [
+    "ontology",
+    "equity-research",
+    "sec-filings",
+    "mcp"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "KRW Ontology",
+    "shortDescription": "Answer filing-grounded equity research questions from 10-K and 10-Q evidence.",
+    "longDescription": "Provides read-only MCP tools and research skills for KRW ontology web chat. The default path uses bounded query_context-first research, ResearchState packs, selected trace/chain verification, and Korean Markdown synthesis. Structured display planning is optional and only used when explicitly requested.",
+    "developerName": "Jeong Woncheol",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read"
+    ],
+    "defaultPrompt": [
+      "Apple의 최근 매출 동인과 사업 구조를 공시자료 기준으로 정리해줘.",
+      "AMZN의 AWS와 리테일 매출 구조를 비교해줘.",
+      "AAPL이 특정 원자재 가격에 직접 노출되어 있는지 확인해줘."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

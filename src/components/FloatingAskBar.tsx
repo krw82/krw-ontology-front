@@ -46,7 +46,7 @@ export default function FloatingAskBar({ selectedTicker }: FloatingAskBarProps) 
     const params = new URLSearchParams();
     if (selectedTicker) params.set("ticker", selectedTicker);
     params.set("query", query.trim());
-    router.push(`/chat?${params.toString()}`);
+    router.push(`/chat/new?${params.toString()}`);
   };
 
   return (

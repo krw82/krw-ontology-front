@@ -1,8 +1,11 @@
 import { NextRequest } from "next/server";
-import { checkMcpHealth } from "@/lib/agent/mcp-client";
 import type { McpHealthResult } from "@/lib/agent/mcp-client";
+import { getReadyAgentWorker } from "@/lib/agent/worker-heartbeat";
 import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
-import { getIndexedCompany } from "@/lib/ontology/catalog";
+import {
+  getActiveOntologyCatalogRelease,
+  getIndexedCompany,
+} from "@/lib/ontology/catalog";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { AgentRunRow, ChatSessionRow } from "@/types/database";
 import {
@@ -19,19 +22,36 @@ import { enqueueAgentRun } from "@/lib/agent/job-queue";
 import { streamAgentRunEventsResponse } from "@/lib/agent/run-events";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
 
-// --- MCP health cache ---
+// --- Agent worker readiness cache ---
 
-let mcpHealthCache: { result: McpHealthResult; timestamp: number } | null = null;
-const MCP_HEALTH_TTL = 30_000;
+let workerReadinessCache: {
+  releaseId: string;
+  result: McpHealthResult;
+  timestamp: number;
+} | null = null;
+const WORKER_READINESS_TTL = 5_000;
 const ATTACHED_FILE_TAG_PATTERN = /<attached_file\s+name="[^"]*">/g;
 
-async function getCachedMcpHealth(): Promise<McpHealthResult> {
-  if (mcpHealthCache && Date.now() - mcpHealthCache.timestamp < MCP_HEALTH_TTL) {
-    return mcpHealthCache.result;
+async function getCachedReadyWorkerHealth(
+  expectedReleaseId: string,
+): Promise<McpHealthResult> {
+  if (
+    workerReadinessCache &&
+    workerReadinessCache.releaseId === expectedReleaseId &&
+    Date.now() - workerReadinessCache.timestamp < WORKER_READINESS_TTL
+  ) {
+    return workerReadinessCache.result;
   }
-  const result = await checkMcpHealth();
-  mcpHealthCache = { result, timestamp: Date.now() };
-  return result;
+  const result = await getReadyAgentWorker(new Date(), expectedReleaseId);
+  if (!result.ok) {
+    throw new Error(result.message);
+  }
+  workerReadinessCache = {
+    releaseId: expectedReleaseId,
+    result: result.mcpHealth,
+    timestamp: Date.now(),
+  };
+  return result.mcpHealth;
 }
 
 function errorResponse(
@@ -77,20 +97,33 @@ export async function POST(request: NextRequest) {
   });
   if (!rateLimitResult.ok) return rateLimitResult.response;
 
-  // 4. Check MCP health (cached for 30s) before reserving execution budget.
+  // 4. Check worker readiness before reserving execution budget. The web/API
+  // server should not need to run the heavy local MCP health path when agent
+  // execution is delegated to a separate worker, such as the production Mac
+  // worker. Require the ready worker to report the same release as the active
+  // web catalog so prod answers cannot mix catalog and SQLite releases.
   let mcpHealth: McpHealthResult;
   try {
-    mcpHealth = await getCachedMcpHealth();
+    const activeCatalog = await getActiveOntologyCatalogRelease();
+    if (!activeCatalog?.release_id) {
+      throw new Error("No active ontology web catalog release found");
+    }
+    mcpHealth = await getCachedReadyWorkerHealth(activeCatalog.release_id);
   } catch {
     return errorResponse(
       503,
-      "mcp_unavailable",
-      "온톨로지 도구에 연결할 수 없습니다.",
+      "worker_unavailable",
+      "분석 워커가 준비되지 않았습니다. 잠시 후 다시 시도해주세요.",
       request_id,
     );
   }
   if (!mcpHealth.connected) {
-    return errorResponse(503, "mcp_unavailable", "온톨로지 도구에 연결할 수 없습니다.", request_id);
+    return errorResponse(
+      503,
+      "worker_unavailable",
+      "분석 워커가 준비되지 않았습니다. 잠시 후 다시 시도해주세요.",
+      request_id,
+    );
   }
 
   // 5. Open an execution-budget record before creating durable chat work.
@@ -146,7 +179,8 @@ export async function POST(request: NextRequest) {
       question_length: content.length,
       attachment_count: countAttachedFiles(content),
       research_mode: body.research_mode,
-      source_surface: body.scope_type === "company" ? "ticker_chat" : "chat",
+      question_source: session.scopeType === "company" ? "company_context" : "custom",
+      source_surface: session.scopeType === "company" ? "ticker_chat" : "chat",
     },
   });
 

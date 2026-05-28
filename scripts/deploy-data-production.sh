@@ -15,12 +15,12 @@ Standard flow:
   5. Verify sha256 and zstd integrity on the VM.
   6. Extract to /srv/krw-ontology-data/releases/<release>.uploading.
   7. Verify SQLite counts and serving indexes.
-  8. Atomically switch /srv/krw-ontology-data/current.
+  8. Stop the legacy GCP agent-worker, atomically switch /srv/krw-ontology-data/current.
   9. Restart web and verify MCP/public health.
 
 Options:
   --dry-run              Validate local data and print the intended target only.
-  --replace-remote-data  Stop web and remove existing releases before extracting.
+  --replace-remote-data  Stop web/legacy GCP agent-worker and remove existing releases before extracting.
   --skip-prune           Keep old remote releases and remote upload archives.
 
 Environment:
@@ -358,7 +358,7 @@ mkdir -p "\$REMOTE_DATA_ROOT/uploads" "\$REMOTE_DATA_ROOT/releases"
 if [ "\$REPLACE_REMOTE_DATA" = "1" ]; then
   if [ -d "\$REMOTE_FRONT_DIR" ]; then
     cd "\$REMOTE_FRONT_DIR"
-    docker compose --project-name "\$COMPOSE_PROJECT_NAME" --env-file .env stop web || true
+    docker compose --project-name "\$COMPOSE_PROJECT_NAME" --env-file .env stop agent-worker web || true
   fi
   if [ "\$PRUNE_REMOTE" = "1" ]; then
     docker builder prune -af || true
@@ -436,6 +436,9 @@ fi
 
 mv "\$UPLOAD_PATH" "\$RELEASE_PATH"
 
+cd "\$REMOTE_FRONT_DIR"
+docker compose --project-name "\$COMPOSE_PROJECT_NAME" --env-file .env stop agent-worker || true
+
 OLD_CURRENT="\$REMOTE_DATA_ROOT/current"
 OLD_BACKUP="\$REMOTE_DATA_ROOT/current.replaced.\$RELEASE_ID"
 if [ -L "\$OLD_CURRENT" ]; then
@@ -446,7 +449,6 @@ elif [ -e "\$OLD_CURRENT" ]; then
 fi
 ln -s "releases/\$RELEASE_ID" "\$OLD_CURRENT"
 
-cd "\$REMOTE_FRONT_DIR"
 docker compose --project-name "\$COMPOSE_PROJECT_NAME" --env-file .env up -d web
 docker compose --project-name "\$COMPOSE_PROJECT_NAME" --env-file .env restart web
 
@@ -510,4 +512,5 @@ gcloud compute ssh "$GCP_INSTANCE" --zone="$GCP_ZONE" --command="$REMOTE_DEPLOY"
 
 echo "Checking public web health..."
 curl -fsS https://krwontology.com/api/healthz >/dev/null
+curl -fsS https://www.krwontology.com/api/healthz >/dev/null
 echo "Ontology data deployment complete."

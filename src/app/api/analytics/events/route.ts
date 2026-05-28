@@ -30,12 +30,16 @@ export async function POST(request: NextRequest) {
 
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
+  const properties = isRecord(body.properties) ? body.properties : {};
 
   const result = await recordAnalyticsEventFromRequest(request, {
     eventName: body.event_name,
     userId: userData.user?.id ?? null,
     anonymousId: typeof body.anonymous_id === "string" ? body.anonymous_id : null,
-    properties: isRecord(body.properties) ? body.properties : {},
+    properties: {
+      auth_state: userData.user ? "authenticated" : "anonymous",
+      ...properties,
+    },
     path: typeof body.path === "string" ? body.path : null,
     referrer: typeof body.referrer === "string" ? body.referrer : null,
     utm: isRecord(body.utm) ? normalizeUtmBody(body.utm) : null,

@@ -34,6 +34,11 @@ interface UseChatOptions {
   onSessionCreated?: (sessionId: string) => void;
 }
 
+interface SendMessageOptions {
+  sessionId?: string;
+  requestId?: string;
+}
+
 export interface ToolCallState {
   tool_call_id: string;
   tool_name: MCPToolName;
@@ -49,6 +54,7 @@ export interface ChatState {
   session: Session | null;
   messages: Message[];
   status: RunStatus | "idle";
+  isHydratingSession: boolean;
   streamingContent: string;
   error: string | null;
   activity: ResearchActivityUpdate | null;
@@ -72,6 +78,7 @@ function createInitialChatState(): ChatState {
     session: null,
     messages: [],
     status: "idle",
+    isHydratingSession: false,
     streamingContent: "",
     error: null,
     activity: null,
@@ -158,6 +165,14 @@ export function useChat({
   }, [state.status]);
 
   useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      streamGenerationRef.current += 1;
+      sendInFlightRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (sessionId) {
       const previousSessionId = activeSessionIdRef.current;
       if (previousSessionId && previousSessionId !== sessionId) {
@@ -170,6 +185,10 @@ export function useChat({
         streamingContentRef.current = "";
         lastEventIdRef.current = "";
         sessionSyncRequestedRef.current = false;
+        setState({
+          ...createInitialChatState(),
+          isHydratingSession: true,
+        });
       }
       activeSessionIdRef.current = sessionId;
       return;
@@ -221,6 +240,7 @@ export function useChat({
             label: "분석 준비 중",
           },
           status: "running",
+          isHydratingSession: false,
         }));
         break;
       }
@@ -235,11 +255,10 @@ export function useChat({
       case "token": {
         const d = data as { text: string };
         if (d.text) {
-          setState((prev) => {
-            const next = prev.streamingContent + d.text;
-            streamingContentRef.current = next;
-            return { ...prev, streamingContent: next };
-          });
+          // Raw agent text can contain planning notes before tool calls. Keep
+          // it out of the visible chat surface; the user-facing Markdown is
+          // committed only by the terminal `done.content` payload.
+          streamingContentRef.current += d.text;
         }
         break;
       }
@@ -306,7 +325,7 @@ export function useChat({
         activeRequestIdRef.current = null;
         sessionSyncRequestedRef.current = false;
         setState((prev) => {
-          const finalContent = (d.content ?? prev.streamingContent).trim();
+          const finalContent = (d.content ?? "").trim();
           let newMessages = prev.messages;
           if (finalContent) {
             const messageId = d.message_id || createClientId();
@@ -352,6 +371,7 @@ export function useChat({
             usage: d.usage,
             executionBudget: d.execution_budget,
             status: "completed",
+            isHydratingSession: false,
           };
         });
         break;
@@ -395,6 +415,7 @@ export function useChat({
               : d.status === "idle"
                 ? "idle"
                 : d.status,
+          isHydratingSession: false,
           activity:
             isActiveStatus
               ? {
@@ -423,30 +444,15 @@ export function useChat({
         };
         finalizedRef.current = true;
         activeRunIdRef.current = d.run_id || null;
-        setState((prev) => {
-          const trimmed = prev.streamingContent.trim();
-          const partialMessage: Message | null = trimmed
-            ? {
-                id: createClientId(),
-                session_id: activeSessionIdRef.current || sessionId,
-                role: "assistant",
-                content: trimmed,
-                status: "failed",
-                created_at: new Date().toISOString(),
-              }
-            : null;
-          return {
-            ...prev,
-            status: "failed",
-            error: d.error_message,
-            streamingContent: "",
-            activity: null,
-            runStartedAt: null,
-            messages: partialMessage
-              ? [...prev.messages, partialMessage]
-              : prev.messages,
-          };
-        });
+        setState((prev) => ({
+          ...prev,
+          status: "failed",
+          isHydratingSession: false,
+          error: d.error_message,
+          streamingContent: "",
+          activity: null,
+          runStartedAt: null,
+        }));
         break;
       }
       case "cancelled": {
@@ -458,6 +464,7 @@ export function useChat({
         setState((prev) => ({
           ...prev,
           status: "cancelled",
+          isHydratingSession: false,
           activity: null,
           runStartedAt: null,
           streamingContent: "",
@@ -468,9 +475,25 @@ export function useChat({
   }, [onSessionCreated, sessionId]);
 
   const syncSessionFromServer = useCallback(async (targetSessionId: string) => {
+    if (activeSessionIdRef.current === targetSessionId) {
+      setState((prev) => ({
+        ...prev,
+        isHydratingSession: true,
+        error: null,
+      }));
+    }
+
     try {
       const res = await fetch(`/api/chat/${encodeURIComponent(targetSessionId)}`);
-      if (!res.ok) return false;
+      if (!res.ok) {
+        if (activeSessionIdRef.current === targetSessionId) {
+          setState((prev) => ({
+            ...prev,
+            isHydratingSession: false,
+          }));
+        }
+        return false;
+      }
       const data: GetChatSessionResponse = await res.json();
       if (activeSessionIdRef.current !== targetSessionId) return false;
 
@@ -478,7 +501,8 @@ export function useChat({
       finalizedRef.current = loaded.status !== "running";
       activeRunIdRef.current = loaded.activeRunId;
       activeAssistantMessageIdRef.current = loaded.activeAssistantMessageId;
-      streamingContentRef.current = loaded.streamingContent;
+      streamingContentRef.current =
+        loaded.status === "running" ? "" : loaded.streamingContent;
       sessionSyncRequestedRef.current = false;
 
       setState((prev) => ({
@@ -486,6 +510,7 @@ export function useChat({
         session: data.session,
         messages: loaded.messages,
         status: loaded.status,
+        isHydratingSession: false,
         error: null,
         activity:
           loaded.status === "running"
@@ -494,7 +519,8 @@ export function useChat({
                 label: "분석 상태 복원 중",
               }
             : null,
-        streamingContent: loaded.streamingContent,
+        streamingContent:
+          loaded.status === "running" ? "" : loaded.streamingContent,
         runId: loaded.activeRunId,
         runStartedAt: loaded.activeRunStartedAt,
         toolCalls: (data.tool_calls ?? []).map((toolCall) => ({
@@ -552,7 +578,11 @@ export function useChat({
       return true;
     } catch {
       if (activeSessionIdRef.current !== targetSessionId) return false;
-      setState((prev) => ({ ...prev, error: "채팅을 불러오지 못했습니다." }));
+      setState((prev) => ({
+        ...prev,
+        isHydratingSession: false,
+        error: "채팅을 불러오지 못했습니다.",
+      }));
       return false;
     }
   }, []);
@@ -712,7 +742,7 @@ export function useChat({
   );
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, options: SendMessageOptions = {}) => {
       if (
         !content.trim() ||
         statusRef.current === "running" ||
@@ -720,6 +750,7 @@ export function useChat({
       ) {
         return;
       }
+      const targetSessionId = options.sessionId || sessionId;
       const contentLimit = getChatContentLimit(content);
       if (content.length > contentLimit) {
         setState((prev) => ({
@@ -729,10 +760,11 @@ export function useChat({
         return;
       }
 
-      const requestId = createClientId();
+      const requestId = options.requestId || createClientId();
       sendInFlightRef.current = true;
       statusRef.current = "running";
       activeRequestIdRef.current = requestId;
+      activeSessionIdRef.current = targetSessionId || null;
       streamGenerationRef.current += 1;
       const generation = streamGenerationRef.current;
 
@@ -745,7 +777,7 @@ export function useChat({
 
       const userMessage: Message = {
         id: createClientId(),
-        session_id: sessionId || "pending",
+        session_id: targetSessionId || "pending",
         role: "user",
         content: content.trim(),
         status: "completed",
@@ -756,6 +788,7 @@ export function useChat({
         ...prev,
         messages: [...prev.messages, userMessage],
         status: "running",
+        isHydratingSession: false,
         streamingContent: "",
         error: null,
         activity: {
@@ -782,7 +815,7 @@ export function useChat({
             Accept: "text/event-stream",
           },
           body: JSON.stringify({
-            ...(sessionId ? { session_id: sessionId } : {}),
+            ...(targetSessionId ? { session_id: targetSessionId } : {}),
             content: content.trim(),
             request_id: requestId,
             research_mode: researchMode,
@@ -801,7 +834,14 @@ export function useChat({
         }
 
         const responseSessionId = response.headers.get("x-chat-session-id");
-        if (!sessionId && responseSessionId) {
+        if (!targetSessionId && responseSessionId) {
+          if (
+            abortController.signal.aborted ||
+            streamGenerationRef.current !== generation ||
+            activeRequestIdRef.current !== requestId
+          ) {
+            return;
+          }
           activeSessionIdRef.current = responseSessionId;
           onSessionCreated?.(responseSessionId);
           setState((prev) => ({
@@ -817,7 +857,7 @@ export function useChat({
         }
 
         const wasFinalized = await readStream(response, {
-          sessionId: responseSessionId || sessionId || null,
+          sessionId: responseSessionId || targetSessionId || null,
           requestId,
           generation,
         });
@@ -826,9 +866,9 @@ export function useChat({
         // an explicit terminal event. A closed SSE connection is not completion.
         if (!wasFinalized && !abortController.signal.aborted) {
           const runId = activeRunIdRef.current;
-          const targetSessionId = activeSessionIdRef.current || sessionId;
+          const reconnectSessionId = activeSessionIdRef.current || targetSessionId;
 
-          if (runId && targetSessionId) {
+          if (runId && reconnectSessionId) {
             setState((prev) => {
               if (prev.status !== "running") return prev;
               return {
@@ -840,7 +880,7 @@ export function useChat({
               };
             });
             await reconnectUntilFinalized(
-              targetSessionId,
+              reconnectSessionId,
               runId,
               abortController.signal,
               generation,
@@ -854,13 +894,43 @@ export function useChat({
           setState((prev) => ({
             ...prev,
             status: "cancelled",
+            isHydratingSession: false,
             activity: null,
             runStartedAt: null,
           }));
         } else {
+          const runId = activeRunIdRef.current;
+          const reconnectSessionId = activeSessionIdRef.current || targetSessionId;
+
+          if (
+            runId &&
+            reconnectSessionId &&
+            streamGenerationRef.current === generation
+          ) {
+            setState((prev) => ({
+              ...prev,
+              activity: {
+                stage: "preparing",
+                label: "분석 상태 복원 중",
+              },
+            }));
+
+            const recovered = await reconnectUntilFinalized(
+              reconnectSessionId,
+              runId,
+              abortController.signal,
+              generation,
+            );
+            if (recovered) return;
+
+            const synced = await syncSessionFromServer(reconnectSessionId);
+            if (synced) return;
+          }
+
           setState((prev) => ({
             ...prev,
             status: "failed",
+            isHydratingSession: false,
             error: (err as Error).message,
             activity: null,
             runStartedAt: null,
@@ -883,6 +953,7 @@ export function useChat({
       researchMode,
       scopeType,
       sessionId,
+      syncSessionFromServer,
     ],
   );
 
@@ -905,6 +976,7 @@ export function useChat({
     setState((prev) => ({
       ...prev,
       status: "cancelled",
+      isHydratingSession: false,
       activity: null,
       streamingContent: "",
       runId: null,

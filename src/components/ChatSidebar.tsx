@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { FormEvent, MouseEvent } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { buildChatSessionHref } from "@/lib/chat/history-state";
 import { useSessions } from "@/hooks/useSessions";
@@ -29,7 +29,8 @@ interface SidebarContentProps {
   mutationError: ReturnType<typeof useSessions>["mutationError"];
   renameSession: ReturnType<typeof useSessions>["renameSession"];
   deleteSession: ReturnType<typeof useSessions>["deleteSession"];
-  onNavigate?: () => void;
+  pendingNavigationSessionId?: string | null;
+  onNavigate?: (sessionId: string) => void;
   onDeleteActiveSession?: () => void;
 }
 
@@ -56,6 +57,7 @@ export default function ChatSidebar({
   refreshSignal,
 }: ChatSidebarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const {
     sessions,
     loading,
@@ -66,6 +68,13 @@ export default function ChatSidebar({
     deleteSession,
   } = useSessions();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [pendingNavigationSessionId, setPendingNavigationSessionId] =
+    useState<string | null>(null);
+
+  const closeMobileSidebar = useCallback(() => {
+    setMobileOpen(false);
+    setPendingNavigationSessionId(null);
+  }, []);
 
   useEffect(() => {
     listSessions(1, 30);
@@ -91,12 +100,36 @@ export default function ChatSidebar({
     if (!mobileOpen) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMobileOpen(false);
+      if (event.key === "Escape") closeMobileSidebar();
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [mobileOpen]);
+  }, [closeMobileSidebar, mobileOpen]);
+
+  useEffect(() => {
+    if (!pendingNavigationSessionId) return;
+    if (pathname !== "/chat") return;
+    if (activeSessionId !== pendingNavigationSessionId) return;
+
+    const timeoutId = window.setTimeout(closeMobileSidebar, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    activeSessionId,
+    closeMobileSidebar,
+    pathname,
+    pendingNavigationSessionId,
+  ]);
+
+  const handleMobileSessionNavigate = (sessionId: string) => {
+    if (pathname === "/chat" && activeSessionId === sessionId) {
+      closeMobileSidebar();
+      return;
+    }
+
+    setPendingNavigationSessionId(sessionId);
+    router.push(buildChatSessionHref(sessionId), { scroll: false });
+  };
 
   return (
     <>
@@ -121,7 +154,7 @@ export default function ChatSidebar({
               type="button"
               className="absolute inset-0 bg-black/35"
               aria-label="채팅 기록 닫기"
-              onClick={() => setMobileOpen(false)}
+              onClick={closeMobileSidebar}
               initial="hidden"
               animate="visible"
               exit="exit"
@@ -144,7 +177,7 @@ export default function ChatSidebar({
                   type="button"
                   className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-surface hover:text-ink"
                   aria-label="채팅 기록 닫기"
-                  onClick={() => setMobileOpen(false)}
+                  onClick={closeMobileSidebar}
                 >
                   <span aria-hidden="true" className="material-symbols-outlined text-[20px]">
                     close
@@ -159,10 +192,11 @@ export default function ChatSidebar({
                 mutationError={mutationError}
                 renameSession={renameSession}
                 deleteSession={deleteSession}
-                onNavigate={() => setMobileOpen(false)}
+                pendingNavigationSessionId={pendingNavigationSessionId}
+                onNavigate={handleMobileSessionNavigate}
                 onDeleteActiveSession={() => {
-                  setMobileOpen(false);
-                  router.replace("/chat");
+                  closeMobileSidebar();
+                  router.replace("/chat/new");
                 }}
               />
             </motion.aside>
@@ -179,7 +213,8 @@ export default function ChatSidebar({
           mutationError={mutationError}
           renameSession={renameSession}
           deleteSession={deleteSession}
-          onDeleteActiveSession={() => router.replace("/chat")}
+          pendingNavigationSessionId={null}
+          onDeleteActiveSession={() => router.replace("/chat/new")}
         />
       </aside>
     </>
@@ -194,6 +229,7 @@ function SidebarContent({
   mutationError,
   renameSession,
   deleteSession,
+  pendingNavigationSessionId,
   onNavigate,
   onDeleteActiveSession,
 }: SidebarContentProps) {
@@ -273,19 +309,6 @@ function SidebarContent({
 
   return (
     <>
-      <div className="border-b border-hairline p-md">
-        <Link
-          href="/chat"
-          className="flex h-11 items-center justify-center gap-xs rounded-[8px] bg-surface-dark px-md text-[14px] font-bold text-on-dark transition-colors hover:bg-primary-active"
-          onClick={onNavigate}
-        >
-          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
-            add
-          </span>
-          새 채팅
-        </Link>
-      </div>
-
       <div ref={menuRootRef} className="flex-1 overflow-y-auto p-sm">
         {(mutationError || notice) && (
           <div
@@ -326,6 +349,7 @@ function SidebarContent({
                   key={session.id}
                   session={session}
                   isActive={isActive}
+                  isNavigating={pendingNavigationSessionId === session.id}
                   isRunning={isRunning}
                   isMenuOpen={menuOpenId === session.id}
                   isEditing={editingSessionId === session.id}
@@ -368,6 +392,7 @@ function SidebarContent({
 function SessionRow({
   session,
   isActive,
+  isNavigating,
   isRunning,
   isMenuOpen,
   isEditing,
@@ -384,13 +409,14 @@ function SessionRow({
 }: {
   session: SessionSummary;
   isActive: boolean;
+  isNavigating: boolean;
   isRunning: boolean;
   isMenuOpen: boolean;
   isEditing: boolean;
   isBusy: boolean;
   editingTitle: string;
   reducedMotion: boolean;
-  onNavigate?: () => void;
+  onNavigate?: (sessionId: string) => void;
   onMenuToggle: () => void;
   onRename: () => void;
   onDelete: () => void;
@@ -398,6 +424,22 @@ function SessionRow({
   onEditingTitleChange: (value: string) => void;
   onRenameSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const handleSessionClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!onNavigate) return;
+    if (
+      event.defaultPrevented ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    onNavigate(session.id);
+  };
+
   return (
     <motion.div
       layout="position"
@@ -466,11 +508,12 @@ function SessionRow({
             href={buildChatSessionHref(session.id)}
             className={[
               "block rounded-[8px] border py-xs pl-sm pr-10 transition-colors",
-              isActive
+              isActive || isNavigating
                 ? "border-primary bg-primary-fixed text-on-primary-fixed"
                 : "border-transparent hover:border-hairline hover:bg-canvas",
             ].join(" ")}
-            onClick={onNavigate}
+            aria-busy={isNavigating}
+            onClick={handleSessionClick}
           >
             <div className="flex items-start justify-between gap-xs">
               <div className="min-w-0">
@@ -481,7 +524,12 @@ function SessionRow({
                   {session.last_message_preview || "아직 메시지가 없습니다."}
                 </p>
               </div>
-              {isRunning && (
+              {isNavigating ? (
+                <span
+                  className="mt-[3px] h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-primary-container/25 border-t-primary-container"
+                  aria-label="채팅 여는 중"
+                />
+              ) : isRunning && (
                 <span
                   className="relative mt-[3px] h-2.5 w-2.5 shrink-0"
                   aria-label="응답 생성 중"

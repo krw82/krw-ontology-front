@@ -13,6 +13,11 @@ export function buildChatSessionHref(sessionId: string): string {
   return `/chat?sessionId=${encodeURIComponent(sessionId)}`;
 }
 
+export function buildNewChatHref(params?: URLSearchParams): string {
+  const query = params?.toString();
+  return `/chat/new${query ? `?${query}` : ""}`;
+}
+
 export function getSessionTickers(
   session: Pick<Session, "default_tickers"> | null | undefined,
   fallbackTicker?: string | null,
@@ -66,7 +71,7 @@ export function deriveLoadedChatState(
     messages: streamingAssistant
       ? messages.filter((message) => message.id !== streamingAssistant.id)
       : messages,
-    streamingContent: streamingAssistant?.content ?? "",
+    streamingContent: "",
     activeRunId: latestRun.id,
     activeAssistantMessageId: streamingAssistant?.id ?? latestRun.assistant_message_id,
     activeRunStartedAt: latestRun.started_at,

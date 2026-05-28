@@ -10,6 +10,7 @@ describe("analytics event schema helpers", () => {
     expect(isAnalyticsEventName("page_viewed")).toBe(true);
     expect(isAnalyticsEventName("cta_clicked")).toBe(true);
     expect(isAnalyticsEventName("question_prefilled")).toBe(true);
+    expect(isAnalyticsEventName("suggested_question_clicked")).toBe(true);
     expect(isAnalyticsEventName("question_submitted")).toBe(true);
     expect(isAnalyticsEventName("Question Submitted")).toBe(false);
     expect(isAnalyticsEventName("raw_question_saved")).toBe(false);
@@ -25,7 +26,7 @@ describe("analytics event schema helpers", () => {
       properties: {
         ticker: "AAPL",
         question_length: 84,
-        raw_question: undefined,
+        raw_question: "애플의 리스크를 원문으로 길게 알려줘",
       },
       path: "/chat?ticker=AAPL",
       referrer: " https://example.com/path ",
@@ -50,6 +51,7 @@ describe("analytics event schema helpers", () => {
         question_length: 84,
       },
     });
+    expect(JSON.stringify(insert?.properties)).not.toContain("애플의 리스크");
   });
 
   it("refuses anonymous events without any identity", () => {
@@ -68,8 +70,12 @@ describe("analytics event schema helpers", () => {
       date: new Date("2026-05-23T00:00:00.000Z"),
       long: "x".repeat(700),
       fn: () => "skip",
+      raw_question: "민감한 질문 원문",
+      rawQuestion: "카멜케이스 질문 원문",
+      full_answer: "긴 답변 전문",
       nested: {
         arr: Array.from({ length: 40 }, (_, index) => index),
+        prompt: "추천 질문 원문",
       },
     });
 
@@ -84,5 +90,9 @@ describe("analytics event schema helpers", () => {
     expect(JSON.stringify(sanitized)).not.toContain("badNumber");
     expect(JSON.stringify(sanitized)).not.toContain("fn");
     expect(JSON.stringify(sanitized)).not.toContain("missing");
+    expect(JSON.stringify(sanitized)).not.toContain("민감한 질문 원문");
+    expect(JSON.stringify(sanitized)).not.toContain("카멜케이스 질문 원문");
+    expect(JSON.stringify(sanitized)).not.toContain("긴 답변 전문");
+    expect(JSON.stringify(sanitized)).not.toContain("추천 질문 원문");
   });
 });

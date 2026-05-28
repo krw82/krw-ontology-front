@@ -121,7 +121,7 @@ export default function Home() {
           <KrwBrand compact />
 
           <div className="hidden items-center gap-8 text-sm font-semibold text-muted md:flex">
-            <Link href="/chat" className="transition-colors hover:text-ink">
+            <Link href="/chat/new" className="transition-colors hover:text-ink">
               리서치
             </Link>
             <Link

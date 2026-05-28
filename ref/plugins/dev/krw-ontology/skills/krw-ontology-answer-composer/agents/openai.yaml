@@ -1,0 +1,4 @@
+interface:
+  display_name: "KRW Ontology Answer Composer"
+  short_description: "Create display plans only when structured frontend handoff is explicitly requested"
+  default_prompt: "Use $krw-ontology-answer-composer only for explicit structured display planning after validated research content exists. Return display_plan metadata only. Do not retrieve evidence, rewrite content, add facts, narrate progress, or mention internal implementation terms in user-facing text."

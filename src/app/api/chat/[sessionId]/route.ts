@@ -62,7 +62,7 @@ export async function GET(
   const { data: runs } = await supabase
     .from("agent_runs")
     .select(
-      "id, status, model, assistant_message_id, queued_at, started_at, finished_at, latency_ms, input_tokens, output_tokens, estimated_cost_usd, ontology_release_id, index_generated_at, error_code, error_message"
+      "id, status, model, assistant_message_id, queued_at, started_at, finished_at, latency_ms, input_tokens, output_tokens, estimated_cost_usd, ontology_env, worker_env, ontology_release_id, index_generated_at, company_count, document_count, object_count, ontology_root, index_path, manifest_path, manifest_valid, agent_index_schema_version, error_code, error_message"
     )
     .eq("session_id", sessionId)
     .order("queued_at", { ascending: true, nullsFirst: true })

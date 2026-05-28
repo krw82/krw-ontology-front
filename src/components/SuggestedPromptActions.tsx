@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import type { MouseEvent } from "react";
 import { useEffect, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
+import { trackClientEventWithTimeout } from "@/lib/analytics/client";
 import { cn } from "@/lib/utils";
 
 const promptCycleIntervalMs = 2200;
@@ -14,6 +17,13 @@ interface SuggestedPromptActionsProps {
   className?: string;
   disabled?: boolean;
   hrefs?: readonly string[];
+  analytics?: {
+    promptCategory?: string;
+    promptIds?: readonly string[];
+    sourceSurface: string;
+    ticker?: string | null;
+    tickers?: readonly string[];
+  };
   onSelect?: (prompt: string) => void;
 }
 
@@ -72,8 +82,10 @@ export default function SuggestedPromptActions({
   className,
   disabled = false,
   hrefs,
+  analytics,
   onSelect,
 }: SuggestedPromptActionsProps) {
+  const router = useRouter();
   const [rawActivePromptIndex, setRawActivePromptIndex] = useState(0);
   const activePromptIndex =
     prompts.length > 0 ? rawActivePromptIndex % prompts.length : 0;
@@ -94,6 +106,19 @@ export default function SuggestedPromptActions({
 
   const itemClassName =
     "group relative flex w-full items-center gap-3 overflow-hidden rounded-[10px] px-3 py-3 text-left text-[14px] font-semibold leading-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60";
+
+  const trackPromptClick = (prompt: string, index: number): Promise<void> => {
+    if (!analytics) return Promise.resolve();
+    return trackClientEventWithTimeout("suggested_question_clicked", {
+      source_surface: analytics.sourceSurface,
+      ticker: analytics.ticker ?? analytics.tickers?.[0] ?? null,
+      tickers: analytics.tickers ?? (analytics.ticker ? [analytics.ticker] : []),
+      prompt_id: analytics.promptIds?.[index] ?? `${groupId}_${index + 1}`,
+      prompt_rank: index + 1,
+      prompt_category: analytics.promptCategory ?? null,
+      prompt_length: prompt.length,
+    });
+  };
 
   return (
     <div className={cn("space-y-1", className)}>
@@ -132,7 +157,17 @@ export default function SuggestedPromptActions({
                     event.preventDefault();
                     return;
                   }
+                  const tracking = trackPromptClick(prompt, index);
                   onSelect?.(prompt);
+
+                  if (!shouldHandleClientNavigation(event, href)) {
+                    void tracking;
+                    return;
+                  }
+                  event.preventDefault();
+                  void tracking.finally(() => {
+                    router.push(href);
+                  });
                 }}
               >
                 <PromptContent
@@ -149,7 +184,10 @@ export default function SuggestedPromptActions({
               type="button"
               key={prompt}
               {...sharedProps}
-              onClick={() => onSelect?.(prompt)}
+              onClick={() => {
+                void trackPromptClick(prompt, index);
+                onSelect?.(prompt);
+              }}
               disabled={disabled}
             >
               <PromptContent
@@ -162,5 +200,19 @@ export default function SuggestedPromptActions({
         })}
       </LayoutGroup>
     </div>
+  );
+}
+
+function shouldHandleClientNavigation(
+  event: MouseEvent<HTMLAnchorElement>,
+  destination: string,
+): boolean {
+  return (
+    event.button === 0 &&
+    !event.metaKey &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.shiftKey &&
+    destination.startsWith("/")
   );
 }

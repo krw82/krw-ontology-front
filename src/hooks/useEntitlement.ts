@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { EntitlementStatus } from "@/types/entitlement";
 
 interface EntitlementResponse {
@@ -18,8 +18,16 @@ export function useEntitlement(enabled = true): UseEntitlementResult {
   const [entitlement, setEntitlement] = useState<EntitlementStatus | null>(null);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
+  const mountedRef = useRef(false);
 
-  const refresh = useCallback(async () => {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const refresh = useCallback(async (signal?: AbortSignal) => {
     if (!enabled) {
       return;
     }
@@ -27,6 +35,7 @@ export function useEntitlement(enabled = true): UseEntitlementResult {
     try {
       const response = await fetch("/api/me/entitlement", {
         cache: "no-store",
+        signal,
       });
 
       if (!response.ok) {
@@ -34,24 +43,34 @@ export function useEntitlement(enabled = true): UseEntitlementResult {
       }
 
       const payload = (await response.json()) as EntitlementResponse;
+      if (!mountedRef.current) return;
       setEntitlement(payload.entitlement ?? null);
       setError(null);
-    } catch {
+    } catch (error) {
+      if ((error as Error).name === "AbortError") return;
+      if (!mountedRef.current) return;
       setError("사용량 정보를 불러오지 못했습니다.");
       setEntitlement(null);
     } finally {
+      if (!mountedRef.current) return;
       setLoading(false);
     }
   }, [enabled]);
 
   useEffect(() => {
     if (!enabled) return;
+    const abortController = new AbortController();
     const timeoutId = window.setTimeout(() => {
-      void refresh();
+      void refresh(abortController.signal);
     }, 0);
 
-    return () => window.clearTimeout(timeoutId);
+    return () => {
+      window.clearTimeout(timeoutId);
+      abortController.abort();
+    };
   }, [enabled, refresh]);
 
-  return { entitlement, loading, error, refresh };
+  const refreshPublic = useCallback(() => refresh(), [refresh]);
+
+  return { entitlement, loading, error, refresh: refreshPublic };
 }

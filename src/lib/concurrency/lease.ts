@@ -1,10 +1,11 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { readIntEnv } from "@/lib/env";
+import { closeOpenToolCallsForRuns } from "@/lib/agent/tool-call-cleanup";
 
 const GLOBAL_CONCURRENT_LIMIT = readIntEnv("GLOBAL_CONCURRENT_RUN_LIMIT", 5, {
   min: 1,
 });
-const LEASE_TIMEOUT_MINUTES = readIntEnv("LEASE_TIMEOUT_MINUTES", 5, {
+const LEASE_TIMEOUT_MINUTES = readIntEnv("LEASE_TIMEOUT_MINUTES", 10, {
   min: 1,
 });
 const LEASE_HEARTBEAT_INTERVAL_MS =
@@ -20,7 +21,7 @@ const LEASE_EXPIRED_MESSAGE =
   "분석 시간이 초과되었습니다. 다시 시도해주세요.";
 const HARD_RUN_TIMEOUT_MINUTES = readIntEnv(
   "AGENT_RUN_HARD_TIMEOUT_MINUTES",
-  15,
+  6,
   { min: 1 },
 );
 
@@ -191,6 +192,13 @@ async function cleanupExpiredRuns(
       finished_at: nowIso,
     })
     .in("id", runIds);
+
+  await closeOpenToolCallsForRuns({
+    admin,
+    runIds,
+    finishedAt: nowIso,
+    errorMessage: "Lease expired before tool result was received",
+  });
 
   if (assistantMessageIds.length > 0) {
     await admin

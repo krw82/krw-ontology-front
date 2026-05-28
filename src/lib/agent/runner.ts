@@ -50,7 +50,45 @@ const MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const DEFAULT_MAX_TURNS = 20;
 const DEFAULT_AGENT_WORKSPACE_DIR = ".agent-workspace";
 const TOOL_BUDGET_EXCEEDED = "tool_budget_exceeded";
+const TOOL_RESULT_MISSING = "tool_result_missing";
 const COMPOSE_EVIDENCE_CHAR_LIMIT = 18_000;
+const KOREAN_BROAD_RESEARCH_TOOL_SET = new Set<MCPToolName>([
+  "krw_ontology_query_context",
+  "krw_ontology_query",
+  "krw_ontology_retrieve",
+]);
+const BROAD_KOREAN_RESEARCH_TERMS = [
+  "섹터",
+  "업종",
+  "산업",
+  "매크로",
+  "거시",
+  "시장",
+  "환경",
+  "기업들",
+  "회사들",
+  "소비재",
+  "필수소비재",
+  "임의소비재",
+  "경기소비재",
+  "금융주",
+  "은행주",
+  "반도체",
+  "소프트웨어",
+  "헬스케어",
+  "바이오",
+  "에너지",
+  "산업재",
+  "통신",
+  "수혜",
+  "찾아",
+  "찾아봐",
+  "찾아줘",
+  "어떤 기업",
+  "어떤 회사",
+  "전반",
+  "전체",
+];
 
 export interface AgentRunOptions {
   sessionId: string;
@@ -429,9 +467,9 @@ async function runSdkPass(params: {
       }
 
       if (message.type === "result") {
-        const closedToolCalls = closeOpenToolCalls(acc, openToolCalls, passName);
-        for (const toolCall of closedToolCalls) {
-          await options.onToolCallEnd?.(toolCall);
+        if (openToolCalls.size > 0) {
+          finalResult = pendingToolResultsFailure(acc, openToolCalls);
+          break;
         }
 
         if (message.subtype === "success") {
@@ -457,6 +495,10 @@ async function runSdkPass(params: {
           };
         }
       }
+    }
+
+    if (!finalResult && openToolCalls.size > 0) {
+      return pendingToolResultsFailure(acc, openToolCalls);
     }
 
     return finalResult ?? { acc, status: "completed" };
@@ -649,6 +691,8 @@ export async function canUseTool(
 ): Promise<PermissionResult> {
   if (isKrwOntologySdkTool(toolName)) {
     const mcpToolName = normalizeMcpToolName(toolName);
+    const broadKoreanGuard = denyBroadKoreanResearchInput(mcpToolName, input);
+    if (broadKoreanGuard) return broadKoreanGuard;
     return allowWithFullResponseDetailDowngrade(mcpToolName, input);
   }
 
@@ -689,6 +733,9 @@ function createToolPermissionGuard(
         message: "Unknown KRW Ontology MCP tool.",
       };
     }
+
+    const broadKoreanGuard = denyBroadKoreanResearchInput(mcpToolName, input);
+    if (broadKoreanGuard) return broadKoreanGuard;
 
     const allowedMcpTools = new Set(getAllowedMcpToolsForResearchMode(mode));
     if (!allowedMcpTools.has(mcpToolName)) {
@@ -773,6 +820,54 @@ function allowWithFullResponseDetailDowngrade(
     };
   }
   return { behavior: "allow" };
+}
+
+function denyBroadKoreanResearchInput(
+  mcpToolName: MCPToolName | null,
+  input: Record<string, unknown>,
+): PermissionResult | null {
+  if (!mcpToolName || !KOREAN_BROAD_RESEARCH_TOOL_SET.has(mcpToolName)) {
+    return null;
+  }
+
+  const text = collectResearchInputText(input);
+  if (!containsKorean(text) || !containsBroadKoreanResearchIntent(text)) {
+    return null;
+  }
+
+  return {
+    behavior: "deny",
+    message: [
+      "Do not send Korean broad sector/global/macro/discovery text to KRW Ontology MCP tools.",
+      "Rewrite the user intent as an internal English research brief, include a bounded ticker set when possible, and retry with English question/topic arguments.",
+    ].join(" "),
+  };
+}
+
+function collectResearchInputText(input: Record<string, unknown>): string {
+  const values: string[] = [];
+  for (const key of ["question", "topic", "query", "topics"]) {
+    const value = input[key];
+    if (typeof value === "string") {
+      values.push(value);
+    } else if (Array.isArray(value)) {
+      values.push(
+        ...value.filter((item): item is string => typeof item === "string"),
+      );
+    }
+  }
+  return values.join(" ");
+}
+
+function containsKorean(text: string): boolean {
+  return /[가-힣]/.test(text);
+}
+
+function containsBroadKoreanResearchIntent(text: string): boolean {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  return BROAD_KOREAN_RESEARCH_TERMS.some((term) =>
+    normalized.includes(term),
+  );
 }
 
 function toolBudgetViolation(
@@ -1329,21 +1424,17 @@ function normalizeMcpToolName(name: unknown): MCPToolName | null {
   return bareName as MCPToolName;
 }
 
-function closeOpenToolCalls(
+function pendingToolResultsFailure(
   acc: AccumulatedRun,
   openToolCalls: Set<string>,
-  passName: "research" | "composer",
-) {
-  const closed: AccumulatedToolCall[] = [];
-  for (const toolCallId of openToolCalls) {
-    const toolCall = endToolCall(acc, toolCallId, "Completed by KRW-AI Agent SDK", null);
-    if (toolCall) {
-      closed.push(toolCall);
-    }
-    logToolDuration(acc, toolCallId, passName, "closed");
-  }
-  openToolCalls.clear();
-  return closed;
+): AgentRunResult {
+  const pendingToolIds = Array.from(openToolCalls);
+  return {
+    acc,
+    status: "failed",
+    errorCode: TOOL_RESULT_MISSING,
+    errorMessage: `Agent run ended before ${pendingToolIds.length} tool result(s) were received.`,
+  };
 }
 
 function toolCallDurationMs(acc: AccumulatedRun, toolCallId: string): number {
@@ -1495,6 +1586,9 @@ function errorCodeFromMessage(message: string): AgentRunResult["errorCode"] {
   ) {
     return TOOL_BUDGET_EXCEEDED;
   }
+  if (lower.includes("before tool result was received")) {
+    return TOOL_RESULT_MISSING;
+  }
   if (
     lower.includes("not logged in") ||
     lower.includes("please run /login") ||
@@ -1522,6 +1616,9 @@ function userFacingErrorMessage(
   }
   if (code === "mcp_unavailable") {
     return "온톨로지 도구 연결을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.";
+  }
+  if (code === TOOL_RESULT_MISSING) {
+    return "온톨로지 도구 결과를 받기 전에 실행이 종료되었습니다. 잠시 후 다시 시도해주세요.";
   }
 
   if (process.env.NODE_ENV !== "production") {

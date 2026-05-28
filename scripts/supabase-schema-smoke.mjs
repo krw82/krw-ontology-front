@@ -62,6 +62,18 @@ const checks = [
     select: "id,request_id,sdk_diagnostics",
   },
   {
+    table: "agent_worker_heartbeats",
+    select: "worker_id,ontology_env,ontology_release_id,manifest_valid",
+  },
+  {
+    table: "ontology_catalog_releases",
+    select: "env,release_id,active,company_count,document_count",
+  },
+  {
+    table: "ontology_companies",
+    select: "env,release_id,ticker,name,document_count",
+  },
+  {
     table: "message_shares",
     select: "id,token,revoked_at",
   },

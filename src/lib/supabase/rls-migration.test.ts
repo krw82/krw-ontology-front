@@ -14,11 +14,19 @@ const softDeleteRlsMigrationPath = join(
   process.cwd(),
   "supabase/migrations/20260522004000_soft_delete_rls.sql",
 );
+const workerHeartbeatRlsMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260528002000_harden_agent_worker_heartbeats_rls.sql",
+);
 
 describe("harden chat RLS migration", () => {
   const migration = readFileSync(migrationPath, "utf8");
   const leaseReadMigration = readFileSync(leaseReadMigrationPath, "utf8");
   const softDeleteRlsMigration = readFileSync(softDeleteRlsMigrationPath, "utf8");
+  const workerHeartbeatRlsMigration = readFileSync(
+    workerHeartbeatRlsMigrationPath,
+    "utf8",
+  );
 
   it("revokes direct client writes from server-owned chat tables", () => {
     expect(migration).toContain("REVOKE INSERT, UPDATE, DELETE ON TABLE");
@@ -68,5 +76,22 @@ describe("harden chat RLS migration", () => {
     expect(softDeleteRlsMigration).toContain("sessions_select_own");
     expect(softDeleteRlsMigration).toContain("sessions_update_own");
     expect(softDeleteRlsMigration).toContain("sessions_delete_own");
+  });
+
+  it("keeps agent worker heartbeat state server-only", () => {
+    expect(workerHeartbeatRlsMigration).toContain(
+      "ALTER TABLE public.agent_worker_heartbeats ENABLE ROW LEVEL SECURITY",
+    );
+    expect(workerHeartbeatRlsMigration).toContain(
+      "REVOKE ALL ON TABLE public.agent_worker_heartbeats",
+    );
+    expect(workerHeartbeatRlsMigration).toContain(
+      "FROM PUBLIC, anon, authenticated",
+    );
+    expect(workerHeartbeatRlsMigration).toContain(
+      "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.agent_worker_heartbeats",
+    );
+    expect(workerHeartbeatRlsMigration).toContain("TO service_role");
+    expect(workerHeartbeatRlsMigration).not.toMatch(/CREATE\s+POLICY/i);
   });
 });

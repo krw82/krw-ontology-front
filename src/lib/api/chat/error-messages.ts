@@ -17,6 +17,7 @@ const PUBLIC_ERROR_MESSAGES: Record<ErrorCode, string> = {
   lease_expired: "분석 시간이 초과되었습니다. 다시 시도해주세요.",
   cancelled: "응답 생성을 취소했습니다.",
   mcp_unavailable: "온톨로지 도구 연결을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.",
+  worker_unavailable: "분석 워커가 준비되지 않았습니다. 잠시 후 다시 시도해주세요.",
   mcp_error: "온톨로지 도구 실행 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
   claude_api_error: "에이전트 실행 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
   claude_rate_limited: "현재 모델 요청 한도에 도달했습니다. 잠시 후 다시 시도해주세요.",

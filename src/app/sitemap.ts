@@ -1,10 +1,41 @@
 import type { MetadataRoute } from "next";
-import { absoluteUrl, QUESTION_TOPIC_PAGES } from "@/lib/marketing/site";
-import { listIndexedCompanies } from "@/lib/ontology/catalog";
+import {
+  hasCompanyLandingCopyForTicker,
+  listCompanyLandingCopyTickers,
+} from "@/lib/companies/landing-copy";
+import { absoluteUrl } from "@/lib/marketing/site";
+import {
+  type IndexedCompany,
+  listIndexedCompanies,
+} from "@/lib/ontology/catalog";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+type SitemapCompany = Pick<IndexedCompany, "ticker" | "generated_at">;
+
+async function listSitemapCompanies(): Promise<SitemapCompany[]> {
+  const indexedCompanies = await listIndexedCompanies().catch(() => []);
+  const indexedWithCopy = indexedCompanies.filter((company) =>
+    hasCompanyLandingCopyForTicker(company.ticker),
+  );
+
+  if (indexedWithCopy.length > 0) {
+    return indexedWithCopy.map((company) => ({
+      ticker: company.ticker,
+      generated_at: company.generated_at,
+    }));
+  }
+
+  return listCompanyLandingCopyTickers().map((ticker) => ({
+    ticker,
+    generated_at: null,
+  }));
+}
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
-  const companies = await listIndexedCompanies().catch(() => []);
+  const companies = await listSitemapCompanies();
   const lastModified = (value: string | null | undefined) => {
     if (!value) return now;
     const date = new Date(value);
@@ -31,12 +62,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     },
     {
-      url: absoluteUrl("/questions"),
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.78,
-    },
-    {
       url: absoluteUrl("/privacy"),
       lastModified: now,
       changeFrequency: "yearly",
@@ -53,12 +78,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: lastModified(company.generated_at),
       changeFrequency: "weekly" as const,
       priority: 0.75,
-    })),
-    ...QUESTION_TOPIC_PAGES.map((topic) => ({
-      url: absoluteUrl(`/questions/${topic.slug}`),
-      lastModified: now,
-      changeFrequency: "monthly" as const,
-      priority: 0.65,
     })),
   ];
 }

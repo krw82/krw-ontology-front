@@ -74,6 +74,8 @@ export function useResearchModePreference(
   );
 
   useEffect(() => {
+    if (!CLIENT_RESEARCH_MODE_PREFERENCE_ENABLED) return;
+
     const previousSessionId = previousSessionIdRef.current;
     previousSessionIdRef.current = sessionId;
 

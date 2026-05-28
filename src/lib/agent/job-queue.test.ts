@@ -41,7 +41,11 @@ const mcpHealth = {
   commandOk: true,
   liveOk: true,
   sqliteOk: true,
+  env: "dev",
   releaseId: "release-1",
+  manifestPath: "/srv/krw-ontology-data/current/manifest.json",
+  manifestValid: true,
+  agentIndexSchemaVersion: "agent_index_v1",
   indexGeneratedAt: "2026-05-25T00:00:00.000Z",
   companyCount: 74,
   documentCount: 300,
@@ -51,6 +55,11 @@ const mcpHealth = {
   root: "/srv/krw-ontology-data/current",
   indexPath: "/srv/krw-ontology-data/current/indexes/agent_index.sqlite",
   pluginPath: "/srv/krw-ontology/plugins/krw-ontology",
+  releaseMetadata: {
+    env: "dev",
+    release_id: "release-1",
+    manifest_valid: true,
+  },
 } satisfies McpHealthResult;
 
 function createQueueAdmin(params: {
@@ -235,8 +244,11 @@ describe("agent job queue", () => {
           model: "sonnet",
           status: "queued",
           ontology_release_id: "release-1",
+          ontology_env: "dev",
           company_count: 74,
           document_count: 300,
+          object_count: 1000,
+          manifest_valid: true,
         }),
       },
     ]);
@@ -360,6 +372,8 @@ describe("agent job queue", () => {
       "claim_agent_run",
       expect.objectContaining({
         p_worker_id: "worker-1",
+        p_worker_env: "dev",
+        p_ontology_env: "dev",
         p_global_limit: expect.any(Number),
         p_lease_seconds: expect.any(Number),
       }),

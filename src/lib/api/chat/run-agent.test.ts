@@ -115,6 +115,9 @@ function createFakeAdmin(params: {
         inFilters[key] = value;
         return query;
       },
+      is() {
+        return query;
+      },
       order() {
         return query;
       },
@@ -138,6 +141,15 @@ function createFakeAdmin(params: {
           );
         });
         return Promise.resolve({ data: matched[0] ?? null, error: null });
+      },
+      returns() {
+        if (table === "tool_calls") {
+          return Promise.resolve({
+            data: [{ id: "tool-open-1", error_message: null }],
+            error: null,
+          });
+        }
+        return Promise.resolve({ data: [], error: null });
       },
       then(resolve: (value: { data: null; error: null }) => unknown) {
         updates.push({ table, payload: payload ?? {} });
@@ -265,6 +277,13 @@ describe("streamPersistedRunEvents", () => {
           payload: expect.objectContaining({
             status: "failed",
             content: "분석 시간이 초과되었습니다. 다시 시도해주세요.",
+          }),
+        }),
+        expect.objectContaining({
+          table: "tool_calls",
+          payload: expect.objectContaining({
+            finished_at: expect.any(String),
+            error_message: "Lease expired before tool result was received",
           }),
         }),
       ]),

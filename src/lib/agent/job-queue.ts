@@ -1,10 +1,10 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { readIntEnv } from "@/lib/env";
+import { getOntologyEnv, readIntEnv } from "@/lib/env";
 import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import type { McpHealthResult } from "@/lib/agent/mcp-client";
 import type { ResolvedSession } from "@/lib/api/chat/resolve-session";
 import type { HistoryResult } from "@/lib/api/chat/fetch-history";
-import type { AgentRunRow, MessageRow } from "@/types/database";
+import type { AgentRunRow, Json, MessageRow } from "@/types/database";
 import type { RunStatus } from "@/types/api-contracts";
 import {
   DEFAULT_RESEARCH_MODE,
@@ -16,7 +16,7 @@ const GLOBAL_CONCURRENT_LIMIT = readIntEnv("GLOBAL_CONCURRENT_RUN_LIMIT", 5, {
   min: 1,
 });
 const LEASE_TIMEOUT_SECONDS =
-  readIntEnv("LEASE_TIMEOUT_MINUTES", 5, { min: 1 }) * 60;
+  readIntEnv("LEASE_TIMEOUT_MINUTES", 10, { min: 1 }) * 60;
 
 export type EnqueueAgentRunResult =
   | {
@@ -40,6 +40,7 @@ export async function enqueueAgentRun(params: {
   researchMode?: ResearchMode;
 }): Promise<EnqueueAgentRunResult> {
   const { session, history, requestId, model, mcpHealth } = params;
+  const ontologyEnv = getOntologyEnv();
   const researchMode = normalizeResearchMode(
     params.researchMode ?? DEFAULT_RESEARCH_MODE,
   );
@@ -82,10 +83,18 @@ export async function enqueueAgentRun(params: {
       queued_at: queuedAt,
       web_commit: process.env.WEB_COMMIT || "dev",
       krw_ontology_commit: process.env.KRW_ONTOLOGY_COMMIT || "dev",
+      ontology_env: ontologyEnv,
       ontology_release_id: mcpHealth.releaseId,
       index_generated_at: mcpHealth.indexGeneratedAt,
       company_count: mcpHealth.companyCount,
       document_count: mcpHealth.documentCount,
+      object_count: mcpHealth.objectCount,
+      ontology_root: mcpHealth.root,
+      index_path: mcpHealth.indexPath,
+      manifest_path: mcpHealth.manifestPath,
+      manifest_valid: mcpHealth.manifestValid,
+      agent_index_schema_version: mcpHealth.agentIndexSchemaVersion,
+      ontology_manifest: releaseSnapshot(mcpHealth),
     })
     .select("id")
     .single<Pick<AgentRunRow, "id">>();
@@ -130,8 +139,11 @@ export async function enqueueAgentRun(params: {
 }
 
 export async function claimNextAgentRun(workerId: string): Promise<string | null> {
+  const ontologyEnv = getOntologyEnv();
   const { data, error } = await getSupabaseAdmin().rpc("claim_agent_run", {
     p_worker_id: workerId,
+    p_worker_env: ontologyEnv,
+    p_ontology_env: ontologyEnv,
     p_lease_seconds: LEASE_TIMEOUT_SECONDS,
     p_global_limit: GLOBAL_CONCURRENT_LIMIT,
   });
@@ -146,6 +158,24 @@ export async function claimNextAgentRun(workerId: string): Promise<string | null
 
   const row = Array.isArray(data) ? data[0] : data;
   return typeof row?.id === "string" ? row.id : null;
+}
+
+function releaseSnapshot(mcpHealth: McpHealthResult): Json {
+  return (
+    mcpHealth.releaseMetadata ?? {
+      env: mcpHealth.env,
+      release_id: mcpHealth.releaseId,
+      manifest_path: mcpHealth.manifestPath,
+      manifest_valid: mcpHealth.manifestValid,
+      agent_index_schema_version: mcpHealth.agentIndexSchemaVersion,
+      index_generated_at: mcpHealth.indexGeneratedAt,
+      root: mcpHealth.root,
+      index_path: mcpHealth.indexPath,
+      company_count: mcpHealth.companyCount,
+      document_count: mcpHealth.documentCount,
+      object_count: mcpHealth.objectCount,
+    }
+  );
 }
 
 export async function heartbeatAgentRun(

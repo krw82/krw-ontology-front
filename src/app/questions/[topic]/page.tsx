@@ -40,6 +40,7 @@ export async function generateMetadata({
     title: `${topic.shortTitle} 질문 그래프`,
     description: topic.description,
     path: `/questions/${topic.slug}`,
+    noIndex: true,
   });
 }
 

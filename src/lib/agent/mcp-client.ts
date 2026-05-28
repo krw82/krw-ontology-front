@@ -5,6 +5,8 @@ import { constants } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import { normalizeOntologyEnv, type OntologyEnv } from "@/lib/env";
+import type { Json } from "@/types/database";
 
 const KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX =
   "mcp__plugin_krw-ontology_krw-ontology__";
@@ -45,7 +47,11 @@ export interface McpHealthResult {
   commandOk: boolean;
   liveOk: boolean;
   sqliteOk: boolean;
+  env: OntologyEnv | null;
   releaseId: string | null;
+  manifestPath: string | null;
+  manifestValid: boolean;
+  agentIndexSchemaVersion: string | null;
   indexGeneratedAt: string | null;
   companyCount: number | null;
   documentCount: number | null;
@@ -55,6 +61,7 @@ export interface McpHealthResult {
   root: string | null;
   indexPath: string | null;
   pluginPath: string;
+  releaseMetadata: Json | null;
   error?: string;
 }
 
@@ -62,12 +69,18 @@ interface PluginMcpConfig {
   mcpServers?: Record<
     string,
     {
+      type?: "stdio" | "http" | "sse";
       command?: string;
       args?: string[];
       env?: Record<string, string>;
+      url?: string;
+      headers?: Record<string, string>;
+      alwaysLoad?: boolean;
     }
   >;
 }
+
+type PluginMcpServerConfig = NonNullable<PluginMcpConfig["mcpServers"]>[string];
 
 export function getKrwOntologyPluginPath(): string {
   const pluginPath =
@@ -109,7 +122,11 @@ function baseHealthResult(
     commandOk: false,
     liveOk: false,
     sqliteOk: false,
+    env: null,
     releaseId: null,
+    manifestPath: null,
+    manifestValid: false,
+    agentIndexSchemaVersion: null,
     indexGeneratedAt: null,
     companyCount: null,
     documentCount: null,
@@ -119,6 +136,7 @@ function baseHealthResult(
     root,
     indexPath: null,
     pluginPath,
+    releaseMetadata: null,
   };
 }
 
@@ -129,7 +147,7 @@ function getHealthTimeoutMs(): number {
     : DEFAULT_MCP_HEALTH_TIMEOUT_MS;
 }
 
-function buildHealthCommand(serverConfig: NonNullable<PluginMcpConfig["mcpServers"]>[string]): {
+function buildHealthCommand(serverConfig: PluginMcpServerConfig): {
   command: string;
   args: string[];
 } {
@@ -171,7 +189,7 @@ import json
 import os
 from krw_ontology.mcp_server.server import health_payload
 
-payload, status = health_payload(root=os.environ.get("KRW_ONTOLOGY_ROOT"))
+payload, status = health_payload()
 print(json.dumps({"status": status, "payload": payload}, ensure_ascii=False))
 raise SystemExit(0 if status == 200 and payload.get("ok") else 1)
 `;
@@ -184,21 +202,52 @@ function asString(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
+function asBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
 function asStringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
 }
 
-async function runLiveMcpHealth(
-  serverConfig: NonNullable<PluginMcpConfig["mcpServers"]>[string],
+function isHttpMcpServer(serverConfig: PluginMcpServerConfig): boolean {
+  return serverConfig.type === "http" || serverConfig.type === "sse";
+}
+
+function getConfiguredMcpUrl(serverConfig: PluginMcpServerConfig): string | null {
+  return process.env.KRW_ONTOLOGY_MCP_URL || serverConfig.url || null;
+}
+
+function healthUrlFromMcpUrl(mcpUrl: string): string {
+  const parsed = new URL(mcpUrl);
+  parsed.pathname = "/health";
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.toString();
+}
+
+function parseMcpHealthPayload(
+  status: number,
+  payload: Record<string, unknown>,
   root: string | null,
 ): Promise<
   Pick<
     McpHealthResult,
     | "liveOk"
     | "sqliteOk"
+    | "env"
     | "releaseId"
+    | "manifestPath"
+    | "manifestValid"
+    | "agentIndexSchemaVersion"
     | "indexGeneratedAt"
     | "companyCount"
     | "documentCount"
@@ -207,13 +256,106 @@ async function runLiveMcpHealth(
     | "tools"
     | "root"
     | "indexPath"
+    | "releaseMetadata"
   >
+> {
+  const tools = asStringArray(payload.tools);
+  const ontologyEnv = normalizeOntologyEnv(asString(payload.env) ?? undefined);
+  const manifestValid = asBoolean(payload.manifest_valid) ?? false;
+  const indexGeneratedAt =
+    asString(payload.index_generated_at) ?? asString(payload.generated_at);
+  const companyCount =
+    asNumber(payload.companies) ?? asNumber(payload.company_count);
+  const documentCount =
+    asNumber(payload.documents) ?? asNumber(payload.document_count);
+  const objectCount = asNumber(payload.objects) ?? asNumber(payload.object_count);
+  const releaseMetadata = {
+    env: ontologyEnv,
+    release_id: asString(payload.release_id),
+    manifest_path: asString(payload.manifest_path),
+    manifest_valid: manifestValid,
+    agent_index_schema_version: asString(payload.agent_index_schema_version),
+    index_generated_at: indexGeneratedAt,
+    root: asString(payload.root) ?? root,
+    index_path: asString(payload.index_path),
+    company_count: companyCount,
+    document_count: documentCount,
+    object_count: objectCount,
+  };
+
+  return Promise.resolve({
+    liveOk: status === 200 && payload.ok === true,
+    sqliteOk:
+      status === 200 &&
+      payload.ok === true &&
+      typeof payload.index_path === "string" &&
+      documentCount !== null &&
+      objectCount !== null,
+    env: ontologyEnv,
+    releaseId: asString(payload.release_id),
+    manifestPath: asString(payload.manifest_path),
+    manifestValid,
+    agentIndexSchemaVersion: asString(payload.agent_index_schema_version),
+    indexGeneratedAt,
+    companyCount,
+    documentCount,
+    objectCount,
+    toolCount: tools.length,
+    tools,
+    root: asString(payload.root) ?? root,
+    indexPath: asString(payload.index_path),
+    releaseMetadata: (asRecord(payload.manifest) as Json | null) ?? releaseMetadata,
+  });
+}
+
+async function runHttpMcpHealth(
+  serverConfig: PluginMcpServerConfig,
+  root: string | null,
+): Promise<
+  Awaited<ReturnType<typeof parseMcpHealthPayload>>
+> {
+  const mcpUrl = getConfiguredMcpUrl(serverConfig);
+  if (!mcpUrl) {
+    throw new Error("KRW Ontology MCP HTTP URL is missing");
+  }
+  const healthUrl =
+    process.env.KRW_ONTOLOGY_MCP_HEALTH_URL || healthUrlFromMcpUrl(mcpUrl);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), getHealthTimeoutMs());
+  try {
+    const response = await fetch(healthUrl, {
+      headers: { accept: "application/json", ...(serverConfig.headers ?? {}) },
+      signal: controller.signal,
+    });
+    const payload = (await response.json()) as Record<string, unknown>;
+    return parseMcpHealthPayload(response.status, payload, root);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function runStdioMcpHealth(
+  serverConfig: PluginMcpServerConfig,
+  root: string | null,
+): Promise<
+  Awaited<ReturnType<typeof parseMcpHealthPayload>>
 > {
   const healthCommand = buildHealthCommand(serverConfig);
   const env = {
-    ...process.env,
     ...(serverConfig.env ?? {}),
-    ...(root ? { KRW_ONTOLOGY_ROOT: root } : {}),
+    ...process.env,
+    ...(root
+      ? {
+          KRW_ONTOLOGY_RELEASE_ROOT: root,
+          KRW_ONTOLOGY_ROOT: root,
+          KRW_ONTOLOGY_MANIFEST_PATH:
+            process.env.KRW_ONTOLOGY_MANIFEST_PATH ||
+            path.join(root, "manifest.json"),
+          KRW_ONTOLOGY_INDEX_PATH:
+            process.env.KRW_ONTOLOGY_INDEX_PATH ||
+            path.join(root, "indexes", "agent_index.sqlite"),
+        }
+      : {}),
   };
   const { stdout } = await execFileAsync(healthCommand.command, healthCommand.args, {
     env,
@@ -224,27 +366,7 @@ async function runLiveMcpHealth(
     status?: number;
     payload?: Record<string, unknown>;
   };
-  const payload = parsed.payload ?? {};
-  const tools = asStringArray(payload.tools);
-
-  return {
-    liveOk: parsed.status === 200 && payload.ok === true,
-    sqliteOk:
-      parsed.status === 200 &&
-      payload.ok === true &&
-      typeof payload.index_path === "string" &&
-      asNumber(payload.documents) !== null &&
-      asNumber(payload.objects) !== null,
-    releaseId: asString(payload.release_id),
-    indexGeneratedAt: asString(payload.index_generated_at),
-    companyCount: asNumber(payload.companies),
-    documentCount: asNumber(payload.documents),
-    objectCount: asNumber(payload.objects),
-    toolCount: tools.length,
-    tools,
-    root: asString(payload.root) ?? root,
-    indexPath: asString(payload.index_path),
-  };
+  return parseMcpHealthPayload(parsed.status ?? 500, parsed.payload ?? {}, root);
 }
 
 export async function checkMcpHealth(): Promise<McpHealthResult> {
@@ -275,18 +397,36 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
     ) as PluginMcpConfig;
     const serverConfig = mcpConfig.mcpServers?.["krw-ontology"];
     const root =
-      process.env.KRW_ONTOLOGY_ROOT || serverConfig?.env?.KRW_ONTOLOGY_ROOT || null;
+      process.env.KRW_ONTOLOGY_RELEASE_ROOT ||
+      process.env.KRW_ONTOLOGY_ROOT ||
+      serverConfig?.env?.KRW_ONTOLOGY_RELEASE_ROOT ||
+      serverConfig?.env?.KRW_ONTOLOGY_ROOT ||
+      null;
 
-    if (!serverConfig?.command) {
+    if (!serverConfig) {
       return {
         ...baseHealthResult(pluginPath, root),
         staticOk: true,
         connected: false,
-        error: "KRW Ontology MCP server command is missing",
+        error: "KRW Ontology MCP server config is missing",
       };
     }
 
-    if (!(await isExecutable(serverConfig.command))) {
+    const isHttp = isHttpMcpServer(serverConfig);
+    const commandOk = isHttp ? Boolean(getConfiguredMcpUrl(serverConfig)) : Boolean(serverConfig.command);
+
+    if (!commandOk) {
+      return {
+        ...baseHealthResult(pluginPath, root),
+        staticOk: true,
+        connected: false,
+        error: isHttp
+          ? "KRW Ontology MCP HTTP URL is missing"
+          : "KRW Ontology MCP server command is missing",
+      };
+    }
+
+    if (!isHttp && serverConfig.command && !(await isExecutable(serverConfig.command))) {
       return {
         ...baseHealthResult(pluginPath, root),
         staticOk: true,
@@ -295,8 +435,11 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
       };
     }
 
-    if (root) {
-      const indexPath = path.join(root, "indexes", "agent_index.sqlite");
+    if (root || process.env.KRW_ONTOLOGY_INDEX_PATH || serverConfig.env?.KRW_ONTOLOGY_INDEX_PATH) {
+      const indexPath =
+        process.env.KRW_ONTOLOGY_INDEX_PATH ||
+        serverConfig.env?.KRW_ONTOLOGY_INDEX_PATH ||
+        path.join(root ?? "", "indexes", "agent_index.sqlite");
       if (!(await exists(indexPath))) {
         return {
           ...baseHealthResult(pluginPath, root),
@@ -309,12 +452,14 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
       }
     }
 
-    const liveHealth = await runLiveMcpHealth(serverConfig, root);
+    const liveHealth = isHttp
+      ? await runHttpMcpHealth(serverConfig, root)
+      : await runStdioMcpHealth(serverConfig, root);
     if (!liveHealth.liveOk || !liveHealth.sqliteOk) {
       return {
         ...baseHealthResult(pluginPath, root),
         staticOk: true,
-        commandOk: true,
+        commandOk,
         ...liveHealth,
         connected: false,
         error: "KRW Ontology MCP live health check failed",
@@ -324,7 +469,7 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
     return {
       connected: true,
       staticOk: true,
-      commandOk: true,
+      commandOk,
       ...liveHealth,
       pluginPath,
     };

@@ -7,6 +7,10 @@ const migrationPath = join(
   process.cwd(),
   "supabase/migrations/20260523001000_analytics_events.sql",
 );
+const suggestedQuestionMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260528000000_add_suggested_question_analytics_event.sql",
+);
 
 describe("analytics events migration", () => {
   const migration = readFileSync(migrationPath, "utf8");
@@ -16,6 +20,23 @@ describe("analytics events migration", () => {
     for (const eventName of ANALYTICS_EVENT_NAMES) {
       expect(migration).toContain(`'${eventName}'`);
     }
+  });
+
+  it("adds suggested question tracking to already-created databases", () => {
+    const suggestedQuestionMigration = readFileSync(
+      suggestedQuestionMigrationPath,
+      "utf8",
+    );
+
+    expect(suggestedQuestionMigration).toContain(
+      "DROP CONSTRAINT IF EXISTS analytics_events_event_name_check",
+    );
+    expect(suggestedQuestionMigration).toContain(
+      "ADD CONSTRAINT analytics_events_event_name_check",
+    );
+    expect(suggestedQuestionMigration).toContain(
+      "'suggested_question_clicked'",
+    );
   });
 
   it("keeps analytics server-owned and indexed for dashboard queries", () => {

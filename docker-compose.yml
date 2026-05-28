@@ -27,18 +27,20 @@ services:
       args:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION}
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+      - GOOGLE_SITE_VERIFICATION=${GOOGLE_SITE_VERIFICATION}
       - AUTH_REDIRECT_ORIGIN=${AUTH_REDIRECT_ORIGIN}
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
-      - KRW_ONTOLOGY_ROOT=/srv/krw-ontology-data/current
+      - KRW_ONTOLOGY_ENV=prod
       - KRW_ONTOLOGY_PLUGIN_PATH=/app/krw-ontology/plugins/krw-ontology
       - CLAUDE_AGENT_CWD=/app/agent-workspace
       - CLAUDE_CODE_EXECUTABLE=/usr/local/bin/claude-prod
@@ -51,12 +53,11 @@ services:
       - CLAUDE_AGENT_MAX_TURNS=${CLAUDE_AGENT_MAX_TURNS:-20}
       - AGENT_MAX_TOOL_CALLS=${AGENT_MAX_TOOL_CALLS:-18}
       - AGENT_MAX_TOOL_RESULT_CHARS=${AGENT_MAX_TOOL_RESULT_CHARS:-100000}
-      - AGENT_RUN_HARD_TIMEOUT_MINUTES=${AGENT_RUN_HARD_TIMEOUT_MINUTES:-15}
-      - LEASE_TIMEOUT_MINUTES=${LEASE_TIMEOUT_MINUTES:-5}
+      - AGENT_RUN_HARD_TIMEOUT_MINUTES=${AGENT_RUN_HARD_TIMEOUT_MINUTES:-6}
+      - LEASE_TIMEOUT_MINUTES=${LEASE_TIMEOUT_MINUTES:-10}
       - MCP_HEALTH_TIMEOUT_MS=${MCP_HEALTH_TIMEOUT_MS:-30000}
       - MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-INFO}
     volumes:
-      - /srv/krw-ontology-data:/srv/krw-ontology-data
       - ${CLAUDE_PROD_CONFIG_DIR:-/srv/claude-prod}:/home/nextjs/.claude-prod
     networks:
       - app-network
@@ -82,7 +83,11 @@ services:
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
+      - KRW_ONTOLOGY_ENV=prod
+      - KRW_ONTOLOGY_RELEASE_ROOT=/srv/krw-ontology-data/current
       - KRW_ONTOLOGY_ROOT=/srv/krw-ontology-data/current
+      - KRW_ONTOLOGY_MANIFEST_PATH=/srv/krw-ontology-data/current/manifest.json
+      - KRW_ONTOLOGY_INDEX_PATH=/srv/krw-ontology-data/current/indexes/agent_index.sqlite
       - KRW_ONTOLOGY_PLUGIN_PATH=/app/krw-ontology/plugins/krw-ontology
       - CLAUDE_AGENT_CWD=/app/agent-workspace
       - CLAUDE_CODE_EXECUTABLE=/usr/local/bin/claude-prod
@@ -95,9 +100,9 @@ services:
       - CLAUDE_AGENT_MAX_TURNS=${CLAUDE_AGENT_MAX_TURNS:-20}
       - AGENT_MAX_TOOL_CALLS=${AGENT_MAX_TOOL_CALLS:-18}
       - AGENT_MAX_TOOL_RESULT_CHARS=${AGENT_MAX_TOOL_RESULT_CHARS:-100000}
-      - AGENT_RUN_HARD_TIMEOUT_MINUTES=${AGENT_RUN_HARD_TIMEOUT_MINUTES:-15}
-      - LEASE_TIMEOUT_MINUTES=${LEASE_TIMEOUT_MINUTES:-5}
-      - LEASE_HEARTBEAT_INTERVAL_MS=${LEASE_HEARTBEAT_INTERVAL_MS:-60000}
+      - AGENT_RUN_HARD_TIMEOUT_MINUTES=${AGENT_RUN_HARD_TIMEOUT_MINUTES:-6}
+      - LEASE_TIMEOUT_MINUTES=${LEASE_TIMEOUT_MINUTES:-10}
+      - LEASE_HEARTBEAT_INTERVAL_MS=${LEASE_HEARTBEAT_INTERVAL_MS:-30000}
       - AGENT_WORKER_POLL_INTERVAL_MS=${AGENT_WORKER_POLL_INTERVAL_MS:-1000}
       - MCP_HEALTH_TIMEOUT_MS=${MCP_HEALTH_TIMEOUT_MS:-30000}
       - MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-INFO}
@@ -110,6 +115,18 @@ services:
       web:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const fs=require('fs'); for (const p of ['.worker/agent-worker.mjs', process.env.KRW_ONTOLOGY_INDEX_PATH || process.env.KRW_ONTOLOGY_ROOT + '/indexes/agent_index.sqlite', process.env.KRW_ONTOLOGY_PLUGIN_PATH + '/.mcp.json']) fs.accessSync(p, fs.constants.R_OK);",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 networks:
   app-network:

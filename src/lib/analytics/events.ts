@@ -8,6 +8,7 @@ export const ANALYTICS_EVENT_NAMES = [
   "login_completed",
   "company_selected",
   "question_prefilled",
+  "suggested_question_clicked",
   "starter_question_clicked",
   "question_submitted",
   "answer_completed",
@@ -57,6 +58,35 @@ const MAX_PROPERTY_STRING_LENGTH = 500;
 const MAX_PROPERTY_ARRAY_LENGTH = 25;
 const MAX_PROPERTY_KEYS = 50;
 const MAX_CONTEXT_STRING_LENGTH = 500;
+const FORBIDDEN_PROPERTY_KEYS = new Set([
+  "answer",
+  "answertext",
+  "answer_text",
+  "attachment_text",
+  "attachmenttext",
+  "full_answer",
+  "full_answer_text",
+  "full_attachment_text",
+  "full_prompt",
+  "full_question",
+  "fullanswer",
+  "fullanswertext",
+  "fullattachmenttext",
+  "fullprompt",
+  "fullquestion",
+  "prompt",
+  "question",
+  "raw_answer",
+  "raw_attachment_text",
+  "raw_content",
+  "raw_prompt",
+  "raw_question",
+  "rawanswer",
+  "rawattachmenttext",
+  "rawcontent",
+  "rawprompt",
+  "rawquestion",
+]);
 
 const eventNameSet = new Set<string>(ANALYTICS_EVENT_NAMES);
 
@@ -130,6 +160,7 @@ function sanitizeJsonValue(value: unknown, depth: number): Json | undefined {
   }
   if (isPlainObject(value)) {
     const entries = Object.entries(value)
+      .filter(([key]) => !isForbiddenAnalyticsPropertyKey(key))
       .slice(0, MAX_PROPERTY_KEYS)
       .map(([key, item]) => [
         key.slice(0, 80),
@@ -141,6 +172,11 @@ function sanitizeJsonValue(value: unknown, depth: number): Json | undefined {
   }
 
   return undefined;
+}
+
+function isForbiddenAnalyticsPropertyKey(key: string): boolean {
+  const normalized = key.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return FORBIDDEN_PROPERTY_KEYS.has(key) || FORBIDDEN_PROPERTY_KEYS.has(normalized);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

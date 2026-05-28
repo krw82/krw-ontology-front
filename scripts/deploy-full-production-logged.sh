@@ -8,15 +8,14 @@ Usage: scripts/deploy-full-production-logged.sh [OPTIONS] [DEPLOY_ALL_ARGS...]
 Run the full production deployment with a persistent local log file.
 
 Default behavior:
-  - rebuild the local agent index through ~/krw-ontology/scripts/deploy-with-local-release.sh
-  - deploy frozen ontology data with --replace-remote-data
+  - build/promote a local release through ~/krw-ontology/scripts/deploy-with-local-release.sh
+  - publish the compact web catalog to Supabase
   - deploy frontend, plugin, and MCP code
   - write all output to ~/krw-deploy-logs/deploy-full-<timestamp>.log
 
 Options:
   --help, -h                 Show this help.
   --queue-timeout SECONDS    Queue stop wait timeout. Default: 7200.
-  --no-replace-remote-data   Do not pass --replace-remote-data to deploy-all-production.sh.
 
 Examples:
   scripts/deploy-full-production-logged.sh
@@ -34,7 +33,6 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 
 QUEUE_TIMEOUT=7200
-REPLACE_REMOTE_DATA=1
 DEPLOY_ALL_ARGS=()
 
 while [ "$#" -gt 0 ]; do
@@ -51,19 +49,12 @@ while [ "$#" -gt 0 ]; do
       fi
       QUEUE_TIMEOUT=$1
       ;;
-    --no-replace-remote-data)
-      REPLACE_REMOTE_DATA=0
-      ;;
     *)
       DEPLOY_ALL_ARGS+=("$1")
       ;;
   esac
   shift
 done
-
-if [ "$REPLACE_REMOTE_DATA" = "1" ]; then
-  DEPLOY_ALL_ARGS=(--replace-remote-data "${DEPLOY_ALL_ARGS[@]}")
-fi
 
 DEPLOY_WITH_RELEASE=${KRW_ONTOLOGY_DEPLOY_WITH_RELEASE:-"$HOME/krw-ontology/scripts/deploy-with-local-release.sh"}
 DEPLOY_ALL=${KRW_FRONT_DEPLOY_ALL:-"$FRONT_DIR/scripts/deploy-all-production.sh"}

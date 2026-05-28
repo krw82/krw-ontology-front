@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildResearchModePrompt,
   DEFAULT_RESEARCH_MODE,
   getAllowedMcpToolsForResearchMode,
   getResearchModeToolBudget,
@@ -67,5 +68,16 @@ describe("research mode", () => {
     expect(getResearchModeToolBudget("deep").maxToolCalls).toBeGreaterThan(
       getResearchModeToolBudget("standard").maxToolCalls,
     );
+  });
+
+  it("requires internal English briefs for broad sector/global research", () => {
+    for (const mode of ["fast", "standard", "deep"] as const) {
+      const prompt = buildResearchModePrompt(mode);
+      expect(prompt).toContain("internal English research brief");
+      expect(prompt).toContain("MCP question/topic arguments must be English");
+      expect(prompt).toContain(
+        "Do not send Korean broad sector/global/macro/discovery",
+      );
+    }
   });
 });

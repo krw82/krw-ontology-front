@@ -4,6 +4,24 @@ export function requireEnv(key: string): string {
   return value;
 }
 
+export type OntologyEnv = "dev" | "staging" | "prod";
+
+const ONTOLOGY_ENVS = new Set<OntologyEnv>(["dev", "staging", "prod"]);
+
+export function normalizeOntologyEnv(value: string | undefined): OntologyEnv | null {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return null;
+  return ONTOLOGY_ENVS.has(normalized as OntologyEnv)
+    ? (normalized as OntologyEnv)
+    : null;
+}
+
+export function getOntologyEnv(env: Record<string, string | undefined> = process.env): OntologyEnv {
+  const configured = normalizeOntologyEnv(env.KRW_ONTOLOGY_ENV);
+  if (configured) return configured;
+  return env.NODE_ENV === "production" ? "prod" : "dev";
+}
+
 interface NumberEnvOptions {
   min?: number;
   max?: number;

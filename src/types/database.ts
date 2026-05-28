@@ -64,10 +64,19 @@ export interface AgentRunRow extends Record<string, unknown> {
   estimated_cost_usd: number | null;
   web_commit: string;
   krw_ontology_commit: string;
+  ontology_env: "dev" | "staging" | "prod";
+  worker_env: "dev" | "staging" | "prod" | null;
   ontology_release_id: string | null;
   index_generated_at: string | null;
   company_count: number | null;
   document_count: number | null;
+  object_count: number | null;
+  ontology_root: string | null;
+  index_path: string | null;
+  manifest_path: string | null;
+  manifest_valid: boolean | null;
+  agent_index_schema_version: string | null;
+  ontology_manifest: Json | null;
   error_code: string | null;
   error_message: string | null;
   sdk_diagnostics: Json | null;
@@ -79,6 +88,73 @@ export interface AgentRunEventRow extends Record<string, unknown> {
   event_type: string;
   payload: Json;
   created_at: string;
+}
+
+export interface AgentWorkerHeartbeatRow extends Record<string, unknown> {
+  worker_id: string;
+  status: "idle" | "running" | "stopped" | "unhealthy";
+  last_seen_at: string;
+  heartbeat_expires_at: string;
+  claude_code_version: string | null;
+  web_commit: string | null;
+  krw_ontology_commit: string | null;
+  worker_env: "dev" | "staging" | "prod";
+  ontology_env: "dev" | "staging" | "prod";
+  ontology_release_id: string | null;
+  index_generated_at: string | null;
+  company_count: number | null;
+  document_count: number | null;
+  object_count: number | null;
+  tool_count: number | null;
+  root: string | null;
+  index_path: string | null;
+  manifest_path: string | null;
+  manifest_valid: boolean;
+  agent_index_schema_version: string | null;
+  plugin_path: string | null;
+  error: string | null;
+  metadata: Json | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OntologyCatalogReleaseRow extends Record<string, unknown> {
+  env: "dev" | "staging" | "prod";
+  release_id: string;
+  active: boolean;
+  format: string;
+  generated_at: string | null;
+  release_created_at: string | null;
+  index_generated_at: string | null;
+  company_count: number;
+  document_count: number;
+  index_document_count: number | null;
+  object_count: number;
+  manifest_json: Json | null;
+  summary_json: Json;
+  source_json: Json | null;
+  catalog_json: Json;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OntologyCompanyRow extends Record<string, unknown> {
+  env: "dev" | "staging" | "prod";
+  release_id: string;
+  ticker: string;
+  name: string;
+  sector: string | null;
+  description: string | null;
+  latest_period: string | null;
+  document_count: number;
+  document_types: string[];
+  periods: string[];
+  coverage_json: Json;
+  documents_json: Json;
+  company_json: Json;
+  generated_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ToolCallRow extends Record<string, unknown> {
@@ -290,6 +366,7 @@ export interface AnalyticsEventRow extends Record<string, unknown> {
     | "login_completed"
     | "company_selected"
     | "question_prefilled"
+    | "suggested_question_clicked"
     | "starter_question_clicked"
     | "question_submitted"
     | "answer_completed"
@@ -408,6 +485,43 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<Omit<AgentRunEventRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      agent_worker_heartbeats: {
+        Row: AgentWorkerHeartbeatRow;
+        Insert: Omit<AgentWorkerHeartbeatRow, "created_at" | "updated_at"> & {
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<AgentWorkerHeartbeatRow, "worker_id" | "created_at">>;
+        Relationships: [];
+      };
+      ontology_catalog_releases: {
+        Row: OntologyCatalogReleaseRow;
+        Insert: Omit<OntologyCatalogReleaseRow, "created_at" | "updated_at"> & {
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Omit<OntologyCatalogReleaseRow, "env" | "release_id" | "created_at">
+        >;
+        Relationships: [];
+      };
+      ontology_companies: {
+        Row: OntologyCompanyRow;
+        Insert: Omit<OntologyCompanyRow, "created_at" | "updated_at"> & {
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Omit<OntologyCompanyRow, "env" | "release_id" | "ticker" | "created_at">
+        >;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];
@@ -748,6 +862,8 @@ export interface Database {
       claim_agent_run: {
         Args: {
           p_worker_id: string;
+          p_worker_env: "dev" | "staging" | "prod";
+          p_ontology_env: "dev" | "staging" | "prod";
           p_lease_seconds: number;
           p_global_limit: number;
         };
@@ -773,6 +889,18 @@ export interface Database {
           allowed: boolean;
           current_count: number;
           retry_after_seconds: number;
+        }>;
+      };
+      publish_ontology_web_catalog: {
+        Args: {
+          p_catalog: Json;
+        };
+        Returns: Array<{
+          env: "dev" | "staging" | "prod";
+          release_id: string;
+          company_count: number;
+          document_count: number;
+          object_count: number;
         }>;
       };
     };

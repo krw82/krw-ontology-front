@@ -440,7 +440,7 @@ export function buildQuestionChatHref(
   if (ticker) params.set("ticker", ticker);
   if (question && question !== topic.question) params.set("query", question);
 
-  return `/chat?${params.toString()}`;
+  return `/chat/new?${params.toString()}`;
 }
 
 export const USE_CASE_PAGES: UseCasePage[] = [
@@ -582,5 +582,5 @@ export function buildUseCaseChatHref(
   params.set("query", options.question?.trim() || useCase.primaryQuestion);
   params.set("useCase", useCase.slug);
 
-  return `/chat?${params.toString()}`;
+  return `/chat/new?${params.toString()}`;
 }

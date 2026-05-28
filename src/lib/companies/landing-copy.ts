@@ -692,6 +692,34 @@ export const COMPANY_RESEARCH_PROFILES = {
     ],
     questionChains: {},
   },
+  ANET: {
+    ticker: "ANET",
+    companyName: "Arista Networks, Inc.",
+    companyNameKo: "아리스타 네트웍스",
+    sectorKo: "클라우드 네트워킹",
+    signature:
+      "클라우드 네트워킹 솔루션, 데이터센터 네트워킹, 신제품 개발과 공급망 관리가 성장과 마진을 좌우합니다.",
+    description:
+      "기업 리포트: 클라우드·데이터센터 네트워킹 수요, 제품 개발, 부품 조달·공급망, 고객 투자 사이클과 매출총이익률을 함께 봅니다.",
+    researchFocus: [
+      "클라우드 네트워킹 솔루션",
+      "데이터센터 네트워킹",
+      "신제품 개발",
+      "부품 조달·공급망 관리",
+    ],
+    riskVariables: [
+      "공급망 차질과 부품 조달",
+      "데이터센터 최종수요",
+      "지정학·관세 리스크",
+      "사이버보안과 경쟁 압력",
+    ],
+    suggestedPrompts: [
+      "아리스타 네트웍스의 클라우드 네트워킹 솔루션, 데이터센터 네트워킹, 신제품 개발이 매출과 마진을 어떻게 만드는지 공시 기준으로 정리해줘.",
+      "아리스타 네트웍스의 부품 조달·공급망 관리와 데이터센터 최종수요가 매출총이익률과 현금흐름에 어떤 의미인지 비교해줘.",
+      "아리스타 네트웍스의 공급망 차질, 지정학·관세, 사이버보안 리스크가 성장 thesis를 어떻게 흔드는지 정리해줘.",
+    ],
+    questionChains: {},
+  },
   AVGO: {
     ticker: "AVGO",
     companyName: "Broadcom Inc.",
@@ -1028,6 +1056,34 @@ export const COMPANY_RESEARCH_PROFILES = {
     ],
     questionChains: {},
   },
+  ETN: {
+    ticker: "ETN",
+    companyName: "Eaton Corporation plc",
+    companyNameKo: "이튼",
+    sectorKo: "전력관리·산업장비",
+    signature:
+      "전력관리 제품 판매, 인수 통합, 구조조정과 운영비 관리가 성장과 마진을 좌우합니다.",
+    description:
+      "기업 리포트: 전력관리·산업 제품 매출, 인수 통합, 구조조정 프로그램, 공급망·인플레이션·환율 변수를 함께 봅니다.",
+    researchFocus: [
+      "전력관리 제품 판매",
+      "인수 통합",
+      "구조조정 프로그램",
+      "운영비와 R&D",
+    ],
+    riskVariables: [
+      "공급망 차질과 원가 부담",
+      "인플레이션과 관세 정책",
+      "금리·부채 비용",
+      "환율과 소송 리스크",
+    ],
+    suggestedPrompts: [
+      "이튼의 전력관리 제품 판매, 인수 통합, 구조조정 프로그램이 매출과 마진을 어떻게 만드는지 공시 기준으로 정리해줘.",
+      "이튼의 공급망 차질과 운영비 관리가 영업이익률, 현금흐름, 투자 부담에 어떤 의미인지 비교해줘.",
+      "이튼의 인플레이션, 관세 정책, 금리·부채 비용 리스크가 성장 thesis를 어떻게 흔드는지 정리해줘.",
+    ],
+    questionChains: {},
+  },
   GILD: {
     ticker: "GILD",
     companyName: "Gilead Sciences, Inc.",
@@ -1081,6 +1137,34 @@ export const COMPANY_RESEARCH_PROFILES = {
       "GE 버노바의 Power·Grid 장비와 서비스, 대형 capital project, 순 PP&E 투자가 매출과 마진을 어떻게 만드는지 공시 기준으로 정리해줘.",
       "GE 버노바의 Power·Grid 장비와 서비스와 계약 가격 조정가 현금흐름, 성장 투자, 비용 구조에 어떤 의미인지 비교해줘.",
       "GE 버노바의 원자재·공급망 가격 변동, 인플레이션과 가격 전가, 대형 프로젝트 현금흐름 리스크가 성장 thesis를 어떻게 흔드는지 정리해줘.",
+    ],
+    questionChains: {},
+  },
+  GLW: {
+    ticker: "GLW",
+    companyName: "Corning Incorporated",
+    companyNameKo: "코닝",
+    sectorKo: "특수소재·광통신",
+    signature:
+      "광통신, 특수소재 제조, 생산능력 최적화와 자본투자가 매출 회복과 마진을 좌우합니다.",
+    description:
+      "기업 리포트: 광통신 수요, 특수소재·제조 운영, 설비투자와 생산능력 조정, 환율·최종수요·공급망 변수를 함께 봅니다.",
+    researchFocus: [
+      "광통신 매출",
+      "특수소재 제조",
+      "생산능력 최적화",
+      "설비투자와 제조 운영",
+    ],
+    riskVariables: [
+      "최종시장 수요 둔화",
+      "환율 변동",
+      "공급망 차질",
+      "소송·규제와 환경 비용",
+    ],
+    suggestedPrompts: [
+      "코닝의 광통신, 특수소재 제조, 생산능력 최적화가 매출과 마진을 어떻게 만드는지 공시 기준으로 정리해줘.",
+      "코닝의 설비투자와 제조 운영이 영업이익률, 현금흐름, 성장 투자에 어떤 의미인지 비교해줘.",
+      "코닝의 최종시장 수요 둔화, 환율, 공급망 차질 리스크가 성장 thesis를 어떻게 흔드는지 정리해줘.",
     ],
     questionChains: {},
   },
@@ -2484,6 +2568,62 @@ export const COMPANY_RESEARCH_PROFILES = {
     ],
     questionChains: {},
   },
+  WDC: {
+    ticker: "WDC",
+    companyName: "Western Digital Corporation",
+    companyNameKo: "웨스턴디지털",
+    sectorKo: "스토리지·반도체",
+    signature:
+      "HDD 제조, 제품 판매, 부품 조달, 제조 원가와 데이터 저장장치 수요 사이클이 실적을 좌우합니다.",
+    description:
+      "기업 리포트: HDD·스토리지 제품 판매, 제조 운영, 부품 조달, 부채·자본투자와 최종수요·환율 변수를 함께 봅니다.",
+    researchFocus: [
+      "HDD 제조",
+      "스토리지 제품 판매",
+      "부품 조달",
+      "제조 원가와 설비투자",
+    ],
+    riskVariables: [
+      "최종수요와 스토리지 사이클",
+      "공급망 차질",
+      "환율과 지정학 리스크",
+      "부채·금리와 유동성",
+    ],
+    suggestedPrompts: [
+      "웨스턴디지털의 HDD 제조, 스토리지 제품 판매, 부품 조달이 매출과 마진을 어떻게 만드는지 공시 기준으로 정리해줘.",
+      "웨스턴디지털의 제조 원가와 설비투자가 매출총이익률, 현금흐름, 부채 부담에 어떤 의미인지 비교해줘.",
+      "웨스턴디지털의 최종수요, 공급망 차질, 환율·지정학 리스크가 성장 thesis를 어떻게 흔드는지 정리해줘.",
+    ],
+    questionChains: {},
+  },
+  WELL: {
+    ticker: "WELL",
+    companyName: "Welltower Inc.",
+    companyNameKo: "웰타워",
+    sectorKo: "헬스케어 리츠",
+    signature:
+      "시니어 주거·의료 부동산, 부동산 인수·개발, 임대·자산관리와 자본시장 접근성이 현금흐름을 좌우합니다.",
+    description:
+      "기업 리포트: 헬스케어 부동산 포트폴리오, 시니어 주거 운영, 부동산 인수·개발, 부채·금리·규제 리스크를 함께 봅니다.",
+    researchFocus: [
+      "시니어 주거·의료 부동산",
+      "부동산 인수와 처분",
+      "개발·건설 프로젝트",
+      "임대·자산관리",
+    ],
+    riskVariables: [
+      "금리와 부채 비용",
+      "자본시장 접근성",
+      "규제 승인과 운영비",
+      "입주율·신용위험",
+    ],
+    suggestedPrompts: [
+      "웰타워의 시니어 주거·의료 부동산, 부동산 인수와 처분, 개발 프로젝트가 매출과 현금흐름을 어떻게 만드는지 공시 기준으로 정리해줘.",
+      "웰타워의 임대·자산관리와 자본시장 접근성이 운영현금흐름, 부채 부담, 성장 투자에 어떤 의미인지 비교해줘.",
+      "웰타워의 금리와 부채 비용, 규제 승인, 입주율·신용위험 리스크가 성장 thesis를 어떻게 흔드는지 정리해줘.",
+    ],
+    questionChains: {},
+  },
   WFC: {
     ticker: "WFC",
     companyName: "Wells Fargo & Company",
@@ -2563,6 +2703,15 @@ export function getCompanyLandingCopyForTicker(
   const normalized = normalizeTickerForCopy(ticker);
   if (!normalized) return {};
   return COMPANY_LANDING_UI_COPY[normalized] ?? {};
+}
+
+export function hasCompanyLandingCopyForTicker(ticker: string): boolean {
+  const normalized = normalizeTickerForCopy(ticker);
+  return Boolean(normalized && COMPANY_LANDING_UI_COPY[normalized]);
+}
+
+export function listCompanyLandingCopyTickers(): string[] {
+  return Object.keys(COMPANY_LANDING_UI_COPY).sort();
 }
 
 // UI guardrail: each Korean prompt must be concise to avoid compact layout overflow.

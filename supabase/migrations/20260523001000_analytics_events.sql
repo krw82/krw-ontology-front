@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS analytics_events (
       'login_completed',
       'company_selected',
       'question_prefilled',
+      'suggested_question_clicked',
       'starter_question_clicked',
       'question_submitted',
       'answer_completed',

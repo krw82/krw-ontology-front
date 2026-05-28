@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildChatSessionHref,
+  buildNewChatHref,
   deriveLoadedChatState,
   getSessionTickers,
 } from "./history-state";
@@ -31,6 +32,13 @@ describe("chat history state", () => {
     expect(buildChatSessionHref("abc 123")).toBe("/chat?sessionId=abc%20123");
   });
 
+  it("builds stable new chat URLs while preserving query params", () => {
+    const params = new URLSearchParams({ ticker: "AAPL", query: "margin" });
+
+    expect(buildNewChatHref()).toBe("/chat/new");
+    expect(buildNewChatHref(params)).toBe("/chat/new?ticker=AAPL&query=margin");
+  });
+
   it("prefers persisted session tickers over URL fallback", () => {
     expect(
       getSessionTickers(
@@ -44,7 +52,7 @@ describe("chat history state", () => {
     expect(getSessionTickers(null, "005930")).toEqual(["005930"]);
   });
 
-  it("extracts a streaming assistant message from visible history", () => {
+  it("hides active assistant draft content from visible history", () => {
     const messages: Message[] = [
       {
         ...baseMessage,
@@ -76,7 +84,7 @@ describe("chat history state", () => {
     expect(state.activeRunId).toBe("run-1");
     expect(state.activeAssistantMessageId).toBe("assistant-1");
     expect(state.activeRunStartedAt).toBe("2026-05-12T00:00:01.000Z");
-    expect(state.streamingContent).toBe("작성 중");
+    expect(state.streamingContent).toBe("");
     expect(state.messages.map((message) => message.id)).toEqual(["user-1"]);
   });
 

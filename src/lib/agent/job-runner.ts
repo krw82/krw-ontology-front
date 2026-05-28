@@ -1,6 +1,6 @@
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { checkMcpHealth } from "@/lib/agent/mcp-client";
+import { checkMcpHealth, type McpHealthResult } from "@/lib/agent/mcp-client";
 import { runAgent, type SdkDiagnostics } from "@/lib/agent/runner";
 import type {
   AccumulatedRun,
@@ -18,8 +18,9 @@ import {
 } from "@/lib/billing/plans";
 import { getBillingPlanFromStore } from "@/lib/billing/plan-store";
 import { heartbeatAgentRun } from "@/lib/agent/job-queue";
+import { closeOpenToolCallsForRun } from "@/lib/agent/tool-call-cleanup";
 import { getCurrentBillingPeriod } from "@/lib/billing/period";
-import { readIntEnv } from "@/lib/env";
+import { getOntologyEnv, readIntEnv } from "@/lib/env";
 import { isAdminEntitlementEmail } from "@/lib/billing/admin-emails";
 import {
   publicAgentErrorMessage,
@@ -51,7 +52,7 @@ const CANCEL_POLL_INTERVAL_MS = readIntEnv("AGENT_CANCEL_POLL_INTERVAL_MS", 1000
   min: 250,
 });
 const AGENT_RUN_HARD_TIMEOUT_MS =
-  readIntEnv("AGENT_RUN_HARD_TIMEOUT_MINUTES", 15, { min: 1 }) * 60_000;
+  readIntEnv("AGENT_RUN_HARD_TIMEOUT_MINUTES", 6, { min: 1 }) * 60_000;
 const RUN_TIMEOUT_MESSAGE =
   "분석 시간이 초과되었습니다. 다시 시도해주세요.";
 const INPUT_COST_PER_1M = Number.parseFloat(
@@ -62,6 +63,13 @@ const OUTPUT_COST_PER_1M = Number.parseFloat(
 );
 
 type SupabaseAdmin = ReturnType<typeof getSupabaseAdmin>;
+
+class AgentRunHardTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`Agent run exceeded hard timeout (${timeoutMs}ms)`);
+    this.name = "AgentRunHardTimeoutError";
+  }
+}
 
 interface AgentJob {
   run: Pick<
@@ -94,8 +102,14 @@ export async function runAgentJob(runId: string, workerId: string) {
 
   const runStartedAt = job.run.started_at ?? new Date().toISOString();
   const abortController = new AbortController();
-  let hardTimedOut = false;
+  let acceptingRunOutput = true;
   const eventWriter = createAgentRunEventWriter(admin, runId);
+  const guardedEventWriter: StreamWriter = {
+    write: async (event) => {
+      if (!acceptingRunOutput) return;
+      await eventWriter.write(event);
+    },
+  };
   const sendEvent = async (
     event: Parameters<typeof appendAgentRunEvent>[2],
     payload: unknown,
@@ -109,11 +123,6 @@ export async function runAgentJob(runId: string, workerId: string) {
     runId,
     abortController,
   );
-  const hardTimeout = setTimeout(() => {
-    hardTimedOut = true;
-    abortController.abort();
-  }, AGENT_RUN_HARD_TIMEOUT_MS);
-  (hardTimeout as { unref?: () => void }).unref?.();
 
   try {
     await admin
@@ -127,7 +136,8 @@ export async function runAgentJob(runId: string, workerId: string) {
     });
 
     const mcpHealth = await checkMcpHealth();
-    if (!mcpHealth.connected) {
+    const mcpReadinessError = mcpHealthReadinessError(mcpHealth);
+    if (mcpReadinessError) {
       await handleFailedJob({
         admin,
         job,
@@ -135,7 +145,7 @@ export async function runAgentJob(runId: string, workerId: string) {
         result: {
           acc: emptyAccumulatedRun(),
           errorCode: "mcp_unavailable",
-          errorMessage: "MCP unavailable",
+          errorMessage: mcpReadinessError,
         },
         sendEvent,
       });
@@ -146,9 +156,17 @@ export async function runAgentJob(runId: string, workerId: string) {
       .from("agent_runs")
       .update({
         ontology_release_id: mcpHealth.releaseId,
+        ontology_env: mcpHealth.env ?? getOntologyEnv(),
         index_generated_at: mcpHealth.indexGeneratedAt,
         company_count: mcpHealth.companyCount,
         document_count: mcpHealth.documentCount,
+        object_count: mcpHealth.objectCount,
+        ontology_root: mcpHealth.root,
+        index_path: mcpHealth.indexPath,
+        manifest_path: mcpHealth.manifestPath,
+        manifest_valid: mcpHealth.manifestValid,
+        agent_index_schema_version: mcpHealth.agentIndexSchemaVersion,
+        ontology_manifest: releaseSnapshot(mcpHealth),
       })
       .eq("id", runId);
 
@@ -163,24 +181,40 @@ export async function runAgentJob(runId: string, workerId: string) {
     );
     const recordSdkDiagnostics = createSdkDiagnosticsRecorder(admin, runId);
 
-    const result = await runAgent(
-      {
-        sessionId: job.session.id,
-        userMessage: job.userMessage.content,
-        scopeType: job.session.scope_type,
-        defaultTickers: job.session.default_tickers ?? [],
-        defaultDocumentTypes:
-          (job.session.default_document_types ?? []) as DocumentType[],
-        history: job.history,
-        researchMode: job.researchMode,
-        abortSignal: abortController.signal,
-        onSdkDiagnostics: recordSdkDiagnostics,
-        onTextDelta: persistPartialText,
-        onToolCallStart: persistRunRecords.persistToolCallStart,
-        onToolCallEnd: persistRunRecords.persistToolCallEnd,
-        onCitation: persistRunRecords.persistCitation,
-      },
-      eventWriter as StreamWriter,
+    const result = await runWithHardTimeout(
+      runAgent(
+        {
+          sessionId: job.session.id,
+          userMessage: job.userMessage.content,
+          scopeType: job.session.scope_type,
+          defaultTickers: job.session.default_tickers ?? [],
+          defaultDocumentTypes:
+            (job.session.default_document_types ?? []) as DocumentType[],
+          history: job.history,
+          researchMode: job.researchMode,
+          abortSignal: abortController.signal,
+          onSdkDiagnostics: recordSdkDiagnostics,
+          onTextDelta: async (delta, fullText) => {
+            if (!acceptingRunOutput) return;
+            await persistPartialText(delta, fullText);
+          },
+          onToolCallStart: async (toolCall) => {
+            if (!acceptingRunOutput) return;
+            await persistRunRecords.persistToolCallStart(toolCall);
+          },
+          onToolCallEnd: async (toolCall) => {
+            if (!acceptingRunOutput) return;
+            await persistRunRecords.persistToolCallEnd(toolCall);
+          },
+          onCitation: async (citation) => {
+            if (!acceptingRunOutput) return;
+            await persistRunRecords.persistCitation(citation);
+          },
+        },
+        guardedEventWriter,
+      ),
+      abortController,
+      AGENT_RUN_HARD_TIMEOUT_MS,
     );
 
     await eventWriter.flush();
@@ -196,24 +230,15 @@ export async function runAgentJob(runId: string, workerId: string) {
         result,
         release: {
           ontology_release_id: mcpHealth.releaseId ?? "",
+          ontology_env: mcpHealth.env ?? getOntologyEnv(),
           index_generated_at: mcpHealth.indexGeneratedAt ?? "",
           company_count: mcpHealth.companyCount ?? 0,
           document_count: mcpHealth.documentCount ?? 0,
-        },
-        sendEvent,
-      });
-      return;
-    }
-
-    if (result.status === "cancelled" && hardTimedOut) {
-      await handleFailedJob({
-        admin,
-        job,
-        runStartedAt,
-        result: {
-          acc: result.acc,
-          errorCode: "lease_expired",
-          errorMessage: RUN_TIMEOUT_MESSAGE,
+          object_count: mcpHealth.objectCount ?? 0,
+          index_path: mcpHealth.indexPath ?? "",
+          manifest_path: mcpHealth.manifestPath ?? "",
+          manifest_valid: mcpHealth.manifestValid,
+          agent_index_schema_version: mcpHealth.agentIndexSchemaVersion ?? "",
         },
         sendEvent,
       });
@@ -238,6 +263,24 @@ export async function runAgentJob(runId: string, workerId: string) {
       sendEvent,
     });
   } catch (err) {
+    acceptingRunOutput = false;
+    if (err instanceof AgentRunHardTimeoutError) {
+      abortController.abort();
+      await eventWriter.flush();
+      await handleFailedJob({
+        admin,
+        job,
+        runStartedAt,
+        result: {
+          acc: emptyAccumulatedRun(),
+          errorCode: "lease_expired",
+          errorMessage: RUN_TIMEOUT_MESSAGE,
+        },
+        sendEvent,
+      });
+      return;
+    }
+
     const rawErrorMessage =
       err instanceof Error ? err.message : "Internal worker error";
     await handleFailedJob({
@@ -252,10 +295,31 @@ export async function runAgentJob(runId: string, workerId: string) {
       sendEvent,
     });
   } finally {
-    clearTimeout(hardTimeout);
     stopHeartbeat();
     stopCancelPolling();
   }
+}
+
+function runWithHardTimeout<T>(
+  promise: Promise<T>,
+  abortController: AbortController,
+  timeoutMs: number,
+): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+
+  const timeoutPromise = new Promise<T>((_resolve, reject) => {
+    timeout = setTimeout(() => {
+      abortController.abort();
+      reject(new AgentRunHardTimeoutError(timeoutMs));
+    }, timeoutMs);
+    (timeout as { unref?: () => void }).unref?.();
+  });
+
+  promise.catch(() => undefined);
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeout) clearTimeout(timeout);
+  });
 }
 
 async function loadAgentJob(
@@ -541,10 +605,16 @@ async function handleCompletedJob(params: {
   runStartedAt: string;
   result: { acc: AccumulatedRun };
   release: {
+    ontology_env: string;
     ontology_release_id: string;
     index_generated_at: string;
     company_count: number;
     document_count: number;
+    object_count: number;
+    index_path: string;
+    manifest_path: string;
+    manifest_valid: boolean;
+    agent_index_schema_version: string;
   };
   sendEvent: (event: Parameters<typeof appendAgentRunEvent>[2], payload: unknown) => Promise<void>;
 }) {
@@ -582,6 +652,13 @@ async function handleCompletedJob(params: {
     })
     .eq("id", job.run.id);
 
+  await closeOpenToolCallsForRun({
+    admin,
+    runId: job.run.id,
+    finishedAt,
+    errorMessage: "Run completed before tool result was received",
+  });
+
   await settleExecutionBudgetForWorker(
     job.session.user_id,
     job.run.request_id,
@@ -612,6 +689,7 @@ async function handleCompletedJob(params: {
       artifact_created: false,
       input_tokens: acc.inputTokens,
       output_tokens: acc.outputTokens,
+      tool_call_count: acc.toolCalls.length,
       estimated_cost_usd: estimatedCost,
       research_mode: job.researchMode,
       answer_verifier_flags: answerVerifier.flags,
@@ -638,6 +716,35 @@ async function handleCompletedJob(params: {
     execution_budget: await loadExecutionBudgetStatus(job.session.user_id),
     answer_diagnostics: answerVerifier,
   });
+}
+
+function mcpHealthReadinessError(mcpHealth: McpHealthResult): string | null {
+  const ontologyEnv = getOntologyEnv();
+  if (!mcpHealth.connected) return "MCP unavailable";
+  if (mcpHealth.env !== ontologyEnv) {
+    return `Ontology env mismatch: worker=${ontologyEnv} mcp=${mcpHealth.env ?? "missing"}`;
+  }
+  if (!mcpHealth.manifestValid) return "Ontology release manifest is invalid or missing";
+  if (!mcpHealth.releaseId) return "Ontology release id is missing";
+  return null;
+}
+
+function releaseSnapshot(mcpHealth: McpHealthResult): Json {
+  return (
+    mcpHealth.releaseMetadata ?? {
+      env: mcpHealth.env,
+      release_id: mcpHealth.releaseId,
+      manifest_path: mcpHealth.manifestPath,
+      manifest_valid: mcpHealth.manifestValid,
+      agent_index_schema_version: mcpHealth.agentIndexSchemaVersion,
+      index_generated_at: mcpHealth.indexGeneratedAt,
+      root: mcpHealth.root,
+      index_path: mcpHealth.indexPath,
+      company_count: mcpHealth.companyCount,
+      document_count: mcpHealth.documentCount,
+      object_count: mcpHealth.objectCount,
+    }
+  );
 }
 
 function normalizeUserFacingPeriodLabels(answer: string): string {
@@ -721,6 +828,13 @@ async function handleCancelledJob(params: {
     })
     .eq("id", job.run.id);
 
+  await closeOpenToolCallsForRun({
+    admin,
+    runId: job.run.id,
+    finishedAt,
+    errorMessage: "Run was cancelled before tool result was received",
+  });
+
   await settleExecutionBudgetForWorker(
     job.session.user_id,
     job.run.request_id,
@@ -775,6 +889,16 @@ async function handleFailedJob(params: {
       status: "failed",
     })
     .eq("id", job.assistantMessageId);
+
+  await closeOpenToolCallsForRun({
+    admin,
+    runId: job.run.id,
+    finishedAt,
+    errorMessage:
+      errorCode === "lease_expired"
+        ? "Agent hard timeout or worker lease expired before tool result was received"
+        : `Run failed before tool result was received: ${rawErrorMessage}`,
+  });
 
   await recordAnalyticsEvent({
     eventName: "answer_failed",

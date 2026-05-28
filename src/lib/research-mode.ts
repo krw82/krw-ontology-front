@@ -106,11 +106,17 @@ export function getAllowedMcpToolsForResearchMode(
 export function buildResearchModePrompt(mode: ResearchMode): string {
   const responseDetailPolicy =
     "Never request response_detail: full in web chat. Use compact or ticker_summary follow-up queries; use selected trace/chain for verification instead of full query output.";
+  const internalEnglishBriefPolicy =
+    "For sector, global, macro, or discovery questions, first rewrite the user's intent into an internal English research brief before any MCP call. Even when the user asks in Korean, MCP question/topic arguments must be English for these broad research tasks, with a bounded ticker set when possible.";
+  const broadKoreanQueryPolicy =
+    "Do not send Korean broad sector/global/macro/discovery question or topic text directly to query_context, query, or retrieve.";
 
   if (mode === "fast") {
     return [
       "Research mode: fast.",
       "Use krw_ontology_query_context first and stop if it is sufficient.",
+      internalEnglishBriefPolicy,
+      broadKoreanQueryPolicy,
       "Do not call trace, chain, retrieve, catalog, quality, company_context, index_context, or broad query tools.",
       "If one targeted query is still necessary, use it once only and then answer with explicit limitations.",
       responseDetailPolicy,
@@ -121,6 +127,8 @@ export function buildResearchModePrompt(mode: ResearchMode): string {
     return [
       "Research mode: deep.",
       "Use krw_ontology_query_context first, then perform additional trace/chain/query work only when it materially improves the answer.",
+      internalEnglishBriefPolicy,
+      broadKoreanQueryPolicy,
       "Deep mode can spend more tool calls, but avoid repeated identical queries and avoid unscoped retrieve.",
       responseDetailPolicy,
     ].join("\n");
@@ -129,6 +137,8 @@ export function buildResearchModePrompt(mode: ResearchMode): string {
   return [
     "Research mode: standard.",
     "Use krw_ontology_query_context first.",
+    internalEnglishBriefPolicy,
+    broadKoreanQueryPolicy,
     "Use CY labels for user-facing periods; do not write FY labels. If source text says FY, convert the display label to the matching CY period and mention fiscal wording only if essential.",
     "If query_context reports sufficient research state, write the answer without more MCP calls.",
     "If targeted follow-up is necessary, use up to two precise queries or one to two trace/chain calls.",

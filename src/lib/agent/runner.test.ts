@@ -101,6 +101,21 @@ function toolUseMessage(toolName: MCPToolName, index: number) {
   };
 }
 
+function toolResultMessage(index: number) {
+  return {
+    type: "user",
+    message: {
+      content: [
+        {
+          type: "tool_result",
+          tool_use_id: `tool-${index}`,
+          content: JSON.stringify({ ok: true, index }),
+        },
+      ],
+    },
+  };
+}
+
 async function probeBudgetDenyMessage(params: {
   existingTools: MCPToolName[];
   attemptedTool: MCPToolName;
@@ -117,6 +132,7 @@ async function probeBudgetDenyMessage(params: {
     makeSdkQueryFromGenerator(async function* () {
       for (const [index, toolName] of params.existingTools.entries()) {
         yield toolUseMessage(toolName, index);
+        yield toolResultMessage(index);
       }
 
       const permission = await call.options.canUseTool?.(
@@ -203,6 +219,65 @@ describe("agent runner research budget recovery", () => {
         response_detail: "compact",
       });
     }
+  });
+
+  it("blocks Korean broad sector/global MCP inputs and asks for an English brief retry", async () => {
+    const permission = await canUseTool(sdkToolName("krw_ontology_query_context"), {
+      question: "소비재 기업들을 보고 소비 매크로 환경이 어떤지 찾아봐줘",
+    });
+
+    expect(permission.behavior).toBe("deny");
+    if (permission.behavior === "deny") {
+      expect(permission.message).toContain("internal English research brief");
+      expect(permission.message).toContain("bounded ticker set");
+    }
+  });
+
+  it("allows non-broad Korean company questions", async () => {
+    const permission = await canUseTool(sdkToolName("krw_ontology_query_context"), {
+      question: "Apple 매출 구조를 정리해줘",
+      ticker: "AAPL",
+    });
+
+    expect(permission.behavior).toBe("allow");
+  });
+
+  it("fails instead of completing when the SDK result arrives with an open tool call", async () => {
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        toolUseMessage("krw_ontology_retrieve", 1),
+        {
+          type: "result",
+          subtype: "success",
+          result: "불완전한 답변입니다.",
+          usage: {
+            input_tokens: 10,
+            output_tokens: 12,
+          },
+        },
+      ]),
+    );
+
+    const onToolCallEnd = vi.fn();
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "소비재 기업들을 보고 소비 매크로 환경이 어떤지 찾아봐줘",
+        scopeType: "global",
+        defaultTickers: [],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        onToolCallEnd,
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
+    expect(result.status).toBe("failed");
+    expect(result.errorCode).toBe("tool_result_missing");
+    expect(onToolCallEnd).not.toHaveBeenCalled();
+    expect(result.acc.toolCalls[0]?.finishedAt).toBeNull();
   });
 
   it("recovers tool budget exhaustion by running a compose-only pass", async () => {

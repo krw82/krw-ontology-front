@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import TopNav from "@/components/TopNav";
+import MarketingCtaLink from "@/components/MarketingCtaLink";
 import SuggestedPromptActions from "@/components/SuggestedPromptActions";
 import { getAuthUser } from "@/lib/auth";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
@@ -22,7 +23,7 @@ type CompanyPageProps = {
 function chatHref(ticker: string, query?: string): string {
   const params = new URLSearchParams({ ticker });
   if (query) params.set("query", query);
-  return `/chat?${params.toString()}`;
+  return `/chat/new?${params.toString()}`;
 }
 
 function stringValue(value: unknown): string | null {
@@ -51,7 +52,7 @@ export async function generateMetadata({
   const companyTitleName = companyNameKo ?? displayCompany.name;
 
   return pageMetadata({
-    title: `${companyTitleName} 공시 기반 기업 분석`,
+    title: `${displayCompany.ticker} ${companyTitleName} 공시 기반 기업 분석`,
     description: `${displayCompany.name}${companyNameKo ? ` · ${companyNameKo}` : ""} (${displayCompany.ticker})의 실적 변화, 리스크, 사업 활동을 공시 근거 기반으로 질문해보세요.`,
     path: `/companies/${displayCompany.ticker}`,
   });
@@ -144,18 +145,35 @@ export default async function CompanyLandingPage({
               {displayCompany.description}
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Link
+              <MarketingCtaLink
                 href={chatHref(displayCompany.ticker)}
+                ctaId="company_start_analysis"
+                ctaLabel={`${displayCompany.ticker} 무료 분석 시작`}
+                surface="company_hero"
+                analyticsProperties={{
+                  ticker: displayCompany.ticker,
+                  company_name: displayCompany.name,
+                }}
                 className="inline-flex min-h-12 items-center justify-center rounded-[8px] bg-surface-dark px-5 py-3 text-[15px] font-extrabold leading-5 text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
                 {displayCompany.ticker} 무료 분석 시작
-              </Link>
-              <Link
+              </MarketingCtaLink>
+              <MarketingCtaLink
                 href={chatHref(displayCompany.ticker, prompts[0])}
+                ctaId="company_hero_suggested_question"
+                ctaLabel="추천 질문 입력"
+                surface="company_hero"
+                analyticsProperties={{
+                  ticker: displayCompany.ticker,
+                  company_name: displayCompany.name,
+                  prompt_id: `${displayCompany.ticker.toLowerCase()}_hero_suggested_1`,
+                  prompt_rank: 1,
+                  question_source: "suggested",
+                }}
                 className="inline-flex min-h-12 items-center justify-center rounded-[8px] border border-hairline bg-canvas px-5 py-3 text-[15px] font-extrabold leading-5 text-ink transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
                 추천 질문 입력
-              </Link>
+              </MarketingCtaLink>
             </div>
           </header>
 
@@ -196,6 +214,16 @@ export default async function CompanyLandingPage({
                 prompts={prompts}
                 groupId={`company-prompts-${displayCompany.ticker}`}
                 hrefs={promptHrefs}
+                analytics={{
+                  sourceSurface: "company_detail",
+                  ticker: displayCompany.ticker,
+                  tickers: [displayCompany.ticker],
+                  promptCategory: "company_research",
+                  promptIds: prompts.map(
+                    (_, index) =>
+                      `${displayCompany.ticker.toLowerCase()}_suggested_${index + 1}`,
+                  ),
+                }}
               />
             </div>
           </section>

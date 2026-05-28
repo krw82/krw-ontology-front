@@ -12,6 +12,7 @@ import {
 } from "@/lib/concurrency/execution-budget";
 import { registerRun, cleanupRun } from "@/lib/agent/abort-manager";
 import { runAgent } from "@/lib/agent/runner";
+import { closeOpenToolCallsForRun } from "@/lib/agent/tool-call-cleanup";
 import type { SdkDiagnostics } from "@/lib/agent/runner";
 import type {
   AccumulatedRun,
@@ -29,7 +30,7 @@ import type {
 } from "@/types/database";
 import type { StreamingCitation } from "@/types/api-contracts";
 import { toErrorCode } from "@/types/api-contracts";
-import { readIntEnv } from "@/lib/env";
+import { getOntologyEnv, readIntEnv } from "@/lib/env";
 import type { ResearchMode } from "@/lib/research-mode";
 import {
   publicAgentErrorMessage,
@@ -39,7 +40,7 @@ import {
 const EXISTING_RUN_POLL_INTERVAL_MS = 800;
 const EXISTING_RUN_MAX_POLL_MS = 120_000;
 const AGENT_RUN_HARD_TIMEOUT_MS =
-  readIntEnv("AGENT_RUN_HARD_TIMEOUT_MINUTES", 15, { min: 1 }) * 60_000;
+  readIntEnv("AGENT_RUN_HARD_TIMEOUT_MINUTES", 6, { min: 1 }) * 60_000;
 const RUN_TIMEOUT_MESSAGE =
   "분석 시간이 초과되었습니다. 다시 시도해주세요.";
 
@@ -185,6 +186,8 @@ export function executeRun(params: RunAgentParams): Response {
             tickers: session.defaultTickers,
             error_code: "internal_error",
             failure_stage: "assistant_message_create",
+            research_mode: params.researchMode ?? null,
+            tool_call_count: 0,
           },
         });
         await sendEvent("error", {
@@ -212,10 +215,18 @@ export function executeRun(params: RunAgentParams): Response {
         .from("agent_runs")
         .update({
           assistant_message_id: assistantMessageId,
+          ontology_env: mcpHealth.env ?? getOntologyEnv(),
           ontology_release_id: mcpHealth.releaseId,
           index_generated_at: mcpHealth.indexGeneratedAt,
           company_count: mcpHealth.companyCount,
           document_count: mcpHealth.documentCount,
+          object_count: mcpHealth.objectCount,
+          ontology_root: mcpHealth.root,
+          index_path: mcpHealth.indexPath,
+          manifest_path: mcpHealth.manifestPath,
+          manifest_valid: mcpHealth.manifestValid,
+          agent_index_schema_version: mcpHealth.agentIndexSchemaVersion,
+          ontology_manifest: releaseSnapshot(mcpHealth),
         })
         .eq("id", runId);
 
@@ -284,6 +295,7 @@ export function executeRun(params: RunAgentParams): Response {
             mcpHealth,
             budget,
             requestId,
+            researchMode: params.researchMode,
             session,
             userId: session.userId,
             sendEvent,
@@ -300,6 +312,7 @@ export function executeRun(params: RunAgentParams): Response {
               errorMessage: RUN_TIMEOUT_MESSAGE,
             },
             session,
+            researchMode: params.researchMode,
             userId: session.userId,
             requestId,
             sendEvent,
@@ -323,6 +336,7 @@ export function executeRun(params: RunAgentParams): Response {
             finishedAt,
             result,
             session,
+            researchMode: params.researchMode,
             userId: session.userId,
             requestId,
             sendEvent,
@@ -362,6 +376,8 @@ export function executeRun(params: RunAgentParams): Response {
             ticker: session.defaultTickers[0] ?? null,
             tickers: session.defaultTickers,
             error_code: "internal_error",
+            research_mode: params.researchMode ?? null,
+            tool_call_count: 0,
           },
         });
 
@@ -426,10 +442,16 @@ type PersistedRun = Pick<
   | "output_tokens"
   | "estimated_cost_usd"
   | "latency_ms"
+  | "ontology_env"
   | "ontology_release_id"
   | "index_generated_at"
   | "company_count"
   | "document_count"
+  | "object_count"
+  | "index_path"
+  | "manifest_path"
+  | "manifest_valid"
+  | "agent_index_schema_version"
   | "error_code"
   | "error_message"
 >;
@@ -628,7 +650,7 @@ export async function streamPersistedRunEvents(params: {
 }
 
 const PERSISTED_RUN_SELECT =
-  "id, session_id, assistant_message_id, request_id, status, lease_expires_at, started_at, input_tokens, output_tokens, estimated_cost_usd, latency_ms, ontology_release_id, index_generated_at, company_count, document_count, error_code, error_message";
+  "id, session_id, assistant_message_id, request_id, status, lease_expires_at, started_at, input_tokens, output_tokens, estimated_cost_usd, latency_ms, ontology_env, ontology_release_id, index_generated_at, company_count, document_count, object_count, index_path, manifest_path, manifest_valid, agent_index_schema_version, error_code, error_message";
 
 async function expirePersistedRunIfNeeded(
   admin: ReturnType<typeof getSupabaseAdmin>,
@@ -669,6 +691,13 @@ async function expirePersistedRunIfNeeded(
       .eq("id", run.assistant_message_id)
       .in("status", ["pending", "streaming"]);
   }
+
+  await closeOpenToolCallsForRun({
+    admin,
+    runId: run.id,
+    finishedAt: now,
+    errorMessage: "Lease expired before tool result was received",
+  });
 
   await releaseExecutionBudget(userId, run.request_id, run.id, "lease_expired");
 
@@ -741,10 +770,16 @@ async function sendPersistedDoneEvent(params: {
     rich_answers: [],
     artifacts: [],
     release: {
+      ontology_env: run.ontology_env ?? getOntologyEnv(),
       ontology_release_id: run.ontology_release_id ?? "",
       index_generated_at: run.index_generated_at ?? "",
       company_count: run.company_count ?? 0,
       document_count: run.document_count ?? 0,
+      object_count: run.object_count ?? 0,
+      index_path: run.index_path ?? "",
+      manifest_path: run.manifest_path ?? "",
+      manifest_valid: run.manifest_valid ?? false,
+      agent_index_schema_version: run.agent_index_schema_version ?? "",
       krw_ontology_commit: process.env.KRW_ONTOLOGY_COMMIT || "dev",
       web_commit: process.env.WEB_COMMIT || "dev",
     },
@@ -962,13 +997,14 @@ interface CompletedRunParams {
   mcpHealth: McpHealthResult;
   budget: ExecutionBudgetCheckResult;
   requestId: string;
+  researchMode?: ResearchMode;
   session: ResolvedSession;
   userId: string;
   sendEvent: (event: string, data: unknown) => Promise<void>;
 }
 
 async function handleCompletedRun(params: CompletedRunParams) {
-  const { admin, runId, assistantMessageId, finishedAt, runStartedAt, result, mcpHealth, budget, requestId, session, userId, sendEvent } = params;
+  const { admin, runId, assistantMessageId, finishedAt, runStartedAt, result, mcpHealth, budget, requestId, researchMode, session, userId, sendEvent } = params;
   const { acc } = result;
   const visibleAnswer = acc.fullText.trim();
 
@@ -997,6 +1033,13 @@ async function handleCompletedRun(params: CompletedRunParams) {
     })
     .eq("id", runId);
 
+  await closeOpenToolCallsForRun({
+    admin,
+    runId,
+    finishedAt,
+    errorMessage: "Run completed before tool result was received",
+  });
+
   await settleExecutionBudget(userId, requestId, runId, estimatedCost, "completed", {
     input_tokens: acc.inputTokens,
     output_tokens: acc.outputTokens,
@@ -1019,7 +1062,9 @@ async function handleCompletedRun(params: CompletedRunParams) {
       artifact_created: false,
       input_tokens: acc.inputTokens,
       output_tokens: acc.outputTokens,
+      tool_call_count: acc.toolCalls.length,
       estimated_cost_usd: estimatedCost,
+      research_mode: researchMode ?? null,
     },
   });
 
@@ -1031,10 +1076,16 @@ async function handleCompletedRun(params: CompletedRunParams) {
     rich_answers: [],
     artifacts: [],
     release: {
+      ontology_env: mcpHealth.env ?? getOntologyEnv(),
       ontology_release_id: mcpHealth.releaseId ?? "",
       index_generated_at: mcpHealth.indexGeneratedAt ?? "",
       company_count: mcpHealth.companyCount ?? 0,
       document_count: mcpHealth.documentCount ?? 0,
+      object_count: mcpHealth.objectCount ?? 0,
+      index_path: mcpHealth.indexPath ?? "",
+      manifest_path: mcpHealth.manifestPath ?? "",
+      manifest_valid: mcpHealth.manifestValid,
+      agent_index_schema_version: mcpHealth.agentIndexSchemaVersion ?? "",
       krw_ontology_commit: process.env.KRW_ONTOLOGY_COMMIT || "dev",
       web_commit: process.env.WEB_COMMIT || "dev",
     },
@@ -1046,6 +1097,24 @@ async function handleCompletedRun(params: CompletedRunParams) {
     },
     execution_budget: getExecutionBudgetStatus(budget, estimatedCost),
   });
+}
+
+function releaseSnapshot(mcpHealth: McpHealthResult): Json {
+  return (
+    mcpHealth.releaseMetadata ?? {
+      env: mcpHealth.env,
+      release_id: mcpHealth.releaseId,
+      manifest_path: mcpHealth.manifestPath,
+      manifest_valid: mcpHealth.manifestValid,
+      agent_index_schema_version: mcpHealth.agentIndexSchemaVersion,
+      index_generated_at: mcpHealth.indexGeneratedAt,
+      root: mcpHealth.root,
+      index_path: mcpHealth.indexPath,
+      company_count: mcpHealth.companyCount,
+      document_count: mcpHealth.documentCount,
+      object_count: mcpHealth.objectCount,
+    }
+  );
 }
 
 function jsonForDb(value: unknown): Json | null {
@@ -1093,6 +1162,13 @@ async function handleCancelledRun(params: CancelledRunParams) {
     })
     .eq("id", runId);
 
+  await closeOpenToolCallsForRun({
+    admin,
+    runId,
+    finishedAt,
+    errorMessage: "Run was cancelled before tool result was received",
+  });
+
   const estimatedCost = estimateCost(result.acc.inputTokens, result.acc.outputTokens);
   await settleExecutionBudget(userId, requestId, runId, estimatedCost, "cancelled", {
     input_tokens: result.acc.inputTokens,
@@ -1113,13 +1189,14 @@ interface FailedRunParams {
   finishedAt: string;
   result: { acc: AccumulatedRun; errorCode?: string; errorMessage?: string };
   session: ResolvedSession;
+  researchMode?: ResearchMode;
   userId: string;
   requestId: string;
   sendEvent: (event: string, data: unknown) => Promise<void>;
 }
 
 async function handleFailedRun(params: FailedRunParams) {
-  const { admin, runId, assistantMessageId, finishedAt, result, session, userId, requestId, sendEvent } = params;
+  const { admin, runId, assistantMessageId, finishedAt, result, session, researchMode, userId, requestId, sendEvent } = params;
   const errorCode = toErrorCode(result.errorCode || "claude_api_error");
   const rawErrorMessage = result.errorMessage || publicErrorMessage(errorCode);
   const publicMessage = publicAgentErrorMessage({ code: errorCode });
@@ -1142,6 +1219,16 @@ async function handleFailedRun(params: FailedRunParams) {
     })
     .eq("id", assistantMessageId);
 
+  await closeOpenToolCallsForRun({
+    admin,
+    runId,
+    finishedAt,
+    errorMessage:
+      errorCode === "lease_expired"
+        ? "Agent hard timeout or lease expired before tool result was received"
+        : `Run failed before tool result was received: ${rawErrorMessage}`,
+  });
+
   await recordAnalyticsEvent({
     eventName: "answer_failed",
     userId,
@@ -1155,6 +1242,7 @@ async function handleFailedRun(params: FailedRunParams) {
       error_code: errorCode,
       output_length: result.acc.fullText.length,
       tool_call_count: result.acc.toolCalls.length,
+      research_mode: researchMode ?? null,
     },
   });
 

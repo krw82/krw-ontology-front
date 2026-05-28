@@ -7,7 +7,7 @@ import type { Database } from "@/types/database";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
-  const protectedPaths = ["/companies", "/chat", "/settings"];
+  const protectedPaths = ["/chat", "/settings"];
   const isProtected = protectedPaths.some((p) =>
     request.nextUrl.pathname.startsWith(p),
   );
