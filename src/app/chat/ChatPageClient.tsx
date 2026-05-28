@@ -571,7 +571,7 @@ function ChatContent() {
           {/* Chat History */}
           <div
             ref={scrollRef}
-            className="flex-1 overflow-y-auto px-base pb-[calc(88px+env(safe-area-inset-bottom))] sm:px-xl sm:pb-[96px]"
+            className="flex-1 overflow-y-auto px-base pb-[calc(128px+env(safe-area-inset-bottom))] sm:px-xl sm:pb-[104px]"
             aria-label="채팅 메시지"
             aria-relevant="additions text"
             role="log"
@@ -839,6 +839,7 @@ function ChatContent() {
             toolCalls={chat.toolCalls}
             initialValue={initialComposerValue}
             draftResetKey={composerDraftResetKey}
+            runStartedAt={chat.runStartedAt}
             researchMode={researchMode}
             onResearchModeChange={setResearchMode}
           />

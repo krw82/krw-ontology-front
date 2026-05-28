@@ -84,7 +84,6 @@ echo "Remote ontology used for build: $REMOTE_ONTOLOGY_DIR"
     --exclude './.supabase-prod-db-password' \
     --exclude './supabase/.branches' \
     --exclude './supabase/.temp' \
-    --exclude './*.png' \
     --exclude './*.tsbuildinfo' \
     --exclude './.DS_Store' \
     --exclude './*/.DS_Store' \

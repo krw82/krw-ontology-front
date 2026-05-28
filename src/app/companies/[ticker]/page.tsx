@@ -158,23 +158,23 @@ export default async function CompanyLandingPage({
               >
                 {displayCompany.ticker} 무료 분석 시작
               </MarketingCtaLink>
-              <MarketingCtaLink
-                href={chatHref(displayCompany.ticker, prompts[0])}
-                ctaId="company_hero_suggested_question"
-                ctaLabel="추천 질문 입력"
-                surface="company_hero"
-                analyticsProperties={{
-                  ticker: displayCompany.ticker,
-                  company_name: displayCompany.name,
-                  prompt_id: `${displayCompany.ticker.toLowerCase()}_hero_suggested_1`,
-                  prompt_rank: 1,
-                  question_source: "suggested",
-                }}
-                className="inline-flex min-h-12 items-center justify-center rounded-[8px] border border-hairline bg-canvas px-5 py-3 text-[15px] font-extrabold leading-5 text-ink transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-              >
-                추천 질문 입력
-              </MarketingCtaLink>
             </div>
+            <SuggestedPromptActions
+              prompts={prompts}
+              groupId={`company-prompts-${displayCompany.ticker}`}
+              className="mt-5"
+              hrefs={promptHrefs}
+              analytics={{
+                sourceSurface: "company_detail",
+                ticker: displayCompany.ticker,
+                tickers: [displayCompany.ticker],
+                promptCategory: "company_research",
+                promptIds: prompts.map(
+                  (_, index) =>
+                    `${displayCompany.ticker.toLowerCase()}_suggested_${index + 1}`,
+                ),
+              }}
+            />
           </header>
 
           <section className="border-b border-hairline pt-8 pb-3">
@@ -208,25 +208,6 @@ export default async function CompanyLandingPage({
             </div>
           </section>
 
-          <section className="pt-3 pb-8">
-            <div>
-              <SuggestedPromptActions
-                prompts={prompts}
-                groupId={`company-prompts-${displayCompany.ticker}`}
-                hrefs={promptHrefs}
-                analytics={{
-                  sourceSurface: "company_detail",
-                  ticker: displayCompany.ticker,
-                  tickers: [displayCompany.ticker],
-                  promptCategory: "company_research",
-                  promptIds: prompts.map(
-                    (_, index) =>
-                      `${displayCompany.ticker.toLowerCase()}_suggested_${index + 1}`,
-                  ),
-                }}
-              />
-            </div>
-          </section>
         </div>
       </main>
     </div>

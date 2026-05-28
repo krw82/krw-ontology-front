@@ -9696,3 +9696,446 @@
 [agent-worker] idle { workerId: 'mac-worker-jwc-4' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-4' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-4' }
+[agent-worker] started { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-4' }
+[agent-worker] started { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] stopped { workerId: 'mac-worker-jwc-4' }
+[agent-worker] started { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-4' }
+[agent-worker] started { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-4',
+  runId: '04063dac-7366-47d7-a163-75b32afa30b6'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'AAPL' },
+  duration_ms: 503,
+  duration_s: 0.503,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_PuRBJOfX0sPt2M7J6UHT4276',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 7403,
+  duration_s: 7.403,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_t0WfLQ3C5cloljC692te0456',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Greater China revenue exposure, China demand, geopolitical risk, iPhone China market'
+  },
+  duration_ms: 6494,
+  duration_s: 6.494,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_nHOPZOcO85bt2uOABsQ69658',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'supply chain concentration, manufacturing exposure, supplier concentration, geographic concentration'
+  },
+  duration_ms: 5872,
+  duration_s: 5.872,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_yTpgi0rorXsrWHIVDAFq1816',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 8468,
+  duration_s: 8.468,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_jtM4OUYHPCujPPc2VRHD8962',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 8024,
+  duration_s: 8.024,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_znJMQAgWDW1Q19nTRNG42038',
+  tool_name: 'krw_ontology_trace'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-4',
+  runId: '04063dac-7366-47d7-a163-75b32afa30b6'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] stopped { workerId: 'mac-worker-jwc-4' }
+[agent-worker] started { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-4',
+  runId: 'ae8f6bec-2569-4330-bb2a-86ffbcf21aee'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'ABT' },
+  duration_ms: 59333,
+  duration_s: 59.333,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_NmIAiMDCGlaFD83QBBPH4782',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'ABT',
+    topic: 'medical devices segment margin revenue growth vs diagnostics segment margin revenue growth capex investment'
+  },
+  duration_ms: 2434,
+  duration_s: 2.434,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_HKHnaMsUN1ucNnSFcchu0581',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'ABT',
+    topic: 'segment revenue operating profit Medical Devices Diagnostics financial results'
+  },
+  duration_ms: 979,
+  duration_s: 0.979,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_sxAuEFMvUY1YsLTzGaU63672',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'ABT' },
+  duration_ms: 175,
+  duration_s: 0.175,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_YSxQZFeEBicTc8lgeYHM1538',
+  tool_name: 'krw_ontology_company_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'ABT',
+    topic: 'Medical Devices segment sales operating earnings margin Diagnostics segment sales operating earnings margin',
+    object_types: [ 'MetricObservation', 'Calculation', 'XBRLFact' ]
+  },
+  duration_ms: 20405,
+  duration_s: 20.405,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_BR6s1Yb84vSk7DQbk86W5001',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'ABT',
+    topic: 'Medical Devices segment vs Diagnostics segment margin revenue growth capex operating profit'
+  },
+  duration_ms: 131,
+  duration_s: 0.131,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_SUYVqTJg9RAQZ7JQidpI4535',
+  tool_name: 'krw_ontology_compare'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 1063,
+  duration_s: 1.063,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_siP3yvRldu66t1tXHrso5542',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 158,
+  duration_s: 0.158,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_Dogs0Zndoma0OL4NiJE17298',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 186,
+  duration_s: 0.186,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_CqPDFWH07zPhB2gHjVxf2767',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'ABT',
+    topic: 'segment information revenue operating profit Diagnostics Medical Devices nutritional pharmaceutical',
+    document_types: [ '10-K' ]
+  },
+  duration_ms: 886,
+  duration_s: 0.886,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_QdDhRwt2ChyJuPOmYu1F0306',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 9925,
+  duration_s: 9.925,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_9dkld0ZuzS0NQdyd5Zdx4374',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'ABT',
+    topic: 'Diagnostic Products segment sales operating earnings revenue'
+  },
+  duration_ms: 3059,
+  duration_s: 3.059,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_bbOuFj5EdCcU3laiwEj43711',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'ABT',
+    topic: 'Medical Devices segment sales operating earnings revenue 2024 2025 2026'
+  },
+  duration_ms: 910,
+  duration_s: 0.91,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_DPAU7sRsz6VJK5aXI7rw9158',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 3192,
+  duration_s: 3.192,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_6wylaK3oRyhblWWxnRpp5016',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 5232,
+  duration_s: 5.232,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_MGhC8sl4Zhg33LU62v4c3851',
+  tool_name: 'krw_ontology_trace'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-4',
+  runId: 'ae8f6bec-2569-4330-bb2a-86ffbcf21aee'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-4' }
+[agent-worker] started { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-4' }

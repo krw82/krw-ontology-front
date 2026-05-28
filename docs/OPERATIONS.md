@@ -2,18 +2,24 @@
 
 ## Current Production Boundary
 
-KRW Ontology Front is currently operated as a single-VM service.
+KRW Ontology Front is operated with GCP web/API as the control-plane entry point
+and this Mac as the production agent/runtime machine.
 
 ```text
-Caddy
-  -> Docker Compose web container
-  -> Claude Agent SDK process
-  -> local Claude plugin
-  -> stdio MCP command
-  -> /srv/krw-ontology-data/current
+User
+  -> GCP web/API
+  -> Supabase queue/catalog
+  -> Mac agent workers
+  -> local prod MCP HTTP sidecar
+  -> ~/krw-ontology-data/releases/prod/current
 ```
 
-This is intentional for the pre-launch service. Do not run multiple web replicas until cancellation, reconnect, SDK session state, and rate limiting are moved to shared infrastructure.
+GCP web/API must not read the full ontology SQLite index. It reads only
+Supabase control-plane data such as the active web catalog. The full
+`agent_index.sqlite` is served only by the Mac prod runtime.
+
+The detailed deploy command reference is
+[`docs/DEPLOY_COMMANDS.md`](./DEPLOY_COMMANDS.md).
 
 ## Deployment Gate
 
@@ -31,36 +37,58 @@ npm run test:e2e
 
 ## Data Deploy
 
-The ontology snapshot is deployed from `~/krw-ontology-data`. Queue workers must be stopped before publishing a stable snapshot.
+Production ontology data is deployed as an immutable local release. Do not
+rebuild or overwrite `prod/current` in place.
 
 ```bash
-krw-ontology queue stop --wait --timeout 7200
-krw-ontology queue status
-npm run deploy:data -- --replace-remote-data
-krw-ontology queue start
+cd ~/krw-ontology
+uv run krw-ontology release prepare-dev <release_id>
+uv run krw-ontology queue start
+uv run krw-ontology queue status
+uv run krw-ontology release finalize-dev <release_id>
+uv run krw-ontology release materialize-prod <release_id>
+
+cd ~/krw-ontology-front
+npm run prod:release:publish -- --release-id <release_id>
 ```
 
-The expected stable index path is:
+The expected production index path is:
 
 ```text
-~/krw-ontology-data/indexes/agent_index.sqlite
+~/krw-ontology-data/releases/prod/current/indexes/agent_index.sqlite
 ```
 
-On the VM, the serving symlink should resolve to:
+`prod:release:publish` verifies the release, exports a compact
+`web_catalog.json`, publishes that catalog to Supabase, restarts prod MCP, then
+restarts Mac workers.
 
-```text
-/srv/krw-ontology-data/current/indexes/agent_index.sqlite
-```
+It does not upload the full SQLite index to GCP.
 
 ## Web And Plugin Deploy
 
-For web/plugin/MCP code changes without data replacement:
+For GCP web/API only:
 
 ```bash
-npm run deploy:all -- --skip-data
+npm run prod:deploy:web
 ```
 
-The deploy script materializes `~/krw-ontology` into a temporary Docker build context. Do not rely on Docker following an external symlink.
+For plugin/skills/MCP/worker runtime only:
+
+```bash
+npm run prod:deploy:runtime
+```
+
+For routine code deploys without ontology release changes:
+
+```bash
+npm run prod:deploy:code
+```
+
+For DB migration, ontology release, web, and runtime together:
+
+```bash
+npm run prod:deploy:full -- --release-id <release_id>
+```
 
 ## Health Checks
 
@@ -114,9 +142,14 @@ Do not leave old VM IP redirect URLs in hosted Auth settings.
 
 Rollback order:
 
-1. Repoint `/srv/krw-ontology-data/current` to the previous data release if the issue is data/index related.
-2. Rebuild/restart the previous Git revision if the issue is web/plugin related.
-3. Verify `/api/healthz/deep` and a real chat smoke test before declaring recovery.
+1. If the issue is ontology/index related, roll back `prod/current` to the
+   previous release and run `npm run prod:deploy:runtime`.
+2. If the issue is catalog publication, republish the previous release with
+   `npm run prod:release:publish -- --release-id <previous_release_id>`.
+3. If the issue is web/runtime code, deploy the previous Git revision with
+   `npm run prod:deploy:code`.
+4. Verify `npm run prod:status`, `/api/healthz`, and a real chat smoke test
+   before declaring recovery.
 
 ## Incident Notes
 

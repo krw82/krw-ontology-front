@@ -59,18 +59,26 @@ Claude, and local MCP processes.
 
 ## Deployment Lanes
 
-Production is split into separate deploy lanes:
+Production command UX is documented in detail at
+[`docs/DEPLOY_COMMANDS.md`](../../docs/DEPLOY_COMMANDS.md).
+
+Use the env-first aliases for routine work:
 
 ```sh
-npm run deploy:web      # GCP web/API only
-npm run deploy:worker   # Mac worker bundle + launchd workers only
-npm run deploy:plugin   # ~/krw-ontology plugin/MCP/skills + Mac workers only
-npm run deploy:prod     # deploy:web, then deploy:plugin
+npm run prod:deploy:web      # GCP web/API only
+npm run prod:deploy:runtime  # plugin/skills + MCP sidecar + Mac workers
+npm run prod:deploy:code     # web + runtime, no ontology release switch
+npm run prod:release:publish -- --release-id <release_id>
+npm run prod:deploy:full -- --release-id <release_id>
 ```
 
-The old VM plugin sync is kept as `npm run deploy:plugin:gcp` only for
+Compatibility aliases such as `npm run deploy:runtime`, `npm run deploy:mcp`,
+and `npm run deploy:plugin` are still kept, but new automation and runbooks
+should use `prod:deploy:runtime`.
+
+The old VM plugin sync is kept as `npm run legacy:gcp-mcp` only for
 compatibility. Normal plugin, skill, and MCP changes should use
-`npm run deploy:plugin`.
+`npm run prod:deploy:runtime`.
 
 ## Rollback
 
@@ -94,7 +102,7 @@ After foreground testing passes, install the launchd plists generated from
 Keep these invariants:
 
 - only one production worker class claims jobs at a time
-- `MAC_WORKER_COUNT=5` and `GLOBAL_CONCURRENT_RUN_LIMIT=5` for the current Mac
+- `MAC_WORKER_COUNT=8` and `GLOBAL_CONCURRENT_RUN_LIMIT=8` for the current Mac
   worker setup
 - local queue writer is stopped while Mac worker serves production
 - GCP web keeps valid plugin/data until web admission no longer depends on local

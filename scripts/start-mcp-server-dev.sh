@@ -37,7 +37,11 @@ KRW_ONTOLOGY_INDEX_PATH=${KRW_ONTOLOGY_INDEX_PATH:-"$KRW_ONTOLOGY_RELEASE_ROOT/i
 KRW_ONTOLOGY_MCP_HOST=${KRW_ONTOLOGY_MCP_HOST:-127.0.0.1}
 KRW_ONTOLOGY_MCP_PORT=${KRW_ONTOLOGY_MCP_PORT:-8766}
 KRW_ONTOLOGY_MCP_PATH=${KRW_ONTOLOGY_MCP_PATH:-/mcp}
-MCP_SERVER_LOG_LEVEL=${MCP_SERVER_LOG_LEVEL:-warning}
+MCP_SERVER_LOG_LEVEL=${MCP_SERVER_LOG_LEVEL:-info}
+MCP_LOG_DIR=${MCP_LOG_DIR:-"$HOME/Library/Logs/krw-ontology"}
+MCP_SERVER_LOG_FILE=${MCP_SERVER_LOG_FILE:-"$MCP_LOG_DIR/mcp-dev.log"}
+KRW_MCP_STORE_MODE=${KRW_MCP_STORE_MODE:-persistent}
+KRW_MCP_STORE_POOL_MAX=${KRW_MCP_STORE_POOL_MAX:-8}
 
 export KRW_ONTOLOGY_ENV
 export KRW_ONTOLOGY_SOURCE_DIR
@@ -45,6 +49,8 @@ export KRW_ONTOLOGY_RELEASE_ROOT
 export KRW_ONTOLOGY_ROOT
 export KRW_ONTOLOGY_MANIFEST_PATH
 export KRW_ONTOLOGY_INDEX_PATH
+export KRW_MCP_STORE_MODE
+export KRW_MCP_STORE_POOL_MAX
 
 if [ ! -f "$KRW_ONTOLOGY_SOURCE_DIR/pyproject.toml" ]; then
   echo "Missing KRW ontology source: $KRW_ONTOLOGY_SOURCE_DIR" >&2
@@ -54,15 +60,21 @@ if [ ! -e "$KRW_ONTOLOGY_INDEX_PATH" ]; then
   echo "Missing dev ontology index: $KRW_ONTOLOGY_INDEX_PATH" >&2
   exit 1
 fi
+mkdir -p "$MCP_LOG_DIR"
 
 echo "Starting KRW Ontology dev MCP HTTP server..."
 echo "Source: $KRW_ONTOLOGY_SOURCE_DIR"
 echo "Release root: $KRW_ONTOLOGY_RELEASE_ROOT"
 echo "MCP URL: http://$KRW_ONTOLOGY_MCP_HOST:$KRW_ONTOLOGY_MCP_PORT$KRW_ONTOLOGY_MCP_PATH"
+echo "MCP log: $MCP_SERVER_LOG_FILE"
 
-exec uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology-mcp-http \
+exec uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology-mcp \
+  --env dev \
   --host "$KRW_ONTOLOGY_MCP_HOST" \
   --port "$KRW_ONTOLOGY_MCP_PORT" \
   --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
+  --index-path "$KRW_ONTOLOGY_INDEX_PATH" \
   --mcp-path "$KRW_ONTOLOGY_MCP_PATH" \
+  --store-mode "$KRW_MCP_STORE_MODE" \
+  --log-file "$MCP_SERVER_LOG_FILE" \
   --log-level "$MCP_SERVER_LOG_LEVEL"

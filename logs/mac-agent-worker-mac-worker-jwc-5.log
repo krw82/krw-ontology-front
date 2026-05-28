@@ -9982,3 +9982,215 @@
 [agent-worker] idle { workerId: 'mac-worker-jwc-5' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-5' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }

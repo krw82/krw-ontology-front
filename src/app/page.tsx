@@ -90,6 +90,14 @@ const browseLinks = [
 ] as const;
 
 export default function Home() {
+  const websiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: SITE_NAME,
+    alternateName: "KRW",
+    url: absoluteUrl("/"),
+  };
+
   const webApplicationJsonLd = {
     "@context": "https://schema.org",
     "@type": "WebApplication",
@@ -109,6 +117,13 @@ export default function Home() {
 
   return (
     <div className="min-h-[100dvh] overflow-x-hidden bg-canvas text-ink">
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(websiteJsonLd),
+        }}
+      />
       <script
         type="application/ld+json"
         suppressHydrationWarning

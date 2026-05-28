@@ -1,0 +1,20 @@
+[agent-worker] started { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-6',
+  runId: 'cb0f9571-40d9-4f94-9ef5-46a56f385c04'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-6',
+  runId: 'cb0f9571-40d9-4f94-9ef5-46a56f385c04'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }

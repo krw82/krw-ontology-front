@@ -6,7 +6,7 @@ usage() {
 Usage: scripts/deploy-plugin-production.sh [--dry-run]
 
 Legacy GCP plugin sync. The canonical production plugin/MCP runtime is now the
-Mac worker. Use `npm run deploy:plugin` for normal plugin/MCP/skill changes.
+Mac worker. Use `npm run prod:deploy:runtime` for normal plugin/MCP/skill changes.
 
 This script only keeps the VM copy fresh for web image compatibility and
 rebuilds/restarts the web container. It intentionally does not start the GCP

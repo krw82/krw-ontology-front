@@ -434,6 +434,8 @@ function healthUrlFromMcpUrl(mcpUrl) {
 const mcpUrl = process.env.KRW_ONTOLOGY_MCP_URL;
 const healthUrl = process.env.KRW_ONTOLOGY_MCP_HEALTH_URL || healthUrlFromMcpUrl(mcpUrl);
 const expectedRoot = process.env.KRW_ONTOLOGY_RELEASE_ROOT;
+const healthTimeoutMs = Number(process.env.MCP_HEALTH_TIMEOUT_MS || 30000);
+const attemptTimeoutMs = Math.min(5000, Math.max(1000, healthTimeoutMs));
 
 function samePath(left, right) {
   if (!left || !right) return false;
@@ -444,37 +446,62 @@ function samePath(left, right) {
   }
 }
 
-(async () => {
+async function readHealth() {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(process.env.MCP_HEALTH_TIMEOUT_MS || 30000));
+  const timeout = setTimeout(() => controller.abort(), attemptTimeoutMs);
   try {
     const response = await fetch(healthUrl, {
       headers: { accept: "application/json" },
       signal: controller.signal,
     });
-    const payload = await response.json();
-    console.log(JSON.stringify({
-      status: response.status,
-      ok: payload.ok,
-      env: payload.env,
-      release_id: payload.release_id,
-      manifest_valid: payload.manifest_valid,
-      root: payload.root,
-      index_path: payload.index_path,
-      documents: payload.documents,
-      objects: payload.objects,
-      tools: Array.isArray(payload.tools) ? payload.tools.length : null,
-    }));
-    if (response.status !== 200 || payload.ok !== true) throw new Error("MCP HTTP health is not ok");
-    if (payload.env !== "prod") throw new Error("MCP health env is not prod");
-    if (!payload.release_id) throw new Error("MCP health is missing release_id");
-    if (payload.manifest_valid !== true) throw new Error("MCP health manifest_valid is not true");
-    if (expectedRoot && !samePath(payload.root, expectedRoot)) {
-      throw new Error(`MCP root mismatch: ${payload.root} !== ${expectedRoot}`);
-    }
+    return { response, payload: await response.json() };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function printHealth(response, payload) {
+  console.log(JSON.stringify({
+    status: response.status,
+    ok: payload.ok,
+    env: payload.env,
+    release_id: payload.release_id,
+    manifest_valid: payload.manifest_valid,
+    root: payload.root,
+    index_path: payload.index_path,
+    documents: payload.documents,
+    objects: payload.objects,
+    tools: Array.isArray(payload.tools) ? payload.tools.length : null,
+  }));
+}
+
+function assertHealth(response, payload) {
+  if (response.status !== 200 || payload.ok !== true) throw new Error("MCP HTTP health is not ok");
+  if (payload.env !== "prod") throw new Error("MCP health env is not prod");
+  if (!payload.release_id) throw new Error("MCP health is missing release_id");
+  if (payload.manifest_valid !== true) throw new Error("MCP health manifest_valid is not true");
+  if (expectedRoot && !samePath(payload.root, expectedRoot)) {
+    throw new Error(`MCP root mismatch: ${payload.root} !== ${expectedRoot}`);
+  }
+}
+
+(async () => {
+  const deadline = Date.now() + healthTimeoutMs;
+  let lastError = null;
+
+  while (Date.now() < deadline) {
+    try {
+      const { response, payload } = await readHealth();
+      assertHealth(response, payload);
+      printHealth(response, payload);
+      return;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+
+  throw lastError || new Error("MCP HTTP health did not become ready");
 })().catch((error) => {
   console.error(error.message || error);
   process.exit(1);

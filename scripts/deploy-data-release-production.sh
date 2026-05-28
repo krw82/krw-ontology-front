@@ -5,7 +5,7 @@ export PATH
 
 usage() {
   cat <<'EOF'
-Usage: scripts/deploy-data-release-production.sh [--release-id ID] [--releases-root DIR] [--env-file FILE] [--dry-run] [--skip-worker-restart] [--catalog-file FILE]
+Usage: scripts/deploy-data-release-production.sh [--release-id ID] [--releases-root DIR] [--env-file FILE] [--dry-run] [--skip-runtime-restart] [--skip-worker-restart] [--catalog-file FILE]
 
 Publish the active local prod ontology release to the GCP web control plane and
 restart Mac production workers onto the same release.
@@ -15,7 +15,8 @@ Flow:
   2. Verify /releases/prod/current and its manifest/index.
   3. Export a compact web_catalog.json from the release.
   4. Publish the catalog to Supabase and mark it active.
-  5. Restart Mac workers and verify heartbeats report the same release_id.
+  5. Restart the local prod MCP sidecar onto the promoted release.
+  6. Restart Mac workers and verify heartbeats report the same release_id.
 
 This script does not upload full ontology data to GCP. The full SQLite index
 stays on the Mac worker release root.
@@ -28,7 +29,7 @@ ONTOLOGY_SOURCE_DIR=${KRW_ONTOLOGY_SOURCE_DIR:-"$HOME/krw-ontology"}
 RELEASE_ID=""
 CATALOG_FILE=""
 DRY_RUN=0
-SKIP_WORKER_RESTART=0
+SKIP_RUNTIME_RESTART=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -48,8 +49,8 @@ while [ "$#" -gt 0 ]; do
       CATALOG_FILE=${2:?Missing value for --catalog-file}
       shift
       ;;
-    --skip-worker-restart)
-      SKIP_WORKER_RESTART=1
+    --skip-runtime-restart|--skip-worker-restart)
+      SKIP_RUNTIME_RESTART=1
       ;;
     --dry-run)
       DRY_RUN=1
@@ -159,7 +160,7 @@ if [ -n "$RELEASE_ID" ]; then
 fi
 
 if [ "$DRY_RUN" = "1" ]; then
-  echo "Dry run: would promote release, export web catalog, publish to Supabase, and restart Mac workers."
+  echo "Dry run: would promote release, export web catalog, publish to Supabase, restart prod MCP, and restart Mac workers."
   echo "Dry run target current: $RELEASE_ROOT"
   exit 0
 fi
@@ -192,9 +193,14 @@ node "$SCRIPT_DIR/publish-web-catalog.mjs" \
   --file "$CATALOG_FILE" \
   --env-file "$ENV_PATH"
 
-if [ "$SKIP_WORKER_RESTART" = "1" ]; then
-  echo "Skipping Mac worker restart by request."
+if [ "$SKIP_RUNTIME_RESTART" = "1" ]; then
+  echo "Skipping prod MCP and Mac worker restart by request."
 else
+  echo "Restarting prod MCP sidecar onto active release..."
+  "$SCRIPT_DIR/install-mcp-server-launchd.sh" \
+    --env-file "$ENV_PATH" \
+    --load
+
   echo "Restarting Mac workers and verifying release heartbeat..."
   "$SCRIPT_DIR/deploy-worker-production.sh" \
     --env-file "$ENV_PATH" \

@@ -1,20 +1,24 @@
 # KRW Ontology Front
 
-KRW Ontology의 웹 채팅/기업 브라우저 프론트엔드입니다. Next.js 앱이 Claude Agent SDK를 실행하고, 로컬 Claude plugin의 `.mcp.json`을 통해 KRW Ontology MCP를 stdio로 붙입니다.
+KRW Ontology의 웹 채팅/기업 브라우저 프론트엔드입니다. GCP web/API는
+Supabase queue/catalog를 다루고, 실제 agent execution과 full SQLite
+ontology index 접근은 Mac runtime이 담당합니다.
 
 ## Architecture
 
 ```text
 Browser
   -> Next.js /api/chat/run
-  -> Claude Agent SDK
+  -> Supabase queue/catalog
+  -> Mac agent workers
   -> local Claude plugin path
-  -> plugin .mcp.json stdio MCP
-  -> ~/krw-ontology package
-  -> ~/krw-ontology-data indexes
+  -> prod/dev MCP HTTP sidecar
+  -> ~/krw-ontology-data/releases/<env>/current
 ```
 
-운영은 현재 단일 VM을 명시적 전제로 둡니다. `abort-manager`와 local SDK session state는 다중 인스턴스 공유를 지원하지 않으므로, 수평 확장 전에는 Redis/DB 기반 cancel/reconnect 설계가 필요합니다.
+GCP web/API는 full ontology SQLite index를 직접 읽지 않습니다. Web이 보는
+데이터는 Supabase의 compact web catalog이고, full index는 Mac MCP/runtime만
+읽습니다.
 
 ## Local Development
 
@@ -42,10 +46,12 @@ npm run test:e2e
   plugins/krw-ontology
 
 ~/krw-ontology-data
-  indexes/agent_index.sqlite
+  releases/dev/current
+  releases/prod/current
 ```
 
-`krw-ontology/plugins/krw-ontology/.mcp.json`은 개발/운영에서 각각 올바른 `KRW_ONTOLOGY_ROOT`와 MCP command를 가리켜야 합니다.
+`ref/plugins/dev/krw-ontology/.mcp.json`은 dev MCP `8766`을,
+`ref/plugins/prod/krw-ontology/.mcp.json`은 prod MCP `8765`를 가리켜야 합니다.
 
 ## Checks
 
@@ -74,25 +80,32 @@ Claude Code native binary: 2.1.141
 
 ## Production Deploy
 
+자세한 명령어 기준은 [docs/DEPLOY_COMMANDS.md](docs/DEPLOY_COMMANDS.md)에
+있습니다. 새 자동화와 수동 작업은 `dev:*`, `prod:*`, `legacy:*` 이름을
+우선 사용합니다.
+
+평소 코드 배포:
+
+```bash
+npm run prod:deploy:code
+```
+
+Prod runtime만 갱신:
+
+```bash
+npm run prod:deploy:runtime
+```
+
+Prod ontology/index/catalog release 전환:
+
+```bash
+npm run prod:release:publish -- --release-id <release_id>
+```
+
 전체 배포:
 
 ```bash
-npm run deploy:all -- --replace-remote-data
-```
-
-기본 순서:
-
-1. Supabase migration drift check
-2. Supabase schema smoke test
-3. data snapshot deploy
-4. frontend/plugin/MCP source sync
-5. Docker Compose build/restart
-6. public and live MCP health checks
-
-마이그레이션을 함께 적용해야 할 때만 명시적으로 실행합니다.
-
-```bash
-npm run deploy:all -- --apply-migrations --replace-remote-data
+npm run prod:deploy:full -- --release-id <release_id>
 ```
 
 ## Operations

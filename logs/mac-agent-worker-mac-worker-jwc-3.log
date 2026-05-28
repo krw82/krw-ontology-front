@@ -10276,3 +10276,404 @@
 [agent-worker] idle { workerId: 'mac-worker-jwc-3' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-3' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-3' }
+[agent-worker] started { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-3' }
+[agent-worker] started { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-3',
+  runId: '112798b0-e0eb-416a-9b5e-c3347e855ff3'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'AAPL' },
+  duration_ms: 1012,
+  duration_s: 1.012,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_NgkGHGKqG1m9HmI2W5oo8196',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'supply chain manufacturing concentration diversification gross margin'
+  },
+  duration_ms: 4642,
+  duration_s: 4.642,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_9hPsPrYtehCmCThqYBb20763',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Greater China revenue demand geopolitical risk'
+  },
+  duration_ms: 4031,
+  duration_s: 4.031,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_4ogcT00mjiD5ThmMVgtn6263',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'App Store regulation services revenue growth antitrust'
+  },
+  duration_ms: 5785,
+  duration_s: 5.785,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_GkOMjIWEDENRJOOmzRbg1838',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'gross margin operating margin product margin cost input price mix',
+    periods: [ 'CY2026Q1', 'CY2025' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 2670,
+  duration_s: 2.67,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_hP4WAbRmmiGV2UJI0Hkk2655',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Greater China revenue segment trend iPhone demand competition',
+    periods: [ 'CY2026Q1', 'CY2025' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 4018,
+  duration_s: 4.018,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_cvWyQFfZeesd7S0SpUrg7124',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'services segment revenue growth margin App Store commission regulatory risk',
+    periods: [ 'CY2026Q1', 'CY2025' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 5433,
+  duration_s: 5.433,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_S7nRfh3adKAZSnPu4nf56460',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'segment revenue services products iPhone installed base geographic breakdown',
+    periods: [ 'CY2026Q1', 'CY2025' ],
+    document_types: [ '10-K', '10-Q' ]
+  },
+  duration_ms: 5695,
+  duration_s: 5.695,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_8nTnuhocrggfESMaFdK93508',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'European Digital Markets Act regulation commission rate App Store policy change'
+  },
+  duration_ms: 3278,
+  duration_s: 3.278,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_Rws0L9OS1qqd9ih9W24Z0019',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'total revenue net income operating income cash flow growth rate annual trend',
+    periods: [ 'CY2025', 'CY2024', 'CY2023' ],
+    document_types: [ '10-K', '10-Q' ]
+  },
+  duration_ms: 4263,
+  duration_s: 4.263,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_VLqUqBmCbOivbB8qNqNx2088',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Greater China segment net sales operating income iPhone revenue trend FY2025 FY2024 FY2023',
+    periods: [ 'CY2025', 'CY2026Q1' ],
+    document_types: [ '10-K', '10-Q' ]
+  },
+  duration_ms: 1696,
+  duration_s: 1.696,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_WgiftGGxIde3ylPiZtm99173',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'supply chain concentration geographic diversification China assembly semiconductor risk'
+  },
+  duration_ms: 752,
+  duration_s: 0.752,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_uHBN9F1aBT4kKxF2HSk38824',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 11479,
+  duration_s: 11.479,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_IlzzEjvjnhwNuDR41z401589',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 17095,
+  duration_s: 17.095,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_w9Fw9lJwgng9w1dRfgri9367',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 15870,
+  duration_s: 15.87,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_No1Qyl9MZhSWNBCCmq8g5307',
+  tool_name: 'krw_ontology_trace'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-3',
+  runId: '112798b0-e0eb-416a-9b5e-c3347e855ff3'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-3' }
+[agent-worker] started { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] stopped { workerId: 'mac-worker-jwc-3' }
+[agent-worker] started { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-3' }
+[agent-worker] started { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-3' }
+[agent-worker] started { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }

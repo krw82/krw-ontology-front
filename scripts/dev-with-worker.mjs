@@ -69,6 +69,11 @@ function configureDevOntologyEnv() {
   if (process.env.KRW_DEV_ALLOW_CUSTOM_MCP_BASE_URL !== "1") {
     process.env.MCP_BASE_URL = new URL(mcpUrl).origin;
   }
+  console.info("[dev] ontology env", {
+    releaseRoot: process.env.KRW_ONTOLOGY_RELEASE_ROOT,
+    pluginPath: process.env.KRW_ONTOLOGY_PLUGIN_PATH,
+    mcpUrl: process.env.KRW_ONTOLOGY_MCP_URL,
+  });
 }
 
 function isReleaseRoot(value) {
@@ -220,7 +225,7 @@ async function readDevMcpHealth() {
   try {
     const response = await fetch(process.env.KRW_ONTOLOGY_MCP_HEALTH_URL, {
       headers: { accept: "application/json" },
-      signal: AbortSignal.timeout(1_000),
+      signal: AbortSignal.timeout(5_000),
     });
     const payload = await response.json();
     return { response, payload };
@@ -251,25 +256,43 @@ async function waitForDevMcpHealth() {
 }
 
 async function ensureDevMcpServer() {
-  const existing = await readDevMcpHealth();
-  if (
-    existing?.response.status === 200 &&
-    existing.payload?.ok === true &&
-    existing.payload?.env === "dev" &&
-    existing.payload?.manifest_valid === true
-  ) {
-    console.info("[dev:mcp] reusing existing server", {
-      releaseId: existing.payload.release_id,
-      root: existing.payload.root,
-    });
-    return;
+  const reuseDeadline = Date.now() + 5_000;
+  while (Date.now() < reuseDeadline) {
+    const existing = await readDevMcpHealth();
+    if (
+      existing?.response.status === 200 &&
+      existing.payload?.ok === true &&
+      existing.payload?.env === "dev" &&
+      existing.payload?.manifest_valid === true
+    ) {
+      console.info("[dev:mcp] reusing existing server", {
+        releaseId: existing.payload.release_id,
+        root: existing.payload.root,
+      });
+      return;
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 500));
   }
 
   devMcp = spawnLabeled(
     "mcp",
     "nice",
     ["-n", String(devMcpNice), "scripts/start-mcp-server-dev.sh"],
-    (code) => {
+    async (code) => {
+      const existing = await readDevMcpHealth();
+      if (
+        existing?.response.status === 200 &&
+        existing.payload?.ok === true &&
+        existing.payload?.env === "dev" &&
+        existing.payload?.manifest_valid === true
+      ) {
+        console.info("[dev:mcp] spawned server exited; reusing existing server", {
+          releaseId: existing.payload.release_id,
+          root: existing.payload.root,
+        });
+        devMcp = null;
+        return;
+      }
       void shutdown("mcp-exit").finally(() => process.exit(code ?? 1));
     },
   );
@@ -329,3 +352,6 @@ nextDev = spawnLabeled("web", "npm", ["run", "dev:web"], (code) => {
   void shutdown("web-exit").finally(() => process.exit(code ?? 1));
 });
 await workerContext.watch();
+await new Promise(() => {
+  // Keep the wrapper alive; child exit handlers and signal handlers own shutdown.
+});

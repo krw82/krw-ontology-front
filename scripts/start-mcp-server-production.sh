@@ -65,13 +65,18 @@ set +a
 KRW_ONTOLOGY_MCP_HOST=${KRW_ONTOLOGY_MCP_HOST:-127.0.0.1}
 KRW_ONTOLOGY_MCP_PORT=${KRW_ONTOLOGY_MCP_PORT:-8765}
 KRW_ONTOLOGY_MCP_PATH=${KRW_ONTOLOGY_MCP_PATH:-/mcp}
-MCP_SERVER_LOG_LEVEL=${MCP_SERVER_LOG_LEVEL:-warning}
+MCP_SERVER_LOG_LEVEL=${MCP_SERVER_LOG_LEVEL:-info}
+MCP_LOG_DIR=${MCP_LOG_DIR:-"$HOME/Library/Logs/krw-ontology"}
+MCP_SERVER_LOG_FILE=${MCP_SERVER_LOG_FILE:-"$MCP_LOG_DIR/mcp-prod.log"}
+KRW_MCP_STORE_MODE=${KRW_MCP_STORE_MODE:-persistent}
+KRW_MCP_STORE_POOL_MAX=${KRW_MCP_STORE_POOL_MAX:-8}
+export KRW_MCP_STORE_POOL_MAX
 
 require_path "$KRW_ONTOLOGY_SOURCE_DIR/pyproject.toml"
 require_path "$KRW_ONTOLOGY_RELEASE_ROOT"
 require_path "$KRW_ONTOLOGY_MANIFEST_PATH"
 require_path "$KRW_ONTOLOGY_INDEX_PATH"
-mkdir -p "$FRONT_DIR/logs"
+mkdir -p "$FRONT_DIR/logs" "$MCP_LOG_DIR"
 
 if [ "${KRW_ONTOLOGY_ENV:-}" != "prod" ]; then
   echo "MCP production server requires KRW_ONTOLOGY_ENV=prod, got: ${KRW_ONTOLOGY_ENV:-unset}" >&2
@@ -82,10 +87,16 @@ echo "Starting KRW Ontology MCP HTTP server..."
 echo "Source: $KRW_ONTOLOGY_SOURCE_DIR"
 echo "Release root: $KRW_ONTOLOGY_RELEASE_ROOT"
 echo "MCP URL: http://$KRW_ONTOLOGY_MCP_HOST:$KRW_ONTOLOGY_MCP_PORT$KRW_ONTOLOGY_MCP_PATH"
+echo "MCP log: $MCP_SERVER_LOG_FILE"
 
-exec uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology-mcp-http \
+exec uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology-mcp \
+  --env prod \
   --host "$KRW_ONTOLOGY_MCP_HOST" \
   --port "$KRW_ONTOLOGY_MCP_PORT" \
   --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
+  --index-path "$KRW_ONTOLOGY_INDEX_PATH" \
+  --require-current-symlink \
   --mcp-path "$KRW_ONTOLOGY_MCP_PATH" \
+  --store-mode "$KRW_MCP_STORE_MODE" \
+  --log-file "$MCP_SERVER_LOG_FILE" \
   --log-level "$MCP_SERVER_LOG_LEVEL"

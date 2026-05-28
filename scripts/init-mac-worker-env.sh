@@ -14,8 +14,8 @@ Defaults:
   --from  .env
   --out   .env.mac-worker.production
 
-The generated file intentionally starts with five Mac production workers and
-GLOBAL_CONCURRENT_RUN_LIMIT=5. Lower both values together if you want a more
+The generated file intentionally starts with eight Mac production workers and
+GLOBAL_CONCURRENT_RUN_LIMIT=8. Lower both values together if you want a more
 conservative rollout.
 EOF
 }
@@ -184,12 +184,16 @@ trap cleanup EXIT INT TERM
   echo "CLAUDE_CODE_EXECUTABLE=$CLAUDE_PATH"
   echo "EXPECTED_CLAUDE_CODE_VERSION=2.1.111"
   echo "AGENT_WORKER_ID_PREFIX=mac-worker-jwc"
-  echo "MAC_WORKER_COUNT=5"
+  echo "MAC_WORKER_COUNT=8"
   echo "MAC_WORKER_NICE=-5"
   echo "MCP_SERVER_NICE=-5"
-  echo "MCP_SERVER_LOG_LEVEL=warning"
+  echo "MCP_SERVER_LOG_LEVEL=info"
+  echo "MCP_LOG_DIR=~/Library/Logs/krw-ontology"
+  echo "MCP_SERVER_MAXFILES=4096"
+  echo "KRW_MCP_STORE_MODE=persistent"
+  echo "KRW_MCP_STORE_POOL_MAX=8"
   echo "AGENT_WORKER_ID=mac-worker-jwc-1"
-  echo "GLOBAL_CONCURRENT_RUN_LIMIT=5"
+  echo "GLOBAL_CONCURRENT_RUN_LIMIT=8"
   echo "AGENT_WORKER_POLL_INTERVAL_MS=1000"
   echo "AGENT_WORKER_IDLE_LOG_INTERVAL_MS=60000"
   echo "CLAUDE_MODEL=sonnet"

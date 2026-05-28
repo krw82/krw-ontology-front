@@ -36,10 +36,19 @@ describe("production deploy scripts", () => {
     expect(deployAll).toContain("deploy-data-release-production.sh");
     expect(deployAll).toContain("Mac worker/plugin validation");
 
+    expect(packageJson).toContain('"prod:status": "npm run mcp:prod:status && npm run worker:prod:status"');
+    expect(packageJson).toContain('"prod:deploy:web": "scripts/deploy-web-production.sh"');
+    expect(packageJson).toContain('"prod:deploy:runtime": "scripts/deploy-plugin-worker-production.sh"');
+    expect(packageJson).toContain('"prod:deploy:code": "scripts/deploy-production.sh"');
+    expect(packageJson).toContain('"prod:deploy:full": "scripts/deploy-all-production.sh --apply-migrations"');
+    expect(packageJson).toContain('"prod:deploy:safe": "scripts/deploy-with-queue-pause.sh"');
+    expect(packageJson).toContain('"prod:release:publish": "scripts/deploy-data-release-production.sh"');
     expect(packageJson).toContain('"deploy:data": "scripts/deploy-data-release-production.sh"');
     expect(packageJson).toContain('"deploy:worker": "scripts/deploy-worker-production.sh"');
     expect(packageJson).toContain('"deploy:plugin": "scripts/deploy-plugin-worker-production.sh"');
     expect(packageJson).toContain('"deploy:mcp": "scripts/deploy-plugin-worker-production.sh"');
+    expect(packageJson).toContain('"legacy:gcp-mcp": "scripts/deploy-plugin-production.sh"');
+    expect(packageJson).toContain('"legacy:data-gcp": "scripts/deploy-data-production.sh"');
     expect(packageJson).toContain('"deploy:plugin:gcp": "scripts/deploy-plugin-production.sh"');
     expect(packageJson).toContain('"deploy:legacy:gcp-mcp": "scripts/deploy-plugin-production.sh"');
     expect(packageJson).toContain('"deploy:legacy:data-gcp": "scripts/deploy-data-production.sh"');
@@ -47,9 +56,12 @@ describe("production deploy scripts", () => {
     expect(packageJson).toContain('"verify:web-catalog": "node scripts/verify-web-catalog-release.mjs"');
     expect(packageJson).toContain('"mcp:prod:start": "scripts/start-mcp-server-production.sh"');
     expect(packageJson).toContain('"mcp:prod:verify": "scripts/verify-mcp-server-production.sh"');
+    expect(packageJson).toContain('"mcp:prod:logs": "scripts/tail-mcp-logs.sh prod"');
     expect(packageJson).toContain('"mcp:prod:launchd:install": "scripts/install-mcp-server-launchd.sh"');
     expect(packageJson).toContain('"mcp:dev:start": "scripts/start-mcp-server-dev.sh"');
     expect(packageJson).toContain('"mcp:dev:verify": "scripts/verify-mcp-server-dev.sh"');
+    expect(packageJson).toContain('"mcp:dev:logs": "scripts/tail-mcp-logs.sh dev"');
+    expect(packageJson).toContain('"mcp:dev:launchd:install": "scripts/install-mcp-server-dev-launchd.sh"');
 
     expect(restartCompose).toContain("restart reverse-proxy web");
     expect(restartCompose).not.toContain("restart reverse-proxy web agent-worker");
@@ -58,9 +70,17 @@ describe("production deploy scripts", () => {
   it("keeps dev data publish local and catalog-only", () => {
     const script = read("scripts/deploy-dev-data-release.sh");
     const packageJson = read("package.json");
+    const commandDocs = read("docs/DEPLOY_COMMANDS.md");
 
     expect(packageJson).toContain('"dev:catalog": "scripts/deploy-dev-data-release.sh"');
     expect(packageJson).toContain('"dev:data": "scripts/deploy-dev-data-release.sh"');
+    expect(packageJson).toContain('"dev:runtime": "scripts/deploy-dev-runtime.sh"');
+    expect(packageJson).toContain('"dev:release": "scripts/deploy-dev-data-release.sh"');
+    expect(packageJson).toContain('"dev:release:publish": "scripts/deploy-dev-data-release.sh"');
+    expect(commandDocs).toContain("npm run dev:runtime");
+    expect(commandDocs).toContain("npm run dev:release:publish -- --release-id <release_id>");
+    expect(commandDocs).toContain("npm run prod:release:publish -- --release-id <release_id>");
+    expect(commandDocs).toContain("deploy:data             -> prod:release:publish");
 
     expect(script).toContain("release export-web-catalog");
     expect(script).toContain("publish-web-catalog.mjs");
@@ -154,6 +174,7 @@ describe("production deploy scripts", () => {
     expect(webSection).not.toContain("KRW_ONTOLOGY_RELEASE_ROOT");
     expect(webSection).not.toContain("agent_index.sqlite");
     expect(webSection).not.toContain("/srv/krw-ontology-data:/srv/krw-ontology-data");
+    expect(read("Dockerfile.web")).toContain("krw-ontology-mcp-stdio");
   });
 
   it("keeps Mac worker cutover scripts conservative", () => {
@@ -215,10 +236,10 @@ describe("production deploy scripts", () => {
     expect(initEnv).toContain("KRW_ONTOLOGY_PLUGIN_SOURCE_PATH");
     expect(initEnv).toContain("KRW_ONTOLOGY_MCP_URL=http://127.0.0.1:8765/mcp");
     expect(initEnv).toContain("KRW_ONTOLOGY_MCP_HEALTH_URL=http://127.0.0.1:8765/health");
-    expect(initEnv).toContain("MAC_WORKER_COUNT=5");
+    expect(initEnv).toContain("MAC_WORKER_COUNT=8");
     expect(initEnv).toContain("MAC_WORKER_NICE=-5");
     expect(initEnv).toContain("MCP_SERVER_NICE=-5");
-    expect(initEnv).toContain("GLOBAL_CONCURRENT_RUN_LIMIT=5");
+    expect(initEnv).toContain("GLOBAL_CONCURRENT_RUN_LIMIT=8");
     expect(initEnv).toContain("KRW_SQLITE_READ_CACHE_MIB=512");
     expect(initEnv).toContain("KRW_SQLITE_READ_MMAP_MIB=2048");
 
@@ -242,11 +263,25 @@ describe("production deploy scripts", () => {
     expect(uninstallLaunchd).toContain("launchctl bootout");
     expect(uninstallLaunchd).toContain("com.krwontology.agent-worker*.plist");
 
-    expect(startMcp).toContain("krw-ontology-mcp-http");
+    expect(startMcp).toContain("krw-ontology-mcp");
+    expect(startMcp).toContain("--env prod");
+    expect(startMcp).toContain("--store-mode");
+    expect(startMcp).toContain("--log-file");
+    expect(startMcp).toContain("--require-current-symlink");
+    const legacyMcpCommand = ["krw", "ontology", "mcp", "http"].join("-");
+    expect(startMcp).not.toContain(legacyMcpCommand);
     expect(startMcp).toContain("--mcp-path");
     expect(startMcp).toContain("KRW_ONTOLOGY_MCP_PORT");
     expect(read("scripts/start-mcp-server-dev.sh")).toContain("KRW_ONTOLOGY_MCP_PORT=${KRW_ONTOLOGY_MCP_PORT:-8766}");
+    expect(read("scripts/start-mcp-server-dev.sh")).toContain("--env dev");
+    expect(read("scripts/start-mcp-server-dev.sh")).toContain("mcp-dev.log");
     expect(read("scripts/verify-mcp-server-dev.sh")).toContain("MCP dev health env is not dev");
+    expect(read("scripts/install-mcp-server-dev-launchd.sh")).toContain(
+      "com.krwontology.mcp-server-dev",
+    );
+    expect(read("ops/launchd/com.krwontology.mcp-server-dev.plist.template")).toContain(
+      "mcp-dev.err.log",
+    );
     expect(read("scripts/materialize-ontology-plugin.mjs")).toContain('"plugins"');
     expect(read("scripts/materialize-ontology-plugin.mjs")).toContain('"krw-ontology"');
     expect(verifyMcp).toContain("KRW_ONTOLOGY_MCP_HEALTH_URL");
@@ -254,9 +289,17 @@ describe("production deploy scripts", () => {
     expect(installMcpLaunchd).toContain("com.krwontology.mcp-server");
     expect(installMcpLaunchd).toContain("verify-mcp-server-production.sh");
     expect(installMcpLaunchd).toContain("MCP_SERVER_NICE");
+    expect(installMcpLaunchd).toContain("MCP_LOG_DIR");
+    expect(installMcpLaunchd).toContain("MCP_SERVER_MAXFILES");
     expect(uninstallMcpLaunchd).toContain("com.krwontology.mcp-server.plist");
     expect(read("ops/launchd/com.krwontology.mcp-server.plist.template")).toContain(
       "start-mcp-server-production.sh",
+    );
+    expect(read("ops/launchd/com.krwontology.mcp-server.plist.template")).toContain(
+      "SoftResourceLimits",
+    );
+    expect(read("ops/launchd/com.krwontology.mcp-server.plist.template")).toContain(
+      "__LOG_DIR__/mcp-prod.err.log",
     );
     expect(read("ref/plugins/prod/krw-ontology/.mcp.json")).toContain(
       '"type": "http"',

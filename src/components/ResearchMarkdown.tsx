@@ -178,47 +178,47 @@ export function normalizeResearchMarkdown(content: string): string {
 
 const RESEARCH_MARKDOWN_COMPONENTS = {
   h1: ({ children }) => (
-    <h1 className="mb-md mt-xl text-[24px] font-black leading-[1.16] tracking-normal text-ink first:mt-0 sm:text-[30px]">
+    <h1 className="mb-sm mt-lg text-[22px] font-extrabold leading-[1.2] tracking-normal text-ink first:mt-0 sm:mb-md sm:mt-xl sm:text-[30px] sm:font-black sm:leading-[1.16]">
       {children}
     </h1>
   ),
   h2: ({ children }) => (
-    <h2 className="mb-sm mt-xxl border-t border-hairline pt-lg text-[20px] font-black leading-[1.24] tracking-normal text-ink first:mt-0 first:border-t-0 first:pt-0 sm:text-[23px]">
+    <h2 className="mb-xs mt-xl border-t border-hairline pt-md text-[18px] font-extrabold leading-[1.32] tracking-normal text-ink first:mt-0 first:border-t-0 first:pt-0 sm:mb-sm sm:mt-xxl sm:pt-lg sm:text-[23px] sm:font-black sm:leading-[1.24]">
       {children}
     </h2>
   ),
   h3: ({ children }) => (
-    <h3 className="mb-sm mt-xl text-[17px] font-black leading-[1.32] tracking-normal text-ink first:mt-0 sm:text-[19px]">
+    <h3 className="mb-xs mt-lg text-[16px] font-extrabold leading-[1.38] tracking-normal text-ink first:mt-0 sm:mb-sm sm:mt-xl sm:text-[19px] sm:font-black sm:leading-[1.32]">
       {children}
     </h3>
   ),
   h4: ({ children }) => (
-    <h4 className="mb-xs mt-lg text-[15px] font-black leading-[1.38] tracking-normal text-ink first:mt-0 sm:text-[16px]">
+    <h4 className="mb-1 mt-md text-[14px] font-extrabold leading-[1.42] tracking-normal text-ink first:mt-0 sm:mb-xs sm:mt-lg sm:text-[16px] sm:font-black sm:leading-[1.38]">
       {children}
     </h4>
   ),
   p: ({ children }) => (
-    <p className="mb-[0.95rem] mt-0 text-[15px] leading-[1.8] text-body [text-wrap:pretty] first:mt-0 last:mb-0 sm:text-[16px]">
+    <p className="mb-[0.8rem] mt-0 text-[15px] leading-[1.68] text-body [text-wrap:pretty] first:mt-0 last:mb-0 sm:mb-[0.95rem] sm:text-[16px] sm:leading-[1.8]">
       {children}
     </p>
   ),
   ul: ({ children }) => (
-    <ul className="mb-[1.05rem] mt-[0.35rem] list-disc space-y-2.5 pl-6 text-[15px] leading-[1.78] text-body marker:text-primary/70 sm:text-[16px]">
+    <ul className="mb-[0.85rem] mt-[0.25rem] list-disc space-y-2 pl-5 text-[15px] leading-[1.66] text-body marker:text-primary/65 sm:mb-[1.05rem] sm:mt-[0.35rem] sm:space-y-2.5 sm:pl-6 sm:text-[16px] sm:leading-[1.78]">
       {children}
     </ul>
   ),
   ol: ({ children }) => (
-    <ol className="mb-[1.05rem] mt-[0.35rem] list-decimal space-y-2.5 pl-6 text-[15px] leading-[1.78] text-body marker:font-bold marker:text-primary/70 sm:text-[16px]">
+    <ol className="mb-[0.85rem] mt-[0.25rem] list-decimal space-y-2 pl-5 text-[15px] leading-[1.66] text-body marker:font-bold marker:text-primary/65 sm:mb-[1.05rem] sm:mt-[0.35rem] sm:space-y-2.5 sm:pl-6 sm:text-[16px] sm:leading-[1.78]">
       {children}
     </ol>
   ),
   li: ({ children }) => (
-    <li className="pl-1.5 marker:text-muted [&>ol]:mb-0 [&>ol]:mt-2 [&>p]:mb-1 [&>p]:mt-0 [&>ul]:mb-0 [&>ul]:mt-2">
+    <li className="pl-0.5 marker:text-muted sm:pl-1.5 [&>ol]:mb-0 [&>ol]:mt-2 [&>p]:mb-1 [&>p]:mt-0 [&>ul]:mb-0 [&>ul]:mt-2">
       {children}
     </li>
   ),
   strong: ({ children }) => (
-    <strong className="font-black text-ink">{children}</strong>
+    <strong className="font-extrabold text-ink sm:font-black">{children}</strong>
   ),
   em: ({ children }) => <em className="text-body">{children}</em>,
   a: ({ children, href }) => {
@@ -255,7 +255,7 @@ const RESEARCH_MARKDOWN_COMPONENTS = {
   ),
   table: ({ children }) => (
     <div className="my-lg max-w-full overflow-x-auto rounded-[8px] border border-hairline bg-canvas">
-      <table className="w-full min-w-[640px] border-collapse text-left text-[13px] leading-[1.62] sm:text-[14px]">
+      <table className="w-full min-w-[560px] border-collapse text-left text-[13px] leading-[1.58] sm:min-w-[640px] sm:text-[14px] sm:leading-[1.62]">
         {children}
       </table>
     </div>

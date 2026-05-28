@@ -5,7 +5,7 @@ export PATH
 
 usage() {
   cat <<'EOF'
-Usage: scripts/install-mac-worker-launchd.sh [--env-file FILE] [--load]
+Usage: scripts/install-mac-worker-launchd.sh [--env-file FILE] [--load] [--skip-preflight]
 
 Install launchd plists for the configured production Mac workers. Pass --load
 to start them immediately after installing.
@@ -13,6 +13,7 @@ EOF
 }
 
 LOAD=0
+SKIP_PREFLIGHT=0
 ENV_FILE=.env.mac-worker.production
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -22,6 +23,9 @@ while [ "$#" -gt 0 ]; do
       ;;
     --load)
       LOAD=1
+      ;;
+    --skip-preflight)
+      SKIP_PREFLIGHT=1
       ;;
     --help|-h)
       usage
@@ -110,10 +114,12 @@ if [ "$MAC_WORKER_NICE" -lt -20 ] || [ "$MAC_WORKER_NICE" -gt 20 ]; then
   exit 1
 fi
 
-"$SCRIPT_DIR/mac-worker-preflight.sh" \
-  --env-file "$ENV_PATH" \
-  --worker-id "$AGENT_WORKER_ID_PREFIX-1" \
-  --skip-worker-duplicate-check
+if [ "$SKIP_PREFLIGHT" != "1" ]; then
+  "$SCRIPT_DIR/mac-worker-preflight.sh" \
+    --env-file "$ENV_PATH" \
+    --worker-id "$AGENT_WORKER_ID_PREFIX-1" \
+    --skip-worker-duplicate-check
+fi
 
 mkdir -p "$PLIST_DIR" "$FRONT_DIR/logs"
 

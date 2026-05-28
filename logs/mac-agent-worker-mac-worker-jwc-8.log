@@ -1,0 +1,200 @@
+[agent-worker] started { workerId: 'mac-worker-jwc-8' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-8' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-8' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-8' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-8' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-8' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-8' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-8' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-8',
+  runId: 'b96762e9-ae23-4210-a7b9-d09a4151468e'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'Now Assist AI SKU add-on paid adoption ACV annual contract value',
+    document_types: [ '10-K', '10-Q' ]
+  },
+  duration_ms: 1597,
+  duration_s: 1.597,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_pZXwBhEG6IWVVyHwB7V91230',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'remaining performance obligations RPO customer ACV large deal growth',
+    document_types: [ '10-K', '10-Q' ]
+  },
+  duration_ms: 1369,
+  duration_s: 1.369,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_BEdOW3jPxWAGdzL8kNzT1173',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'customer ACV million large deal wins million-dollar ACV',
+    document_types: [ '10-K', '10-Q' ]
+  },
+  duration_ms: 5657,
+  duration_s: 5.657,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_4G4vlCVYo9n4ipqYi7gp1570',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 7158,
+  duration_s: 7.158,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_X439MEiHNFruYJpRlsOx9466',
+  tool_name: 'krw_ontology_chain'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'customer ACV greater than million count metric',
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 360,
+  duration_s: 0.36,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_SY41DIjM7ZBhmUiIxr7U6182',
+  tool_name: 'krw_ontology_query'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-8',
+  runId: 'b96762e9-ae23-4210-a7b9-d09a4151468e'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-8' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-8' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-8',
+  runId: 'ad99bbe4-8b45-4e4c-a9d6-b9be46052872'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'MSFT' },
+  duration_ms: 980,
+  duration_s: 0.98,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_UcFVs5t4WSrj4MhnXQQg8454',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'MSFT',
+    topic: 'Microsoft AI capex infrastructure investment margin cloud',
+    periods: [ 'CY2026Q1', 'CY2025', 'CY2024' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 3381,
+  duration_s: 3.381,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_5BLYn8Ev30pkVsGfw48k1325',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'MSFT',
+    topic: 'Microsoft operating margin COGS data center buildout depreciation ROI LLM',
+    periods: [ 'CY2026Q1', 'CY2025' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 1004,
+  duration_s: 1.004,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_ey1XMjiMi4ujvSn7PBIP7136',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'MSFT',
+    topic: 'Microsoft Azure AI revenue growth OpenAI competition enterprise AI monetization',
+    periods: [ 'CY2026Q1', 'CY2025' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 2272,
+  duration_s: 2.272,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_YPb6nxKVtdifg3ltCebL2357',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 7283,
+  duration_s: 7.283,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_Kkf9oIoMF0nLfX4j22XC0234',
+  tool_name: 'krw_ontology_chain'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'MSFT',
+    topic: 'Microsoft revenue growth Azure cloud Intelligent Cloud segment productivity business processes',
+    periods: [ 'CY2026Q1', 'CY2025' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 5971,
+  duration_s: 5.971,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_wkVT1DTMftFJlnsaD4iX9536',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'MSFT',
+    topic: 'Microsoft capital expenditure AI infrastructure buildout cash flow operating expense R&D',
+    periods: [ 'CY2026Q1', 'CY2025' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 6690,
+  duration_s: 6.69,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_KsDAFfO4qN2hdUZQAxsn7057',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 6374,
+  duration_s: 6.374,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_4eh7pA33Cqkn4VDvmyif9457',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'MSFT',
+    topic: 'Microsoft revenue segment growth Intelligent Cloud Azure More Personal Computing Productivity Business Processes oper...',
+    periods: [ 'CY2026Q1' ],
+    document_types: [ '10-Q' ]
+  },
+  duration_ms: 1426,
+  duration_s: 1.426,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_91h1Ucy07VDi7qGkwJTG5251',
+  tool_name: 'krw_ontology_query'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-8',
+  runId: 'ad99bbe4-8b45-4e4c-a9d6-b9be46052872'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-8' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-8' }

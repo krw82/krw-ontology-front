@@ -16,10 +16,7 @@ import {
   MAX_CHAT_PAYLOAD_CHARS,
 } from "@/lib/chat-limits";
 import { createClientId } from "@/lib/client-id";
-import {
-  getActiveResearchLabel,
-  type ResearchToolCallStatus,
-} from "@/lib/chat/research-status";
+import type { ResearchToolCallStatus } from "@/lib/chat/research-status";
 import type { ResearchMode } from "@/lib/research-mode";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
@@ -35,6 +32,7 @@ interface ComposerProps {
   toolCalls?: ResearchToolCallStatus[];
   initialValue?: string;
   draftResetKey?: number;
+  runStartedAt?: string | null;
   researchMode?: ResearchMode;
   onResearchModeChange?: (mode: ResearchMode) => void;
 }
@@ -120,11 +118,9 @@ function composeMessage(message: string, attachments: TextAttachment[]): string 
 export default function Composer({
   onSend,
   onCancel,
-  activity,
   disabled = false,
   isGenerating = false,
   placeholder = "기업에 대해 질문하세요...",
-  toolCalls = [],
   initialValue,
   draftResetKey = 0,
 }: ComposerProps) {
@@ -151,10 +147,6 @@ export default function Composer({
   const isOverLimit = composedLength > payloadLimit;
   const isInputDisabled = disabled || isGenerating;
   const canSubmit = composedLength > 0 && !isOverLimit && !isInputDisabled;
-  const generatingLabel = useMemo(
-    () => `${getActiveResearchLabel(toolCalls, activity)} 중...`,
-    [activity, toolCalls],
-  );
 
   const syncTextareaValue = useCallback((nextValue: string) => {
     setValue(nextValue);
@@ -645,14 +637,16 @@ export default function Composer({
           <AnimatePresence mode="wait" initial={false}>
             {isGenerating && (
               <motion.div
-                key={generatingLabel}
-                className="pointer-events-none absolute inset-x-xs inset-y-0 flex min-w-0 items-center text-[16px] font-bold leading-[1.5] text-muted sm:inset-x-sm"
-                initial={{ opacity: 0, y: motionConfig.y, filter: "blur(2px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                exit={{ opacity: 0, y: -motionConfig.y, filter: "blur(2px)" }}
+                key="generating-label"
+                className="pointer-events-none absolute inset-x-xs inset-y-0 flex min-w-0 items-center text-[16px] font-medium leading-[1.5] text-muted sm:inset-x-sm"
+                initial={{ opacity: 0, y: motionConfig.y }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -motionConfig.y }}
                 transition={{ duration: motionConfig.duration, ease: motionConfig.ease }}
               >
-                <span className="truncate">{generatingLabel}</span>
+                <span className="min-w-0 truncate text-muted">
+                  분석 진행중
+                </span>
               </motion.div>
             )}
           </AnimatePresence>

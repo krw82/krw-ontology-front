@@ -26,11 +26,17 @@
   <key>Nice</key>
   <integer>__NICE__</integer>
 
+  <key>SoftResourceLimits</key>
+  <dict>
+    <key>NumberOfFiles</key>
+    <integer>__MAXFILES__</integer>
+  </dict>
+
   <key>StandardOutPath</key>
-  <string>__FRONT_DIR__/logs/launchd-mcp-server.out.log</string>
+  <string>__LOG_DIR__/mcp-prod.out.log</string>
 
   <key>StandardErrorPath</key>
-  <string>__FRONT_DIR__/logs/launchd-mcp-server.err.log</string>
+  <string>__LOG_DIR__/mcp-prod.err.log</string>
 
   <key>EnvironmentVariables</key>
   <dict>

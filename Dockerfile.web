@@ -69,7 +69,7 @@ cat > ./krw-ontology/plugins/krw-ontology/.mcp.json <<'JSON'
 {
   "mcpServers": {
     "krw-ontology": {
-      "command": "/opt/krw-ontology-venv/bin/krw-ontology-mcp",
+      "command": "/opt/krw-ontology-venv/bin/krw-ontology-mcp-stdio",
       "args": [],
       "env": {
         "KRW_ONTOLOGY_ENV": "prod"

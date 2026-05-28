@@ -9730,3 +9730,312 @@
 [agent-worker] idle { workerId: 'mac-worker-jwc-2' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-2' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: 'prod',
+  releaseId: '20260528_215304_legacy_rebuilt',
+  manifestValid: true,
+  connected: false,
+  error: 'KRW Ontology MCP live health check failed'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: `Unexpected token 'I', "Internal S"... is not valid JSON`
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-2' }
+[agent-worker] started { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-2' }
+[agent-worker] started { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-2' }
+[agent-worker] started { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-2' }
+[agent-worker] started { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-2' }
+[agent-worker] started { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-2',
+  runId: '89d3a9cd-5da2-4d5c-887b-958b405c9c24'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'NOW' },
+  duration_ms: 571,
+  duration_s: 0.571,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_6iO1MUSb2X3EBuEjPBCZ5941',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 13197,
+  duration_s: 13.197,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_ICi8HQOONhCrqBakvIzz1434',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 18520,
+  duration_s: 18.52,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_SSz7LhHjRsp9umwela0Q1340',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'competition generative AI LLM disruption risk factors',
+    document_types: [ '10-K', '10-Q' ]
+  },
+  duration_ms: 1895,
+  duration_s: 1.895,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_FdXI6EEp4WVf9i5lYYx02641',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'subscription revenue growth outlook AI automation market',
+    document_types: [ '10-K', '10-Q' ]
+  },
+  duration_ms: 1341,
+  duration_s: 1.341,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_f56GeJxFkBNgCAWH5lpv0095',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'competitive risk factors market competition',
+    document_types: [ '10-K', '10-Q' ]
+  },
+  duration_ms: 4266,
+  duration_s: 4.266,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_3eztlCCHHjtghSTYPwlH0751',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'Now Assist AI platform subscription revenue growth quarterly',
+    periods: [ 'CY2026Q1' ],
+    document_types: [ '10-Q' ]
+  },
+  duration_ms: 3757,
+  duration_s: 3.757,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_02fErpfF9CSYUiHdtUwF2096',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'subscription revenues total revenues operating income',
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 555,
+  duration_s: 0.555,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_PYPsBAYWkLztmue06sfK4228',
+  tool_name: 'krw_ontology_query'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-2',
+  runId: '89d3a9cd-5da2-4d5c-887b-958b405c9c24'
+}
+[agent-worker] stopped { workerId: 'mac-worker-jwc-2' }
+[agent-worker] started { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }

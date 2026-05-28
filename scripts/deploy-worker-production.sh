@@ -6,7 +6,7 @@ usage() {
 Usage: scripts/deploy-worker-production.sh [--env-file FILE] [--release-id ID] [--dry-run]
 
 Rebuild and restart only the Mac production agent workers. The long-running MCP
-HTTP server must already be healthy. Use deploy:mcp when plugin/MCP code
+HTTP server must already be healthy. Use prod:deploy:runtime when plugin/MCP code
 changes too.
 
 This does not deploy or restart the GCP web container.
@@ -87,6 +87,7 @@ fi
 
 "$SCRIPT_DIR/install-mac-worker-launchd.sh" \
   --env-file "$ENV_PATH" \
+  --skip-preflight \
   --load
 
 if [ -n "$EXPECTED_RELEASE_ID" ]; then
