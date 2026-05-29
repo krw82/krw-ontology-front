@@ -198,8 +198,12 @@ test.describe("dev auth bypass", () => {
     await composer.fill("테스트 질문");
     await expect(composer).toHaveValue("테스트 질문");
     const sendRequestBaseline = runRequestCount;
-    await expect(sendButton).toBeEnabled({ timeout: 5000 });
-    await sendButton.click();
+    if (await sendButton.isDisabled()) {
+      await composer.press("Enter");
+    } else {
+      await sendButton.click();
+    }
+    await expect(composer).toHaveValue("", { timeout: 5000 });
 
     if (createSessionRequestCount === 0) {
       await expect

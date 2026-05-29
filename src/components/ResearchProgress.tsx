@@ -6,6 +6,7 @@ import type {
   ChatCitation,
   ResearchActivityUpdate,
 } from "@/types/api-contracts";
+import { getResearchActivityLabel } from "@/lib/chat/research-status";
 import { formatResearchDuration } from "@/lib/chat/research-status";
 import {
   useRunningDurationMs,
@@ -27,6 +28,7 @@ const progressTransition = {
 
 export default function ResearchProgress({
   isStreaming = false,
+  activity,
   toolCalls = [],
   runStartedAt,
 }: ResearchProgressProps) {
@@ -39,6 +41,9 @@ export default function ResearchProgress({
   if (!isStreaming) return null;
 
   const durationLabel = formatResearchDuration(elapsedMs);
+  const statusLabel = activity
+    ? getResearchActivityLabel(activity)
+    : "분석 준비 중";
 
   return (
     <motion.div
@@ -49,7 +54,13 @@ export default function ResearchProgress({
       animate={{ opacity: 1, y: 0 }}
       transition={progressTransition}
     >
-      <p className="max-w-full text-left font-mono text-[12px] font-medium leading-5 text-muted sm:text-[13px]">
+      <p className="text-left text-[12px] font-extrabold leading-5 text-ink sm:text-[13px]">
+        {statusLabel}
+      </p>
+      <p
+        aria-hidden="true"
+        className="mt-0.5 text-[12px] font-medium leading-5 text-muted-soft sm:text-[13px]"
+      >
         {durationLabel}
       </p>
       <p className="mt-0.5 text-[12px] font-medium leading-5 text-muted-soft sm:text-[13px]">

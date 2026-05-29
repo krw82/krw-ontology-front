@@ -39,6 +39,10 @@ interface SendMessageOptions {
   requestId?: string;
 }
 
+export type SendMessageResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
 export interface ToolCallState {
   tool_call_id: string;
   tool_name: MCPToolName;
@@ -475,13 +479,11 @@ export function useChat({
   }, [onSessionCreated, sessionId]);
 
   const syncSessionFromServer = useCallback(async (targetSessionId: string) => {
-    if (activeSessionIdRef.current === targetSessionId) {
-      setState((prev) => ({
-        ...prev,
-        isHydratingSession: true,
-        error: null,
-      }));
-    }
+    setState((prev) => ({
+      ...prev,
+      isHydratingSession: true,
+      error: null,
+    }));
 
     try {
       const res = await fetch(`/api/chat/${encodeURIComponent(targetSessionId)}`);
@@ -742,13 +744,22 @@ export function useChat({
   );
 
   const sendMessage = useCallback(
-    async (content: string, options: SendMessageOptions = {}) => {
+    async (
+      content: string,
+      options: SendMessageOptions = {},
+    ): Promise<SendMessageResult> => {
       if (
         !content.trim() ||
         statusRef.current === "running" ||
         sendInFlightRef.current
       ) {
-        return;
+        return {
+          ok: false,
+          message:
+            !content.trim()
+              ? "메시지를 입력해야 합니다."
+              : "현재 답변 생성 중입니다.",
+        };
       }
       const targetSessionId = options.sessionId || sessionId;
       const contentLimit = getChatContentLimit(content);
@@ -757,7 +768,10 @@ export function useChat({
           ...prev,
           error: `메시지가 너무 깁니다. 최대 ${contentLimit.toLocaleString()}자까지 입력할 수 있습니다.`,
         }));
-        return;
+        return {
+          ok: false,
+          message: `메시지가 너무 깁니다. 최대 ${contentLimit.toLocaleString()}자까지 입력할 수 있습니다.`,
+        };
       }
 
       const requestId = options.requestId || createClientId();
@@ -807,8 +821,123 @@ export function useChat({
       const abortController = new AbortController();
       abortRef.current = abortController;
 
+      const processRun = async (response: Response) => {
+        try {
+          const responseSessionId = response.headers.get("x-chat-session-id");
+          if (!targetSessionId && responseSessionId) {
+            if (
+              abortController.signal.aborted ||
+              streamGenerationRef.current !== generation ||
+              activeRequestIdRef.current !== requestId
+            ) {
+              return;
+            }
+            activeSessionIdRef.current = responseSessionId;
+            onSessionCreated?.(responseSessionId);
+            setState((prev) => ({
+              ...prev,
+              messages: prev.messages.map((message) => ({
+                ...message,
+                session_id:
+                  message.session_id === "pending"
+                    ? responseSessionId
+                    : message.session_id,
+              })),
+            }));
+          }
+
+          const wasFinalized = await readStream(response, {
+            sessionId: responseSessionId || targetSessionId || null,
+            requestId,
+            generation,
+          });
+
+          // If the transport ends early, keep reconnecting until the server sends
+          // an explicit terminal event. A closed SSE connection is not completion.
+          if (!wasFinalized && !abortController.signal.aborted) {
+            const runId = activeRunIdRef.current;
+            const reconnectSessionId = activeSessionIdRef.current || targetSessionId;
+
+            if (runId && reconnectSessionId) {
+              setState((prev) => {
+                if (prev.status !== "running") return prev;
+                return {
+                  ...prev,
+                  activity: {
+                    stage: "preparing",
+                    label: "분석 상태 복원 중",
+                  },
+                };
+              });
+              await reconnectUntilFinalized(
+                reconnectSessionId,
+                runId,
+                abortController.signal,
+                generation,
+              );
+            } else if (!finalizedRef.current) {
+              throw new Error("실행 정보를 확인하지 못했습니다. 다시 시도해주세요.");
+            }
+          }
+        } catch (err) {
+          if ((err as Error).name === "AbortError") {
+            setState((prev) => ({
+              ...prev,
+              status: "cancelled",
+              isHydratingSession: false,
+              activity: null,
+              runStartedAt: null,
+            }));
+          } else {
+            const runId = activeRunIdRef.current;
+            const reconnectSessionId = activeSessionIdRef.current || targetSessionId;
+
+            if (
+              runId &&
+              reconnectSessionId &&
+              streamGenerationRef.current === generation
+            ) {
+              setState((prev) => ({
+                ...prev,
+                activity: {
+                  stage: "preparing",
+                  label: "분석 상태 복원 중",
+                },
+              }));
+
+              const recovered = await reconnectUntilFinalized(
+                reconnectSessionId,
+                runId,
+                abortController.signal,
+                generation,
+              );
+              if (recovered) return;
+
+              const synced = await syncSessionFromServer(reconnectSessionId);
+              if (synced) return;
+            }
+
+            setState((prev) => ({
+              ...prev,
+              status: "failed",
+              isHydratingSession: false,
+              error: (err as Error).message,
+              activity: null,
+              runStartedAt: null,
+            }));
+          }
+        } finally {
+          abortRef.current = null;
+          if (activeRequestIdRef.current === requestId) {
+            activeRequestIdRef.current = null;
+          }
+          sendInFlightRef.current = false;
+        }
+      };
+
+      let response: Response;
       try {
-        const response = await fetch("/api/chat/run", {
+        response = await fetch("/api/chat/run", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -825,124 +954,49 @@ export function useChat({
           }),
           signal: abortController.signal,
         });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => null);
-          throw new Error(
-            errorData?.error?.message || `요청에 실패했습니다: ${response.status}`,
-          );
-        }
-
-        const responseSessionId = response.headers.get("x-chat-session-id");
-        if (!targetSessionId && responseSessionId) {
-          if (
-            abortController.signal.aborted ||
-            streamGenerationRef.current !== generation ||
-            activeRequestIdRef.current !== requestId
-          ) {
-            return;
-          }
-          activeSessionIdRef.current = responseSessionId;
-          onSessionCreated?.(responseSessionId);
-          setState((prev) => ({
-            ...prev,
-            messages: prev.messages.map((message) => ({
-              ...message,
-              session_id:
-                message.session_id === "pending"
-                  ? responseSessionId
-                  : message.session_id,
-            })),
-          }));
-        }
-
-        const wasFinalized = await readStream(response, {
-          sessionId: responseSessionId || targetSessionId || null,
-          requestId,
-          generation,
-        });
-
-        // If the transport ends early, keep reconnecting until the server sends
-        // an explicit terminal event. A closed SSE connection is not completion.
-        if (!wasFinalized && !abortController.signal.aborted) {
-          const runId = activeRunIdRef.current;
-          const reconnectSessionId = activeSessionIdRef.current || targetSessionId;
-
-          if (runId && reconnectSessionId) {
-            setState((prev) => {
-              if (prev.status !== "running") return prev;
-              return {
-                ...prev,
-                activity: {
-                  stage: "preparing",
-                  label: "분석 상태 복원 중",
-                },
-              };
-            });
-            await reconnectUntilFinalized(
-              reconnectSessionId,
-              runId,
-              abortController.signal,
-              generation,
-            );
-          } else if (!finalizedRef.current) {
-            throw new Error("실행 정보를 확인하지 못했습니다. 다시 시도해주세요.");
-          }
-        }
       } catch (err) {
-        if ((err as Error).name === "AbortError") {
-          setState((prev) => ({
-            ...prev,
-            status: "cancelled",
-            isHydratingSession: false,
-            activity: null,
-            runStartedAt: null,
-          }));
-        } else {
-          const runId = activeRunIdRef.current;
-          const reconnectSessionId = activeSessionIdRef.current || targetSessionId;
-
-          if (
-            runId &&
-            reconnectSessionId &&
-            streamGenerationRef.current === generation
-          ) {
-            setState((prev) => ({
-              ...prev,
-              activity: {
-                stage: "preparing",
-                label: "분석 상태 복원 중",
-              },
-            }));
-
-            const recovered = await reconnectUntilFinalized(
-              reconnectSessionId,
-              runId,
-              abortController.signal,
-              generation,
-            );
-            if (recovered) return;
-
-            const synced = await syncSessionFromServer(reconnectSessionId);
-            if (synced) return;
-          }
-
-          setState((prev) => ({
-            ...prev,
-            status: "failed",
-            isHydratingSession: false,
-            error: (err as Error).message,
-            activity: null,
-            runStartedAt: null,
-          }));
-        }
-      } finally {
+        sendInFlightRef.current = false;
+        activeRequestIdRef.current = null;
         abortRef.current = null;
+        const message =
+          err instanceof Error
+            ? err.message
+            : "메시지를 보내지 못했습니다. 네트워크 상태를 확인해주세요.";
+        setState((prev) => ({
+          ...prev,
+          status: "failed",
+          isHydratingSession: false,
+          error: message,
+          activity: null,
+          runStartedAt: null,
+        }));
+        return {
+          ok: false,
+          message,
+        };
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const message =
+          errorData?.error?.message || `요청에 실패했습니다: ${response.status}`;
+        sendInFlightRef.current = false;
         if (activeRequestIdRef.current === requestId) {
           activeRequestIdRef.current = null;
         }
-        sendInFlightRef.current = false;
+        setState((prev) => ({
+          ...prev,
+          status: "failed",
+          isHydratingSession: false,
+          error: message,
+          activity: null,
+          runStartedAt: null,
+        }));
+        return { ok: false, message };
       }
+
+      void processRun(response);
+      return { ok: true };
     },
     [
       defaultDocumentTypes,

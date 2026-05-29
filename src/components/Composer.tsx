@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { flushSync } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
   MAX_CHAT_ATTACHMENT_BYTES,
@@ -17,7 +18,7 @@ import { useReducedMotion } from "@/hooks/useReducedMotion";
 import type { ResearchActivityUpdate } from "@/types/api-contracts";
 
 interface ComposerProps {
-  onSend: (message: string) => void | Promise<void>;
+  onSend: (message: string) => Promise<ComposerSendResult>;
   onCancel?: () => void | Promise<void>;
   activity?: ResearchActivityUpdate | null;
   disabled?: boolean;
@@ -32,6 +33,10 @@ interface ComposerProps {
   focusRequestKey?: number;
   onFocusChange?: (focused: boolean) => void;
 }
+
+export type ComposerSendResult =
+  | { ok: true }
+  | { ok: false; message: string };
 
 interface TextAttachment {
   id: string;
@@ -120,6 +125,8 @@ export default function Composer({
   disabled = false,
   isGenerating = false,
   placeholder = "기업에 대해 질문하세요...",
+  researchMode = "deep",
+  onResearchModeChange,
   initialValue,
   draftResetKey = 0,
   focusRequestKey = 0,
@@ -148,8 +155,9 @@ export default function Composer({
   const payloadLimit =
     attachments.length > 0 ? MAX_CHAT_PAYLOAD_CHARS : MAX_CHAT_MESSAGE_CHARS;
   const isOverLimit = composedLength > payloadLimit;
-  const isInputDisabled = disabled || isGenerating || isSubmitting;
-  const canSubmit = composedLength > 0 && !isOverLimit && !isInputDisabled;
+  const isInputBusy = disabled || isSubmitting;
+  const canSubmit =
+    composedLength > 0 && !isOverLimit && !isInputBusy && !isGenerating;
 
   const syncTextareaValue = useCallback((nextValue: string) => {
     setValue(nextValue);
@@ -195,7 +203,7 @@ export default function Composer({
 
     lastFocusRequestKeyRef.current = focusRequestKey;
 
-    if (isInputDisabled) return;
+    if (isInputBusy) return;
 
     const frameId = window.requestAnimationFrame(() => {
       const textarea = textareaRef.current;
@@ -208,7 +216,7 @@ export default function Composer({
     });
 
     return () => window.cancelAnimationFrame(frameId);
-  }, [focusRequestKey, isInputDisabled]);
+  }, [focusRequestKey, isInputBusy]);
 
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current;
@@ -351,6 +359,29 @@ export default function Composer({
     setAttachmentError(null);
   };
 
+  const clearDraft = () => {
+    setValue("");
+    setAttachments([]);
+    setAttachmentError(null);
+
+    if (textareaRef.current) {
+      textareaRef.current.value = "";
+      textareaRef.current.style.height = "auto";
+    }
+  };
+
+  const restoreDraft = (draft: string, files: TextAttachment[]) => {
+    setValue(draft);
+    setAttachments(files);
+
+    if (textareaRef.current) {
+      textareaRef.current.value = draft;
+      textareaRef.current.style.height = "auto";
+    }
+
+    requestAnimationFrame(adjustHeight);
+  };
+
   const handleSubmit = async () => {
     const latestValue = readTextareaValue();
     if (latestValue !== value) {
@@ -358,7 +389,7 @@ export default function Composer({
     }
 
     const message = composeMessage(latestValue, attachments);
-    if (!message.trim() || isInputDisabled) return;
+    if (!message.trim() || isInputBusy || isGenerating) return;
     if (message.length > payloadLimit) {
       setAttachmentError(
         `첨부 포함 메시지는 ${payloadLimit.toLocaleString()}자를 넘을 수 없습니다.`,
@@ -366,21 +397,24 @@ export default function Composer({
       return;
     }
 
-    setIsSubmitting(true);
+    const draftSnapshot = latestValue;
+    const attachmentSnapshot = [...attachments];
+
+    flushSync(() => {
+      clearDraft();
+      setIsSubmitting(true);
+    });
 
     try {
-      await onSend(message);
+      const result = await onSend(message);
 
-      setValue("");
-      setAttachments([]);
-      setAttachmentError(null);
-
-      if (textareaRef.current) {
-        textareaRef.current.value = "";
-        textareaRef.current.style.height = "auto";
+      if (!result.ok) {
+        restoreDraft(draftSnapshot, attachmentSnapshot);
+        setAttachmentError(result.message);
       }
     } catch {
       setAttachmentError("메시지를 보내지 못했습니다. 다시 시도해주세요.");
+      restoreDraft(draftSnapshot, attachmentSnapshot);
     } finally {
       setIsSubmitting(false);
     }
@@ -464,14 +498,18 @@ export default function Composer({
           <div className="grid gap-1.5" aria-label="분석 모드">
             <button
               type="button"
-              disabled
               className={[
                 isSheet
                   ? "flex w-full cursor-not-allowed items-center gap-3 rounded-[14px] px-3 py-3.5 text-left text-muted opacity-55"
                   : "flex min-h-[56px] w-full cursor-not-allowed items-center justify-between gap-3 rounded-[10px] px-2.5 py-2 text-left text-muted opacity-60",
               ].join(" ")}
               role="menuitem"
+              onClick={() => {
+                onResearchModeChange?.("fast");
+                setIsToolsOpen(false);
+              }}
               aria-disabled="true"
+              disabled
             >
               <span className="min-w-0">
                 <span
@@ -505,9 +543,12 @@ export default function Composer({
                   ? "flex w-full items-center gap-3 rounded-[14px] bg-primary-container/10 px-3 py-3.5 text-left text-primary transition-colors active:bg-primary-container/14"
                   : "flex min-h-[56px] w-full items-center justify-between gap-3 rounded-[10px] bg-primary-container/12 px-2.5 py-2 text-left text-primary transition-colors hover:bg-primary-container/16",
               ].join(" ")}
-              onClick={() => setIsToolsOpen(false)}
+              onClick={() => {
+                onResearchModeChange?.("standard");
+                setIsToolsOpen(false);
+              }}
               role="menuitem"
-              aria-current="true"
+              aria-current={researchMode === "standard"}
             >
               <span className="min-w-0">
                 <span
@@ -526,15 +567,19 @@ export default function Composer({
                       : "mt-0.5 block text-[12px] font-semibold leading-4 text-primary/75"
                   }
                 >
-                  공시 근거를 충분히 확인해 답변합니다.
+                  {researchMode === "standard"
+                    ? "공시 근거를 충분히 확인해 답변합니다."
+                    : "기본 분석 정책으로 답변합니다."}
                 </span>
               </span>
-              <span
-                aria-hidden="true"
-                className="material-symbols-outlined ml-auto flex-shrink-0 text-[20px]"
-              >
-                check
-              </span>
+              {researchMode === "standard" && (
+                <span
+                  aria-hidden="true"
+                  className="material-symbols-outlined ml-auto flex-shrink-0 text-[20px]"
+                >
+                  check
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -625,7 +670,7 @@ export default function Composer({
                   className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-dim hover:text-ink"
                   aria-label={`${file.name} 첨부 제거`}
                   onClick={() => removeAttachment(file.id)}
-                  disabled={isInputDisabled}
+                  disabled={isInputBusy}
                 >
                   <span
                     aria-hidden="true"
@@ -661,7 +706,7 @@ export default function Composer({
           accept={ACCEPTED_TEXT_FILE_TYPES}
           multiple
           onChange={handleFileChange}
-          disabled={isInputDisabled}
+          disabled={isInputBusy}
         />
         <div ref={toolsRef} className="relative flex-shrink-0 self-center">
           <button
@@ -672,7 +717,7 @@ export default function Composer({
                 : "border-transparent text-muted hover:bg-surface-soft hover:text-ink",
             ].join(" ")}
             onClick={() => setIsToolsOpen((open) => !open)}
-            disabled={isInputDisabled}
+            disabled={isInputBusy}
             aria-label="입력 도구 열기"
             aria-expanded={isToolsOpen}
             aria-haspopup={motionConfig.isMobile ? "dialog" : "menu"}
@@ -721,7 +766,7 @@ export default function Composer({
             onFocus={() => onFocusChange?.(true)}
             onBlur={() => onFocusChange?.(false)}
             onKeyDown={handleKeyDown}
-            disabled={isInputDisabled}
+            disabled={isInputBusy}
             aria-label="메시지 입력"
           />
           <AnimatePresence mode="wait" initial={false}>

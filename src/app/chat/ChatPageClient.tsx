@@ -6,8 +6,9 @@ import { Suspense } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import TopNav from "@/components/TopNav";
 import ChatMessage from "@/components/ChatMessage";
-import Composer from "@/components/Composer";
+import Composer, { type ComposerSendResult } from "@/components/Composer";
 import SuggestedPromptActions from "@/components/SuggestedPromptActions";
+import RunStatusDock from "@/components/RunStatusDock";
 import { useChat } from "@/hooks/useChat";
 import { useChatMobileDock } from "@/hooks/useChatMobileDock";
 import { useEntitlement } from "@/hooks/useEntitlement";
@@ -557,9 +558,14 @@ function ChatContent() {
   // ---------------------------------------------------------------------------
 
   const handleSend = useCallback(
-    async (content: string) => {
+    async (content: string): Promise<ComposerSendResult> => {
       const trimmed = content.trim();
-      if (!trimmed) return;
+      if (!trimmed) {
+        return {
+          ok: false,
+          message: "메시지를 입력해야 합니다.",
+        };
+      }
 
       shouldStickToBottomRef.current = true;
       setComposerExpanded();
@@ -568,7 +574,10 @@ function ChatContent() {
         const createdSessionId = await createSessionForDraft();
 
         if (!createdSessionId) {
-          throw new Error("session_create_failed");
+          return {
+            ok: false,
+            message: "채팅 세션을 만들지 못했습니다.",
+          };
         }
 
         const nextDraftMessageId = createClientId();
@@ -581,8 +590,13 @@ function ChatContent() {
           })
         ) {
           setSessionError("새 채팅 메시지를 준비하지 못했습니다.");
-          throw new Error("draft_message_store_failed");
+          return {
+            ok: false,
+            message: "새 채팅 메시지를 준비하지 못했습니다.",
+          };
         }
+
+        setComposerDraftResetKey((value) => value + 1);
 
         const nextParams = new URLSearchParams({
           sessionId: createdSessionId,
@@ -591,11 +605,23 @@ function ChatContent() {
         router.replace(`/chat?${nextParams.toString()}`, {
           scroll: false,
         });
-        return;
+        return { ok: true };
       }
 
       clearComposerPrefillParams();
-      await sendMessage(trimmed);
+      try {
+        const result = await sendMessage(trimmed);
+        if (result.ok) return { ok: true };
+        return { ok: false, message: result.message };
+      } catch (error) {
+        return {
+          ok: false,
+          message:
+            error instanceof Error
+              ? error.message
+              : "메시지를 보내지 못했습니다. 다시 시도해주세요.",
+        };
+      }
     },
     [
       clearComposerPrefillParams,
@@ -678,7 +704,7 @@ function ChatContent() {
             role="log"
           >
             {/* Spacer */}
-            <div className="h-xl sm:h-[96px]" />
+            <div className="h-xl sm:h-[96px] md:hidden" />
 
             {/* Company research context */}
             {contextTickers.length > 0 && (
@@ -909,7 +935,7 @@ function ChatContent() {
 
               {/* Spacer for fixed composer overlay — dynamically measured */}
               <div
-                className="md:h-xl"
+                className="md:hidden"
                 style={{
                   height: isBodyScrollChat
                     ? isComposerCompact
@@ -919,6 +945,7 @@ function ChatContent() {
                 }}
                 aria-hidden="true"
               />
+              <div className="hidden h-xl md:block" aria-hidden="true" />
             </div>
           </div>
 
@@ -936,12 +963,24 @@ function ChatContent() {
             </div>
           )}
 
+          {isStreaming && (
+            <div className="hidden md:block">
+              <RunStatusDock
+                onCancel={handleCancel}
+                activity={chat.activity}
+                toolCalls={chat.toolCalls}
+                runStartedAt={chat.runStartedAt}
+              />
+            </div>
+          )}
+
           {/* Full composer (expanded / focused) */}
           <div
             ref={composerHostRef}
             className={[
-              "pointer-events-none fixed inset-x-0 bottom-0 z-30 transform-gpu transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:absolute",
+              "pointer-events-none fixed inset-x-0 bottom-0 z-30 transform-gpu transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:pointer-events-auto md:static md:z-auto md:translate-y-0 md:opacity-100 md:transition-none",
               isComposerCompact ? "opacity-0" : "opacity-100",
+              isStreaming ? "md:hidden" : "",
             ].join(" ")}
             style={{
               transform: isBodyScrollChat
