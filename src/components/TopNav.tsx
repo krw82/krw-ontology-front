@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { KrwBrand } from "@/components/KrwBrand";
 import UsageStatus from "@/components/UsageStatus";
 import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
+import { dispatchOpenChatSidebar } from "@/lib/chat/sidebar-events";
 import { createClient } from "@/lib/supabase/client";
 import { popoverMenu } from "@/lib/animation";
 import { useEntitlement } from "@/hooks/useEntitlement";
@@ -28,6 +29,10 @@ interface TopNavProps {
   initialUserProfile?: TopNavUserProfile | null;
   brandHref?: string;
   brandAriaLabel?: string;
+  hideAccountMenu?: boolean;
+  showSidebarTrigger?: boolean;
+  mobileCollapsed?: boolean;
+  mobileOverlay?: boolean;
 }
 
 function profileFromUser(user: User | null | undefined): TopNavUserProfile | null {
@@ -87,6 +92,10 @@ export default function TopNav({
   initialUserProfile,
   brandHref = "/",
   brandAriaLabel,
+  hideAccountMenu = false,
+  showSidebarTrigger = false,
+  mobileCollapsed = false,
+  mobileOverlay = false,
 }: TopNavProps = {}) {
   const router = useRouter();
   const pathname = usePathname();
@@ -194,9 +203,31 @@ export default function TopNav({
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 h-[72px] w-full flex-shrink-0 border-b border-hairline bg-canvas/95 backdrop-blur-xl md:h-[64px]">
-      <div className="mx-auto flex h-full w-full max-w-[1600px] items-center justify-between gap-sm px-base pl-[72px] sm:px-md md:pl-md">
-        <div className="flex min-w-0 items-center gap-lg">
+    <header
+      className={[
+        mobileOverlay ? "fixed inset-x-0 top-0 md:sticky md:inset-auto" : "sticky top-0",
+        "z-50 h-[72px] w-full flex-shrink-0 border-b bg-canvas/95 backdrop-blur-xl transition-[transform,opacity,border-color] duration-200 ease-out md:h-[64px] md:translate-y-0 md:border-hairline md:opacity-100",
+        mobileCollapsed
+          ? "-translate-y-full border-transparent opacity-0"
+          : "translate-y-0 border-hairline opacity-100",
+      ].join(" ")}
+    >
+      <div className="mx-auto flex h-full w-full max-w-[1600px] items-center justify-between gap-sm px-base sm:px-md md:pl-md">
+        <div className="flex min-w-0 items-center gap-sm sm:gap-lg">
+          {showSidebarTrigger && (
+            <button
+              type="button"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas md:hidden"
+              aria-label="채팅 기록 열기"
+              aria-controls="mobile-chat-sidebar"
+              onClick={dispatchOpenChatSidebar}
+            >
+              <span aria-hidden="true" className="relative block h-5 w-6">
+                <span className="absolute left-0 top-[3px] h-[2px] w-5 rounded-full bg-ink" />
+                <span className="absolute bottom-[3px] left-0 h-[2px] w-3.5 rounded-full bg-ink" />
+              </span>
+            </button>
+          )}
           <KrwBrand
             href={brandHref}
             compact
@@ -205,7 +236,7 @@ export default function TopNav({
         </div>
 
         <div className="flex shrink-0 items-center justify-end gap-xs sm:gap-md">
-          {!authChecked ? (
+          {hideAccountMenu ? null : !authChecked ? (
             <div
               aria-hidden="true"
               className="h-9 w-0 sm:h-10"

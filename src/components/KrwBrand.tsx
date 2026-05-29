@@ -53,7 +53,7 @@ export function KrwBrand({
         className={compact ? "h-8 w-8 shrink-0" : "h-9 w-9 shrink-0"}
       />
       <span className="flex min-w-0 flex-col justify-center">
-        <span className="block truncate text-[15px] font-extrabold leading-[1.18] tracking-[0.06em]">
+        <span className="block whitespace-nowrap text-[15px] font-extrabold leading-[1.32] tracking-[0.06em]">
           KRW Ontology
         </span>
         {!compact && (

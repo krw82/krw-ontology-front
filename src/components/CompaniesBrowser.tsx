@@ -90,10 +90,10 @@ export default function CompaniesBrowser({
   }, [initialCompanies, search]);
 
   return (
-    <div className="relative mx-auto flex min-h-0 w-full max-w-[1600px] flex-1">
+    <div className="relative mx-auto w-full max-w-[1600px]">
       <main
         id="main-content"
-        className="min-h-0 w-full flex-grow overflow-y-auto px-base pb-[112px] pt-xl sm:px-md md:px-xl md:pb-[96px] md:pt-[72px]"
+        className="w-full px-base pb-[112px] pt-xl sm:px-md md:px-xl md:pb-[96px] md:pt-[72px]"
       >
         <header className="border-b border-hairline pb-8">
           <div className="w-full">

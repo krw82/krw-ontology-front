@@ -44,11 +44,12 @@ export default async function CompaniesPage() {
     : null;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+    <div className="min-h-[100dvh] bg-canvas">
       <TopNav
         initialUserProfile={initialUserProfile}
         brandHref="/"
         brandAriaLabel="홈으로 이동"
+        showSidebarTrigger
       />
       <CompaniesBrowser initialCompanies={displayCompanies} />
     </div>

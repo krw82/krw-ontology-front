@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useState,
-  useRef,
-  useEffect,
-  useCallback,
-  useMemo,
-} from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -23,7 +17,7 @@ import { useReducedMotion } from "@/hooks/useReducedMotion";
 import type { ResearchActivityUpdate } from "@/types/api-contracts";
 
 interface ComposerProps {
-  onSend: (message: string) => void;
+  onSend: (message: string) => void | Promise<void>;
   onCancel?: () => void | Promise<void>;
   activity?: ResearchActivityUpdate | null;
   disabled?: boolean;
@@ -35,6 +29,8 @@ interface ComposerProps {
   runStartedAt?: string | null;
   researchMode?: ResearchMode;
   onResearchModeChange?: (mode: ResearchMode) => void;
+  focusRequestKey?: number;
+  onFocusChange?: (focused: boolean) => void;
 }
 
 interface TextAttachment {
@@ -67,7 +63,7 @@ function formatBytes(bytes: number): string {
 
 function escapeAttachmentName(name: string): string {
   return name.replace(/["&<>]/g, (char) => {
-    if (char === "\"") return "&quot;";
+    if (char === '"') return "&quot;";
     if (char === "&") return "&amp;";
     if (char === "<") return "&lt;";
     return "&gt;";
@@ -106,7 +102,10 @@ function useComposerMotionConfig() {
   };
 }
 
-function composeMessage(message: string, attachments: TextAttachment[]): string {
+function composeMessage(
+  message: string,
+  attachments: TextAttachment[],
+): string {
   const attachmentBlocks = attachments.map(
     (file) =>
       `<attached_file name="${escapeAttachmentName(file.name)}">\n${file.content.trimEnd()}\n</attached_file>`,
@@ -123,6 +122,8 @@ export default function Composer({
   placeholder = "기업에 대해 질문하세요...",
   initialValue,
   draftResetKey = 0,
+  focusRequestKey = 0,
+  onFocusChange,
 }: ComposerProps) {
   const initialDraftValue = initialValue ?? "";
   const [value, setValue] = useState(initialDraftValue);
@@ -132,6 +133,8 @@ export default function Composer({
   const [isClientReady, setIsClientReady] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastFocusRequestKeyRef = useRef(focusRequestKey);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const toolsRef = useRef<HTMLDivElement>(null);
   const toolsSheetRef = useRef<HTMLDivElement>(null);
   const lastInitialValueRef = useRef(initialDraftValue);
@@ -145,7 +148,7 @@ export default function Composer({
   const payloadLimit =
     attachments.length > 0 ? MAX_CHAT_PAYLOAD_CHARS : MAX_CHAT_MESSAGE_CHARS;
   const isOverLimit = composedLength > payloadLimit;
-  const isInputDisabled = disabled || isGenerating;
+  const isInputDisabled = disabled || isGenerating || isSubmitting;
   const canSubmit = composedLength > 0 && !isOverLimit && !isInputDisabled;
 
   const syncTextareaValue = useCallback((nextValue: string) => {
@@ -187,6 +190,26 @@ export default function Composer({
     }
   }, [draftResetKey]);
 
+  useEffect(() => {
+    if (lastFocusRequestKeyRef.current === focusRequestKey) return;
+
+    lastFocusRequestKeyRef.current = focusRequestKey;
+
+    if (isInputDisabled) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      textarea.focus();
+
+      const length = textarea.value.length;
+      textarea.setSelectionRange(length, length);
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [focusRequestKey, isInputDisabled]);
+
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -226,7 +249,8 @@ export default function Composer({
     if (!isToolsOpen || !motionConfig.isMobile) return;
 
     const previousOverflow = document.body.style.overflow;
-    const previousOverscroll = document.documentElement.style.overscrollBehavior;
+    const previousOverscroll =
+      document.documentElement.style.overscrollBehavior;
     document.body.style.overflow = "hidden";
     document.documentElement.style.overscrollBehavior = "none";
 
@@ -327,7 +351,7 @@ export default function Composer({
     setAttachmentError(null);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const latestValue = readTextareaValue();
     if (latestValue !== value) {
       setValue(latestValue);
@@ -342,20 +366,32 @@ export default function Composer({
       return;
     }
 
-    onSend(message);
-    setValue("");
-    setAttachments([]);
-    setAttachmentError(null);
-    if (textareaRef.current) {
-      textareaRef.current.value = "";
-      textareaRef.current.style.height = "auto";
+    setIsSubmitting(true);
+
+    try {
+      await onSend(message);
+
+      setValue("");
+      setAttachments([]);
+      setAttachmentError(null);
+
+      if (textareaRef.current) {
+        textareaRef.current.value = "";
+        textareaRef.current.style.height = "auto";
+      }
+    } catch {
+      setAttachmentError("메시지를 보내지 못했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.nativeEvent.isComposing) return;
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit();
+      void handleSubmit();
     }
   };
 
@@ -365,7 +401,7 @@ export default function Composer({
       return;
     }
 
-    handleSubmit();
+    void handleSubmit();
   };
 
   const openFilePicker = () => {
@@ -386,7 +422,11 @@ export default function Composer({
       : "sr-only";
 
     return (
-      <div className={isSheet ? "grid gap-2" : ""} role="menu" aria-label="입력 도구">
+      <div
+        className={isSheet ? "grid gap-2" : ""}
+        role="menu"
+        aria-label="입력 도구"
+      >
         <button
           type="button"
           className={itemBase}
@@ -403,7 +443,9 @@ export default function Composer({
           )}
           <span className="min-w-0">
             <span className={titleClass || undefined}>파일 첨부</span>
-            <span className={descriptionClass}>txt/md 문서를 질문에 함께 보냅니다.</span>
+            <span className={descriptionClass}>
+              txt/md 문서를 질문에 함께 보냅니다.
+            </span>
           </span>
           {!isSheet && (
             <span className="ml-auto rounded-full bg-surface-dim px-2 py-1 text-[11px] font-extrabold leading-none text-muted">
@@ -412,7 +454,13 @@ export default function Composer({
           )}
         </button>
 
-        <div className={isSheet ? "mt-3 border-t border-hairline pt-3" : "mt-2 border-t border-hairline pt-3"}>
+        <div
+          className={
+            isSheet
+              ? "mt-3 border-t border-hairline pt-3"
+              : "mt-2 border-t border-hairline pt-3"
+          }
+        >
           <div className="grid gap-1.5" aria-label="분석 모드">
             <button
               type="button"
@@ -426,10 +474,22 @@ export default function Composer({
               aria-disabled="true"
             >
               <span className="min-w-0">
-                <span className={isSheet ? "block text-[17px] font-extrabold leading-6" : "block text-[14px] font-extrabold leading-5"}>
+                <span
+                  className={
+                    isSheet
+                      ? "block text-[17px] font-extrabold leading-6"
+                      : "block text-[14px] font-extrabold leading-5"
+                  }
+                >
                   패스트 모드
                 </span>
-                <span className={isSheet ? "mt-0.5 block text-[13px] font-semibold leading-5 text-muted-soft" : "mt-0.5 block text-[12px] font-semibold leading-4 text-muted-soft"}>
+                <span
+                  className={
+                    isSheet
+                      ? "mt-0.5 block text-[13px] font-semibold leading-5 text-muted-soft"
+                      : "mt-0.5 block text-[12px] font-semibold leading-4 text-muted-soft"
+                  }
+                >
                   빠른 요약은 준비 중입니다.
                 </span>
               </span>
@@ -450,10 +510,22 @@ export default function Composer({
               aria-current="true"
             >
               <span className="min-w-0">
-                <span className={isSheet ? "block text-[17px] font-extrabold leading-6" : "block text-[14px] font-extrabold leading-5"}>
+                <span
+                  className={
+                    isSheet
+                      ? "block text-[17px] font-extrabold leading-6"
+                      : "block text-[14px] font-extrabold leading-5"
+                  }
+                >
                   스탠다드 모드
                 </span>
-                <span className={isSheet ? "mt-0.5 block text-[13px] font-semibold leading-5 text-primary/75" : "mt-0.5 block text-[12px] font-semibold leading-4 text-primary/75"}>
+                <span
+                  className={
+                    isSheet
+                      ? "mt-0.5 block text-[13px] font-semibold leading-5 text-primary/75"
+                      : "mt-0.5 block text-[12px] font-semibold leading-4 text-primary/75"
+                  }
+                >
                   공시 근거를 충분히 확인해 답변합니다.
                 </span>
               </span>
@@ -522,9 +594,9 @@ export default function Composer({
       : null;
 
   return (
-    <div className="border-t border-hairline bg-canvas/95 px-base py-sm backdrop-blur-xl sm:px-lg sm:py-base">
+    <div className="pointer-events-none bg-transparent px-[34px] pb-0 pt-0 sm:px-lg">
       {(attachments.length > 0 || attachmentError) && (
-        <div className="mx-auto mb-xs flex max-w-4xl flex-wrap items-center gap-xs">
+        <div className="pointer-events-auto mx-auto mb-xs flex max-w-4xl flex-wrap items-center gap-xs">
           <AnimatePresence>
             {attachments.map((file) => (
               <motion.div
@@ -533,25 +605,35 @@ export default function Composer({
                 initial={{ opacity: 0, y: motionConfig.y }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -motionConfig.y }}
-                transition={{ duration: motionConfig.duration, ease: motionConfig.ease }}
+                transition={{
+                  duration: motionConfig.duration,
+                  ease: motionConfig.ease,
+                }}
                 className="inline-flex max-w-full items-center gap-xs rounded-full border border-hairline bg-surface-soft px-sm py-xxs text-[12px] leading-[1.4] text-body"
               >
-              <span className="material-symbols-outlined text-[16px] text-primary">
-                description
-              </span>
-              <span className="max-w-[160px] truncate sm:max-w-[220px]">{file.name}</span>
-              <span className="text-muted-soft">{formatBytes(file.size)}</span>
-              <button
-                type="button"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-dim hover:text-ink"
-                aria-label={`${file.name} 첨부 제거`}
-                onClick={() => removeAttachment(file.id)}
-                disabled={isInputDisabled}
-              >
-                <span aria-hidden="true" className="material-symbols-outlined text-[16px]">
-                  close
+                <span className="material-symbols-outlined text-[16px] text-primary">
+                  description
                 </span>
-              </button>
+                <span className="max-w-[160px] truncate sm:max-w-[220px]">
+                  {file.name}
+                </span>
+                <span className="text-muted-soft">
+                  {formatBytes(file.size)}
+                </span>
+                <button
+                  type="button"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-dim hover:text-ink"
+                  aria-label={`${file.name} 첨부 제거`}
+                  onClick={() => removeAttachment(file.id)}
+                  disabled={isInputDisabled}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="material-symbols-outlined text-[16px]"
+                  >
+                    close
+                  </span>
+                </button>
               </motion.div>
             ))}
             {attachmentError && (
@@ -559,7 +641,10 @@ export default function Composer({
                 initial={{ opacity: 0, y: motionConfig.y }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -motionConfig.y }}
-                transition={{ duration: motionConfig.duration, ease: motionConfig.ease }}
+                transition={{
+                  duration: motionConfig.duration,
+                  ease: motionConfig.ease,
+                }}
                 className="text-[12px] leading-[1.4] text-error"
               >
                 {attachmentError}
@@ -568,7 +653,7 @@ export default function Composer({
           </AnimatePresence>
         </div>
       )}
-      <div className="relative mx-auto flex max-w-4xl items-end rounded-[20px] border border-outline-variant bg-surface p-[5px] shadow-[0_10px_28px_rgba(10,11,13,0.08)] transition-all duration-150 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+      <div className="pointer-events-auto relative mx-auto flex max-w-4xl items-center rounded-[26px] border border-hairline bg-canvas/92 p-[5px] shadow-[0_14px_42px_rgba(10,11,13,0.14)] backdrop-blur-md transition-all duration-150 focus-within:border-outline-variant focus-within:bg-canvas/96 focus-within:shadow-[0_16px_46px_rgba(10,11,13,0.16)]">
         <input
           ref={fileInputRef}
           className="hidden"
@@ -578,13 +663,13 @@ export default function Composer({
           onChange={handleFileChange}
           disabled={isInputDisabled}
         />
-        <div ref={toolsRef} className="relative -translate-y-[2px] flex-shrink-0 self-center">
+        <div ref={toolsRef} className="relative flex-shrink-0 self-center">
           <button
             className={[
-              "ml-0.5 inline-flex h-11 w-11 items-center justify-center rounded-full border transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40",
+              "inline-flex h-11 w-11 items-center justify-center rounded-full border transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40",
               isToolsOpen
                 ? "border-primary bg-surface text-primary shadow-[0_0_0_3px_rgba(0,82,255,0.10)]"
-                : "border-transparent text-body hover:bg-surface-dim hover:text-ink",
+                : "border-transparent text-muted hover:bg-surface-soft hover:text-ink",
             ].join(" ")}
             onClick={() => setIsToolsOpen((open) => !open)}
             disabled={isInputDisabled}
@@ -605,7 +690,10 @@ export default function Composer({
                 initial={{ opacity: 0, y: 8, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                transition={{ duration: motionConfig.duration, ease: motionConfig.ease }}
+                transition={{
+                  duration: motionConfig.duration,
+                  ease: motionConfig.ease,
+                }}
                 className="absolute bottom-[calc(100%+10px)] left-0 z-30 w-[282px] overflow-hidden rounded-[18px] border border-hairline bg-canvas p-3 text-ink shadow-[0_18px_48px_rgba(10,11,13,0.16)]"
                 role="menu"
                 aria-label="입력 도구"
@@ -622,7 +710,7 @@ export default function Composer({
             maxLength={MAX_CHAT_MESSAGE_CHARS}
             placeholder={isGenerating ? "" : placeholder}
             rows={1}
-            style={{ minHeight: 48 }}
+            style={{ minHeight: 44 }}
             value={value}
             data-client-ready={isClientReady ? "true" : "false"}
             onChange={(event) => syncTextareaValue(event.currentTarget.value)}
@@ -630,6 +718,8 @@ export default function Composer({
             onCompositionEnd={(event) =>
               syncTextareaValue(event.currentTarget.value)
             }
+            onFocus={() => onFocusChange?.(true)}
+            onBlur={() => onFocusChange?.(false)}
             onKeyDown={handleKeyDown}
             disabled={isInputDisabled}
             aria-label="메시지 입력"
@@ -642,11 +732,12 @@ export default function Composer({
                 initial={{ opacity: 0, y: motionConfig.y }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -motionConfig.y }}
-                transition={{ duration: motionConfig.duration, ease: motionConfig.ease }}
+                transition={{
+                  duration: motionConfig.duration,
+                  ease: motionConfig.ease,
+                }}
               >
-                <span className="min-w-0 truncate text-muted">
-                  분석 진행중
-                </span>
+                <span className="min-w-0 truncate text-muted">분석 진행중</span>
               </motion.div>
             )}
           </AnimatePresence>
@@ -661,7 +752,7 @@ export default function Composer({
           )}
         </div>
         <button
-          className="mb-0.5 mr-0.5 inline-flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary shadow-sm transition-all duration-150 hover:scale-[1.03] hover:bg-primary-active active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
+          className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center self-center rounded-full bg-primary-container text-on-primary shadow-[0_8px_22px_rgba(0,82,255,0.24)] transition-all duration-150 hover:scale-[1.03] hover:bg-primary-active active:scale-95 disabled:cursor-not-allowed disabled:bg-primary-container disabled:text-on-primary disabled:opacity-55"
           onClick={handlePrimaryAction}
           disabled={isGenerating ? !onCancel : !canSubmit}
           aria-label={isGenerating ? "응답 생성 중지" : "메시지 보내기"}
@@ -674,7 +765,10 @@ export default function Composer({
                 initial={{ opacity: 0, scale: 0.84 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.84 }}
-                transition={{ duration: motionConfig.duration, ease: motionConfig.ease }}
+                transition={{
+                  duration: motionConfig.duration,
+                  ease: motionConfig.ease,
+                }}
                 className="relative inline-flex h-5 w-5 animate-spin rounded-full bg-[conic-gradient(from_0deg,rgba(255,255,255,0)_0deg,rgba(255,255,255,0.18)_92deg,#ffffff_170deg,#ffffff_260deg,rgba(255,255,255,0)_360deg)] p-[2px] [animation-duration:780ms]"
               >
                 <span className="h-full w-full rounded-full bg-primary-container shadow-[inset_0_0_0_1px_rgba(255,255,255,0.22)]" />
@@ -686,7 +780,10 @@ export default function Composer({
                 initial={{ opacity: 0, scale: 0.84 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.84 }}
-                transition={{ duration: motionConfig.duration, ease: motionConfig.ease }}
+                transition={{
+                  duration: motionConfig.duration,
+                  ease: motionConfig.ease,
+                }}
                 className="material-symbols-outlined text-[22px]"
               >
                 arrow_upward

@@ -141,6 +141,10 @@
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
+html {
+  color-scheme: only light;
+}
+
 body {
   background: var(--color-canvas);
   color: var(--color-on-surface);

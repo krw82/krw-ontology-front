@@ -9,6 +9,7 @@ import ChatMessage from "@/components/ChatMessage";
 import Composer from "@/components/Composer";
 import SuggestedPromptActions from "@/components/SuggestedPromptActions";
 import { useChat } from "@/hooks/useChat";
+import { useChatMobileDock } from "@/hooks/useChatMobileDock";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { useResearchModePreference } from "@/hooks/useResearchModePreference";
 import {
@@ -116,12 +117,14 @@ function ChatContent() {
     Record<string, CompanyMeta>
   >({});
   const scrollRef = useRef<HTMLDivElement>(null);
+  const composerHostRef = useRef<HTMLDivElement>(null);
   const hasLoadedRef = useRef(false);
   const cancelledRef = useRef(false);
   const lastRefreshedRunIdRef = useRef<string | null>(null);
   const budgetAlertTrackedRef = useRef<string | null>(null);
   const prefilledQuestionTrackedRef = useRef<string | null>(null);
   const startedDraftMessageIdsRef = useRef<Set<string>>(new Set());
+  const prevMessagesCountRef = useRef(0);
   const { entitlement, refresh: refreshEntitlement } = useEntitlement();
   const [researchMode, setResearchMode] = useResearchModePreference(sessionId);
   const [composerDraftResetKey, setComposerDraftResetKey] = useState(0);
@@ -211,6 +214,39 @@ function ChatContent() {
   });
   const sendMessage = chat.sendMessage;
   const cancelRun = chat.cancelRun;
+  const isStreaming = chat.status === "running";
+
+  // ---------------------------------------------------------------------------
+  // Mobile dock state machine
+  // ---------------------------------------------------------------------------
+
+  const {
+    isBodyScrollChat,
+    mobileHeaderHidden,
+    isComposerCompact,
+    keyboardOffset,
+    composerHeight,
+    composerFocusRequestKey,
+    shouldStickToBottomRef,
+    getScrollSurface,
+    getScrollViewportHeight,
+    scrollToBottom,
+    revealComposer,
+    revealComposerForTyping,
+    handleComposerPointerDown,
+    handleComposerFocusChange,
+    setComposerExpanded,
+  } = useChatMobileDock({
+    sessionKey: sessionId,
+    scrollRef,
+    composerHostRef,
+    messageCount: chat.messages.length,
+    isStreaming,
+  });
+
+  // ---------------------------------------------------------------------------
+  // Session hydration & lifecycle
+  // ---------------------------------------------------------------------------
 
   useEffect(() => {
     if (chat.status !== "completed" && chat.status !== "failed") return;
@@ -264,13 +300,10 @@ function ChatContent() {
     loadSessionRef.current();
   }, [sessionId]);
 
-  const scrollToBottom = useCallback(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, []);
+  // ---------------------------------------------------------------------------
+  // Derived state
+  // ---------------------------------------------------------------------------
 
-  const isStreaming = chat.status === "running";
   const isHydratingSession = Boolean(sessionId && chat.isHydratingSession);
   const isBudgetBlocked = entitlement?.usage.can_run === false;
   const hasConversationContent =
@@ -284,17 +317,35 @@ function ChatContent() {
     y: 4,
   };
 
+  // ---------------------------------------------------------------------------
+  // Auto-scroll to bottom
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
     if (!hasConversationContent) return;
+    if (!shouldStickToBottomRef.current) return;
+    if (!isStreaming && chat.messages.length === prevMessagesCountRef.current) {
+      return;
+    }
+
     const frameId = window.requestAnimationFrame(scrollToBottom);
     return () => window.cancelAnimationFrame(frameId);
   }, [
-    chat.activity,
     chat.messages.length,
     chat.streamingContent,
     hasConversationContent,
+    isStreaming,
     scrollToBottom,
+    shouldStickToBottomRef,
   ]);
+
+  useEffect(() => {
+    prevMessagesCountRef.current = chat.messages.length;
+  }, [chat.messages.length]);
+
+  // ---------------------------------------------------------------------------
+  // Hash-based message scrolling
+  // ---------------------------------------------------------------------------
 
   useEffect(() => {
     if (!sessionId || chat.messages.length === 0) return;
@@ -302,13 +353,33 @@ function ChatContent() {
     if (!hash.startsWith("message-")) return;
 
     const frameId = window.requestAnimationFrame(() => {
-      document.getElementById(hash)?.scrollIntoView({
-        block: "center",
-      });
+      const target = document.getElementById(hash);
+      const surface = getScrollSurface();
+      if (!target || !surface) return;
+
+      const surfaceTop = isBodyScrollChat
+        ? 0
+        : surface.getBoundingClientRect().top;
+      const targetTop =
+        target.getBoundingClientRect().top - surfaceTop + surface.scrollTop;
+      surface.scrollTop = Math.max(
+        0,
+        targetTop - getScrollViewportHeight(surface) / 2,
+      );
     });
 
     return () => window.cancelAnimationFrame(frameId);
-  }, [chat.messages.length, sessionId]);
+  }, [
+    chat.messages.length,
+    getScrollSurface,
+    getScrollViewportHeight,
+    isBodyScrollChat,
+    sessionId,
+  ]);
+
+  // ---------------------------------------------------------------------------
+  // Context tickers & suggested prompts
+  // ---------------------------------------------------------------------------
 
   const contextTickers = getSessionTickers(chat.session, ticker);
   const contextTickersKey = contextTickers.join(",");
@@ -356,6 +427,11 @@ function ChatContent() {
       : null;
   const hasComposerPrefillParams = Boolean(queryParam || templateId);
   const serializedSearchParams = searchParams.toString();
+
+  // ---------------------------------------------------------------------------
+  // Session creation for drafts
+  // ---------------------------------------------------------------------------
+
   const createSessionForDraft = useCallback(async (): Promise<string | null> => {
     const normalizedTicker = ticker?.trim().toUpperCase();
     const requestBody: CreateSessionRequest = {
@@ -394,6 +470,10 @@ function ChatContent() {
       scroll: false,
     });
   }, [hasComposerPrefillParams, isDraftRoute, router, serializedSearchParams]);
+
+  // ---------------------------------------------------------------------------
+  // Analytics
+  // ---------------------------------------------------------------------------
 
   useEffect(() => {
     const trimmedQuestion = initialComposerValue?.trim();
@@ -472,17 +552,28 @@ function ChatContent() {
     };
   }, [companyMetaByTicker, contextTickers, contextTickersKey]);
 
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
+
   const handleSend = useCallback(
     async (content: string) => {
       const trimmed = content.trim();
       if (!trimmed) return;
 
+      shouldStickToBottomRef.current = true;
+      setComposerExpanded();
+
       if (!sessionId) {
         const createdSessionId = await createSessionForDraft();
-        if (!createdSessionId) return;
+
+        if (!createdSessionId) {
+          throw new Error("session_create_failed");
+        }
 
         const nextDraftMessageId = createClientId();
         const nextRequestId = createClientId();
+
         if (
           !storeDraftMessage(nextDraftMessageId, {
             content: trimmed,
@@ -490,7 +581,7 @@ function ChatContent() {
           })
         ) {
           setSessionError("새 채팅 메시지를 준비하지 못했습니다.");
-          return;
+          throw new Error("draft_message_store_failed");
         }
 
         const nextParams = new URLSearchParams({
@@ -512,7 +603,9 @@ function ChatContent() {
       router,
       sendMessage,
       sessionId,
+      setComposerExpanded,
       setSessionError,
+      shouldStickToBottomRef,
     ],
   );
 
@@ -556,22 +649,30 @@ function ChatContent() {
     );
   }, [entitlement]);
 
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+    <div className="min-h-[100dvh] bg-canvas pt-[72px] md:flex md:h-full md:min-h-0 md:flex-col md:overflow-hidden md:pt-0">
       {/* Top Nav */}
       <TopNav
         brandHref="/companies"
         brandAriaLabel="회사 목록으로 이동"
+        hideAccountMenu
+        showSidebarTrigger
+        mobileOverlay
+        mobileCollapsed={mobileHeaderHidden}
       />
 
       {/* Main Workspace */}
-      <main id="main-content" className="mx-auto flex min-h-0 w-full max-w-[1280px] flex-1 overflow-hidden">
+      <main id="main-content" className="mx-auto w-full max-w-[1280px] md:flex md:min-h-0 md:flex-1 md:overflow-hidden">
         {/* Chat Canvas */}
-        <div className="relative flex min-w-0 flex-1 flex-col bg-canvas">
+        <div className="relative min-w-0 bg-canvas md:flex md:flex-1 md:flex-col">
           {/* Chat History */}
           <div
             ref={scrollRef}
-            className="flex-1 overflow-y-auto px-base pb-[calc(128px+env(safe-area-inset-bottom))] sm:px-xl sm:pb-[104px]"
+            className="px-base sm:px-xl md:flex-1 md:overflow-y-auto"
             aria-label="채팅 메시지"
             aria-relevant="additions text"
             role="log"
@@ -761,7 +862,7 @@ function ChatContent() {
                 !isHydratingSession &&
                 !isStreaming &&
                 !sessionError && (
-                <div className="mx-auto grid w-full max-w-4xl gap-7 py-lg sm:py-xxl md:grid-cols-[minmax(0,1fr)_320px] md:items-start">
+                  <div className="mx-auto grid w-full max-w-4xl gap-7 py-lg sm:py-xxl md:grid-cols-[minmax(0,1fr)_320px] md:items-start">
                   <motion.div
                     className="min-w-0 border-b border-hairline-soft pb-6 md:border-b-0 md:pb-0 md:pr-6"
                     initial={{ opacity: 0, y: 8 }}
@@ -805,6 +906,19 @@ function ChatContent() {
                   </motion.div>
                 </div>
               )}
+
+              {/* Spacer for fixed composer overlay — dynamically measured */}
+              <div
+                className="md:h-xl"
+                style={{
+                  height: isBodyScrollChat
+                    ? isComposerCompact
+                      ? 88
+                      : composerHeight + 28
+                    : undefined,
+                }}
+                aria-hidden="true"
+              />
             </div>
           </div>
 
@@ -822,27 +936,97 @@ function ChatContent() {
             </div>
           )}
 
-          {/* M-09: Session creation loading indicator */}
-          <Composer
-            onSend={handleSend}
-            onCancel={handleCancel}
-            activity={chat.activity}
-            disabled={Boolean(effectiveSessionError) || isBudgetBlocked}
-            isGenerating={isStreaming}
-            placeholder={
-              effectiveSessionError
-                ? "인덱스에 있는 회사만 채팅할 수 있습니다."
-                : isBudgetBlocked
-                  ? "분석 크레딧을 모두 사용했습니다."
-                : "기업에 대해 질문하세요..."
-            }
-            toolCalls={chat.toolCalls}
-            initialValue={initialComposerValue}
-            draftResetKey={composerDraftResetKey}
-            runStartedAt={chat.runStartedAt}
-            researchMode={researchMode}
-            onResearchModeChange={setResearchMode}
-          />
+          {/* Full composer (expanded / focused) */}
+          <div
+            ref={composerHostRef}
+            className={[
+              "pointer-events-none fixed inset-x-0 bottom-0 z-30 transform-gpu transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:absolute",
+              isComposerCompact ? "opacity-0" : "opacity-100",
+            ].join(" ")}
+            style={{
+              transform: isBodyScrollChat
+                ? isComposerCompact
+                  ? `translate3d(0, calc(100% + 24px), 0)`
+                  : `translate3d(0, -${keyboardOffset}px, 0)`
+                : "translate3d(0, 0, 0)",
+            }}
+            aria-hidden={isComposerCompact ? true : undefined}
+            onPointerDownCapture={handleComposerPointerDown}
+          >
+            <Composer
+              onSend={handleSend}
+              onCancel={handleCancel}
+              activity={chat.activity}
+              disabled={Boolean(effectiveSessionError) || isBudgetBlocked}
+              isGenerating={isStreaming}
+              placeholder={
+                effectiveSessionError
+                  ? "인덱스에 있는 회사만 채팅할 수 있습니다."
+                  : isBudgetBlocked
+                    ? "분석 크레딧을 모두 사용했습니다."
+                  : "기업에 대해 질문하세요..."
+              }
+              toolCalls={chat.toolCalls}
+              initialValue={initialComposerValue}
+              draftResetKey={composerDraftResetKey}
+              runStartedAt={chat.runStartedAt}
+              researchMode={researchMode}
+              onResearchModeChange={setResearchMode}
+              focusRequestKey={composerFocusRequestKey}
+              onFocusChange={handleComposerFocusChange}
+            />
+          </div>
+
+          {/* Compact pill — shown when full composer slides away */}
+          <AnimatePresence>
+            {isComposerCompact && (
+              <motion.div
+                key="compact-composer-pill"
+                className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-base pb-[calc(env(safe-area-inset-bottom)+10px)] md:hidden"
+                style={{
+                  transform: `translate3d(0, -${keyboardOffset}px, 0)`,
+                }}
+                initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 12, scale: 0.98 }}
+                transition={{
+                  duration: 0.18,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
+              >
+                <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-hairline bg-canvas/94 p-1 shadow-[0_14px_42px_rgba(10,11,13,0.18)] backdrop-blur-md">
+                  <button
+                    type="button"
+                    className="inline-flex h-10 items-center gap-2 rounded-full px-4 text-[14px] font-extrabold text-ink active:bg-surface-dim"
+                    onClick={isStreaming ? revealComposer : revealComposerForTyping}
+                    aria-label={isStreaming ? "분석 상태 보기" : "질문 입력"}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={[
+                        "material-symbols-outlined text-[19px]",
+                        isStreaming ? "animate-spin" : "",
+                      ].join(" ")}
+                    >
+                      {isStreaming ? "progress_activity" : "edit"}
+                    </span>
+                    <span>{isStreaming ? "분석 진행중" : "질문 입력"}</span>
+                  </button>
+
+                  {isStreaming && (
+                    <button
+                      type="button"
+                      className="inline-flex h-10 items-center rounded-full bg-surface-dim px-3 text-[13px] font-extrabold text-error active:scale-95"
+                      onClick={handleCancel}
+                      aria-label="응답 생성 중지"
+                    >
+                      중지
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </main>
     </div>

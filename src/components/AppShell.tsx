@@ -17,11 +17,21 @@ function shouldShowGlobalSidebar(pathname: string): boolean {
   );
 }
 
+function isBrowseWorkspace(pathname: string): boolean {
+  return pathname === "/companies" || pathname.startsWith("/companies/");
+}
+
+function isChatWorkspace(pathname: string): boolean {
+  return pathname === "/chat" || pathname.startsWith("/chat/");
+}
+
 export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const reducedMotion = useReducedMotion();
   const showSidebar = shouldShowGlobalSidebar(pathname);
+  const isBrowse = isBrowseWorkspace(pathname);
+  const isChat = isChatWorkspace(pathname);
   const pageEntrance = {
     opacity: 1,
     y: 0,
@@ -47,8 +57,46 @@ export default function AppShell({ children }: AppShellProps) {
   const activeSessionId = searchParams.get("sessionId");
   const refreshSignal = `${pathname}?${searchParams.toString()}`;
 
+  if (isBrowse) {
+    return (
+      <div className="min-h-[100dvh] w-full bg-canvas md:grid md:grid-cols-[280px_minmax(0,1fr)]">
+        <ChatSidebar
+          activeSessionId={activeSessionId}
+          refreshSignal={refreshSignal}
+        />
+        <motion.div
+          key={pathname}
+          className="min-w-0"
+          initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+          animate={pageEntrance}
+        >
+          {children}
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (isChat) {
+    return (
+      <div className="min-h-[100dvh] w-full bg-canvas md:flex md:h-[100dvh] md:min-h-[100svh] md:overflow-hidden">
+        <ChatSidebar
+          activeSessionId={activeSessionId}
+          refreshSignal={refreshSignal}
+        />
+        <motion.div
+          key={pathname}
+          className="min-w-0 md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-hidden"
+          initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+          animate={pageEntrance}
+        >
+          {children}
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-[100dvh] min-h-0 w-full overflow-hidden bg-canvas">
+    <div className="flex h-[100dvh] min-h-[100svh] w-full overflow-hidden bg-canvas">
       <ChatSidebar
         activeSessionId={activeSessionId}
         refreshSignal={refreshSignal}

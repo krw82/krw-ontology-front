@@ -20,11 +20,11 @@ export default async function PricingPage() {
   const plans = await listPublicBillingPlansFromStore();
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-canvas text-ink">
+    <div className="min-h-[100dvh] bg-canvas text-ink">
       <PublicTopNav />
       <main
         id="main-content"
-        className="min-h-0 flex-1 overflow-y-auto px-base pb-[112px] pt-xl sm:px-md md:px-xl md:pb-[96px] md:pt-[72px]"
+        className="px-base pb-[112px] pt-xl sm:px-md md:px-xl md:pb-[96px] md:pt-[72px]"
       >
         <div className="mx-auto w-full max-w-6xl">
           <header className="border-b border-hairline pb-8">

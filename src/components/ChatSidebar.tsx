@@ -13,6 +13,7 @@ import {
   sidebarPanel,
   sidebarBackdrop,
 } from "@/lib/animation";
+import { OPEN_CHAT_SIDEBAR_EVENT } from "@/lib/chat/sidebar-events";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import type { SessionSummary } from "@/types/api-contracts";
 
@@ -81,6 +82,18 @@ export default function ChatSidebar({
   }, [listSessions, refreshSignal]);
 
   useEffect(() => {
+    const handleOpenSidebar = () => {
+      setPendingNavigationSessionId(null);
+      setMobileOpen(true);
+    };
+
+    window.addEventListener(OPEN_CHAT_SIDEBAR_EVENT, handleOpenSidebar);
+    return () => {
+      window.removeEventListener(OPEN_CHAT_SIDEBAR_EVENT, handleOpenSidebar);
+    };
+  }, []);
+
+  useEffect(() => {
     const hasRunningSession = sessions.some(
       (session) =>
         session.latest_run_status === "running" ||
@@ -133,20 +146,6 @@ export default function ChatSidebar({
 
   return (
     <>
-      <button
-        type="button"
-        className="fixed left-base top-[14px] z-[70] inline-flex h-11 w-11 items-center justify-center rounded-[8px] text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas md:hidden"
-        aria-label="채팅 기록 열기"
-        aria-expanded={mobileOpen}
-        aria-controls="mobile-chat-sidebar"
-        onClick={() => setMobileOpen(true)}
-      >
-        <span aria-hidden="true" className="relative block h-5 w-6">
-          <span className="absolute left-0 top-[3px] h-[2px] w-5 rounded-full bg-ink" />
-          <span className="absolute bottom-[3px] left-0 h-[2px] w-3.5 rounded-full bg-ink" />
-        </span>
-      </button>
-
       <AnimatePresence>
         {mobileOpen && (
           <div className="fixed inset-0 z-[80] md:hidden">
@@ -204,7 +203,7 @@ export default function ChatSidebar({
         )}
       </AnimatePresence>
 
-      <aside className="hidden w-[280px] shrink-0 flex-col border-r border-hairline bg-surface/80 md:flex">
+      <aside className="hidden w-[280px] shrink-0 flex-col border-r border-hairline bg-surface/80 md:sticky md:top-0 md:flex md:h-[100dvh] md:max-h-[100dvh]">
         <SidebarContent
           activeSessionId={activeSessionId}
           loading={loading}

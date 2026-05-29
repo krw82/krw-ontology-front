@@ -71,6 +71,7 @@ echo "Remote ontology used for build: $REMOTE_ONTOLOGY_DIR"
   COPYFILE_DISABLE=1 tar -czf "$FRONT_ARCHIVE" \
     --exclude './.git' \
     --exclude './.next' \
+    --exclude './.next-e2e' \
     --exclude './node_modules' \
     --exclude './out' \
     --exclude './output' \
