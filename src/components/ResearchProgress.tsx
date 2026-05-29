@@ -50,6 +50,7 @@ export default function ResearchProgress({
       className="mb-xs w-full max-w-[780px]"
       role="status"
       aria-live="polite"
+      aria-atomic="false"
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={progressTransition}

@@ -568,7 +568,10 @@ function ChatContent() {
       }
 
       shouldStickToBottomRef.current = true;
-      setComposerExpanded();
+      setComposerExpanded({
+        stickToBottom: true,
+        resetManualScroll: true,
+      });
 
       if (!sessionId) {
         const createdSessionId = await createSessionForDraft();
@@ -990,6 +993,7 @@ function ChatContent() {
                 : "translate3d(0, 0, 0)",
             }}
             aria-hidden={isComposerCompact ? true : undefined}
+            inert={isComposerCompact ? true : undefined}
             onPointerDownCapture={handleComposerPointerDown}
           >
             <Composer
@@ -1002,7 +1006,7 @@ function ChatContent() {
                 effectiveSessionError
                   ? "인덱스에 있는 회사만 채팅할 수 있습니다."
                   : isBudgetBlocked
-                    ? "분석 크레딧을 모두 사용했습니다."
+                  ? "분석 크레딧을 모두 사용했습니다."
                   : "기업에 대해 질문하세요..."
               }
               toolCalls={chat.toolCalls}

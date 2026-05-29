@@ -27,21 +27,29 @@ export interface UseChatMobileDockResult {
   revealComposerForTyping: () => void;
   handleComposerPointerDown: () => void;
   handleComposerFocusChange: (focused: boolean) => void;
-  setComposerExpanded: (options?: { keepFocus?: boolean }) => void;
+  setComposerExpanded: (options?: {
+    keepFocus?: boolean;
+    stickToBottom?: boolean;
+    resetManualScroll?: boolean;
+  }) => void;
 }
 
 const MOBILE_MEDIA_QUERY = "(max-width: 767px)";
-const NEAR_BOTTOM_TOLERANCE = 48;
+const NEAR_BOTTOM_TOLERANCE = 80;
 const COMPACT_ENTER_DISTANCE = 180;
 const COMPACT_EXIT_DISTANCE = 80;
-const SCROLL_DIRECTION_THRESHOLD = 8;
+const SCROLL_DIRECTION_THRESHOLD = 18;
+const HEADER_HIDE_DELTA = 18;
+const HEADER_SHOW_DELTA = -14;
+const HEADER_HIDE_MIN_SCROLL_TOP = 96;
+const HEADER_FORCE_SHOW_SCROLL_TOP = 40;
+const FOCUS_ANCHOR_RESTORE_TIME_MS = 800;
 
 export function useChatMobileDock({
   sessionKey,
   scrollRef,
   composerHostRef,
   messageCount,
-  isStreaming,
 }: UseChatMobileDockParams): UseChatMobileDockResult {
   const [isBodyScrollChat, setIsBodyScrollChat] = useState(false);
   const [mobileHeaderHidden, setMobileHeaderHidden] = useState(false);
@@ -53,13 +61,20 @@ export function useChatMobileDock({
   const lastScrollTopRef = useRef(0);
   const isComposerFocusedRef = useRef(false);
   const hasManualScrollRef = useRef(false);
+  const composerInteractionUntilRef = useRef(0);
+  const composerFocusScrollTopRef = useRef<number | null>(null);
+  const composerFocusStickToBottomRef = useRef(true);
+  const restoreTimersRef = useRef<number[]>([]);
 
   const getScrollSurface = useCallback((): HTMLElement | null => {
     if (!isBodyScrollChat || typeof document === "undefined") {
       return scrollRef.current;
     }
 
-    return (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
+    return (
+      (document.scrollingElement as HTMLElement | null) ??
+      document.documentElement
+    );
   }, [isBodyScrollChat, scrollRef]);
 
   const getScrollViewportHeight = useCallback((surface: HTMLElement): number => {
@@ -69,6 +84,24 @@ export function useChatMobileDock({
 
     return surface.clientHeight;
   }, [isBodyScrollChat]);
+
+  const getScrollTop = useCallback(
+    (surface: HTMLElement): number => {
+      if (isBodyScrollChat) {
+        return typeof window === "undefined" ? 0 : window.scrollY;
+      }
+
+      return surface.scrollTop;
+    },
+    [isBodyScrollChat],
+  );
+
+  const clearRestoreTimers = useCallback(() => {
+    restoreTimersRef.current.forEach((timer) => {
+      window.clearTimeout(timer);
+    });
+    restoreTimersRef.current = [];
+  }, []);
 
   const updateComposerHeight = useCallback(() => {
     const composerHost = composerHostRef.current;
@@ -80,62 +113,130 @@ export function useChatMobileDock({
     setComposerHeight(Math.max(composerHost.offsetHeight, 0));
   }, [composerHostRef]);
 
-  const setComposerExpanded = useCallback((options?: { keepFocus?: boolean }) => {
-    shouldStickToBottomRef.current = true;
-    if (!options?.keepFocus) {
-      isComposerFocusedRef.current = false;
-    }
-    hasManualScrollRef.current = false;
-    setIsComposerCompact(false);
+  const setComposerExpanded = useCallback(
+    (options?: {
+      keepFocus?: boolean;
+      stickToBottom?: boolean;
+      resetManualScroll?: boolean;
+    }) => {
+      if (options?.stickToBottom) {
+        shouldStickToBottomRef.current = true;
+      }
+      if (!options?.keepFocus) {
+        isComposerFocusedRef.current = false;
+      }
+      if (options?.resetManualScroll) {
+        hasManualScrollRef.current = false;
+      }
+      setIsComposerCompact(false);
+    },
+    [],
+  );
+
+  const captureComposerFocusAnchor = useCallback(() => {
+    const surface = getScrollSurface();
+    if (!surface) return;
+
+    const currentTop = isBodyScrollChat
+      ? typeof window === "undefined"
+        ? 0
+        : window.scrollY
+      : surface.scrollTop;
+
+    composerFocusScrollTopRef.current = currentTop;
+    composerFocusStickToBottomRef.current = shouldStickToBottomRef.current;
+    composerInteractionUntilRef.current = performance.now() + FOCUS_ANCHOR_RESTORE_TIME_MS;
+  }, [getScrollSurface, isBodyScrollChat]);
+
+  const restoreComposerFocusAnchor = useCallback(() => {
+    if (!isBodyScrollChat || typeof window === "undefined") return;
+    const targetTop = composerFocusScrollTopRef.current;
+    if (targetTop == null) return;
+
+    const restore = () => {
+      window.scrollTo({ top: targetTop, behavior: "auto" });
+      shouldStickToBottomRef.current = composerFocusStickToBottomRef.current;
+      lastScrollTopRef.current = targetTop;
+    };
+
+    restore();
+    clearRestoreTimers();
+    restoreTimersRef.current.push(
+      window.setTimeout(() => requestAnimationFrame(restore), 80),
+    );
+    restoreTimersRef.current.push(
+      window.setTimeout(() => requestAnimationFrame(restore), 180),
+    );
+  }, [clearRestoreTimers, isBodyScrollChat]);
+
+  const withInteractionLock = useCallback(() => {
+    composerInteractionUntilRef.current = performance.now() + FOCUS_ANCHOR_RESTORE_TIME_MS;
   }, []);
 
   const revealComposer = useCallback(() => {
-    setComposerExpanded();
-  }, [setComposerExpanded]);
+    setComposerExpanded({
+      resetManualScroll: true,
+    });
+    captureComposerFocusAnchor();
+    withInteractionLock();
+  }, [captureComposerFocusAnchor, setComposerExpanded, withInteractionLock]);
 
   const revealComposerForTyping = useCallback(() => {
-    setComposerExpanded();
+    setComposerExpanded({
+      resetManualScroll: true,
+    });
     setComposerFocusRequestKey((value) => value + 1);
-  }, [setComposerExpanded]);
+    captureComposerFocusAnchor();
+    withInteractionLock();
+  }, [captureComposerFocusAnchor, setComposerExpanded, withInteractionLock]);
 
   const handleComposerPointerDown = useCallback(() => {
-    setComposerExpanded();
-  }, [setComposerExpanded]);
+    setComposerExpanded({
+      resetManualScroll: true,
+    });
+    captureComposerFocusAnchor();
+    withInteractionLock();
+  }, [captureComposerFocusAnchor, setComposerExpanded, withInteractionLock]);
 
   const handleComposerFocusChange = useCallback(
     (focused: boolean) => {
       isComposerFocusedRef.current = focused;
       if (!focused) return;
 
-      shouldStickToBottomRef.current = true;
       setComposerExpanded({ keepFocus: true });
+      withInteractionLock();
+      requestAnimationFrame(() => {
+        restoreComposerFocusAnchor();
+      });
     },
-    [setComposerExpanded],
+    [restoreComposerFocusAnchor, setComposerExpanded, withInteractionLock],
   );
-
-  const scrollToBottom = useCallback(() => {
-    const surface = getScrollSurface();
-    if (!surface) return;
-
-    surface.scrollTo({
-      top: surface.scrollHeight,
-      behavior: "auto",
-    });
-  }, [getScrollSurface]);
 
   const applyScrollState = useCallback(
     (surface: HTMLElement) => {
       const viewportHeight = getScrollViewportHeight(surface);
-      const current = surface.scrollTop;
+      const current = getScrollTop(surface);
       const distanceFromBottom = Math.max(
         surface.scrollHeight - viewportHeight - current,
         0,
       );
 
-      shouldStickToBottomRef.current = distanceFromBottom <= NEAR_BOTTOM_TOLERANCE;
+      shouldStickToBottomRef.current = distanceFromBottom < NEAR_BOTTOM_TOLERANCE;
 
       const previous = lastScrollTopRef.current;
       const delta = current - previous;
+      const interactionLocked =
+        isComposerFocusedRef.current ||
+        performance.now() < composerInteractionUntilRef.current;
+      const forceShowHeader = current <= HEADER_FORCE_SHOW_SCROLL_TOP;
+
+      if (interactionLocked) {
+        setMobileHeaderHidden(false);
+        setIsComposerCompact(false);
+        lastScrollTopRef.current = current;
+        return;
+      }
+
       if (isBodyScrollChat) {
         if (Math.abs(delta) > SCROLL_DIRECTION_THRESHOLD) {
           hasManualScrollRef.current = true;
@@ -148,23 +249,28 @@ export function useChatMobileDock({
           return;
         }
 
-        if (delta > SCROLL_DIRECTION_THRESHOLD) {
+        if (forceShowHeader) {
+          setMobileHeaderHidden(false);
+        } else if (
+          !isComposerFocusedRef.current &&
+          delta > HEADER_HIDE_DELTA &&
+          current > HEADER_HIDE_MIN_SCROLL_TOP
+        ) {
           setMobileHeaderHidden(true);
-        } else if (delta < -SCROLL_DIRECTION_THRESHOLD) {
+        } else if (delta < HEADER_SHOW_DELTA) {
           setMobileHeaderHidden(false);
         }
 
         setIsComposerCompact((currentCompact) => {
-          if (isStreaming) return true;
           if (isComposerFocusedRef.current) return false;
           if (messageCount === 0) return false;
           if (distanceFromBottom <= COMPACT_EXIT_DISTANCE) return false;
 
-          if (delta > SCROLL_DIRECTION_THRESHOLD) {
+          if (delta > HEADER_HIDE_DELTA && current > HEADER_HIDE_MIN_SCROLL_TOP) {
             return true;
           }
 
-          if (delta < -SCROLL_DIRECTION_THRESHOLD) {
+          if (delta < HEADER_SHOW_DELTA) {
             return false;
           }
 
@@ -179,8 +285,8 @@ export function useChatMobileDock({
     },
     [
       getScrollViewportHeight,
+      getScrollTop,
       isBodyScrollChat,
-      isStreaming,
       messageCount,
     ],
   );
@@ -210,18 +316,33 @@ export function useChatMobileDock({
 
   useEffect(() => {
     const surface = getScrollSurface();
-    if (!surface) return;
+    const scrollTarget: Window | HTMLElement | null = isBodyScrollChat
+      ? (typeof window === "undefined" ? null : window)
+      : surface;
+    if (!scrollTarget) return;
 
+    let frameId: number | null = null;
     const onScroll = () => {
-      applyScrollState(surface);
+      if (frameId !== null) return;
+
+      frameId = window.requestAnimationFrame(() => {
+        frameId = null;
+
+        const currentSurface = getScrollSurface();
+        if (!currentSurface) return;
+        applyScrollState(currentSurface);
+      });
     };
 
     onScroll();
-    surface.addEventListener("scroll", onScroll, { passive: true });
+    scrollTarget.addEventListener("scroll", onScroll, { passive: true });
     return () => {
-      surface.removeEventListener("scroll", onScroll);
+      scrollTarget.removeEventListener("scroll", onScroll);
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+      }
     };
-  }, [applyScrollState, getScrollSurface]);
+  }, [applyScrollState, getScrollSurface, isBodyScrollChat]);
 
   useEffect(() => {
     if (!isBodyScrollChat) {
@@ -230,22 +351,26 @@ export function useChatMobileDock({
     }
 
     if (!window.visualViewport) return;
+    const viewport = window.visualViewport;
 
     const updateKeyboardOffset = () => {
-      const viewportHeight = window.visualViewport?.height;
+      const viewportHeight = viewport.height;
       if (typeof viewportHeight !== "number") return;
-
-      const diff = Math.max(0, window.innerHeight - viewportHeight);
-      setKeyboardOffset(Math.min(diff, 280));
+      const offsetTop = viewport.offsetTop ?? 0;
+      const diff = Math.max(
+        0,
+        Math.round(window.innerHeight - viewportHeight - offsetTop),
+      );
+      setKeyboardOffset(diff);
     };
 
     updateKeyboardOffset();
-    window.visualViewport.addEventListener("resize", updateKeyboardOffset);
-    window.visualViewport.addEventListener("scroll", updateKeyboardOffset);
+    viewport.addEventListener("resize", updateKeyboardOffset);
+    viewport.addEventListener("scroll", updateKeyboardOffset);
 
     return () => {
-      window.visualViewport?.removeEventListener("resize", updateKeyboardOffset);
-      window.visualViewport?.removeEventListener("scroll", updateKeyboardOffset);
+      viewport.removeEventListener("resize", updateKeyboardOffset);
+      viewport.removeEventListener("scroll", updateKeyboardOffset);
     };
   }, [isBodyScrollChat]);
 
@@ -256,7 +381,14 @@ export function useChatMobileDock({
     hasManualScrollRef.current = false;
     setIsComposerCompact(false);
     lastScrollTopRef.current = 0;
-  }, [sessionKey, isBodyScrollChat]);
+    clearRestoreTimers();
+  }, [sessionKey, isBodyScrollChat, clearRestoreTimers]);
+
+  useEffect(() => {
+    return () => {
+      clearRestoreTimers();
+    };
+  }, [clearRestoreTimers]);
 
   return {
     isBodyScrollChat,
@@ -268,7 +400,23 @@ export function useChatMobileDock({
     shouldStickToBottomRef,
     getScrollSurface,
     getScrollViewportHeight,
-    scrollToBottom,
+    scrollToBottom: () => {
+      const surface = getScrollSurface();
+      if (!surface) return;
+
+      if (isBodyScrollChat && typeof window !== "undefined") {
+        window.scrollTo({
+          top: surface.scrollHeight,
+          behavior: "auto",
+        });
+        return;
+      }
+
+      surface.scrollTo({
+        top: surface.scrollHeight,
+        behavior: "auto",
+      });
+    },
     revealComposer,
     revealComposerForTyping,
     handleComposerPointerDown,

@@ -142,6 +142,7 @@ export default function Composer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastFocusRequestKeyRef = useRef(focusRequestKey);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isComposerFocused, setIsComposerFocused] = useState(false);
   const toolsRef = useRef<HTMLDivElement>(null);
   const toolsSheetRef = useRef<HTMLDivElement>(null);
   const lastInitialValueRef = useRef(initialDraftValue);
@@ -158,6 +159,7 @@ export default function Composer({
   const isInputBusy = disabled || isSubmitting;
   const canSubmit =
     composedLength > 0 && !isOverLimit && !isInputBusy && !isGenerating;
+  const showGeneratingOverlay = isGenerating && !isComposerFocused && !value.trim();
 
   const syncTextareaValue = useCallback((nextValue: string) => {
     setValue(nextValue);
@@ -430,11 +432,6 @@ export default function Composer({
   };
 
   const handlePrimaryAction = () => {
-    if (isGenerating) {
-      void onCancel?.();
-      return;
-    }
-
     void handleSubmit();
   };
 
@@ -763,14 +760,20 @@ export default function Composer({
             onCompositionEnd={(event) =>
               syncTextareaValue(event.currentTarget.value)
             }
-            onFocus={() => onFocusChange?.(true)}
-            onBlur={() => onFocusChange?.(false)}
+            onFocus={() => {
+              setIsComposerFocused(true);
+              onFocusChange?.(true);
+            }}
+            onBlur={() => {
+              setIsComposerFocused(false);
+              onFocusChange?.(false);
+            }}
             onKeyDown={handleKeyDown}
             disabled={isInputBusy}
             aria-label="메시지 입력"
           />
           <AnimatePresence mode="wait" initial={false}>
-            {isGenerating && (
+            {showGeneratingOverlay && (
               <motion.div
                 key="generating-label"
                 className="pointer-events-none absolute inset-x-xs inset-y-0 flex min-w-0 items-center text-[16px] font-medium leading-[1.5] text-muted sm:inset-x-sm"
@@ -786,7 +789,7 @@ export default function Composer({
               </motion.div>
             )}
           </AnimatePresence>
-          {isGenerating && (
+          {showGeneratingOverlay && (
             <motion.span
               aria-hidden="true"
               className="absolute bottom-[7px] left-xs right-xs h-px bg-primary-container/55 sm:left-sm sm:right-sm"
@@ -796,30 +799,26 @@ export default function Composer({
             />
           )}
         </div>
-        <button
-          className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center self-center rounded-full bg-primary-container text-on-primary shadow-[0_8px_22px_rgba(0,82,255,0.24)] transition-all duration-150 hover:scale-[1.03] hover:bg-primary-active active:scale-95 disabled:cursor-not-allowed disabled:bg-primary-container disabled:text-on-primary disabled:opacity-55"
-          onClick={handlePrimaryAction}
-          disabled={isGenerating ? !onCancel : !canSubmit}
-          aria-label={isGenerating ? "응답 생성 중지" : "메시지 보내기"}
-          type="button"
-        >
-          <AnimatePresence mode="wait" initial={false}>
-            {isGenerating ? (
-              <motion.span
-                key="generating"
-                initial={{ opacity: 0, scale: 0.84 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.84 }}
-                transition={{
-                  duration: motionConfig.duration,
-                  ease: motionConfig.ease,
-                }}
-                className="relative inline-flex h-5 w-5 animate-spin rounded-full bg-[conic-gradient(from_0deg,rgba(255,255,255,0)_0deg,rgba(255,255,255,0.18)_92deg,#ffffff_170deg,#ffffff_260deg,rgba(255,255,255,0)_360deg)] p-[2px] [animation-duration:780ms]"
-              >
-                <span className="h-full w-full rounded-full bg-primary-container shadow-[inset_0_0_0_1px_rgba(255,255,255,0.22)]" />
-                <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-on-primary shadow-[0_0_8px_rgba(255,255,255,0.85)]" />
-              </motion.span>
-            ) : (
+        {isGenerating && !isComposerFocused && onCancel && (
+          <button
+            type="button"
+            className="ml-2 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center self-center rounded-full bg-surface-dim text-error shadow-[0_8px_22px_rgba(10,11,13,0.14)] transition-all duration-150 hover:scale-[1.03] active:scale-95 disabled:cursor-not-allowed disabled:opacity-55"
+            onClick={() => void onCancel?.()}
+            disabled={disabled || isSubmitting}
+            aria-label="응답 생성 중지"
+          >
+            <span className="material-symbols-outlined text-[22px]">stop</span>
+          </button>
+        )}
+        {!isGenerating && (
+          <button
+            className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center self-center rounded-full bg-primary-container text-on-primary shadow-[0_8px_22px_rgba(0,82,255,0.24)] transition-all duration-150 hover:scale-[1.03] hover:bg-primary-active active:scale-95 disabled:cursor-not-allowed disabled:bg-primary-container disabled:text-on-primary disabled:opacity-55"
+            onClick={handlePrimaryAction}
+            disabled={!canSubmit}
+            aria-label="메시지 보내기"
+            type="button"
+          >
+            <AnimatePresence mode="wait" initial={false}>
               <motion.span
                 key="send"
                 initial={{ opacity: 0, scale: 0.84 }}
@@ -833,9 +832,9 @@ export default function Composer({
               >
                 arrow_upward
               </motion.span>
-            )}
-          </AnimatePresence>
-        </button>
+            </AnimatePresence>
+          </button>
+        )}
       </div>
       {mobileToolsSheet}
     </div>
