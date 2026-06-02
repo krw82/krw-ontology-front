@@ -14344,3 +14344,415 @@
 [agent-worker] idle { workerId: 'mac-worker-jwc-1' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-1' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] stopped { workerId: 'mac-worker-jwc-1' }
+[agent-worker] started { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] stopped { workerId: 'mac-worker-jwc-1' }
+[agent-worker] started { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-1',
+  runId: '2f24dcd0-2dda-4cd2-a449-3b99ecc94312'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'NOW' },
+  duration_ms: 1777,
+  duration_s: 1.777,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_frvrx2Hcz7m6hKRQbhBi3493',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'LLM flexibility, third-party LLM integration, own LLM, multi-model AI strategy, customer choice of AI models, languag...',
+    periods: [ 'CY2025' ]
+  },
+  duration_ms: 1818,
+  duration_s: 1.818,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_kmp4epDS85HKXwIeFkPn3346',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'Now Assist platform, AI capabilities, enterprise AI, workflow AI, AI agent platform, workflow automation AI integration',
+    periods: [ 'CY2025', 'CY2026Q1' ]
+  },
+  duration_ms: 1111,
+  duration_s: 1.111,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_36Q1QhVl2HFaU8TzpEX22655',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 11330,
+  duration_s: 11.33,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_QU4yJPUz4WgELHu9n7oD5583',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'AI platform native approach, workflow orchestration, AI integration layer, differentiation from point AI solutions, A...',
+    periods: [ 'CY2025' ]
+  },
+  duration_ms: 10642,
+  duration_s: 10.642,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_Df9GVHpEaKqbktqqtEit6232',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 23010,
+  duration_s: 23.01,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_A1WCBfNtZUnpZi5nK5M69974',
+  tool_name: 'krw_ontology_chain'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 23614,
+  duration_s: 23.614,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_QymQI2g39jRIteQbcek49008',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 8183,
+  duration_s: 8.183,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_pslCegagrrLyo5xL0LkO0236',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'ambition defining AI enterprise software company, AI platform ambition, AI native point solutions challenge integrati...',
+    periods: [ 'CY2025' ]
+  },
+  duration_ms: 292,
+  duration_s: 0.292,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_Z4izH4oLpBcFb6Q9WMhm8037',
+  tool_name: 'krw_ontology_query'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-1',
+  runId: '2f24dcd0-2dda-4cd2-a449-3b99ecc94312'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-1' }
+[agent-worker] started { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-1',
+  runId: '72631eed-9f18-42d3-ac8c-b2cd7000d218'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'GOOG', document_types: [ '10-K', '10-Q' ] },
+  duration_ms: 777,
+  duration_s: 0.777,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_fQMCxGnAcZJN6FFhXbQz4001',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOG',
+    topic: 'capital expenditure capex data center technical infrastructure investment gross margin cost of revenue operating cash...',
+    document_types: [ '10-K', '10-Q' ]
+  },
+  duration_ms: 4847,
+  duration_s: 4.847,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_ukUF27rs3V9Qf6fre4Zf2089',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 36159,
+  duration_s: 36.159,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_IS6gczv10O4k5wvEEZOD4980',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 35668,
+  duration_s: 35.668,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_PUYWnBocPt9nFKFnH0148906',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 36037,
+  duration_s: 36.037,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_KiUamshyaGVVJ3vR0ET08016',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOG',
+    topic: 'Google Cloud segment operating income loss revenue gross margin cost of revenues CY2025 CY2026Q1 segment results',
+    document_types: [ '10-K', '10-Q' ]
+  },
+  duration_ms: 1211,
+  duration_s: 1.211,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_PXpIDOBDW8i7uwwtvoxG7645',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 21376,
+  duration_s: 21.376,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_uOloFwHPAhOsVLBXKaOc4789',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 21114,
+  duration_s: 21.114,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_LaElwTt9BgVy6mEDiGW35929',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOG',
+    topic: 'Google Cloud segment revenue operating income 2025 2026 first quarter segment financial results Alphabet consolidated...',
+    document_types: [ '10-K', '10-Q' ]
+  },
+  duration_ms: 7881,
+  duration_s: 7.881,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_AZIqTgJLMd4NFx5BKeTL3602',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 8690,
+  duration_s: 8.69,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_brm0TeIC3fVIMdqQnQJ57890',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 11238,
+  duration_s: 11.238,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_L5lgUwqBSaVfi2alyuaH4625',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOG',
+    topic: 'Google Cloud operating income segment profit loss CY2025 CY2026 first quarter segment operating result',
+    document_types: [ '10-K', '10-Q' ]
+  },
+  duration_ms: 10480,
+  duration_s: 10.48,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_eKWRGcshr7X3yg2fGIoV3745',
+  tool_name: 'krw_ontology_query'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-1',
+  runId: '72631eed-9f18-42d3-ac8c-b2cd7000d218'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-1',
+  runId: '9dff035f-9f6a-401b-9d70-8d34cb271a70'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOG',
+    topic: 'Alphabet GOOG balance sheet debt total debt long-term debt short-term debt equity shares outstanding diluted shares C...',
+    document_types: [ '10-Q' ]
+  },
+  duration_ms: 1091,
+  duration_s: 1.091,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_W0iuNZhxNIVRfNggXqhy6293',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 97196,
+  duration_s: 97.196,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_NAtlXWE5O1z8IdJUtadW6661',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOG',
+    periods: [ 'CY2026Q1' ],
+    document_types: [ '10-Q' ]
+  },
+  duration_ms: 96584,
+  duration_s: 96.584,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_etIW0sm2NQAesx1DsBIF6470',
+  tool_name: 'krw_ontology_retrieve'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOG',
+    topic: 'Alphabet GOOG debt balance sheet total liabilities long-term debt current portion short-term debt stockholders equity...',
+    periods: [ 'CY2026Q1' ],
+    document_types: [ '10-Q' ]
+  },
+  duration_ms: 774,
+  duration_s: 0.774,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_7G4e05bPqmNq9nk8G0PF4799',
+  tool_name: 'krw_ontology_query'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-1',
+  runId: '9dff035f-9f6a-401b-9d70-8d34cb271a70'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }

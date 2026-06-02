@@ -39,6 +39,7 @@ function params(sessionId = SESSION_ID) {
 
 function createSupabase(overrides: {
   session?: Record<string, unknown> | null;
+  messages?: Array<Record<string, unknown>>;
   sessionError?: { message: string } | null;
   messagesError?: { message: string } | null;
   runsError?: { message: string } | null;
@@ -57,7 +58,7 @@ function createSupabase(overrides: {
     created_at: "2026-05-31T00:00:00.000Z",
     updated_at: "2026-05-31T00:00:00.000Z",
   };
-  const messages = [
+  const messages = overrides.messages ?? [
     {
       id: "message-1",
       session_id: SESSION_ID,
@@ -210,6 +211,44 @@ describe("GET /api/chat/[sessionId]", () => {
     ]);
     expect(body).not.toHaveProperty("tool_calls");
     expect(body).not.toHaveProperty("citations");
+  });
+
+  it("returns assistant messages without leading internal narration", async () => {
+    const supabase = createSupabase({
+      messages: [
+        {
+          id: "message-1",
+          session_id: SESSION_ID,
+          role: "user",
+          content: "Let me retrieve라고 사용자가 직접 입력",
+          status: "completed",
+          request_id: null,
+          created_at: "2026-05-31T00:00:00.000Z",
+          updated_at: "2026-05-31T00:00:00.000Z",
+        },
+        {
+          id: "message-2",
+          session_id: SESSION_ID,
+          role: "assistant",
+          content:
+            "Let me retrieve more evidence.분석 결과를 작성하겠습니다.\n\n---\n\n최종 답변입니다.",
+          status: "completed",
+          request_id: null,
+          created_at: "2026-05-31T00:01:00.000Z",
+          updated_at: "2026-05-31T00:01:00.000Z",
+        },
+      ],
+    });
+    vi.mocked(createClient).mockResolvedValue(supabase.client);
+
+    const response = await GET(request(), params());
+    const body = await json(response);
+
+    expect(response.status).toBe(200);
+    expect(body.messages).toMatchObject([
+      { role: "user", content: "Let me retrieve라고 사용자가 직접 입력" },
+      { role: "assistant", content: "최종 답변입니다." },
+    ]);
   });
 
   it("returns 500 instead of not_found when session loading fails", async () => {

@@ -41,10 +41,11 @@ function postRequest(body: unknown) {
 }
 
 function createSupabase(params: {
+  sessions?: Array<Record<string, unknown>>;
   sessionsError?: { message: string } | null;
 } = {}) {
   const queriedTables: string[] = [];
-  const sessions = [
+  const sessions = params.sessions ?? [
     {
       id: "session-1",
       user_id: "user-1",
@@ -138,6 +139,41 @@ describe("GET /api/sessions", () => {
       ],
     });
     expect(supabase.queriedTables).toEqual(["chat_sessions"]);
+  });
+
+  it("hides internal assistant narration from session previews", async () => {
+    const supabase = createSupabase({
+      sessions: [
+        {
+          id: "session-1",
+          user_id: "user-1",
+          title: "NOW",
+          scope_type: "company",
+          default_tickers: ["NOW"],
+          default_document_types: [],
+          last_message_preview:
+            "Let me retrieve the full query_context output and run targeted follow-up queries",
+          last_message_at: "2026-05-31T00:00:00.000Z",
+          latest_run_status: "completed",
+          deleted_at: null,
+          created_at: "2026-05-30T00:00:00.000Z",
+          updated_at: "2026-05-31T00:00:00.000Z",
+        },
+      ],
+    });
+    vi.mocked(createClient).mockResolvedValue(supabase.client);
+
+    const response = await GET(getRequest());
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toMatchObject({
+      sessions: [
+        {
+          id: "session-1",
+          last_message_preview: "",
+        },
+      ],
+    });
   });
 
   it("returns 500 when the session list query fails", async () => {

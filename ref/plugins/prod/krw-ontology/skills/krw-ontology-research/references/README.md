@@ -32,6 +32,9 @@ bounded-autonomy-and-stop-rules.md
 period-and-latest-policy.md
 - CY labels and latest-filing precedence
 
+financial-statement-interpretation.md
+- cash-flow, FCF, R&D, M&A, buyback, SBC, and capital-allocation interpretation guardrails
+
 trace-chain-policy.md
 - trace vs chain use cases and boundaries
 

@@ -5,6 +5,10 @@ import type {
   MessageRow,
   MessageShareRow,
 } from "@/types/database";
+import {
+  sanitizeAssistantContent,
+  sanitizeAssistantPreviewContent,
+} from "@/lib/chat/assistant-content";
 
 const SHARE_TOKEN_BYTES = 18;
 const MAX_SHARE_TITLE_LENGTH = 90;
@@ -52,7 +56,15 @@ export async function findPublicMessageShare(
     .is("revoked_at", null)
     .maybeSingle<PublicMessageShare>();
 
-  return data ?? null;
+  if (!data) return null;
+
+  const answerContent = sanitizeAssistantContent(data.answer_content);
+  const titleFallback = sanitizeAssistantPreviewContent(data.title);
+  return {
+    ...data,
+    title: buildShareTitle(answerContent, titleFallback || undefined),
+    answer_content: answerContent,
+  };
 }
 
 export async function findExistingActiveShare(
@@ -76,13 +88,14 @@ export async function createMessageShare(params: {
 }): Promise<Pick<MessageShareRow, "token">> {
   const admin = getSupabaseAdmin();
   const token = createShareToken();
+  const answerContent = sanitizeAssistantContent(params.message.content);
   const payload = {
     token,
     owner_user_id: params.userId,
     source_session_id: params.session.id,
     source_message_id: params.message.id,
-    title: buildShareTitle(params.message.content, params.session.title),
-    answer_content: params.message.content,
+    title: buildShareTitle(answerContent, params.session.title),
+    answer_content: answerContent,
     answer_created_at: params.message.created_at,
     tickers: params.session.default_tickers ?? null,
   };

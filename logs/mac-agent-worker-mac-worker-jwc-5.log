@@ -13930,3 +13930,550 @@
 [agent-worker] idle { workerId: 'mac-worker-jwc-5' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-5' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] stopped { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-5',
+  runId: '6d98abed-d844-4dba-9f96-079e4c49b710'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'NOW' },
+  duration_ms: 1874,
+  duration_s: 1.874,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_QEm2mYaE0UhffAtxHoy08326',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'NOW' },
+  duration_ms: 171,
+  duration_s: 0.171,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_HRFppwqSZgOYmIJc9rRz7658',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'GenAI investment spending, R&D costs, strategic investment, capital allocation for AI platform development',
+    periods: [ 'CY2025', 'CY2026Q1' ]
+  },
+  duration_ms: 12338,
+  duration_s: 12.338,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_zS0ZXPcTQ7SBbt5Aapcf4880',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'large enterprise sales cycle, deal scrutiny, subscription revenue, ACV, billing arrangements, customer concentration,...',
+    periods: [ 'CY2025', 'CY2026Q1' ]
+  },
+  duration_ms: 11556,
+  duration_s: 11.556,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_r8mmAJL51IM9BqN9F9wj6857',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'competitive pressure, IT service management competition, low-code platform competition, pricing pressure, market shar...',
+    periods: [ 'CY2025', 'CY2026Q1' ]
+  },
+  duration_ms: 10842,
+  duration_s: 10.842,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_NxDIkETOz8zeJlgbyfII9370',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'operating margin, gross margin, profitability, cost structure, free cash flow, margin trajectory',
+    periods: [ 'CY2025', 'CY2026Q1' ]
+  },
+  duration_ms: 10223,
+  duration_s: 10.223,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_03_Xy9IetCAme6W3VqPXQWU3017',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'subscription revenue, total revenue, revenue growth rate, remaining performance obligations, RPO, current RPO',
+    periods: [ 'CY2025', 'CY2026Q1' ]
+  },
+  duration_ms: 6171,
+  duration_s: 6.171,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_TKdKN4JiUbDZRFdzosWt2269',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'operating income, non-GAAP operating margin, GAAP operating margin, operating expenses, sales and marketing, R&D expense',
+    periods: [ 'CY2025', 'CY2026Q1' ]
+  },
+  duration_ms: 5963,
+  duration_s: 5.963,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_4h8E8zvGatAZevD4tSRU7271',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'AI capabilities, generative AI, now platform, AI investments, Washington DC, federal business, public sector',
+    periods: [ 'CY2025', 'CY2026Q1' ]
+  },
+  duration_ms: 5246,
+  duration_s: 5.246,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_MLctK5OhgXs7ASsTHHUD8272',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'total revenue, subscription revenue, revenue by geography, revenue by segment, professional services revenue',
+    periods: [ 'CY2025', 'CY2026Q1' ]
+  },
+  duration_ms: 8314,
+  duration_s: 8.314,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_vafh4WpZgHWvep8if4Kl3727',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'headcount, employee growth, cost of revenue, gross profit, gross margin dollars percentage',
+    periods: [ 'CY2025', 'CY2026Q1' ]
+  },
+  duration_ms: 7561,
+  duration_s: 7.561,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_XEYmLsZ4spTF7RVl2cZT2567',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'competition, competitors, vendors, consolidate, ITSM, ITOM, low-code platform, ServiceNow vs competitors',
+    periods: [ 'CY2025', 'CY2026Q1' ]
+  },
+  duration_ms: 6761,
+  duration_s: 6.761,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_FRzt8D0pyytOEarE71X00780',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 22438,
+  duration_s: 22.438,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_wAuMje01KEU9QbA5S8tS1054',
+  tool_name: 'krw_ontology_chain'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'R&D investment, platform development, product innovation, research and development expense, platform investment spend',
+    periods: [ 'CY2025', 'CY2026Q1' ]
+  },
+  duration_ms: 23013,
+  duration_s: 23.013,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_VbqLxNyDoQlCJpUseC0S0137',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'CY2026Q1 revenue, subscription revenue, operating income, operating expenses, margin percentage, total revenue dollars',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 23972,
+  duration_s: 23.972,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_hQWoy3A4dhEitsbmLFZw3984',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 12930,
+  duration_s: 12.93,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_SS6OQmSJZU5cAGHCGIWX9328',
+  tool_name: 'krw_ontology_chain'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'non-GAAP operating margin, rule of 40, operating cash flow, free cash flow margin, FCF margin targets',
+    periods: [ 'CY2025' ]
+  },
+  duration_ms: 12561,
+  duration_s: 12.561,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_sVUX3KXEfhRNWqwqjRis4191',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'enterprise sales cycle, sales productivity, quota attainment, enterprise segment, upsell, cross-sell, land and expand',
+    periods: [ 'CY2025', 'CY2026Q1' ]
+  },
+  duration_ms: 11837,
+  duration_s: 11.837,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_FL2pQ7MI3U4YrYEmBEMG5388',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 15156,
+  duration_s: 15.156,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_MqetsUR8DGysUSO50oQu6932',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 15665,
+  duration_s: 15.665,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_zx8rIyXbdWQAKYKOqhbz4093',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'Now Assist AI, generative AI product adoption, AI assistant, pro-plus SKU, AI platform monetization, enterprise AI agent',
+    periods: [ 'CY2025', 'CY2026Q1' ]
+  },
+  duration_ms: 14462,
+  duration_s: 14.462,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_FOtdAejQjGkhkS6HnYYu4306',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'competitive landscape, competitors include, competitive factors, platform vs point solutions, vendor consolidation, l...',
+    periods: [ 'CY2025' ]
+  },
+  duration_ms: 8430,
+  duration_s: 8.43,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_w4NayF9uZnL83srY2G4l6228',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'revenue breakdown, revenue by segment, remaining performance obligations, current remaining performance obligations,...',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 7726,
+  duration_s: 7.726,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_GY0Bc0zF25j4Izdcb8bb1842',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 9533,
+  duration_s: 9.533,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_nlI1unJF2rKYkaWoOCi85146',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 22156,
+  duration_s: 22.156,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_YaJ5HcbuApOeC4c9HAhZ9875',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'multi-product platform, platform vendor consolidation, ITSM market share, ITOM market share, government and regulated...',
+    periods: [ 'CY2025' ]
+  },
+  duration_ms: 21067,
+  duration_s: 21.067,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_W4AzOYbf62pRzi20M0Le1501',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 21986,
+  duration_s: 21.986,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_GjJWqKaqrkhYaV1u0VAW4795',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'strategic investment, M&A, acquisitions, Genesys acquisition, capital deployment, share repurchase, buyback',
+    periods: [ 'CY2025', 'CY2026Q1' ]
+  },
+  duration_ms: 5285,
+  duration_s: 5.285,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_XomWQt7djlKy8xdSWupJ2186',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'large technology company competition, Microsoft, Salesforce, ServiceNow competitive position, platform competition, E...',
+    periods: [ 'CY2025' ]
+  },
+  duration_ms: 6126,
+  duration_s: 6.126,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_u2Y5xdKKEr3Tn439oNXj1735',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'subscription revenue CY2026Q1, current remaining performance obligations cRPO, remaining performance obligations RPO,...',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 3750,
+  duration_s: 3.75,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_bPXBJmpk4tKRGujDYN4y2912',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'sales and marketing expense as percentage of revenue, operating expense ratio, cost structure efficiency, opex levera...',
+    periods: [ 'CY2025', 'CY2026Q1' ]
+  },
+  duration_ms: 3045,
+  duration_s: 3.045,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_uvvZ1Y8OJM9Yi3lcs5Zt4761',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'employee growth, hiring plans, R&D headcount, sales headcount, go-to-market investment, SG&A expense trend',
+    periods: [ 'CY2025' ]
+  },
+  duration_ms: 2663,
+  duration_s: 2.663,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_y2jGNbLsdJAnNytkGx0j5096',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NOW',
+    topic: 'SBC stock based compensation, share dilution, employee equity compensation expense trend',
+    periods: [ 'CY2025' ]
+  },
+  duration_ms: 1982,
+  duration_s: 1.982,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_DVUAUXSadXHeaCx6d5Dv3236',
+  tool_name: 'krw_ontology_query'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-5',
+  runId: '6d98abed-d844-4dba-9f96-079e4c49b710'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }

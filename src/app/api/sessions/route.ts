@@ -4,6 +4,7 @@ import { getIndexedCompanies } from "@/lib/ontology/catalog";
 import { createClient } from "@/lib/supabase/server";
 import type { CreateSessionRequest } from "@/types/api-contracts";
 import type { ChatSessionRow } from "@/types/database";
+import { sanitizeAssistantPreviewContent } from "@/lib/chat/assistant-content";
 import {
   isOptionalStringArray,
   isPlainObject,
@@ -61,7 +62,9 @@ export async function GET(request: NextRequest) {
     title: s.title,
     scope_type: s.scope_type,
     default_tickers: s.default_tickers ?? [],
-    last_message_preview: s.last_message_preview,
+    last_message_preview: s.last_message_preview
+      ? sanitizeAssistantPreviewContent(s.last_message_preview)
+      : s.last_message_preview,
     last_message_at: s.last_message_at,
     latest_run_status: s.latest_run_status,
     created_at: s.created_at,

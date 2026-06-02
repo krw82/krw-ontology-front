@@ -18,6 +18,7 @@ import {
   FAILED_ASSISTANT_MESSAGE,
 } from "@/lib/chat/message-status";
 import { parseChatAttachmentContent } from "@/lib/chat/attachments";
+import { sanitizeAssistantContent } from "@/lib/chat/assistant-content";
 
 interface ChatMessageProps {
   role: "user" | "assistant";
@@ -401,6 +402,8 @@ export default function ChatMessage({
     );
   }
 
+  const assistantContent = sanitizeAssistantContent(content);
+
   return (
     <motion.div
       id={messageId ? `message-${messageId}` : undefined}
@@ -428,16 +431,16 @@ export default function ChatMessage({
             citations={citations}
             toolCalls={toolCalls}
           />
-          {content ? (
-            <StreamingContentBlocks content={content} />
+          {assistantContent ? (
+            <StreamingContentBlocks content={assistantContent} />
           ) : !toolCalls?.length && !citations?.length ? (
             <LoadingDots label={activityLabel(activity)} />
           ) : null}
         </div>
       ) : (
         <div className="max-w-full pl-0 text-body sm:pl-[48px]">
-          {content ? (
-            <CompletedAssistantContent content={content} />
+          {assistantContent ? (
+            <CompletedAssistantContent content={assistantContent} />
           ) : terminalAssistantContent(status) ? (
             <p className="text-[15px] leading-[1.5] text-muted">
               {terminalAssistantContent(status)}

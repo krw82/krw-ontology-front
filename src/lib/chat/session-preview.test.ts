@@ -37,4 +37,25 @@ describe("buildSessionPreview", () => {
       }),
     ).toBe("첫 줄 둘째 줄");
   });
+
+  it("hides assistant internal narration from previews", () => {
+    expect(
+      buildSessionPreview({
+        role: "assistant",
+        content:
+          "Let me retrieve more evidence.분석 결과를 작성하겠습니다.\n\n---\n\n최종 답변입니다.",
+        status: "completed",
+      }),
+    ).toBe("최종 답변입니다.");
+  });
+
+  it("keeps user text that looks like an English instruction", () => {
+    expect(
+      buildSessionPreview({
+        role: "user",
+        content: "Let me retrieve라고 사용자가 직접 입력",
+        status: "completed",
+      }),
+    ).toBe("Let me retrieve라고 사용자가 직접 입력");
+  });
 });

@@ -1,3 +1,5 @@
+import { sanitizeAssistantContent } from "@/lib/chat/assistant-content";
+
 export interface CompanyPromptContext {
   ticker: string;
   documentTypes: string[];
@@ -99,7 +101,11 @@ export function sanitizePromptHistory(
       MAX_PROMPT_HISTORY_MESSAGE_CHARS,
       remainingChars,
     );
-    const content = truncatePromptText(message.content, perMessageLimit);
+    const rawContent =
+      message.role === "assistant"
+        ? sanitizeAssistantContent(message.content)
+        : message.content;
+    const content = truncatePromptText(rawContent, perMessageLimit);
     if (!content) continue;
 
     selected.unshift({

@@ -42,6 +42,14 @@ SQLite
 JSONL
 cache
 schema
+ontology quality
+artifact contract
+validation
+rejected object
+rejected_object
+index internals
+pipeline
+registry
 diagnostics
 object_id
 quote_id
@@ -80,6 +88,17 @@ traceable_direct
 traceable_related
 direct_answerable
 negative_answer_supported
+internal English investment brief
+ontology/MCP-aware
+retrieval surface
+evidence retrieval
+스키마
+온톨로지 품질
+아티팩트 계약
+검증 실패
+거절 객체
+인덱스 내부
+파이프라인
 ```
 
 ## Replacement style

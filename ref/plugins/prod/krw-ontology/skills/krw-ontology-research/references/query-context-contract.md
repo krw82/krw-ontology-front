@@ -85,6 +85,38 @@ not_answerable:
 do not force a conclusion
 ```
 
-## Sector/global note
+## Internal English investment brief
 
-For sector/global/macro questions, query_context should receive an internal English research brief and a bounded covered universe when possible. Do not send broad Korean topic text directly to query_context.
+For normal KRW ontology research, query_context should receive a concise internal English investment brief. Do not send broad Korean topic text directly to query_context.
+
+The brief is not a literal translation. Build it with awareness of the KRW ontology schema, evidence types, research packs, and MCP retrieval surface so it is optimized for ontology evidence retrieval.
+
+The English investment brief should preserve:
+
+```text
+user intent
+tickers and company names
+periods
+exact metrics
+comparison axes
+direct-exposure factors
+capital-allocation or cash-flow concepts
+```
+
+Map user intent to ontology-friendly retrieval concepts when useful:
+
+```text
+explanatory filing text / notes
+MD&A / management discussion
+segment commentary
+revenue recognition / RPO / backlog
+cost of revenue / gross margin / operating margin
+cash flow / FCF / capex
+business combinations / acquisitions
+share repurchases / dilution management
+SBC / R&D / talent investment
+direct exposure / related pressure channel
+business model / product platform / customer demand
+```
+
+For sector/global/macro questions, pair the internal English investment brief with a bounded covered universe when possible.

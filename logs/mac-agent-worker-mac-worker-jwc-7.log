@@ -3734,3 +3734,152 @@
 [agent-worker] idle { workerId: 'mac-worker-jwc-7' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-7' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] stopped { workerId: 'mac-worker-jwc-7' }
+[agent-worker] started { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-7' }
+[agent-worker] started { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-7' }
+[agent-worker] started { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-7',
+  runId: '34ef5791-95d8-40fe-ab3c-822225f5fb0b'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOG',
+    topic: 'Alphabet GOOG debt interest expense share repurchase share buyback diluted shares weighted average shares outstanding...',
+    periods: [ 'CY2025' ],
+    document_types: [ '10-K' ]
+  },
+  duration_ms: 960,
+  duration_s: 0.96,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_Y49zGFvx5ZRfQhGvnV2n0742',
+  tool_name: 'krw_ontology_query'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-7',
+  runId: '34ef5791-95d8-40fe-ab3c-822225f5fb0b'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-7' }

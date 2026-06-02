@@ -77,4 +77,23 @@ describe("buildSystemPrompt", () => {
     expect(sanitized[0]?.content.startsWith("0:")).toBe(false);
     expect(sanitized.at(-1)?.content.startsWith("11:")).toBe(true);
   });
+
+  it("removes assistant internal progress narration from prompt history", () => {
+    const sanitized = sanitizePromptHistory([
+      {
+        role: "assistant",
+        content:
+          "Let me retrieve more evidence.분석 결과를 작성하겠습니다.\n\n---\n\n최종 답변입니다.",
+      },
+      {
+        role: "user",
+        content: "Let me retrieve라고 사용자가 직접 쓴 질문은 유지",
+      },
+    ]);
+
+    expect(sanitized).toEqual([
+      { role: "assistant", content: "최종 답변입니다." },
+      { role: "user", content: "Let me retrieve라고 사용자가 직접 쓴 질문은 유지" },
+    ]);
+  });
 });

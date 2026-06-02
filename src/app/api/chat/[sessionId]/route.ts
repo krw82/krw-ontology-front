@@ -3,6 +3,7 @@ import { getAuthUser, handleAuthError, forbiddenError } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/api/validation";
 import { publicAgentErrorMessage } from "@/lib/api/chat/error-messages";
+import { sanitizeAssistantContent } from "@/lib/chat/assistant-content";
 import type {
   AgentRunRow,
   ChatSessionRow,
@@ -88,11 +89,19 @@ export async function GET(
 
   return Response.json({
     session,
-    messages: messages ?? [],
+    messages: (messages ?? []).map(toPublicMessage),
     runs: (runs ?? []).map(toPublicRunSummary),
     rich_answers: [],
     research_artifacts: [],
   });
+}
+
+function toPublicMessage(message: MessageRow): MessageRow {
+  if (message.role !== "assistant") return message;
+  return {
+    ...message,
+    content: sanitizeAssistantContent(message.content),
+  };
 }
 
 function toPublicRunSummary(run: Partial<AgentRunRow>) {
