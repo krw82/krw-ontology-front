@@ -14,6 +14,8 @@ Final answer = business interpretation grounded in filing evidence
 
 Do not copy ontology internals into user-facing prose.
 
+Internal ontology knowledge may be used for evidence selection, confidence calibration, routing decisions, and quality checks. It must not become the user-facing explanation.
+
 ## Candidate route vs evidence
 
 Projection and lookup tables are routing aids.
@@ -59,6 +61,47 @@ Internal: candidate route from company_topic_index.
 User-facing: The company disclosures point to the topic as a recurring business issue.
 ```
 
+## Explanatory text and notes first
+
+When the user asks what a company action, product/platform strategy, cost change, cash-flow pattern, or investment program means, prioritize explanatory filing text and notes:
+
+```text
+MD&A / management discussion
+financial statement notes
+segment notes
+revenue recognition notes
+RPO / backlog commentary
+SBC notes
+business combinations or acquisition notes
+share repurchase notes
+debt and liquidity notes
+risk-factor updates when they describe a specific current channel
+business, product, platform, customer, or demand descriptions
+```
+
+Numbers are evidence, not the answer. Use them internally to verify magnitude, direction, period alignment, and accounting treatment. In the final answer, translate the numbers into business and investor meaning.
+
+## Numeric evidence to investor language
+
+Prefer:
+
+```text
+The company is funding AI/platform expansion while preserving high FCF conversion.
+The cost structure is under pressure because subscription cost of revenue is rising faster than subscription revenue.
+The buyback looks partly like dilution management rather than a pure capital-return signal.
+The acquisition step-up began before the latest quarter, so the inflection should be dated to the earlier annual period and then reinforced by the latest quarter.
+```
+
+Avoid:
+
+```text
+long raw number tables when the question asks for meaning
+mixing P&L expenses, FCF calculation items, investing cash flows, and financing cash flows as the same layer
+adding R&D again as a post-FCF use of cash
+treating every buyback dollar as pure shareholder return
+attributing cost, revenue, or margin movement to AI/platform without explicit filing support
+```
+
 ## Sector/global answers
 
 For sector, macro, discovery, or multi-company basket questions, do not summarize object inventory.
@@ -98,6 +141,11 @@ lookup/index/table names
 raw object IDs
 tool routing
 coverage diagnostics
+internal English investment brief
+schema quality
+artifact contract
+validation or rejected-object mechanics
+pipeline, registry, or index internals
 ```
 
 Use them only for debug, audit, raw evidence, structured handoff, or developer-facing output.

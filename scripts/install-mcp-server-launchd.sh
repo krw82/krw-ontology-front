@@ -68,6 +68,7 @@ set +a
 MCP_SERVER_NICE=${MCP_SERVER_NICE:-${MAC_WORKER_NICE:--5}}
 MCP_LOG_DIR=${MCP_LOG_DIR:-"$HOME/Library/Logs/krw-ontology"}
 MCP_SERVER_MAXFILES=${MCP_SERVER_MAXFILES:-4096}
+KRW_ONTOLOGY_MCP_PORT=${KRW_ONTOLOGY_MCP_PORT:-8765}
 case "$MCP_SERVER_NICE" in
   -[0-9]*|[0-9]*) ;;
   *)
@@ -90,6 +91,78 @@ if [ "$MCP_SERVER_MAXFILES" -lt 256 ]; then
   echo "MCP_SERVER_MAXFILES must be at least 256: $MCP_SERVER_MAXFILES" >&2
   exit 1
 fi
+case "$KRW_ONTOLOGY_MCP_PORT" in
+  [0-9]*) ;;
+  *)
+    echo "KRW_ONTOLOGY_MCP_PORT must be a positive integer: $KRW_ONTOLOGY_MCP_PORT" >&2
+    exit 1
+    ;;
+esac
+if [ "$KRW_ONTOLOGY_MCP_PORT" -lt 1 ] || [ "$KRW_ONTOLOGY_MCP_PORT" -gt 65535 ]; then
+  echo "KRW_ONTOLOGY_MCP_PORT must be between 1 and 65535: $KRW_ONTOLOGY_MCP_PORT" >&2
+  exit 1
+fi
+
+mcp_listener_pids() {
+  if ! command -v lsof >/dev/null 2>&1; then
+    return 0
+  fi
+  lsof -nP -tiTCP:"$KRW_ONTOLOGY_MCP_PORT" -sTCP:LISTEN 2>/dev/null || true
+}
+
+is_managed_mcp_listener() {
+  pid=$1
+  command=$(ps -p "$pid" -o command= 2>/dev/null || true)
+  case "$command" in
+    *"krw-ontology-mcp"*"--port $KRW_ONTOLOGY_MCP_PORT"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+wait_for_mcp_port_release() {
+  attempts=${1:-10}
+  for _ in $(seq 1 "$attempts"); do
+    if [ -z "$(mcp_listener_pids)" ]; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+stop_lingering_mcp_listeners() {
+  pids=$(mcp_listener_pids)
+  if [ -z "$pids" ]; then
+    return 0
+  fi
+
+  for pid in $pids; do
+    if ! is_managed_mcp_listener "$pid"; then
+      echo "Port $KRW_ONTOLOGY_MCP_PORT is occupied by an unmanaged process: pid=$pid" >&2
+      ps -p "$pid" -o pid,command= >&2 || true
+      return 1
+    fi
+    echo "Stopping lingering MCP listener pid=$pid on port $KRW_ONTOLOGY_MCP_PORT"
+    kill "$pid" >/dev/null 2>&1 || true
+  done
+
+  if wait_for_mcp_port_release 5; then
+    return 0
+  fi
+
+  pids=$(mcp_listener_pids)
+  for pid in $pids; do
+    if ! is_managed_mcp_listener "$pid"; then
+      echo "Port $KRW_ONTOLOGY_MCP_PORT is still occupied by an unmanaged process: pid=$pid" >&2
+      ps -p "$pid" -o pid,command= >&2 || true
+      return 1
+    fi
+    echo "Force stopping lingering MCP listener pid=$pid on port $KRW_ONTOLOGY_MCP_PORT"
+    kill -KILL "$pid" >/dev/null 2>&1 || true
+  done
+
+  wait_for_mcp_port_release 5
+}
 
 if [ "$DRY_RUN" = "1" ]; then
   echo "Dry run: would install $PLIST and load com.krwontology.mcp-server=$LOAD"
@@ -114,6 +187,9 @@ if [ "$LOAD" != "1" ]; then
 fi
 
 launchctl bootout "$DOMAIN" "$PLIST" >/dev/null 2>&1 || true
+if ! wait_for_mcp_port_release 10; then
+  stop_lingering_mcp_listeners
+fi
 launchctl bootstrap "$DOMAIN" "$PLIST"
 launchctl enable "$DOMAIN/com.krwontology.mcp-server"
 launchctl kickstart -k "$DOMAIN/com.krwontology.mcp-server"

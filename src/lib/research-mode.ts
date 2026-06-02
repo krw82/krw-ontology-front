@@ -18,11 +18,6 @@ export const RESEARCH_MODE_DESCRIPTIONS: Record<ResearchMode, string> = {
 
 export interface ResearchModeToolBudget {
   maxToolCalls: number;
-  queryContext: number;
-  query: number;
-  retrieve: number;
-  traceChain: number;
-  compare: number;
 }
 
 export const RESEARCH_MODE_TOOL_BUDGETS: Record<
@@ -31,27 +26,12 @@ export const RESEARCH_MODE_TOOL_BUDGETS: Record<
 > = {
   fast: {
     maxToolCalls: 2,
-    queryContext: 1,
-    query: 1,
-    retrieve: 0,
-    traceChain: 0,
-    compare: 0,
   },
   standard: {
     maxToolCalls: 6,
-    queryContext: 1,
-    query: 3,
-    retrieve: 0,
-    traceChain: 2,
-    compare: 1,
   },
   deep: {
     maxToolCalls: 32,
-    queryContext: 4,
-    query: 12,
-    retrieve: 2,
-    traceChain: 16,
-    compare: 6,
   },
 };
 

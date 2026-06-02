@@ -11,6 +11,19 @@ Bad: FY2026, FY 2026
 
 If the issuer fiscal calendar matters, add only a short parenthetical note.
 
+## Default period anchor
+
+Unless the user asks for a specific historical period, specific filing, or long-horizon trend, start with the most recent available filing evidence by filing/period recency.
+
+Use older filings as baseline context:
+
+```text
+annual revenue mix
+business model baseline
+historical trend
+change, persistence, improvement, or deterioration
+```
+
 ## Recent/latest questions
 
 If the user says:
@@ -25,7 +38,7 @@ recent
 most recent
 ```
 
-start with the most recent available filing by filing/period recency. A newer 10-Q beats an older 10-K for current drivers; a latest 10-K is primary only when no newer 10-Q exists.
+the same default applies with extra force: start with the most recent available filing by filing/period recency. A newer 10-Q beats an older 10-K for current drivers, financial impact, cost, cash flow, risk, and management commentary; a latest 10-K is primary only when no newer 10-Q exists.
 
 Example: if the available documents are `CY2025 10-K` and `CY2026Q1 10-Q`, lead with `CY2026Q1 10-Q` for current drivers and use `CY2025 10-K` as annual mix/business baseline context.
 

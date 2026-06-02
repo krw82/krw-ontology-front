@@ -74,3 +74,11 @@ answer from covered companies and caveat coverage only if it changes interpretat
 ```
 
 The answer should not become a coverage report. It should explain what the covered company disclosures imply about the macro or sector question.
+
+Do not introduce non-covered companies, tickers, or peers in normal answers, comparison tables, or follow-up questions unless:
+
+```text
+the user explicitly asked for that company/ticker/peer
+coverage is confirmed through indexed/catalog/company metadata
+the answer clearly states that the company is outside the covered evidence set and the user asked for that caveat
+```

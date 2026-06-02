@@ -33,13 +33,9 @@ describe("research mode", () => {
     );
   });
 
-  it("limits fast mode to query_context plus one targeted query", () => {
-    expect(getResearchModeToolBudget("fast")).toMatchObject({
+  it("keeps fast mode to the smallest total cap and current narrow allowlist", () => {
+    expect(getResearchModeToolBudget("fast")).toEqual({
       maxToolCalls: 2,
-      queryContext: 1,
-      query: 1,
-      retrieve: 0,
-      traceChain: 0,
     });
     expect(getAllowedMcpToolsForResearchMode("fast")).toEqual([
       "krw_ontology_query_context",
@@ -48,13 +44,8 @@ describe("research mode", () => {
   });
 
   it("keeps standard mode narrower than deep mode", () => {
-    expect(getResearchModeToolBudget("standard")).toMatchObject({
+    expect(getResearchModeToolBudget("standard")).toEqual({
       maxToolCalls: 6,
-      queryContext: 1,
-      query: 3,
-      retrieve: 0,
-      traceChain: 2,
-      compare: 1,
     });
     expect(getAllowedMcpToolsForResearchMode("standard")).toContain(
       "krw_ontology_trace",

@@ -124,17 +124,19 @@ function toolResultMessage(index: number) {
   };
 }
 
-async function probeBudgetDenyMessage(params: {
+async function probeToolPermission(params: {
   existingTools: MCPToolName[];
   attemptedTool: MCPToolName;
-}): Promise<string> {
-  let denyMessage = "";
+  input?: Record<string, unknown>;
+  researchMode?: ResearchMode;
+}): Promise<{
+  permission: Awaited<ReturnType<typeof canUseTool>>;
+  result: Awaited<ReturnType<typeof runAgent>>;
+}> {
+  let permission: Awaited<ReturnType<typeof canUseTool>> | null = null;
   sdkMocks.query.mockImplementationOnce((call: {
     options: {
-      canUseTool?: (toolName: string) => Promise<{
-        behavior: "allow" | "deny";
-        message?: string;
-      }>;
+      canUseTool?: typeof canUseTool;
     };
   }) =>
     makeSdkQueryFromGenerator(async function* () {
@@ -143,10 +145,13 @@ async function probeBudgetDenyMessage(params: {
         yield toolResultMessage(index);
       }
 
-      const permission = await call.options.canUseTool?.(
+      permission = await call.options.canUseTool?.(
         sdkToolName(params.attemptedTool),
-      );
-      denyMessage = permission?.message ?? "";
+        params.input ?? {},
+      ) ?? {
+        behavior: "deny",
+        message: "Permission guard was not installed.",
+      };
 
       yield {
         type: "result",
@@ -167,7 +172,7 @@ async function probeBudgetDenyMessage(params: {
       scopeType: "company",
       defaultTickers: ["AAPL"],
       defaultDocumentTypes: [],
-      researchMode: "deep",
+      researchMode: params.researchMode ?? "deep",
     },
     {
       write: vi.fn().mockResolvedValue(undefined),
@@ -175,8 +180,8 @@ async function probeBudgetDenyMessage(params: {
   );
 
   expect(result.status).toBe("completed");
-  expect(denyMessage).toBeTruthy();
-  return denyMessage;
+  expect(permission).not.toBeNull();
+  return { permission: permission!, result };
 }
 
 describe("agent runner research budget recovery", () => {
@@ -185,14 +190,9 @@ describe("agent runner research budget recovery", () => {
     sdkMocks.getSessionInfo.mockResolvedValue(undefined);
   });
 
-  it("keeps the deep mode tool budget unchanged", () => {
+  it("keeps the deep mode total tool budget unchanged", () => {
     expect(getResearchModeToolBudget("deep")).toEqual({
       maxToolCalls: 32,
-      queryContext: 4,
-      query: 12,
-      retrieve: 2,
-      traceChain: 16,
-      compare: 6,
     });
   });
 
@@ -381,30 +381,16 @@ describe("agent runner research budget recovery", () => {
     expect(result.acc.toolCalls[0]?.finishedAt).toBeNull();
   });
 
-  it("recovers tool budget exhaustion by running a compose-only pass", async () => {
-    sdkMocks.query
-      .mockReturnValueOnce(
-        makeSdkQuery([
-          {
-            type: "result",
-            subtype: "error_during_execution",
-            errors: ["tool_budget_exceeded: query calls"],
-          },
-        ]),
-      )
-      .mockReturnValueOnce(
-        makeSdkQuery([
-          {
-            type: "result",
-            subtype: "success",
-            result: "Apple은 iPhone과 Services를 중심으로 매출을 창출합니다.",
-            usage: {
-              input_tokens: 10,
-              output_tokens: 12,
-            },
-          },
-        ]),
-      );
+  it("does not run a compose-only pass when the SDK errors before answer text", async () => {
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        {
+          type: "result",
+          subtype: "error_during_execution",
+          errors: ["tool_budget_exceeded: query calls"],
+        },
+      ]),
+    );
 
     const streamWriter = {
       write: vi.fn().mockResolvedValue(undefined),
@@ -422,152 +408,216 @@ describe("agent runner research budget recovery", () => {
       streamWriter,
     );
 
+    expect(result.status).toBe("failed");
+    expect(result.errorCode).toBe("tool_budget_exceeded");
+    expect(result.acc.fullText).toBe("");
+    expect(sdkMocks.query).toHaveBeenCalledTimes(1);
+
+    const researchCall = sdkMocks.query.mock.calls[0]?.[0];
+    expect(researchCall.prompt).toContain(
+      "/krw-ontology:krw-ontology-research",
+    );
+    expect(researchCall.options.allowedTools).toEqual(
+      expect.arrayContaining([
+        sdkToolName("krw_ontology_query_context"),
+        sdkToolName("krw_ontology_query"),
+      ]),
+    );
+  });
+
+  it("keeps the research pass answer when the SDK reports tool budget exhaustion after text", async () => {
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        {
+          type: "assistant",
+          message: {
+            content: [
+              {
+                type: "text",
+                text: "이미 수집된 근거 기준 최종 답변입니다.",
+              },
+            ],
+          },
+        },
+        {
+          type: "result",
+          subtype: "error_during_execution",
+          errors: ["tool_budget_exceeded: max tool calls"],
+          usage: {
+            input_tokens: 10,
+            output_tokens: 12,
+          },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "Apple 매출 구조를 정리해줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
     expect(result.status).toBe("completed");
     expect(result.errorCode).toBeUndefined();
-    expect(result.acc.fullText).toContain("iPhone과 Services");
-    expect(sdkMocks.query).toHaveBeenCalledTimes(2);
-
-    const composeCall = sdkMocks.query.mock.calls[1]?.[0];
-    expect(composeCall.options.allowedTools).toEqual([]);
-    expect(composeCall.options.resume).toBeUndefined();
-    expect(composeCall.options.sessionId).not.toBe(
-      "11111111-1111-4111-8111-111111111111",
-    );
-    expect(composeCall.options.disallowedTools).toEqual(
-      expect.arrayContaining(["Bash", "Read", "Write", "WebFetch"]),
-    );
-    expect(composeCall.prompt).toContain("Do not call any tools.");
+    expect(result.acc.fullText).toContain("최종 답변");
+    expect(sdkMocks.query).toHaveBeenCalledTimes(1);
   });
 
-  it("guides compare overflow toward existing evidence and one targeted query when query remains", async () => {
-    const budget = getResearchModeToolBudget("deep");
-    const message = await probeBudgetDenyMessage({
+  it("allows deep retrieve calls beyond the previous per-tool retrieve limit", async () => {
+    const { permission } = await probeToolPermission({
       existingTools: [
         "krw_ontology_query_context",
-        ...Array.from<MCPToolName>({ length: budget.compare }).fill("krw_ontology_compare"),
-      ],
-      attemptedTool: "krw_ontology_compare",
-    });
-
-    expect(message).toContain("Do not call krw_ontology_compare again");
-    expect(message).toContain("Use existing comparison evidence");
-    expect(message).toContain("one targeted krw_ontology_query");
-    expect(message).toContain("final Korean Markdown answer");
-  });
-
-  it("does not suggest query after compare overflow when query is already exhausted", async () => {
-    const budget = getResearchModeToolBudget("deep");
-    const message = await probeBudgetDenyMessage({
-      existingTools: [
-        "krw_ontology_query_context",
-        ...Array.from<MCPToolName>({ length: budget.query }).fill("krw_ontology_query"),
-        ...Array.from<MCPToolName>({ length: budget.compare }).fill("krw_ontology_compare"),
-      ],
-      attemptedTool: "krw_ontology_compare",
-    });
-
-    expect(message).toContain("Do not call krw_ontology_compare again");
-    expect(message).not.toContain("one targeted krw_ontology_query");
-    expect(message).toContain("final Korean Markdown answer");
-  });
-
-  it("guides query overflow toward trace or chain only when trace/chain remains", async () => {
-    const budget = getResearchModeToolBudget("deep");
-    const message = await probeBudgetDenyMessage({
-      existingTools: [
-        "krw_ontology_query_context",
-        ...Array.from<MCPToolName>({ length: budget.query }).fill("krw_ontology_query"),
-      ],
-      attemptedTool: "krw_ontology_query",
-    });
-
-    expect(message).toContain("Do not call krw_ontology_query again");
-    expect(message).toContain("krw_ontology_trace or krw_ontology_chain");
-    expect(message).toContain("final Korean Markdown answer");
-  });
-
-  it("does not suggest trace or chain after query overflow when trace/chain is exhausted", async () => {
-    const budget = getResearchModeToolBudget("deep");
-    const message = await probeBudgetDenyMessage({
-      existingTools: [
-        "krw_ontology_query_context",
-        ...Array.from<MCPToolName>({ length: budget.query }).fill("krw_ontology_query"),
-        ...Array.from<MCPToolName>({ length: budget.traceChain }).fill("krw_ontology_trace"),
-      ],
-      attemptedTool: "krw_ontology_query",
-    });
-
-    expect(message).toContain("Do not call krw_ontology_query again");
-    expect(message).not.toContain("krw_ontology_trace or krw_ontology_chain");
-    expect(message).toContain("final Korean Markdown answer");
-  });
-
-  it("guides trace or chain overflow directly to the final answer", async () => {
-    const budget = getResearchModeToolBudget("deep");
-    const message = await probeBudgetDenyMessage({
-      existingTools: [
-        "krw_ontology_query_context",
-        ...Array.from<MCPToolName>({ length: budget.traceChain }).fill("krw_ontology_trace"),
-      ],
-      attemptedTool: "krw_ontology_chain",
-    });
-
-    expect(message).toContain(
-      "Do not call krw_ontology_trace or krw_ontology_chain again",
-    );
-    expect(message).toContain("write the final Korean Markdown answer");
-  });
-
-  it("guides retrieve overflow away from retrieve and toward existing evidence", async () => {
-    const budget = getResearchModeToolBudget("deep");
-    const message = await probeBudgetDenyMessage({
-      existingTools: [
-        "krw_ontology_query_context",
-        ...Array.from<MCPToolName>({ length: budget.retrieve }).fill("krw_ontology_retrieve"),
+        "krw_ontology_retrieve",
+        "krw_ontology_retrieve",
       ],
       attemptedTool: "krw_ontology_retrieve",
     });
 
-    expect(message).toContain("Do not call krw_ontology_retrieve again");
-    expect(message).toContain("evidence already collected");
-    expect(message).toContain("one targeted krw_ontology_query");
+    expect(permission.behavior).toBe("allow");
+    if (permission.behavior === "allow") {
+      expect(permission.updatedInput).toEqual({
+        agent_context: {
+          tool_usage: {
+            total: 3,
+            krw_ontology_retrieve: 2,
+          },
+        },
+      });
+    }
   });
 
-  it("guides query_context overflow away from another context pass", async () => {
-    const budget = getResearchModeToolBudget("deep");
-    const message = await probeBudgetDenyMessage({
-      existingTools: Array.from<MCPToolName>({
-        length: budget.queryContext,
-      }).fill("krw_ontology_query_context"),
-      attemptedTool: "krw_ontology_query_context",
+  it("records retrieve tool usage metadata on repeated retrieve tool calls", async () => {
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        toolUseMessage("krw_ontology_retrieve", 1),
+        toolResultMessage(1),
+        toolUseMessage("krw_ontology_retrieve", 2),
+        toolResultMessage(2),
+        toolUseMessage("krw_ontology_retrieve", 3),
+        toolResultMessage(3),
+        {
+          type: "result",
+          subtype: "success",
+          result: "반복 retrieve 메타데이터 테스트 답변입니다.",
+          usage: {
+            input_tokens: 10,
+            output_tokens: 12,
+          },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "Apple 매출 구조를 정리해줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
+    expect(result.status).toBe("completed");
+    const thirdArgs = JSON.parse(result.acc.toolCalls[2]?.argumentsJson ?? "{}");
+    expect(thirdArgs.agent_context).toEqual({
+      tool_usage: {
+        total: 2,
+        krw_ontology_retrieve: 2,
+      },
     });
-
-    expect(message).toContain("Do not call krw_ontology_query_context again");
-    expect(message).toContain("Use the existing research state");
-    expect(message).toContain("one targeted krw_ontology_query");
   });
 
-  it("guides max tool call overflow to stop all tools and answer", async () => {
+  it("allows repeated deep query, trace, and compare calls while total cap remains", async () => {
+    const scenarios: Array<{
+      existingTools: MCPToolName[];
+      attemptedTool: MCPToolName;
+    }> = [
+      {
+        existingTools: [
+          "krw_ontology_query_context",
+          ...Array.from<MCPToolName>({ length: 12 }).fill("krw_ontology_query"),
+        ],
+        attemptedTool: "krw_ontology_query",
+      },
+      {
+        existingTools: [
+          "krw_ontology_query_context",
+          ...Array.from<MCPToolName>({ length: 16 }).fill("krw_ontology_trace"),
+        ],
+        attemptedTool: "krw_ontology_chain",
+      },
+      {
+        existingTools: [
+          "krw_ontology_query_context",
+          ...Array.from<MCPToolName>({ length: 6 }).fill("krw_ontology_compare"),
+        ],
+        attemptedTool: "krw_ontology_compare",
+      },
+    ];
+
+    for (const scenario of scenarios) {
+      const { permission } = await probeToolPermission(scenario);
+      expect(permission).toEqual({ behavior: "allow" });
+    }
+  });
+
+  it("denies only projected total tool-call overflow and still completes when the research pass answers", async () => {
     const budget = getResearchModeToolBudget("deep");
-    const traceCallsForTotalLimit =
-      budget.maxToolCalls -
-      budget.queryContext -
-      budget.query -
-      budget.retrieve -
-      budget.compare;
-    const message = await probeBudgetDenyMessage({
-      existingTools: [
-        ...Array.from<MCPToolName>({ length: budget.queryContext }).fill("krw_ontology_query_context"),
-        ...Array.from<MCPToolName>({ length: budget.query }).fill("krw_ontology_query"),
-        ...Array.from<MCPToolName>({ length: budget.retrieve }).fill("krw_ontology_retrieve"),
-        ...Array.from<MCPToolName>({ length: budget.compare }).fill("krw_ontology_compare"),
-        ...Array.from<MCPToolName>({ length: traceCallsForTotalLimit }).fill("krw_ontology_trace"),
-      ],
+    const { permission, result } = await probeToolPermission({
+      existingTools: Array.from<MCPToolName>({
+        length: budget.maxToolCalls,
+      }).fill("krw_ontology_query"),
       attemptedTool: "krw_ontology_chain",
     });
 
-    expect(message).toContain("No more KRW Ontology MCP tools");
-    expect(message).toContain("Do not call another tool");
-    expect(message).toContain("final Korean Markdown answer");
+    expect(result.status).toBe("completed");
+    expect(permission.behavior).toBe("deny");
+    if (permission.behavior === "deny") {
+      expect(permission.message).toContain("No more KRW Ontology MCP tools");
+      expect(permission.message).toContain("Do not call another tool");
+      expect(permission.message).toContain("final Korean Markdown answer");
+      expect(permission.message).not.toContain("krw_ontology_retrieve");
+      expect(permission.message).not.toContain("one targeted krw_ontology_query");
+    }
+  });
+
+  it("honors AGENT_MAX_TOOL_CALLS as a lower total cap without failing when the research pass answers", async () => {
+    const previousValue = process.env.AGENT_MAX_TOOL_CALLS;
+    process.env.AGENT_MAX_TOOL_CALLS = "3";
+
+    try {
+      const { permission, result } = await probeToolPermission({
+        existingTools: [
+          "krw_ontology_query_context",
+          "krw_ontology_query",
+          "krw_ontology_trace",
+        ],
+        attemptedTool: "krw_ontology_chain",
+      });
+
+      expect(result.status).toBe("completed");
+      expect(permission.behavior).toBe("deny");
+      if (permission.behavior === "deny") {
+        expect(permission.message).toContain("No more KRW Ontology MCP tools");
+      }
+    } finally {
+      if (previousValue === undefined) {
+        delete process.env.AGENT_MAX_TOOL_CALLS;
+      } else {
+        process.env.AGENT_MAX_TOOL_CALLS = previousValue;
+      }
+    }
   });
 });

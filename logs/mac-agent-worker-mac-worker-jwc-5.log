@@ -13155,3 +13155,778 @@
 [agent-worker] idle { workerId: 'mac-worker-jwc-5' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-5' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-5',
+  runId: 'c1772f01-de53-4fbc-a459-41d9b5a7d6e1'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 97124,
+  duration_s: 97.124,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_UDW4JQX83ZOA6jmAKvcO3103',
+  tool_name: 'krw_ontology_index_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    tickers: [
+      'NVDA', 'KO',
+      'GD',   'AMAT',
+      'ADI',  'STX',
+      'WDC'
+    ]
+  },
+  duration_ms: 15562,
+  duration_s: 15.562,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_TX6YeBt8UGA5yPmVw4nk2740',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NVDA',
+    topic: 'revenue growth, segment performance, demand environment, margin, data center, gaming from latest CY2026Q2 10-Q'
+  },
+  duration_ms: 10766,
+  duration_s: 10.766,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_nfxQlOP0rCAlkUNeeDXP5664',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'KO',
+    topic: 'revenue, volume, pricing, margin, operating performance from CY2026Q2 10-Q MD&A'
+  },
+  duration_ms: 10536,
+  duration_s: 10.536,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_2oIhPgX8yGT7IPpbWOsb1136',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AMAT',
+    topic: 'revenue, demand, wafer fab equipment, margin, segment trends from CY2026Q2 10-Q'
+  },
+  duration_ms: 9772,
+  duration_s: 9.772,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_03_x42CdpiU26aDufZEaPyf1076',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GD',
+    topic: 'revenue, margin, demand, backlog, segment performance from CY2026Q2 10-Q'
+  },
+  duration_ms: 10981,
+  duration_s: 10.981,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_hMfUBHwKYpohwiFRjyfx1116',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'ADI',
+    topic: 'revenue, demand, industrial, automotive, margin from CY2026Q2 10-Q'
+  },
+  duration_ms: 10167,
+  duration_s: 10.167,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_04_cZ8nDkXSu9itNuMAeTCf5307',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'STX',
+    topic: 'revenue, demand, HDD, cloud, margin from CY2026Q2 10-Q'
+  },
+  duration_ms: 7992,
+  duration_s: 7.992,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_e3EQxbsbsCV64KPXi7Ro3695',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'JPM',
+    topic: 'revenue, NII, loan, provision, margin from CY2026Q1 10-Q'
+  },
+  duration_ms: 6266,
+  duration_s: 6.266,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_04_F8g5GuWCwsvDJGd5cYgy2967',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'MSFT',
+    topic: 'revenue, cloud, Azure, AI, margin from CY2026Q1 10-Q'
+  },
+  duration_ms: 6935,
+  duration_s: 6.935,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_03_QIvRoegg5g3lmR3RGehq6270',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'revenue, demand, Services, iPhone, margin from CY2026Q1 10-Q'
+  },
+  duration_ms: 7684,
+  duration_s: 7.684,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_g69DrUHFiZhN3Rf6hTgN0706',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'WDC',
+    topic: 'revenue, demand, HDD, flash, margin from CY2026Q2 10-Q'
+  },
+  duration_ms: 8442,
+  duration_s: 8.442,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_SCnE2n07spIuZKSFQHOd3434',
+  tool_name: 'krw_ontology_query'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-5',
+  runId: 'c1772f01-de53-4fbc-a459-41d9b5a7d6e1'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] stopped { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] stopped { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }

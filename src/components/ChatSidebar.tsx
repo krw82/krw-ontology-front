@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, MouseEvent } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { buildChatSessionHref } from "@/lib/chat/history-state";
 import { useSessions } from "@/hooks/useSessions";
@@ -631,10 +632,18 @@ function DeleteSessionDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  return (
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setPortalTarget(document.body);
+  }, []);
+
+  if (!portalTarget) return null;
+
+  return createPortal(
     <AnimatePresence>
       {session && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/20 p-base">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/20 p-base">
           <motion.div
             className="w-full max-w-[360px] rounded-[8px] border border-hairline bg-canvas p-md shadow-xl"
             initial={{ opacity: 0, y: 8, scale: 0.98 }}
@@ -688,6 +697,7 @@ function DeleteSessionDialog({
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    portalTarget,
   );
 }
