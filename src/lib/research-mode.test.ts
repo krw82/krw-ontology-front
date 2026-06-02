@@ -70,14 +70,11 @@ describe("research mode", () => {
     );
   });
 
-  it("requires internal English briefs for broad sector/global research", () => {
+  it("keeps response detail guidance in each mode prompt", () => {
     for (const mode of ["fast", "standard", "deep"] as const) {
       const prompt = buildResearchModePrompt(mode);
-      expect(prompt).toContain("internal English research brief");
-      expect(prompt).toContain("MCP question/topic arguments must be English");
-      expect(prompt).toContain(
-        "Do not send Korean broad sector/global/macro/discovery",
-      );
+      expect(prompt).toContain("Never request response_detail: full");
+      expect(prompt).toContain(`Research mode: ${mode}.`);
     }
   });
 });

@@ -5,7 +5,7 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   query: vi.fn(),
 }));
 vi.mock("@/lib/ontology/catalog", () => ({
-  getIndexedCompany: vi.fn(),
+  getIndexedCompanies: vi.fn(),
 }));
 
 import { canUseTool } from "./runner";

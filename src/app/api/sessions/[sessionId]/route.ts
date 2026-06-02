@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import { forbiddenError, getAuthUser, handleAuthError } from "@/lib/auth";
 import { isPlainObject, isUuid } from "@/lib/api/validation";

@@ -16,6 +16,9 @@ export interface ChatSessionRow extends Record<string, unknown> {
   scope_type: "global" | "company";
   default_tickers: string[] | null;
   default_document_types: string[] | null;
+  last_message_preview: string | null;
+  last_message_at: string | null;
+  latest_run_status: AgentRunRow["status"] | null;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
@@ -26,7 +29,7 @@ export interface MessageRow extends Record<string, unknown> {
   session_id: string;
   role: "user" | "assistant" | "system";
   content: string;
-  status: "pending" | "streaming" | "completed" | "failed";
+  status: "pending" | "streaming" | "completed" | "failed" | "cancelled";
   request_id: string | null;
   created_at: string;
   updated_at: string;
@@ -405,11 +408,21 @@ export interface Database {
         Row: ChatSessionRow;
         Insert: Omit<
           ChatSessionRow,
-          "id" | "created_at" | "updated_at" | "client_request_id" | "deleted_at"
+          | "id"
+          | "created_at"
+          | "updated_at"
+          | "client_request_id"
+          | "deleted_at"
+          | "last_message_preview"
+          | "last_message_at"
+          | "latest_run_status"
         > & {
           id?: string;
           client_request_id?: string | null;
           deleted_at?: string | null;
+          last_message_preview?: string | null;
+          last_message_at?: string | null;
+          latest_run_status?: AgentRunRow["status"] | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -845,6 +858,22 @@ export interface Database {
           reservation_id: string | null;
           released_cost_usd: number;
         }>;
+      };
+      mark_agent_run_terminal: {
+        Args: {
+          p_run_id: string;
+          p_status: AgentRunRow["status"];
+          p_finished_at: string | null;
+          p_error_code: string | null;
+          p_error_message: string | null;
+          p_input_tokens: number | null;
+          p_output_tokens: number | null;
+          p_estimated_cost_usd: number | null;
+          p_latency_ms: number | null;
+          p_assistant_message_id: string | null;
+          p_open_tool_error_message: string | null;
+        };
+        Returns: boolean;
       };
       try_acquire_lease: {
         Args: {

@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import {
-  checkChatRunRateLimit,
-  getClientIp,
-} from "@/lib/api/chat/rate-limit";
+import { checkChatRunRateLimit } from "@/lib/api/chat/rate-limit";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/admin", () => ({
@@ -118,16 +115,5 @@ describe("chat run durable rate limit", () => {
     await expect(result.response.json()).resolves.toMatchObject({
       error: { code: "service_unavailable" },
     });
-  });
-});
-
-describe("getClientIp", () => {
-  it("prefers the first forwarded IP", () => {
-    const headers = new Headers({
-      "x-forwarded-for": "203.0.113.10, 10.0.0.1",
-      "x-real-ip": "198.51.100.8",
-    });
-
-    expect(getClientIp(headers)).toBe("203.0.113.10");
   });
 });

@@ -12,6 +12,7 @@ import {
   SITE_NAME,
   type QuestionTopicPage,
 } from "@/lib/marketing/site";
+import { getCspNonce } from "@/lib/security/csp-nonce";
 
 type QuestionPageProps = {
   params: Promise<{ topic: string }>;
@@ -47,6 +48,7 @@ export async function generateMetadata({
 export default async function QuestionTopicPage({
   params,
 }: QuestionPageProps) {
+  const nonce = await getCspNonce();
   const { topic: slug } = await params;
   const topic = findQuestionTopic(slug);
 
@@ -82,6 +84,7 @@ export default async function QuestionTopicPage({
   return (
     <div className="min-h-[100dvh] bg-canvas text-ink">
       <script
+        nonce={nonce}
         type="application/ld+json"
         suppressHydrationWarning
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

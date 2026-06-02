@@ -35,6 +35,9 @@ period-and-latest-policy.md
 trace-chain-policy.md
 - trace vs chain use cases and boundaries
 
+financial-statement-interpretation.md
+- FCF, OCF, capex, R&D, M&A cash spending, buyback, and capital-allocation interpretation rules
+
 forbidden-user-facing-language.md
 - phrases and internal terms that must not appear in normal answers
 

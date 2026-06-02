@@ -1,12 +1,28 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireEnv } from "@/lib/env";
-import { isDevAuthBypassEnabled } from "@/lib/dev-auth";
+import { isDevAuthBypassEnabledForHost } from "@/lib/dev-auth-runtime";
 import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
 import type { Database } from "@/types/database";
 
-export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+interface UpdateSessionOptions {
+  requestHeaderOverrides?: Headers;
+}
+
+export async function updateSession(
+  request: NextRequest,
+  { requestHeaderOverrides }: UpdateSessionOptions = {},
+) {
+  function nextResponseWithRequestHeaders() {
+    const headers = new Headers(request.headers);
+    requestHeaderOverrides?.forEach((value, key) => {
+      headers.set(key, value);
+    });
+
+    return NextResponse.next({ request: { headers } });
+  }
+
+  let supabaseResponse = nextResponseWithRequestHeaders();
   const protectedPaths = ["/chat", "/settings"];
   const isProtected = protectedPaths.some((p) =>
     request.nextUrl.pathname.startsWith(p),
@@ -25,7 +41,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (isDevAuthBypassEnabled()) {
+  if (isDevAuthBypassEnabledForHost(request.nextUrl.hostname)) {
     if (request.nextUrl.pathname === "/login") {
       const url = new URL(
         normalizeInternalNextPath(request.nextUrl.searchParams.get("next")),
@@ -49,7 +65,7 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
-          supabaseResponse = NextResponse.next({ request });
+          supabaseResponse = nextResponseWithRequestHeaders();
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options),
           );

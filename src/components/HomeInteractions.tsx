@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
 import { easeOutExpo } from "@/lib/animation";
 import { trackClientEventSilently } from "@/lib/analytics/client";
-import { DEV_AUTH_EMAIL, isDevAuthBypassEnabled } from "@/lib/dev-auth";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 const traceTransitionMs = 0.12;
@@ -96,15 +95,9 @@ function useHomeDemoStep(defaultStep: HomeDemoStep = "idle") {
 }
 
 export function HomeHeaderActions() {
-  const devAuthBypass = isDevAuthBypassEnabled();
-  const [userEmail, setUserEmail] = useState<string | null>(
-    devAuthBypass ? DEV_AUTH_EMAIL : null,
-  );
-  const [authChecked, setAuthChecked] = useState(devAuthBypass);
-  const supabase = useMemo(
-    () => (devAuthBypass ? null : createClient()),
-    [devAuthBypass],
-  );
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     if (!supabase) return;

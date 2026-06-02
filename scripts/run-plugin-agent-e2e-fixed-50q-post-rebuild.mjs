@@ -106,14 +106,6 @@ function normalizeToolName(name) {
   return i >= 0 ? name.slice(i + 2) : name;
 }
 
-function parseToolJson(text) {
-  if (!text || typeof text !== 'string') return null;
-  try { return JSON.parse(text); } catch {}
-  const m = text.match(/\{[\s\S]*\}/);
-  if (m) { try { return JSON.parse(m[0]); } catch {} }
-  return null;
-}
-
 function summarizeText(v, max = 1600) {
   const s = typeof v === 'string' ? v : JSON.stringify(v ?? '');
   return s.slice(0, max);

@@ -19,7 +19,7 @@
 | JSON-LD 구조화된 데이터 | **미구현** | 중간 |
 | HTTPS / 보안 헤더 | HSTS, CSP, X-Frame-Options 설정됨 | 양호 |
 | html lang="ko" | 설정됨 | 양호 |
-| 한국어 폰트 (Noto Sans KR) | 로드됨, display: swap | 양호 |
+| 한국어 폰트 | 시스템 폰트 스택 사용, 원격 폰트 의존 없음 | 양호 |
 | 모바일 반응형 | flex/grid 기반, min-h-[100dvh] 사용 | 양호 |
 | Core Web Vitals | 측정 전 — Next.js standalone + SWC 최적화 기대 | 측정 필요 |
 | 내부 링크 구조 | 홈 → 채팅/회사목록/프라이버시/약관만 연결 | 낮음 |

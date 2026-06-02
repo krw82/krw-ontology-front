@@ -1,4 +1,4 @@
-import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import type { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { ToolCallRow } from "@/types/database";
 
 type SupabaseAdmin = ReturnType<typeof getSupabaseAdmin>;

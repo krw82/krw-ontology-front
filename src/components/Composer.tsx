@@ -156,7 +156,7 @@ export default function Composer({
   const payloadLimit =
     attachments.length > 0 ? MAX_CHAT_PAYLOAD_CHARS : MAX_CHAT_MESSAGE_CHARS;
   const isOverLimit = composedLength > payloadLimit;
-  const isInputBusy = disabled || isSubmitting;
+  const isInputBusy = disabled || isSubmitting || !isClientReady;
   const canSubmit =
     composedLength > 0 && !isOverLimit && !isInputBusy && !isGenerating;
   const showGeneratingOverlay = isGenerating && !isComposerFocused && !value.trim();

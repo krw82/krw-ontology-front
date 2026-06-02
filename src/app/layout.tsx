@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono, Noto_Sans_KR } from "next/font/google";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import AnalyticsBootstrap from "@/components/analytics/AnalyticsBootstrap";
 import AppShell from "@/components/AppShell";
@@ -7,25 +7,6 @@ import { getSiteOrigin, SITE_DESCRIPTION, SITE_NAME } from "@/lib/marketing/site
 import "./globals.css";
 
 const googleSiteVerification = process.env.GOOGLE_SITE_VERIFICATION?.trim();
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-mono",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const notoSansKr = Noto_Sans_KR({
-  variable: "--font-noto-sans-kr",
-  subsets: ["latin"],
-  weight: "variable",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteOrigin()),
@@ -99,16 +80,16 @@ export const viewport: Viewport = {
   colorScheme: "only light",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Per-request CSP nonces require runtime rendering so Next can attach them.
+  await connection();
+
   return (
-    <html
-      lang="ko"
-      className={`${inter.variable} ${jetbrainsMono.variable} ${notoSansKr.variable} h-full antialiased`}
-    >
+    <html lang="ko" className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-canvas text-on-surface">
         <AnalyticsBootstrap />
         {/* L-05: Skip to content link for accessibility */}

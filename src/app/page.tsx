@@ -19,6 +19,7 @@ import {
   QuestionFormEntrance,
 } from "@/components/HeroSection";
 import { absoluteUrl, pageMetadata, SITE_NAME } from "@/lib/marketing/site";
+import { getCspNonce } from "@/lib/security/csp-nonce";
 
 export const metadata: Metadata = pageMetadata({
   title: "근거가 보이는 기업 분석 AI",
@@ -89,7 +90,8 @@ const browseLinks = [
   { href: "/pricing", label: "가격" },
 ] as const;
 
-export default function Home() {
+export default async function Home() {
+  const nonce = await getCspNonce();
   const websiteJsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
@@ -118,6 +120,7 @@ export default function Home() {
   return (
     <div className="min-h-[100dvh] overflow-x-hidden bg-canvas text-ink">
       <script
+        nonce={nonce}
         type="application/ld+json"
         suppressHydrationWarning
         dangerouslySetInnerHTML={{
@@ -125,6 +128,7 @@ export default function Home() {
         }}
       />
       <script
+        nonce={nonce}
         type="application/ld+json"
         suppressHydrationWarning
         dangerouslySetInnerHTML={{

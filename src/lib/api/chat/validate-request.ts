@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import type { ChatRunRequest, ErrorCode } from "@/types/api-contracts";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
 import { validateChatAttachments } from "@/lib/chat/attachments";
@@ -85,6 +85,18 @@ export async function validateRequest(
         "validation_error",
         "Missing required fields: content, request_id",
         normalizedRequestId || undefined,
+      ),
+    };
+  }
+
+  if (!isUuid(normalizedRequestId)) {
+    return {
+      ok: false,
+      response: errorResponse(
+        400,
+        "validation_error",
+        "request_id must be a valid UUID",
+        normalizedRequestId,
       ),
     };
   }

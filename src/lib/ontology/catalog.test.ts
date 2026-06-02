@@ -3,7 +3,9 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
   getActiveOntologyCatalogRelease,
   getIndexedCompany,
+  getIndexedCompanies,
   listIndexedCompanies,
+  searchIndexedCompanies,
 } from "./catalog";
 import type {
   OntologyCatalogReleaseRow,
@@ -82,6 +84,9 @@ const companyRows: OntologyCompanyRow[] = [
 
 class QueryMock {
   private filters = new Map<string, unknown>();
+  private inFilters = new Map<string, unknown[]>();
+  private search: string | null = null;
+  private rowLimit: number | null = null;
 
   constructor(private table: string) {}
 
@@ -94,7 +99,22 @@ class QueryMock {
     return this;
   }
 
+  in(key: string, values: unknown[]) {
+    this.inFilters.set(key, values);
+    return this;
+  }
+
+  or(filter: string) {
+    this.search = filter;
+    return this;
+  }
+
   order() {
+    return this;
+  }
+
+  limit(value: number) {
+    this.rowLimit = value;
     return this;
   }
 
@@ -129,9 +149,30 @@ class QueryMock {
     const rows = companyRows.filter(
       (company) =>
         company.env === this.filters.get("env") &&
-        company.release_id === this.filters.get("release_id"),
+        company.release_id === this.filters.get("release_id") &&
+        (!this.inFilters.has("ticker") ||
+          this.inFilters.get("ticker")?.includes(company.ticker)) &&
+        (!this.search || this.matchesSearch(company)),
     );
-    return { data: rows as T, error: null };
+    return {
+      data: rows.slice(0, this.rowLimit ?? rows.length) as T,
+      error: null,
+    };
+  }
+
+  private matchesSearch(company: OntologyCompanyRow) {
+    const match = this.search?.match(/name\.ilike\.\*([^*]+)\*/);
+    const query = match?.[1]?.toLowerCase();
+    if (!query) return true;
+    return [
+      company.ticker,
+      company.name,
+      company.description ?? "",
+      company.sector ?? "",
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(query);
   }
 }
 
@@ -180,6 +221,25 @@ describe("ontology catalog", () => {
       sector: "에너지",
       description: "Indexed ontology coverage for XOM.",
       document_count: 1,
+    });
+  });
+
+  it("batch loads tickers once and preserves requested ticker order", async () => {
+    const companies = await getIndexedCompanies([" xom ", "AAPL", "XOM", "MISS"]);
+
+    expect(companies.map((company) => company.ticker)).toEqual(["XOM", "AAPL"]);
+  });
+
+  it("searches indexed companies with a bounded DB-side query", async () => {
+    const companies = await searchIndexedCompanies({
+      query: "apple",
+      limit: 1,
+    });
+
+    expect(companies).toHaveLength(1);
+    expect(companies[0]).toMatchObject({
+      ticker: "AAPL",
+      name: "Apple Inc.",
     });
   });
 });

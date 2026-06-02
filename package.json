@@ -76,12 +76,12 @@
     "test:e2e:reuse": "PLAYWRIGHT_REUSE_SERVER=1 playwright test",
     "test:e2e:prod-chat": "node scripts/run-prod-chat-e2e.mjs",
     "verify:sdk-freeze": "node scripts/verify-sdk-freeze.mjs",
-    "supabase:login": "npx supabase login",
-    "supabase:orgs": "npx supabase orgs list",
-    "supabase:projects": "npx supabase projects list",
-    "supabase:link": "npx supabase link",
-    "supabase:db:push:dry": "npx supabase db push --dry-run",
-    "supabase:db:push": "npx supabase db push",
+    "supabase:login": "scripts/supabase-cli.sh login",
+    "supabase:orgs": "scripts/supabase-cli.sh orgs list",
+    "supabase:projects": "scripts/supabase-cli.sh projects list",
+    "supabase:link": "scripts/supabase-cli.sh link",
+    "supabase:db:push:dry": "scripts/supabase-cli.sh db push --dry-run",
+    "supabase:db:push": "scripts/supabase-cli.sh db push",
     "supabase:schema:smoke": "node scripts/supabase-schema-smoke.mjs"
   },
   "dependencies": {

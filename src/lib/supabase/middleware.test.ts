@@ -7,7 +7,7 @@ vi.mock("@supabase/ssr", () => ({
   createServerClient: vi.fn(),
 }));
 
-const ORIGINAL_DEV_AUTH_BYPASS = process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS;
+const ORIGINAL_DEV_AUTH_BYPASS = process.env.DEV_AUTH_BYPASS;
 
 function mockAuthUser(user: { id: string } | null) {
   vi.mocked(createServerClient).mockReturnValue({
@@ -27,12 +27,12 @@ describe("updateSession auth redirects", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
-    process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS = ORIGINAL_DEV_AUTH_BYPASS;
+    process.env.DEV_AUTH_BYPASS = ORIGINAL_DEV_AUTH_BYPASS;
   });
 
   it("redirects login to a normalized next path without preserving recursive next query", async () => {
     vi.stubEnv("NODE_ENV", "development");
-    process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS = "1";
+    process.env.DEV_AUTH_BYPASS = "1";
 
     const response = await updateSession(
       new NextRequest(
@@ -48,7 +48,7 @@ describe("updateSession auth redirects", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.example");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon");
-    process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS = "0";
+    process.env.DEV_AUTH_BYPASS = "0";
     mockAuthUser({ id: "user-1" });
 
     const response = await updateSession(
@@ -65,7 +65,7 @@ describe("updateSession auth redirects", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.example");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon");
-    process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS = "0";
+    process.env.DEV_AUTH_BYPASS = "0";
 
     const response = await updateSession(
       new NextRequest("http://localhost/?code=oauth-code&next=%2Fchat"),
@@ -82,7 +82,7 @@ describe("updateSession auth redirects", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.example");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon");
-    process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS = "0";
+    process.env.DEV_AUTH_BYPASS = "0";
     mockAuthUser(null);
 
     const indexResponse = await updateSession(
@@ -98,11 +98,37 @@ describe("updateSession auth redirects", () => {
     expect(detailResponse.headers.get("location")).toBeNull();
   });
 
+  it("forwards proxy request header overrides to upstream rendering", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    process.env.DEV_AUTH_BYPASS = "1";
+
+    const requestHeaderOverrides = new Headers();
+    requestHeaderOverrides.set("x-nonce", "nonce-for-render");
+    requestHeaderOverrides.set(
+      "Content-Security-Policy",
+      "script-src 'self' 'nonce-nonce-for-render'",
+    );
+
+    const response = await updateSession(
+      new NextRequest("http://localhost/companies"),
+      { requestHeaderOverrides },
+    );
+
+    expect(response.headers.get("x-middleware-request-x-nonce")).toBe(
+      "nonce-for-render",
+    );
+    expect(
+      response.headers.get(
+        "x-middleware-request-content-security-policy",
+      ),
+    ).toBe("script-src 'self' 'nonce-nonce-for-render'");
+  });
+
   it("still redirects anonymous chat requests to login", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.example");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon");
-    process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS = "0";
+    process.env.DEV_AUTH_BYPASS = "0";
     mockAuthUser(null);
 
     const response = await updateSession(

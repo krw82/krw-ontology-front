@@ -32,11 +32,22 @@ describe("reserveBudgetStep", () => {
       runCount: 2,
     });
 
-    const result = await reserveBudgetStep("user-1", "req-1");
+    const result = await reserveBudgetStep(
+      "user-1",
+      "req-1",
+      "user@example.test",
+      "deep",
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.budget.reservationId).toBe("reservation-1");
+    expect(reserveExecutionBudget).toHaveBeenCalledWith(
+      "user-1",
+      "req-1",
+      "user@example.test",
+      "deep",
+    );
   });
 
   it("maps internal budget failures to a 500 response", async () => {

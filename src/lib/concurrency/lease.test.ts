@@ -22,9 +22,28 @@ function createLeaseAdmin() {
     filters: Record<string, unknown>;
     lessThanFilters: Record<string, unknown>;
   }> = [];
-  const rpc = vi.fn().mockResolvedValue({
-    data: [{ id: "run-new" }],
-    error: null,
+  const rpc = vi.fn().mockImplementation((fnName: string, args: Record<string, unknown>) => {
+    if (fnName === "mark_agent_run_terminal") {
+      updates.push({
+        table: "agent_runs",
+        payload: {
+          status: args.p_status,
+          error_code: args.p_error_code,
+          error_message: args.p_error_message,
+          finished_at: args.p_finished_at,
+          lease_expires_at: null,
+        },
+        filters: { id: args.p_run_id },
+        inFilters: {},
+        nullFilters: {},
+      });
+      return Promise.resolve({ data: true, error: null });
+    }
+
+    return Promise.resolve({
+      data: [{ id: "run-new" }],
+      error: null,
+    });
   });
 
   const admin = {
@@ -172,10 +191,11 @@ describe("lease cleanup", () => {
         expect.objectContaining({
           table: "agent_runs",
           payload: expect.objectContaining({
-            status: "failed",
+            status: "expired",
             error_code: "lease_expired",
+            lease_expires_at: null,
           }),
-          inFilters: { id: ["run-expired"] },
+          filters: { id: "run-expired" },
         }),
         expect.objectContaining({
           table: "tool_calls",
@@ -199,6 +219,15 @@ describe("lease cleanup", () => {
           nullFilters: { released_at: null },
         }),
       ]),
+    );
+    expect(fake.rpc).toHaveBeenCalledWith(
+      "mark_agent_run_terminal",
+      expect.objectContaining({
+        p_run_id: "run-expired",
+        p_status: "expired",
+        p_error_code: "lease_expired",
+        p_open_tool_error_message: "Lease expired before tool result was received",
+      }),
     );
     expect(fake.rpc).toHaveBeenCalledWith(
       "try_acquire_lease",

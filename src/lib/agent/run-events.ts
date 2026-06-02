@@ -190,7 +190,19 @@ export function streamAgentRunEventsResponse(params: {
             return;
           }
 
-          await sendSyntheticTerminalEvent({
+          const terminalEventId = await loadEarliestTerminalEventId(
+            admin,
+            currentRunId,
+          );
+          if (terminalEventId != null) {
+            if (terminalEventId <= cursor) {
+              controller.close();
+              return;
+            }
+            continue;
+          }
+
+          const syntheticEvent = await createSyntheticTerminalEvent({
             admin,
             runId: currentRunId,
             sessionId,
@@ -199,7 +211,13 @@ export function streamAgentRunEventsResponse(params: {
             errorCode: latestStatus.error_code,
             requestId: latestStatus.request_id,
           });
-          continue;
+          await sendEvent(
+            syntheticEvent.eventType,
+            syntheticEvent.payload,
+            syntheticEvent.id ?? undefined,
+          );
+          controller.close();
+          return;
         }
 
         await new Promise((resolve) =>
@@ -288,6 +306,22 @@ async function loadEventsAfter(
   return data ?? [];
 }
 
+async function loadEarliestTerminalEventId(
+  admin: SupabaseAdmin,
+  runId: string,
+): Promise<number | null> {
+  const { data } = await admin
+    .from("agent_run_events")
+    .select("id")
+    .eq("run_id", runId)
+    .in("event_type", ["done", "error", "cancelled"])
+    .order("id", { ascending: true })
+    .limit(1)
+    .maybeSingle<{ id: number }>();
+
+  return data?.id ?? null;
+}
+
 async function loadRunStatus(
   admin: SupabaseAdmin,
   runId: string,
@@ -311,7 +345,7 @@ async function loadRunStatus(
   return data ?? null;
 }
 
-async function sendSyntheticTerminalEvent(params: {
+async function createSyntheticTerminalEvent(params: {
   admin: SupabaseAdmin;
   runId: string;
   sessionId: string;
@@ -319,17 +353,23 @@ async function sendSyntheticTerminalEvent(params: {
   status: RunStatus;
   errorCode: string | null;
   requestId: string;
-}) {
+}): Promise<{
+  eventType: StreamingEventType;
+  payload: unknown;
+  id: number | null;
+}> {
   const { admin, runId, sessionId, userId, status, errorCode, requestId } = params;
-  const latestEvents = await loadEventsAfter(admin, runId, 0);
-  if (latestEvents.some((event) => isTerminalEvent(event.event_type))) return;
 
   if (status === "cancelled") {
-    await appendAgentRunEvent(admin, runId, "cancelled", {
+    const payload = {
       run_id: runId,
       message_id: null,
-    });
-    return;
+    };
+    return {
+      eventType: "cancelled",
+      payload,
+      id: await appendAgentRunEvent(admin, runId, "cancelled", payload),
+    };
   }
 
   if (status === "failed" || status === "expired") {
@@ -339,20 +379,29 @@ async function sendSyntheticTerminalEvent(params: {
       runId,
       errorCode ?? "worker_expired",
     );
-    await appendAgentRunEvent(admin, runId, "error", {
+    const payload = {
       run_id: runId,
       error_code: errorCode ?? "internal_error",
       error_message: "분석이 완료되지 않았습니다. 다시 시도해주세요.",
-    });
-    return;
+    };
+    return {
+      eventType: "error",
+      payload,
+      id: await appendAgentRunEvent(admin, runId, "error", payload),
+    };
   }
 
-  await appendAgentRunEvent(admin, runId, "state_sync", {
+  const payload = {
     session_id: sessionId,
     run_id: runId,
     status,
     reason: "session_synced",
-  });
+  };
+  return {
+    eventType: "state_sync",
+    payload,
+    id: await appendAgentRunEvent(admin, runId, "state_sync", payload),
+  };
 }
 
 async function releaseExecutionBudget(

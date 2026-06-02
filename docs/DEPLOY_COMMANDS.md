@@ -253,6 +253,11 @@ npm run supabase:db:push
 npm run supabase:schema:smoke
 ```
 
+Supabase CLI는 `scripts/supabase-cli.sh`를 통해 실행한다. 이 wrapper는
+`SUPABASE_CLI`, local `node_modules/.bin`, PATH, `$HOME/.local/bin`, Homebrew
+경로 순서로 CLI를 찾는다. `npx supabase`는 darwin-arm64 native package
+해결이 불안정할 수 있어 배포 경로에서 직접 사용하지 않는다.
+
 `prod:deploy:code`는 migration dry-run만 수행한다.
 `prod:deploy:full`은 `--apply-migrations`가 포함되어 migration을 실제 apply한다.
 
@@ -337,4 +342,3 @@ DB migration, release, web, runtime을 모두 바꾼다
 상태를 본다
   npm run prod:status
 ```
-

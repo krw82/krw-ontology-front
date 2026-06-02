@@ -1,10 +1,10 @@
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import type { McpHealthResult } from "@/lib/agent/mcp-client";
 import { getReadyAgentWorker } from "@/lib/agent/worker-heartbeat";
 import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import {
   getActiveOntologyCatalogRelease,
-  getIndexedCompany,
+  getIndexedCompanies,
 } from "@/lib/ontology/catalog";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { AgentRunRow, ChatSessionRow } from "@/types/database";
@@ -21,6 +21,8 @@ import {
 import { enqueueAgentRun } from "@/lib/agent/job-queue";
 import { streamAgentRunEventsResponse } from "@/lib/agent/run-events";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
+import { parseChatAttachmentContent } from "@/lib/chat/attachments";
+import type { ChatRunRequest, ErrorCode } from "@/types/api-contracts";
 
 // --- Agent worker readiness cache ---
 
@@ -30,7 +32,6 @@ let workerReadinessCache: {
   timestamp: number;
 } | null = null;
 const WORKER_READINESS_TTL = 5_000;
-const ATTACHED_FILE_TAG_PATTERN = /<attached_file\s+name="[^"]*">/g;
 
 async function getCachedReadyWorkerHealth(
   expectedReleaseId: string,
@@ -56,7 +57,7 @@ async function getCachedReadyWorkerHealth(
 
 function errorResponse(
   status: number,
-  code: import("@/types/api-contracts").ErrorCode,
+  code: ErrorCode,
   message: string,
   requestId?: string
 ) {
@@ -127,7 +128,12 @@ export async function POST(request: NextRequest) {
   }
 
   // 5. Open an execution-budget record before creating durable chat work.
-  const budgetResult = await reserveBudgetStep(userId, request_id, userEmail);
+  const budgetResult = await reserveBudgetStep(
+    userId,
+    request_id,
+    userEmail,
+    body.research_mode,
+  );
   if (!budgetResult.ok) return budgetResult.response;
 
   // 6. Resolve session (lookup + ownership check)
@@ -266,7 +272,7 @@ async function findExistingRunForRequest(
 }
 
 async function getOrCreateSessionId(
-  body: import("@/types/api-contracts").ChatRunRequest,
+  body: ChatRunRequest,
   userId: string,
   requestId: string,
 ): Promise<{ ok: true; sessionId: string } | { ok: false; response: Response }> {
@@ -279,11 +285,12 @@ async function getOrCreateSessionId(
 
   if (scopeType === "company") {
     defaultTickers = defaultTickers.map((ticker) => ticker.trim().toUpperCase());
-    const indexedCompanies = await Promise.all(
-      defaultTickers.map((ticker) => getIndexedCompany(ticker)),
+    const indexedCompanies = await getIndexedCompanies(defaultTickers);
+    const indexedTickerSet = new Set(
+      indexedCompanies.map((company) => company.ticker),
     );
     const missingTicker = defaultTickers.find(
-      (_, index) => !indexedCompanies[index],
+      (ticker) => !indexedTickerSet.has(ticker),
     );
 
     if (missingTicker) {
@@ -350,5 +357,5 @@ async function getOrCreateSessionId(
 }
 
 function countAttachedFiles(content: string): number {
-  return content.match(ATTACHED_FILE_TAG_PATTERN)?.length ?? 0;
+  return parseChatAttachmentContent(content).attachments.length;
 }

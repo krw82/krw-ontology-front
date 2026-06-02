@@ -1,4 +1,7 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import "server-only";
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import type { WebSocketLikeConstructor } from "@supabase/realtime-js";
 import WebSocket from "ws";
 import { requireEnv } from "@/lib/env";

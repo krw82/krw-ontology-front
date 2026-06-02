@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+export { getClientIp } from "@/lib/http/client-ip";
 import type { ErrorCode } from "@/types/api-contracts";
 
 const WINDOW_SECONDS = 60;
@@ -54,17 +55,6 @@ function getWindowStart(now: Date): string {
   const windowStartSeconds =
     Math.floor(epochSeconds / WINDOW_SECONDS) * WINDOW_SECONDS;
   return new Date(windowStartSeconds * 1000).toISOString();
-}
-
-export function getClientIp(headers: Headers): string {
-  const forwardedFor = headers.get("x-forwarded-for");
-  const firstForwardedIp = forwardedFor?.split(",")[0]?.trim();
-  return (
-    firstForwardedIp ||
-    headers.get("x-real-ip")?.trim() ||
-    headers.get("cf-connecting-ip")?.trim() ||
-    "unknown"
-  );
 }
 
 function buildLimitChecks(args: RateLimitArgs): LimitCheck[] {

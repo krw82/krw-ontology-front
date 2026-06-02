@@ -270,6 +270,7 @@ describe("streamPersistedRunEvents", () => {
           payload: expect.objectContaining({
             status: "failed",
             error_code: "lease_expired",
+            lease_expires_at: null,
           }),
         }),
         expect.objectContaining({

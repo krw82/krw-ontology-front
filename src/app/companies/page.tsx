@@ -42,11 +42,14 @@ export default async function CompaniesPage() {
           stringValue(metadata?.photo_url),
       }
     : null;
+  const preserveInitialUserProfile =
+    user?.app_metadata?.provider === "dev-auth-bypass";
 
   return (
     <div className="min-h-[100dvh] bg-canvas">
       <TopNav
         initialUserProfile={initialUserProfile}
+        preserveInitialUserProfile={preserveInitialUserProfile}
         brandHref="/"
         brandAriaLabel="홈으로 이동"
         showSidebarTrigger

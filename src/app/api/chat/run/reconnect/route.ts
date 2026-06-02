@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { forbiddenError, getAuthUser, handleAuthError } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { streamAgentRunEventsResponse } from "@/lib/agent/run-events";

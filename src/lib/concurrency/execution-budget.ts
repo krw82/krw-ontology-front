@@ -7,6 +7,10 @@ import {
 import { getBillingPlanFromStore } from "@/lib/billing/plan-store";
 import { readFloatEnv } from "@/lib/env";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import {
+  normalizeResearchMode,
+  type ResearchMode,
+} from "@/lib/research-mode";
 import type { EntitlementStatus } from "@/types/entitlement";
 import type { Json } from "@/types/database";
 
@@ -16,6 +20,13 @@ const INPUT_COST_PER_1M = readFloatEnv("INPUT_COST_PER_MILLION", 3.0, {
 const OUTPUT_COST_PER_1M = readFloatEnv("OUTPUT_COST_PER_MILLION", 15.0, {
   min: 0,
 });
+const RESEARCH_MODE_RESERVE_COST_USD: Record<ResearchMode, number> = {
+  fast: readFloatEnv("FAST_RESEARCH_RESERVE_COST_USD", 0.05, { min: 0 }),
+  standard: readFloatEnv("STANDARD_RESEARCH_RESERVE_COST_USD", 0.15, {
+    min: 0,
+  }),
+  deep: readFloatEnv("DEEP_RESEARCH_RESERVE_COST_USD", 0.5, { min: 0 }),
+};
 
 export interface ExecutionBudgetCheckResult {
   allowed: boolean;
@@ -34,6 +45,12 @@ export interface ExecutionBudgetCheckResult {
 
 function roundUsd(value: number): number {
   return Math.round(Math.max(0, Number.isFinite(value) ? value : 0) * 1_000_000) / 1_000_000;
+}
+
+export function getResearchModeReserveCostUsd(
+  researchMode?: ResearchMode,
+): number {
+  return roundUsd(RESEARCH_MODE_RESERVE_COST_USD[normalizeResearchMode(researchMode)]);
 }
 
 function creditLimit(budgetUsd: number): number {
@@ -89,6 +106,7 @@ export async function reserveExecutionBudget(
   userId: string,
   requestId: string,
   userEmail?: string | null,
+  researchMode?: ResearchMode,
 ): Promise<ExecutionBudgetCheckResult> {
   const budget = await checkExecutionBudget(userId, userEmail);
   if (!budget.allowed || !budget.entitlement) return budget;
@@ -96,6 +114,9 @@ export async function reserveExecutionBudget(
 
   const plan = await getBillingPlanFromStore(budget.entitlement.plan.key);
   if (plan.unlimited) return budget;
+  const reserveCostUsd = roundUsd(
+    Math.max(plan.perRunReserveUsd, getResearchModeReserveCostUsd(researchMode)),
+  );
   const dailyBudgetUsd = getEffectiveDailyBudgetUsd(plan);
   const monthlyPeriod = getCurrentMonthlyBillingPeriod();
   const dailyPeriod = getCurrentDailyBillingPeriod();
@@ -109,7 +130,7 @@ export async function reserveExecutionBudget(
     p_daily_period_end: dailyPeriod.end,
     p_monthly_budget_usd: plan.monthlyBudgetUsd,
     p_daily_budget_usd: dailyBudgetUsd,
-    p_reserve_cost_usd: 0,
+    p_reserve_cost_usd: reserveCostUsd,
     p_expires_at: new Date(Date.now() + 30 * 60_000).toISOString(),
   });
 
@@ -133,6 +154,7 @@ export async function reserveExecutionBudget(
       dailyBudgetUsedUsd: Number(result?.daily_used_usd ?? budget.dailyBudgetUsedUsd),
       dailyBudgetReservedUsd: Number(result?.daily_reserved_usd ?? budget.dailyBudgetReservedUsd),
       dailyBudgetLimitUsd: Number(result?.daily_limit_usd ?? budget.dailyBudgetLimitUsd),
+      reserveCostUsd,
     };
   }
 
@@ -146,7 +168,7 @@ export async function reserveExecutionBudget(
     dailyBudgetUsedUsd: Number(result.daily_used_usd),
     dailyBudgetReservedUsd: Number(result.daily_reserved_usd),
     dailyBudgetLimitUsd: Number(result.daily_limit_usd),
-    reserveCostUsd: 0,
+    reserveCostUsd,
   };
 }
 

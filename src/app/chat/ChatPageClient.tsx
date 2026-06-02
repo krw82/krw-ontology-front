@@ -782,6 +782,7 @@ function ChatContent() {
                       key={msg.id}
                       role={msg.role}
                       content={msg.content}
+                      status={msg.status}
                       messageId={msg.role === "assistant" ? msg.id : undefined}
                       createdAt={
                         msg.role === "assistant" ? msg.created_at : undefined

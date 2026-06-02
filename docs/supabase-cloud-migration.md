@@ -36,7 +36,7 @@ If browser login is inconvenient, create a Supabase access token in the dashboar
 and run:
 
 ```bash
-npx supabase login --token "$SUPABASE_ACCESS_TOKEN"
+SUPABASE_CLI=/absolute/path/to/supabase scripts/supabase-cli.sh login --token "$SUPABASE_ACCESS_TOKEN"
 ```
 
 Check the organization id:
@@ -48,7 +48,7 @@ npm run supabase:orgs
 Create the cloud project:
 
 ```bash
-npx supabase projects create krw-ontology-prod \
+scripts/supabase-cli.sh projects create krw-ontology-prod \
   --org-id "<org-id>" \
   --region "<region>" \
   --db-password "<strong-db-password>"

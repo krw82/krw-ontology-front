@@ -25,7 +25,17 @@ export interface IndexedCompany {
   generated_at: string | null;
 }
 
+interface SearchIndexedCompaniesOptions {
+  query?: string | null;
+  limit?: number;
+}
+
 type UnknownRecord = Record<string, unknown>;
+
+const COMPANY_SELECT_COLUMNS =
+  "env, release_id, ticker, name, sector, description, latest_period, document_count, document_types, periods, coverage_json, documents_json, company_json, generated_at, created_at, updated_at";
+const DEFAULT_COMPANY_SEARCH_LIMIT = 50;
+const MAX_COMPANY_SEARCH_LIMIT = 100;
 
 const SECTOR_LABELS: Record<string, string> = {
   consumer: "소비재",
@@ -83,6 +93,10 @@ function stringValue(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function isNonEmptyString(value: string | null): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
 function stringArrayValue(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
@@ -112,6 +126,32 @@ function trimSentence(text: string, maxLength = 260): string {
   const normalized = text.replace(/\s+/g, " ").trim();
   if (normalized.length <= maxLength) return normalized;
   return `${normalized.slice(0, maxLength - 1).trimEnd()}...`;
+}
+
+function normalizeCompanySearchQuery(query: string | null | undefined): string {
+  return (query ?? "")
+    .replace(/[^\p{L}\p{N}\s.-]/gu, " ")
+    .replace(/[,%*()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+}
+
+function clampCompanySearchLimit(limit: number | undefined): number {
+  if (!Number.isSafeInteger(limit) || !limit || limit < 1) {
+    return DEFAULT_COMPANY_SEARCH_LIMIT;
+  }
+  return Math.min(limit, MAX_COMPANY_SEARCH_LIMIT);
+}
+
+function companySearchFilter(query: string): string {
+  const pattern = `*${query}*`;
+  return [
+    `ticker.ilike.${pattern}`,
+    `name.ilike.${pattern}`,
+    `description.ilike.${pattern}`,
+    `sector.ilike.${pattern}`,
+  ].join(",");
 }
 
 function iconForCompany(row: OntologyCompanyRow): string {
@@ -210,9 +250,7 @@ export async function listIndexedCompanies(): Promise<IndexedCompany[]> {
 
   const { data, error } = await getSupabaseAdmin()
     .from("ontology_companies")
-    .select(
-      "env, release_id, ticker, name, sector, description, latest_period, document_count, document_types, periods, coverage_json, documents_json, company_json, generated_at, created_at, updated_at",
-    )
+    .select(COMPANY_SELECT_COLUMNS)
     .eq("env", env)
     .eq("release_id", release.release_id)
     .order("ticker", { ascending: true })
@@ -223,6 +261,67 @@ export async function listIndexedCompanies(): Promise<IndexedCompany[]> {
   }
 
   return (data ?? []).map(companyFromRow);
+}
+
+export async function searchIndexedCompanies(
+  options: SearchIndexedCompaniesOptions = {},
+): Promise<IndexedCompany[]> {
+  const env = getOntologyEnv();
+  const release = await getActiveOntologyCatalogRelease(env);
+  if (!release) return [];
+
+  const query = normalizeCompanySearchQuery(options.query);
+  const limit = clampCompanySearchLimit(options.limit);
+  const builder = getSupabaseAdmin()
+    .from("ontology_companies")
+    .select(COMPANY_SELECT_COLUMNS)
+    .eq("env", env)
+    .eq("release_id", release.release_id)
+    .order("ticker", { ascending: true })
+    .limit(limit);
+
+  const { data, error } = await (query
+    ? builder.or(companySearchFilter(query))
+    : builder
+  ).returns<OntologyCompanyRow[]>();
+
+  if (error) {
+    throw new Error(`Failed to search ontology catalog companies: ${error.message}`);
+  }
+
+  return (data ?? []).map(companyFromRow);
+}
+
+export async function getIndexedCompanies(
+  tickers: string[],
+): Promise<IndexedCompany[]> {
+  const normalizedTickers = Array.from(
+    new Set(tickers.map(normalizeTicker).filter(isNonEmptyString)),
+  );
+  if (normalizedTickers.length === 0) return [];
+
+  const env = getOntologyEnv();
+  const release = await getActiveOntologyCatalogRelease(env);
+  if (!release) return [];
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("ontology_companies")
+    .select(COMPANY_SELECT_COLUMNS)
+    .eq("env", env)
+    .eq("release_id", release.release_id)
+    .in("ticker", normalizedTickers)
+    .returns<OntologyCompanyRow[]>();
+
+  if (error) {
+    throw new Error(`Failed to read ontology catalog companies: ${error.message}`);
+  }
+
+  const companiesByTicker = new Map(
+    (data ?? []).map((row) => [row.ticker, companyFromRow(row)]),
+  );
+  return normalizedTickers
+    .map((ticker) => companiesByTicker.get(ticker))
+    .filter((company): company is IndexedCompany => Boolean(company));
 }
 
 export async function getIndexedCompany(
@@ -237,9 +336,7 @@ export async function getIndexedCompany(
 
   const { data, error } = await getSupabaseAdmin()
     .from("ontology_companies")
-    .select(
-      "env, release_id, ticker, name, sector, description, latest_period, document_count, document_types, periods, coverage_json, documents_json, company_json, generated_at, created_at, updated_at",
-    )
+    .select(COMPANY_SELECT_COLUMNS)
     .eq("env", env)
     .eq("release_id", release.release_id)
     .eq("ticker", normalized)

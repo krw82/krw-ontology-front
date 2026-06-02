@@ -19,6 +19,7 @@ import {
 import { getBillingPlanFromStore } from "@/lib/billing/plan-store";
 import { heartbeatAgentRun } from "@/lib/agent/job-queue";
 import { closeOpenToolCallsForRun } from "@/lib/agent/tool-call-cleanup";
+import { markAgentRunTerminal } from "@/lib/agent/run-lifecycle";
 import { getCurrentBillingPeriod } from "@/lib/billing/period";
 import { getOntologyEnv, readIntEnv } from "@/lib/env";
 import { isAdminEntitlementEmail } from "@/lib/billing/admin-emails";
@@ -26,6 +27,11 @@ import {
   publicAgentErrorMessage,
   publicErrorMessage,
 } from "@/lib/api/chat/error-messages";
+import { cancelledAssistantContent } from "@/lib/chat/message-status";
+import {
+  isSdkDiagnosticsEnabled,
+  mergeSdkDiagnosticsForPersistence,
+} from "@/lib/agent/sdk-diagnostics";
 import { MAX_PROMPT_HISTORY_MESSAGES } from "@/lib/agent/system-prompt";
 import type {
   AgentRunRow,
@@ -71,6 +77,21 @@ class AgentRunHardTimeoutError extends Error {
   }
 }
 
+class AgentJobLoadError extends Error {
+  readonly runId?: string;
+  readonly assistantMessageId?: string;
+
+  constructor(
+    message: string,
+    context: { runId?: string; assistantMessageId?: string } = {},
+  ) {
+    super(message);
+    this.name = "AgentJobLoadError";
+    this.runId = context.runId;
+    this.assistantMessageId = context.assistantMessageId;
+  }
+}
+
 interface AgentJob {
   run: Pick<
     AgentRunRow,
@@ -93,7 +114,25 @@ interface AgentJob {
 
 export async function runAgentJob(runId: string, workerId: string) {
   const admin = getSupabaseAdmin();
-  const job = await loadAgentJob(admin, runId);
+  let job: AgentJob | null;
+
+  try {
+    job = await loadAgentJob(admin, runId);
+  } catch (err) {
+    const loadError =
+      err instanceof AgentJobLoadError
+        ? err
+        : new AgentJobLoadError(
+            err instanceof Error ? err.message : "Agent job load failed",
+            { runId },
+          );
+    console.warn("[agent-worker] job load failed", {
+      runId,
+      error: loadError.message,
+    });
+    await failUnloadedAgentJob(admin, runId, loadError);
+    return;
+  }
 
   if (!job) {
     console.warn("[agent-worker] job not found", { runId });
@@ -326,19 +365,26 @@ async function loadAgentJob(
   admin: SupabaseAdmin,
   runId: string,
 ): Promise<AgentJob | null> {
-  const { data: run } = await admin
+  const { data: run, error: runError } = await admin
     .from("agent_runs")
     .select("id, session_id, user_message_id, assistant_message_id, request_id, started_at")
     .eq("id", runId)
     .maybeSingle<AgentJob["run"]>();
 
+  if (runError) {
+    throw new AgentJobLoadError(
+      `Agent run load failed: ${formatSupabaseError(runError)}`,
+      { runId },
+    );
+  }
+
   if (!run?.assistant_message_id) return null;
 
   const [
-    { data: session },
-    { data: userMessage },
-    { data: previousMessages },
-    { data: runStartedEvent },
+    sessionResult,
+    userMessageResult,
+    previousMessagesResult,
+    runStartedEventResult,
   ] =
     await Promise.all([
       admin
@@ -372,6 +418,50 @@ async function loadAgentJob(
         .maybeSingle<{ payload: Json }>(),
     ]);
 
+  const loadContext = {
+    runId: run.id,
+    assistantMessageId: run.assistant_message_id,
+  };
+
+  if (sessionResult.error) {
+    throw new AgentJobLoadError(
+      `Agent session load failed: ${formatSupabaseError(sessionResult.error)}`,
+      loadContext,
+    );
+  }
+
+  if (userMessageResult.error) {
+    throw new AgentJobLoadError(
+      `Agent user message load failed: ${formatSupabaseError(
+        userMessageResult.error,
+      )}`,
+      loadContext,
+    );
+  }
+
+  if (previousMessagesResult.error) {
+    throw new AgentJobLoadError(
+      `Agent history load failed: ${formatSupabaseError(
+        previousMessagesResult.error,
+      )}`,
+      loadContext,
+    );
+  }
+
+  if (runStartedEventResult.error) {
+    throw new AgentJobLoadError(
+      `Agent run started event load failed: ${formatSupabaseError(
+        runStartedEventResult.error,
+      )}`,
+      loadContext,
+    );
+  }
+
+  const session = sessionResult.data;
+  const userMessage = userMessageResult.data;
+  const previousMessages = previousMessagesResult.data;
+  const runStartedEvent = runStartedEventResult.data;
+
   if (!session || !userMessage) return null;
   const startedPayload = isRecord(runStartedEvent?.payload)
     ? runStartedEvent.payload
@@ -385,6 +475,52 @@ async function loadAgentJob(
     history: [...(previousMessages ?? [])].reverse(),
     researchMode: normalizeResearchMode(startedPayload.research_mode),
   };
+}
+
+function formatSupabaseError(error: { code?: string; message?: string }) {
+  const message = error.message ?? "Unknown database error";
+  return error.code ? `${error.code}: ${message}` : message;
+}
+
+async function failUnloadedAgentJob(
+  admin: SupabaseAdmin,
+  requestedRunId: string,
+  error: AgentJobLoadError,
+) {
+  const failedRunId = error.runId ?? requestedRunId;
+  const finishedAt = new Date().toISOString();
+  const publicMessage = publicErrorMessage("internal_error");
+
+  if (error.assistantMessageId) {
+    await admin
+      .from("messages")
+      .update({
+        content: "",
+        status: "failed",
+      })
+      .eq("id", error.assistantMessageId);
+  }
+
+  await markAgentRunTerminal(admin, failedRunId, {
+    status: "failed",
+    finishedAt,
+    errorCode: "internal_error",
+    errorMessage: error.message,
+    openToolErrorMessage: error.message,
+  });
+
+  await closeOpenToolCallsForRun({
+    admin,
+    runId: failedRunId,
+    finishedAt,
+    errorMessage: error.message,
+  });
+
+  await appendAgentRunEvent(admin, failedRunId, "error", {
+    run_id: failedRunId,
+    error_code: "internal_error",
+    error_message: publicMessage,
+  });
 }
 
 function startHeartbeat(
@@ -430,25 +566,15 @@ function createSdkDiagnosticsRecorder(
   admin: SupabaseAdmin,
   runId: string,
 ): ((diagnostics: SdkDiagnostics) => Promise<void>) | undefined {
-  if (
-    process.env.CLAUDE_SDK_DIAGNOSTICS !== "1" &&
-    process.env.NODE_ENV !== "development" &&
-    process.env.WEB_COMMIT !== "dev"
-  ) {
-    return undefined;
-  }
+  if (!isSdkDiagnosticsEnabled()) return undefined;
 
   let mergedDiagnostics: Record<string, unknown> = {};
 
   return async (diagnostics: SdkDiagnostics) => {
-    mergedDiagnostics = {
-      ...mergedDiagnostics,
-      ...diagnostics,
-      observedModels:
-        diagnostics.observedModels ??
-        (mergedDiagnostics.observedModels as string[] | undefined),
-      updatedAt: new Date().toISOString(),
-    };
+    mergedDiagnostics = mergeSdkDiagnosticsForPersistence(
+      mergedDiagnostics,
+      diagnostics,
+    );
 
     await admin
       .from("agent_runs")
@@ -620,13 +746,7 @@ async function handleCompletedJob(params: {
 }) {
   const { admin, job, runStartedAt, result, release, sendEvent } = params;
   const { acc } = result;
-  const visibleAnswer = normalizeUserFacingPeriodLabels(acc.fullText.trim());
-  const answerVerifier = buildAnswerVerifierDiagnostics(
-    job.userMessage.content,
-    visibleAnswer,
-    acc,
-    job.researchMode,
-  );
+  const visibleAnswer = acc.fullText.trim();
   const estimatedCost = estimateCost(acc.inputTokens, acc.outputTokens);
   const finishedAt = new Date().toISOString();
   const latencyMs = Date.now() - new Date(runStartedAt).getTime();
@@ -639,18 +759,15 @@ async function handleCompletedJob(params: {
     })
     .eq("id", job.assistantMessageId);
 
-  await admin
-    .from("agent_runs")
-    .update({
-      status: "completed",
-      finished_at: finishedAt,
-      input_tokens: acc.inputTokens,
-      output_tokens: acc.outputTokens,
-      estimated_cost_usd: estimatedCost,
-      latency_ms: latencyMs,
-      lease_expires_at: null,
-    })
-    .eq("id", job.run.id);
+  await markAgentRunTerminal(admin, job.run.id, {
+    status: "completed",
+    finishedAt,
+    inputTokens: acc.inputTokens,
+    outputTokens: acc.outputTokens,
+    estimatedCostUsd: estimatedCost,
+    latencyMs,
+    openToolErrorMessage: "Run completed before tool result was received",
+  });
 
   await closeOpenToolCallsForRun({
     admin,
@@ -669,7 +786,6 @@ async function handleCompletedJob(params: {
       input_tokens: acc.inputTokens,
       output_tokens: acc.outputTokens,
       tool_call_count: acc.toolCalls.length,
-      answer_verifier: answerVerifier,
     },
   );
 
@@ -692,7 +808,6 @@ async function handleCompletedJob(params: {
       tool_call_count: acc.toolCalls.length,
       estimated_cost_usd: estimatedCost,
       research_mode: job.researchMode,
-      answer_verifier_flags: answerVerifier.flags,
     },
   });
 
@@ -714,7 +829,6 @@ async function handleCompletedJob(params: {
       latency_ms: latencyMs,
     },
     execution_budget: await loadExecutionBudgetStatus(job.session.user_id),
-    answer_diagnostics: answerVerifier,
   });
 }
 
@@ -747,59 +861,6 @@ function releaseSnapshot(mcpHealth: McpHealthResult): Json {
   );
 }
 
-function normalizeUserFacingPeriodLabels(answer: string): string {
-  return answer.replace(
-    /\bFY\s?(20\d{2})(?:\s?Q([1-4]))?\b/gi,
-    (_match, year: string, quarter: string | undefined) =>
-      `CY${year}${quarter ? `Q${quarter}` : ""}`,
-  );
-}
-
-function buildAnswerVerifierDiagnostics(
-  question: string,
-  answer: string,
-  acc: AccumulatedRun,
-  researchMode: ResearchMode,
-) {
-  const flags: string[] = [];
-  const latestRequested = /최근|latest|recent|최근\s*분기|latest quarter/i.test(question);
-  const fyLabelUsed = /\bFY\s?20\d{2}\b/i.test(answer);
-  const internalTermLeak = /\b(research_pack|kernel|object_id|trace_status|metric_lineage|agent_autonomy|allowed_next_tools)\b/i.test(answer);
-  const latestQuarterMentioned = /\b(10-q|quarter|q[1-4]|분기|3개월|six months|three months)\b/i.test(answer);
-  const retrieveCount = acc.toolCalls.filter((tool) => tool.toolName === "krw_ontology_retrieve").length;
-  const queryContextCount = acc.toolCalls.filter((tool) => tool.toolName === "krw_ontology_query_context").length;
-  const traceChainCount = acc.toolCalls.filter(
-    (tool) => tool.toolName === "krw_ontology_trace" || tool.toolName === "krw_ontology_chain",
-  ).length;
-
-  if (fyLabelUsed) flags.push("fy_label_used");
-  if (internalTermLeak) flags.push("internal_term_leak");
-  if (latestRequested && !latestQuarterMentioned) flags.push("latest_question_without_quarter_context");
-  if (researchMode !== "deep" && retrieveCount > 0) flags.push("retrieve_used_outside_deep");
-  if (researchMode === "fast" && traceChainCount > 0) flags.push("fast_mode_trace_or_chain_used");
-  if (queryContextCount === 0 && /krw|apple|aapl|msft|amzn|meta|jpm|bac/i.test(question)) {
-    flags.push("missing_query_context_first_pass");
-  }
-
-  return {
-    version: "answer_verifier_v0.1",
-    research_mode: researchMode,
-    flags,
-    checks: {
-      fy_label_used: fyLabelUsed,
-      internal_term_leak: internalTermLeak,
-      latest_requested: latestRequested,
-      latest_quarter_mentioned: latestQuarterMentioned,
-      retrieve_count: retrieveCount,
-      query_context_count: queryContextCount,
-      trace_chain_count: traceChainCount,
-      tool_call_count: acc.toolCalls.length,
-      answer_char_count: answer.length,
-      question_char_count: question.length,
-    },
-  };
-}
-
 async function handleCancelledJob(params: {
   admin: SupabaseAdmin;
   job: AgentJob;
@@ -813,20 +874,17 @@ async function handleCancelledJob(params: {
   await admin
     .from("messages")
     .update({
-      content: result.acc.fullText || "",
-      status: "failed",
+      content: cancelledAssistantContent(result.acc.fullText),
+      status: "cancelled",
     })
     .eq("id", job.assistantMessageId);
 
-  await admin
-    .from("agent_runs")
-    .update({
-      status: "cancelled",
-      finished_at: finishedAt,
-      error_code: "cancelled",
-      lease_expires_at: null,
-    })
-    .eq("id", job.run.id);
+  await markAgentRunTerminal(admin, job.run.id, {
+    status: "cancelled",
+    finishedAt,
+    errorCode: "cancelled",
+    openToolErrorMessage: "Run was cancelled before tool result was received",
+  });
 
   await closeOpenToolCallsForRun({
     admin,
@@ -868,19 +926,19 @@ async function handleFailedJob(params: {
   const finishedAt = new Date().toISOString();
   const estimatedCost = estimateCost(result.acc.inputTokens, result.acc.outputTokens);
 
-  await admin
-    .from("agent_runs")
-    .update({
-      status: errorCode === "lease_expired" ? "expired" : "failed",
-      finished_at: finishedAt,
-      error_code: errorCode,
-      error_message: rawErrorMessage,
-      input_tokens: result.acc.inputTokens,
-      output_tokens: result.acc.outputTokens,
-      estimated_cost_usd: estimatedCost,
-      lease_expires_at: null,
-    })
-    .eq("id", job.run.id);
+  await markAgentRunTerminal(admin, job.run.id, {
+    status: errorCode === "lease_expired" ? "expired" : "failed",
+    finishedAt,
+    errorCode,
+    errorMessage: rawErrorMessage,
+    inputTokens: result.acc.inputTokens,
+    outputTokens: result.acc.outputTokens,
+    estimatedCostUsd: estimatedCost,
+    openToolErrorMessage:
+      errorCode === "lease_expired"
+        ? "Agent hard timeout or worker lease expired before tool result was received"
+        : `Run failed before tool result was received: ${rawErrorMessage}`,
+  });
 
   await admin
     .from("messages")

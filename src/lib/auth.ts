@@ -5,11 +5,11 @@ import {
   DEV_AUTH_EMAIL,
   DEV_AUTH_NAME,
   DEV_AUTH_USER_ID,
-  isDevAuthBypassEnabled,
 } from "@/lib/dev-auth";
+import { isDevAuthBypassEnabled } from "@/lib/dev-auth-server";
 
 export async function getAuthUser(): Promise<User | null> {
-  if (isDevAuthBypassEnabled()) {
+  if (await isDevAuthBypassEnabled()) {
     return {
       id: DEV_AUTH_USER_ID,
       aud: "authenticated",

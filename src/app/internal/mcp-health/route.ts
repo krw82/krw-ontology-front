@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "crypto";
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { getReadyAgentWorker } from "@/lib/agent/worker-heartbeat";
 import { getOntologyEnv } from "@/lib/env";
 import { getActiveOntologyCatalogRelease } from "@/lib/ontology/catalog";

@@ -18,3 +18,3290 @@
 [agent-worker] idle { workerId: 'mac-worker-jwc-6' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-6' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] started { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-6',
+  runId: '360aaafe-d314-476b-b11f-c5346f725aa3'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'AAPL' },
+  duration_ms: 246,
+  duration_s: 0.246,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_i9Mg7TQb74rse2kT8wtz1415',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple revenue segment breakdown iPhone Services Mac iPad Wearables business model'
+  },
+  duration_ms: 4690,
+  duration_s: 4.69,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_mDOzburtA7rw6Za5YkID8264',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple recent revenue drivers latest quarter MD&A commentary growth'
+  },
+  duration_ms: 4314,
+  duration_s: 4.314,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_xMKKoKuEpMexs35Bhm9C3473',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple segment revenue iPhone Services Mac iPad Wearables Home Accessories quarterly annual net sales percentage'
+  },
+  duration_ms: 1247,
+  duration_s: 1.247,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_WeEsncbFzHVOTizUz04b9140',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'AAPL CY2025 CY2026Q1 revenue segment performance growth decline product category'
+  },
+  duration_ms: 790,
+  duration_s: 0.79,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_JMUtf4COQkJKBJYHT5wh1560',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'iPhone revenue net sales annual quarterly segment results'
+  },
+  duration_ms: 2546,
+  duration_s: 2.546,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_7lF3HHbRe2zRGDfelwDt9172',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Services revenue net sales Apple annual quarterly App Store Apple Music iCloud AppleCare'
+  },
+  duration_ms: 2170,
+  duration_s: 2.17,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_m1YWr72Zxcd7N4dCFPiW5939',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Mac iPad Wearables Home Accessories revenue net sales segment annual'
+  },
+  duration_ms: 1797,
+  duration_s: 1.797,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_bskm8QZXDBJFLUT6nyEQ2313',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Services net sales revenue 2025 2024 annual segment advertising cloud App Store AppleCare licensing'
+  },
+  duration_ms: 2589,
+  duration_s: 2.589,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_HI9kwTDNtGBA0953OMIk5917',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple Wearables Home Accessories Wearables segment net sales revenue 2025 2024 Apple Watch AirPods'
+  },
+  duration_ms: 2053,
+  duration_s: 2.053,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_b6S08utbM5K2LC0ejFf55636',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple total net sales revenue 2025 2024 2023 annual segment breakdown product iPhone percentage Services'
+  },
+  duration_ms: 1571,
+  duration_s: 1.571,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_GRofBNF0PgGATTr9526x7021',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple segment net sales CY2025 iPhone Services Mac iPad Wearables dollar amount millions'
+  },
+  duration_ms: 491,
+  duration_s: 0.491,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_uv0cD4BUgmGg9DnKPkVf1768',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 831,
+  duration_s: 0.831,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_jkZ7GbootB3vu4MvdSoi9574',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'AAPL' },
+  duration_ms: 298,
+  duration_s: 0.298,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_yBqwz21AB4JbRxr60T047583',
+  tool_name: 'krw_ontology_retrieve'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'AAPL' },
+  duration_ms: 328,
+  duration_s: 0.328,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_BhKgQMPXXO7dub91pgtU8269',
+  tool_name: 'krw_ontology_retrieve'
+}
+[agent-run-lifecycle] terminal RPC failed; falling back {
+  runId: '360aaafe-d314-476b-b11f-c5346f725aa3',
+  status: 'completed',
+  code: 'PGRST202',
+  message: 'Could not find the function public.mark_agent_run_terminal(p_assistant_message_id, p_error_code, p_error_message, p_estimated_cost_usd, p_finished_at, p_input_tokens, p_latency_ms, p_open_tool_error_message, p_output_tokens, p_run_id, p_status) in the schema cache'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-6',
+  runId: '360aaafe-d314-476b-b11f-c5346f725aa3'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-6' }
+[agent-worker] started { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-6',
+  runId: 'cfadf1e7-fd26-495b-a917-91f67a4b46d3'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'AAPL' },
+  duration_ms: 766,
+  duration_s: 0.766,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_z2yVVnwYow5WwLfiPE114120',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'AAPL' },
+  duration_ms: 1014,
+  duration_s: 1.014,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_sAN0ftl9GQKv20Frs8WL4765',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple business model revenue segments iPhone Services Mac iPad Wearables'
+  },
+  duration_ms: 1022,
+  duration_s: 1.022,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_ntVxk0NOCSUvDbm7funf2716',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple iPhone revenue performance latest filing MD&A segment sales growth driver'
+  },
+  duration_ms: 328,
+  duration_s: 0.328,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_4Q1yIf95l5tAp4ZeRCcV3743',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple revenue growth driver Services segment growth installed base paid subscriptions recent performance'
+  },
+  duration_ms: 473,
+  duration_s: 0.473,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_0GTYcyAgTRFOcBCK7I4c6946',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple CY2026Q1 revenue segment performance iPhone Services Mac iPad Wearables',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 235,
+  duration_s: 0.235,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_2BtNRU15b4zSvBMF5kJa1990',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple net sales revenue segment iPhone Services Mac iPad Wearables product mix share',
+    periods: [ 'CY2025' ]
+  },
+  duration_ms: 587,
+  duration_s: 0.587,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_YKEvBGUahfekqjCt8GVL3988',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 5101,
+  duration_s: 5.101,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_8JJhixk9cUv2tMLjMQRS8929',
+  tool_name: 'krw_ontology_chain'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple products iPhone Mac iPad Wearables home accessories hardware products description lineup'
+  },
+  duration_ms: 177,
+  duration_s: 0.177,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_Zg2B24SQvU7WPvOwadl32647',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple segment net sales iPhone Services Mac iPad Wearables revenue percentage revenue share of total',
+    object_types: [ 'MetricObservation', 'Calculation', 'XBRLFact' ]
+  },
+  duration_ms: 33934,
+  duration_s: 33.934,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_TUDeKjdT7NjxjuW2Sko47646',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple net sales products segment iPhone Services Mac iPad Wearables revenue amount',
+    object_types: [ 'MetricObservation', 'XBRLFact' ]
+  },
+  duration_ms: 13441,
+  duration_s: 13.441,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_JKqlRHIpszSaZ9IwR4F01078',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple total net sales revenue products segment total company',
+    object_types: [ 'MetricObservation', 'Calculation' ],
+    periods: [ 'CY2025' ]
+  },
+  duration_ms: 32476,
+  duration_s: 32.476,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_CObRNEGCDnha7OQAHfi44142',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 3052,
+  duration_s: 3.052,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_ex01juHabYzfZrGXaSzp9001',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple iPhone revenue net sales segment product financial results MD&A management discussion latest filing',
+    periods: [ 'CY2025' ]
+  },
+  duration_ms: 505,
+  duration_s: 0.505,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_ZrChfcbyzSviycWBqEaa6981',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple 10-Q MD&A net sales revenue segment performance drivers quarterly filing',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 621,
+  duration_s: 0.621,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_XjVrNlQFLM3YQmhMqVKh2728',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple revenue segment sales product iPhone Services Mac iPad Wearables',
+    object_types: [ 'XBRLFact' ]
+  },
+  duration_ms: 7124,
+  duration_s: 7.124,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_2UJV3046w3rkVUmB8nc95005',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'AAPL' },
+  duration_ms: 6409,
+  duration_s: 6.409,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_lrYxzLvdbaFo7LZfUlmm3441',
+  tool_name: 'krw_ontology_retrieve'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-6',
+  runId: 'cfadf1e7-fd26-495b-a917-91f67a4b46d3'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-6',
+  runId: 'd6e32e48-601d-4f7f-b2c3-83bf6d79405d'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'AAPL' },
+  duration_ms: 637,
+  duration_s: 0.637,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_wvo3USsuxMAi3rdFNbGv5914',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Apple Intelligence artificial intelligence AI features iPhone demand upgrade cycle',
+    periods: [ 'CY2025', 'CY2026Q1' ]
+  },
+  duration_ms: 177,
+  duration_s: 0.177,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_rUiwzLVCChHq16jFSf5q2522',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'iPhone average selling price ASP revenue unit sales volume upgrade cycle replacement rate customer demand'
+  },
+  duration_ms: 795,
+  duration_s: 0.795,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_27xR7lMWcDgk2PbsaZyG7288',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 4978,
+  duration_s: 4.978,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_G4j1iws48nC7qI7cV3OD7471',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 5014,
+  duration_s: 5.014,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_KCGayY0kG2oSV11xKeRl9972',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'iPhone net sales revenue Pro models product mix premium demand growth',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 1286,
+  duration_s: 1.286,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_367rFqXvHoerdgAhTlE09469',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 5152,
+  duration_s: 5.152,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_2hBErY42nvm4hFi1yk822045',
+  tool_name: 'krw_ontology_chain'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'iPhone revenue growth drivers Pro models product mix premium Americas segment sales price',
+    periods: [ 'CY2026Q1', 'CY2025' ]
+  },
+  duration_ms: 805,
+  duration_s: 0.805,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_UPW0qZcbgRWxZj35I8Np1337',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'iPhone revenue net sales segment Services Mac iPad Wearables',
+    object_types: [ 'MetricObservation', 'XBRLFact' ],
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 4096,
+  duration_s: 4.096,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_IKMChHcERQDQnbgFgAPs7867',
+  tool_name: 'krw_ontology_query'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-6',
+  runId: 'd6e32e48-601d-4f7f-b2c3-83bf6d79405d'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-6' }

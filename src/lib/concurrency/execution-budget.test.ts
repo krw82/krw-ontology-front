@@ -5,6 +5,7 @@ import type { EntitlementStatus } from "@/types/entitlement";
 import {
   checkExecutionBudget,
   getExecutionBudgetStatus,
+  getResearchModeReserveCostUsd,
   reserveExecutionBudget,
 } from "./execution-budget";
 
@@ -82,6 +83,12 @@ describe("execution budget", () => {
     expect(result.reserveCostUsd).toBe(0);
   });
 
+  it("defines mode-based reservation floors", () => {
+    expect(getResearchModeReserveCostUsd("fast")).toBe(0.05);
+    expect(getResearchModeReserveCostUsd("standard")).toBe(0.15);
+    expect(getResearchModeReserveCostUsd("deep")).toBe(0.5);
+  });
+
   it("allows runs when any execution budget remains", async () => {
     vi.mocked(getEntitlementStatus).mockResolvedValue(
       entitlement({
@@ -114,7 +121,7 @@ describe("execution budget", () => {
     expect(result.reason).toBe("cost_cap_exceeded");
   });
 
-  it("opens an execution budget record without reserving credits", async () => {
+  it("opens an execution budget record with a research-mode reservation", async () => {
     vi.mocked(getEntitlementStatus).mockResolvedValue(entitlement());
     const rpc = vi.fn().mockResolvedValue({
       data: [
@@ -123,10 +130,10 @@ describe("execution budget", () => {
           reason: null,
           reservation_id: "reservation-1",
           monthly_used_usd: 0.5,
-          monthly_reserved_usd: 0,
+          monthly_reserved_usd: 0.5,
           monthly_limit_usd: 20,
           daily_used_usd: 0.1,
-          daily_reserved_usd: 0,
+          daily_reserved_usd: 0.5,
           daily_limit_usd: 20,
         },
       ],
@@ -134,11 +141,13 @@ describe("execution budget", () => {
     });
     vi.mocked(getSupabaseAdmin).mockReturnValue({ rpc } as never);
 
-    const result = await reserveExecutionBudget("user-1", "req-1");
+    const result = await reserveExecutionBudget("user-1", "req-1", null, "deep");
 
     expect(result.allowed).toBe(true);
     expect(result.reservationId).toBe("reservation-1");
-    expect(result.budgetReservedUsd).toBe(0);
+    expect(result.budgetReservedUsd).toBe(0.5);
+    expect(result.dailyBudgetReservedUsd).toBe(0.5);
+    expect(result.reserveCostUsd).toBe(0.5);
     expect(rpc).toHaveBeenCalledWith(
       "reserve_execution_budget",
       expect.objectContaining({
@@ -146,7 +155,7 @@ describe("execution budget", () => {
         p_request_id: "req-1",
         p_monthly_budget_usd: 20,
         p_daily_budget_usd: 20,
-        p_reserve_cost_usd: 0,
+        p_reserve_cost_usd: 0.5,
       }),
     );
   });

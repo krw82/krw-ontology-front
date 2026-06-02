@@ -10,6 +10,7 @@ import {
   QUESTION_TOPIC_PAGES,
   SITE_NAME,
 } from "@/lib/marketing/site";
+import { getCspNonce } from "@/lib/security/csp-nonce";
 
 export const metadata: Metadata = pageMetadata({
   title: "기업 리서치 질문 그래프",
@@ -19,7 +20,8 @@ export const metadata: Metadata = pageMetadata({
   noIndex: true,
 });
 
-export default function QuestionsIndexPage() {
+export default async function QuestionsIndexPage() {
+  const nonce = await getCspNonce();
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
@@ -45,6 +47,7 @@ export default function QuestionsIndexPage() {
   return (
     <div className="min-h-[100dvh] bg-canvas text-ink">
       <script
+        nonce={nonce}
         type="application/ld+json"
         suppressHydrationWarning
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

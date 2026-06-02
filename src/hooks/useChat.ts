@@ -13,12 +13,15 @@ import type {
   ReleaseMetadata,
   ErrorCode,
   GetChatSessionResponse,
+  GetChatEvidenceResponse,
   Session,
   ResearchActivityUpdate,
   MCPToolName,
+  ToolCall,
 } from "@/types/api-contracts";
 import { getChatContentLimit } from "@/lib/chat-limits";
 import { deriveLoadedChatState } from "@/lib/chat/history-state";
+import { removeOptimisticUserMessage } from "@/lib/chat/optimistic-message";
 import { createClientId } from "@/lib/client-id";
 import {
   DEFAULT_RESEARCH_MODE,
@@ -105,6 +108,35 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   );
 }
 
+function mapToolCallState(toolCall: ToolCall): ToolCallState {
+  return {
+    tool_call_id: toolCall.tool_use_id ?? toolCall.id,
+    tool_name: toolCall.tool_name,
+    status: toolCall.error_message
+      ? "failed"
+      : toolCall.finished_at
+        ? "completed"
+        : "running",
+    arguments: isPlainObject(toolCall.arguments_json)
+      ? toolCall.arguments_json
+      : undefined,
+    result_summary: toolCall.result_summary,
+    started_at: toolCall.started_at
+      ? new Date(toolCall.started_at).getTime()
+      : undefined,
+    finished_at: toolCall.finished_at
+      ? new Date(toolCall.finished_at).getTime()
+      : undefined,
+  };
+}
+
+function latestCompletedAssistantMessageId(messages: Message[]) {
+  return [...messages]
+    .reverse()
+    .find((message) => message.role === "assistant" && message.status === "completed")
+    ?.id;
+}
+
 function activityForTool(toolName: MCPToolName): ResearchActivityUpdate {
   if (
     toolName === "krw_ontology_catalog" ||
@@ -163,13 +195,17 @@ export function useChat({
   const sendInFlightRef = useRef(false);
   const sessionSyncRequestedRef = useRef(false);
   const streamGenerationRef = useRef(0);
+  const mountedRef = useRef(false);
 
   useEffect(() => {
     statusRef.current = state.status;
   }, [state.status]);
 
   useEffect(() => {
+    mountedRef.current = true;
+
     return () => {
+      mountedRef.current = false;
       abortRef.current?.abort();
       streamGenerationRef.current += 1;
       sendInFlightRef.current = false;
@@ -506,6 +542,10 @@ export function useChat({
       streamingContentRef.current =
         loaded.status === "running" ? "" : loaded.streamingContent;
       sessionSyncRequestedRef.current = false;
+      const evidenceMessageId =
+        loaded.status === "completed"
+          ? latestCompletedAssistantMessageId(loaded.messages)
+          : undefined;
 
       setState((prev) => ({
         ...prev,
@@ -525,26 +565,8 @@ export function useChat({
           loaded.status === "running" ? "" : loaded.streamingContent,
         runId: loaded.activeRunId,
         runStartedAt: loaded.activeRunStartedAt,
-        toolCalls: (data.tool_calls ?? []).map((toolCall) => ({
-          tool_call_id: toolCall.tool_use_id ?? toolCall.id,
-          tool_name: toolCall.tool_name,
-          status: toolCall.error_message
-            ? "failed"
-            : toolCall.finished_at
-              ? "completed"
-              : "running",
-          arguments: isPlainObject(toolCall.arguments_json)
-            ? toolCall.arguments_json
-            : undefined,
-          result_summary: toolCall.result_summary,
-          started_at: toolCall.started_at
-            ? new Date(toolCall.started_at).getTime()
-            : undefined,
-          finished_at: toolCall.finished_at
-            ? new Date(toolCall.finished_at).getTime()
-            : undefined,
-        })),
-        citations: (data.citations ?? []) as ChatCitation[],
+        toolCalls: [],
+        citations: [],
         runDurationsByMessageId: Object.fromEntries(
           (data.runs ?? [])
             .filter(
@@ -576,6 +598,45 @@ export function useChat({
             }
           : {}),
       }));
+
+      if (evidenceMessageId) {
+        void fetch(
+          `/api/chat/${encodeURIComponent(targetSessionId)}/evidence?message_id=${encodeURIComponent(evidenceMessageId)}`,
+        )
+          .then(async (evidenceResponse) => {
+            if (!evidenceResponse.ok) return null;
+            return (await evidenceResponse.json()) as GetChatEvidenceResponse;
+          })
+          .then((evidence) => {
+            if (
+              !evidence ||
+              !mountedRef.current ||
+              activeSessionIdRef.current !== targetSessionId ||
+              evidence.message_id !== evidenceMessageId
+            ) {
+              return;
+            }
+
+            setState((prev) => {
+              if (
+                prev.status !== "completed" ||
+                latestCompletedAssistantMessageId(prev.messages) !==
+                  evidenceMessageId
+              ) {
+                return prev;
+              }
+
+              return {
+                ...prev,
+                toolCalls: evidence.tool_calls.map(mapToolCallState),
+                citations: evidence.citations as ChatCitation[],
+              };
+            });
+          })
+          .catch(() => {
+            // Evidence is supplemental; the session itself has already loaded.
+          });
+      }
 
       return true;
     } catch {
@@ -958,12 +1019,27 @@ export function useChat({
         sendInFlightRef.current = false;
         activeRequestIdRef.current = null;
         abortRef.current = null;
+        if ((err as Error).name === "AbortError") {
+          setState((prev) => ({
+            ...prev,
+            messages: removeOptimisticUserMessage(prev.messages, userMessage.id),
+            status: "cancelled",
+            isHydratingSession: false,
+            activity: null,
+            runStartedAt: null,
+          }));
+          return {
+            ok: false,
+            message: "응답 생성을 취소했습니다.",
+          };
+        }
         const message =
           err instanceof Error
             ? err.message
             : "메시지를 보내지 못했습니다. 네트워크 상태를 확인해주세요.";
         setState((prev) => ({
           ...prev,
+          messages: removeOptimisticUserMessage(prev.messages, userMessage.id),
           status: "failed",
           isHydratingSession: false,
           error: message,
@@ -986,6 +1062,7 @@ export function useChat({
         }
         setState((prev) => ({
           ...prev,
+          messages: removeOptimisticUserMessage(prev.messages, userMessage.id),
           status: "failed",
           isHydratingSession: false,
           error: message,

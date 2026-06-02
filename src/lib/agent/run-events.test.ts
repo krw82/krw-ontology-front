@@ -69,6 +69,7 @@ function createEventAdmin(params: {
         },
         select() {
           const filters: Record<string, unknown> = {};
+          const inFilters: Record<string, unknown[]> = {};
           const nullFilters: Record<string, null> = {};
           let greaterThanId = 0;
           let queryLimit = 100;
@@ -76,6 +77,10 @@ function createEventAdmin(params: {
           const query = {
             eq(key: string, value: unknown) {
               filters[key] = value;
+              return query;
+            },
+            in(key: string, values: unknown[]) {
+              inFilters[key] = values;
               return query;
             },
             is(key: string, value: null) {
@@ -94,6 +99,22 @@ function createEventAdmin(params: {
               return query;
             },
             maybeSingle() {
+              if (table === "agent_run_events") {
+                const row =
+                  events.find((event) => {
+                    const matchesFilters = Object.entries(filters).every(
+                      ([key, value]) =>
+                        event[key as keyof AgentRunEventRow] === value,
+                    );
+                    const matchesInFilters = Object.entries(inFilters).every(
+                      ([key, values]) =>
+                        values.includes(event[key as keyof AgentRunEventRow]),
+                    );
+                    return matchesFilters && matchesInFilters;
+                  }) ?? null;
+                return Promise.resolve({ data: row, error: null });
+              }
+
               if (table === "agent_runs") {
                 const row =
                   params.runs?.find((run) =>
@@ -131,6 +152,11 @@ function createEventAdmin(params: {
                   Object.entries(filters).every(
                     ([key, value]) =>
                       event[key as keyof AgentRunEventRow] === value,
+                  ),
+                )
+                .filter((event) =>
+                  Object.entries(inFilters).every(([key, values]) =>
+                    values.includes(event[key as keyof AgentRunEventRow]),
                   ),
                 )
                 .filter((event) => event.id > greaterThanId)
@@ -329,5 +355,49 @@ describe("agent run events", () => {
         'event: state_sync\ndata: {"session_id":"session-1","run_id":"run-1","status":"completed","reason":"session_synced"}\n\n',
     );
     expect(fake.events).toHaveLength(1);
+  });
+
+  it("does not append a duplicate synthetic terminal event when the existing terminal event is past the first page", async () => {
+    const durableEvents: AgentRunEventRow[] = [
+      ...Array.from({ length: 100 }, (_, index) => ({
+        id: index + 1,
+        run_id: "run-1",
+        event_type: "token" as const,
+        payload: { content: `chunk-${index + 1}` },
+        created_at: "2026-05-25T00:00:00.000Z",
+      })),
+      {
+        id: 101,
+        run_id: "run-1",
+        event_type: "error",
+        payload: { run_id: "run-1", error_code: "worker_expired" },
+        created_at: "2026-05-25T00:00:01.000Z",
+      },
+    ];
+    const fake = createEventAdmin({
+      runs: [
+        {
+          id: "run-1",
+          session_id: "session-1",
+          request_id: "req-1",
+          status: "failed",
+          error_code: "worker_expired",
+        },
+      ],
+      sessions: [{ id: "session-1", user_id: "user-1", deleted_at: null }],
+      events: durableEvents,
+    });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+
+    const response = streamAgentRunEventsResponse({
+      userId: "user-1",
+      sessionId: "session-1",
+      runId: "run-1",
+      lastEventId: 101,
+    });
+
+    await expect(readStream(response)).resolves.toBe("");
+    expect(fake.events).toHaveLength(101);
+    expect(fake.rpc).not.toHaveBeenCalled();
   });
 });

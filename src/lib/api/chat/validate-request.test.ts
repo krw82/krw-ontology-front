@@ -4,6 +4,9 @@ import { getAuthUser, handleAuthError } from "@/lib/auth";
 import { MAX_CHAT_ATTACHMENT_BYTES } from "@/lib/chat/attachments";
 import { validateRequest } from "./validate-request";
 
+const REQUEST_ID = "550e8400-e29b-41d4-a716-446655440001";
+const SECOND_REQUEST_ID = "550e8400-e29b-41d4-a716-446655440002";
+
 vi.mock("@/lib/auth", () => ({
   getAuthUser: vi.fn(),
   handleAuthError: vi.fn((error: unknown, requestId?: string) =>
@@ -58,7 +61,7 @@ describe("validateRequest", () => {
 
   it("rejects non-string content before content limit checks can throw", async () => {
     const result = await validateRequest(
-      makeRequest({ content: { text: "hi" }, request_id: "req-1" }),
+      makeRequest({ content: { text: "hi" }, request_id: REQUEST_ID }),
     );
 
     expect(result.ok).toBe(false);
@@ -68,6 +71,24 @@ describe("validateRequest", () => {
       error: {
         code: "validation_error",
         message: "content and request_id must be strings",
+      },
+      request_id: REQUEST_ID,
+    });
+    expect(getAuthUser).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-UUID request ids before querying auth/session data", async () => {
+    const result = await validateRequest(
+      makeRequest({ content: "hello", request_id: "req-1" }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.response.status).toBe(400);
+    expect(await json(result.response)).toMatchObject({
+      error: {
+        code: "validation_error",
+        message: "request_id must be a valid UUID",
       },
       request_id: "req-1",
     });
@@ -79,7 +100,7 @@ describe("validateRequest", () => {
       makeRequest({
         session_id: "not-a-uuid",
         content: "hello",
-        request_id: "req-1",
+        request_id: REQUEST_ID,
       }),
     );
 
@@ -99,7 +120,7 @@ describe("validateRequest", () => {
     const result = await validateRequest(
       makeRequest({
         content: "hello",
-        request_id: "req-1",
+        request_id: REQUEST_ID,
         scope_type: "company",
         default_tickers: ["  "],
       }),
@@ -122,7 +143,7 @@ describe("validateRequest", () => {
       makeRequest({
         content:
           "please read\n\n<attached_file name=\"filing.pdf\">\ntext\n</attached_file>",
-        request_id: "req-1",
+        request_id: REQUEST_ID,
       }),
     );
 
@@ -134,7 +155,7 @@ describe("validateRequest", () => {
         code: "validation_error",
         message: "txt 또는 md 파일만 첨부할 수 있습니다.",
       },
-      request_id: "req-1",
+      request_id: REQUEST_ID,
     });
     expect(getAuthUser).not.toHaveBeenCalled();
   });
@@ -143,7 +164,7 @@ describe("validateRequest", () => {
     const result = await validateRequest(
       makeRequest({
         content: "hello\n\n<attached_file name=\"note.md\">\nmissing close",
-        request_id: "req-1",
+        request_id: REQUEST_ID,
       }),
     );
 
@@ -165,7 +186,7 @@ describe("validateRequest", () => {
         content: `<attached_file name=\"note.md\">\n${"a".repeat(
           MAX_CHAT_ATTACHMENT_BYTES + 1,
         )}\n</attached_file>`,
-        request_id: "req-1",
+        request_id: REQUEST_ID,
       }),
     );
 
@@ -185,7 +206,7 @@ describe("validateRequest", () => {
     const result = await validateRequest(
       makeRequest({
         content: "hello",
-        request_id: " req-1 ",
+        request_id: ` ${REQUEST_ID} `,
         scope_type: "company",
         default_tickers: [" AAPL ", "AAPL"],
         default_document_types: [" 10-K ", ""],
@@ -197,7 +218,7 @@ describe("validateRequest", () => {
     expect(result.data.userId).toBe("user-1");
     expect(result.data.body).toMatchObject({
       content: "hello",
-      request_id: "req-1",
+      request_id: REQUEST_ID,
       scope_type: "company",
       default_tickers: ["AAPL"],
       default_document_types: ["10-K"],
@@ -209,13 +230,13 @@ describe("validateRequest", () => {
     const missingResult = await validateRequest(
       makeRequest({
         content: "hello",
-        request_id: "req-1",
+        request_id: REQUEST_ID,
       }),
     );
     const invalidResult = await validateRequest(
       makeRequest({
         content: "hello",
-        request_id: "req-2",
+        request_id: SECOND_REQUEST_ID,
         research_mode: "slow",
       }),
     );
@@ -231,7 +252,7 @@ describe("validateRequest", () => {
     const result = await validateRequest(
       makeRequest({
         content: "hello",
-        request_id: "req-1",
+        request_id: REQUEST_ID,
         research_mode: "deep",
       }),
     );
@@ -245,7 +266,7 @@ describe("validateRequest", () => {
     const result = await validateRequest(
       makeRequest({
         content: "summarize\n\n<attached_file name=\"note.md\">\n# Memo\n</attached_file>",
-        request_id: "req-1",
+        request_id: REQUEST_ID,
       }),
     );
 
@@ -258,11 +279,11 @@ describe("validateRequest", () => {
     vi.mocked(getAuthUser).mockRejectedValueOnce(new Error("No user"));
 
     const result = await validateRequest(
-      makeRequest({ content: "hello", request_id: " req-1 " }),
+      makeRequest({ content: "hello", request_id: ` ${REQUEST_ID} ` }),
     );
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(handleAuthError).toHaveBeenCalledWith(expect.any(Error), "req-1");
+    expect(handleAuthError).toHaveBeenCalledWith(expect.any(Error), REQUEST_ID);
   });
 });

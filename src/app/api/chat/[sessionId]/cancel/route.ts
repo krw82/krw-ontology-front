@@ -1,12 +1,14 @@
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { getAuthUser, handleAuthError, forbiddenError } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { abortRun } from "@/lib/agent/abort-manager";
 import { requestAgentRunCancel } from "@/lib/agent/job-queue";
 import { appendAgentRunEvent } from "@/lib/agent/run-events";
+import { markAgentRunTerminal } from "@/lib/agent/run-lifecycle";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
 import { isUuid } from "@/lib/api/validation";
+import { CANCELLED_ASSISTANT_MESSAGE } from "@/lib/chat/message-status";
 import type { ChatSessionRow, AgentRunRow } from "@/types/database";
 
 function notFoundError(message: string) {
@@ -73,20 +75,21 @@ export async function POST(
   abortRun(run.id);
 
   if (cancelResult.status === "queued" || cancelResult.status === "pending") {
-    await admin
-      .from("agent_runs")
-      .update({
-        status: "cancelled",
-        finished_at: new Date().toISOString(),
-        error_code: "cancelled",
-      })
-      .eq("id", run.id)
-      .in("status", ["pending", "queued"]);
+    await markAgentRunTerminal(admin, run.id, {
+      status: "cancelled",
+      finishedAt: new Date().toISOString(),
+      assistantMessageId: cancelResult.assistantMessageId ?? undefined,
+      errorCode: "cancelled",
+      openToolErrorMessage: "Run was cancelled before tool result was received",
+    });
 
     if (cancelResult.assistantMessageId) {
       await admin
         .from("messages")
-        .update({ status: "failed", content: "" })
+        .update({
+          status: "cancelled",
+          content: CANCELLED_ASSISTANT_MESSAGE,
+        })
         .eq("id", cancelResult.assistantMessageId);
     }
 

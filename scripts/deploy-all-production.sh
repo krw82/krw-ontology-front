@@ -83,14 +83,14 @@ FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 
 if [ "$DB_CHECK" = "1" ]; then
   echo "Checking Supabase migration drift..."
-  (cd "$FRONT_DIR" && npx supabase db push --dry-run)
+  (cd "$FRONT_DIR" && "$SCRIPT_DIR/supabase-cli.sh" db push --dry-run)
 
   if [ "$APPLY_MIGRATIONS" = "1" ]; then
     if [ "$DRY_RUN" = "1" ]; then
-      echo "Dry run: would apply Supabase migrations with npx supabase db push."
+      echo "Dry run: would apply Supabase migrations with Supabase CLI db push."
     else
       echo "Applying Supabase migrations..."
-      (cd "$FRONT_DIR" && npx supabase db push)
+      (cd "$FRONT_DIR" && "$SCRIPT_DIR/supabase-cli.sh" db push)
     fi
   fi
 

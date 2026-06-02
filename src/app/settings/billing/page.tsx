@@ -36,6 +36,8 @@ export default async function BillingSettingsPage() {
           stringValue(metadata?.photo_url),
       }
     : null;
+  const preserveInitialUserProfile =
+    user.app_metadata?.provider === "dev-auth-bypass";
   const entitlement = await getEntitlementStatus(user.id, user.email ?? null);
   const plans = await listPublicBillingPlansFromStore();
   const enabledFeatures = entitlement.features.filter((feature) => feature.enabled);
@@ -45,7 +47,10 @@ export default async function BillingSettingsPage() {
 
   return (
     <div className="min-h-[100dvh] bg-canvas">
-      <TopNav initialUserProfile={initialUserProfile} />
+      <TopNav
+        initialUserProfile={initialUserProfile}
+        preserveInitialUserProfile={preserveInitialUserProfile}
+      />
       <main
         id="main-content"
         className="px-base pb-[112px] pt-xl sm:px-md md:px-xl md:pb-[96px] md:pt-[72px]"

@@ -6,7 +6,7 @@ import {
 export { MAX_CHAT_ATTACHMENT_BYTES, MAX_CHAT_ATTACHMENT_COUNT };
 
 const ATTACHMENT_PATTERN =
-  /<attached_file name="([^"]{1,200})">\n([\s\S]*?)\n<\/attached_file>/g;
+  /(?:\n\n)?<attached_file name="([^"]{1,200})">\n([\s\S]*?)\n<\/attached_file>/g;
 const ATTACHMENT_MARKER_PATTERN = /<\/?attached_file\b/;
 const ALLOWED_EXTENSIONS = new Set([".txt", ".md", ".markdown"]);
 
@@ -14,6 +14,13 @@ export interface ParsedChatAttachment {
   name: string;
   content: string;
   byteLength: number;
+  characterCount: number;
+}
+
+export interface ParsedChatAttachmentContent {
+  visibleText: string;
+  attachments: ParsedChatAttachment[];
+  hasMalformedMarkers: boolean;
 }
 
 export type AttachmentValidationResult =
@@ -21,16 +28,12 @@ export type AttachmentValidationResult =
   | { ok: false; message: string };
 
 export function hasChatAttachments(content: string): boolean {
-  return content.includes("<attached_file");
+  return ATTACHMENT_MARKER_PATTERN.test(content);
 }
 
-export function validateChatAttachments(
+export function parseChatAttachmentContent(
   content: string,
-): AttachmentValidationResult {
-  if (!hasChatAttachments(content)) {
-    return { ok: true, attachments: [] };
-  }
-
+): ParsedChatAttachmentContent {
   const attachments: ParsedChatAttachment[] = [];
   let stripped = content;
   let match: RegExpExecArray | null;
@@ -40,7 +43,33 @@ export function validateChatAttachments(
     const [block, rawName, attachmentContent] = match;
     stripped = stripped.replace(block, "");
 
-    const name = decodeAttachmentName(rawName).trim();
+    attachments.push({
+      name: decodeAttachmentName(rawName).trim(),
+      content: attachmentContent,
+      byteLength: new TextEncoder().encode(attachmentContent).byteLength,
+      characterCount: attachmentContent.trim().length,
+    });
+  }
+
+  return {
+    visibleText: stripped.replace(/\n{3,}/g, "\n\n").trim(),
+    attachments,
+    hasMalformedMarkers: ATTACHMENT_MARKER_PATTERN.test(stripped),
+  };
+}
+
+export function validateChatAttachments(
+  content: string,
+): AttachmentValidationResult {
+  if (!hasChatAttachments(content)) {
+    return { ok: true, attachments: [] };
+  }
+
+  const result = parseChatAttachmentContent(content);
+  const attachments: ParsedChatAttachment[] = [];
+
+  for (const attachment of result.attachments) {
+    const name = attachment.name;
     if (!isSafeAttachmentName(name)) {
       return { ok: false, message: "첨부 파일 이름이 올바르지 않습니다." };
     }
@@ -49,18 +78,17 @@ export function validateChatAttachments(
       return { ok: false, message: "txt 또는 md 파일만 첨부할 수 있습니다." };
     }
 
-    const byteLength = Buffer.byteLength(attachmentContent, "utf8");
-    if (byteLength > MAX_CHAT_ATTACHMENT_BYTES) {
+    if (attachment.byteLength > MAX_CHAT_ATTACHMENT_BYTES) {
       return {
         ok: false,
         message: `첨부 파일 하나는 ${MAX_CHAT_ATTACHMENT_BYTES.toLocaleString()}바이트를 넘을 수 없습니다.`,
       };
     }
 
-    attachments.push({ name, content: attachmentContent, byteLength });
+    attachments.push(attachment);
   }
 
-  if (ATTACHMENT_MARKER_PATTERN.test(stripped)) {
+  if (result.hasMalformedMarkers) {
     return { ok: false, message: "첨부 파일 형식이 올바르지 않습니다." };
   }
 

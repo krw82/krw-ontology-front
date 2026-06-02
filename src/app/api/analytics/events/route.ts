@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { isAnalyticsEventName } from "@/lib/analytics/events";
 import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import { createClient } from "@/lib/supabase/server";

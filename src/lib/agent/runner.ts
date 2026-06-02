@@ -21,8 +21,9 @@ import {
   buildSystemPrompt,
   type CompanyPromptContext,
 } from "./system-prompt";
+import { normalizeKrwOntologyToolInput } from "./tool-input-policy";
 import { buildResearchPassPrompt } from "./workflow";
-import { getIndexedCompany } from "@/lib/ontology/catalog";
+import { getIndexedCompanies } from "@/lib/ontology/catalog";
 import { readIntEnv } from "@/lib/env";
 import {
   buildResearchModePrompt,
@@ -52,44 +53,22 @@ const DEFAULT_AGENT_WORKSPACE_DIR = ".agent-workspace";
 const TOOL_BUDGET_EXCEEDED = "tool_budget_exceeded";
 const TOOL_RESULT_MISSING = "tool_result_missing";
 const COMPOSE_EVIDENCE_CHAR_LIMIT = 18_000;
-const KOREAN_BROAD_RESEARCH_TOOL_SET = new Set<MCPToolName>([
-  "krw_ontology_query_context",
-  "krw_ontology_query",
-  "krw_ontology_retrieve",
-]);
-const BROAD_KOREAN_RESEARCH_TERMS = [
-  "섹터",
-  "업종",
-  "산업",
-  "매크로",
-  "거시",
-  "시장",
-  "환경",
-  "기업들",
-  "회사들",
-  "소비재",
-  "필수소비재",
-  "임의소비재",
-  "경기소비재",
-  "금융주",
-  "은행주",
-  "반도체",
-  "소프트웨어",
-  "헬스케어",
-  "바이오",
-  "에너지",
-  "산업재",
-  "통신",
-  "수혜",
-  "찾아",
-  "찾아봐",
-  "찾아줘",
-  "어떤 기업",
-  "어떤 회사",
-  "전반",
-  "전체",
+const DISALLOWED_SDK_TOOLS = [
+  "Bash",
+  "Read",
+  "Write",
+  "Edit",
+  "MultiEdit",
+  "NotebookEdit",
+  "WebFetch",
+  "WebSearch",
+  "TodoWrite",
+  "Task",
+  "Glob",
+  "Grep",
+  "LS",
+  "Skill",
 ];
-
 export interface AgentRunOptions {
   sessionId: string;
   userMessage: string;
@@ -168,10 +147,12 @@ export interface SdkDiagnostics {
   pluginPath?: string;
   promptPreview?: string;
   permissionMode?: string;
+  allowDangerouslySkipPermissions?: boolean;
   scopeType?: "global" | "company";
   settingSources?: string[];
   tools?: unknown;
   allowedTools?: string[];
+  disallowedTools?: string[];
   researchMode?: ResearchMode;
   toolBudget?: ResearchModeToolBudget;
   plugins?: unknown;
@@ -236,10 +217,11 @@ export async function runAgent(
     plugins: [{ type: "local", path: pluginPath }],
     tools: [],
     allowedTools,
-    permissionMode: "bypassPermissions",
-    allowDangerouslySkipPermissions: true,
+    disallowedTools: DISALLOWED_SDK_TOOLS,
+    permissionMode: "dontAsk",
+    allowDangerouslySkipPermissions: false,
     canUseTool,
-    settingSources: ["project"],
+    settingSources: [],
     maxTurns: readIntEnv("CLAUDE_AGENT_MAX_TURNS", DEFAULT_MAX_TURNS, {
       min: 1,
     }),
@@ -573,8 +555,6 @@ function buildComposeOnlyPrompt(params: {
     "Write the final user-facing answer in Korean Markdown.",
     "Do not call any tools.",
     "Do not mention internal tool budgets, tool limits, errors, retries, research modes, or failed searches.",
-    "Do not use the phrase '공시자료 기반 한계'.",
-    "Use CY labels for user-facing periods; do not write FY labels unless fiscal wording is essential as a short parenthetical note.",
     "If exact numeric values are not present in the collected evidence, do not invent numbers and do not use placeholders. Answer qualitatively from supported evidence.",
     "Use the collected evidence below as the only factual basis.",
     "",
@@ -647,10 +627,12 @@ async function reportSdkInitialization(params: {
     pluginPath,
     promptPreview: prompt.slice(0, 500),
     permissionMode: sdkOptions.permissionMode,
+    allowDangerouslySkipPermissions: sdkOptions.allowDangerouslySkipPermissions,
     scopeType: options.scopeType,
     settingSources: sdkOptions.settingSources,
     tools: sdkOptions.tools,
     allowedTools: sdkOptions.allowedTools,
+    disallowedTools: sdkOptions.disallowedTools,
     researchMode,
     toolBudget,
     plugins: sdkOptions.plugins,
@@ -691,9 +673,7 @@ export async function canUseTool(
 ): Promise<PermissionResult> {
   if (isKrwOntologySdkTool(toolName)) {
     const mcpToolName = normalizeMcpToolName(toolName);
-    const broadKoreanGuard = denyBroadKoreanResearchInput(mcpToolName, input);
-    if (broadKoreanGuard) return broadKoreanGuard;
-    return allowWithFullResponseDetailDowngrade(mcpToolName, input);
+    return allowWithInputPolicy(mcpToolName, input);
   }
 
   return {
@@ -734,42 +714,11 @@ function createToolPermissionGuard(
       };
     }
 
-    const broadKoreanGuard = denyBroadKoreanResearchInput(mcpToolName, input);
-    if (broadKoreanGuard) return broadKoreanGuard;
-
     const allowedMcpTools = new Set(getAllowedMcpToolsForResearchMode(mode));
     if (!allowedMcpTools.has(mcpToolName)) {
       return {
         behavior: "deny",
         message: `Research mode ${mode} does not allow ${mcpToolName}.`,
-      };
-    }
-
-    const queryContextCalls = countToolCalls(acc.toolCalls, "krw_ontology_query_context");
-    if (queryContextCalls === 0 && mcpToolName !== "krw_ontology_query_context") {
-      return {
-        behavior: "deny",
-        message: "Call krw_ontology_query_context first before using follow-up tools.",
-      };
-    }
-
-    const researchStatePolicy = toolPolicyFromLatestQueryContext(acc);
-    if (researchStatePolicy?.blockedTools.has(mcpToolName)) {
-      return {
-        behavior: "deny",
-        message: `query_context research state says not to call ${mcpToolName}.`,
-      };
-    }
-    if (
-      researchStatePolicy &&
-      !researchStatePolicy.allowedTools.has(mcpToolName) &&
-      mcpToolName !== "krw_ontology_query_context"
-    ) {
-      return {
-        behavior: "deny",
-        message:
-          researchStatePolicy.reason ||
-          `query_context research state does not allow ${mcpToolName}.`,
       };
     }
 
@@ -786,88 +735,22 @@ function createToolPermissionGuard(
       };
     }
 
-    return allowWithFullResponseDetailDowngrade(mcpToolName, input);
+    return allowWithInputPolicy(mcpToolName, input);
   };
 }
 
-const RESPONSE_DETAIL_TOOL_SET = new Set<MCPToolName>([
-  "krw_ontology_query",
-  "krw_ontology_retrieve",
-  "krw_ontology_compare",
-]);
-
-function downgradeFullResponseDetailInput(
-  mcpToolName: MCPToolName | null,
-  input: Record<string, unknown>,
-): Record<string, unknown> | null {
-  if (!mcpToolName || !RESPONSE_DETAIL_TOOL_SET.has(mcpToolName)) return null;
-  if (input.response_detail !== "full") return null;
-  return {
-    ...input,
-    response_detail: "compact",
-  };
-}
-
-function allowWithFullResponseDetailDowngrade(
+function allowWithInputPolicy(
   mcpToolName: MCPToolName | null,
   input: Record<string, unknown>,
 ): PermissionResult {
-  const updatedInput = downgradeFullResponseDetailInput(mcpToolName, input);
-  if (updatedInput) {
+  const policy = normalizeKrwOntologyToolInput(mcpToolName, input);
+  if (policy.changed) {
     return {
       behavior: "allow",
-      updatedInput,
+      updatedInput: policy.input,
     };
   }
   return { behavior: "allow" };
-}
-
-function denyBroadKoreanResearchInput(
-  mcpToolName: MCPToolName | null,
-  input: Record<string, unknown>,
-): PermissionResult | null {
-  if (!mcpToolName || !KOREAN_BROAD_RESEARCH_TOOL_SET.has(mcpToolName)) {
-    return null;
-  }
-
-  const text = collectResearchInputText(input);
-  if (!containsKorean(text) || !containsBroadKoreanResearchIntent(text)) {
-    return null;
-  }
-
-  return {
-    behavior: "deny",
-    message: [
-      "Do not send Korean broad sector/global/macro/discovery text to KRW Ontology MCP tools.",
-      "Rewrite the user intent as an internal English research brief, include a bounded ticker set when possible, and retry with English question/topic arguments.",
-    ].join(" "),
-  };
-}
-
-function collectResearchInputText(input: Record<string, unknown>): string {
-  const values: string[] = [];
-  for (const key of ["question", "topic", "query", "topics"]) {
-    const value = input[key];
-    if (typeof value === "string") {
-      values.push(value);
-    } else if (Array.isArray(value)) {
-      values.push(
-        ...value.filter((item): item is string => typeof item === "string"),
-      );
-    }
-  }
-  return values.join(" ");
-}
-
-function containsKorean(text: string): boolean {
-  return /[가-힣]/.test(text);
-}
-
-function containsBroadKoreanResearchIntent(text: string): boolean {
-  const normalized = text.replace(/\s+/g, " ").trim();
-  return BROAD_KOREAN_RESEARCH_TERMS.some((term) =>
-    normalized.includes(term),
-  );
 }
 
 function toolBudgetViolation(
@@ -1051,143 +934,6 @@ function countToolCalls(
   return toolCalls.filter((toolCall) => toolCall.toolName === toolName).length;
 }
 
-function toolPolicyFromLatestQueryContext(acc: AccumulatedRun): {
-  allowedTools: Set<MCPToolName>;
-  blockedTools: Set<MCPToolName>;
-  reason: string | null;
-} | null {
-  const queryContextCall = [...acc.toolCalls]
-    .reverse()
-    .find((toolCall) => toolCall.toolName === "krw_ontology_query_context");
-  if (!queryContextCall?.resultJson && !queryContextCall?.resultText) return null;
-
-  const payload = coerceRecord(
-    queryContextCall.resultJson,
-    queryContextCall.resultText,
-  );
-  if (!payload) return null;
-
-  const agentAutonomy =
-    coerceRecord(payload.agent_autonomy) ||
-    coerceRecord(getNested(payload, ["kernel", "agent_autonomy"])) ||
-    coerceRecord(getNested(payload, ["research_pack", "agent_autonomy"]));
-  const kernel = coerceRecord(payload.kernel);
-  const status = stringValue(payload.research_status) || stringValue(kernel?.status);
-  const allowedRaw =
-    arrayValue(agentAutonomy?.allowed_next_tools) ||
-    arrayValue(kernel?.allowed_next_tools) ||
-    arrayValue(getNested(payload, ["context_policy", "allowed_next_tools"]));
-  const doNotCallRaw =
-    arrayValue(agentAutonomy?.do_not_call) ||
-    arrayValue(kernel?.do_not_call) ||
-    arrayValue(getNested(payload, ["context_policy", "do_not_call"]));
-  const mayContinue = agentAutonomy?.may_continue_research;
-  const blockedTools = new Set<MCPToolName>();
-
-  for (const item of doNotCallRaw ?? []) {
-    for (const mappedTool of mcpToolsFromPolicyValue(item)) {
-      blockedTools.add(mappedTool);
-    }
-  }
-
-  if (mayContinue === false) {
-    return {
-      allowedTools: new Set<MCPToolName>(),
-      blockedTools,
-      reason: "query_context says the research state is sufficient; answer without more MCP calls.",
-    };
-  }
-
-  if (!allowedRaw) {
-    return null;
-  }
-
-  const allowedTools = new Set<MCPToolName>();
-  for (const item of allowedRaw) {
-    for (const mappedTool of mcpToolsFromPolicyValue(item)) {
-      allowedTools.add(mappedTool);
-    }
-  }
-
-  if (
-    allowedTools.size === 0 &&
-    (status === "sufficient_for_default_answer" ||
-      status === "out_of_scope_for_filing_ontology")
-  ) {
-    return {
-      allowedTools,
-      blockedTools,
-      reason: "query_context says the research state is sufficient; answer without more MCP calls.",
-    };
-  }
-
-  return {
-    allowedTools,
-    blockedTools,
-    reason: null,
-  };
-}
-
-function mcpToolsFromPolicyValue(value: unknown): MCPToolName[] {
-  if (typeof value !== "string") return [];
-  const normalized = value.trim().toLowerCase();
-  if (!normalized) return [];
-
-  const direct = normalizeMcpToolName(normalized);
-  if (direct) return [direct];
-
-  if (normalized === "trace") return ["krw_ontology_trace"];
-  if (normalized === "chain") return ["krw_ontology_chain"];
-  if (normalized === "query") return ["krw_ontology_query"];
-  if (normalized === "retrieve" || normalized === "broad_retrieve") {
-    return ["krw_ontology_retrieve"];
-  }
-  if (normalized === "compare") return ["krw_ontology_compare"];
-  if (normalized === "quality") return ["krw_ontology_quality"];
-  if (normalized === "catalog") return ["krw_ontology_catalog"];
-  if (normalized === "company_context") return ["krw_ontology_company_context"];
-  if (normalized === "index_context") return ["krw_ontology_index_context"];
-  if (normalized === "topic_map") return ["krw_ontology_topic_map"];
-  if (normalized === "plan_query") return ["krw_ontology_plan_query"];
-
-  return [];
-}
-
-function coerceRecord(
-  value: unknown,
-  fallbackText?: string | null,
-): Record<string, unknown> | null {
-  if (isRecord(value)) return value;
-  if (!fallbackText) return null;
-
-  try {
-    const parsed = JSON.parse(fallbackText);
-    return isRecord(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function getNested(
-  value: Record<string, unknown>,
-  pathParts: string[],
-): unknown {
-  let current: unknown = value;
-  for (const part of pathParts) {
-    if (!isRecord(current)) return undefined;
-    current = current[part];
-  }
-  return current;
-}
-
-function arrayValue(value: unknown): unknown[] | null {
-  return Array.isArray(value) ? value : null;
-}
-
-function stringValue(value: unknown): string | null {
-  return typeof value === "string" ? value : null;
-}
-
 async function getCompanyPromptContexts(
   tickers: string[],
 ): Promise<CompanyPromptContext[]> {
@@ -1195,12 +941,9 @@ async function getCompanyPromptContexts(
     new Set(tickers.map((ticker) => ticker.trim().toUpperCase()).filter(Boolean)),
   );
 
-  const companies = await Promise.all(
-    uniqueTickers.map((ticker) => getIndexedCompany(ticker)),
-  );
+  const companies = await getIndexedCompanies(uniqueTickers);
 
   return companies
-    .filter((company): company is NonNullable<typeof company> => Boolean(company))
     .map((company) => ({
       ticker: company.ticker,
       documentTypes: company.document_types,
@@ -1254,8 +997,7 @@ async function consumeSdkMessage(params: {
         const toolCallId =
           typeof block.id === "string" ? block.id : crypto.randomUUID();
         const rawInput = isRecord(block.input) ? block.input : {};
-        const input =
-          downgradeFullResponseDetailInput(toolName, rawInput) ?? rawInput;
+        const input = normalizeKrwOntologyToolInput(toolName, rawInput).input;
 
         if (!openToolCalls.has(toolCallId)) {
           openToolCalls.add(toolCallId);

@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { readIntEnv } from "@/lib/env";
+import { markAgentRunTerminal } from "@/lib/agent/run-lifecycle";
 import { closeOpenToolCallsForRuns } from "@/lib/agent/tool-call-cleanup";
 
 const GLOBAL_CONCURRENT_LIMIT = readIntEnv("GLOBAL_CONCURRENT_RUN_LIMIT", 5, {
@@ -118,10 +119,12 @@ export async function tryAcquireLease(
     });
 
   if (leaseError) {
-    await admin
-      .from("agent_runs")
-      .update({ status: "failed", error_code: "internal_error" })
-      .eq("id", runId);
+    await markAgentRunTerminal(admin, runId, {
+      status: "failed",
+      finishedAt: new Date().toISOString(),
+      errorCode: "internal_error",
+      errorMessage: "Failed to create concurrency lease",
+    });
     return { acquired: false, reason: "internal_error" };
   }
 
@@ -183,15 +186,17 @@ async function cleanupExpiredRuns(
     .map((run) => run.assistant_message_id)
     .filter((id): id is string => Boolean(id));
 
-  await admin
-    .from("agent_runs")
-    .update({
-      status: "failed",
-      error_code: "lease_expired",
-      error_message: "Lease expired",
-      finished_at: nowIso,
-    })
-    .in("id", runIds);
+  await Promise.all(
+    expiredRuns.map((run) =>
+      markAgentRunTerminal(admin, run.id, {
+        status: "expired",
+        finishedAt: nowIso,
+        errorCode: "lease_expired",
+        errorMessage: "Lease expired",
+        openToolErrorMessage: "Lease expired before tool result was received",
+      }),
+    ),
+  );
 
   await closeOpenToolCallsForRuns({
     admin,
@@ -286,14 +291,12 @@ async function tryAcquireLeaseFallback(
     .gt("lease_expires_at", now.toISOString());
 
   if ((activeRunCount ?? 0) > GLOBAL_CONCURRENT_LIMIT) {
-    await admin
-      .from("agent_runs")
-      .update({
-        status: "failed",
-        error_code: "concurrency_limit",
-        finished_at: new Date().toISOString(),
-      })
-      .eq("id", run.id);
+    await markAgentRunTerminal(admin, run.id, {
+      status: "failed",
+      finishedAt: new Date().toISOString(),
+      errorCode: "concurrency_limit",
+      errorMessage: "Global concurrency limit exceeded",
+    });
     return { acquired: false, reason: "concurrency_limit" };
   }
 
@@ -306,10 +309,12 @@ async function tryAcquireLeaseFallback(
     });
 
   if (leaseError) {
-    await admin
-      .from("agent_runs")
-      .update({ status: "failed", error_code: "internal_error" })
-      .eq("id", run.id);
+    await markAgentRunTerminal(admin, run.id, {
+      status: "failed",
+      finishedAt: new Date().toISOString(),
+      errorCode: "internal_error",
+      errorMessage: "Failed to create concurrency lease",
+    });
     return { acquired: false, reason: "internal_error" };
   }
 

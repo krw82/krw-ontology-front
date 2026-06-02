@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
 
+function cspDirective(csp: string, name: string) {
+  return csp
+    .split(";")
+    .map((directive) => directive.trim())
+    .find((directive) => directive.startsWith(`${name} `));
+}
+
 test.describe("dev auth bypass", () => {
   test("opens protected companies page with stable account nav", async ({
     page,
@@ -313,6 +320,19 @@ test.describe("dev auth bypass", () => {
       });
     });
 
+    await page.route(`**/api/chat/${sessionId}/evidence?**`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          message_id: "66666666-6666-4666-8666-666666666666",
+          run_ids: [],
+          tool_calls: [],
+          citations: [],
+        }),
+      });
+    });
+
     await page.route("**/api/companies?**", async (route) => {
       const url = new URL(route.request().url());
       if (url.searchParams.get("ticker") !== "AAPL") {
@@ -372,7 +392,23 @@ test.describe("dev auth bypass", () => {
 
 test.describe("public pages", () => {
   test("renders home, privacy, and terms", async ({ page }) => {
-    await page.goto("/");
+    const response = await page.goto("/");
+    const csp = response?.headers()["content-security-policy"];
+    expect(csp).toBeTruthy();
+    const scriptSrc = cspDirective(csp ?? "", "script-src");
+    expect(scriptSrc).toContain("'nonce-");
+    expect(scriptSrc).toContain("'strict-dynamic'");
+    expect(scriptSrc).not.toContain("'unsafe-inline'");
+    const cspNonce = scriptSrc?.match(/'nonce-([^']+)'/)?.[1];
+    expect(cspNonce).toBeTruthy();
+    const jsonLdNonces = await page
+      .locator('script[type="application/ld+json"]')
+      .evaluateAll((scripts) =>
+        scripts.map((script) => (script as HTMLScriptElement).nonce),
+      );
+    expect(jsonLdNonces.length).toBeGreaterThan(0);
+    expect(jsonLdNonces.every((nonce) => nonce === cspNonce)).toBe(true);
+
     await expect(
       page.getByRole("main").getByText("근거가 보이는").first(),
     ).toBeVisible();

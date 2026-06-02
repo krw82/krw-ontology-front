@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import { getAuthUser, forbiddenError, handleAuthError } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";

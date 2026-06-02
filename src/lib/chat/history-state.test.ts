@@ -149,4 +149,31 @@ describe("chat history state", () => {
     expect(state.streamingContent).toBe("");
     expect(state.messages).toHaveLength(1);
   });
+
+  it("keeps cancelled assistant messages visible but terminal", () => {
+    const messages: Message[] = [
+      {
+        ...baseMessage,
+        id: "assistant-1",
+        role: "assistant",
+        content: "응답 생성을 취소했습니다.",
+        status: "cancelled",
+      },
+    ];
+    const runs: AgentRunSummary[] = [
+      {
+        ...baseRun,
+        id: "run-1",
+        status: "cancelled",
+        assistant_message_id: "assistant-1",
+      },
+    ];
+
+    const state = deriveLoadedChatState(messages, runs);
+
+    expect(state.status).toBe("cancelled");
+    expect(state.activeRunId).toBe("run-1");
+    expect(state.activeRunStartedAt).toBeNull();
+    expect(state.messages).toEqual(messages);
+  });
 });

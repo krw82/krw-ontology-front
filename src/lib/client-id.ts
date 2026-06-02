@@ -16,7 +16,11 @@ export function createClientId(): string {
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
   }
 
-  return `id-${Date.now().toString(36)}-${Math.random()
-    .toString(36)
-    .slice(2, 12)}`;
+  const fallbackHex = Array.from({ length: 32 }, () =>
+    Math.floor(Math.random() * 16).toString(16),
+  );
+  fallbackHex[12] = "4";
+  fallbackHex[16] = (8 + Math.floor(Math.random() * 4)).toString(16);
+  const hex = fallbackHex.join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }

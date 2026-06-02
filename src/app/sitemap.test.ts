@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type * as LandingCopyModule from "@/lib/companies/landing-copy";
 
 const mocks = vi.hoisted(() => ({
   hasCompanyLandingCopyForTicker: vi.fn<(ticker: string) => boolean>(),
@@ -7,8 +8,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/companies/landing-copy", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@/lib/companies/landing-copy")>();
+  const actual = await importOriginal<typeof LandingCopyModule>();
 
   return {
     ...actual,

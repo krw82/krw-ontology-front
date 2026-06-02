@@ -53,4 +53,41 @@ describe("agent queue expiry migration", () => {
     );
     expect(migration).toContain("from public.claim_agent_run(");
   });
+
+  it("centralizes terminal run updates in a reusable database function", () => {
+    const migration = readFileSync(
+      "supabase/migrations/20260528007000_agent_run_terminal_lifecycle.sql",
+      "utf8",
+    );
+
+    expect(migration).toContain(
+      "create or replace function public.mark_agent_run_terminal",
+    );
+    expect(migration).toContain("p_status public.run_status");
+    expect(migration).toContain("status must be terminal");
+    expect(migration).toContain("finished_at = v_finished_at");
+    expect(migration).toContain("lease_expires_at = null");
+    expect(migration).toContain("update public.tool_calls as tc");
+    expect(migration).toContain("tc.finished_at is null");
+    expect(migration).toContain(
+      "grant execute on function public.mark_agent_run_terminal",
+    );
+  });
+
+  it("routes claim_agent_run stale lease expiry through the terminal lifecycle helper", () => {
+    const migration = readFileSync(
+      "supabase/migrations/20260528007000_agent_run_terminal_lifecycle.sql",
+      "utf8",
+    );
+
+    expect(migration).toContain("perform public.mark_agent_run_terminal");
+    expect(migration).toContain("'expired'::public.run_status");
+    expect(migration).toContain("'lease_expired'");
+    expect(migration).toContain(
+      "Worker lease expired before tool result was received",
+    );
+    expect(migration).toContain(
+      "grant execute on function public.claim_agent_run(text, text, text, integer, integer)",
+    );
+  });
 });

@@ -27,7 +27,7 @@ describe("production deploy scripts", () => {
 
     expect(deployProd).toContain("deploy-web-production.sh");
     expect(deployProd).toContain("deploy-plugin-worker-production.sh");
-    expect(deployProd).toContain("npx supabase db push --dry-run");
+    expect(deployProd).toContain("supabase-cli.sh\" db push --dry-run");
     expect(deployProd).toContain("npm run supabase:schema:smoke");
     expect(deployProd).toContain("intentionally does not start the GCP agent-worker");
 

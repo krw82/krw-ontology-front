@@ -1,12 +1,23 @@
 import { updateSession } from "@/lib/supabase/middleware";
+import { getClientIp } from "@/lib/http/client-ip";
+import { buildContentSecurityPolicy } from "@/lib/security/headers";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const rateLimitMap = new Map<string, { count: number; lastReset: number }>();
 const WINDOW_MS = 60_000;
-const MAX_REQUESTS = 10;
+const DEFAULT_GROSS_ABUSE_LIMIT = 300;
+const isDevelopment = process.env.NODE_ENV === "development";
 
-function isRateLimited(ip: string): boolean {
+function getGrossAbuseLimit(): number {
+  const raw = process.env.CHAT_RUN_PROXY_GROSS_ABUSE_PER_MINUTE;
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+  return Number.isSafeInteger(parsed) && parsed >= 1
+    ? parsed
+    : DEFAULT_GROSS_ABUSE_LIMIT;
+}
+
+function isRateLimited(ip: string, limit = getGrossAbuseLimit()): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(ip);
 
@@ -16,7 +27,27 @@ function isRateLimited(ip: string): boolean {
   }
 
   entry.count++;
-  return entry.count > MAX_REQUESTS;
+  return entry.count > limit;
+}
+
+function shouldApplyContentSecurityPolicy(pathname: string) {
+  return !pathname.startsWith("/api/");
+}
+
+function createCspRequestHeaders() {
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const contentSecurityPolicy = buildContentSecurityPolicy({
+    isDevelopment,
+    nonce,
+  });
+  const requestHeaderOverrides = new Headers();
+  requestHeaderOverrides.set("x-nonce", nonce);
+  requestHeaderOverrides.set(
+    "Content-Security-Policy",
+    contentSecurityPolicy,
+  );
+
+  return { contentSecurityPolicy, requestHeaderOverrides };
 }
 
 declare global {
@@ -37,21 +68,54 @@ if (typeof globalThis._rateLimitCleanup === "undefined") {
 }
 
 export async function proxy(request: NextRequest) {
+  const csp = shouldApplyContentSecurityPolicy(request.nextUrl.pathname)
+    ? createCspRequestHeaders()
+    : null;
+
   if (request.nextUrl.pathname === "/api/chat/run") {
-    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+    const ip = getClientIp(request.headers);
     if (isRateLimited(ip)) {
       return NextResponse.json(
-        { error: "Too many requests" },
-        { status: 429, headers: { "Retry-After": "60" } }
+        {
+          error: {
+            code: "rate_limited" as const,
+            message: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
+          },
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": "60",
+            "X-Rate-Limit-Scope": "proxy-gross-abuse",
+          },
+        },
       );
     }
   }
 
-  return await updateSession(request);
+  const response = await updateSession(request, {
+    requestHeaderOverrides: csp?.requestHeaderOverrides,
+  });
+  if (csp) {
+    response.headers.set("Content-Security-Policy", csp.contentSecurityPolicy);
+  }
+
+  return response;
 }
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    {
+      source:
+        "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+      missing: [
+        { type: "header", key: "next-router-prefetch" },
+        { type: "header", key: "purpose", value: "prefetch" },
+      ],
+    },
   ],
 };
+
+export function resetProxyRateLimitForTests() {
+  rateLimitMap.clear();
+}

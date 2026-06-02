@@ -4,8 +4,14 @@ import {
   buildContentSecurityPolicy,
   buildSecurityHeaders,
   contentSecurityPolicy,
-  securityHeaders,
 } from "./headers";
+
+function cspDirective(csp: string, name: string) {
+  return csp
+    .split(";")
+    .map((directive) => directive.trim())
+    .find((directive) => directive.startsWith(`${name} `));
+}
 
 describe("security headers", () => {
   it("disables the Next.js powered-by header", () => {
@@ -18,21 +24,43 @@ describe("security headers", () => {
     expect(contentSecurityPolicy).toContain("https://*.supabase.co");
     expect(contentSecurityPolicy).toContain("upgrade-insecure-requests");
     expect(contentSecurityPolicy).not.toContain("http://localhost:*");
-    expect(contentSecurityPolicy).not.toContain("'unsafe-eval'");
+    expect(cspDirective(contentSecurityPolicy, "script-src")).not.toContain(
+      "'unsafe-inline'",
+    );
+    expect(cspDirective(contentSecurityPolicy, "script-src")).not.toContain(
+      "'unsafe-eval'",
+    );
 
     const headers = await nextConfig.headers?.();
 
     expect(headers).toEqual([
       {
         source: "/:path*",
-        headers: [...securityHeaders],
+        headers: [
+          ...buildSecurityHeaders({
+            includeContentSecurityPolicy: false,
+          }),
+        ],
       },
     ]);
+  });
+
+  it("uses nonce based script CSP when a request nonce is available", () => {
+    const nonce = "test-nonce";
+    const csp = buildContentSecurityPolicy({ nonce });
+
+    expect(csp).toContain(`script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`);
+    expect(cspDirective(csp, "script-src")).not.toContain("'unsafe-inline'");
+    expect(cspDirective(csp, "script-src")).not.toContain("'unsafe-eval'");
   });
 
   it("allows local Supabase and dev websocket connections only in development", () => {
     const developmentCsp = buildContentSecurityPolicy({
       isDevelopment: true,
+    });
+    const developmentNonceCsp = buildContentSecurityPolicy({
+      isDevelopment: true,
+      nonce: "dev-nonce",
     });
     const developmentHeaders = buildSecurityHeaders({
       isDevelopment: true,
@@ -41,7 +69,20 @@ describe("security headers", () => {
     expect(developmentCsp).toContain("http://localhost:*");
     expect(developmentCsp).toContain("http://127.0.0.1:*");
     expect(developmentCsp).toContain("ws://localhost:*");
-    expect(developmentCsp).toContain("'unsafe-eval'");
+    expect(cspDirective(developmentCsp, "script-src")).toContain(
+      "'unsafe-inline'",
+    );
+    expect(cspDirective(developmentCsp, "script-src")).toContain(
+      "'unsafe-eval'",
+    );
+    expect(developmentNonceCsp).toContain("'nonce-dev-nonce'");
+    expect(developmentNonceCsp).toContain("'strict-dynamic'");
+    expect(cspDirective(developmentNonceCsp, "script-src")).not.toContain(
+      "'unsafe-inline'",
+    );
+    expect(cspDirective(developmentNonceCsp, "script-src")).toContain(
+      "'unsafe-eval'",
+    );
     expect(developmentCsp).not.toContain("upgrade-insecure-requests");
     expect(developmentHeaders).not.toContainEqual(
       expect.objectContaining({ key: "Strict-Transport-Security" }),

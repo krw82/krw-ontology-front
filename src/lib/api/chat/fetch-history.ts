@@ -45,7 +45,7 @@ export async function fetchHistory(
   }
 
   // Load previous messages for multi-turn context
-  const { data: previousMessages } = await admin
+  const { data: previousMessages, error: previousMessagesError } = await admin
     .from("messages")
     .select("role, content")
     .eq("session_id", sessionId)
@@ -55,6 +55,22 @@ export async function fetchHistory(
     .order("created_at", { ascending: false })
     .limit(MAX_PROMPT_HISTORY_MESSAGES)
     .returns<Array<{ role: string; content: string }>>();
+
+  if (previousMessagesError) {
+    if (userMessageResult.created) {
+      await admin.from("messages").delete().eq("id", userMessageResult.id);
+    }
+
+    return {
+      ok: false,
+      response: errorResponse(
+        500,
+        "internal_error",
+        "대화 기록을 불러오지 못했습니다.",
+        requestId,
+      ),
+    };
+  }
 
   const history: Array<{ role: string; content: string }> = [
     ...(previousMessages ?? []),
@@ -74,7 +90,7 @@ async function getOrCreateUserMessage(
   sessionId: string,
   content: string,
   requestId?: string,
-): Promise<{ id: string } | null> {
+): Promise<{ id: string; created: boolean } | null> {
   const insertPayload = {
     session_id: sessionId,
     role: "user" as const,
@@ -89,7 +105,7 @@ async function getOrCreateUserMessage(
     .select("id")
     .single<{ id: string }>();
 
-  if (userMessage) return userMessage;
+  if (userMessage) return { id: userMessage.id, created: true };
 
   if (error?.code !== "23505" || !requestId) return null;
 
@@ -101,5 +117,5 @@ async function getOrCreateUserMessage(
     .eq("role", "user")
     .maybeSingle<{ id: string }>();
 
-  return existing ?? null;
+  return existing ? { id: existing.id, created: false } : null;
 }

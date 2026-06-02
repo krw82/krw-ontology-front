@@ -1,12 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { isDevAuthBypassEnabled } from "@/lib/dev-auth";
+import { isDevAuthBypassEnabled } from "@/lib/dev-auth-server";
 import { requireEnv } from "@/lib/env";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { Database } from "@/types/database";
 
 export async function createClient() {
-  if (isDevAuthBypassEnabled()) {
+  if (await isDevAuthBypassEnabled()) {
     return getSupabaseAdmin();
   }
 

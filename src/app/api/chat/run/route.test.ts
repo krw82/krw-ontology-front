@@ -10,7 +10,7 @@ vi.mock("@/lib/analytics/server", () => ({
 }));
 vi.mock("@/lib/ontology/catalog", () => ({
   getActiveOntologyCatalogRelease: vi.fn(),
-  getIndexedCompany: vi.fn(),
+  getIndexedCompanies: vi.fn(),
 }));
 vi.mock("@/lib/api/chat", () => ({
   validateRequest: vi.fn(),
@@ -43,10 +43,15 @@ import {
   reserveBudgetStep,
   fetchHistory,
 } from "@/lib/api/chat";
+import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import { checkChatRunRateLimit } from "@/lib/api/chat/rate-limit";
 import { enqueueAgentRun } from "@/lib/agent/job-queue";
 import { streamAgentRunEventsResponse } from "@/lib/agent/run-events";
-import { getActiveOntologyCatalogRelease } from "@/lib/ontology/catalog";
+import {
+  getActiveOntologyCatalogRelease,
+  getIndexedCompanies,
+} from "@/lib/ontology/catalog";
+import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { POST } from "./route";
 
@@ -84,26 +89,53 @@ function request() {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       content: "Apple 알려줘",
-      request_id: "req-1",
+      request_id: "550e8400-e29b-41d4-a716-446655440001",
       session_id: "11111111-1111-4111-8111-111111111111",
       research_mode: "fast",
     }),
   });
 }
 
-function createAdmin() {
-  return {
-    from() {
+function createAdmin({
+  existingRuns = [null],
+  sessionUserId = "user-1",
+}: {
+  existingRuns?: Array<{ id: string; session_id: string } | null>;
+  sessionUserId?: string;
+} = {}) {
+  const deleted: Array<{ table: string; key: string; value: unknown }> = [];
+  const runLookups = [...existingRuns];
+  const admin = {
+    from(table: string) {
+      const filters: Record<string, unknown> = {};
       return {
         select() {
           const query = {
-            eq() {
+            eq(key: string, value: unknown) {
+              filters[key] = value;
               return query;
             },
-            is() {
+            is(key: string, value: unknown) {
+              filters[key] = value;
               return query;
             },
             maybeSingle() {
+              if (table === "agent_runs") {
+                return Promise.resolve({
+                  data: runLookups.length > 0 ? runLookups.shift() : null,
+                  error: null,
+                });
+              }
+
+              if (table === "chat_sessions") {
+                return Promise.resolve({
+                  data: filters.id
+                    ? { id: filters.id, user_id: sessionUserId }
+                    : null,
+                  error: null,
+                });
+              }
+
               return Promise.resolve({ data: null, error: null });
             },
           };
@@ -111,7 +143,8 @@ function createAdmin() {
         },
         delete() {
           return {
-            eq() {
+            eq(key: string, value: unknown) {
+              deleted.push({ table, key, value });
               return Promise.resolve({ data: null, error: null });
             },
           };
@@ -119,6 +152,8 @@ function createAdmin() {
       };
     },
   };
+
+  return { admin, deleted };
 }
 
 async function json(response: Response) {
@@ -131,7 +166,7 @@ async function json(response: Response) {
 describe("POST /api/chat/run worker admission", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getSupabaseAdmin).mockReturnValue(createAdmin() as never);
+    vi.mocked(getSupabaseAdmin).mockReturnValue(createAdmin().admin as never);
     vi.mocked(validateRequest).mockResolvedValue({
       ok: true,
       data: {
@@ -139,7 +174,7 @@ describe("POST /api/chat/run worker admission", () => {
         userEmail: "user@example.test",
         body: {
           content: "Apple 알려줘",
-          request_id: "req-1",
+          request_id: "550e8400-e29b-41d4-a716-446655440001",
           session_id: "11111111-1111-4111-8111-111111111111",
           research_mode: "fast",
         },
@@ -217,7 +252,7 @@ describe("POST /api/chat/run worker admission", () => {
     expect(response.status).toBe(503);
     expect(await json(response)).toMatchObject({
       error: { code: "worker_unavailable" },
-      request_id: "req-1",
+      request_id: "550e8400-e29b-41d4-a716-446655440001",
     });
     expect(reserveBudgetStep).not.toHaveBeenCalled();
     expect(enqueueAgentRun).not.toHaveBeenCalled();
@@ -240,9 +275,15 @@ describe("POST /api/chat/run worker admission", () => {
     expect(response.headers.get("X-Chat-Session-Id")).toBe(
       "11111111-1111-4111-8111-111111111111",
     );
+    expect(reserveBudgetStep).toHaveBeenCalledWith(
+      "user-1",
+      "550e8400-e29b-41d4-a716-446655440001",
+      "user@example.test",
+      "fast",
+    );
     expect(enqueueAgentRun).toHaveBeenCalledWith(
       expect.objectContaining({
-        requestId: "req-1",
+        requestId: "550e8400-e29b-41d4-a716-446655440001",
         model: expect.any(String),
         mcpHealth: readyMcpHealth,
         researchMode: "fast",
@@ -257,8 +298,201 @@ describe("POST /api/chat/run worker admission", () => {
         userId: "user-1",
         sessionId: "11111111-1111-4111-8111-111111111111",
         runId: "run-1",
-        requestId: "req-1",
+        requestId: "550e8400-e29b-41d4-a716-446655440001",
       }),
     );
+  });
+
+  it("uses one batch catalog lookup before creating a new company session", async () => {
+    vi.mocked(getReadyAgentWorker).mockResolvedValue({
+      ok: true,
+      worker: { worker_id: "mac-worker-jwc-1" } as never,
+      mcpHealth: readyMcpHealth,
+    });
+    vi.mocked(validateRequest).mockResolvedValue({
+      ok: true,
+      data: {
+        userId: "user-1",
+        userEmail: "user@example.test",
+        body: {
+          content: "두 회사를 비교해줘",
+          request_id: "550e8400-e29b-41d4-a716-446655440001",
+          scope_type: "company",
+          default_tickers: ["AAPL", "MSFT"],
+          research_mode: "fast",
+        },
+      },
+    });
+    vi.mocked(getIndexedCompanies).mockResolvedValue([
+      { ticker: "AAPL", name: "Apple Inc." },
+    ] as Awaited<ReturnType<typeof getIndexedCompanies>>);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(400);
+    expect(await json(response)).toMatchObject({
+      error: {
+        code: "validation_error",
+        message: "현재 온톨로지 인덱스에 없는 회사입니다: MSFT",
+      },
+      request_id: "550e8400-e29b-41d4-a716-446655440001",
+    });
+    expect(getIndexedCompanies).toHaveBeenCalledTimes(1);
+    expect(getIndexedCompanies).toHaveBeenCalledWith(["AAPL", "MSFT"]);
+    expect(releaseExecutionBudget).toHaveBeenCalledWith(
+      "user-1",
+      "550e8400-e29b-41d4-a716-446655440001",
+      null,
+      "session_resolve_failed",
+    );
+    expect(resolveSession).not.toHaveBeenCalled();
+    expect(fetchHistory).not.toHaveBeenCalled();
+    expect(enqueueAgentRun).not.toHaveBeenCalled();
+  });
+
+  it("reattaches duplicate requests to an existing run before rate limit or budget work", async () => {
+    const fake = createAdmin({
+      existingRuns: [
+        {
+          id: "existing-run-1",
+          session_id: "11111111-1111-4111-8111-111111111111",
+        },
+      ],
+    });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin as never);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("X-Chat-Session-Id")).toBe(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    expect(checkChatRunRateLimit).not.toHaveBeenCalled();
+    expect(getActiveOntologyCatalogRelease).not.toHaveBeenCalled();
+    expect(reserveBudgetStep).not.toHaveBeenCalled();
+    expect(resolveSession).not.toHaveBeenCalled();
+    expect(fetchHistory).not.toHaveBeenCalled();
+    expect(enqueueAgentRun).not.toHaveBeenCalled();
+    expect(streamAgentRunEventsResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user-1",
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        runId: "existing-run-1",
+        requestId: "550e8400-e29b-41d4-a716-446655440001",
+      }),
+    );
+  });
+
+  it("reattaches duplicate requests that appear after the user message is saved", async () => {
+    const fake = createAdmin({
+      existingRuns: [
+        null,
+        {
+          id: "existing-run-after-message",
+          session_id: "11111111-1111-4111-8111-111111111111",
+        },
+      ],
+    });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin as never);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(resolveSession).toHaveBeenCalledOnce();
+    expect(fetchHistory).toHaveBeenCalledOnce();
+    expect(recordAnalyticsEventFromRequest).not.toHaveBeenCalled();
+    expect(enqueueAgentRun).not.toHaveBeenCalled();
+    expect(releaseExecutionBudget).not.toHaveBeenCalled();
+    expect(fake.deleted).toEqual([]);
+    expect(streamAgentRunEventsResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user-1",
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        runId: "existing-run-after-message",
+        requestId: "550e8400-e29b-41d4-a716-446655440001",
+      }),
+    );
+  });
+
+  it("reattaches duplicate requests reported by enqueue without releasing budget or deleting the user message", async () => {
+    const fake = createAdmin({ existingRuns: [null, null] });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin as never);
+    vi.mocked(enqueueAgentRun).mockResolvedValue({
+      ok: false,
+      reason: "duplicate_request",
+      runId: "enqueue-duplicate-run",
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(releaseExecutionBudget).not.toHaveBeenCalled();
+    expect(fake.deleted).toEqual([]);
+    expect(streamAgentRunEventsResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user-1",
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        runId: "enqueue-duplicate-run",
+        requestId: "550e8400-e29b-41d4-a716-446655440001",
+      }),
+    );
+  });
+
+  it("releases budget and deletes the created user message when enqueue fails", async () => {
+    const fake = createAdmin({ existingRuns: [null, null] });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin as never);
+    vi.mocked(enqueueAgentRun).mockResolvedValue({
+      ok: false,
+      reason: "internal_error",
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(500);
+    expect(await json(response)).toMatchObject({
+      error: {
+        code: "internal_error",
+        message: "분석 작업을 대기열에 넣지 못했습니다.",
+      },
+      request_id: "550e8400-e29b-41d4-a716-446655440001",
+    });
+    expect(releaseExecutionBudget).toHaveBeenCalledWith(
+      "user-1",
+      "550e8400-e29b-41d4-a716-446655440001",
+      null,
+      "internal_error",
+    );
+    expect(fake.deleted).toEqual([
+      { table: "messages", key: "id", value: "user-message-1" },
+    ]);
+  });
+
+  it("returns a conflict and cleans up when another run is already active", async () => {
+    const fake = createAdmin({ existingRuns: [null, null] });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin as never);
+    vi.mocked(enqueueAgentRun).mockResolvedValue({
+      ok: false,
+      reason: "active_run_exists",
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(409);
+    expect(await json(response)).toMatchObject({
+      error: {
+        code: "active_run_exists",
+        message: "이미 응답을 생성 중입니다.",
+      },
+      request_id: "550e8400-e29b-41d4-a716-446655440001",
+    });
+    expect(releaseExecutionBudget).toHaveBeenCalledWith(
+      "user-1",
+      "550e8400-e29b-41d4-a716-446655440001",
+      null,
+      "active_run_exists",
+    );
+    expect(fake.deleted).toEqual([
+      { table: "messages", key: "id", value: "user-message-1" },
+    ]);
   });
 });

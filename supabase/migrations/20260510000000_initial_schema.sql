@@ -10,11 +10,11 @@ DO $$ BEGIN
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'message_status') THEN
-    CREATE TYPE message_status AS ENUM ('pending', 'streaming', 'completed', 'failed');
+    CREATE TYPE message_status AS ENUM ('pending', 'streaming', 'completed', 'failed', 'cancelled');
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'run_status') THEN
-    CREATE TYPE run_status AS ENUM ('pending', 'running', 'completed', 'failed', 'cancelled');
+    CREATE TYPE run_status AS ENUM ('pending', 'queued', 'running', 'completed', 'failed', 'cancelled', 'expired');
   END IF;
 END $$;
 
@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
   scope_type session_scope_type NOT NULL DEFAULT 'global',
   default_tickers TEXT[],
   default_document_types TEXT[],
+  last_message_preview TEXT,
+  last_message_at TIMESTAMPTZ,
+  latest_run_status run_status,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

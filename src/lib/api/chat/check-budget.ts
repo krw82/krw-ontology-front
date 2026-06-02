@@ -2,6 +2,7 @@ import {
   reserveExecutionBudget,
   type ExecutionBudgetCheckResult,
 } from "@/lib/concurrency/execution-budget";
+import type { ResearchMode } from "@/lib/research-mode";
 import type { ErrorCode } from "@/types/api-contracts";
 
 function errorResponse(
@@ -24,11 +25,17 @@ export async function reserveBudgetStep(
   userId: string,
   requestId: string,
   userEmail?: string | null,
+  researchMode?: ResearchMode,
 ): Promise<
   | { ok: true; budget: ExecutionBudgetCheckResult }
   | { ok: false; response: Response }
 > {
-  const budget = await reserveExecutionBudget(userId, requestId, userEmail);
+  const budget = await reserveExecutionBudget(
+    userId,
+    requestId,
+    userEmail,
+    researchMode,
+  );
 
   if (!budget.allowed) {
     if (budget.reason === "internal_error") {

@@ -20,6 +20,15 @@ describe("buildSessionPreview", () => {
     ).toBe("응답 생성에 실패했습니다.");
   });
 
+  it("uses a generic preview for cancelled messages", () => {
+    expect(
+      buildSessionPreview({
+        content: "partial internal output",
+        status: "cancelled",
+      }),
+    ).toBe("응답 생성을 취소했습니다.");
+  });
+
   it("compacts normal message previews", () => {
     expect(
       buildSessionPreview({

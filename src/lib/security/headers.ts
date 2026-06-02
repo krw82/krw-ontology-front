@@ -1,5 +1,12 @@
 interface SecurityHeaderOptions {
   isDevelopment?: boolean;
+  nonce?: string;
+  includeContentSecurityPolicy?: boolean;
+}
+
+interface SecurityHeader {
+  key: string;
+  value: string;
 }
 
 const productionConnectSources = [
@@ -18,7 +25,18 @@ const developmentConnectSources = [
 
 export function buildContentSecurityPolicy({
   isDevelopment = false,
+  nonce,
 }: SecurityHeaderOptions = {}) {
+  const scriptSources = ["'self'"];
+  if (nonce) {
+    scriptSources.push(`'nonce-${nonce}'`, "'strict-dynamic'");
+  } else if (isDevelopment) {
+    scriptSources.push("'unsafe-inline'");
+  }
+  if (isDevelopment) {
+    scriptSources.push("'unsafe-eval'");
+  }
+
   const directives = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -28,7 +46,7 @@ export function buildContentSecurityPolicy({
     "img-src 'self' data: blob: https://lh3.googleusercontent.com",
     "font-src 'self' data:",
     "style-src 'self' 'unsafe-inline'",
-    `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
+    `script-src ${scriptSources.join(" ")}`,
     `connect-src ${
       isDevelopment
         ? developmentConnectSources.join(" ")
@@ -49,12 +67,19 @@ export const contentSecurityPolicy = buildContentSecurityPolicy();
 
 export function buildSecurityHeaders({
   isDevelopment = false,
+  nonce,
+  includeContentSecurityPolicy = true,
 }: SecurityHeaderOptions = {}) {
-  const headers = [
-    {
+  const headers: SecurityHeader[] = [];
+
+  if (includeContentSecurityPolicy) {
+    headers.push({
       key: "Content-Security-Policy",
-      value: buildContentSecurityPolicy({ isDevelopment }),
-    },
+      value: buildContentSecurityPolicy({ isDevelopment, nonce }),
+    });
+  }
+
+  headers.push(
     {
       key: "X-Content-Type-Options",
       value: "nosniff",
@@ -71,7 +96,7 @@ export function buildSecurityHeaders({
       key: "X-Frame-Options",
       value: "DENY",
     },
-  ];
+  );
 
   if (!isDevelopment) {
     headers.splice(1, 0, {

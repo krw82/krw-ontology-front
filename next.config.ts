@@ -23,7 +23,10 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/:path*",
-        headers: buildSecurityHeaders({ isDevelopment }),
+        headers: buildSecurityHeaders({
+          isDevelopment,
+          includeContentSecurityPolicy: false,
+        }),
       },
     ];
   },

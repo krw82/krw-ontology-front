@@ -1,16 +1,22 @@
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
-import { buildSessionPreview } from "@/lib/chat/session-preview";
-import { getIndexedCompany } from "@/lib/ontology/catalog";
+import { getIndexedCompanies } from "@/lib/ontology/catalog";
 import { createClient } from "@/lib/supabase/server";
 import type { CreateSessionRequest } from "@/types/api-contracts";
-import type { ChatSessionRow, MessageRow, AgentRunRow } from "@/types/database";
+import type { ChatSessionRow } from "@/types/database";
 import {
   isOptionalStringArray,
   isPlainObject,
   normalizeStringList,
   parsePositiveIntParam,
 } from "@/lib/api/validation";
+
+function internalError(message: string) {
+  return Response.json(
+    { error: { code: "internal_error" as const, message } },
+    { status: 500 },
+  );
+}
 
 export async function GET(request: NextRequest) {
   let user;
@@ -36,82 +42,31 @@ export async function GET(request: NextRequest) {
   } = await supabase
     .from("chat_sessions")
     .select(
-      "id, title, scope_type, default_tickers, created_at, updated_at",
+      "id, title, scope_type, default_tickers, last_message_preview, last_message_at, latest_run_status, created_at, updated_at",
       { count: "exact" },
     )
     .eq("user_id", user.id)
     .is("deleted_at", null)
+    .or("last_message_at.not.is.null,latest_run_status.in.(pending,queued,running)")
     .order("updated_at", { ascending: false })
     .range(offset, offset + limit - 1)
     .returns<ChatSessionRow[]>();
 
   if (error) {
-    return Response.json(
-      { error: { code: "internal_error" as const, message: "채팅 목록을 불러오지 못했습니다." } },
-      { status: 500 }
-    );
+    return internalError("채팅 목록을 불러오지 못했습니다.");
   }
 
-  // Get last message preview for each session
-  const sessionIds = (sessions ?? []).map((s) => s.id);
-  const lastMessages: Record<string, { content: string; created_at: string }> =
-    {};
-  const latestRunStatus: Record<string, AgentRunRow["status"]> = {};
-
-  if (sessionIds.length > 0) {
-    const { data: msgs } = await supabase
-      .from("messages")
-      .select("session_id, content, status, created_at")
-      .in("session_id", sessionIds)
-      .order("created_at", { ascending: false })
-      .returns<MessageRow[]>();
-
-    if (msgs) {
-      for (const m of msgs) {
-        if (!lastMessages[m.session_id]) {
-          lastMessages[m.session_id] = {
-            content: buildSessionPreview(m),
-            created_at: m.created_at,
-          };
-        }
-      }
-    }
-
-    const { data: runs } = await supabase
-      .from("agent_runs")
-      .select("session_id, status, queued_at, started_at")
-      .in("session_id", sessionIds)
-      .order("queued_at", { ascending: false, nullsFirst: false })
-      .returns<AgentRunRow[]>();
-
-    if (runs) {
-      for (const run of runs) {
-        if (!latestRunStatus[run.session_id]) {
-          latestRunStatus[run.session_id] = run.status;
-        }
-      }
-    }
-  }
-
-  const summaries = (sessions ?? [])
-    .map((s) => ({
-      id: s.id,
-      title: s.title,
-      scope_type: s.scope_type,
-      default_tickers: s.default_tickers ?? [],
-      last_message_preview: lastMessages[s.id]?.content ?? null,
-      last_message_at: lastMessages[s.id]?.created_at ?? null,
-      latest_run_status: latestRunStatus[s.id] ?? null,
-      created_at: s.created_at,
-      updated_at: s.updated_at,
-    }))
-    .filter(
-      (summary) =>
-        summary.last_message_at !== null ||
-        summary.latest_run_status === "running" ||
-        summary.latest_run_status === "queued" ||
-        summary.latest_run_status === "pending",
-    );
+  const summaries = (sessions ?? []).map((s) => ({
+    id: s.id,
+    title: s.title,
+    scope_type: s.scope_type,
+    default_tickers: s.default_tickers ?? [],
+    last_message_preview: s.last_message_preview,
+    last_message_at: s.last_message_at,
+    latest_run_status: s.latest_run_status,
+    created_at: s.created_at,
+    updated_at: s.updated_at,
+  }));
 
   return Response.json({
     sessions: summaries,
@@ -212,11 +167,12 @@ export async function POST(request: NextRequest) {
   }
 
   if (body.scope_type === "company") {
-    const indexedCompanies = await Promise.all(
-      normalizedTickers.map((ticker) => getIndexedCompany(ticker)),
+    const indexedCompanies = await getIndexedCompanies(normalizedTickers);
+    const indexedTickerSet = new Set(
+      indexedCompanies.map((company) => company.ticker),
     );
     const missingTicker = normalizedTickers.find(
-      (_, index) => !indexedCompanies[index],
+      (ticker) => !indexedTickerSet.has(ticker),
     );
 
     if (missingTicker) {
@@ -266,10 +222,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (error || !session) {
-    return Response.json(
-      { error: { code: "internal_error", message: "새 채팅을 만들지 못했습니다." } },
-      { status: 500 }
-    );
+    return internalError("새 채팅을 만들지 못했습니다.");
   }
 
   return Response.json({ session }, { status: 201 });

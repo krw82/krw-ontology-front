@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest} from "next/server";
+import { NextResponse } from "next/server";
 import {
   getIndexedCompany,
-  listIndexedCompanies,
+  searchIndexedCompanies,
 } from "@/lib/ontology/catalog";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
+import { parsePositiveIntParam } from "@/lib/api/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,36 +21,34 @@ export async function GET(request: NextRequest) {
 
   const url = new URL(request.url);
   const ticker = url.searchParams.get("ticker");
-  const query = url.searchParams.get("q")?.trim().toLowerCase();
+  const query = url.searchParams.get("q")?.trim();
+  const limit = parsePositiveIntParam(url.searchParams.get("limit"), 50, {
+    max: 100,
+  });
 
-  if (ticker) {
-    const company = await getIndexedCompany(ticker);
+  try {
+    if (ticker) {
+      const company = await getIndexedCompany(ticker);
+      return NextResponse.json({
+        companies: company ? [company] : [],
+        count: company ? 1 : 0,
+      });
+    }
+
+    const companies = await searchIndexedCompanies({ query, limit });
     return NextResponse.json({
-      companies: company ? [company] : [],
-      count: company ? 1 : 0,
+      companies,
+      count: companies.length,
     });
-  }
-
-  let companies = await listIndexedCompanies();
-
-  if (query) {
-    companies = companies.filter((company) =>
-      [
-        company.ticker,
-        company.name,
-        company.description,
-        company.coverage,
-        company.core_strength ?? "",
-        company.critical_risk ?? "",
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query),
+  } catch {
+    return NextResponse.json(
+      {
+        error: {
+          code: "internal_error" as const,
+          message: "회사 목록을 불러오지 못했습니다.",
+        },
+      },
+      { status: 500 },
     );
   }
-
-  return NextResponse.json({
-    companies,
-    count: companies.length,
-  });
 }

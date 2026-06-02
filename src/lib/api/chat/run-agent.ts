@@ -13,6 +13,7 @@ import {
 import { registerRun, cleanupRun } from "@/lib/agent/abort-manager";
 import { runAgent } from "@/lib/agent/runner";
 import { closeOpenToolCallsForRun } from "@/lib/agent/tool-call-cleanup";
+import { markAgentRunTerminal } from "@/lib/agent/run-lifecycle";
 import type { SdkDiagnostics } from "@/lib/agent/runner";
 import type {
   AccumulatedRun,
@@ -36,6 +37,11 @@ import {
   publicAgentErrorMessage,
   publicErrorMessage,
 } from "@/lib/api/chat/error-messages";
+import {
+  isSdkDiagnosticsEnabled,
+  mergeSdkDiagnosticsForPersistence,
+} from "@/lib/agent/sdk-diagnostics";
+import { cancelledAssistantContent } from "@/lib/chat/message-status";
 
 const EXISTING_RUN_POLL_INTERVAL_MS = 800;
 const EXISTING_RUN_MAX_POLL_MS = 120_000;
@@ -166,15 +172,14 @@ export function executeRun(params: RunAgentParams): Response {
         .single();
 
       if (assistantMsgError || !assistantMsg) {
-        await admin
-          .from("agent_runs")
-          .update({
-            status: "failed",
-            finished_at: new Date().toISOString(),
-            error_code: "internal_error",
-            error_message: "응답 메시지를 만들지 못했습니다.",
-          })
-          .eq("id", runId);
+        await markAgentRunTerminal(admin, runId, {
+          status: "failed",
+          finishedAt: new Date().toISOString(),
+          errorCode: "internal_error",
+          errorMessage: "응답 메시지를 만들지 못했습니다.",
+          openToolErrorMessage:
+            "Run failed before tool result was received: 응답 메시지를 만들지 못했습니다.",
+        });
         await recordAnalyticsEvent({
           eventName: "answer_failed",
           userId: session.userId,
@@ -348,15 +353,13 @@ export function executeRun(params: RunAgentParams): Response {
           err instanceof Error ? err.message : "Internal error";
         const publicMessage = publicErrorMessage("internal_error");
 
-        await admin
-          .from("agent_runs")
-          .update({
-            status: "failed",
-            finished_at: finishedAt,
-            error_code: "internal_error",
-            error_message: rawErrorMessage,
-          })
-          .eq("id", runId);
+        await markAgentRunTerminal(admin, runId, {
+          status: "failed",
+          finishedAt,
+          errorCode: "internal_error",
+          errorMessage: rawErrorMessage,
+          openToolErrorMessage: `Run failed before tool result was received: ${rawErrorMessage}`,
+        });
         await admin
           .from("messages")
           .update({
@@ -670,16 +673,13 @@ async function expirePersistedRunIfNeeded(
   if (!Number.isFinite(expiresAt) || expiresAt >= Date.now()) return run;
 
   const now = new Date().toISOString();
-  await admin
-    .from("agent_runs")
-    .update({
-      status: "failed",
-      error_code: "lease_expired",
-      error_message: "Lease expired",
-      finished_at: now,
-    })
-    .eq("id", run.id)
-    .in("status", ["pending", "running"]);
+  await markAgentRunTerminal(admin, run.id, {
+    status: "failed",
+    finishedAt: now,
+    errorCode: "lease_expired",
+    errorMessage: "Lease expired",
+    openToolErrorMessage: "Lease expired before tool result was received",
+  });
 
   if (run.assistant_message_id) {
     await admin
@@ -801,11 +801,7 @@ async function getExecutionBudgetStatusForPersistedRun(userId: string) {
 // --- Helper functions for each terminal state ---
 
 function isDevSdkDiagnosticsEnabled(): boolean {
-  return (
-    process.env.CLAUDE_SDK_DIAGNOSTICS === "1" ||
-    process.env.NODE_ENV === "development" ||
-    process.env.WEB_COMMIT === "dev"
-  );
+  return isSdkDiagnosticsEnabled();
 }
 
 function createDevSdkDiagnosticsRecorder(
@@ -817,14 +813,10 @@ function createDevSdkDiagnosticsRecorder(
   let mergedDiagnostics: Record<string, unknown> = {};
 
   return async (diagnostics: SdkDiagnostics) => {
-    mergedDiagnostics = {
-      ...mergedDiagnostics,
-      ...diagnostics,
-      observedModels:
-        diagnostics.observedModels ??
-        (mergedDiagnostics.observedModels as string[] | undefined),
-      updatedAt: new Date().toISOString(),
-    };
+    mergedDiagnostics = mergeSdkDiagnosticsForPersistence(
+      mergedDiagnostics,
+      diagnostics,
+    );
 
     console.info("[claude-sdk-diagnostics]", {
       runId,
@@ -1020,18 +1012,16 @@ async function handleCompletedRun(params: CompletedRunParams) {
   const estimatedCost = estimateCost(acc.inputTokens, acc.outputTokens);
   const latencyMs = Date.now() - new Date(runStartedAt).getTime();
 
-  await admin
-    .from("agent_runs")
-    .update({
-      status: "completed",
-      assistant_message_id: assistantMessageId,
-      finished_at: finishedAt,
-      input_tokens: acc.inputTokens,
-      output_tokens: acc.outputTokens,
-      estimated_cost_usd: estimatedCost,
-      latency_ms: latencyMs,
-    })
-    .eq("id", runId);
+  await markAgentRunTerminal(admin, runId, {
+    status: "completed",
+    assistantMessageId,
+    finishedAt,
+    inputTokens: acc.inputTokens,
+    outputTokens: acc.outputTokens,
+    estimatedCostUsd: estimatedCost,
+    latencyMs,
+    openToolErrorMessage: "Run completed before tool result was received",
+  });
 
   await closeOpenToolCallsForRun({
     admin,
@@ -1147,20 +1137,18 @@ async function handleCancelledRun(params: CancelledRunParams) {
   await admin
     .from("messages")
     .update({
-      content: result.acc.fullText || "",
-      status: "failed",
+      content: cancelledAssistantContent(result.acc.fullText),
+      status: "cancelled",
     })
     .eq("id", assistantMessageId);
 
-  await admin
-    .from("agent_runs")
-    .update({
-      status: "cancelled",
-      assistant_message_id: assistantMessageId,
-      finished_at: finishedAt,
-      error_code: "cancelled",
-    })
-    .eq("id", runId);
+  await markAgentRunTerminal(admin, runId, {
+    status: "cancelled",
+    assistantMessageId,
+    finishedAt,
+    errorCode: "cancelled",
+    openToolErrorMessage: "Run was cancelled before tool result was received",
+  });
 
   await closeOpenToolCallsForRun({
     admin,
@@ -1201,15 +1189,16 @@ async function handleFailedRun(params: FailedRunParams) {
   const rawErrorMessage = result.errorMessage || publicErrorMessage(errorCode);
   const publicMessage = publicAgentErrorMessage({ code: errorCode });
 
-  await admin
-    .from("agent_runs")
-    .update({
-      status: "failed",
-      finished_at: finishedAt,
-      error_code: errorCode,
-      error_message: rawErrorMessage,
-    })
-    .eq("id", runId);
+  await markAgentRunTerminal(admin, runId, {
+    status: "failed",
+    finishedAt,
+    errorCode,
+    errorMessage: rawErrorMessage,
+    openToolErrorMessage:
+      errorCode === "lease_expired"
+        ? "Agent hard timeout or lease expired before tool result was received"
+        : `Run failed before tool result was received: ${rawErrorMessage}`,
+  });
 
   await admin
     .from("messages")

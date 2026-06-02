@@ -8,10 +8,16 @@ import ResearchProgress from "@/components/ResearchProgress";
 import type { ToolCallState } from "@/hooks/useChat";
 import type {
   ChatCitation,
+  MessageStatus,
   ResearchActivityUpdate,
 } from "@/types/api-contracts";
 import { chatMessageAssistant, chatMessageUser } from "@/lib/animation";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import {
+  CANCELLED_ASSISTANT_MESSAGE,
+  FAILED_ASSISTANT_MESSAGE,
+} from "@/lib/chat/message-status";
+import { parseChatAttachmentContent } from "@/lib/chat/attachments";
 
 interface ChatMessageProps {
   role: "user" | "assistant";
@@ -25,11 +31,7 @@ interface ChatMessageProps {
   runStartedAt?: string | null;
   messageId?: string;
   createdAt?: string;
-}
-
-interface DisplayAttachment {
-  name: string;
-  characterCount: number;
+  status?: MessageStatus;
 }
 
 const statusTransition = {
@@ -43,36 +45,6 @@ const dotTransition = {
   repeatType: "loop" as const,
   ease: "easeInOut" as const,
 };
-
-const attachedFilePattern =
-  /(?:\n\n)?<attached_file\s+name="([^"]*)">\n?([\s\S]*?)\n?<\/attached_file>/g;
-
-function decodeAttachmentName(name: string): string {
-  return name
-    .replace(/&quot;/g, "\"")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&");
-}
-
-function parseUserDisplayContent(content: string): {
-  visibleText: string;
-  attachments: DisplayAttachment[];
-} {
-  const attachments: DisplayAttachment[] = [];
-  const visibleText = content
-    .replace(attachedFilePattern, (_match, rawName: string, rawContent: string) => {
-      attachments.push({
-        name: decodeAttachmentName(rawName),
-        characterCount: rawContent.trim().length,
-      });
-      return "";
-    })
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-
-  return { visibleText, attachments };
-}
 
 function useStreamingMotionOffset() {
   const prefersReducedMotion = useReducedMotion();
@@ -360,6 +332,12 @@ function CompletedAssistantContent({ content }: { content: string }) {
   return <ResearchMarkdown content={content} />;
 }
 
+function terminalAssistantContent(status: MessageStatus | undefined) {
+  if (status === "cancelled") return CANCELLED_ASSISTANT_MESSAGE;
+  if (status === "failed") return FAILED_ASSISTANT_MESSAGE;
+  return "";
+}
+
 export default function ChatMessage({
   role,
   content,
@@ -372,9 +350,10 @@ export default function ChatMessage({
   runStartedAt,
   messageId,
   createdAt,
+  status,
 }: ChatMessageProps) {
   if (role === "user") {
-    const { visibleText, attachments } = parseUserDisplayContent(content);
+    const { visibleText, attachments } = parseChatAttachmentContent(content);
 
     return (
       <motion.div
@@ -457,8 +436,14 @@ export default function ChatMessage({
         </div>
       ) : (
         <div className="max-w-full pl-0 text-body sm:pl-[48px]">
-          {content ? <CompletedAssistantContent content={content} /> : null}
-          {messageId && createdAt ? (
+          {content ? (
+            <CompletedAssistantContent content={content} />
+          ) : terminalAssistantContent(status) ? (
+            <p className="text-[15px] leading-[1.5] text-muted">
+              {terminalAssistantContent(status)}
+            </p>
+          ) : null}
+          {messageId && createdAt && status === "completed" ? (
             <MessageActions messageId={messageId} createdAt={createdAt} />
           ) : null}
         </div>

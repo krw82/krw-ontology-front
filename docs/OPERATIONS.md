@@ -162,6 +162,19 @@ order by started_at desc
 limit 20;
 ```
 
+`sdk_diagnostics` is recorded only when `CLAUDE_SDK_DIAGNOSTICS=1` is set
+before the run starts. Persisted diagnostics exclude prompt previews and local
+filesystem paths.
+
+Agent SDK runs use `permissionMode: "dontAsk"` with an explicit allow-list of
+KRW Ontology MCP tools, disabled built-in tools, and no filesystem setting
+sources. Do not enable global bypass permissions for production workers.
+
+Execution budget reservations are mode-based before durable chat work starts:
+fast defaults to `$0.05`, standard to `$0.15`, and deep to `$0.50`. Override
+with `FAST_RESEARCH_RESERVE_COST_USD`, `STANDARD_RESEARCH_RESERVE_COST_USD`,
+and `DEEP_RESEARCH_RESERVE_COST_USD` only after checking observed costs.
+
 For rate limiting, inspect:
 
 ```sql
@@ -170,3 +183,9 @@ from rate_limit_counters
 order by updated_at desc
 limit 50;
 ```
+
+Durable chat-run policy is enforced through `increment_rate_limit` using
+`CHAT_RUNS_PER_USER_PER_MINUTE`, `CHAT_RUNS_PER_IP_PER_MINUTE`, and
+`CHAT_RUNS_PER_SESSION_PER_MINUTE`. The Next proxy keeps only a high-threshold
+in-process gross-abuse guard, configured by
+`CHAT_RUN_PROXY_GROSS_ABUSE_PER_MINUTE`; do not use it as product policy.

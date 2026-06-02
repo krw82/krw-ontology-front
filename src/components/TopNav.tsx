@@ -12,11 +12,6 @@ import { dispatchOpenChatSidebar } from "@/lib/chat/sidebar-events";
 import { createClient } from "@/lib/supabase/client";
 import { popoverMenu } from "@/lib/animation";
 import { useEntitlement } from "@/hooks/useEntitlement";
-import {
-  DEV_AUTH_EMAIL,
-  DEV_AUTH_NAME,
-  isDevAuthBypassEnabled,
-} from "@/lib/dev-auth";
 import type { User } from "@supabase/supabase-js";
 
 export interface TopNavUserProfile {
@@ -33,6 +28,7 @@ interface TopNavProps {
   showSidebarTrigger?: boolean;
   mobileCollapsed?: boolean;
   mobileOverlay?: boolean;
+  preserveInitialUserProfile?: boolean;
 }
 
 function profileFromUser(user: User | null | undefined): TopNavUserProfile | null {
@@ -96,44 +92,50 @@ export default function TopNav({
   showSidebarTrigger = false,
   mobileCollapsed = false,
   mobileOverlay = false,
+  preserveInitialUserProfile = false,
 }: TopNavProps = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const devAuthBypass = isDevAuthBypassEnabled();
   const [userProfile, setUserProfile] = useState<TopNavUserProfile | null>(() =>
-    initialUserProfile ??
-    (devAuthBypass
-      ? { email: DEV_AUTH_EMAIL, name: DEV_AUTH_NAME, avatarUrl: null }
-      : null),
+    initialUserProfile ?? null,
   );
   const [authChecked, setAuthChecked] = useState(
-    Boolean(initialUserProfile) || devAuthBypass,
+    Boolean(initialUserProfile),
   );
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [clientReady, setClientReady] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const { entitlement } = useEntitlement(Boolean(userProfile));
 
   // M-07: useMemo to cache Supabase client
-  const supabase = useMemo(
-    () => (devAuthBypass ? null : createClient()),
-    [devAuthBypass],
-  );
+  const supabase = useMemo(() => createClient(), []);
   const query = searchParams.toString();
   const currentPath = normalizeInternalNextPath(
     query ? `${pathname}?${query}` : pathname,
   );
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setClientReady(true);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
   // M-08: onAuthStateChange listener
   useEffect(() => {
     if (!supabase) return;
 
     let isMounted = true;
+    const fallbackProfile = preserveInitialUserProfile
+      ? initialUserProfile ?? null
+      : null;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (!isMounted) return;
-        setUserProfile(profileFromUser(session?.user));
+        setUserProfile(profileFromUser(session?.user) ?? fallbackProfile);
         setAuthChecked(true);
         setAccountMenuOpen(false);
       }
@@ -143,10 +145,10 @@ export default function TopNav({
     supabase.auth
       .getUser()
       .then(({ data: { user } }) => {
-        if (isMounted) setUserProfile(profileFromUser(user));
+        if (isMounted) setUserProfile(profileFromUser(user) ?? fallbackProfile);
       })
       .catch(() => {
-        if (isMounted) setUserProfile(null);
+        if (isMounted) setUserProfile(fallbackProfile);
       })
       .finally(() => {
         if (isMounted) setAuthChecked(true);
@@ -156,7 +158,7 @@ export default function TopNav({
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [initialUserProfile, preserveInitialUserProfile, supabase]);
 
   useEffect(() => {
     if (!accountMenuOpen) return;
@@ -217,10 +219,11 @@ export default function TopNav({
           {showSidebarTrigger && (
             <button
               type="button"
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas md:hidden"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55 md:hidden"
               aria-label="채팅 기록 열기"
               aria-controls="mobile-chat-sidebar"
               onClick={dispatchOpenChatSidebar}
+              disabled={!clientReady}
             >
               <span aria-hidden="true" className="relative block h-5 w-6">
                 <span className="absolute left-0 top-[3px] h-[2px] w-5 rounded-full bg-ink" />
@@ -245,10 +248,11 @@ export default function TopNav({
             <div ref={accountMenuRef} className="relative">
               <button
                 type="button"
-                className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-[8px] border border-hairline bg-surface-dark text-[13px] font-semibold text-on-dark shadow-sm transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas sm:h-10 sm:w-10"
+                className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-[8px] border border-hairline bg-surface-dark text-[13px] font-semibold text-on-dark shadow-sm transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55 sm:h-10 sm:w-10"
                 aria-label={`${userProfile.name ?? userProfile.email} 계정 메뉴`}
                 aria-expanded={accountMenuOpen}
                 aria-haspopup="menu"
+                disabled={!clientReady}
                 onClick={() => {
                   setAccountMenuOpen((open) => !open);
                 }}

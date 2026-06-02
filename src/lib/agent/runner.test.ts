@@ -9,7 +9,7 @@ const sdkMocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@anthropic-ai/claude-agent-sdk", () => sdkMocks);
 vi.mock("@/lib/ontology/catalog", () => ({
-  getIndexedCompany: vi.fn().mockResolvedValue(null),
+  getIndexedCompanies: vi.fn().mockResolvedValue([]),
 }));
 vi.mock("./mcp-client", () => {
   const tools = [
@@ -86,6 +86,14 @@ function sdkToolName(toolName: MCPToolName): string {
 }
 
 function toolUseMessage(toolName: MCPToolName, index: number) {
+  return toolUseMessageWithInput(toolName, index, {});
+}
+
+function toolUseMessageWithInput(
+  toolName: MCPToolName,
+  index: number,
+  input: Record<string, unknown>,
+) {
   return {
     type: "assistant",
     message: {
@@ -94,7 +102,7 @@ function toolUseMessage(toolName: MCPToolName, index: number) {
           type: "tool_use",
           id: `tool-${index}`,
           name: sdkToolName(toolName),
-          input: {},
+          input,
         },
       ],
     },
@@ -193,7 +201,7 @@ describe("agent runner research budget recovery", () => {
       "krw_ontology_retrieve",
     );
     expect(buildResearchModePrompt("deep")).toContain(
-      "avoid unscoped retrieve",
+      "Never request response_detail: full",
     );
   });
 
@@ -204,6 +212,59 @@ describe("agent runner research budget recovery", () => {
         "Never request response_detail: full",
       );
     }
+  });
+
+  it("runs the SDK without global permission bypass or filesystem settings", async () => {
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        {
+          type: "result",
+          subtype: "success",
+          result: "Apple은 iPhone과 Services를 중심으로 매출을 창출합니다.",
+          usage: {
+            input_tokens: 10,
+            output_tokens: 12,
+          },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "Apple 매출 구조를 정리해줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
+    expect(result.status).toBe("completed");
+    const call = sdkMocks.query.mock.calls[0]?.[0];
+    expect(call.options.permissionMode).toBe("dontAsk");
+    expect(call.options.allowDangerouslySkipPermissions).toBe(false);
+    expect(call.options.settingSources).toEqual([]);
+    expect(call.options.tools).toEqual([]);
+    expect(call.options.allowedTools).toEqual(
+      expect.arrayContaining([
+        sdkToolName("krw_ontology_query_context"),
+        sdkToolName("krw_ontology_query"),
+      ]),
+    );
+    expect(call.options.disallowedTools).toEqual(
+      expect.arrayContaining([
+        "Bash",
+        "Read",
+        "Write",
+        "Edit",
+        "WebFetch",
+        "WebSearch",
+      ]),
+    );
   });
 
   it("downgrades full response detail before KRW ontology tool execution", async () => {
@@ -221,25 +282,65 @@ describe("agent runner research budget recovery", () => {
     }
   });
 
-  it("blocks Korean broad sector/global MCP inputs and asks for an English brief retry", async () => {
+  it("passes Korean research inputs unchanged before execution", async () => {
     const permission = await canUseTool(sdkToolName("krw_ontology_query_context"), {
       question: "소비재 기업들을 보고 소비 매크로 환경이 어떤지 찾아봐줘",
     });
 
-    expect(permission.behavior).toBe("deny");
-    if (permission.behavior === "deny") {
-      expect(permission.message).toContain("internal English research brief");
-      expect(permission.message).toContain("bounded ticker set");
-    }
+    expect(permission).toEqual({ behavior: "allow" });
   });
 
-  it("allows non-broad Korean company questions", async () => {
+  it("allows Korean company questions", async () => {
     const permission = await canUseTool(sdkToolName("krw_ontology_query_context"), {
       question: "Apple 매출 구조를 정리해줘",
       ticker: "AAPL",
     });
 
     expect(permission.behavior).toBe("allow");
+  });
+
+  it("records original Korean tool arguments in the accumulated run", async () => {
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        toolUseMessageWithInput("krw_ontology_query_context", 1, {
+          question: "소비재 기업들을 보고 소비 매크로 환경이 어떤지 찾아봐줘",
+          limit_results: 10,
+          limit_tickers: 20,
+        }),
+        toolResultMessage(1),
+        {
+          type: "result",
+          subtype: "success",
+          result: "소비재 기업 공시 신호를 요약했습니다.",
+          usage: {
+            input_tokens: 10,
+            output_tokens: 12,
+          },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "소비재 기업들을 보고 소비 매크로 환경이 어떤지 찾아봐줘",
+        scopeType: "global",
+        defaultTickers: [],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
+    expect(result.status).toBe("completed");
+    const args = JSON.parse(result.acc.toolCalls[0]?.argumentsJson ?? "{}");
+    expect(args).toEqual({
+      question: "소비재 기업들을 보고 소비 매크로 환경이 어떤지 찾아봐줘",
+      limit_results: 10,
+      limit_tickers: 20,
+    });
   });
 
   it("fails instead of completing when the SDK result arrives with an open tool call", async () => {
@@ -332,7 +433,9 @@ describe("agent runner research budget recovery", () => {
     expect(composeCall.options.sessionId).not.toBe(
       "11111111-1111-4111-8111-111111111111",
     );
-    expect(composeCall.options.disallowedTools).toBeUndefined();
+    expect(composeCall.options.disallowedTools).toEqual(
+      expect.arrayContaining(["Bash", "Read", "Write", "WebFetch"]),
+    );
     expect(composeCall.prompt).toContain("Do not call any tools.");
   });
 

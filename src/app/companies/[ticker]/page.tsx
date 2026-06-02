@@ -12,6 +12,7 @@ import {
   getSuggestedPromptsForTickers,
 } from "@/lib/companies/landing-copy";
 import { absoluteUrl, pageMetadata, SITE_NAME } from "@/lib/marketing/site";
+import { getCspNonce } from "@/lib/security/csp-nonce";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,6 +62,7 @@ export async function generateMetadata({
 export default async function CompanyLandingPage({
   params,
 }: CompanyPageProps) {
+  const nonce = await getCspNonce();
   const { ticker: rawTicker } = await params;
   const ticker = normalizeTicker(rawTicker);
   const [company, user] = await Promise.all([
@@ -84,6 +86,8 @@ export default async function CompanyLandingPage({
           stringValue(metadata?.photo_url),
       }
     : null;
+  const preserveInitialUserProfile =
+    user?.app_metadata?.provider === "dev-auth-bypass";
 
   const prompts = getSuggestedPromptsForTickers([company.ticker]);
   const promptHrefs = prompts.map((prompt) => chatHref(company.ticker, prompt));
@@ -112,12 +116,14 @@ export default async function CompanyLandingPage({
   return (
     <div className="min-h-[100dvh] bg-canvas text-ink">
       <script
+        nonce={nonce}
         type="application/ld+json"
         suppressHydrationWarning
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <TopNav
         initialUserProfile={initialUserProfile}
+        preserveInitialUserProfile={preserveInitialUserProfile}
         brandHref="/companies"
         brandAriaLabel="회사 목록으로 이동"
         showSidebarTrigger

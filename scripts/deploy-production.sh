@@ -42,7 +42,7 @@ FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 
 if [ "$DB_CHECK" = "1" ]; then
   echo "Checking Supabase migration drift..."
-  (cd "$FRONT_DIR" && npx supabase db push --dry-run)
+  (cd "$FRONT_DIR" && "$SCRIPT_DIR/supabase-cli.sh" db push --dry-run)
 
   if [ "$DRY_RUN" = "1" ]; then
     echo "Dry run: skipping Supabase schema smoke test."

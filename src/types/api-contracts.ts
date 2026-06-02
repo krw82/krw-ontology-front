@@ -29,7 +29,12 @@ export type RunStatus =
 export type MessageRole = "user" | "assistant" | "system";
 
 /** Chat message persistence state */
-export type MessageStatus = "pending" | "streaming" | "completed" | "failed";
+export type MessageStatus =
+  | "pending"
+  | "streaming"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
 /** Chat session scope */
 export type SessionScopeType = "global" | "company";
@@ -872,6 +877,14 @@ export interface GetChatSessionResponse {
   tool_calls?: ToolCall[];
   rich_answers?: ResearchArtifact[];
   research_artifacts?: ResearchArtifact[];
+}
+
+/** GET /api/chat/[sessionId]/evidence response */
+export interface GetChatEvidenceResponse {
+  message_id: string;
+  run_ids: string[];
+  citations: Citation[];
+  tool_calls: ToolCall[];
 }
 
 /** GET /api/sessions response */

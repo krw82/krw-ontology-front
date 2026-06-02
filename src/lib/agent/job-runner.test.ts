@@ -33,13 +33,34 @@ import { runAgentJob } from "./job-runner";
 
 function createRunnerAdmin(params: {
   openToolCalls?: Array<{ id: string; error_message: string | null }>;
+  previousMessagesError?: { code?: string; message: string } | null;
 } = {}) {
   const updates: Array<{
     table: string;
     payload: Record<string, unknown>;
     filters: Record<string, unknown>;
   }> = [];
-  const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+  const rpc = vi.fn((fn: string, args: Record<string, unknown>) => {
+    if (fn === "mark_agent_run_terminal") {
+      updates.push({
+        table: "agent_runs",
+        payload: {
+          status: args.p_status,
+          assistant_message_id: args.p_assistant_message_id ?? undefined,
+          finished_at: args.p_finished_at,
+          input_tokens: args.p_input_tokens ?? undefined,
+          output_tokens: args.p_output_tokens ?? undefined,
+          estimated_cost_usd: args.p_estimated_cost_usd ?? undefined,
+          latency_ms: args.p_latency_ms ?? undefined,
+          error_code: args.p_error_code ?? undefined,
+          error_message: args.p_error_message ?? undefined,
+          lease_expires_at: null,
+        },
+        filters: { id: args.p_run_id },
+      });
+    }
+    return Promise.resolve({ data: null, error: null });
+  });
 
   const rows = {
     agent_runs: [
@@ -155,6 +176,12 @@ function createRunnerAdmin(params: {
                   error: null,
                 });
               }
+              if (table === "messages" && params.previousMessagesError) {
+                return Promise.resolve({
+                  data: null,
+                  error: params.previousMessagesError,
+                });
+              }
               return Promise.resolve({ data: [], error: null });
             },
           };
@@ -262,6 +289,52 @@ describe("agent job runner", () => {
         userId: "user-1",
         sessionId: "session-1",
         runId: "run-1",
+      }),
+    );
+  });
+
+  it("fails the run instead of invoking Claude when job history loading fails", async () => {
+    const fake = createRunnerAdmin({
+      previousMessagesError: {
+        code: "XX000",
+        message: "database unavailable",
+      },
+    });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+
+    await runAgentJob("run-1", "worker-1");
+
+    expect(runAgent).not.toHaveBeenCalled();
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: "messages",
+          payload: {
+            content: "",
+            status: "failed",
+          },
+          filters: { id: "assistant-message-1" },
+        }),
+        expect.objectContaining({
+          table: "agent_runs",
+          payload: expect.objectContaining({
+            status: "failed",
+            error_code: "internal_error",
+            error_message:
+              "Agent history load failed: XX000: database unavailable",
+            lease_expires_at: null,
+          }),
+          filters: { id: "run-1" },
+        }),
+      ]),
+    );
+    expect(appendAgentRunEvent).toHaveBeenCalledWith(
+      fake.admin,
+      "run-1",
+      "error",
+      expect.objectContaining({
+        run_id: "run-1",
+        error_code: "internal_error",
       }),
     );
   });

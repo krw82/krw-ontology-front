@@ -1,6 +1,6 @@
 -- Durable rate limiting for chat run requests.
--- The web proxy still keeps a small in-process burst guard, but production
--- enforcement happens through this service-role-only counter.
+-- The web proxy only keeps a high-threshold in-process gross-abuse guard;
+-- production policy enforcement happens through this service-role-only counter.
 
 CREATE TABLE IF NOT EXISTS public.rate_limit_counters (
   key text NOT NULL,

@@ -38,10 +38,29 @@ MCP
 plugin
 skill
 agent_index
+agent_index.sqlite
 SQLite
 JSONL
 cache
 schema
+schema design
+schema version
+ontology schema
+ontology quality
+extraction quality
+artifact
+artifact contract
+canonical artifact
+validation report
+rejected object
+rejected objects
+index internals
+pipeline
+pipeline stage
+registry
+build process
+MCP server
+MCP internals
 diagnostics
 object_id
 quote_id
@@ -80,6 +99,18 @@ traceable_direct
 traceable_related
 direct_answerable
 negative_answer_supported
+온톨로지 품질
+스키마
+스키마 설계
+아티팩트
+아티팩트 계약
+검증 리포트
+리젝트 객체
+인덱스 내부
+파이프라인
+레지스트리
+빌드 과정
+MCP 내부
 ```
 
 ## Replacement style
@@ -93,8 +124,14 @@ Use filing-facing language:
 관련 비용/공급망/마진 맥락은 있습니다
 공시자료의 기간별 수치
 사업/리스크 요인
+확인된 공시 근거는 강합니다
+직접적인 수치 근거는 제한적입니다
+관련 압력 채널은 보이지만 직접 노출로 단정하기는 어렵습니다
+확인된 공시 기준으로는 이 항목이 핵심입니다
 ```
 
 ## Rule
 
-If evidence is incomplete, narrow the answer. Do not add a limitation section explaining internal retrieval limits.
+The agent may use ontology schema, quality, validation, artifact, rejected-object, index, pipeline, registry, and MCP implementation details internally to choose evidence and calibrate confidence.
+
+If evidence is incomplete, narrow the answer. Do not add a limitation section explaining internal retrieval limits, ontology quality, schema coverage, artifact state, rejected objects, index internals, or pipeline behavior.
