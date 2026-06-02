@@ -275,6 +275,20 @@ describe("POST /api/chat/run worker admission", () => {
     expect(response.headers.get("X-Chat-Session-Id")).toBe(
       "11111111-1111-4111-8111-111111111111",
     );
+    expect(checkChatRunRateLimit).toHaveBeenCalledTimes(2);
+    expect(checkChatRunRateLimit).toHaveBeenNthCalledWith(1, {
+      userId: "user-1",
+      requestId: "550e8400-e29b-41d4-a716-446655440001",
+      ip: "127.0.0.1",
+      scope: "user_ip",
+    });
+    expect(checkChatRunRateLimit).toHaveBeenNthCalledWith(2, {
+      userId: "user-1",
+      requestId: "550e8400-e29b-41d4-a716-446655440001",
+      ip: "127.0.0.1",
+      sessionId: "11111111-1111-4111-8111-111111111111",
+      scope: "session",
+    });
     expect(reserveBudgetStep).toHaveBeenCalledWith(
       "user-1",
       "550e8400-e29b-41d4-a716-446655440001",
@@ -339,13 +353,45 @@ describe("POST /api/chat/run worker admission", () => {
     });
     expect(getIndexedCompanies).toHaveBeenCalledTimes(1);
     expect(getIndexedCompanies).toHaveBeenCalledWith(["AAPL", "MSFT"]);
-    expect(releaseExecutionBudget).toHaveBeenCalledWith(
-      "user-1",
-      "550e8400-e29b-41d4-a716-446655440001",
-      null,
-      "session_resolve_failed",
-    );
+    expect(reserveBudgetStep).not.toHaveBeenCalled();
+    expect(releaseExecutionBudget).not.toHaveBeenCalled();
     expect(resolveSession).not.toHaveBeenCalled();
+    expect(fetchHistory).not.toHaveBeenCalled();
+    expect(enqueueAgentRun).not.toHaveBeenCalled();
+  });
+
+  it("does not spend the session rate-limit bucket before session ownership is verified", async () => {
+    vi.mocked(getReadyAgentWorker).mockResolvedValue({
+      ok: true,
+      worker: { worker_id: "mac-worker-jwc-1" } as never,
+      mcpHealth: readyMcpHealth,
+    });
+    vi.mocked(resolveSession).mockResolvedValue({
+      ok: false,
+      response: Response.json(
+        {
+          error: {
+            code: "forbidden",
+            message: "세션에 접근할 수 없습니다.",
+          },
+          request_id: "550e8400-e29b-41d4-a716-446655440001",
+        },
+        { status: 403 },
+      ),
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(403);
+    expect(checkChatRunRateLimit).toHaveBeenCalledOnce();
+    expect(checkChatRunRateLimit).toHaveBeenCalledWith({
+      userId: "user-1",
+      requestId: "550e8400-e29b-41d4-a716-446655440001",
+      ip: "127.0.0.1",
+      scope: "user_ip",
+    });
+    expect(reserveBudgetStep).not.toHaveBeenCalled();
+    expect(releaseExecutionBudget).not.toHaveBeenCalled();
     expect(fetchHistory).not.toHaveBeenCalled();
     expect(enqueueAgentRun).not.toHaveBeenCalled();
   });

@@ -6,6 +6,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { KrwBrand } from "@/components/KrwBrand";
 import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
+import { getConfiguredAppOrigin } from "@/lib/auth/origin";
 import { trackClientEventWithTimeout } from "@/lib/analytics/client";
 import { createClient } from "@/lib/supabase/client";
 import { easeOutExpo } from "@/lib/animation";
@@ -78,7 +79,10 @@ function LoginContent() {
     setErrorVisible(false);
 
     try {
-      const redirectTo = new URL("/auth/callback", window.location.origin);
+      const redirectTo = new URL(
+        "/auth/callback",
+        getConfiguredAppOrigin() ?? window.location.origin,
+      );
       redirectTo.searchParams.set("next", nextPath);
       await trackClientEventWithTimeout("signup_started", {
         provider: "google",

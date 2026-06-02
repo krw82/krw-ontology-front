@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase/middleware", () => ({
   updateSession: vi.fn(() => NextResponse.json({ ok: true })),
@@ -8,8 +8,23 @@ vi.mock("@/lib/supabase/middleware", () => ({
 import { updateSession } from "@/lib/supabase/middleware";
 import { proxy, resetProxyRateLimitForTests } from "./proxy";
 
+const ORIGINAL_NEXT_PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
+const ORIGINAL_NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL;
+
 function request(path: string, headers?: HeadersInit) {
   return new NextRequest(`http://localhost${path}`, { headers });
+}
+
+function absoluteRequest(url: string, headers?: HeadersInit) {
+  return new NextRequest(url, { headers });
+}
+
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
 }
 
 async function json(response: Response) {
@@ -31,12 +46,47 @@ describe("proxy gross-abuse guard", () => {
     vi.clearAllMocks();
     resetProxyRateLimitForTests();
     delete process.env.CHAT_RUN_PROXY_GROSS_ABUSE_PER_MINUTE;
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+    delete process.env.NEXT_PUBLIC_APP_URL;
+  });
+
+  afterEach(() => {
+    restoreEnv("NEXT_PUBLIC_SITE_URL", ORIGINAL_NEXT_PUBLIC_SITE_URL);
+    restoreEnv("NEXT_PUBLIC_APP_URL", ORIGINAL_NEXT_PUBLIC_APP_URL);
+  });
+
+  it("redirects document GET requests to the configured canonical origin", async () => {
+    process.env.NEXT_PUBLIC_SITE_URL = "https://krwontology.com";
+
+    const response = await proxy(
+      absoluteRequest("https://www.krwontology.com/login?next=%2Fchat"),
+    );
+
+    expect(response.status).toBe(308);
+    expect(response.headers.get("Location")).toBe(
+      "https://krwontology.com/login?next=%2Fchat",
+    );
+    expect(updateSession).not.toHaveBeenCalled();
+  });
+
+  it("does not redirect the canonical host when only the internal protocol differs", async () => {
+    process.env.NEXT_PUBLIC_SITE_URL = "https://krwontology.com";
+
+    const response = await proxy(
+      absoluteRequest("http://web:3000/login?next=%2Fchat", {
+        host: "krwontology.com",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Location")).toBeNull();
+    expect(updateSession).toHaveBeenCalledOnce();
   });
 
   it("lets normal chat run requests pass through to session middleware", async () => {
     const response = await proxy(
       request("/api/chat/run", {
-        "cf-connecting-ip": "203.0.113.20",
+        "x-krw-client-ip": "203.0.113.20",
       }),
     );
 
@@ -48,10 +98,10 @@ describe("proxy gross-abuse guard", () => {
   it("uses a high-threshold gross-abuse guard with API-shaped errors", async () => {
     process.env.CHAT_RUN_PROXY_GROSS_ABUSE_PER_MINUTE = "2";
 
-    await proxy(request("/api/chat/run", { "x-real-ip": "198.51.100.8" }));
-    await proxy(request("/api/chat/run", { "x-real-ip": "198.51.100.8" }));
+    await proxy(request("/api/chat/run", { "x-krw-client-ip": "198.51.100.8" }));
+    await proxy(request("/api/chat/run", { "x-krw-client-ip": "198.51.100.8" }));
     const response = await proxy(
-      request("/api/chat/run", { "x-real-ip": "198.51.100.8" }),
+      request("/api/chat/run", { "x-krw-client-ip": "198.51.100.8" }),
     );
 
     expect(response.status).toBe(429);
@@ -68,9 +118,9 @@ describe("proxy gross-abuse guard", () => {
   it("does not rate-limit unrelated routes in proxy", async () => {
     process.env.CHAT_RUN_PROXY_GROSS_ABUSE_PER_MINUTE = "1";
 
-    await proxy(request("/api/companies", { "x-real-ip": "198.51.100.8" }));
+    await proxy(request("/api/companies", { "x-krw-client-ip": "198.51.100.8" }));
     const response = await proxy(
-      request("/api/companies", { "x-real-ip": "198.51.100.8" }),
+      request("/api/companies", { "x-krw-client-ip": "198.51.100.8" }),
     );
 
     expect(response.status).toBe(200);

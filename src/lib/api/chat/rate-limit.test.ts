@@ -65,6 +65,63 @@ describe("chat run durable rate limit", () => {
     });
   });
 
+  it("can check only user and IP buckets before session ownership is known", async () => {
+    const rpc = mockRpc();
+
+    const result = await checkChatRunRateLimit(
+      {
+        userId: "user-1",
+        requestId: "req-1",
+        ip: "203.0.113.10",
+        sessionId: "session-1",
+        scope: "user_ip",
+      },
+      new Date("2026-05-23T01:02:33.456Z"),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc).toHaveBeenNthCalledWith(1, "increment_rate_limit", {
+      p_key: "user:user-1",
+      p_bucket: "chat_run:user:minute",
+      p_window_start: "2026-05-23T01:02:00.000Z",
+      p_window_seconds: 60,
+      p_limit: 5,
+    });
+    expect(rpc).toHaveBeenNthCalledWith(2, "increment_rate_limit", {
+      p_key: "ip:203.0.113.10",
+      p_bucket: "chat_run:ip:minute",
+      p_window_start: "2026-05-23T01:02:00.000Z",
+      p_window_seconds: 60,
+      p_limit: 20,
+    });
+  });
+
+  it("can check only the owned session bucket after ownership is known", async () => {
+    const rpc = mockRpc();
+
+    const result = await checkChatRunRateLimit(
+      {
+        userId: "user-1",
+        requestId: "req-1",
+        ip: "203.0.113.10",
+        sessionId: "session-1",
+        scope: "session",
+      },
+      new Date("2026-05-23T01:02:33.456Z"),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(rpc).toHaveBeenCalledWith("increment_rate_limit", {
+      p_key: "session:session-1",
+      p_bucket: "chat_run:session:minute",
+      p_window_start: "2026-05-23T01:02:00.000Z",
+      p_window_seconds: 60,
+      p_limit: 8,
+    });
+  });
+
   it("returns a 429 with Retry-After when a bucket is exhausted", async () => {
     mockRpc(
       vi

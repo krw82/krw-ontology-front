@@ -89,12 +89,15 @@ export async function POST(request: NextRequest) {
     }), existingRun.session_id);
   }
 
-  // 3. Check durable request rate limits before reserving budget or starting work.
+  const clientIp = getClientIp(request.headers);
+
+  // 3. Check durable user/IP request rate limits before reserving budget or
+  // starting work. The session bucket is checked only after ownership is known.
   const rateLimitResult = await checkChatRunRateLimit({
     userId,
     requestId: request_id,
-    ip: getClientIp(request.headers),
-    sessionId: body.session_id ?? null,
+    ip: clientIp,
+    scope: "user_ip",
   });
   if (!rateLimitResult.ok) return rateLimitResult.response;
 
@@ -127,19 +130,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 5. Open an execution-budget record before creating durable chat work.
-  const budgetResult = await reserveBudgetStep(
-    userId,
-    request_id,
-    userEmail,
-    body.research_mode,
-  );
-  if (!budgetResult.ok) return budgetResult.response;
-
-  // 6. Resolve session (lookup + ownership check)
+  // 5. Resolve session (lookup + ownership check) before touching the
+  // per-session rate-limit bucket.
   const sessionIdResult = await getOrCreateSessionId(body, userId, request_id);
   if (!sessionIdResult.ok) {
-    await releaseExecutionBudget(userId, request_id, null, "session_resolve_failed");
     return sessionIdResult.response;
   }
 
@@ -149,10 +143,27 @@ export async function POST(request: NextRequest) {
     request_id,
   );
   if (!sessionResult.ok) {
-    await releaseExecutionBudget(userId, request_id, null, "session_forbidden");
     return sessionResult.response;
   }
   const session = sessionResult.session;
+
+  const sessionRateLimitResult = await checkChatRunRateLimit({
+    userId,
+    requestId: request_id,
+    ip: clientIp,
+    sessionId: session.id,
+    scope: "session",
+  });
+  if (!sessionRateLimitResult.ok) return sessionRateLimitResult.response;
+
+  // 6. Open an execution-budget record before creating durable chat work.
+  const budgetResult = await reserveBudgetStep(
+    userId,
+    request_id,
+    userEmail,
+    body.research_mode,
+  );
+  if (!budgetResult.ok) return budgetResult.response;
 
   // 7. Save user message idempotently & fetch history
   const historyResult = await fetchHistory(session.id, content, request_id);

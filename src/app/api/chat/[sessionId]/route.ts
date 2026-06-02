@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { getAuthUser, handleAuthError, forbiddenError } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/api/validation";
+import { publicAgentErrorMessage } from "@/lib/api/chat/error-messages";
 import type {
   AgentRunRow,
   ChatSessionRow,
@@ -75,7 +76,7 @@ export async function GET(
   const { data: runs, error: runsError } = await supabase
     .from("agent_runs")
     .select(
-      "id, status, model, assistant_message_id, queued_at, started_at, finished_at, latency_ms, input_tokens, output_tokens, estimated_cost_usd, ontology_env, worker_env, ontology_release_id, index_generated_at, company_count, document_count, object_count, ontology_root, index_path, manifest_path, manifest_valid, agent_index_schema_version, error_code, error_message"
+      "id, status, model, assistant_message_id, queued_at, started_at, finished_at, latency_ms, input_tokens, output_tokens, estimated_cost_usd, ontology_env, worker_env, ontology_release_id, index_generated_at, company_count, document_count, object_count, manifest_valid, agent_index_schema_version, error_code"
     )
     .eq("session_id", sessionId)
     .order("queued_at", { ascending: true, nullsFirst: true })
@@ -88,11 +89,39 @@ export async function GET(
   return Response.json({
     session,
     messages: messages ?? [],
-    runs: (runs ?? []).map((run) => ({
-      ...run,
-      started_at: run.started_at ?? run.queued_at ?? null,
-    })),
+    runs: (runs ?? []).map(toPublicRunSummary),
     rich_answers: [],
     research_artifacts: [],
   });
+}
+
+function toPublicRunSummary(run: Partial<AgentRunRow>) {
+  const errorCode = run.error_code ?? null;
+
+  return {
+    id: run.id,
+    status: run.status,
+    model: run.model,
+    assistant_message_id: run.assistant_message_id ?? null,
+    queued_at: run.queued_at ?? null,
+    started_at: run.started_at ?? run.queued_at ?? "",
+    finished_at: run.finished_at ?? null,
+    latency_ms: run.latency_ms ?? null,
+    input_tokens: run.input_tokens ?? null,
+    output_tokens: run.output_tokens ?? null,
+    estimated_cost_usd: run.estimated_cost_usd ?? null,
+    ontology_env: run.ontology_env ?? null,
+    worker_env: run.worker_env ?? null,
+    ontology_release_id: run.ontology_release_id ?? null,
+    index_generated_at: run.index_generated_at ?? null,
+    company_count: run.company_count ?? null,
+    document_count: run.document_count ?? null,
+    object_count: run.object_count ?? null,
+    manifest_valid: run.manifest_valid ?? null,
+    agent_index_schema_version: run.agent_index_schema_version ?? null,
+    error_code: errorCode,
+    error_message: errorCode
+      ? publicAgentErrorMessage({ code: errorCode })
+      : null,
+  };
 }

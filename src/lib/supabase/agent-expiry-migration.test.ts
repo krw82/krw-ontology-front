@@ -90,4 +90,48 @@ describe("agent queue expiry migration", () => {
       "grant execute on function public.claim_agent_run(text, text, text, integer, integer)",
     );
   });
+
+  it("restricts privileged worker RPCs to service_role and caps worker leases", () => {
+    const migration = readFileSync(
+      "supabase/migrations/20260602073850_harden_privileged_rpc_acl.sql",
+      "utf8",
+    );
+
+    expect(migration).toContain(
+      "v_lease_seconds integer := least(greatest(coalesce(p_lease_seconds, 300), 30), 1800)",
+    );
+    expect(migration).toContain(
+      "revoke all on function public.claim_agent_run(text, integer, integer)",
+    );
+    expect(migration).toContain(
+      "revoke all on function public.claim_agent_run(text, text, text, integer, integer)",
+    );
+    expect(migration).toContain(
+      "revoke all on function public.heartbeat_agent_run(uuid, text, integer)",
+    );
+    expect(migration).toContain(
+      "revoke all on function public.mark_agent_run_terminal",
+    );
+    expect(migration).toContain(
+      "revoke all on function public.publish_ontology_web_catalog(jsonb)",
+    );
+    expect(migration).toContain(
+      "revoke all on function public.record_usage_event",
+    );
+    expect(migration).toContain(
+      "from PUBLIC, anon, authenticated",
+    );
+    expect(migration).toContain(
+      "grant execute on function public.claim_agent_run(text, text, text, integer, integer)",
+    );
+    expect(migration).toContain(
+      "grant execute on function public.heartbeat_agent_run(uuid, text, integer)",
+    );
+    expect(migration).toContain(
+      "grant execute on function public.publish_ontology_web_catalog(jsonb)",
+    );
+    expect(migration).toContain(
+      "grant execute on function public.record_usage_event",
+    );
+  });
 });

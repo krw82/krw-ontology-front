@@ -63,7 +63,7 @@ function createSupabase(overrides: {
       session_id: SESSION_ID,
       role: "user",
       content: "Apple 알려줘",
-      status: "completed",
+      status: "failed",
       request_id: null,
       created_at: "2026-05-31T00:00:00.000Z",
       updated_at: "2026-05-31T00:00:00.000Z",
@@ -94,8 +94,8 @@ function createSupabase(overrides: {
       manifest_path: "/tmp/manifest.json",
       manifest_valid: true,
       agent_index_schema_version: "agent_index_v1",
-      error_code: null,
-      error_message: null,
+      error_code: "claude_api_error",
+      error_message: "stack trace: secret=/srv/claude-prod/token",
     },
   ];
 
@@ -191,9 +191,18 @@ describe("GET /api/chat/[sessionId]", () => {
         {
           id: "run-1",
           started_at: "2026-05-31T00:00:00.000Z",
+          error_code: "claude_api_error",
+          error_message:
+            "에이전트 실행 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
         },
       ],
     });
+    expect(body.runs?.[0]).not.toHaveProperty("ontology_root");
+    expect(body.runs?.[0]).not.toHaveProperty("index_path");
+    expect(body.runs?.[0]).not.toHaveProperty("manifest_path");
+    expect(body.runs?.[0]?.error_message).not.toContain(
+      "/srv/claude-prod/token",
+    );
     expect(supabase.queriedTables).toEqual([
       "chat_sessions",
       "messages",

@@ -13,11 +13,14 @@ type LimitCheck = {
   limit: number;
 };
 
+type RateLimitScope = "all" | "user_ip" | "session";
+
 type RateLimitArgs = {
   userId: string;
   requestId: string;
   ip: string;
   sessionId?: string | null;
+  scope?: RateLimitScope;
 };
 
 type RateLimitAllowed = {
@@ -58,23 +61,31 @@ function getWindowStart(now: Date): string {
 }
 
 function buildLimitChecks(args: RateLimitArgs): LimitCheck[] {
-  const checks: LimitCheck[] = [
-    {
-      key: `user:${args.userId}`,
-      bucket: "chat_run:user:minute",
-      limit: readPositiveIntEnv(
-        "CHAT_RUNS_PER_USER_PER_MINUTE",
-        DEFAULT_USER_LIMIT,
-      ),
-    },
-    {
-      key: `ip:${args.ip}`,
-      bucket: "chat_run:ip:minute",
-      limit: readPositiveIntEnv("CHAT_RUNS_PER_IP_PER_MINUTE", DEFAULT_IP_LIMIT),
-    },
-  ];
+  const scope = args.scope ?? "all";
+  const checks: LimitCheck[] = [];
 
-  if (args.sessionId) {
+  if (scope === "all" || scope === "user_ip") {
+    checks.push(
+      {
+        key: `user:${args.userId}`,
+        bucket: "chat_run:user:minute",
+        limit: readPositiveIntEnv(
+          "CHAT_RUNS_PER_USER_PER_MINUTE",
+          DEFAULT_USER_LIMIT,
+        ),
+      },
+      {
+        key: `ip:${args.ip}`,
+        bucket: "chat_run:ip:minute",
+        limit: readPositiveIntEnv(
+          "CHAT_RUNS_PER_IP_PER_MINUTE",
+          DEFAULT_IP_LIMIT,
+        ),
+      },
+    );
+  }
+
+  if ((scope === "all" || scope === "session") && args.sessionId) {
     checks.push({
       key: `session:${args.sessionId}`,
       bucket: "chat_run:session:minute",

@@ -232,6 +232,7 @@ export interface AgentRunSummary {
   status: RunStatus;
   model: string;
   assistant_message_id: string | null;
+  queued_at?: string | null;
   started_at: string;
   finished_at: string | null;
   latency_ms: number | null;
@@ -239,13 +240,12 @@ export interface AgentRunSummary {
   output_tokens: number | null;
   estimated_cost_usd: number | null;
   ontology_env?: "dev" | "staging" | "prod";
+  worker_env?: "dev" | "staging" | "prod" | null;
   ontology_release_id: string | null;
   index_generated_at: string | null;
   company_count?: number | null;
   document_count?: number | null;
   object_count?: number | null;
-  index_path?: string | null;
-  manifest_path?: string | null;
   manifest_valid?: boolean | null;
   agent_index_schema_version?: string | null;
   error_code: ErrorCode | null;
@@ -651,8 +651,6 @@ export interface ReleaseMetadata {
   company_count: number;
   document_count: number;
   object_count?: number;
-  index_path?: string;
-  manifest_path?: string;
   manifest_valid?: boolean;
   agent_index_schema_version?: string;
   krw_ontology_commit: string;

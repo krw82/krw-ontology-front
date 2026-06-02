@@ -148,6 +148,13 @@ describe("production deploy scripts", () => {
     expect(script).toContain("DEPLOY_ARGS=\"$DEPLOY_ARGS --release-id $1\"");
     expect(script).toContain("--no-publish-prod");
     expect(script).toContain("--no-rebuild-agent-index");
+    expect(script).toContain("ONTOLOGY_SOURCE_DIR=");
+    expect(script).toContain("uv run krw-ontology");
+    expect(script).toContain("queue status --root \"$QUEUE_ROOT\" --json");
+    expect(script).toContain("assert_queue_stopped_and_safe");
+    expect(script).toContain("Local ontology queue can mutate prod/current");
+    expect(script).toContain("Warning: queue has");
+    expect(script).not.toContain("grep -q 'running=0'");
     expect(script).not.toContain("QUEUE_PUBLISH_PROD");
     expect(script).not.toContain("agent_index.sqlite");
   });
@@ -174,7 +181,11 @@ describe("production deploy scripts", () => {
     expect(webSection).not.toContain("KRW_ONTOLOGY_RELEASE_ROOT");
     expect(webSection).not.toContain("agent_index.sqlite");
     expect(webSection).not.toContain("/srv/krw-ontology-data:/srv/krw-ontology-data");
-    expect(read("Dockerfile.web")).toContain("krw-ontology-mcp-stdio");
+    const dockerfileWeb = read("Dockerfile.web");
+    expect(dockerfileWeb).toContain(
+      '"/opt/krw-ontology-venv/bin/krw-ontology-mcp"',
+    );
+    expect(dockerfileWeb).not.toContain("krw-ontology-mcp-stdio");
   });
 
   it("keeps Mac worker cutover scripts conservative", () => {

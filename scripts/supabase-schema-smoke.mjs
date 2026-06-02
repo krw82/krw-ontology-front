@@ -36,10 +36,12 @@ loadEnvFile(path.join(repoRoot, ".env"));
 const supabaseUrl =
   process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const anonKey =
+  process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !serviceRoleKey) {
+if (!supabaseUrl || !serviceRoleKey || !anonKey) {
   console.error(
-    "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for schema smoke test.",
+    "Missing SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, or SUPABASE_ANON_KEY/NEXT_PUBLIC_SUPABASE_ANON_KEY for schema smoke test.",
   );
   process.exit(1);
 }
@@ -47,11 +49,15 @@ if (!supabaseUrl || !serviceRoleKey) {
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
+const anonSupabase = createClient(supabaseUrl, anonKey, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
 
 const checks = [
   {
     table: "chat_sessions",
-    select: "id,deleted_at,client_request_id",
+    select:
+      "id,deleted_at,client_request_id,last_message_preview,last_message_at,latest_run_status",
   },
   {
     table: "messages",
@@ -153,5 +159,82 @@ if (reserveRpcError && reserveRpcError.code !== "23503") {
   process.exit(1);
 }
 console.log("OK schema: reserve_execution_budget RPC");
+
+function isExpectedBlockedRpcError(error) {
+  const code = String(error?.code ?? "");
+  const message = String(error?.message ?? "").toLowerCase();
+
+  return (
+    code === "42501" ||
+    code === "PGRST202" ||
+    message.includes("permission denied") ||
+    message.includes("could not find the function") ||
+    message.includes("schema cache")
+  );
+}
+
+async function expectAnonRpcBlocked(name, args) {
+  const { data, error } = await anonSupabase.rpc(name, args);
+
+  if (!error) {
+    console.error(
+      `Schema smoke failed for ${name}: anon role executed privileged RPC (${JSON.stringify(
+        data,
+      )}).`,
+    );
+    process.exit(1);
+  }
+
+  if (!isExpectedBlockedRpcError(error)) {
+    console.error(
+      `Schema smoke failed for ${name}: expected anon execute denial, got ${error.code ?? "unknown"} ${error.message}`,
+    );
+    process.exit(1);
+  }
+
+  console.log(`OK schema: ${name} blocks anon execute`);
+}
+
+await expectAnonRpcBlocked("claim_agent_run", {
+  p_worker_id: "",
+  p_lease_seconds: 300,
+  p_global_limit: 1,
+});
+await expectAnonRpcBlocked("claim_agent_run", {
+  p_worker_id: "schema-smoke",
+  p_worker_env: "invalid",
+  p_ontology_env: "prod",
+  p_lease_seconds: 300,
+  p_global_limit: 1,
+});
+await expectAnonRpcBlocked("heartbeat_agent_run", {
+  p_run_id: zeroUuid,
+  p_worker_id: "schema-smoke",
+  p_lease_seconds: 300,
+});
+await expectAnonRpcBlocked("mark_agent_run_terminal", {
+  p_run_id: zeroUuid,
+  p_status: "failed",
+  p_finished_at: new Date().toISOString(),
+  p_error_code: "schema_smoke",
+  p_error_message: "schema smoke",
+  p_input_tokens: null,
+  p_output_tokens: null,
+  p_estimated_cost_usd: null,
+  p_latency_ms: null,
+  p_assistant_message_id: null,
+  p_open_tool_error_message: null,
+});
+await expectAnonRpcBlocked("publish_ontology_web_catalog", {
+  p_catalog: {},
+});
+await expectAnonRpcBlocked("record_usage_event", {
+  p_user_id: zeroUuid,
+  p_request_id: "schema-smoke",
+  p_run_id: zeroUuid,
+  p_period_start: new Date().toISOString(),
+  p_period_end: new Date().toISOString(),
+  p_cost: 0,
+});
 
 console.log("Supabase schema smoke test passed.");

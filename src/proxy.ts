@@ -1,5 +1,6 @@
 import { updateSession } from "@/lib/supabase/middleware";
 import { getClientIp } from "@/lib/http/client-ip";
+import { getConfiguredAppOrigin } from "@/lib/auth/origin";
 import { buildContentSecurityPolicy } from "@/lib/security/headers";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
@@ -32,6 +33,38 @@ function isRateLimited(ip: string, limit = getGrossAbuseLimit()): boolean {
 
 function shouldApplyContentSecurityPolicy(pathname: string) {
   return !pathname.startsWith("/api/");
+}
+
+function shouldApplyCanonicalRedirect(pathname: string) {
+  return !pathname.startsWith("/api/") && !pathname.startsWith("/internal/");
+}
+
+function getCanonicalRedirectUrl(request: NextRequest): URL | null {
+  if (
+    request.method !== "GET" &&
+    request.method !== "HEAD"
+  ) {
+    return null;
+  }
+  if (!shouldApplyCanonicalRedirect(request.nextUrl.pathname)) return null;
+
+  const canonicalOrigin = getConfiguredAppOrigin();
+  if (!canonicalOrigin) return null;
+
+  const canonicalUrl = new URL(canonicalOrigin);
+  const requestHost =
+    request.headers.get("host")?.split(":")[0]?.trim().toLowerCase() ||
+    request.nextUrl.hostname;
+
+  if (requestHost === canonicalUrl.hostname) {
+    return null;
+  }
+
+  const redirectUrl = request.nextUrl.clone();
+  redirectUrl.protocol = canonicalUrl.protocol;
+  redirectUrl.hostname = canonicalUrl.hostname;
+  redirectUrl.port = canonicalUrl.port;
+  return redirectUrl;
 }
 
 function createCspRequestHeaders() {
@@ -68,6 +101,11 @@ if (typeof globalThis._rateLimitCleanup === "undefined") {
 }
 
 export async function proxy(request: NextRequest) {
+  const canonicalRedirectUrl = getCanonicalRedirectUrl(request);
+  if (canonicalRedirectUrl) {
+    return NextResponse.redirect(canonicalRedirectUrl, 308);
+  }
+
   const csp = shouldApplyContentSecurityPolicy(request.nextUrl.pathname)
     ? createCspRequestHeaders()
     : null;

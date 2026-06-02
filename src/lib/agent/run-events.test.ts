@@ -294,6 +294,99 @@ describe("agent run events", () => {
     );
   });
 
+  it("redacts private release paths while replaying durable done events", async () => {
+    const fake = createEventAdmin({
+      runs: [
+        {
+          id: "run-1",
+          session_id: "session-1",
+          request_id: "req-1",
+          status: "completed",
+          error_code: null,
+        },
+      ],
+      sessions: [{ id: "session-1", user_id: "user-1", deleted_at: null }],
+      events: [
+        {
+          id: 1,
+          run_id: "run-1",
+          event_type: "done",
+          payload: {
+            run_id: "run-1",
+            message_id: "message-1",
+            release: {
+              ontology_release_id: "release-1",
+              ontology_env: "dev",
+              index_path: "/srv/private/index.sqlite",
+              manifest_path: "/srv/private/manifest.json",
+              company_count: 1,
+              document_count: 2,
+              object_count: 3,
+              krw_ontology_commit: "abc123",
+              web_commit: "def456",
+            },
+          },
+          created_at: "2026-05-25T00:00:00.000Z",
+        },
+      ],
+    });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+
+    const response = streamAgentRunEventsResponse({
+      userId: "user-1",
+      sessionId: "session-1",
+      runId: "run-1",
+    });
+
+    const text = await readStream(response);
+    expect(text).toContain('"ontology_release_id":"release-1"');
+    expect(text).not.toContain("index_path");
+    expect(text).not.toContain("manifest_path");
+    expect(text).not.toContain("/srv/private");
+  });
+
+  it("redacts raw error messages while replaying durable error events", async () => {
+    const fake = createEventAdmin({
+      runs: [
+        {
+          id: "run-1",
+          session_id: "session-1",
+          request_id: "req-1",
+          status: "failed",
+          error_code: "claude_api_error",
+        },
+      ],
+      sessions: [{ id: "session-1", user_id: "user-1", deleted_at: null }],
+      events: [
+        {
+          id: 1,
+          run_id: "run-1",
+          event_type: "error",
+          payload: {
+            run_id: "run-1",
+            error_code: "claude_api_error",
+            error_message: "stack trace: secret=/srv/claude-prod/token",
+          },
+          created_at: "2026-05-25T00:00:00.000Z",
+        },
+      ],
+    });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+
+    const response = streamAgentRunEventsResponse({
+      userId: "user-1",
+      sessionId: "session-1",
+      runId: "run-1",
+    });
+
+    const text = await readStream(response);
+    expect(text).toContain(
+      "에이전트 실행 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+    );
+    expect(text).not.toContain("secret=");
+    expect(text).not.toContain("/srv/claude-prod/token");
+  });
+
   it("turns unknown or unauthorized runs into idle state sync", async () => {
     const fake = createEventAdmin({
       runs: [

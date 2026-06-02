@@ -43,6 +43,7 @@ import type {
 } from "@/types/database";
 import type {
   DocumentType,
+  ReleaseMetadata,
   StreamingCitation,
 } from "@/types/api-contracts";
 import { toErrorCode } from "@/types/api-contracts";
@@ -69,6 +70,18 @@ const OUTPUT_COST_PER_1M = Number.parseFloat(
 );
 
 type SupabaseAdmin = ReturnType<typeof getSupabaseAdmin>;
+type PublicReleaseInput = Omit<
+  ReleaseMetadata,
+  "krw_ontology_commit" | "web_commit"
+>;
+
+function publicReleaseMetadata(release: PublicReleaseInput): ReleaseMetadata {
+  return {
+    ...release,
+    krw_ontology_commit: process.env.KRW_ONTOLOGY_COMMIT || "dev",
+    web_commit: process.env.WEB_COMMIT || "dev",
+  };
+}
 
 class AgentRunHardTimeoutError extends Error {
   constructor(timeoutMs: number) {
@@ -274,8 +287,6 @@ export async function runAgentJob(runId: string, workerId: string) {
           company_count: mcpHealth.companyCount ?? 0,
           document_count: mcpHealth.documentCount ?? 0,
           object_count: mcpHealth.objectCount ?? 0,
-          index_path: mcpHealth.indexPath ?? "",
-          manifest_path: mcpHealth.manifestPath ?? "",
           manifest_valid: mcpHealth.manifestValid,
           agent_index_schema_version: mcpHealth.agentIndexSchemaVersion ?? "",
         },
@@ -730,18 +741,7 @@ async function handleCompletedJob(params: {
   job: AgentJob;
   runStartedAt: string;
   result: { acc: AccumulatedRun };
-  release: {
-    ontology_env: string;
-    ontology_release_id: string;
-    index_generated_at: string;
-    company_count: number;
-    document_count: number;
-    object_count: number;
-    index_path: string;
-    manifest_path: string;
-    manifest_valid: boolean;
-    agent_index_schema_version: string;
-  };
+  release: PublicReleaseInput;
   sendEvent: (event: Parameters<typeof appendAgentRunEvent>[2], payload: unknown) => Promise<void>;
 }) {
   const { admin, job, runStartedAt, result, release, sendEvent } = params;
@@ -817,11 +817,7 @@ async function handleCompletedJob(params: {
     content: visibleAnswer,
     rich_answers: [],
     artifacts: [],
-    release: {
-      ...release,
-      krw_ontology_commit: process.env.KRW_ONTOLOGY_COMMIT || "dev",
-      web_commit: process.env.WEB_COMMIT || "dev",
-    },
+    release: publicReleaseMetadata(release),
     usage: {
       input_tokens: acc.inputTokens,
       output_tokens: acc.outputTokens,

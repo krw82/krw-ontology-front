@@ -1,11 +1,15 @@
+import { isIP } from "node:net";
+
+const DEFAULT_TRUSTED_CLIENT_IP_HEADER = "x-krw-client-ip";
+
+function getTrustedClientIpHeaderName(): string {
+  const configured = process.env.TRUSTED_CLIENT_IP_HEADER?.trim().toLowerCase();
+  return configured || DEFAULT_TRUSTED_CLIENT_IP_HEADER;
+}
+
 export function getClientIp(headers: Headers): string {
-  const cloudflareIp = headers.get("cf-connecting-ip")?.trim();
-  if (cloudflareIp) return cloudflareIp;
+  const rawIp = headers.get(getTrustedClientIpHeaderName())?.trim();
+  const clientIp = rawIp?.split(",")[0]?.trim();
 
-  const realIp = headers.get("x-real-ip")?.trim();
-  if (realIp) return realIp;
-
-  const forwardedFor = headers.get("x-forwarded-for");
-  const firstForwardedIp = forwardedFor?.split(",")[0]?.trim();
-  return firstForwardedIp || "unknown";
+  return clientIp && isIP(clientIp) ? clientIp : "unknown";
 }

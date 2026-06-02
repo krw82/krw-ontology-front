@@ -70,7 +70,6 @@ use a bounded covered universe
 synthesize cross-company signals
 avoid whole-catalog inventory
 avoid unsupported tickers
-do not introduce non-covered companies in the answer or follow-up questions
 answer from covered companies and caveat coverage only if it changes interpretation
 ```
 

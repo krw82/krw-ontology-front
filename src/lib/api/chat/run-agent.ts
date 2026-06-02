@@ -29,7 +29,10 @@ import type {
   Json,
   MessageRow,
 } from "@/types/database";
-import type { StreamingCitation } from "@/types/api-contracts";
+import type {
+  ReleaseMetadata,
+  StreamingCitation,
+} from "@/types/api-contracts";
 import { toErrorCode } from "@/types/api-contracts";
 import { getOntologyEnv, readIntEnv } from "@/lib/env";
 import type { ResearchMode } from "@/lib/research-mode";
@@ -49,6 +52,19 @@ const AGENT_RUN_HARD_TIMEOUT_MS =
   readIntEnv("AGENT_RUN_HARD_TIMEOUT_MINUTES", 6, { min: 1 }) * 60_000;
 const RUN_TIMEOUT_MESSAGE =
   "분석 시간이 초과되었습니다. 다시 시도해주세요.";
+
+type PublicReleaseInput = Omit<
+  ReleaseMetadata,
+  "krw_ontology_commit" | "web_commit"
+>;
+
+function publicReleaseMetadata(release: PublicReleaseInput): ReleaseMetadata {
+  return {
+    ...release,
+    krw_ontology_commit: process.env.KRW_ONTOLOGY_COMMIT || "dev",
+    web_commit: process.env.WEB_COMMIT || "dev",
+  };
+}
 
 export interface RunAgentParams {
   request: NextRequest;
@@ -451,8 +467,6 @@ type PersistedRun = Pick<
   | "company_count"
   | "document_count"
   | "object_count"
-  | "index_path"
-  | "manifest_path"
   | "manifest_valid"
   | "agent_index_schema_version"
   | "error_code"
@@ -653,7 +667,7 @@ export async function streamPersistedRunEvents(params: {
 }
 
 const PERSISTED_RUN_SELECT =
-  "id, session_id, assistant_message_id, request_id, status, lease_expires_at, started_at, input_tokens, output_tokens, estimated_cost_usd, latency_ms, ontology_env, ontology_release_id, index_generated_at, company_count, document_count, object_count, index_path, manifest_path, manifest_valid, agent_index_schema_version, error_code, error_message";
+  "id, session_id, assistant_message_id, request_id, status, lease_expires_at, started_at, input_tokens, output_tokens, estimated_cost_usd, latency_ms, ontology_env, ontology_release_id, index_generated_at, company_count, document_count, object_count, manifest_valid, agent_index_schema_version, error_code, error_message";
 
 async function expirePersistedRunIfNeeded(
   admin: ReturnType<typeof getSupabaseAdmin>,
@@ -769,20 +783,16 @@ async function sendPersistedDoneEvent(params: {
     content: message?.content ?? "",
     rich_answers: [],
     artifacts: [],
-    release: {
+    release: publicReleaseMetadata({
       ontology_env: run.ontology_env ?? getOntologyEnv(),
       ontology_release_id: run.ontology_release_id ?? "",
       index_generated_at: run.index_generated_at ?? "",
       company_count: run.company_count ?? 0,
       document_count: run.document_count ?? 0,
       object_count: run.object_count ?? 0,
-      index_path: run.index_path ?? "",
-      manifest_path: run.manifest_path ?? "",
       manifest_valid: run.manifest_valid ?? false,
       agent_index_schema_version: run.agent_index_schema_version ?? "",
-      krw_ontology_commit: process.env.KRW_ONTOLOGY_COMMIT || "dev",
-      web_commit: process.env.WEB_COMMIT || "dev",
-    },
+    }),
     usage: {
       input_tokens: run.input_tokens ?? 0,
       output_tokens: run.output_tokens ?? 0,
@@ -1065,20 +1075,16 @@ async function handleCompletedRun(params: CompletedRunParams) {
     content: visibleAnswer,
     rich_answers: [],
     artifacts: [],
-    release: {
+    release: publicReleaseMetadata({
       ontology_env: mcpHealth.env ?? getOntologyEnv(),
       ontology_release_id: mcpHealth.releaseId ?? "",
       index_generated_at: mcpHealth.indexGeneratedAt ?? "",
       company_count: mcpHealth.companyCount ?? 0,
       document_count: mcpHealth.documentCount ?? 0,
       object_count: mcpHealth.objectCount ?? 0,
-      index_path: mcpHealth.indexPath ?? "",
-      manifest_path: mcpHealth.manifestPath ?? "",
       manifest_valid: mcpHealth.manifestValid,
       agent_index_schema_version: mcpHealth.agentIndexSchemaVersion ?? "",
-      krw_ontology_commit: process.env.KRW_ONTOLOGY_COMMIT || "dev",
-      web_commit: process.env.WEB_COMMIT || "dev",
-    },
+    }),
     usage: {
       input_tokens: acc.inputTokens,
       output_tokens: acc.outputTokens,

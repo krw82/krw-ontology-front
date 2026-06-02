@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { readIntEnv } from "@/lib/env";
+import { publicAgentErrorMessage } from "@/lib/api/chat/error-messages";
 import type { Json } from "@/types/database";
 import type { RunStatus, StreamingEventType } from "@/types/api-contracts";
 
@@ -169,7 +170,11 @@ export function streamAgentRunEventsResponse(params: {
 
         for (const event of events) {
           cursor = Math.max(cursor, event.id);
-          await sendEvent(event.event_type, event.payload, event.id);
+          await sendEvent(
+            event.event_type,
+            sanitizeStreamingPayload(event.event_type, event.payload),
+            event.id,
+          );
 
           if (isTerminalEvent(event.event_type)) {
             controller.close();
@@ -434,6 +439,65 @@ function isTerminalStatus(status: RunStatus): boolean {
     status === "failed" ||
     status === "cancelled" ||
     status === "expired"
+  );
+}
+
+function sanitizeStreamingPayload(
+  eventType: StreamingEventType,
+  payload: Json,
+): unknown {
+  if (!isPlainObject(payload)) return payload;
+
+  if (eventType === "done") {
+    return {
+      ...payload,
+      release: isPlainObject(payload.release)
+        ? sanitizeReleasePayload(payload.release)
+        : payload.release,
+    };
+  }
+
+  if (eventType === "error") {
+    const errorCode =
+      typeof payload.error_code === "string" ? payload.error_code : null;
+    return {
+      ...payload,
+      error_message: publicAgentErrorMessage({ code: errorCode }),
+    };
+  }
+
+  return payload;
+}
+
+function sanitizeReleasePayload(release: Record<string, unknown>) {
+  const allowedKeys = [
+    "ontology_release_id",
+    "ontology_env",
+    "index_generated_at",
+    "company_count",
+    "document_count",
+    "object_count",
+    "manifest_valid",
+    "agent_index_schema_version",
+    "krw_ontology_commit",
+    "web_commit",
+  ];
+  const sanitized: Record<string, unknown> = {};
+
+  for (const key of allowedKeys) {
+    if (Object.prototype.hasOwnProperty.call(release, key)) {
+      sanitized[key] = release[key];
+    }
+  }
+
+  return sanitized;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value)
   );
 }
 
