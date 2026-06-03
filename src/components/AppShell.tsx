@@ -3,6 +3,7 @@
 import { usePathname, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import ChatSidebar from "@/components/ChatSidebar";
+import { stripLocalePrefix } from "@/i18n/routing";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -29,9 +30,10 @@ export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const reducedMotion = useReducedMotion();
-  const showSidebar = shouldShowGlobalSidebar(pathname);
-  const isBrowse = isBrowseWorkspace(pathname);
-  const isChat = isChatWorkspace(pathname);
+  const unlocalizedPathname = stripLocalePrefix(pathname);
+  const showSidebar = shouldShowGlobalSidebar(unlocalizedPathname);
+  const isBrowse = isBrowseWorkspace(unlocalizedPathname);
+  const isChat = isChatWorkspace(unlocalizedPathname);
   const pageEntrance = {
     opacity: 1,
     y: 0,

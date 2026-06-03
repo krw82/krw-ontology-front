@@ -32,10 +32,20 @@ describe("sitemap", () => {
     const urls = await sitemap();
     const paths = urls.map((item) => new URL(item.url).pathname);
 
-    expect(paths).toContain("/");
-    expect(paths).toContain("/companies");
-    expect(paths).not.toContain("/questions");
-    expect(paths.some((path) => path.startsWith("/questions/"))).toBe(false);
+    expect(paths).toContain("/ko");
+    expect(paths).toContain("/en");
+    expect(paths).toContain("/ko/companies");
+    expect(paths).toContain("/en/companies");
+    expect(paths).not.toContain("/ko/questions");
+    expect(paths).not.toContain("/en/questions");
+    expect(paths.some((path) => path.includes("/questions/"))).toBe(false);
+    expect(
+      urls.find((item) => new URL(item.url).pathname === "/ko")?.alternates
+        ?.languages,
+    ).toMatchObject({
+      ko: "https://krwontology.com/ko",
+      en: "https://krwontology.com/en",
+    });
   });
 
   it("only includes company pages backed by curated landing copy", async () => {
@@ -57,8 +67,10 @@ describe("sitemap", () => {
     const urls = await sitemap();
     const paths = urls.map((item) => new URL(item.url).pathname);
 
-    expect(paths).toContain("/companies/AAPL");
-    expect(paths).not.toContain("/companies/WMT");
+    expect(paths).toContain("/ko/companies/AAPL");
+    expect(paths).toContain("/en/companies/AAPL");
+    expect(paths).not.toContain("/ko/companies/WMT");
+    expect(paths).not.toContain("/en/companies/WMT");
   });
 
   it("falls back to curated company landing pages when the indexed catalog is unavailable", async () => {
@@ -69,7 +81,9 @@ describe("sitemap", () => {
     const urls = await sitemap();
     const paths = urls.map((item) => new URL(item.url).pathname);
 
-    expect(paths).toContain("/companies/AAPL");
-    expect(paths).toContain("/companies/MSFT");
+    expect(paths).toContain("/ko/companies/AAPL");
+    expect(paths).toContain("/en/companies/AAPL");
+    expect(paths).toContain("/ko/companies/MSFT");
+    expect(paths).toContain("/en/companies/MSFT");
   });
 });

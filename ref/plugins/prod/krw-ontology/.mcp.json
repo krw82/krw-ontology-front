@@ -5,12 +5,9 @@
       "url": "http://127.0.0.1:8765/mcp",
       "alwaysLoad": true
     },
-    "web-search-prime": {
+    "stock-news-zai": {
       "type": "http",
-      "url": "https://api.z.ai/api/mcp/web_search_prime/mcp",
-      "headers": {
-        "Authorization": "Bearer ${ZAI_API_KEY}"
-      }
+      "url": "http://127.0.0.1:8775/mcp"
     }
   }
 }

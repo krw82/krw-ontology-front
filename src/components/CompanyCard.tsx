@@ -7,6 +7,8 @@ import { motion } from "motion/react";
 import { easeOutExpo, listRow } from "@/lib/animation";
 import { trackClientEventWithTimeout } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
+import { localizedPath } from "@/i18n/routing";
 
 export interface CompanyCardData {
   ticker: string;
@@ -28,28 +30,35 @@ export interface CompanyCardData {
 interface CompanyCardProps {
   company: CompanyCardData;
   motionDelay?: number;
+  locale?: Locale;
 }
 
-function readableText(value: string): string {
-  return value
+function readableText(value: string, locale: Locale): string {
+  const normalized = value.replace(/_/g, " ").replace(/\s+/g, " ").trim();
+
+  if (locale === "en") {
+    return normalized
+      .replace(/^Primary activities:\s*/i, "Primary activity: ")
+      .replace(/^Key external factors:\s*/i, "Key watch item: ");
+  }
+
+  return normalized
     .replace(/^Primary activities:\s*/i, "주요 활동: ")
-    .replace(/^Key external factors:\s*/i, "핵심 변수: ")
-    .replace(/_/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/^Key external factors:\s*/i, "핵심 변수: ");
 }
 
 export default function CompanyCard({
   company,
   motionDelay = 0,
+  locale = DEFAULT_LOCALE,
 }: CompanyCardProps) {
   const router = useRouter();
   const reducedMotion = useReducedMotion();
   const coreStrength = company.core_strength
-    ? readableText(company.core_strength)
+    ? readableText(company.core_strength, locale)
     : null;
   const criticalRisk = company.critical_risk
-    ? readableText(company.critical_risk)
+    ? readableText(company.critical_risk, locale)
     : null;
   const companyLabel =
     company.name && company.name !== company.ticker ? company.name : "";
@@ -61,7 +70,11 @@ export default function CompanyCard({
     company.ticker,
     company.name && company.name !== company.ticker ? company.name : null,
     companyNameKo,
-    company.sector ? `${company.sector} 섹터` : null,
+    company.sector
+      ? locale === "ko"
+        ? `${company.sector} 섹터`
+        : `${company.sector} sector`
+      : null,
     company.coverage,
     coreStrength,
   ]
@@ -84,9 +97,12 @@ export default function CompanyCard({
       className="border-b border-hairline-soft last:border-b-0"
     >
       <Link
-        href={`/companies/${encodeURIComponent(company.ticker)}`}
+        href={localizedPath(locale, `/companies/${encodeURIComponent(company.ticker)}`)}
         onClick={(event) => {
-          const destination = `/companies/${encodeURIComponent(company.ticker)}`;
+          const destination = localizedPath(
+            locale,
+            `/companies/${encodeURIComponent(company.ticker)}`,
+          );
           const shouldNavigateAfterTracking =
             shouldHandleClientNavigation(event);
           if (shouldNavigateAfterTracking) {
@@ -114,7 +130,11 @@ export default function CompanyCard({
           void tracking;
         }}
         className="group block cursor-pointer"
-        aria-label={`${accessibleSummary}. 이 회사 리서치 페이지 열기`}
+        aria-label={`${accessibleSummary}. ${
+          locale === "ko"
+            ? "이 회사 리서치 페이지 열기"
+            : "Open this company research page"
+        }`}
       >
         <article className="grid gap-3 px-4 py-4 transition-[transform,color,background-color] duration-150 ease-out hover:-translate-y-[1px] hover:bg-surface 2xl:grid-cols-[116px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] 2xl:items-start active:scale-[0.995] active:bg-surface-soft">
           <div className="flex min-w-0 items-start justify-between gap-4 2xl:block">
@@ -154,7 +174,8 @@ export default function CompanyCard({
           </p>
 
           <p className="hidden min-w-0 text-[13px] leading-5 text-muted 2xl:line-clamp-2">
-            {criticalRisk ?? "추적 변수 미등록"}
+            {criticalRisk ??
+              (locale === "ko" ? "추적 변수 미등록" : "No watch item registered")}
           </p>
         </article>
       </Link>

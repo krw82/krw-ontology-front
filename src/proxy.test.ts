@@ -83,6 +83,34 @@ describe("proxy gross-abuse guard", () => {
     expect(updateSession).toHaveBeenCalledOnce();
   });
 
+  it("redirects unprefixed public pages to the default Korean locale", async () => {
+    const response = await proxy(request("/companies/AAPL?tab=overview"));
+
+    expect(response.status).toBe(308);
+    expect(response.headers.get("Location")).toBe(
+      "http://localhost/ko/companies/AAPL?tab=overview",
+    );
+    expect(updateSession).not.toHaveBeenCalled();
+  });
+
+  it("does not locale-redirect API or app routes", async () => {
+    const apiResponse = await proxy(request("/api/companies"));
+    const chatResponse = await proxy(request("/chat"));
+
+    expect(apiResponse.status).toBe(200);
+    expect(apiResponse.headers.get("Location")).toBeNull();
+    expect(chatResponse.status).toBe(200);
+    expect(chatResponse.headers.get("Location")).toBeNull();
+    expect(updateSession).toHaveBeenCalledTimes(2);
+  });
+
+  it("forwards the URL locale to document requests", async () => {
+    await proxy(request("/en/companies"));
+
+    const pageOptions = vi.mocked(updateSession).mock.calls.at(-1)?.[1];
+    expect(pageOptions?.requestHeaderOverrides?.get("x-krw-locale")).toBe("en");
+  });
+
   it("lets normal chat run requests pass through to session middleware", async () => {
     const response = await proxy(
       request("/api/chat/run", {
@@ -128,7 +156,7 @@ describe("proxy gross-abuse guard", () => {
   });
 
   it("adds nonce CSP only to non-API document routes", async () => {
-    const pageResponse = await proxy(request("/companies"));
+    const pageResponse = await proxy(request("/ko/companies"));
 
     const csp = pageResponse.headers.get("Content-Security-Policy");
     expect(csp).toContain("script-src 'self' 'nonce-");
@@ -148,6 +176,9 @@ describe("proxy gross-abuse guard", () => {
 
     expect(apiResponse.headers.get("Content-Security-Policy")).toBeNull();
     const apiOptions = vi.mocked(updateSession).mock.calls.at(-1)?.[1];
-    expect(apiOptions?.requestHeaderOverrides).toBeUndefined();
+    expect(apiOptions?.requestHeaderOverrides?.get("x-krw-locale")).toBe("ko");
+    expect(
+      apiOptions?.requestHeaderOverrides?.get("Content-Security-Policy"),
+    ).toBeNull();
   });
 });

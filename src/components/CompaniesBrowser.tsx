@@ -9,9 +9,11 @@ import CompanyCard, {
 import { easeOutExpo } from "@/lib/animation";
 import { filterAndSortCompanies } from "@/lib/companies/filter";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 
 interface CompaniesBrowserProps {
   initialCompanies: CompanyCardData[];
+  locale?: Locale;
 }
 
 /* ─── Flow Animation ─────────────────────────────────────────────
@@ -80,10 +82,50 @@ function FlowAnimation({ disabled }: { disabled: boolean }) {
 
 export default function CompaniesBrowser({
   initialCompanies,
+  locale = DEFAULT_LOCALE,
 }: CompaniesBrowserProps) {
   const [search, setSearch] = useState("");
   const reducedMotion = useReducedMotion();
   const normalizedSearch = search.trim();
+  const copy = locale === "ko"
+    ? {
+        eyebrow: "회사 찾기",
+        heading: "분석할 회사를 고르세요.",
+        intro:
+          "티커를 알면 바로 검색하고, 회사명이 떠오르지 않으면 사업 활동이나 리스크 키워드로 찾아보세요. 선택한 회사는 채팅에서 이어서 분석할 수 있습니다.",
+        searchLabel: "Ticker 검색",
+        searchPlaceholder: "예: AAPL, NVDA, TSLA",
+        searchAria: "티커 검색",
+        multiCompanyCta: "아이디어 하나로 여러 회사 리서치해 보세요",
+        multiCompanyLineOne: "아이디어 하나로",
+        multiCompanyLineTwo: "여러 회사 리서치해 보세요",
+        emptyCatalog:
+          "현재 환경의 웹 카탈로그에서 인덱싱된 회사를 찾지 못했습니다.",
+        availableCompanies: "분석 가능한 회사",
+        countSuffix: "개 표시",
+        emptySearch: "검색 조건에 맞는 회사가 없습니다.",
+        footer:
+          "© 2026 KRW Ontology. 근거 기반 기업 리서치와 데이터 분석.",
+      }
+    : {
+        eyebrow: "Find a company",
+        heading: "Choose a company to analyze.",
+        intro:
+          "Search by ticker, or browse by business activity and risk keyword when the company name is not top of mind. Selected companies can continue into chat analysis.",
+        searchLabel: "Ticker search",
+        searchPlaceholder: "e.g. AAPL, NVDA, TSLA",
+        searchAria: "Ticker search",
+        multiCompanyCta: "Research multiple companies from one idea",
+        multiCompanyLineOne: "Research multiple companies",
+        multiCompanyLineTwo: "from one idea",
+        emptyCatalog:
+          "No indexed companies were found in the current web catalog.",
+        availableCompanies: "Available companies",
+        countSuffix: "shown",
+        emptySearch: "No companies match this search.",
+        footer:
+          "© 2026 KRW Ontology. Evidence-first company research and data analysis.",
+      };
 
   const filteredCompanies = useMemo(() => {
     return filterAndSortCompanies(initialCompanies, search);
@@ -99,22 +141,20 @@ export default function CompaniesBrowser({
           <div className="w-full">
             <div className="min-w-0 max-w-3xl">
               <p className="text-[13px] font-extrabold leading-5 text-primary">
-                회사 찾기
+                {copy.eyebrow}
               </p>
               <h1 className="mt-3 max-w-3xl text-balance text-[32px] font-black leading-[1.08] tracking-normal text-ink sm:text-[44px]">
-                분석할 회사를 고르세요.
+                {copy.heading}
               </h1>
               <p className="mt-4 max-w-2xl text-[16px] leading-7 text-body sm:text-[18px]">
-                티커를 알면 바로 검색하고, 회사명이 떠오르지 않으면 사업
-                활동이나 리스크 키워드로 찾아보세요. 선택한 회사는 채팅에서
-                이어서 분석할 수 있습니다.
+                {copy.intro}
               </p>
             </div>
           </div>
 
           <div className="mt-5">
             <p className="mb-2 font-mono text-[12px] font-bold uppercase tracking-[0.1em] text-muted">
-              Ticker 검색
+              {copy.searchLabel}
             </p>
             <div className="relative w-full">
               <motion.span
@@ -134,11 +174,11 @@ export default function CompaniesBrowser({
               </motion.span>
               <input
                 className="h-[52px] w-full rounded-[8px] border border-hairline bg-surface pl-11 pr-sm font-mono text-[15px] font-semibold uppercase leading-[1.5] tracking-wide transition-all duration-300 ease-out placeholder:normal-case placeholder:tracking-normal placeholder:text-muted focus:border-primary-fixed-dim focus:bg-canvas focus:ring-4 focus:ring-primary-fixed-dim/20 focus:outline-none"
-                placeholder="예: AAPL, NVDA, TSLA"
+                placeholder={copy.searchPlaceholder}
                 type="text"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                aria-label="티커 검색"
+                aria-label={copy.searchAria}
               />
             </div>
           </div>
@@ -147,11 +187,11 @@ export default function CompaniesBrowser({
           <Link
             href="/chat/new"
             className="group mt-3 grid min-h-[72px] w-full grid-cols-[minmax(0,1fr)_56px] items-center gap-3 rounded-[8px] bg-ink px-6 py-5 text-[15px] font-extrabold leading-6 text-canvas shadow-sm transition-all hover:bg-ink/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas sm:min-h-[80px] sm:grid-cols-[minmax(0,1fr)_64px] sm:gap-4 sm:px-7 sm:text-[16px]"
-            aria-label="아이디어 하나로 여러 회사 리서치해 보세요"
+            aria-label={copy.multiCompanyCta}
           >
             <span className="min-w-0 leading-[1.45]">
-              <span className="block">아이디어 하나로</span>
-              <span className="block">여러 회사 리서치해 보세요</span>
+              <span className="block">{copy.multiCompanyLineOne}</span>
+              <span className="block">{copy.multiCompanyLineTwo}</span>
             </span>
             <FlowAnimation disabled={reducedMotion} />
           </Link>
@@ -159,13 +199,13 @@ export default function CompaniesBrowser({
 
         {initialCompanies.length === 0 ? (
           <div className="mt-8 rounded-[8px] border border-hairline bg-surface p-lg text-[15px] leading-[1.5] text-body sm:text-[16px]">
-            현재 환경의 웹 카탈로그에서 인덱싱된 회사를 찾지 못했습니다.
+            {copy.emptyCatalog}
           </div>
         ) : (
           <div className="mt-8">
             <div className="mb-3 flex items-center justify-between gap-4">
               <p className="text-[13px] font-extrabold leading-5 text-ink">
-                분석 가능한 회사
+                {copy.availableCompanies}
               </p>
               <p className="text-[12px] font-bold leading-4 text-muted" aria-live="polite">
                 <AnimatePresence mode="wait" initial={false}>
@@ -179,7 +219,7 @@ export default function CompaniesBrowser({
                       ease: easeOutExpo,
                     }}
                   >
-                    {filteredCompanies.length.toLocaleString()}개 표시
+                    {filteredCompanies.length.toLocaleString()} {copy.countSuffix}
                   </motion.span>
                 </AnimatePresence>
               </p>
@@ -203,6 +243,7 @@ export default function CompaniesBrowser({
                   <CompanyCard
                     key={company.ticker}
                     company={company}
+                    locale={locale}
                     motionDelay={Math.min(index * 24, 120)}
                   />
                 ))}
@@ -222,7 +263,7 @@ export default function CompaniesBrowser({
               transition={{ duration: reducedMotion ? 0 : 0.16, ease: easeOutExpo }}
             >
               <p className="text-[18px] font-bold leading-[1.33] text-muted">
-                검색 조건에 맞는 회사가 없습니다.
+                {copy.emptySearch}
               </p>
             </motion.div>
           )}
@@ -231,7 +272,7 @@ export default function CompaniesBrowser({
         <footer className="mt-xxl w-full border-t border-hairline py-xxl md:mt-[96px] md:py-[72px]">
           <div className="flex w-full flex-col items-center text-center md:items-start md:text-left">
             <div className="text-[15px] font-bold leading-[1.4] text-ink sm:text-[16px] md:leading-[1.25]">
-              &copy; 2026 KRW Ontology. 근거 기반 기업 리서치와 데이터 분석.
+              {copy.footer}
             </div>
           </div>
         </footer>

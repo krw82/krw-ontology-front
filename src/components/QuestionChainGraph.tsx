@@ -8,6 +8,7 @@ import {
 
 interface QuestionChainGraphProps {
   topic: QuestionTopicPage;
+  displayTopic?: QuestionTopicPage;
 }
 
 function AnswerHint({ value }: { value?: string }) {
@@ -27,12 +28,14 @@ function AnswerHint({ value }: { value?: string }) {
 
 function QuestionNode({
   node,
+  canonicalNode,
   topic,
   index,
   isEntry,
   animationDelay = 0,
 }: {
   node: QuestionChainNode;
+  canonicalNode?: QuestionChainNode;
   topic: QuestionTopicPage;
   index: number;
   isEntry?: boolean;
@@ -90,7 +93,7 @@ function QuestionNode({
     <Link
       href={buildQuestionChatHref(topic, {
         ticker: topic.questionChain.ticker,
-        question: node.question,
+        question: canonicalNode?.question ?? node.question,
       })}
       className="question-chain-node question-chain-entry group block rounded-[8px] border border-primary bg-surface px-3 py-3 transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
       style={motionStyle}
@@ -100,8 +103,12 @@ function QuestionNode({
   );
 }
 
-export default function QuestionChainGraph({ topic }: QuestionChainGraphProps) {
+export default function QuestionChainGraph({
+  topic,
+  displayTopic = topic,
+}: QuestionChainGraphProps) {
   const chain = topic.questionChain;
+  const displayChain = displayTopic.questionChain;
   const totalNodeCount = chain.stages.reduce(
     (sum, stage) => sum + stage.nodes.length,
     0,
@@ -115,18 +122,18 @@ export default function QuestionChainGraph({ topic }: QuestionChainGraphProps) {
   return (
     <section
       className="rounded-[8px] border border-hairline bg-canvas p-base sm:p-lg"
-      aria-label={`${chain.companyName} 질문 체인`}
+      aria-label={`${displayChain.companyName} question chain`}
     >
       <div className="flex flex-col gap-3 border-b border-hairline pb-5 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="font-mono text-[11px] font-black uppercase leading-5 tracking-[0.16em] text-primary">
-            {chain.ticker} question chain
+            {displayChain.ticker} question chain
           </p>
           <h2 className="mt-2 text-[24px] font-black leading-8 text-ink sm:text-[30px]">
-            {chain.title}
+            {displayChain.title}
           </h2>
           <p className="mt-3 max-w-3xl text-[14px] font-medium leading-6 text-body sm:text-[15px]">
-            {chain.description}
+            {displayChain.description}
           </p>
         </div>
         <p className="font-mono text-[12px] font-black leading-5 text-muted">
@@ -141,7 +148,10 @@ export default function QuestionChainGraph({ topic }: QuestionChainGraphProps) {
             gridTemplateColumns: `repeat(${chain.stages.length}, minmax(0, 1fr))`,
           }}
         >
-          {chain.stages.map((stage, stageIndex) => (
+          {chain.stages.map((stage, stageIndex) => {
+            const displayStage = displayChain.stages[stageIndex] ?? stage;
+
+            return (
             <div
               key={stage.id}
               className="question-chain-stage question-chain-stage-desktop relative min-w-0 border-l border-hairline pl-4"
@@ -152,7 +162,7 @@ export default function QuestionChainGraph({ topic }: QuestionChainGraphProps) {
                   {String(stageIndex + 1).padStart(2, "0")}
                 </p>
                 <h3 className="mt-1 text-[15px] font-black leading-5 text-ink">
-                  {stage.label}
+                  {displayStage.label}
                 </h3>
                 <p className="mt-1 text-[12px] font-semibold leading-5 text-muted">
                   {stage.nodes.length}개 질문
@@ -161,10 +171,12 @@ export default function QuestionChainGraph({ topic }: QuestionChainGraphProps) {
               <div className="space-y-2 border-t border-hairline pt-2">
                 {stage.nodes.map((node, index) => {
                   const absoluteIndex = stageStartIndexes[stageIndex] + index;
+                  const displayNode = displayStage.nodes[index] ?? node;
                   return (
                     <QuestionNode
                       key={node.id}
-                      node={node}
+                      node={displayNode}
+                      canonicalNode={node}
                       topic={topic}
                       index={absoluteIndex}
                       isEntry={stageIndex === 0 && absoluteIndex === 0}
@@ -174,12 +186,16 @@ export default function QuestionChainGraph({ topic }: QuestionChainGraphProps) {
                 })}
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       </div>
 
       <div className="mt-6 space-y-6 lg:hidden">
-        {chain.stages.map((stage, stageIndex) => (
+        {chain.stages.map((stage, stageIndex) => {
+          const displayStage = displayChain.stages[stageIndex] ?? stage;
+
+          return (
           <div
             key={stage.id}
             className="question-chain-stage"
@@ -190,16 +206,18 @@ export default function QuestionChainGraph({ topic }: QuestionChainGraphProps) {
                 {String(stageIndex + 1).padStart(2, "0")}
               </p>
               <h3 className="font-mono text-[11px] font-black uppercase leading-5 tracking-[0.14em] text-primary">
-                {stage.label}
+                {displayStage.label}
               </h3>
             </div>
             <div className="mt-2 space-y-2">
               {stage.nodes.map((node, index) => {
                 const absoluteIndex = stageStartIndexes[stageIndex] + index;
+                const displayNode = displayStage.nodes[index] ?? node;
                 return (
                   <QuestionNode
                     key={node.id}
-                    node={node}
+                    node={displayNode}
+                    canonicalNode={node}
                     topic={topic}
                     index={absoluteIndex}
                     isEntry={stageIndex === 0 && absoluteIndex === 0}
@@ -209,7 +227,8 @@ export default function QuestionChainGraph({ topic }: QuestionChainGraphProps) {
               })}
             </div>
           </div>
-        ))}
+        );
+        })}
       </div>
     </section>
   );

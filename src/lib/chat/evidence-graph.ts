@@ -51,7 +51,14 @@ const toolTitleMap: Partial<Record<MCPToolName, string>> = {
   krw_ontology_chain: "주장-근거 체인 확인 중",
   krw_ontology_quality: "근거 품질 점검 중",
   krw_ontology_compare: "항목 비교 중",
-  web_search_prime: "최신 웹 정보 확인 중",
+  route_news_question: "뉴스 질문 분류 중",
+  resolve_news_entities: "뉴스 대상 확인 중",
+  search_company_news_events: "기업 뉴스 이벤트 확인 중",
+  search_market_news_events: "시장 뉴스 이벤트 확인 중",
+  search_news_by_domain: "출처별 뉴스 확인 중",
+  read_news_sources: "뉴스 원문 확인 중",
+  build_news_timeline: "뉴스 흐름 정리 중",
+  audit_news_sources: "뉴스 출처 점검 중",
 };
 
 const documentLabels: Partial<Record<DocumentType, string>> = {
@@ -336,7 +343,14 @@ function getActiveNodeId({
     case "krw_ontology_query":
     case "krw_ontology_query_context":
     case "krw_ontology_retrieve":
-    case "web_search_prime":
+    case "route_news_question":
+    case "resolve_news_entities":
+    case "search_company_news_events":
+    case "search_market_news_events":
+    case "search_news_by_domain":
+    case "read_news_sources":
+    case "build_news_timeline":
+    case "audit_news_sources":
       return topicNodes.at(-1)?.id ?? evidenceNodeId;
     case "krw_ontology_trace":
     case "krw_ontology_chain":

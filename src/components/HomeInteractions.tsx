@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { easeOutExpo } from "@/lib/animation";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
+import { localizedPath } from "@/i18n/routing";
 
 const traceTransitionMs = 0.12;
 const demoStepEvent = "krw-home-demo-step";
@@ -34,43 +36,79 @@ export interface HomeEvidenceCard {
   detail: string;
 }
 
-const demoTimeline: Array<{
+type DemoTimelineItem = {
   step: HomeDemoStep;
   label: string;
   icon: string;
   duration: number;
-}> = [
-  {
-    step: "idle",
-    label: "예: AMZN 클라우드 이익률",
-    icon: "search",
-    duration: 1400,
-  },
-  {
-    step: "source",
-    label: "답변 단서 확인 중",
-    icon: "description",
-    duration: 1050,
-  },
-  {
-    step: "node",
-    label: "사업 흐름 연결 중",
-    icon: "hub",
-    duration: 1050,
-  },
-  {
-    step: "path",
-    label: "답변 근거 정리 중",
-    icon: "route",
-    duration: 1050,
-  },
-  {
-    step: "complete",
-    label: "근거 기반 답변 준비 완료",
-    icon: "check_circle",
-    duration: 1250,
-  },
-];
+};
+
+const demoTimelineByLocale = {
+  ko: [
+    {
+      step: "idle",
+      label: "예: AMZN 클라우드 이익률",
+      icon: "search",
+      duration: 1400,
+    },
+    {
+      step: "source",
+      label: "답변 단서 확인 중",
+      icon: "description",
+      duration: 1050,
+    },
+    {
+      step: "node",
+      label: "사업 흐름 연결 중",
+      icon: "hub",
+      duration: 1050,
+    },
+    {
+      step: "path",
+      label: "답변 근거 정리 중",
+      icon: "route",
+      duration: 1050,
+    },
+    {
+      step: "complete",
+      label: "근거 기반 답변 준비 완료",
+      icon: "check_circle",
+      duration: 1250,
+    },
+  ],
+  en: [
+    {
+      step: "idle",
+      label: "Example: AMZN cloud margin",
+      icon: "search",
+      duration: 1400,
+    },
+    {
+      step: "source",
+      label: "Checking answer signals",
+      icon: "description",
+      duration: 1050,
+    },
+    {
+      step: "node",
+      label: "Connecting business context",
+      icon: "hub",
+      duration: 1050,
+    },
+    {
+      step: "path",
+      label: "Organizing answer evidence",
+      icon: "route",
+      duration: 1050,
+    },
+    {
+      step: "complete",
+      label: "Evidence-first answer ready",
+      icon: "check_circle",
+      duration: 1250,
+    },
+  ],
+} satisfies Record<Locale, DemoTimelineItem[]>;
 
 function emitDemoStep(step: HomeDemoStep) {
   if (typeof window === "undefined") return;
@@ -94,7 +132,11 @@ function useHomeDemoStep(defaultStep: HomeDemoStep = "idle") {
   return demoStep;
 }
 
-export function HomeHeaderActions() {
+export function HomeHeaderActions({
+  locale = DEFAULT_LOCALE,
+}: {
+  locale?: Locale;
+}) {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const supabase = useMemo(() => createClient(), []);
@@ -130,6 +172,10 @@ export function HomeHeaderActions() {
     };
   }, [supabase]);
 
+  const companiesHref = localizedPath(locale, "/companies");
+  const startLabel = locale === "ko" ? "무료로 시작" : "Start free";
+  const loginLabel = locale === "ko" ? "로그인" : "Log in";
+
   return (
     <div className="flex min-w-0 items-center gap-3">
       {userEmail ? (
@@ -141,7 +187,7 @@ export function HomeHeaderActions() {
           href="/login"
           className="hidden rounded-[8px] border border-hairline px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-primary hover:text-primary sm:inline-flex"
         >
-          로그인
+          {loginLabel}
         </Link>
       ) : (
         <span
@@ -150,46 +196,58 @@ export function HomeHeaderActions() {
         />
       )}
       <Link
-        href="/companies"
+        href={companiesHref}
         onClick={() => {
           trackClientEventSilently("cta_clicked", {
             cta_id: "home_header_start",
-            cta_label: "무료로 시작",
+            cta_label: startLabel,
             surface: "home_header",
-            destination: "/companies",
+            destination: companiesHref,
           });
         }}
         className="rounded-[8px] bg-surface-dark px-4 py-2 text-sm font-extrabold text-on-dark transition-colors hover:bg-primary-active"
       >
-        무료로 시작
+        {startLabel}
       </Link>
     </div>
   );
 }
 
-export function HomePrimaryCtas() {
+export function HomePrimaryCtas({
+  locale = DEFAULT_LOCALE,
+}: {
+  locale?: Locale;
+}) {
+  const companiesHref = localizedPath(locale, "/companies");
+  const label = locale === "ko" ? "무료로 첫 분석 시작" : "Start your first analysis";
+
   return (
     <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
       <Link
-        href="/companies"
+        href={companiesHref}
         onClick={() => {
           trackClientEventSilently("cta_clicked", {
             cta_id: "home_hero_primary",
-            cta_label: "무료로 첫 분석 시작",
+            cta_label: label,
             surface: "home_hero_primary",
-            destination: "/companies",
+            destination: companiesHref,
           });
         }}
         className="inline-flex min-h-12 items-center justify-center rounded-[8px] bg-surface-dark px-5 py-3 text-[15px] font-extrabold leading-5 text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
       >
-        무료로 첫 분석 시작
+        {label}
       </Link>
     </div>
   );
 }
 
-export function HomeQuestionForm() {
+export function HomeQuestionForm({
+  locale = DEFAULT_LOCALE,
+}: {
+  locale?: Locale;
+}) {
   const [demoStep, setDemoStep] = useState<HomeDemoStep>("idle");
+  const demoTimeline = demoTimelineByLocale[locale];
   const activeDemo =
     demoTimeline.find((item) => item.step === demoStep) ?? demoTimeline[0];
   const isResolving = demoStep !== "idle";
@@ -209,7 +267,7 @@ export function HomeQuestionForm() {
     tick();
 
     return () => window.clearTimeout(timeoutId);
-  }, []);
+  }, [demoTimeline]);
 
   return (
     <div

@@ -4,21 +4,27 @@ import type { Metadata } from "next";
 import TopNav from "@/components/TopNav";
 import MarketingCtaLink from "@/components/MarketingCtaLink";
 import SuggestedPromptActions from "@/components/SuggestedPromptActions";
+import {
+  getCompanyDisplayCopyForTicker,
+  getSuggestedPromptDisplaysForTickers,
+} from "@/content/companies/display";
+import { isLocale } from "@/i18n/config";
+import { localizedPageMetadata } from "@/i18n/metadata";
+import { localizedPath } from "@/i18n/routing";
 import { getAuthUser } from "@/lib/auth";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { normalizeTicker } from "@/lib/ontology/ticker";
 import {
-  getCompanyLandingCopyForTicker,
   getSuggestedPromptsForTickers,
 } from "@/lib/companies/landing-copy";
-import { absoluteUrl, pageMetadata, SITE_NAME } from "@/lib/marketing/site";
+import { absoluteUrl, SITE_NAME } from "@/lib/marketing/site";
 import { getCspNonce } from "@/lib/security/csp-nonce";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type CompanyPageProps = {
-  params: Promise<{ ticker: string }>;
+  params: Promise<{ locale: string; ticker: string }>;
 };
 
 function chatHref(ticker: string, query?: string): string {
@@ -34,27 +40,40 @@ function stringValue(value: unknown): string | null {
 export async function generateMetadata({
   params,
 }: CompanyPageProps): Promise<Metadata> {
-  const { ticker: rawTicker } = await params;
+  const { locale, ticker: rawTicker } = await params;
+  if (!isLocale(locale)) notFound();
+
   const ticker = normalizeTicker(rawTicker);
   const company = ticker ? await getIndexedCompany(ticker) : null;
 
   if (!company) {
-    return pageMetadata({
-      title: "회사를 찾지 못했습니다",
-      description: "현재 KRW Ontology 인덱스에서 찾을 수 없는 회사입니다.",
+    return localizedPageMetadata({
+      locale,
+      title: locale === "ko" ? "회사를 찾지 못했습니다" : "Company not found",
+      description:
+        locale === "ko"
+          ? "현재 KRW Ontology 인덱스에서 찾을 수 없는 회사입니다."
+          : "This company is not currently available in the KRW Ontology index.",
       path: `/companies/${rawTicker}`,
       noIndex: true,
     });
   }
 
-  const copy = getCompanyLandingCopyForTicker(company.ticker);
+  const copy = getCompanyDisplayCopyForTicker(locale, company.ticker);
   const displayCompany = { ...company, ...copy };
   const companyNameKo = displayCompany.companyNameKo;
   const companyTitleName = companyNameKo ?? displayCompany.name;
 
-  return pageMetadata({
-    title: `${displayCompany.ticker} ${companyTitleName} 공시 기반 기업 분석`,
-    description: `${displayCompany.name}${companyNameKo ? ` · ${companyNameKo}` : ""} (${displayCompany.ticker})의 실적 변화, 리스크, 사업 활동을 공시 근거 기반으로 질문해보세요.`,
+  return localizedPageMetadata({
+    locale,
+    title:
+      locale === "ko"
+        ? `${displayCompany.ticker} ${companyTitleName} 공시 기반 기업 분석`
+        : `${displayCompany.ticker} ${displayCompany.name} filing-grounded company analysis`,
+    description:
+      locale === "ko"
+        ? `${displayCompany.name}${companyNameKo ? ` · ${companyNameKo}` : ""} (${displayCompany.ticker})의 실적 변화, 리스크, 사업 활동을 공시 근거 기반으로 질문해보세요.`
+        : `Research ${displayCompany.name} (${displayCompany.ticker}) performance changes, risks, and business activity with filing-grounded evidence.`,
     path: `/companies/${displayCompany.ticker}`,
   });
 }
@@ -63,7 +82,9 @@ export default async function CompanyLandingPage({
   params,
 }: CompanyPageProps) {
   const nonce = await getCspNonce();
-  const { ticker: rawTicker } = await params;
+  const { locale, ticker: rawTicker } = await params;
+  if (!isLocale(locale)) notFound();
+
   const ticker = normalizeTicker(rawTicker);
   const [company, user] = await Promise.all([
     ticker ? getIndexedCompany(ticker) : Promise.resolve(null),
@@ -89,22 +110,51 @@ export default async function CompanyLandingPage({
   const preserveInitialUserProfile =
     user?.app_metadata?.provider === "dev-auth-bypass";
 
-  const prompts = getSuggestedPromptsForTickers([company.ticker]);
-  const promptHrefs = prompts.map((prompt) => chatHref(company.ticker, prompt));
-  const copy = getCompanyLandingCopyForTicker(company.ticker);
+  const canonicalPrompts = getSuggestedPromptsForTickers([company.ticker]);
+  const prompts = getSuggestedPromptDisplaysForTickers(locale, [company.ticker]);
+  const promptHrefs = prompts.map((_, index) =>
+    chatHref(company.ticker, canonicalPrompts[index]),
+  );
+  const copy = getCompanyDisplayCopyForTicker(locale, company.ticker);
   const displayCompany = { ...company, ...copy };
   const companyNameKo = displayCompany.companyNameKo;
   const companyTitleName = companyNameKo ?? displayCompany.name;
+  const pageCopy =
+    locale === "ko"
+      ? {
+          jsonLdName: `${companyTitleName} 공시 기반 기업 분석`,
+          breadcrumbCompanies: "회사 목록",
+          heroHeading: `${companyTitleName} 공시 기반 리서치`,
+          startCta: `${displayCompany.ticker} 무료 분석 시작`,
+          scopeEyebrow: "분석 범위",
+          scopeHeading: `${companyTitleName} 리서치 초점`,
+          businessActivity: "사업 활동",
+          watchItem: "추적 변수",
+          fallbackActivity: "회사별 사업 활동 인덱스 확인",
+          fallbackRisk: "리스크 변수 인덱스 확인",
+        }
+      : {
+          jsonLdName: `${displayCompany.name} filing-grounded company analysis`,
+          breadcrumbCompanies: "Companies",
+          heroHeading: `${displayCompany.name} filing-grounded research`,
+          startCta: `Start ${displayCompany.ticker} analysis`,
+          scopeEyebrow: "Analysis scope",
+          scopeHeading: `${displayCompany.name} research focus`,
+          businessActivity: "Business activity",
+          watchItem: "Watch item",
+          fallbackActivity: "Company-specific business activity index",
+          fallbackRisk: "Company-specific risk variable index",
+        };
 
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebPage",
-    name: `${companyTitleName} 공시 기반 기업 분석`,
-    url: absoluteUrl(`/companies/${displayCompany.ticker}`),
+    name: pageCopy.jsonLdName,
+    url: absoluteUrl(localizedPath(locale, `/companies/${displayCompany.ticker}`)),
     isPartOf: {
       "@type": "WebSite",
       name: SITE_NAME,
-      url: absoluteUrl("/"),
+      url: absoluteUrl(localizedPath(locale)),
     },
     about: {
       "@type": "Organization",
@@ -124,9 +174,10 @@ export default async function CompanyLandingPage({
       <TopNav
         initialUserProfile={initialUserProfile}
         preserveInitialUserProfile={preserveInitialUserProfile}
-        brandHref="/companies"
-        brandAriaLabel="회사 목록으로 이동"
+        brandHref={localizedPath(locale, "/companies")}
+        brandAriaLabel={locale === "ko" ? "회사 목록으로 이동" : "Go to companies"}
         showSidebarTrigger
+        showLocaleSwitcher
       />
       <main
         id="main-content"
@@ -134,8 +185,8 @@ export default async function CompanyLandingPage({
       >
         <div className="mx-auto w-full max-w-5xl">
           <nav className="mb-6 text-[13px] font-bold leading-5 text-muted">
-            <Link href="/companies" className="hover:text-primary">
-              회사 목록
+            <Link href={localizedPath(locale, "/companies")} className="hover:text-primary">
+              {pageCopy.breadcrumbCompanies}
             </Link>
             <span className="mx-2 text-outline-variant">/</span>
             <span className="text-ink">{companyTitleName}</span>
@@ -146,7 +197,7 @@ export default async function CompanyLandingPage({
               {displayCompany.name}
             </p>
             <h1 className="mt-3 max-w-4xl text-balance text-[34px] font-black leading-[1.08] tracking-normal text-ink sm:text-[48px]">
-              {companyTitleName} 공시 기반 리서치
+              {pageCopy.heroHeading}
             </h1>
             <p className="mt-4 max-w-3xl text-[16px] leading-7 text-body sm:text-[18px]">
               {displayCompany.description}
@@ -155,7 +206,7 @@ export default async function CompanyLandingPage({
               <MarketingCtaLink
                 href={chatHref(displayCompany.ticker)}
                 ctaId="company_start_analysis"
-                ctaLabel={`${displayCompany.ticker} 무료 분석 시작`}
+                ctaLabel={pageCopy.startCta}
                 surface="company_hero"
                 analyticsProperties={{
                   ticker: displayCompany.ticker,
@@ -163,7 +214,7 @@ export default async function CompanyLandingPage({
                 }}
                 className="inline-flex min-h-12 items-center justify-center rounded-[8px] bg-surface-dark px-5 py-3 text-[15px] font-extrabold leading-5 text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
-                {displayCompany.ticker} 무료 분석 시작
+                {pageCopy.startCta}
               </MarketingCtaLink>
             </div>
             <SuggestedPromptActions
@@ -188,27 +239,27 @@ export default async function CompanyLandingPage({
             <div className="grid gap-6 md:grid-cols-[180px_minmax(0,1fr)] md:items-start">
               <div>
                 <p className="font-mono text-[11px] font-black uppercase tracking-[0.16em] text-primary">
-                  분석 범위
+                  {pageCopy.scopeEyebrow}
                 </p>
                 <h2 className="mt-2 text-[22px] font-black leading-7 text-ink">
-                  {companyTitleName} 리서치 초점
+                  {pageCopy.scopeHeading}
                 </h2>
               </div>
               <div className="divide-y divide-hairline border-t border-hairline">
                 <ScopeRow
                   index="01"
-                  label="사업 활동"
+                  label={pageCopy.businessActivity}
                   value={
                     displayCompany.core_strength ??
-                    "회사별 사업 활동 인덱스 확인"
+                    pageCopy.fallbackActivity
                   }
                 />
                 <ScopeRow
                   index="02"
-                  label="추적 변수"
+                  label={pageCopy.watchItem}
                   value={
                     displayCompany.critical_risk ??
-                    "리스크 변수 인덱스 확인"
+                    pageCopy.fallbackRisk
                   }
                 />
               </div>

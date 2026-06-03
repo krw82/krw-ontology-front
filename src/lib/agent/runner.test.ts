@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   AnalysisMode,
   MCPToolName,
-  WebSearchMCPToolName,
+  StockNewsMCPToolName,
 } from "@/types/api-contracts";
 
 const sdkMocks = vi.hoisted(() => ({
@@ -30,30 +30,38 @@ vi.mock("./mcp-client", () => {
     "krw_ontology_quality",
     "krw_ontology_plan_query",
   ];
+  const stockNewsTools = [
+    "route_news_question",
+    "resolve_news_entities",
+    "search_company_news_events",
+    "search_market_news_events",
+    "search_news_by_domain",
+    "read_news_sources",
+    "build_news_timeline",
+    "audit_news_sources",
+  ];
   return {
     KRW_ONTOLOGY_MCP_TOOLS: tools,
-    ZAI_WEB_SEARCH_MCP_TOOLS: ["web_search_prime"],
+    STOCK_NEWS_ZAI_MCP_TOOLS: stockNewsTools,
     KRW_ONTOLOGY_SDK_ALLOWED_TOOLS: tools.map(
       (toolName) => `mcp__plugin_krw-ontology_krw-ontology__${toolName}`,
     ),
-    ZAI_WEB_SEARCH_SDK_ALLOWED_TOOLS: [
-      "mcp__plugin_krw-ontology_web-search-prime__web_search_prime",
-    ],
+    STOCK_NEWS_ZAI_SDK_ALLOWED_TOOLS: stockNewsTools.map(
+      (toolName) => `mcp__plugin_krw-ontology_stock-news-zai__${toolName}`,
+    ),
     getKrwOntologyPluginPath: () => "/tmp/krw-ontology-plugin",
-    getZaiWebSearchSdkAllowedTools: () =>
-      process.env.KRW_WEB_SEARCH_ENABLED === "1" &&
-      process.env.KRW_WEB_SEARCH_FORCE_DISABLED !== "1" &&
-      Boolean(process.env.ZAI_API_KEY)
-        ? ["mcp__plugin_krw-ontology_web-search-prime__web_search_prime"]
+    getStockNewsZaiSdkAllowedTools: () =>
+      process.env.STOCK_NEWS_ZAI_FORCE_DISABLED !== "1"
+        ? stockNewsTools.map(
+            (toolName) => `mcp__plugin_krw-ontology_stock-news-zai__${toolName}`,
+          )
         : [],
     isKrwOntologySdkTool: (toolName: string) =>
       toolName.startsWith("mcp__plugin_krw-ontology_krw-ontology__krw_ontology_"),
-    isZaiWebSearchEnabled: () =>
-      process.env.KRW_WEB_SEARCH_ENABLED === "1" &&
-      process.env.KRW_WEB_SEARCH_FORCE_DISABLED !== "1" &&
-      Boolean(process.env.ZAI_API_KEY),
-    isZaiWebSearchSdkTool: (toolName: string) =>
-      toolName === "mcp__plugin_krw-ontology_web-search-prime__web_search_prime",
+    isStockNewsZaiEnabled: () =>
+      process.env.STOCK_NEWS_ZAI_FORCE_DISABLED !== "1",
+    isStockNewsZaiSdkTool: (toolName: string) =>
+      toolName.startsWith("mcp__plugin_krw-ontology_stock-news-zai__"),
   };
 });
 
@@ -102,12 +110,25 @@ function makeSdkQueryFromGenerator(generator: () => AsyncGenerator<unknown>) {
 }
 
 function sdkToolName(toolName: MCPToolName): string {
-  if (toolName === "web_search_prime") return webSearchSdkToolName(toolName);
+  if (isStockNewsToolName(toolName)) return stockNewsSdkToolName(toolName);
   return `mcp__plugin_krw-ontology_krw-ontology__${toolName}`;
 }
 
-function webSearchSdkToolName(toolName: WebSearchMCPToolName): string {
-  return `mcp__plugin_krw-ontology_web-search-prime__${toolName}`;
+function stockNewsSdkToolName(toolName: StockNewsMCPToolName): string {
+  return `mcp__plugin_krw-ontology_stock-news-zai__${toolName}`;
+}
+
+function isStockNewsToolName(toolName: MCPToolName): toolName is StockNewsMCPToolName {
+  return [
+    "route_news_question",
+    "resolve_news_entities",
+    "search_company_news_events",
+    "search_market_news_events",
+    "search_news_by_domain",
+    "read_news_sources",
+    "build_news_timeline",
+    "audit_news_sources",
+  ].includes(toolName);
 }
 
 function toolUseMessage(toolName: MCPToolName, index: number) {
@@ -215,11 +236,9 @@ describe("agent runner research budget recovery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sdkMocks.getSessionInfo.mockResolvedValue(undefined);
-    delete process.env.KRW_WEB_SEARCH_ENABLED;
-    delete process.env.KRW_WEB_SEARCH_FORCE_DISABLED;
-    delete process.env.KRW_WEB_SEARCH_PROVIDER;
-    delete process.env.KRW_WEB_SEARCH_MAX_CALLS;
-    delete process.env.KRW_WEB_SEARCH_RESULT_COUNT;
+    delete process.env.STOCK_NEWS_ZAI_FORCE_DISABLED;
+    delete process.env.STOCK_NEWS_ZAI_ENABLED;
+    delete process.env.STOCK_NEWS_MAX_CALLS;
     delete process.env.ZAI_API_KEY;
   });
 
@@ -299,49 +318,33 @@ describe("agent runner research budget recovery", () => {
       ]),
     );
     expect(call.options.allowedTools).not.toContain(
-      webSearchSdkToolName("web_search_prime"),
+      stockNewsSdkToolName("search_company_news_events"),
     );
     expect(call.options.systemPrompt.append).toContain(
       "Do not perform web searches",
     );
   });
 
-  it("allows raw Z.AI Web Search MCP only when the runtime flag and key are present", async () => {
+  it("allows Stock News Z.ai MCP by default unless explicitly disabled", async () => {
     await expect(
-      canUseTool(webSearchSdkToolName("web_search_prime"), {
-        search_query: "AVGO recent AI networking news",
-        count: 5,
-      }),
-    ).resolves.toMatchObject({
-      behavior: "deny",
-    });
-
-    process.env.KRW_WEB_SEARCH_ENABLED = "1";
-    process.env.KRW_WEB_SEARCH_PROVIDER = "zai_mcp";
-    process.env.ZAI_API_KEY = "zai-test-key";
-
-    await expect(
-      canUseTool(webSearchSdkToolName("web_search_prime"), {
-        search_query: "AVGO recent AI networking news",
-        count: 5,
+      canUseTool(stockNewsSdkToolName("search_company_news_events"), {
+        ticker: "AVGO",
+        question: "AVGO recent AI networking news",
       }),
     ).resolves.toEqual({ behavior: "allow" });
 
-    process.env.KRW_WEB_SEARCH_FORCE_DISABLED = "1";
+    process.env.STOCK_NEWS_ZAI_FORCE_DISABLED = "1";
     await expect(
-      canUseTool(webSearchSdkToolName("web_search_prime"), {
-        search_query: "AVGO recent AI networking news",
+      canUseTool(stockNewsSdkToolName("search_company_news_events"), {
+        ticker: "AVGO",
+        question: "AVGO recent AI networking news",
       }),
     ).resolves.toMatchObject({
       behavior: "deny",
     });
   });
 
-  it("keeps raw Z.AI Web Search MCP out of company mode even when enabled", async () => {
-    process.env.KRW_WEB_SEARCH_ENABLED = "1";
-    process.env.KRW_WEB_SEARCH_PROVIDER = "zai_mcp";
-    process.env.ZAI_API_KEY = "zai-test-key";
-
+  it("keeps Stock News Z.ai MCP out of company mode", async () => {
     sdkMocks.query.mockReturnValueOnce(
       makeSdkQuery([
         {
@@ -374,21 +377,17 @@ describe("agent runner research budget recovery", () => {
     expect(result.status).toBe("completed");
     const call = sdkMocks.query.mock.calls[0]?.[0];
     expect(call.options.allowedTools).not.toContain(
-      webSearchSdkToolName("web_search_prime"),
+      stockNewsSdkToolName("search_company_news_events"),
     );
     expect(call.options.systemPrompt.append).toContain(
       "Do not perform web searches",
     );
     expect(call.options.systemPrompt.append).not.toContain(
-      "attempt at least one current web search",
+      "current news/event discovery",
     );
   });
 
-  it("adds the raw Z.AI Web Search MCP tool to SDK allowedTools in news mode when enabled", async () => {
-    process.env.KRW_WEB_SEARCH_ENABLED = "1";
-    process.env.KRW_WEB_SEARCH_PROVIDER = "zai_mcp";
-    process.env.ZAI_API_KEY = "zai-test-key";
-
+  it("adds Stock News Z.ai MCP tools to SDK allowedTools in news mode", async () => {
     sdkMocks.query.mockReturnValueOnce(
       makeSdkQuery([
         {
@@ -421,14 +420,17 @@ describe("agent runner research budget recovery", () => {
     expect(result.status).toBe("completed");
     const call = sdkMocks.query.mock.calls[0]?.[0];
     expect(call.options.allowedTools).toEqual(
-      expect.arrayContaining([webSearchSdkToolName("web_search_prime")]),
+      expect.arrayContaining([
+        stockNewsSdkToolName("search_company_news_events"),
+        stockNewsSdkToolName("read_news_sources"),
+      ]),
     );
     expect(call.options.disallowedTools).toEqual(
       expect.arrayContaining(["WebFetch", "WebSearch"]),
     );
-    expect(call.options.systemPrompt.append).toContain("Z.AI Web Search MCP");
+    expect(call.options.systemPrompt.append).toContain("Stock News Z.ai MCP");
     expect(call.options.systemPrompt.append).toContain(
-      "attempt at least one current web search",
+      "current news/event discovery",
     );
     expect(call.options.systemPrompt.append).toContain(
       "source provenance internally",
@@ -438,42 +440,29 @@ describe("agent runner research budget recovery", () => {
     );
   });
 
-  it("caps raw Z.AI Web Search result count before execution", async () => {
-    process.env.KRW_WEB_SEARCH_ENABLED = "1";
-    process.env.KRW_WEB_SEARCH_PROVIDER = "zai_mcp";
-    process.env.ZAI_API_KEY = "zai-test-key";
-    process.env.KRW_WEB_SEARCH_RESULT_COUNT = "5";
-
-    const permission = await canUseTool(webSearchSdkToolName("web_search_prime"), {
-      search_query: "AAPL latest services news",
-      count: 25,
+  it("passes Stock News Z.ai MCP inputs unchanged before execution", async () => {
+    const permission = await canUseTool(stockNewsSdkToolName("search_company_news_events"), {
+      ticker: "AAPL",
+      question: "AAPL latest services news",
+      max_events: 5,
     });
 
-    expect(permission.behavior).toBe("allow");
-    if (permission.behavior === "allow") {
-      expect(permission.updatedInput).toEqual({
-        search_query: "AAPL latest services news",
-        count: 5,
-      });
-    }
+    expect(permission).toEqual({ behavior: "allow" });
   });
 
-  it("limits raw Z.AI Web Search MCP calls separately from ontology calls", async () => {
-    process.env.KRW_WEB_SEARCH_ENABLED = "1";
-    process.env.KRW_WEB_SEARCH_PROVIDER = "zai_mcp";
-    process.env.ZAI_API_KEY = "zai-test-key";
-    process.env.KRW_WEB_SEARCH_MAX_CALLS = "2";
+  it("limits Stock News Z.ai MCP calls separately from ontology calls", async () => {
+    process.env.STOCK_NEWS_MAX_CALLS = "2";
 
     const { permission, result } = await probeToolPermission({
-      existingTools: ["web_search_prime", "web_search_prime"],
-      attemptedTool: "web_search_prime",
+      existingTools: ["search_company_news_events", "read_news_sources"],
+      attemptedTool: "audit_news_sources",
       analysisMode: "news",
     });
 
     expect(result.status).toBe("completed");
     expect(permission.behavior).toBe("deny");
     if (permission.behavior === "deny") {
-      expect(permission.message).toContain("No more Z.AI Web Search MCP tools");
+      expect(permission.message).toContain("No more Stock News Z.ai MCP tools");
       expect(permission.message).toContain("filing evidence");
     }
   });

@@ -44,6 +44,8 @@ function configureDevOntologyEnv() {
   );
   const pluginPath = join(frontDir, "ref", "plugins", "dev", "krw-ontology");
   const mcpUrl = process.env.KRW_DEV_MCP_URL || "http://127.0.0.1:8766/mcp";
+  const stockNewsMcpUrl =
+    process.env.STOCK_NEWS_ZAI_MCP_URL || "http://127.0.0.1:8776/mcp";
 
   if (!allowProdOntology || !process.env.KRW_ONTOLOGY_ENV) {
     process.env.KRW_ONTOLOGY_ENV = "dev";
@@ -66,6 +68,11 @@ function configureDevOntologyEnv() {
   process.env.KRW_ONTOLOGY_MCP_HOST = new URL(mcpUrl).hostname;
   process.env.KRW_ONTOLOGY_MCP_PORT = new URL(mcpUrl).port || "80";
   process.env.KRW_ONTOLOGY_MCP_PATH = new URL(mcpUrl).pathname || "/mcp";
+  process.env.STOCK_NEWS_ZAI_MCP_URL = stockNewsMcpUrl;
+  process.env.STOCK_NEWS_ZAI_MCP_HOST = new URL(stockNewsMcpUrl).hostname;
+  process.env.STOCK_NEWS_ZAI_MCP_PORT = new URL(stockNewsMcpUrl).port || "80";
+  process.env.STOCK_NEWS_ZAI_MCP_PATH =
+    new URL(stockNewsMcpUrl).pathname || "/mcp";
   if (process.env.KRW_DEV_ALLOW_CUSTOM_MCP_BASE_URL !== "1") {
     process.env.MCP_BASE_URL = new URL(mcpUrl).origin;
   }
@@ -73,6 +80,7 @@ function configureDevOntologyEnv() {
     releaseRoot: process.env.KRW_ONTOLOGY_RELEASE_ROOT,
     pluginPath: process.env.KRW_ONTOLOGY_PLUGIN_PATH,
     mcpUrl: process.env.KRW_ONTOLOGY_MCP_URL,
+    stockNewsMcpUrl: process.env.STOCK_NEWS_ZAI_MCP_URL,
   });
 }
 
@@ -107,6 +115,7 @@ materializeDevPlugin();
 let worker = null;
 let nextDev = null;
 let devMcp = null;
+let stockNewsMcp = null;
 let shuttingDown = false;
 let workerStartQueued = false;
 let workerRestarting = false;
@@ -234,6 +243,19 @@ async function readDevMcpHealth() {
   }
 }
 
+async function readStockNewsMcpHealth() {
+  try {
+    const response = await fetch(healthUrlFromMcpUrl(process.env.STOCK_NEWS_ZAI_MCP_URL), {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(5_000),
+    });
+    const payload = await response.json();
+    return { response, payload };
+  } catch {
+    return null;
+  }
+}
+
 async function waitForDevMcpHealth() {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
@@ -299,6 +321,67 @@ async function ensureDevMcpServer() {
   await waitForDevMcpHealth();
 }
 
+async function waitForStockNewsMcpHealth() {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    const result = await readStockNewsMcpHealth();
+    if (
+      result?.response.status === 200 &&
+      result.payload?.ok === true &&
+      result.payload?.name === "stock-news-zai-mcp"
+    ) {
+      console.info("[dev:stock-news-mcp] ready", {
+        coverageCount: result.payload.coverage_count,
+        hasZaiApiKey: result.payload.has_zai_api_key,
+      });
+      return;
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 500));
+  }
+  throw new Error("Stock News Z.ai dev MCP server did not become healthy");
+}
+
+async function ensureStockNewsMcpServer() {
+  const reuseDeadline = Date.now() + 5_000;
+  while (Date.now() < reuseDeadline) {
+    const existing = await readStockNewsMcpHealth();
+    if (
+      existing?.response.status === 200 &&
+      existing.payload?.ok === true &&
+      existing.payload?.name === "stock-news-zai-mcp"
+    ) {
+      console.info("[dev:stock-news-mcp] reusing existing server", {
+        coverageCount: existing.payload.coverage_count,
+        hasZaiApiKey: existing.payload.has_zai_api_key,
+      });
+      return;
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 500));
+  }
+
+  stockNewsMcp = spawnLabeled(
+    "stock-news-mcp",
+    "nice",
+    ["-n", String(devMcpNice), "scripts/start-stock-news-zai-mcp-dev.sh"],
+    async (code) => {
+      const existing = await readStockNewsMcpHealth();
+      if (
+        existing?.response.status === 200 &&
+        existing.payload?.ok === true &&
+        existing.payload?.name === "stock-news-zai-mcp"
+      ) {
+        console.info("[dev:stock-news-mcp] spawned server exited; reusing existing server", {
+          coverageCount: existing.payload.coverage_count,
+        });
+        stockNewsMcp = null;
+        return;
+      }
+      void shutdown("stock-news-mcp-exit").finally(() => process.exit(code ?? 1));
+    },
+  );
+  await waitForStockNewsMcpHealth();
+}
+
 const workerRestartPlugin = {
   name: "worker-restart",
   setup(build) {
@@ -336,6 +419,7 @@ async function shutdown(signal) {
     workerContext.dispose(),
     stopChild(worker),
     stopChild(devMcp),
+    stopChild(stockNewsMcp),
     stopChild(nextDev),
   ]);
 }
@@ -347,6 +431,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 }
 
 await ensureDevMcpServer();
+await ensureStockNewsMcpServer();
 
 nextDev = spawnLabeled("web", "npm", ["run", "dev:web"], (code) => {
   void shutdown("web-exit").finally(() => process.exit(code ?? 1));

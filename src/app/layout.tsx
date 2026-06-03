@@ -1,8 +1,14 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import AnalyticsBootstrap from "@/components/analytics/AnalyticsBootstrap";
 import AppShell from "@/components/AppShell";
+import {
+  DEFAULT_LOCALE,
+  isLocale,
+  localeToHtmlLang,
+} from "@/i18n/config";
 import { getSiteOrigin, SITE_DESCRIPTION, SITE_NAME } from "@/lib/marketing/site";
 import "./globals.css";
 
@@ -87,9 +93,12 @@ export default async function RootLayout({
 }>) {
   // Per-request CSP nonces require runtime rendering so Next can attach them.
   await connection();
+  const requestHeaders = await headers();
+  const requestLocale = requestHeaders.get("x-krw-locale");
+  const locale = isLocale(requestLocale) ? requestLocale : DEFAULT_LOCALE;
 
   return (
-    <html lang="ko" className="h-full antialiased">
+    <html lang={localeToHtmlLang(locale)} className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-canvas text-on-surface">
         <AnalyticsBootstrap />
         {/* L-05: Skip to content link for accessibility */}

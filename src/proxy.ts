@@ -2,6 +2,13 @@ import { updateSession } from "@/lib/supabase/middleware";
 import { getClientIp } from "@/lib/http/client-ip";
 import { getConfiguredAppOrigin } from "@/lib/auth/origin";
 import { buildContentSecurityPolicy } from "@/lib/security/headers";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
+import {
+  getPathLocale,
+  isPublicLocalizedPathname,
+  localizedPath,
+  stripLocalePrefix,
+} from "@/i18n/routing";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -67,6 +74,24 @@ function getCanonicalRedirectUrl(request: NextRequest): URL | null {
   return redirectUrl;
 }
 
+function getRequestLocale(pathname: string): Locale {
+  return getPathLocale(pathname) ?? DEFAULT_LOCALE;
+}
+
+function getLocaleRedirectUrl(request: NextRequest): URL | null {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return null;
+  }
+
+  const { pathname } = request.nextUrl;
+  if (getPathLocale(pathname)) return null;
+  if (!isPublicLocalizedPathname(pathname)) return null;
+
+  const redirectUrl = request.nextUrl.clone();
+  redirectUrl.pathname = localizedPath(DEFAULT_LOCALE, stripLocalePrefix(pathname));
+  return redirectUrl;
+}
+
 function createCspRequestHeaders() {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const contentSecurityPolicy = buildContentSecurityPolicy({
@@ -81,6 +106,19 @@ function createCspRequestHeaders() {
   );
 
   return { contentSecurityPolicy, requestHeaderOverrides };
+}
+
+function createRequestHeaderOverrides({
+  contentSecurityPolicy,
+  locale,
+}: {
+  contentSecurityPolicy: ReturnType<typeof createCspRequestHeaders> | null;
+  locale: Locale;
+}) {
+  const requestHeaderOverrides =
+    contentSecurityPolicy?.requestHeaderOverrides ?? new Headers();
+  requestHeaderOverrides.set("x-krw-locale", locale);
+  return requestHeaderOverrides;
 }
 
 declare global {
@@ -106,6 +144,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(canonicalRedirectUrl, 308);
   }
 
+  const localeRedirectUrl = getLocaleRedirectUrl(request);
+  if (localeRedirectUrl) {
+    return NextResponse.redirect(localeRedirectUrl, 308);
+  }
+
+  const requestLocale = getRequestLocale(request.nextUrl.pathname);
   const csp = shouldApplyContentSecurityPolicy(request.nextUrl.pathname)
     ? createCspRequestHeaders()
     : null;
@@ -132,7 +176,10 @@ export async function proxy(request: NextRequest) {
   }
 
   const response = await updateSession(request, {
-    requestHeaderOverrides: csp?.requestHeaderOverrides,
+    requestHeaderOverrides: createRequestHeaderOverrides({
+      contentSecurityPolicy: csp,
+      locale: requestLocale,
+    }),
   });
   if (csp) {
     response.headers.set("Content-Security-Policy", csp.contentSecurityPolicy);

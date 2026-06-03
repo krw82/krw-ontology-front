@@ -3,6 +3,8 @@ import {
   hasCompanyLandingCopyForTicker,
   listCompanyLandingCopyTickers,
 } from "@/lib/companies/landing-copy";
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type Locale } from "@/i18n/config";
+import { localizedPath } from "@/i18n/routing";
 import { absoluteUrl } from "@/lib/marketing/site";
 import {
   type IndexedCompany,
@@ -13,6 +15,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type SitemapCompany = Pick<IndexedCompany, "ticker" | "generated_at">;
+type SitemapEntry = MetadataRoute.Sitemap[number];
+type SitemapChangeFrequency = NonNullable<SitemapEntry["changeFrequency"]>;
 
 async function listSitemapCompanies(): Promise<SitemapCompany[]> {
   const indexedCompanies = await listIndexedCompanies().catch(() => []);
@@ -42,42 +46,76 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return Number.isFinite(date.getTime()) ? date : now;
   };
 
+  const localizedEntries = ({
+    path,
+    lastModified: entryLastModified,
+    changeFrequency,
+    priority,
+  }: {
+    path: string;
+    lastModified: Date;
+    changeFrequency: SitemapChangeFrequency;
+    priority: number;
+  }): SitemapEntry[] => {
+    const languages = Object.fromEntries(
+      SUPPORTED_LOCALES.map((locale) => [
+        locale,
+        absoluteUrl(localizedPath(locale, path)),
+      ]),
+    ) as Record<Locale, string>;
+
+    return SUPPORTED_LOCALES.map((locale) => ({
+      url: absoluteUrl(localizedPath(locale, path)),
+      lastModified: entryLastModified,
+      changeFrequency,
+      priority,
+      alternates: {
+        languages: {
+          ...languages,
+          "x-default": absoluteUrl(localizedPath(DEFAULT_LOCALE, path)),
+        },
+      },
+    }));
+  };
+
   return [
-    {
-      url: absoluteUrl("/"),
+    ...localizedEntries({
+      path: "/",
       lastModified: now,
       changeFrequency: "weekly",
       priority: 1,
-    },
-    {
-      url: absoluteUrl("/companies"),
+    }),
+    ...localizedEntries({
+      path: "/companies",
       lastModified: now,
       changeFrequency: "daily",
       priority: 0.9,
-    },
-    {
-      url: absoluteUrl("/pricing"),
+    }),
+    ...localizedEntries({
+      path: "/pricing",
       lastModified: now,
       changeFrequency: "monthly",
       priority: 0.7,
-    },
-    {
-      url: absoluteUrl("/privacy"),
+    }),
+    ...localizedEntries({
+      path: "/privacy",
       lastModified: now,
       changeFrequency: "yearly",
       priority: 0.2,
-    },
-    {
-      url: absoluteUrl("/terms"),
+    }),
+    ...localizedEntries({
+      path: "/terms",
       lastModified: now,
       changeFrequency: "yearly",
       priority: 0.2,
-    },
-    ...companies.map((company) => ({
-      url: absoluteUrl(`/companies/${encodeURIComponent(company.ticker)}`),
-      lastModified: lastModified(company.generated_at),
-      changeFrequency: "weekly" as const,
-      priority: 0.75,
-    })),
+    }),
+    ...companies.flatMap((company) =>
+      localizedEntries({
+        path: `/companies/${encodeURIComponent(company.ticker)}`,
+        lastModified: lastModified(company.generated_at),
+        changeFrequency: "weekly",
+        priority: 0.75,
+      }),
+    ),
   ];
 }

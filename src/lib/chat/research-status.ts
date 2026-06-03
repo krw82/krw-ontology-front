@@ -30,7 +30,14 @@ const toolLabels: Partial<Record<MCPToolName, string>> = {
   krw_ontology_chain: "주장-근거 체인 확인",
   krw_ontology_quality: "근거 품질 점검",
   krw_ontology_compare: "항목 비교",
-  web_search_prime: "웹 정보 확인",
+  route_news_question: "뉴스 질문 분류",
+  resolve_news_entities: "뉴스 대상 확인",
+  search_company_news_events: "기업 뉴스 이벤트 확인",
+  search_market_news_events: "시장 뉴스 이벤트 확인",
+  search_news_by_domain: "출처별 뉴스 확인",
+  read_news_sources: "뉴스 원문 확인",
+  build_news_timeline: "뉴스 흐름 정리",
+  audit_news_sources: "뉴스 출처 점검",
 };
 
 const toolStepMap: Record<MCPToolName, ResearchStepId> = {
@@ -46,7 +53,14 @@ const toolStepMap: Record<MCPToolName, ResearchStepId> = {
   krw_ontology_chain: "trace",
   krw_ontology_quality: "compose",
   krw_ontology_compare: "compose",
-  web_search_prime: "search",
+  route_news_question: "scope",
+  resolve_news_entities: "scope",
+  search_company_news_events: "search",
+  search_market_news_events: "search",
+  search_news_by_domain: "search",
+  read_news_sources: "search",
+  build_news_timeline: "trace",
+  audit_news_sources: "compose",
 };
 
 const baseSteps: Array<{ id: ResearchStepId; label: string }> = [

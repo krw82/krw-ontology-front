@@ -143,10 +143,19 @@ function latestCompletedAssistantMessageId(messages: Message[]) {
 }
 
 function activityForTool(toolName: MCPToolName): ResearchActivityUpdate {
-  if (toolName === "web_search_prime") {
+  if (
+    toolName === "route_news_question" ||
+    toolName === "resolve_news_entities" ||
+    toolName === "search_company_news_events" ||
+    toolName === "search_market_news_events" ||
+    toolName === "search_news_by_domain" ||
+    toolName === "read_news_sources" ||
+    toolName === "build_news_timeline" ||
+    toolName === "audit_news_sources"
+  ) {
     return {
       stage: "researching",
-      label: "최신 웹 정보 확인 중",
+      label: "최신 뉴스 이벤트 확인 중",
     };
   }
 

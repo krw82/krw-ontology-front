@@ -8,14 +8,14 @@ import { promisify } from "node:util";
 import { normalizeOntologyEnv, type OntologyEnv } from "@/lib/env";
 import type {
   KRWOntologyMCPToolName,
-  WebSearchMCPToolName,
+  StockNewsMCPToolName,
 } from "@/types/api-contracts";
 import type { Json } from "@/types/database";
 
 const KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX =
   "mcp__plugin_krw-ontology_krw-ontology__";
-const ZAI_WEB_SEARCH_PLUGIN_TOOL_PREFIX =
-  "mcp__plugin_krw-ontology_web-search-prime__";
+const STOCK_NEWS_ZAI_PLUGIN_TOOL_PREFIX =
+  "mcp__plugin_krw-ontology_stock-news-zai__";
 
 export const KRW_ONTOLOGY_MCP_TOOLS = [
   "krw_ontology_catalog",
@@ -32,20 +32,27 @@ export const KRW_ONTOLOGY_MCP_TOOLS = [
   "krw_ontology_chain",
 ] as const satisfies readonly KRWOntologyMCPToolName[];
 
-export const ZAI_WEB_SEARCH_MCP_TOOLS = [
-  "web_search_prime",
-] as const satisfies readonly WebSearchMCPToolName[];
+export const STOCK_NEWS_ZAI_MCP_TOOLS = [
+  "route_news_question",
+  "resolve_news_entities",
+  "search_company_news_events",
+  "search_market_news_events",
+  "search_news_by_domain",
+  "read_news_sources",
+  "build_news_timeline",
+  "audit_news_sources",
+] as const satisfies readonly StockNewsMCPToolName[];
 
 export const KRW_ONTOLOGY_SDK_ALLOWED_TOOLS = KRW_ONTOLOGY_MCP_TOOLS.map(
   (toolName) => `${KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX}${toolName}`,
 );
 
-export const ZAI_WEB_SEARCH_SDK_ALLOWED_TOOLS = ZAI_WEB_SEARCH_MCP_TOOLS.map(
-  (toolName) => `${ZAI_WEB_SEARCH_PLUGIN_TOOL_PREFIX}${toolName}`,
+export const STOCK_NEWS_ZAI_SDK_ALLOWED_TOOLS = STOCK_NEWS_ZAI_MCP_TOOLS.map(
+  (toolName) => `${STOCK_NEWS_ZAI_PLUGIN_TOOL_PREFIX}${toolName}`,
 );
 
 const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
-const ZAI_WEB_SEARCH_MCP_TOOL_SET = new Set<string>(ZAI_WEB_SEARCH_MCP_TOOLS);
+const STOCK_NEWS_ZAI_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_ZAI_MCP_TOOLS);
 const execFileAsync = promisify(execFile);
 const DEFAULT_MCP_HEALTH_TIMEOUT_MS = 30_000;
 
@@ -56,34 +63,36 @@ export function isKrwOntologySdkTool(toolName: string): boolean {
   return Boolean(bareName && KRW_ONTOLOGY_MCP_TOOL_SET.has(bareName));
 }
 
-export function isZaiWebSearchSdkTool(toolName: string): boolean {
-  if (!toolName.startsWith(ZAI_WEB_SEARCH_PLUGIN_TOOL_PREFIX)) return false;
-  const bareName = toolName.slice(ZAI_WEB_SEARCH_PLUGIN_TOOL_PREFIX.length);
+export function isStockNewsZaiSdkTool(toolName: string): boolean {
+  if (!toolName.startsWith(STOCK_NEWS_ZAI_PLUGIN_TOOL_PREFIX)) return false;
+  const bareName = toolName.slice(STOCK_NEWS_ZAI_PLUGIN_TOOL_PREFIX.length);
 
-  return Boolean(bareName && ZAI_WEB_SEARCH_MCP_TOOL_SET.has(bareName));
+  return Boolean(bareName && STOCK_NEWS_ZAI_MCP_TOOL_SET.has(bareName));
 }
 
-export function isZaiWebSearchEnabled(
+export function isStockNewsZaiEnabled(
   env: Record<string, string | undefined> = process.env,
 ): boolean {
-  if (truthyEnv(env.KRW_WEB_SEARCH_FORCE_DISABLED)) return false;
-  if (!truthyEnv(env.KRW_WEB_SEARCH_ENABLED)) return false;
+  if (truthyEnv(env.STOCK_NEWS_ZAI_FORCE_DISABLED)) return false;
+  if (falseyEnv(env.STOCK_NEWS_ZAI_ENABLED)) return false;
 
-  const provider = env.KRW_WEB_SEARCH_PROVIDER?.trim().toLowerCase();
-  if (provider && provider !== "zai_mcp") return false;
-
-  return Boolean(env.ZAI_API_KEY?.trim());
+  return true;
 }
 
-export function getZaiWebSearchSdkAllowedTools(
+export function getStockNewsZaiSdkAllowedTools(
   env: Record<string, string | undefined> = process.env,
 ): string[] {
-  return isZaiWebSearchEnabled(env) ? ZAI_WEB_SEARCH_SDK_ALLOWED_TOOLS : [];
+  return isStockNewsZaiEnabled(env) ? STOCK_NEWS_ZAI_SDK_ALLOWED_TOOLS : [];
 }
 
 function truthyEnv(value: string | undefined): boolean {
   if (!value) return false;
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+}
+
+function falseyEnv(value: string | undefined): boolean {
+  if (!value) return false;
+  return ["0", "false", "no", "off"].includes(value.trim().toLowerCase());
 }
 
 export interface McpHealthResult {

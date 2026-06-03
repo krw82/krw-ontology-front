@@ -101,14 +101,17 @@ echo "Ontology source: $ONTOLOGY_SOURCE_DIR"
 echo "Plugin path: $KRW_ONTOLOGY_PLUGIN_PATH"
 echo "Skill files: $SKILL_COUNT"
 echo "MCP URL: ${KRW_ONTOLOGY_MCP_URL:-unset}"
+echo "Stock News MCP URL: ${STOCK_NEWS_ZAI_MCP_URL:-http://127.0.0.1:8775/mcp}"
 
 if [ "$DRY_RUN" = "1" ]; then
   "$SCRIPT_DIR/install-mcp-server-launchd.sh" --env-file "$ENV_PATH" --dry-run
+  "$SCRIPT_DIR/install-stock-news-zai-mcp-launchd.sh" --env-file "$ENV_PATH" --dry-run
   "$SCRIPT_DIR/deploy-worker-production.sh" --env-file "$ENV_PATH" --dry-run
   exit 0
 fi
 
 "$SCRIPT_DIR/install-mcp-server-launchd.sh" --env-file "$ENV_PATH" --load
+"$SCRIPT_DIR/install-stock-news-zai-mcp-launchd.sh" --env-file "$ENV_PATH" --load
 "$SCRIPT_DIR/deploy-worker-production.sh" --env-file "$ENV_PATH"
 
 echo "Plugin/MCP Mac worker deployment complete."

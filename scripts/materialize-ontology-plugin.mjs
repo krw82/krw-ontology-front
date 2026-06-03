@@ -18,12 +18,10 @@ let env = "";
 let source = process.env.KRW_ONTOLOGY_PLUGIN_SOURCE_PATH || defaultSource;
 let out = "";
 let mcpUrl = process.env.KRW_ONTOLOGY_MCP_URL || "";
-const zaiWebSearchMcpUrl =
-  process.env.ZAI_WEB_SEARCH_MCP_URL ||
-  "https://api.z.ai/api/mcp/web_search_prime/mcp";
+let stockNewsMcpUrl = process.env.STOCK_NEWS_ZAI_MCP_URL || "";
 
 function usage() {
-  console.error(`Usage: scripts/materialize-ontology-plugin.mjs --env dev|prod [--source DIR] [--out DIR] [--mcp-url URL]`);
+  console.error(`Usage: scripts/materialize-ontology-plugin.mjs --env dev|prod [--source DIR] [--out DIR] [--mcp-url URL] [--stock-news-url URL]`);
 }
 
 for (let index = 0; index < args.length; index += 1) {
@@ -40,6 +38,9 @@ for (let index = 0; index < args.length; index += 1) {
       break;
     case "--mcp-url":
       mcpUrl = args[++index] || "";
+      break;
+    case "--stock-news-url":
+      stockNewsMcpUrl = args[++index] || "";
       break;
     case "--help":
     case "-h":
@@ -63,6 +64,10 @@ if (!out) {
 if (!mcpUrl) {
   const port = env === "prod" ? 8765 : 8766;
   mcpUrl = `http://127.0.0.1:${port}/mcp`;
+}
+if (!stockNewsMcpUrl) {
+  const port = env === "prod" ? 8775 : 8776;
+  stockNewsMcpUrl = `http://127.0.0.1:${port}/mcp`;
 }
 
 const resolvedSource = path.resolve(source);
@@ -88,13 +93,10 @@ const mcpServers = {
   },
 };
 
-if (isZaiWebSearchEnabled()) {
-  mcpServers["web-search-prime"] = {
+if (isStockNewsZaiEnabled()) {
+  mcpServers["stock-news-zai"] = {
     type: "http",
-    url: zaiWebSearchMcpUrl,
-    headers: {
-      Authorization: "Bearer ${ZAI_API_KEY}",
-    },
+    url: stockNewsMcpUrl,
   };
 }
 
@@ -111,25 +113,20 @@ writeFileSync(
 
 console.log(`Materialized ${env} KRW Ontology plugin: ${resolvedOut}`);
 console.log(`MCP URL: ${mcpUrl}`);
-console.log(`Z.AI Web Search MCP: ${isZaiWebSearchEnabled() ? "enabled" : "disabled"}`);
+console.log(`Stock News Z.ai MCP: ${isStockNewsZaiEnabled() ? "enabled" : "disabled"}`);
 
-function isZaiWebSearchEnabled() {
-  if (truthyEnv(process.env.KRW_WEB_SEARCH_FORCE_DISABLED)) return false;
-  if (!truthyEnv(process.env.KRW_WEB_SEARCH_ENABLED)) return false;
-
-  const provider = process.env.KRW_WEB_SEARCH_PROVIDER?.trim().toLowerCase();
-  if (provider && provider !== "zai_mcp") return false;
-
-  if (!process.env.ZAI_API_KEY?.trim()) {
-    throw new Error(
-      "KRW_WEB_SEARCH_ENABLED is on, but ZAI_API_KEY is missing.",
-    );
-  }
-
+function isStockNewsZaiEnabled() {
+  if (truthyEnv(process.env.STOCK_NEWS_ZAI_FORCE_DISABLED)) return false;
+  if (falseyEnv(process.env.STOCK_NEWS_ZAI_ENABLED)) return false;
   return true;
 }
 
 function truthyEnv(value) {
   if (!value) return false;
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+}
+
+function falseyEnv(value) {
+  if (!value) return false;
+  return ["0", "false", "no", "off"].includes(value.trim().toLowerCase());
 }

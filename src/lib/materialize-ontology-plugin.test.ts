@@ -75,36 +75,28 @@ describe("materialize-ontology-plugin", () => {
     }
   });
 
-  it("keeps Z.AI Web Search MCP absent by default", () => {
+  it("adds Stock News Z.ai MCP by default", () => {
     const { stdout, mcpConfig } = runMaterialize({
-      KRW_WEB_SEARCH_ENABLED: undefined,
       ZAI_API_KEY: undefined,
-    });
-
-    expect(Object.keys(mcpConfig.mcpServers)).toEqual(["krw-ontology"]);
-    expect(stdout).toContain("Z.AI Web Search MCP: disabled");
-  });
-
-  it("adds raw Z.AI Web Search MCP with env-expanded authorization when enabled", () => {
-    const { stdout, mcpConfig } = runMaterialize({
-      KRW_WEB_SEARCH_ENABLED: "1",
-      KRW_WEB_SEARCH_PROVIDER: "zai_mcp",
-      ZAI_API_KEY: "zai-secret-test-key",
     });
 
     expect(Object.keys(mcpConfig.mcpServers)).toEqual([
       "krw-ontology",
-      "web-search-prime",
+      "stock-news-zai",
     ]);
-    expect(mcpConfig.mcpServers["web-search-prime"]).toEqual({
+    expect(mcpConfig.mcpServers["stock-news-zai"]).toEqual({
       type: "http",
-      url: "https://api.z.ai/api/mcp/web_search_prime/mcp",
-      headers: {
-        Authorization: "Bearer ${ZAI_API_KEY}",
-      },
+      url: "http://127.0.0.1:8775/mcp",
     });
-    expect(JSON.stringify(mcpConfig)).not.toContain("zai-secret-test-key");
-    expect(stdout).not.toContain("zai-secret-test-key");
-    expect(stdout).toContain("Z.AI Web Search MCP: enabled");
+    expect(stdout).toContain("Stock News Z.ai MCP: enabled");
+  });
+
+  it("keeps Stock News Z.ai MCP absent when explicitly disabled", () => {
+    const { stdout, mcpConfig } = runMaterialize({
+      STOCK_NEWS_ZAI_FORCE_DISABLED: "1",
+    });
+
+    expect(Object.keys(mcpConfig.mcpServers)).toEqual(["krw-ontology"]);
+    expect(stdout).toContain("Stock News Z.ai MCP: disabled");
   });
 });

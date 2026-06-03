@@ -132,11 +132,19 @@ export type KRWOntologyMCPToolName =
   | "krw_ontology_plan_query"
   | "krw_ontology_chain";
 
-/** Allowed read-only web MCP tool names */
-export type WebSearchMCPToolName = "web_search_prime";
+/** Allowed read-only stock-news MCP tool names */
+export type StockNewsMCPToolName =
+  | "route_news_question"
+  | "resolve_news_entities"
+  | "search_company_news_events"
+  | "search_market_news_events"
+  | "search_news_by_domain"
+  | "read_news_sources"
+  | "build_news_timeline"
+  | "audit_news_sources";
 
 /** Allowed MCP tool names */
-export type MCPToolName = KRWOntologyMCPToolName | WebSearchMCPToolName;
+export type MCPToolName = KRWOntologyMCPToolName | StockNewsMCPToolName;
 
 /** Document types in the ontology */
 export type DocumentType =

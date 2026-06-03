@@ -6,7 +6,9 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { KrwBrand } from "@/components/KrwBrand";
+import LocaleSwitcher from "@/components/LocaleSwitcher";
 import UsageStatus from "@/components/UsageStatus";
+import { getPathLocale } from "@/i18n/routing";
 import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
 import { dispatchOpenChatSidebar } from "@/lib/chat/sidebar-events";
 import { createClient } from "@/lib/supabase/client";
@@ -29,6 +31,7 @@ interface TopNavProps {
   mobileCollapsed?: boolean;
   mobileOverlay?: boolean;
   preserveInitialUserProfile?: boolean;
+  showLocaleSwitcher?: boolean;
 }
 
 function profileFromUser(user: User | null | undefined): TopNavUserProfile | null {
@@ -93,10 +96,12 @@ export default function TopNav({
   mobileCollapsed = false,
   mobileOverlay = false,
   preserveInitialUserProfile = false,
+  showLocaleSwitcher = false,
 }: TopNavProps = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const currentLocale = getPathLocale(pathname) ?? "ko";
   const [userProfile, setUserProfile] = useState<TopNavUserProfile | null>(() =>
     initialUserProfile ?? null,
   );
@@ -220,7 +225,9 @@ export default function TopNav({
             <button
               type="button"
               className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55 md:hidden"
-              aria-label="채팅 기록 열기"
+              aria-label={
+                currentLocale === "ko" ? "채팅 기록 열기" : "Open chat history"
+              }
               aria-controls="mobile-chat-sidebar"
               onClick={dispatchOpenChatSidebar}
               disabled={!clientReady}
@@ -239,6 +246,7 @@ export default function TopNav({
         </div>
 
         <div className="flex shrink-0 items-center justify-end gap-xs sm:gap-md">
+          {showLocaleSwitcher && <LocaleSwitcher compact />}
           {hideAccountMenu ? null : !authChecked ? (
             <div
               aria-hidden="true"
@@ -249,7 +257,9 @@ export default function TopNav({
               <button
                 type="button"
                 className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-[8px] border border-hairline bg-surface-dark text-[13px] font-semibold text-on-dark shadow-sm transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55 sm:h-10 sm:w-10"
-                aria-label={`${userProfile.name ?? userProfile.email} 계정 메뉴`}
+                aria-label={`${userProfile.name ?? userProfile.email} ${
+                  currentLocale === "ko" ? "계정 메뉴" : "account menu"
+                }`}
                 aria-expanded={accountMenuOpen}
                 aria-haspopup="menu"
                 disabled={!clientReady}
@@ -306,7 +316,7 @@ export default function TopNav({
                       role="menuitem"
                       onClick={handleSignOut}
                     >
-                      <span>로그아웃</span>
+                      <span>{currentLocale === "ko" ? "로그아웃" : "Log out"}</span>
                       <span
                         aria-hidden="true"
                         className="material-symbols-outlined text-[18px]"
@@ -322,9 +332,9 @@ export default function TopNav({
             <Link
               href={`/login?next=${encodeURIComponent(currentPath)}`}
               className="inline-flex min-h-10 items-center rounded-[8px] bg-surface-dark px-sm py-xs text-[14px] font-semibold leading-[1.15] text-on-dark transition-colors duration-200 hover:bg-primary-active sm:px-base sm:text-[16px]"
-              aria-label="로그인"
+              aria-label={currentLocale === "ko" ? "로그인" : "Log in"}
             >
-              로그인
+              {currentLocale === "ko" ? "로그인" : "Log in"}
             </Link>
           )}
 

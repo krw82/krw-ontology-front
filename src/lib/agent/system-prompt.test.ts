@@ -45,38 +45,38 @@ describe("buildSystemPrompt", () => {
     );
   });
 
-  it("keeps web search disabled in the prompt unless explicitly enabled", () => {
+  it("keeps current-news search disabled in the prompt unless explicitly enabled", () => {
     const disabledPrompt = buildSystemPrompt();
     expect(disabledPrompt).toContain("Do not perform web searches");
-    expect(disabledPrompt).not.toContain("Z.AI Web Search MCP");
+    expect(disabledPrompt).not.toContain("Stock News Z.ai MCP");
 
     const enabledPrompt = buildSystemPrompt(undefined, [], {
-      webSearchEnabled: true,
+      stockNewsEnabled: true,
     });
     expect(enabledPrompt).toContain("Do not use built-in WebSearch or WebFetch");
-    expect(enabledPrompt).toContain("Z.AI Web Search MCP");
+    expect(enabledPrompt).toContain("Stock News Z.ai MCP");
     expect(enabledPrompt).toContain("source provenance internally");
   });
 
-  it("marks web search as required for news mode when the MCP is available", () => {
+  it("marks stock-news discovery as required for news mode when the MCP is available", () => {
     const prompt = buildSystemPrompt(undefined, [], {
-      webSearchEnabled: true,
-      webSearchRequired: true,
+      stockNewsEnabled: true,
+      stockNewsRequired: true,
     });
 
     expect(prompt).toContain("This run is in news mode");
-    expect(prompt).toContain("attempt at least one current web search");
-    expect(prompt).toContain("If the web-search MCP call fails");
+    expect(prompt).toContain("current news/event discovery");
+    expect(prompt).toContain("If the stock-news MCP call fails");
   });
 
-  it("falls back cleanly when news mode is selected but web MCP is unavailable", () => {
+  it("falls back cleanly when news mode is selected but stock-news MCP is unavailable", () => {
     const prompt = buildSystemPrompt(undefined, [], {
-      webSearchUnavailableForNews: true,
+      stockNewsUnavailableForNews: true,
     });
 
     expect(prompt).toContain("selected news mode");
-    expect(prompt).toContain("web-search MCP tool is unavailable");
-    expect(prompt).toContain("Do not attempt web search");
+    expect(prompt).toContain("stock-news MCP tool is unavailable");
+    expect(prompt).toContain("Do not attempt current-news search");
   });
 
   it("limits prompt history count and size before adding it to the system prompt", () => {

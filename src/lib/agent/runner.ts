@@ -12,12 +12,12 @@ import {
 import {
   KRW_ONTOLOGY_MCP_TOOLS,
   KRW_ONTOLOGY_SDK_ALLOWED_TOOLS,
-  ZAI_WEB_SEARCH_MCP_TOOLS,
+  STOCK_NEWS_ZAI_MCP_TOOLS,
+  getStockNewsZaiSdkAllowedTools,
   getKrwOntologyPluginPath,
-  getZaiWebSearchSdkAllowedTools,
   isKrwOntologySdkTool,
-  isZaiWebSearchEnabled,
-  isZaiWebSearchSdkTool,
+  isStockNewsZaiEnabled,
+  isStockNewsZaiSdkTool,
 } from "./mcp-client";
 import { buildClaudeAgentEnv } from "./env";
 import {
@@ -36,11 +36,7 @@ import {
   type ResearchMode,
   type ResearchModeToolBudget,
 } from "@/lib/research-mode";
-import {
-  buildAnalysisModePrompt,
-  normalizeAnalysisMode,
-  type AnalysisMode,
-} from "@/lib/analysis-mode";
+import { normalizeAnalysisMode, type AnalysisMode } from "@/lib/analysis-mode";
 import {
   createAccumulator,
   createSSEWriter,
@@ -58,17 +54,16 @@ import type {
   KRWOntologyMCPToolName,
   MCPToolName,
   StreamingCitation,
-  WebSearchMCPToolName,
+  StockNewsMCPToolName,
 } from "@/types/api-contracts";
 
 const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
-const ZAI_WEB_SEARCH_MCP_TOOL_SET = new Set<string>(ZAI_WEB_SEARCH_MCP_TOOLS);
+const STOCK_NEWS_ZAI_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_ZAI_MCP_TOOLS);
 const DEFAULT_MAX_TURNS = 20;
 const DEFAULT_AGENT_WORKSPACE_DIR = ".agent-workspace";
 const TOOL_BUDGET_EXCEEDED = "tool_budget_exceeded";
 const TOOL_RESULT_MISSING = "tool_result_missing";
-const DEFAULT_WEB_SEARCH_MAX_CALLS = 2;
-const DEFAULT_WEB_SEARCH_MAX_RESULTS = 5;
+const DEFAULT_STOCK_NEWS_MAX_CALLS = 12;
 const DISALLOWED_SDK_TOOLS = [
   "Bash",
   "Read",
@@ -169,8 +164,8 @@ export async function runAgent(
   const abortController = new AbortController();
   const researchMode = normalizeResearchMode(options.researchMode);
   const analysisMode = normalizeAnalysisMode(options.analysisMode);
-  const webSearchEnabledForRun =
-    analysisMode === "news" && isZaiWebSearchEnabled();
+  const stockNewsEnabledForRun =
+    analysisMode === "news" && isStockNewsZaiEnabled();
   const toolBudget = getResearchModeToolBudget(researchMode);
 
   const abortHandler = () => abortController.abort();
@@ -194,17 +189,14 @@ export async function runAgent(
     promptContext,
     shouldResume ? [] : (options.history ?? []),
     {
-      webSearchEnabled: webSearchEnabledForRun,
-      webSearchRequired: analysisMode === "news" && webSearchEnabledForRun,
-      webSearchUnavailableForNews:
-        analysisMode === "news" && !webSearchEnabledForRun,
+      stockNewsEnabled: stockNewsEnabledForRun,
+      stockNewsRequired: analysisMode === "news" && stockNewsEnabledForRun,
+      stockNewsUnavailableForNews:
+        analysisMode === "news" && !stockNewsEnabledForRun,
     },
   );
   const researchPrompt = [
     buildResearchPassPrompt(options.userMessage, analysisMode),
-    buildAnalysisModePrompt(analysisMode, {
-      webSearchAvailable: webSearchEnabledForRun,
-    }),
     buildResearchModePrompt(researchMode),
   ].join("\n\n");
   const allowedTools = allowedSdkToolsForResearchMode(
@@ -337,9 +329,9 @@ async function runSdkPass(params: {
     readIntEnv("AGENT_MAX_TOOL_CALLS", toolBudget.maxToolCalls, { min: 1 }),
     toolBudget.maxToolCalls,
   );
-  const maxWebSearchCalls = readIntEnv(
-    "KRW_WEB_SEARCH_MAX_CALLS",
-    DEFAULT_WEB_SEARCH_MAX_CALLS,
+  const maxStockNewsCalls = readIntEnv(
+    "STOCK_NEWS_MAX_CALLS",
+    DEFAULT_STOCK_NEWS_MAX_CALLS,
     { min: 1 },
   );
 
@@ -349,7 +341,7 @@ async function runSdkPass(params: {
       researchMode,
       analysisMode,
       maxToolCalls,
-      maxWebSearchCalls,
+      maxStockNewsCalls,
     );
     const sdkQuery = query({
       prompt,
@@ -549,21 +541,21 @@ export async function canUseTool(
     return allowWithInputPolicy(mcpToolName, input);
   }
 
-  if (isZaiWebSearchSdkTool(toolName)) {
-    if (!isZaiWebSearchEnabled()) {
+  if (isStockNewsZaiSdkTool(toolName)) {
+    if (!isStockNewsZaiEnabled()) {
       return {
         behavior: "deny",
-        message: "Z.AI Web Search MCP is disabled for this runtime.",
+        message: "Stock News Z.ai MCP is disabled for this runtime.",
       };
     }
 
-    return allowWithWebSearchPolicy(normalizeZaiWebSearchToolName(toolName), input);
+    return { behavior: "allow" };
   }
 
   return {
     behavior: "deny",
     message:
-      "Only configured read-only KRW Ontology and Z.AI Web Search MCP tools are allowed in web chat.",
+      "Only configured read-only KRW Ontology and Stock News Z.ai MCP tools are allowed in web chat.",
   };
 }
 
@@ -579,7 +571,7 @@ function allowedSdkToolsForResearchMode(
 
   return [
     ...allowedOntologyTools,
-    ...(analysisMode === "news" ? getZaiWebSearchSdkAllowedTools() : []),
+    ...(analysisMode === "news" ? getStockNewsZaiSdkAllowedTools() : []),
   ];
 }
 
@@ -588,45 +580,46 @@ function createToolPermissionGuard(
   mode: ResearchMode,
   analysisMode: AnalysisMode,
   maxToolCalls: number,
-  maxWebSearchCalls: number,
+  maxStockNewsCalls: number,
 ) {
   return async (
     toolName: string,
     input: Record<string, unknown> = {},
   ): Promise<PermissionResult> => {
-    if (!isKrwOntologySdkTool(toolName) && !isZaiWebSearchSdkTool(toolName)) {
+    if (!isKrwOntologySdkTool(toolName) && !isStockNewsZaiSdkTool(toolName)) {
       return {
         behavior: "deny",
         message:
-          "Only configured read-only KRW Ontology and Z.AI Web Search MCP tools are allowed in web chat.",
+          "Only configured read-only KRW Ontology and Stock News Z.ai MCP tools are allowed in web chat.",
       };
     }
 
-    if (isZaiWebSearchSdkTool(toolName)) {
-      const webToolName = normalizeZaiWebSearchToolName(toolName);
+    if (isStockNewsZaiSdkTool(toolName)) {
+      const stockNewsToolName = normalizeStockNewsZaiToolName(toolName);
       if (analysisMode !== "news") {
         return {
           behavior: "deny",
-          message: "News mode is required to use Z.AI Web Search MCP.",
+          message: "News mode is required to use Stock News Z.ai MCP.",
         };
       }
 
-      if (!isZaiWebSearchEnabled() || !webToolName) {
+      if (!isStockNewsZaiEnabled() || !stockNewsToolName) {
         return {
           behavior: "deny",
-          message: "Z.AI Web Search MCP is disabled for this runtime.",
+          message: "Stock News Z.ai MCP is disabled for this runtime.",
         };
       }
 
-      const nextWebSearchCalls = countToolCalls(acc.toolCalls, webToolName) + 1;
-      if (nextWebSearchCalls > maxWebSearchCalls) {
+      const nextStockNewsCalls =
+        countStockNewsToolCalls(acc.toolCalls) + 1;
+      if (nextStockNewsCalls > maxStockNewsCalls) {
         return {
           behavior: "deny",
-          message: buildWebSearchBudgetDenyMessage(),
+          message: buildStockNewsBudgetDenyMessage(),
         };
       }
 
-      return allowWithWebSearchPolicy(webToolName, input);
+      return { behavior: "allow" };
     }
 
     const mcpToolName = normalizeKrwOntologyToolName(toolName);
@@ -678,36 +671,6 @@ function allowWithInputPolicy(
   return { behavior: "allow" };
 }
 
-function allowWithWebSearchPolicy(
-  mcpToolName: WebSearchMCPToolName | null,
-  input: Record<string, unknown>,
-): PermissionResult {
-  if (!mcpToolName) {
-    return {
-      behavior: "deny",
-      message: "Unknown Z.AI Web Search MCP tool.",
-    };
-  }
-
-  const maxResults = readIntEnv(
-    "KRW_WEB_SEARCH_RESULT_COUNT",
-    DEFAULT_WEB_SEARCH_MAX_RESULTS,
-    { min: 1, max: 50 },
-  );
-  const requestedCount = typeof input.count === "number" ? input.count : null;
-  if (requestedCount !== null && requestedCount > maxResults) {
-    return {
-      behavior: "allow",
-      updatedInput: {
-        ...input,
-        count: maxResults,
-      },
-    };
-  }
-
-  return { behavior: "allow" };
-}
-
 interface PreparedToolInput {
   input: Record<string, unknown>;
   changed: boolean;
@@ -718,11 +681,8 @@ function prepareToolInputForRun(
   input: Record<string, unknown>,
   acc: AccumulatedRun,
 ): PreparedToolInput {
-  if (mcpToolName === "web_search_prime") {
-    const permission = allowWithWebSearchPolicy(mcpToolName, input);
-    return permission.behavior === "allow" && permission.updatedInput
-      ? { input: permission.updatedInput, changed: true }
-      : { input, changed: false };
+  if (isStockNewsMcpToolName(mcpToolName)) {
+    return { input, changed: false };
   }
 
   const inputWithContext = attachAgentContextInput(mcpToolName, input, acc);
@@ -776,11 +736,11 @@ function buildToolBudgetDenyMessage(): string {
   ].join(" ");
 }
 
-function buildWebSearchBudgetDenyMessage(): string {
+function buildStockNewsBudgetDenyMessage(): string {
   return [
-    "No more Z.AI Web Search MCP tools can be called in this run.",
-    "Do not call another web search tool.",
-    "Continue with filing evidence and web results already collected.",
+    "No more Stock News Z.ai MCP tools can be called in this run.",
+    "Do not call another current-news tool.",
+    "Continue with filing evidence and news results already collected.",
   ].join(" ");
 }
 
@@ -1010,7 +970,7 @@ function summarizeToolResult(text: string): string | null {
 }
 
 function normalizeMcpToolName(name: unknown): MCPToolName | null {
-  return normalizeKrwOntologyToolName(name) ?? normalizeZaiWebSearchToolName(name);
+  return normalizeKrwOntologyToolName(name) ?? normalizeStockNewsZaiToolName(name);
 }
 
 function normalizeKrwOntologyToolName(
@@ -1022,13 +982,13 @@ function normalizeKrwOntologyToolName(
   return bareName as KRWOntologyMCPToolName;
 }
 
-function normalizeZaiWebSearchToolName(
+function normalizeStockNewsZaiToolName(
   name: unknown,
-): WebSearchMCPToolName | null {
+): StockNewsMCPToolName | null {
   if (typeof name !== "string") return null;
   const bareName = name.includes("__") ? name.split("__").at(-1) : name;
-  if (!bareName || !ZAI_WEB_SEARCH_MCP_TOOL_SET.has(bareName)) return null;
-  return bareName as WebSearchMCPToolName;
+  if (!bareName || !STOCK_NEWS_ZAI_MCP_TOOL_SET.has(bareName)) return null;
+  return bareName as StockNewsMCPToolName;
 }
 
 function pendingToolResultsFailure(
@@ -1078,6 +1038,18 @@ function countToolCalls(
   return toolCalls.filter((toolCall) => toolCall.toolName === toolName).length;
 }
 
+function countStockNewsToolCalls(
+  toolCalls: Array<Pick<AccumulatedToolCall, "toolName">>,
+): number {
+  return toolCalls.filter((toolCall) => isStockNewsMcpToolName(toolCall.toolName)).length;
+}
+
+function isStockNewsMcpToolName(
+  toolName: MCPToolName | null,
+): toolName is StockNewsMCPToolName {
+  return Boolean(toolName && STOCK_NEWS_ZAI_MCP_TOOL_SET.has(toolName));
+}
+
 const SAFE_TOOL_ARGUMENT_KEYS = [
   "ticker",
   "tickers",
@@ -1090,6 +1062,16 @@ const SAFE_TOOL_ARGUMENT_KEYS = [
   "periods",
   "document_type",
   "document_types",
+  "question",
+  "query",
+  "company",
+  "companies",
+  "domain",
+  "domains",
+  "lookback_hours",
+  "max_events",
+  "urls",
+  "event_id",
 ] as const;
 
 function summarizeToolArguments(

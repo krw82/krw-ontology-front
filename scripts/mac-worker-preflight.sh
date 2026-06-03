@@ -343,6 +343,16 @@ if (server.type === "http" || server.type === "sse") {
     throw new Error(`Plugin .mcp.json MCP URL mismatch: ${server.url} !== ${expectedUrl}`);
   }
   console.log(`OK plugin MCP URL: ${server.url}`);
+  const stockNewsServer = config.mcpServers && config.mcpServers["stock-news-zai"];
+  const expectedStockNewsUrl = process.env.STOCK_NEWS_ZAI_MCP_URL || "http://127.0.0.1:8775/mcp";
+  if (!stockNewsServer) throw new Error("Missing mcpServers.stock-news-zai");
+  if (stockNewsServer.type !== "http") {
+    throw new Error(`Stock News MCP must use streamable HTTP MCP, got: ${stockNewsServer.type}`);
+  }
+  if (stockNewsServer.url !== expectedStockNewsUrl) {
+    throw new Error(`Plugin .mcp.json Stock News MCP URL mismatch: ${stockNewsServer.url} !== ${expectedStockNewsUrl}`);
+  }
+  console.log(`OK plugin Stock News MCP URL: ${stockNewsServer.url}`);
   process.exit(0);
 }
 const configuredRoot = server.env && (

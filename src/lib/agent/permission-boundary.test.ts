@@ -11,45 +11,36 @@ vi.mock("@/lib/ontology/catalog", () => ({
 import { canUseTool } from "./runner";
 import {
   isKrwOntologySdkTool,
-  isZaiWebSearchSdkTool,
+  isStockNewsZaiSdkTool,
   KRW_ONTOLOGY_MCP_TOOLS,
   KRW_ONTOLOGY_SDK_ALLOWED_TOOLS,
-  ZAI_WEB_SEARCH_SDK_ALLOWED_TOOLS,
+  STOCK_NEWS_ZAI_MCP_TOOLS,
+  STOCK_NEWS_ZAI_SDK_ALLOWED_TOOLS,
 } from "./mcp-client";
 
 describe("agent permission boundary", () => {
   beforeEach(() => {
-    delete process.env.KRW_WEB_SEARCH_ENABLED;
-    delete process.env.KRW_WEB_SEARCH_FORCE_DISABLED;
-    delete process.env.KRW_WEB_SEARCH_PROVIDER;
-    delete process.env.KRW_WEB_SEARCH_RESULT_COUNT;
+    delete process.env.STOCK_NEWS_ZAI_ENABLED;
+    delete process.env.STOCK_NEWS_ZAI_FORCE_DISABLED;
     delete process.env.ZAI_API_KEY;
   });
 
-  it("denies raw Z.AI Web Search MCP by default", async () => {
-    for (const toolName of ZAI_WEB_SEARCH_SDK_ALLOWED_TOOLS) {
-      await expect(canUseTool(toolName)).resolves.toMatchObject({
-        behavior: "deny",
+  it("allows Stock News Z.ai MCP by default at the global MCP boundary", async () => {
+    for (const toolName of STOCK_NEWS_ZAI_SDK_ALLOWED_TOOLS) {
+      await expect(canUseTool(toolName)).resolves.toEqual({
+        behavior: "allow",
       });
-      expect(isZaiWebSearchSdkTool(toolName)).toBe(true);
+      expect(isStockNewsZaiSdkTool(toolName)).toBe(true);
     }
   });
 
-  it("allows raw Z.AI Web Search MCP only behind the runtime feature flag", async () => {
-    process.env.KRW_WEB_SEARCH_ENABLED = "1";
-    process.env.KRW_WEB_SEARCH_PROVIDER = "zai_mcp";
-    process.env.ZAI_API_KEY = "zai-test-key";
+  it("denies Stock News Z.ai MCP when explicitly disabled", async () => {
+    process.env.STOCK_NEWS_ZAI_FORCE_DISABLED = "1";
 
-    try {
-      for (const toolName of ZAI_WEB_SEARCH_SDK_ALLOWED_TOOLS) {
-        await expect(canUseTool(toolName)).resolves.toEqual({
-          behavior: "allow",
-        });
-      }
-    } finally {
-      delete process.env.KRW_WEB_SEARCH_ENABLED;
-      delete process.env.KRW_WEB_SEARCH_PROVIDER;
-      delete process.env.ZAI_API_KEY;
+    for (const toolName of STOCK_NEWS_ZAI_SDK_ALLOWED_TOOLS) {
+      await expect(canUseTool(toolName)).resolves.toMatchObject({
+        behavior: "deny",
+      });
     }
   });
 
@@ -74,7 +65,7 @@ describe("agent permission boundary", () => {
       "WebSearch",
       "NotebookEdit",
       "TodoWrite",
-      "mcp__plugin_krw-ontology_other__web_search_prime",
+      "mcp__plugin_krw-ontology_other__search_company_news_events",
     ];
 
     for (const toolName of deniedToolNames) {
@@ -98,8 +89,10 @@ describe("agent permission boundary", () => {
         (toolName) => `mcp__plugin_krw-ontology_krw-ontology__${toolName}`,
       ),
     );
-    expect(ZAI_WEB_SEARCH_SDK_ALLOWED_TOOLS).toEqual([
-      "mcp__plugin_krw-ontology_web-search-prime__web_search_prime",
-    ]);
+    expect(STOCK_NEWS_ZAI_SDK_ALLOWED_TOOLS).toEqual(
+      STOCK_NEWS_ZAI_MCP_TOOLS.map(
+        (toolName) => `mcp__plugin_krw-ontology_stock-news-zai__${toolName}`,
+      ),
+    );
   });
 });
