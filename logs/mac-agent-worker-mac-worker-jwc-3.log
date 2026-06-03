@@ -16567,3 +16567,629 @@
 [agent-worker] idle { workerId: 'mac-worker-jwc-3' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-3' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-3',
+  runId: '8538ee87-0129-4d59-b36f-27ea6f7c1451'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'GOOGL' },
+  duration_ms: 161,
+  duration_s: 0.161,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_GyxhzK0w3mY1wM4KKBZK8721',
+  tool_name: 'krw_ontology_catalog'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'GOOGL' },
+  duration_ms: 781,
+  duration_s: 0.781,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_dtrQuTBtaqTocZ46ckgB4442',
+  tool_name: 'krw_ontology_company_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'GOOGL', periods: [ 'CY2026Q1', 'CY2025', 'CY2024' ] },
+  duration_ms: 37586,
+  duration_s: 37.586,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_81VDZ5ofCB19lay0QDXE3757',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'GOOGL', periods: [ 'CY2026Q1', 'CY2025', 'CY2024' ] },
+  duration_ms: 83281,
+  duration_s: 83.281,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_MQaaFVJ0OPGHuHMYixSI7456',
+  tool_name: 'krw_ontology_retrieve'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'GOOGL', periods: [ 'CY2026Q1', 'CY2025', 'CY2024' ] },
+  duration_ms: 84198,
+  duration_s: 84.198,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_EYew7a9h0UsIE1gbHK9l4272',
+  tool_name: 'krw_ontology_retrieve'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'operating income net income earnings per share',
+    periods: [ 'CY2026Q1', 'CY2025' ]
+  },
+  duration_ms: 4649,
+  duration_s: 4.649,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_h79ZQItXx4pyoK7qNSaG7222',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'capital expenditure capex free cash flow share repurchase cash flow investing',
+    periods: [ 'CY2026Q1', 'CY2025' ]
+  },
+  duration_ms: 4634,
+  duration_s: 4.634,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_pLJZTfM2uMACZ5p3p1OZ2600',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'GOOGL', periods: [ 'CY2026Q1', 'CY2025' ] },
+  duration_ms: 2610,
+  duration_s: 2.61,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_EekfhAO5sSDBXekJDJvn7235',
+  tool_name: 'krw_ontology_retrieve'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'GOOGL', periods: [ 'CY2025', 'CY2026Q1' ] },
+  duration_ms: 251,
+  duration_s: 0.251,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_fF84gz8qUla7fpjk5HWz1970',
+  tool_name: 'krw_ontology_topic_map'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 1809,
+  duration_s: 1.809,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_SNdcIbTrCcU45jYSiULo1784',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 1557,
+  duration_s: 1.557,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_TPRrI8D5JQCLxOyBabLA2462',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 9487,
+  duration_s: 9.487,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_BYqMbi6AxKL70LFmpneJ6223',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'operating_income operating_cash_flow CY2025',
+    periods: [ 'CY2025' ]
+  },
+  duration_ms: 1506,
+  duration_s: 1.506,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_5yYG5eDQNX8S1yYvuoqw3008',
+  tool_name: 'krw_ontology_query'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-3',
+  runId: '8538ee87-0129-4d59-b36f-27ea6f7c1451'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] stopped { workerId: 'mac-worker-jwc-3' }
+[agent-worker] started { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] stopped { workerId: 'mac-worker-jwc-3' }
+[agent-worker] started { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] stopped { workerId: 'mac-worker-jwc-3' }
+[agent-worker] started { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-3',
+  runId: 'f7577fa2-6d19-4a38-be45-9ea0e9fceeb3'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    question: 'GOOGL latest MD&A revenue growth drivers, margin pressure, capex outlook, competitive landscape in search and cloud,...'
+  },
+  duration_ms: 5792,
+  duration_s: 5.792,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_3vwFIfcMadiYxGq3MGgE3292',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    question: 'GOOGL recent stock price adjustment reasons, current business pressure, and long-term investment perspective',
+    company: 'Alphabet',
+    lookback_hours: 168,
+    max_events: 10
+  },
+  duration_ms: 51178,
+  duration_s: 51.178,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_WP2H5AYsefv9QkiXrGQc4538',
+  tool_name: 'search_company_news_events'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    question: 'GOOGL recent stock price adjustment, reasons for decline, market concerns about antitrust, AI competition, capex spen...',
+    company: 'Alphabet',
+    lookback_hours: 168,
+    max_events: 8
+  },
+  duration_ms: 42925,
+  duration_s: 42.925,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_xY6PIFgxKKCA0ElvnJUS7198',
+  tool_name: 'search_company_news_events'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    query: 'Google Alphabet antitrust ruling search default DOJ remedy 2026',
+    domains: [ 'reuters.com', 'cnbc.com', 'wsj.com', 'bloomberg.com' ]
+  },
+  duration_ms: 5317,
+  duration_s: 5.317,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_ZIOfheMItOGxxLdAJtXP8598',
+  tool_name: 'search_news_by_domain'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    query: 'Alphabet GOOGL stock price decline reasons antitrust AI competition capex spending 2026',
+    domains: [
+      'reuters.com',
+      'cnbc.com',
+      'wsj.com',
+      'bloomberg.com',
+      'sec.gov'
+    ]
+  },
+  duration_ms: 7094,
+  duration_s: 7.094,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_X6rrNYgxneEdT0qpDL2y4826',
+  tool_name: 'search_news_by_domain'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    query: 'Alphabet Google cloud growth slowdown capex spending efficiency 2026 quarter earnings',
+    domains: [
+      'reuters.com',
+      'cnbc.com',
+      'wsj.com',
+      'bloomberg.com',
+      'sec.gov',
+      'abc.xyz/investor'
+    ]
+  },
+  duration_ms: 3553,
+  duration_s: 3.553,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_dLHnHrjUZGdkLr4yZq5S8905',
+  tool_name: 'search_news_by_domain'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    query: 'Alphabet GOOGL stock May June 2026 AI competition Microsoft OpenAI search revenue growth',
+    domains: [
+      'reuters.com',
+      'cnbc.com',
+      'wsj.com',
+      'bloomberg.com',
+      'sec.gov',
+      'abc.xyz/investor'
+    ]
+  },
+  duration_ms: 4340,
+  duration_s: 4.34,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_PTr8ZpzL5rZ5kl458mYZ4688',
+  tool_name: 'search_news_by_domain'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    query: 'GOOGL Alphabet stock down selloff June 2026 recession fears market rotation tech sell-off',
+    domains: [ 'reuters.com', 'cnbc.com', 'wsj.com', 'bloomberg.com' ]
+  },
+  duration_ms: 5093,
+  duration_s: 5.093,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_AcnsNtFQj377dxAnRvK48305',
+  tool_name: 'search_news_by_domain'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    question: 'tech sector sell-off June 2026 AI bubble concern recession risk rotation factors affecting GOOGL and large cap tech',
+    domains: [ 'tech', 'ai', 'semiconductors', 'market_macro' ],
+    lookback_hours: 168,
+    max_events: 10
+  },
+  duration_ms: 14549,
+  duration_s: 14.549,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_PTHePpoFAxeU9s587yxt5734',
+  tool_name: 'search_market_news_events'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    urls: [
+      'https://www.cnbc.com/2026/05/10/alphabet-160percent-rally-in-year-reflects-value-of-owning-most-of-ai-stack.html',
+      'https://www.cnbc.com/2026/04/29/investors-trust-google-more-than-meta-when-comes-to-spending-on-ai.html'
+    ]
+  },
+  duration_ms: 5748,
+  duration_s: 5.748,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_YAlaxEPkkRB153hh9b3s7736',
+  tool_name: 'read_news_sources'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    document_types: [ '10-Q' ],
+    question: 'GOOGL CY2026Q1 10-Q revenue growth drivers, segment results, margin trends, capex, cash flow'
+  },
+  duration_ms: 843,
+  duration_s: 0.843,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_GbVdRJrOvbgmLA0ChzKI7923',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    question: 'GOOGL capex outlook AI investment cost pressure capital allocation share repurchase cash flow FCF'
+  },
+  duration_ms: 633,
+  duration_s: 0.633,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_n4NaOZJb26PlGvxIGNOE4054',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 11138,
+  duration_s: 11.138,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_7ANKlkpn2GpbJyuBYWEk6050',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'GOOGL' },
+  duration_ms: 11005,
+  duration_s: 11.005,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_w8ixmDe2d7doCzKc6yLd3405',
+  tool_name: 'krw_ontology_company_context'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-3',
+  runId: 'f7577fa2-6d19-4a38-be45-9ea0e9fceeb3'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-3' }

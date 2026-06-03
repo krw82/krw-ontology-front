@@ -107,12 +107,30 @@ if [ "$LOAD" != "1" ]; then
 fi
 
 launchctl bootout "$DOMAIN/com.krwontology.stock-news-zai-mcp" >/dev/null 2>&1 || true
-launchctl bootstrap "$DOMAIN" "$PLIST" >/dev/null 2>&1 || true
+BOOTSTRAP_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/stock-news-zai-mcp-bootstrap.XXXXXX")
+trap 'rm -f "$BOOTSTRAP_OUTPUT"' EXIT INT TERM
+
+BOOTSTRAPPED=0
+for _ in 1 2 3 4 5; do
+  if launchctl bootstrap "$DOMAIN" "$PLIST" >"$BOOTSTRAP_OUTPUT" 2>&1; then
+    BOOTSTRAPPED=1
+    break
+  fi
+  if launchctl print "$DOMAIN/com.krwontology.stock-news-zai-mcp" >/dev/null 2>&1; then
+    BOOTSTRAPPED=1
+    break
+  fi
+  sleep 1
+done
+if [ "$BOOTSTRAPPED" != "1" ]; then
+  cat "$BOOTSTRAP_OUTPUT" >&2
+  exit 1
+fi
+
 launchctl enable "$DOMAIN/com.krwontology.stock-news-zai-mcp"
-launchctl kickstart -k "$DOMAIN/com.krwontology.stock-news-zai-mcp"
 
 VERIFY_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/stock-news-zai-mcp-verify.XXXXXX")
-trap 'rm -f "$VERIFY_OUTPUT"' EXIT INT TERM
+trap 'rm -f "$BOOTSTRAP_OUTPUT" "$VERIFY_OUTPUT"' EXIT INT TERM
 for _ in 1 2 3 4 5 6 7 8 9 10; do
   if "$SCRIPT_DIR/verify-stock-news-zai-mcp-production.sh" --env-file "$ENV_PATH" >"$VERIFY_OUTPUT" 2>&1; then
     cat "$VERIFY_OUTPUT"

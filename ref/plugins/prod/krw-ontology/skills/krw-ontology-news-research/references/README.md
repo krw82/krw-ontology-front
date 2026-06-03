@@ -1,6 +1,6 @@
 # KRW Ontology News Research References
 
-These references are internal guidance for the `krw-ontology-news-research` skill. Normal web-chat answers should not expose file names, schema terms, tool names, object IDs, diagnostics, runtime settings, web-search mechanics, or routing logic.
+These references are internal guidance for the `krw-ontology-news-research` skill. Normal web-chat answers should not expose file names, schema terms, tool names, object IDs, diagnostics, runtime settings, stock-news mechanics, source tiers, event IDs, ontology bridge briefs, or routing logic.
 
 ## Active references
 
@@ -8,11 +8,11 @@ These references are internal guidance for the `krw-ontology-news-research` skil
 web-chat-runtime.md
 - visible answer shape, Korean Markdown boundary, follow-up question rule
 
-web-search-policy.md
-- news-first search, source priority, ontology augmentation, and conflict handling
+news-event-policy.md
+- stock-news event discovery, source priority, ontology augmentation, and conflict handling
 
 tool-policy.md
-- MCP tool roles and normal tool workflow
+- stock-news event tool roles, KRW ontology tool roles, inputs, and normal workflow
 
 research-pack-rendering.md
 - how runtime research packs should be rendered without exposing pack names

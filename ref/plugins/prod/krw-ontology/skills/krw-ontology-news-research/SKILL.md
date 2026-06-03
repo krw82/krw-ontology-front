@@ -1,1077 +1,338 @@
 ---
 name: krw-ontology-news-research
-description: Use for news-mode equity research. Start with current web/news search, then use KRW ontology evidence to interpret company-specific financial, business, risk, and capital-allocation meaning.
+description: Use for news-mode equity research. Start with stock-news event discovery, then use KRW ontology evidence to interpret company-specific financial, business, risk, and capital-allocation meaning. Final answers are Korean investor prose.
 ---
 
 # KRW Ontology News Research Skill
 
-## 1. Operating contract
+This skill is only for news-mode equity research.
 
-Default runtime:
+Do not use or modify the filing-only `krw-ontology-research` workflow from this skill. News mode is a separate path:
 
 ```text
-Korean Markdown answer only.
+stock-news event discovery -> event-to-investment framing -> KRW ontology baseline -> fused Korean investor interpretation
 ```
 
-News-mode contract:
+## 1. Operating Contract
+
+Default output is Korean Markdown only.
+
+Use this skill when the user asks about:
 
 ```text
-News mode is news-led and ontology-augmented.
-Web search discovers the current event, report, announcement, or market update first.
-KRW ontology then explains the company-specific baseline, financial channel, accounting context, risk channel, and investment meaning.
-The final Korean answer should synthesize news and ontology evidence into one fused investor interpretation.
-Do not mechanically split every answer into "news section" and "filing section" unless that is the clearest reading structure.
+recent stock moves
+current market/news reasons
+latest company news
+post-filing events
+news impact on a covered company
+sector/macro/factor news connected to covered companies
+current-event comparison across covered companies
 ```
 
-Internal research input:
+Do not answer from memory when stock-news or KRW ontology evidence can answer or constrain the answer.
+
+The stock-news event MCP is the first layer in news mode. It discovers the current event and source context. KRW ontology is the second layer. It explains company-specific baseline, financial channel, risk channel, accounting context, and investment meaning.
+
+## 2. Default Workflow
+
+Follow this order unless the user explicitly asks for a different format:
 
 ```text
-Before current web search, convert the user's request into a concise internal English news/investment brief.
-Use web search first to identify the latest relevant news, report, announcement, or post-filing update.
-Extract the event internally: company, date, source, event type, affected product/business line, claimed impact, and open questions.
-After the current event is identified, build an ontology/MCP-aware internal English investment brief for KRW ontology search.
-Optimize the ontology brief for company-specific evidence retrieval, not literal translation.
-Preserve user intent, tickers, company names, periods, exact metrics, requested comparison axes, and news-event details.
-Do not expose the internal English briefs in the final Korean answer.
+1. Convert the Korean user request into an internal English news/investment brief.
+2. Use stock-news event discovery to identify the latest relevant news/event/source context.
+3. Resolve covered tickers and avoid introducing non-covered companies unless the user asks for them.
+4. Extract the current event: date, source timing, company, event type, claimed impact, uncertainty, and financial channel.
+5. Convert the event into an ontology-aware internal English investment brief.
+6. Use KRW ontology query_context to retrieve the company-specific baseline.
+7. Use targeted ontology follow-up only for a specific missing metric, filing comment, exposure, or comparison axis.
+8. Write one fused Korean investor interpretation.
 ```
 
-Map the news event to ontology-friendly retrieval concepts when useful:
+Never expose the internal English brief.
+
+## 3. Stock-News Event Tool Summary
+
+Use the stock-news tools as the web-backed current-event layer. Do not call them by name in the final answer.
+
+For detailed roles, inputs, and usage examples, read `references/tool-policy.md`.
+
+Normal selection:
 
 ```text
-explanatory filing text / notes
-MD&A / management discussion
-segment commentary
-revenue recognition / RPO / backlog
-cost of revenue / gross margin / operating margin
+route_news_question
+- Use for broad, ambiguous, tickerless, sector/macro, comparison, metric-news, or valuation-opinion questions.
+- It classifies the question and recommends the news/ontology route.
+
+resolve_news_entities
+- Use when ticker/company/entity ambiguity matters.
+- It checks coverage_companies.json and returns covered entities, unmatched terms, sectors, factors, and default recency context.
+
+search_company_news_events
+- Default for a ticker/company latest-news question.
+- It searches recent company news, ranks sources, extracts event candidates, and returns ontology bridge briefs.
+
+search_market_news_events
+- Default for tickerless market/sector/macro/factor news.
+- It searches market news and maps events back to covered companies when possible.
+
+search_news_by_domain
+- Use for constrained official or high-priority source confirmation.
+- Good for company IR, SEC, Reuters, Bloomberg, CNBC, WSJ, AP, FT, or a specific domain.
+
+read_news_sources
+- Use sparingly on the top 1-3 URLs when snippets are not enough.
+- Use it for exact wording, dates, guidance, deal terms, accounting claims, or source conflicts.
+
+build_news_timeline
+- Use when several events or dates matter.
+- It sorts event candidates by event date.
+
+audit_news_sources
+- Use before strong conclusions when source quality is mixed, weak, stale, or conflicting.
+- It identifies source-tier, date-quality, and reader-verification risks.
+```
+
+Do not use any legacy generic web-search tool in this skill.
+
+## 4. News Recency Policy
+
+Default current-news window:
+
+```text
+today
+yesterday
+within 72 hours
+last 3 US trading sessions fallback
+```
+
+Extend to 7 calendar days only when the default window has no useful high-quality event. Use older sources only as background or to confirm the original event date.
+
+Rank by materiality, source quality, and recency together. Today does not beat a materially stronger official or major-news source merely because it is newer.
+
+## 5. Source Policy
+
+Keep two ideas separate:
+
+```text
+news discovery priority = find the current event quickly
+fact verification priority = confirm exact facts with official or primary evidence
+```
+
+Use recent major news to discover market reaction. Use official company/SEC/IR/earnings-release evidence to verify reported numbers, accounting classification, guidance, transaction details, and management wording.
+
+Treat commentary sites, newsletters, blogs, forums, social posts, YouTube, and Reddit as lead-generation or sentiment context, not final-answer evidence, unless the user explicitly asks about sentiment or online reaction.
+
+## 6. Event-To-Ontology Bridge
+
+After the news event is identified, convert it into a concise internal English investment brief optimized for KRW ontology retrieval.
+
+The brief must preserve:
+
+```text
+user intent
+tickers and company names
+periods
+event date and source timing
+event type
+comparison axes
+exact metrics if requested
+financial channel
+risk, margin, cash-flow, growth, valuation, or capital-allocation angle
+```
+
+Map the event to ontology-friendly concepts:
+
+```text
 cash flow / FCF / capex
-business combinations / acquisitions
+M&A / business combinations / acquisition cash outflow
 share repurchases / dilution management
 SBC / R&D / talent investment
-direct exposure / related pressure channel
-business model / product platform / customer demand
+cost of revenue / gross margin / operating margin
+revenue recognition / RPO / backlog
+product platform / customer demand
+segment commentary
+risk factors and direct exposure
+MD&A, notes, and management discussion
 ```
 
-This skill is the news-mode research analyst path for the web chat. It finds current news context first, retrieves related KRW ontology evidence second, and writes one fused Korean investor-facing answer.
+Do not send broad Korean topic text directly to ontology `query_context`.
 
-The answer must feel like an analyst explanation, not a tool report.
+## 7. KRW Ontology Use
 
-```text
-AI agent = analyst, judgment, caveats, comparison, final prose
-Web search MCP = current event discovery and post-filing update layer
-KRW ontology MCP = deterministic filing baseline, financial channel, and research state
-Runner = tool budget and execution enforcement
-```
-
-The agent may use ontology schema, quality, validation, artifact, index, pipeline, registry, and MCP implementation details for internal evidence selection and confidence calibration.
-
-Do not expose internal method, mode, tool names, pack names, IDs, diagnostics, schema terms, ontology quality, artifact contracts, validation/rejected-object details, index internals, pipeline/build details, routing logic, web-search mechanics, or the internal English briefs in normal answers.
-
-Default news-mode flow:
-
-```text
-1. Build a concise internal English news/investment brief from the Korean user request.
-2. Use web search first to identify the latest relevant news/report/announcement/post-filing update.
-3. Extract the current event and its claimed business or financial impact.
-4. Convert that event into an ontology-aware investment brief.
-5. Use query_context to retrieve related company/event/financial baseline from KRW ontology.
-6. Use targeted ontology query/trace/chain only for the specific financial channel, event, metric, or risk gap.
-7. Write one fused Korean investor interpretation that explains what the news means using ontology-grounded context.
-```
-
-Reference: `references/web-search-policy.md`.
-
-## 2. Recommended News-Led Research Pattern
-
-Use this as the default news-mode playbook, not as a rigid state machine. It describes the preferred evidence path for a current-event-first workflow.
-
-The agent may choose a different route when the question, available evidence, or tool results make another path clearly better. Preserve analytical autonomy, but keep evidence quality and latency bounded.
-
-Separate these two concepts:
-
-```text
-Recommended pattern:
-current event discovery, event-to-investment framing, likely ontology objects, likely MCP tool order, and answer structure.
-
-Hard constraints:
-web search first in news mode, no internal tool/schema/pack terms, no unsupported direct claims, no response_detail="full" in normal web chat, no repeated broad search after sufficient evidence, no non-covered company introductions, and no user-facing overflow/tool-failure caveats.
-```
-
-Hard constraints:
-
-```text
-Do not answer from memory when web search or ontology evidence can answer or constrain the answer.
-Attempt current web search first in normal news-mode answers.
-Do not let web snippets override direct filing evidence for historical reported numbers or accounting classification.
-Use KRW ontology after web search to interpret company-specific baseline, financial channel, and investment meaning.
-Do not expose tool names, schema names, object IDs, pack names, diagnostics, or routing logic.
-Do not call broad retrieve after a sufficient query_context.
-Do not loop over similar query_context/query/retrieve/trace/chain calls.
-Do not use response_detail="full" in normal web chat.
-If a tool result overflows, treat it as a too-broad signal and split the research path; do not stop, apologize, or expose overflow.
-Always end a normal answer with exactly 3 related Korean follow-up questions.
-Do not introduce non-covered companies, tickers, or peers in normal answers, comparisons, or follow-up questions unless the user explicitly asks or coverage is confirmed.
-```
-
-### 2.1 First classify the question
-
-Use these categories as planning examples after the current event is identified. If the user question mixes categories, choose the path that best protects answer quality and latency. The agent can override the category when the evidence points elsewhere.
-
-```text
-A. Ticker/company question
-B. Tickerless sector/global/macro/discovery question
-C. Metric/numeric series question
-D. Business model/company overview question
-E. Risk/thesis/scenario question
-F. Direct exposure question
-G. Comparison question
-H. Contract/event/factual lookup question
-I. Valuation/price target/investment opinion question
-```
-
-If multiple paths apply, choose the most restrictive evidence path first:
-
-```text
-metric/numeric > direct exposure > valuation stop > comparison > risk/thesis > business overview > sector/global
-```
-
-### 2.2 Path A: ticker/company question
-
-Use when the user provides a ticker/company or the chat session has default tickers.
-
-Flow:
-
-```text
-1. Build a concise internal English news/investment brief that preserves the user's ticker/tickers, period, metric, news, and comparison intent.
-2. Use web search first to identify the latest relevant event or update.
-3. Extract event date, source, event type, affected business line, claimed impact, and uncertainty.
-4. Build an ontology-aware investment brief from that event.
-5. Call query_context with the ticker/tickers and the event-specific ontology brief.
-6. Read research_status, research_pack, answerability, agent_autonomy, and kernel when present.
-7. If trace is recommended for a strong claim, trace/chain only selected roots.
-8. If a specific material gap remains, use one targeted query/compare for that gap.
-9. Write fused Korean investor synthesis.
-```
-
-Use ontology objects by purpose:
-
-```text
-business model -> CompanyBusinessProfile, BusinessActivity, ResearchClaim, EvidenceQuote
-metrics -> MetricObservation, Calculation, XBRLFact, SupportLink
-risks/exposures -> BusinessFactor, ExternalFactorExposure, ResearchClaim, EvidenceQuote
-contracts/events -> AgreementTerm, BusinessEvent, ChangeEvent, ResearchClaim, EvidenceQuote
-```
-
-### 2.3 Path B: tickerless sector/global/macro/discovery question
-
-Use when default tickers are empty and the user asks about a sector, industry, macro environment, theme, beneficiary group, or broad company set.
-
-Do not start with:
-
-```text
-query_context(question=sector/global brief, tickers=[])
-broad catalog(limit > 5)
-catalog as a sector discovery substitute
-unbounded retrieve
-```
-
-Flow:
-
-```text
-1. Build a concise internal English news/investment brief.
-2. Use web search first to identify the latest relevant sector/global/macro event or report.
-3. Extract the event, affected sectors, named companies, and claimed financial channels.
-4. Identify a bounded covered ticker basket before the ontology research call.
-5. Use only indexed/catalog/company metadata to confirm ontology coverage.
-6. Select 4-6 representative indexed tickers when the user did not provide tickers.
-7. Call query_context with selected tickers, limit_tickers <= 5, limit_results <= 3, and compact/markdown output when available.
-8. If multi-company query_context overflows, do not retry the same broad call. Split into per-ticker or per-channel compact query calls.
-9. Synthesize current event -> affected companies -> financial channels -> investor interpretation.
-```
-
-Overflow continuation rule:
-
-```text
-Overflow is not terminal failure.
-Do not read huge saved tool-result files in normal web chat.
-Do not mention overflow to the user.
-Fallback to one compact query per selected ticker or one compact query per top channel.
-Use short English topics, response_detail="compact", response_format="markdown" when available, and limit <= 3.
-Stop when covered signals are enough for a directional synthesis.
-```
-
-Bad flow:
-
-```text
-query_context(question="consumer macro...", tickers=[])
-catalog(limit=50)
-catalog(limit=200)
-query_context(question="...", limit_results=10, limit_tickers=20)
-```
-
-Good flow:
-
-```text
-news_brief="latest consumer slowdown news: retail demand, pricing, volume, margin pressure, companies named, event date"
-ontology_brief="consumer sector news read-through: pricing power, volume trends, trade-down, consumer demand, inflation, input cost pressure, margin impact"
-covered_tickers=[4-6 indexed relevant tickers]
-query_context(question=ontology_brief, tickers=covered_tickers, limit_results=3, limit_tickers=5)
-if overflow: query(ticker=one covered ticker, topic=one short channel, limit=3, response_detail="compact")
-```
-
-If no bounded covered ticker basket can be identified, ask one concise clarification question instead of running broad catalog/query loops.
-
-### 2.4 Path C: metric/numeric series question
-
-Use for revenue, segment/product mix, share of total, YoY growth, margin, cost ratio, NII, cash flow, or numeric comparisons.
-
-Flow:
-
-```text
-1. Prefer query_context and use metric_series_pack when present.
-2. Use MetricObservation + Calculation + XBRLFact lineage for values.
-3. Verify unit, scale, period alignment, dimensions, denominator role, and annual/quarterly labels.
-4. Use targeted query only for a specific missing metric/dimension/period.
-5. Trace metric lineage only for strong numeric claims or suspicious values.
-6. Render table only when values are supported and aligned.
-```
-
-Do not:
-
-```text
-invent numeric tables
-use total-company metric as segment/product metric
-mix annual and quarterly values without clear labels
-re-query each metric repeatedly after metric_series_pack is sufficient
-```
-
-### 2.5 Path D: business model/company overview question
-
-Use for "how does the company make money", business structure, revenue drivers, segment explanation, or broad company profile.
-
-Flow:
-
-```text
-1. After current-event extraction, use query_context with the event-specific ontology brief.
-2. Prefer business_profile_pack when present.
-3. Use CompanyBusinessProfile, BusinessActivity, ResearchClaim, EvidenceQuote, and selected MetricObservation.
-4. If the user asks recent/latest, lead with the most recent 10-Q/current filing drivers, then annual baseline.
-5. Use chain only for selected business mechanisms that clarify revenue/cost/margin paths.
-6. Do not declare not_answerable merely because exact segment metrics are missing.
-```
-
-Answer shape:
-
-```text
-current drivers if requested
-annual mix/business baseline
-segment/activity explanation
-financial implication
-material caveats
-```
-
-### 2.6 Path E: risk/thesis/scenario question
-
-Use for growth thesis, margin pressure, risk factors, cost pressure, supply chain, labor, regulation, demand, macro, commodity, FX, or rate sensitivity.
-
-Flow:
-
-```text
-1. After current-event extraction, use query_context with the event-specific risk/thesis brief.
-2. Prefer risk_mechanism_pack when present.
-3. Use BusinessFactor, ExternalFactorExposure, ResearchClaim, EvidenceQuote, and selected representative MetricObservation.
-4. Organize evidence as risk/premise -> financial path -> affected metric/channel -> implication -> caveat.
-5. Use representative metrics only; do not perform exhaustive all-metric searches unless explicitly required by the question.
-6. Use chain for selected risk-to-financial-path mechanisms.
-```
-
-Do not:
-
-```text
-turn related context into direct proof
-list ontology objects as the answer
-make strong claims without traceable evidence or metric lineage
-```
-
-### 2.7 Path F: direct exposure question
-
-Use when the user asks whether a company is directly exposed to a specific factor, commodity, customer, supplier, region, regulation, event, or macro variable.
-
-Flow:
-
-```text
-1. After current-event extraction, use query_context with the company and exact factor.
-2. Prefer direct_exposure_pack when present.
-3. Use ExternalFactorExposure only when the requested factor is explicitly connected to the company/channel.
-4. Separate direct evidence, related context, and no direct evidence.
-5. Negative direct-exposure answers can be sufficient when the ontology supports no direct evidence but related context exists.
-6. Trace selected direct candidates before strong direct wording.
-```
-
-Do not:
-
-```text
-promote broad commodity/cost/margin/supply-chain/geopolitical matches into direct exposure
-say "directly exposed" from related context only
-```
-
-### 2.8 Path G: comparison question
-
-Use for company-vs-company, segment-vs-segment, metric-vs-metric, risk comparison, direct exposure comparison, or business model comparison.
-
-Flow:
-
-```text
-1. Determine comparison type: metric, risk, direct exposure, business model, contract/event, or mixed.
-2. After current-event extraction, use query_context if it can frame comparison.
-3. Use compare only when explicit comparison state is missing or the user asks for a comparison table.
-4. For metric comparison, require same basis/period/unit.
-5. For risk/direct comparison, compare channels and evidence strength, not hit counts.
-6. Final judgment is written by the analyst; MCP hints are not automatic conclusions.
-```
-
-### 2.9 Path H: contract/event/factual lookup question
-
-Use for agreement terms, maturities, commitments, pricing mechanisms, named events, dates, regulatory items, milestones, or factual filing lookup.
-
-Flow:
-
-```text
-1. Use query_context unless the user gives fully structured arguments.
-2. Use targeted query for AgreementTerm, BusinessEvent, ChangeEvent, ResearchClaim, EvidenceQuote, or MetricObservation as needed.
-3. Trace exact dates, amounts, counterparties, terms, and event claims before strong wording.
-4. Answer narrowly and avoid broader thesis if not asked.
-```
-
-### 2.10 Path I: valuation/price target/investment opinion question
-
-Use for target price, fair value, investment recommendation, buy/sell/hold, 12-month target, or final valuation conclusion.
-
-Flow:
-
-```text
-1. Treat final valuation or investment recommendation as out of scope for filing-only ontology.
-2. Do not force a target price or rating.
-3. Provide filing-supported assumptions only: revenue drivers, margin risks, cash flow, capex, debt, segment trends, and risk factors.
-4. If the user supplies an external model/price/assumption, analyze filing support for that assumption.
-```
-
-## 3. Tool policy
-
-Use tools by role:
-
-```text
-query_context = default research workbench
-query = one targeted structured follow-up
-compare = explicit comparison only when query_context is insufficient
-trace = selected evidence lineage
-chain = selected business mechanism expansion
-retrieve = legacy fallback only
-company_context = orientation only when needed
-index_context/catalog/quality = debug, audit, or coverage only
-```
-
-For sector, macro, thesis, or broad business questions, ask MCP for latest and specific evidence instead of broad generic risk-factor hits.
-
-Prefer query wording that targets:
-
-```text
-pricing
-volume
-gross margin
-COGS
-SG&A
-traffic
-comparable sales
-demand commentary
-segment margin
-management discussion
-latest MD&A
-company filing commentary
-```
-
-Avoid broad topics that mainly retrieve generic risk factors.
-
-Reference: `references/tool-policy.md`.
-
-## 4. Evidence floor and overflow recovery
-
-Before writing a substantive final answer, check whether you have real filing evidence.
-
-Real evidence includes:
-
-```text
-successful query_context evidence rows or research packs
-successful targeted query results
-metric_series_pack or calculation lineage
-company filing commentary from MD&A, business discussion, notes, or specific risk-factor channels
-trace result for a selected evidence root
-chain result for a selected mechanism root
-```
-
-Not real evidence:
-
-```text
-catalog output
-index_context output
-quality/debug output
-coverage diagnostics
-overflow messages
-"result saved to file" messages
-markdown status-only query_context summaries
-tool status fields without underlying company evidence
-open or missing tool results
-```
-
-Do not write a substantive answer from catalog, diagnostic, overflow-only, or status-only evidence.
-
-If the evidence floor is not met, perform one narrower recovery path before answering:
-
-```text
-reduce ticker basket
-reduce topic scope
-switch from query_context to targeted query
-ask for latest MD&A / company filing commentary / pricing / volume / margin / demand commentary
-use trace or chain only after candidate roots exist
-```
-
-If query_context overflows:
-
-```text
-Treat overflow as a scope problem, not as evidence.
-Do not retry the same broad query_context.
-Do not summarize from the overflow message.
-Split by ticker, topic, or signal.
-Prefer targeted query for latest and specific company evidence.
-Answer only from successfully received evidence.
-```
-
-Good recovery examples:
-
-```text
-Bad:
-KO/PEP/PG/MCD/COST/AMZN broad query_context overflows -> retry the same broad query_context -> answer from catalog.
-
-Good:
-Broad consumer macro query_context overflows -> query KO/PEP/PG for latest MD&A pricing/volume/margin commentary -> query COST/MCD/PM for traffic/comparable sales/margin commentary -> answer from successful evidence only.
-```
-
-Catalog/index/quality outputs may orient research, but they must not become user-facing evidence.
-
-## 5. Research pack policy
-
-Packs are runtime research state, not DB tables and not user-facing concepts.
-
-Use packs when present:
-
-```text
-metric_series_pack -> numeric table, share, growth, period/unit checks
-business_profile_pack -> business segments, drivers, annual mix, caveats
-risk_mechanism_pack -> support summary, financial path, affected metrics, implication
-comparison_view -> same-basis rows and conclusion hints
-direct_exposure_pack -> direct vs related candidates and negative-answer policy
-scope_guard_pack -> target price/fair value/investment opinion stop
-evidence_index / chain_pack -> selected trace/chain roots only
-```
-
-Never mention pack names in normal answers.
-
-Reference: `references/research-pack-rendering.md`.
-
-## 6. Evidence-to-analyst synthesis guardrail
-
-Keep the old ontology discipline, but do not expose it to users.
-
-```text
-Projection/lookup results = candidate routes, not final evidence.
-Ontology object names/scores/directness labels = internal reasoning aids, not answer prose.
-Strong claims = traced filing evidence or metric lineage.
-Final answer = analyst synthesis, not object inventory.
-```
-
-Translate internal evidence into business language:
-
-```text
-Bad: ExternalFactorExposure objects exist with medium specificity.
-Good: Several covered consumer companies flag input-cost pressure that can flow through gross margin and operating margin.
-
-Bad: traceable related context was found, direct evidence was not.
-Good: The filing evidence supports this as a related pressure channel, not a direct one-company quantified impact.
-```
-
-For sector/global/macro questions, synthesize cross-company signals:
-
-```text
-1. common macro signal
-2. company-by-company evidence signal
-3. financial channel
-4. interpretation
-```
-
-Do not turn sector/global answers into a list of ontology objects, lookup hits, or coverage diagnostics.
-
-Reference: `references/evidence-to-analyst-synthesis.md`, `references/ontology-layer-map.md`, `references/query-context-contract.md`, and `references/bounded-autonomy-and-stop-rules.md`.
-
-## 7. Period and latest policy
-
-Use CY-style user-facing labels.
-
-```text
-Good: CY2026Q1, CY2025
-Bad: FY2026, fiscal year 2026 as primary label
-```
-
-If issuer fiscal calendar matters, mention it only as a short parenthetical note.
-
-Unless the user explicitly asks for a historical period or a specific filing, start with the most recent available filing by filing/period recency. A newer 10-Q beats an older 10-K for current drivers, financial impact, cost, cash flow, risk, and management commentary. If the available documents are `CY2025 10-K` and `CY2026Q1 10-Q`, lead with `CY2026Q1 10-Q` for current drivers and use `CY2025 10-K` only as annual revenue mix/business baseline context. If `CY2026Q1 10-Q` and `CY2026Q2 10-Q` are both available, lead with `CY2026Q2 10-Q`. If no newer 10-Q exists, the latest 10-K may be the primary recent filing.
-
-For investor-facing answers, anchor analysis on the latest available filing evidence.
-
-Start by looking for the latest company filing commentary, especially MD&A or management discussion explaining actual revenue, margin, cost, demand, volume, pricing, segment, cash flow, or balance sheet movement.
-
-Use older filings to explain:
-
-```text
-trend
-persistence
-change
-deterioration or improvement
-historical baseline
-```
-
-Do not lead with older filings unless the user explicitly asks for historical evolution or a long-term trend.
-
-For general company, sector, macro, risk, or thesis questions:
-
-```text
-current state first
-then trend and historical context
-```
-
-For metric-series questions, tables may be chronological when that improves readability, but the interpretation should still anchor on the latest period first.
-
-For risk or thesis questions, prioritize whether the risk appears in the latest filing, then compare older filings to judge whether it is new, persistent, weakening, or intensifying.
-
-For business model plus recent driver questions, prioritize the most recent filing drivers/current changes, then use annual revenue mix or business baseline only as context.
-
-Do not make old risk-factor language the primary evidence for current investor judgments unless the latest filing confirms the same signal.
-
-Reference: `references/period-and-latest-policy.md`.
-
-## 8. Directness and answerability
-
-Strong claims require direct traceable evidence or metric lineage.
-
-Related context is useful, but it is not direct proof.
-
-For direct exposure questions, separate:
-
-```text
-direct evidence
-related context
-no direct evidence
-```
-
-Do not promote broad commodity, margin, cost, supply-chain, geopolitical, or revenue matches into direct exposure unless the requested narrow factor is explicitly connected.
-
-For target price, fair value, investment recommendation, or 12-month target questions, stop with filing-supported assumptions only. Do not force a valuation conclusion from filing ontology data.
-
-## 9. Trace and chain policy
-
-```text
-trace = evidence verification for one selected object
-chain = mechanism expansion around one selected object
-```
-
-Use trace to verify exact facts, values, dates, counterparties, terms, quote support, source spans, metric lineage, and strong claim support.
-
-Use chain to understand why selected evidence matters:
-
-```text
-business mechanism
-risk -> financial path
-direct vs related exposure
-comparison axis
-sector signal convergence
-offsetting factors or caveats
-```
-
-Trace is not broad search. Chain is not broad search. Use them only after selecting a small number of candidate roots from query_context, query, compare, or retrieve.
-
-Good trace use:
-
-```text
-Metric questions:
-Trace metric lineage, period, unit, scale, denominator, and source table before using strong numeric wording.
-
-Contract/event/factual questions:
-Trace exact dates, amounts, counterparties, named events, obligations, maturities, and terms.
-
-Direct exposure questions:
-Trace the selected direct candidate before saying "directly exposed".
-
-Strong qualitative claims:
-Trace the selected quote/claim when the wording depends on a specific company statement.
-```
-
-Good chain use:
-
-```text
-Metric questions:
-Usually no chain unless the metric needs business mechanism explanation.
-
-Company overview:
-Use chain on 1-2 core business activities or revenue drivers when it clarifies how the company makes money.
-
-Risk or thesis:
-Use chain on 1-3 selected risk/exposure roots to identify financial path, affected metrics, and offsetting factors.
-
-Direct exposure:
-Use chain to separate direct exposure from related context.
-
-Comparison:
-Use chain only for comparison axes that need mechanism support.
-
-Sector or macro:
-Use chain on representative company signals, not every company.
-```
-
-Do not:
-
-```text
-trace every candidate
-chain every candidate
-use trace/chain as search replacement
-chain generic boilerplate into a broad conclusion
-expose trace or chain object names, IDs, scores, or internal paths
-add trace/chain detail when it does not improve the answer
-```
-
-Translate trace/chain output into analyst language:
-
-```text
-Bad: Chain found ExternalFactorExposure linked to BusinessFactor and MetricObservation.
-Good: The filing evidence points to a cost-pressure channel that can hit gross margin before flowing into operating income.
-
-Bad: Trace returned quote support for object id abc.
-Good: The cited filing language supports the statement that pricing and volume are moving in opposite directions.
-```
-
-Keep trace/chain internals out of normal answers.
-
-Reference: `references/trace-chain-policy.md`.
-
-## 10. Answer style
-
-Write dense, useful Korean Markdown.
-
-Do not force a fixed answer template. Choose the structure that best fits the user's question, the available evidence, and the natural reading flow.
-
-Mobile readability matters. Write Korean Markdown that is easy to read on a phone:
+Use ontology after news discovery. The first ontology call should normally be `query_context` with the event-specific internal English investment brief.
 
-```text
-Avoid long paragraphs.
-Put a blank line between distinct thought units.
-Use headings and bullets only when they improve readability.
-Do not force a fixed answer template.
-For long answers, start with a short conclusion summary before explaining evidence.
-Keep filing-evidence density, but make the answer easy to skim.
-```
-
-A strong answer should usually do some of the following when relevant:
-
-```text
-Give the user a clear answer, judgment, or decision frame early.
-Translate filing evidence into investor meaning.
-Explain the business mechanism, not just the disclosed fact.
-Connect evidence to revenue, margin, cash flow, risk, or valuation assumptions.
-Use numbers when they materially improve the answer.
-Use caveats only when they change interpretation.
-Avoid generic "more research is needed" endings.
-Make the answer feel complete enough that the user does not need to ask "so what?"
-```
-
-Do not force all elements into every answer.
-
-Normal answers are interpretation-first, not raw-number dumps. Internally inspect exact values, units, periods, and line-item definitions, but show exact numbers only when they support, qualify, or correct the conclusion.
-
-When a table helps, prefer interpretation columns over raw numeric grids:
-
-```text
-분석 축 | 공시에서 보이는 신호 | 투자 해석
-```
-
-Do not force a fixed heading order.
-
-Do not make every answer look the same.
-
-For metric questions, use tables only when they materially improve clarity. If exact numeric support is absent, do not invent a table and do not explain internal lookup limits.
-
-For risk or thesis questions, make the financial path clear somewhere in the answer. Do not merely list risks. The order is flexible.
-
-For comparison questions, compare on the same basis and period/context. The MCP may provide hints, but the AI analyst writes the final comparison judgment.
-
-## 11. Evidence-forward analyst answer
-
-This applies to every substantive research answer, not only sector or macro questions.
-
-The answer structure is flexible, but the evidence must be visible.
-
-Every substantive answer should make the user feel:
-
-```text
-I can see what evidence was used.
-I understand why the agent reached this judgment.
-I know what it means for revenue, margin, cash flow, risk, or valuation assumptions.
-```
-
-Use this internal reasoning ladder:
-
-```text
-Evidence -> Mechanism -> Financial meaning -> Investor judgment
-```
-
-Do not force this as the answer heading order. The answer can be written naturally, but the reasoning should be present somewhere in the answer.
-
-The stronger the claim, the more visible the evidence must be.
-
-### 11.1 Evidence quality ranking
-
-When MCP or tool results include evidence quality fields, use them to rank evidence before writing:
-
-```text
-evidence_grade
-evidence_strength
-support_strength
-specificity_score
-boilerplate_score
-ranking_score
-confidence
-materiality
-supported_by_quotes
-supported_by_claims
-related_metrics
-```
-
-Strong evidence usually has several of these qualities:
-
-```text
-latest 10-Q or latest 10-K
-latest company filing commentary, especially MD&A or management discussion
-direct quote support
-metric lineage
-concrete numeric evidence
-high specificity
-low boilerplate
-clear business or financial channel
-```
-
-Medium evidence:
-
-```text
-recent risk factor or claim with a specific cost, demand, pricing, margin, cash flow, balance sheet, or segment channel
-claim or quote support exists, but exact numeric support is limited
-```
-
-Weak evidence:
-
-```text
-old 10-K risk factor used as primary evidence
-generic risk-factor boilerplate
-"consumer demand may change"
-"competition may affect pricing"
-"costs may increase"
-low specificity
-high boilerplate
-inferred or unsupported broad claim
-```
-
-Do not base broad macro, sector, thesis, or comparison conclusions primarily on generic risk-factor boilerplate, even if similar language appears across multiple companies.
-
-If evidence is mostly weak, narrow the claim.
-
-```text
-Bad: Consumer slowdown is clear.
-Good: Several companies flag demand uncertainty, but the evidence is not yet enough to call a clear consumption slowdown without volume, traffic, comparable-sales, margin, pricing, or MD&A support.
-```
-
-### 11.2 Explanatory filing text and notes as evidence
-
-Treat explanatory filing text, notes, and company commentary as first-class evidence when they explain actual period performance, current business conditions, or the accounting/business channel behind a number.
-
-```text
-Numbers show what changed.
-Explanatory filing text and notes explain why it changed, how management frames it, and what channel matters next.
-```
-
-Prefer explanatory text and notes in this order:
-
-```text
-1. Latest MD&A or management discussion explaining actual revenue, margin, cost, demand, volume, pricing, segment, cash flow, or balance sheet movement.
-2. Financial statement notes, revenue recognition notes, RPO/backlog notes, segment notes, SBC notes, acquisition notes, share repurchase notes, debt/liquidity notes, or segment tables that explain or quantify the commentary.
-3. Risk Factors when they describe a specific channel or confirm persistence/change of a risk already visible in MD&A, notes, or numbers.
-4. Business section for business model, products, platform, customers, and market structure.
-```
-
-Do not treat all company commentary, notes, or risk language as equal.
-
-Risk Factors are useful, but often hypothetical. Do not use generic risk-factor language as the primary basis for strong current macro, sector, or thesis conclusions.
+Use targeted follow-up only when it answers a clear missing part:
 
-When possible, pair commentary with a number:
-
 ```text
-management says demand softened + volume declined
-company says pricing offset cost pressure + gross margin expanded
-company says input cost inflation persisted + COGS or margin worsened
-company says traffic improved + comparable sales increased
+specific metric
+specific filing comment
+specific exposure
+specific period
+specific comparison axis
+specific trace/chain root
 ```
-
-If commentary or notes are strong but numeric support is absent, use them as qualitative evidence and moderate the conclusion.
 
-When the user asks what something means for cash flow, growth investment, cost structure, margin, or capital allocation, prioritize management commentary and explanatory notes before raw numeric extraction. The goal is not to recite many numbers; the goal is to explain the business and investment implication supported by the numbers and notes.
+Do not loop over similar searches. Do not use broad retrieve after sufficient `query_context`.
 
-For broad sector, macro, thesis, or comparison claims:
+## 8. Answer Style
 
-```text
-Use multiple company signals when available.
-Include period context when it materially affects interpretation.
-Prefer recent 10-Q evidence for "recent", "current", or "latest" claims.
-Use numbers when they materially strengthen the answer.
-If evidence is thin, narrow the claim instead of making a broad conclusion.
-```
+Write for an investor, not for a data auditor.
 
-Question-specific quality bars:
+Final answers should be interpretation-first:
 
 ```text
-Metric questions:
-Do not just report values. Explain what changed and why it matters.
-
-Company overview questions:
-Explain how the company makes money, where growth is coming from, and what structurally constrains or supports it.
-
-Risk or thesis questions:
-Connect the risk to the financial line item it would affect: revenue, cost, margin, cash flow, balance sheet, or growth durability.
-
-Direct exposure questions:
-Separate direct evidence, related context, and no direct evidence. Do not blur them.
-
-Comparison questions:
-Compare on the same basis and state the practical difference for the investor.
-
-Contract, event, or factual lookup questions:
-State the fact, then explain why it matters if it has business or financial significance.
-
-Sector or macro questions:
-Show whether multiple companies point to the same signal, and distinguish common signals from company-specific noise.
+current event -> company baseline -> financial channel -> investor meaning
 ```
 
-Avoid weak endings:
+Use exact numbers only when they support, qualify, or correct the conclusion. Internally inspect numbers, but do not dump raw metric tables by default.
 
-```text
-추가 확인이 필요합니다.
-현재 조회 범위에서는 제한적입니다.
-더 자세한 분석이 필요하면 알려주세요.
-```
+Prefer interpretation tables when a table helps:
 
-Instead, adjust confidence and explain what would change the conclusion:
-
 ```text
-확인된 공시 근거 기준으로는 A가 핵심입니다. 다만 B가 확인되면 결론의 강도는 달라질 수 있습니다.
+구분 | 투자적으로 보는 의미 | 확인할 지점
+뉴스 이벤트 | 단기 주가/심리/리스크 변화 | 일회성인지 구조적인지
+온톨로지 baseline | 기존 사업/현금흐름/비용 구조 | 이벤트를 흡수할 체력
+장기 관점 | thesis 변화 여부 | 다음 filing에서 볼 지표
 ```
 
-## 12. Korean investor-facing style
+Do not mechanically separate "news evidence" and "ontology evidence" unless the user asks for audit-style separation.
 
-Write for a Korean equity investor, not for an internal research system and not like a literal translation of a U.S. analyst memo.
+## 9. Latest Filing And Period Policy
 
-This is a style preference, not a rigid answer template. Preserve analytical judgment, but default to this style in normal answers.
+Use `CY` labels in final answers.
 
-Core style:
+For current interpretation, the latest available filing baseline still matters:
 
 ```text
-Start with the investment conclusion before listing evidence.
-Use natural Korean financial language before English jargon.
-If an English term is useful, write Korean first and English in parentheses once.
-Do not repeatedly use untranslated terms like headwind, tailwind, trade-down, pricing power, gross margin, unit case volume, or watchpoint.
-Never expose ontology, tool, schema, diagnostic, pack, routing, object ID, or directness-grade terms.
-Translate filing evidence into investor meaning: what does it imply for revenue, margins, cash flow, risk, or valuation assumptions?
-Use short paragraphs and decisive section headings.
+newer 10-Q > older 10-K for current drivers
+latest 10-K = annual mix/business baseline when a newer 10-Q exists
+latest 10-K = primary only when no newer 10-Q exists
 ```
 
-Preferred translations:
+News date and filing period are different:
 
 ```text
-headwind -> 부담 요인 / 역풍
-tailwind -> 우호 요인 / 순풍
-trade-down -> 저가 제품으로 이동 / 가격 민감도 상승
-pricing power -> 가격 전가력
-gross margin -> 매출총이익률
-operating margin -> 영업이익률
-unit case volume -> 판매량 / 출하량 지표
-watchpoint -> 확인할 지표 / 체크포인트
-input cost pressure -> 원가 부담
-mix shift -> 제품 믹스 변화
+news date = event/reporting date
+filing period = financial baseline period
 ```
 
-For sector, global, or macro questions, a strong answer usually identifies some of these elements when relevant:
-
-```text
-common signals across covered companies
-company-level differences
-what changed recently
-which companies look more defensive, more exposed, or more cyclical
-what matters next for investors
-```
+If `CY2025 10-K` and `CY2026Q1 10-Q` are both available, use `CY2026Q1` as the current driver and `CY2025` as annual/business baseline.
 
-Do not force this order. Use the structure that makes the reasoning easiest to read.
+## 10. Financial Interpretation Guardrails
 
-Use tables when they materially improve clarity. When using sector/global tables, prefer investor interpretation over raw evidence dumps:
+Preserve these accounting boundaries:
 
 ```text
-신호 | 공시에서 보이는 내용 | 투자 해석
-비용 부담 | 원자재/포장재/운임 변동성 지속 | 비용 압력은 완화됐지만 사라지지 않음
-가격 저항 | 가격 인상이 항상 전가되지는 않음 | 판매량 감소 여부가 중요
-수요 변화 | 소비자 가격 민감도 상승 | 방어주와 경기민감 소비재 차별화 가능
+R&D is an operating expense already reflected before OCF; do not add it again as a post-FCF cash use.
+CAPEX is part of the FCF calculation.
+M&A cash spending uses acquisition/business-combination cash-flow lines, not FCF addbacks.
+Company-defined FCF and simple OCF minus capex are different when addbacks exist.
+Share repurchases are not pure shareholder return when filings describe dilution management.
+Capital-allocation inflection timing must check annual periods and latest quarters together.
+AI/platform/product attribution requires explicit support or must be framed as inference.
 ```
 
-For company overview answers, usually cover the most decision-relevant pieces, but do not force a fixed order:
-
-```text
-latest drivers
-revenue mix
-segment interpretation
-caveats that change interpretation
-```
+Use `references/financial-statement-interpretation.md` for detailed rules.
 
-For metric-heavy answers, tables are often useful, but the agent decides. A concise narrative may be better when the table would feel mechanical.
+## 11. Coverage Boundary
 
-For risk/thesis answers, make the investment implication explicit:
+Do not introduce non-covered companies, tickers, or peers in normal answers unless:
 
 ```text
-What is the risk?
-How could it affect revenue, margins, cash flow, or growth?
-How much should the investor care?
+the user explicitly asks for that company/ticker/peer
+coverage is confirmed
+the answer clearly says the company is outside the covered evidence set and that caveat matters
 ```
 
-Avoid this style:
+Follow-up questions should also avoid non-covered companies.
 
-```text
-ExternalFactorExposure
-direct grade
-high materiality
-watchpoint
-trade-down pressure
-headwind without Korean explanation
-```
+## 12. Stop Rules
 
-Prefer this style:
+Stop searching when:
 
 ```text
-공시를 종합하면, 비용 부담은 완화됐지만 높은 수준에서 유지되고 있습니다.
-투자 관점에서는 매출 성장률보다 판매량, 가격 전가력, 매출총이익률 방어 여부가 더 중요합니다.
+the current event is identified and source quality is adequate
+the ontology baseline is sufficient for a narrow answer
+the remaining gap would only make the answer more exhaustive, not more correct
+only weak sources exist after one constrained confirmation attempt
+the claim would require market price, valuation, or non-filing external data not available in the evidence
 ```
 
-## 13. Forbidden user-facing language
+If no meaningful recent event is found, answer narrowly: say the recent-news window did not confirm a material new event, then interpret from the latest filing baseline.
 
-Never include generic mode/scope boilerplate or internal retrieval limitations.
+## 13. Forbidden User-Facing Language
 
-Forbidden examples:
+Never expose:
 
 ```text
-공시자료 기반 한계
-공시자료 기준 한계
-분석 한계
-참고: 위 분석은
-수치 기반의 정량적 매크로 지표보다는
-질적 리스크 요인을 중심으로
-이번 분석은 내부 실행 설정에 따라 진행되어
-현재 조회 범위에서는
-현재 도구 조회 범위에서는
-근거 탐색 범위
-세부 매출 수치가 충분히 추출되지 않았습니다
-추가 확인이 가능합니다
-더 자세한 분석이 필요하면
-tool_budget_exceeded
-budget exceeded
-MCP
+MCP/tool/plugin/skill names
+stock-news-zai
+tool call names
+source tier
+recency bucket
+event_id
+ontology_bridge_brief
 query_context
-research_pack
-metric_series_pack
-trace
-chain
-object_id
+object IDs
+schema terms
+ontology quality
+artifact contract
+retrieval, routing, diagnostics, pack, or pipeline terms
+internal English brief
 ```
 
-Instead, answer directly with the evidence that is present. If evidence is weak, narrow the claim. If a numeric table is unsupported, omit it.
+Use investor-facing language:
 
-Reference: `references/forbidden-user-facing-language.md`.
+```text
+최근 보도 흐름
+공식 발표/공시에서 확인되는 내용
+공시된 수치 기준
+직접 확인되는 내용
+관련 비용/마진/현금흐름 경로
+사업/리스크 요인
+```
 
-## 14. Default follow-up questions
+## 14. Follow-Up Questions
 
-Every normal web-chat research answer should end with this section unless the user explicitly asks for no follow-ups or the response is raw/debug/audit output:
+Normal answers should end with:
 
 ```text
 다음으로 파고들 질문
 ```
 
-Rules:
+Include exactly 3 concise Korean questions unless the user explicitly asks for no follow-ups, asks for raw/debug/status output, or the answer is a very short clarification.
+
+Do not run tools to create follow-up questions.
+
+## 15. References
+
+Load only the references needed for the question:
 
 ```text
-- exactly 3 concise Korean questions
-- no extra tool calls to create them
-- derive from the current answer's business mechanism, risk channel, metric gap, or comparison axis
-- prefer investment interpretation follow-ups: business mechanism, margin durability, cash-flow conversion, capital allocation, risk channel, valuation-assumption sensitivity
-- do not introduce non-covered companies, tickers, or peers unless the user asked for them or coverage was confirmed
-- avoid follow-ups that are merely raw numeric table requests unless the current answer genuinely depends on a missing metric
-- do not expose chain, trace, object, pack, mode, or tool terminology
-- do not phrase them as "관련 체인"
-```
-
-## 15. Debug, audit, and structured handoff
-
-Only expose raw IDs, object types, trace/chain internals, diagnostics, quote text, tool routing, or structured JSON when the user explicitly asks for debug, audit, raw evidence, exportable citations, or structured frontend handoff.
-
-`ResearchSynthesis`, `canonical_answer`, `display_plan`, and artifact contracts are optional structured-handoff paths. They are not the default web-chat runtime.
-
-Reference: `references/structured-handoff-contract.md` and `references/artifact-contract.md`.
-
-## 16. Final sanitizer
-
-Before sending a normal answer, silently remove:
-
-```text
-progress narration
-internal English investment brief
-runtime setting names
-tool names
-budget/error labels
-generic limitation headings
-pack names
-object/schema terms
-raw IDs
-diagnostics
-implementation details
-generic limitation headings
-```
-
-The final visible answer should contain only useful analysis, supported numbers or qualitative evidence, material caveats, and the three follow-up questions.
-
-## 17. Key references
-
-Use these references only when needed:
-
-```text
-references/web-chat-runtime.md
 references/tool-policy.md
-references/research-pack-rendering.md
-references/evidence-to-analyst-synthesis.md
-references/ontology-schema-reference.md
-references/ontology-layer-map.md
+- Detailed stock-news and ontology tool roles, inputs, usage order, and examples.
+
+references/news-event-policy.md
+- News recency, source priority, event extraction, conflict handling, and ontology augmentation.
+
 references/query-context-contract.md
-references/bounded-autonomy-and-stop-rules.md
+- Internal English investment brief and query_context handling.
+
 references/period-and-latest-policy.md
+- CY labels, latest filing precedence, news date vs filing period.
+
 references/financial-statement-interpretation.md
-references/trace-chain-policy.md
+- FCF, R&D, M&A, buybacks, SBC, and capital-allocation guardrails.
+
+references/evidence-to-analyst-synthesis.md
+- Translate evidence into Korean investor interpretation.
+
 references/forbidden-user-facing-language.md
-references/structured-handoff-contract.md
-references/artifact-contract.md
+- Internal terms and phrases that must not appear in normal answers.
+
+references/bounded-autonomy-and-stop-rules.md
+- Tool budgets, loop prevention, and stop conditions.
+
 references/evaluation-gates.md
+- Manual/E2E quality gates.
 ```

@@ -15786,3 +15786,426 @@
 [agent-worker] idle { workerId: 'mac-worker-jwc-5' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-5' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-5',
+  runId: 'f03c65f5-7270-481b-976a-fa4058306ae7'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-5',
+  runId: 'f03c65f5-7270-481b-976a-fa4058306ae7'
+}
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-5',
+  runId: 'e9bd3393-79c3-4ab0-ba89-7cc3011d22d1'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    question: 'Apple Inc. iPhone vs Services revenue mix, regional revenue growth drivers by geography, R&D and SG&A expense trends,...'
+  },
+  duration_ms: 64989,
+  duration_s: 64.989,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_7udoYaEPIVz1FyehGCBb6073',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'iPhone revenue segment product mix',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 6197,
+  duration_s: 6.197,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_3sdF6uMqhNg3pYaM2Jeo6305',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'regional revenue geographic segment Americas Europe Greater China Japan Asia Pacific',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 17832,
+  duration_s: 17.832,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_shlldU8JRBnAWGY7ttYR8618',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Services segment revenue growth margin',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 18669,
+  duration_s: 18.669,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_5rkvA9yc0wqttOMaDZfb8260',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'gross margin operating margin free cash flow profitability cash generation',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 16815,
+  duration_s: 16.815,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_04_UldcjIhb6nGUtVNKtJeb7715',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'R&D SG&A research development selling general administrative operating expense trend',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 17476,
+  duration_s: 17.476,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_03_SlVKPu1i7Z16beCd03pU9558',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 19121,
+  duration_s: 19.121,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_XYctbzdh2Lh7MPXdBFfP6495',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 28896,
+  duration_s: 28.896,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_OCTjfeHzsiExbFQgnrx06304',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 28574,
+  duration_s: 28.574,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_CC1NrRZ6ZGQoZIOV8AAc6107',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 28300,
+  duration_s: 28.3,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_03_Ql94HnXuK4w80KBWGbj22883',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'iPhone Services revenue mix annual segment product regional revenue R&D SG&A gross margin operating margin free cash...',
+    periods: [ 'CY2025' ]
+  },
+  duration_ms: 381,
+  duration_s: 0.381,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_BO2Bobp8xIHrkOzdEBuW9427',
+  tool_name: 'krw_ontology_query'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-5',
+  runId: 'e9bd3393-79c3-4ab0-ba89-7cc3011d22d1'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-5' }
+[agent-worker] started { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] claim failed { code: '', message: 'TypeError: fetch failed' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] claim failed { code: '', message: 'TypeError: fetch failed' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-5' }

@@ -15246,3 +15246,546 @@
 [agent-worker] idle { workerId: 'mac-worker-jwc-2' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-2' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-2' }
+[agent-worker] started { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-2',
+  runId: '2484850e-ff2c-430e-9557-0c3b96a21448'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    question: 'GOOGL current stock adjustment reasons and long-term perspective',
+    company: 'Alphabet',
+    lookback_hours: 72,
+    max_events: 10
+  },
+  duration_ms: 791,
+  duration_s: 0.791,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_V4PFjhkSw2vU5Gw63Mk15654',
+  tool_name: 'search_company_news_events'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'GOOGL' },
+  duration_ms: 442,
+  duration_s: 0.442,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_anxg6rARypicMEyVFaQl3529',
+  tool_name: 'krw_ontology_company_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'GOOGL' },
+  duration_ms: 323,
+  duration_s: 0.323,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_m3smUalfimOOBxBVI2bL6391',
+  tool_name: 'krw_ontology_catalog'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    periods: [ 'CY2026Q1', 'CY2025', 'CY2024' ],
+    document_types: [ '10-K', '10-Q' ],
+    question: 'Alphabet GOOGL current stock adjustment investment analysis: revenue growth, operating income, free cash flow, AI cap...'
+  },
+  duration_ms: 18787,
+  duration_s: 18.787,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_24gt3tInapFcBFU9uEoC7084',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    periods: [ 'CY2026Q1', 'CY2025', 'CY2024' ],
+    document_types: [ '10-K', '10-Q' ],
+    question: 'Alphabet GOOGL revenue Google Search advertising YouTube Google Cloud segment revenue'
+  },
+  duration_ms: 3061,
+  duration_s: 3.061,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_c0lWcckERnnYougmpU7B5009',
+  tool_name: 'krw_ontology_retrieve'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    periods: [ 'CY2026Q1', 'CY2025', 'CY2024' ],
+    document_types: [ '10-K', '10-Q' ],
+    question: 'Alphabet GOOGL operating income operating margin free cash flow capital expenditure share repurchases cash flow from...'
+  },
+  duration_ms: 2679,
+  duration_s: 2.679,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_ONZZxXllYQSNpGQ4DisM6871',
+  tool_name: 'krw_ontology_retrieve'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    periods: [ 'CY2026Q1', 'CY2025', 'CY2024' ],
+    document_types: [ '10-K', '10-Q' ],
+    question: 'Alphabet GOOGL AI capex investment capital expenditure data center infrastructure spending'
+  },
+  duration_ms: 14635,
+  duration_s: 14.635,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_qz8XiZyuYSu49IMj3Q8X6779',
+  tool_name: 'krw_ontology_retrieve'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    periods: [ 'CY2025', 'CY2026Q1' ],
+    document_types: [ '10-K', '10-Q' ],
+    question: 'Alphabet GOOGL antitrust litigation DOJ regulatory risk search distribution remedies'
+  },
+  duration_ms: 13945,
+  duration_s: 13.945,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_SRIxFwnKrLuutcSTsjVX2918',
+  tool_name: 'krw_ontology_retrieve'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-2',
+  runId: '2484850e-ff2c-430e-9557-0c3b96a21448'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] claim failed { code: '', message: 'TypeError: fetch failed' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-2' }
+[agent-worker] started { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-2',
+  runId: '41019842-1c03-459a-882f-0dd48e84bc23'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'ABT',
+    question: 'Abbott revenue drivers and performance comparison across segments: FreeStyle Libre (diabetes / continuous glucose mon...'
+  },
+  duration_ms: 1141,
+  duration_s: 1.141,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_UU2ztgUunQg3nGkAp78f2788',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'ABT',
+    question: 'Abbott 2026 Q1 and 2025 segment revenue performance, segment operating margin, and MD&A commentary for Medical Device...'
+  },
+  duration_ms: 278,
+  duration_s: 0.278,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_X25CAClDixEBaLEEOC8B7557',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'ABT',
+    topic: 'segment revenue growth MD&A 2026 Q1 performance medical devices diagnostics nutrition established pharmaceuticals dia...'
+  },
+  duration_ms: 2589,
+  duration_s: 2.589,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_QGJ5C53qfcWVkAn6TJBw7458',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 25289,
+  duration_s: 25.289,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_zcHq2hPZkxPTFUrtxWgi8765',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 25741,
+  duration_s: 25.741,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_SCnW6Egvp5ioRlBLhs8W4712',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 25295,
+  duration_s: 25.295,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_cCLHYcuw8SQbRCsj7McK6206',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'ABT',
+    topic: '2025 annual segment revenue medical devices diagnostics nutrition established pharmaceuticals sales growth rate'
+  },
+  duration_ms: 2591,
+  duration_s: 2.591,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_wjgopeAR3RPZrPwDgeWb9997',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 672,
+  duration_s: 0.672,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_ryKq8NkASBuj46SAfAxW3352',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 487,
+  duration_s: 0.487,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_H71u7KMre38WhPor0mAx9837',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 398,
+  duration_s: 0.398,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_XlJSdN1WtGSxybrTzHNk2830',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 2357,
+  duration_s: 2.357,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_PINGjhJXspkbGIKrdYvi2229',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'ABT',
+    topic: '2025 full year annual segment revenue medical devices 5539 4895 diagnostics 2180 2054 nutrition 2017 2146 established...'
+  },
+  duration_ms: 1720,
+  duration_s: 1.72,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_fXBCWRtGT3PypsbximqP1622',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'ABT',
+    topic: 'FreeStyle Libre diabetes care continuous glucose monitoring revenue growth 2026 2025'
+  },
+  duration_ms: 460,
+  duration_s: 0.46,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_GljUIwgivlAf7IXugUMv7970',
+  tool_name: 'krw_ontology_query'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-2',
+  runId: '41019842-1c03-459a-882f-0dd48e84bc23'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-2' }
+[agent-worker] started { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-2' }

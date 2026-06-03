@@ -16299,3 +16299,596 @@
 [agent-worker] idle { workerId: 'mac-worker-jwc-1' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-1' }
 [agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-1' }
+[agent-worker] started { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-1' }
+[agent-worker] started { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-1',
+  runId: 'bfac6c00-4352-412e-8f0b-e0ab2c4dcb26'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    question: 'GOOGL current stock price adjustment reasons and long-term outlook',
+    company: 'Alphabet Inc.',
+    lookback_hours: 168,
+    max_events: 10
+  },
+  duration_ms: 5829,
+  duration_s: 5.829,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_slg00Rws5gqXp6F556fR2363',
+  tool_name: 'search_company_news_events'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    urls: [
+      '~/.claude-krw/projects/-Users-username-krw-ontology-front--agent-workspace/0de6eb25-6318-45...'
+    ]
+  },
+  duration_ms: 267,
+  duration_s: 0.267,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_n1pPJRjEYZnPPghwKiAt3788',
+  tool_name: 'read_news_sources'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    question: 'GOOGL current stock price adjustment reasons',
+    company: 'Alphabet Inc.',
+    lookback_hours: 168,
+    max_events: 5
+  },
+  duration_ms: 7324,
+  duration_s: 7.324,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_4ytNWVPIgQvKeunr8aaq8667',
+  tool_name: 'search_company_news_events'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    query: 'Alphabet GOOGL stock price adjustment reasons June 2026',
+    domains: [
+      'reuters.com',
+      'cnbc.com',
+      'bloomberg.com',
+      'wsj.com',
+      'sec.gov',
+      'abc.xyz'
+    ]
+  },
+  duration_ms: 4928,
+  duration_s: 4.928,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_kWBzza04ZcsLQdyiJSTO9788',
+  tool_name: 'search_news_by_domain'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    question: 'Alphabet GOOGL Q1 2026 earnings revenue growth profit margin AI capex free cash flow segment performance Search YouTu...'
+  },
+  duration_ms: 545,
+  duration_s: 0.545,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_2INPgWiT2FSvQthdpbj52181',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'GOOGL' },
+  duration_ms: 1427,
+  duration_s: 1.427,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_5O9l2EuKm963ff5WWk7X3836',
+  tool_name: 'krw_ontology_company_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    periods: [ 'CY2026Q1' ],
+    question: 'GOOGL Alphabet CY2026 Q1 Q1 2026 quarterly financial results earnings revenue profit margin cash flow AI capex'
+  },
+  duration_ms: 1124,
+  duration_s: 1.124,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_EeNW6PzXjRn9Q3SEG6p23574',
+  tool_name: 'krw_ontology_retrieve'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    question: 'GOOGL Q1 2026 CY2026Q1 revenue operating income net income free cash flow segment revenue Search YouTube Cloud capita...'
+  },
+  duration_ms: 2291,
+  duration_s: 2.291,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_IgGgE4lroWiE4N4dFkzd5746',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'GOOGL' },
+  duration_ms: 190,
+  duration_s: 0.19,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_7YbDR48gnzMu0GnXWbVv0253',
+  tool_name: 'krw_ontology_topic_map'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'GOOGL', topic: 'revenue', periods: [ 'CY2026Q1' ] },
+  duration_ms: 4174,
+  duration_s: 4.174,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_BMOqpahbq7u5SqLejnq08303',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'operating_cash_flow',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 6316,
+  duration_s: 6.316,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_frmgkxwGPSQeayjVPmkk0291',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'segment_revenue',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 5738,
+  duration_s: 5.738,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_tJJqJjEbNsqLcvOhged89757',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'capital_expenditures',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 5538,
+  duration_s: 5.538,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_03_EAsSzTmTwou0QwakWnVl0249',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 4387,
+  duration_s: 4.387,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_UsGzcrupsJWLtA01sEte2977',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'operating_income',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 4765,
+  duration_s: 4.765,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_YcOZmT3nLtjkD4FqdaHK4478',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'share repurchase stock buyback',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 4142,
+  duration_s: 4.142,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_FuK7UUAUc9iIZOSWayF27128',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'GOOGL', topic: 'revenue', periods: [ 'CY2025' ] },
+  duration_ms: 5413,
+  duration_s: 5.413,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_kqNcESly9k3mUIOqRY8w4281',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'free cash flow FCF',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 4804,
+  duration_s: 4.804,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_2CScecBcW63xbAty9JzV6026',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'Google Cloud segment revenue',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 3519,
+  duration_s: 3.519,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_03_HvLLZTRbhtfJm0rNuN4C2538',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'operating cash flow',
+    periods: [ 'CY2025' ]
+  },
+  duration_ms: 4187,
+  duration_s: 4.187,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_Docthsf6JhaA7dQdAHwL8292',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'Google Search advertising revenue',
+    periods: [ 'CY2026Q1' ]
+  },
+  duration_ms: 1421,
+  duration_s: 1.421,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_UmkfU8GkgymcAqtIajkI3417',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'antitrust regulatory litigation risk',
+    periods: [ 'CY2025' ]
+  },
+  duration_ms: 872,
+  duration_s: 0.872,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_jtw4GWSVIkozKm4yUZxF4022',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 12201,
+  duration_s: 12.201,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_upISIJZwdQm25ifm1FWP3319',
+  tool_name: 'krw_ontology_trace'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-1',
+  runId: 'bfac6c00-4352-412e-8f0b-e0ab2c4dcb26'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] stopped { workerId: 'mac-worker-jwc-1' }
+[agent-worker] started { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] claimed {
+  workerId: 'mac-worker-jwc-1',
+  runId: '86617fcc-d542-4869-a369-9598a408e51a'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    question: 'GOOGL near-term business pressure/adjustment reasons and long-term investment perspective: latest MD&A revenue growth...'
+  },
+  duration_ms: 972,
+  duration_s: 0.972,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_FtGx45iWOoIzPD2NTamJ6839',
+  tool_name: 'krw_ontology_query_context'
+}
+[agent-worker] finished {
+  workerId: 'mac-worker-jwc-1',
+  runId: '86617fcc-d542-4869-a369-9598a408e51a'
+}
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }
+[agent-worker] idle { workerId: 'mac-worker-jwc-1' }

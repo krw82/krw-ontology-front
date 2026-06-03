@@ -28,6 +28,10 @@ object IDs
 object type names
 diagnostics
 schema terms
+stock-news mechanics
+source tiers
+event IDs
+ontology bridge briefs
 query/routing narration
 progress narration
 generic limitation sections

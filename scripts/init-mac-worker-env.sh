@@ -188,6 +188,7 @@ trap cleanup EXIT INT TERM
   echo "MAC_WORKER_COUNT=8"
   echo "MAC_WORKER_NICE=-5"
   echo "MCP_SERVER_NICE=-5"
+  echo "STOCK_NEWS_MCP_NICE=0"
   echo "MCP_SERVER_LOG_LEVEL=info"
   echo "MCP_LOG_DIR=~/Library/Logs/krw-ontology"
   echo "MCP_SERVER_MAXFILES=4096"
