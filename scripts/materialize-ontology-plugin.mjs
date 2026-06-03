@@ -18,6 +18,9 @@ let env = "";
 let source = process.env.KRW_ONTOLOGY_PLUGIN_SOURCE_PATH || defaultSource;
 let out = "";
 let mcpUrl = process.env.KRW_ONTOLOGY_MCP_URL || "";
+const zaiWebSearchMcpUrl =
+  process.env.ZAI_WEB_SEARCH_MCP_URL ||
+  "https://api.z.ai/api/mcp/web_search_prime/mcp";
 
 function usage() {
   console.error(`Usage: scripts/materialize-ontology-plugin.mjs --env dev|prod [--source DIR] [--out DIR] [--mcp-url URL]`);
@@ -76,17 +79,30 @@ cpSync(resolvedSource, resolvedOut, {
   recursive: true,
   filter: (sourcePath) => path.basename(sourcePath) !== ".DS_Store",
 });
+
+const mcpServers = {
+  "krw-ontology": {
+    type: "http",
+    url: mcpUrl,
+    alwaysLoad: true,
+  },
+};
+
+if (isZaiWebSearchEnabled()) {
+  mcpServers["web-search-prime"] = {
+    type: "http",
+    url: zaiWebSearchMcpUrl,
+    headers: {
+      Authorization: "Bearer ${ZAI_API_KEY}",
+    },
+  };
+}
+
 writeFileSync(
   path.join(resolvedOut, ".mcp.json"),
   `${JSON.stringify(
     {
-      mcpServers: {
-        "krw-ontology": {
-          type: "http",
-          url: mcpUrl,
-          alwaysLoad: true,
-        },
-      },
+      mcpServers,
     },
     null,
     2,
@@ -95,3 +111,25 @@ writeFileSync(
 
 console.log(`Materialized ${env} KRW Ontology plugin: ${resolvedOut}`);
 console.log(`MCP URL: ${mcpUrl}`);
+console.log(`Z.AI Web Search MCP: ${isZaiWebSearchEnabled() ? "enabled" : "disabled"}`);
+
+function isZaiWebSearchEnabled() {
+  if (truthyEnv(process.env.KRW_WEB_SEARCH_FORCE_DISABLED)) return false;
+  if (!truthyEnv(process.env.KRW_WEB_SEARCH_ENABLED)) return false;
+
+  const provider = process.env.KRW_WEB_SEARCH_PROVIDER?.trim().toLowerCase();
+  if (provider && provider !== "zai_mcp") return false;
+
+  if (!process.env.ZAI_API_KEY?.trim()) {
+    throw new Error(
+      "KRW_WEB_SEARCH_ENABLED is on, but ZAI_API_KEY is missing.",
+    );
+  }
+
+  return true;
+}
+
+function truthyEnv(value) {
+  if (!value) return false;
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+}

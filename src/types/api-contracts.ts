@@ -39,6 +39,9 @@ export type MessageStatus =
 /** Chat session scope */
 export type SessionScopeType = "global" | "company";
 
+/** Chat analysis mode */
+export type AnalysisMode = "company" | "news";
+
 /** SSE streaming event types */
 export type StreamingEventType =
   | "run_started"
@@ -114,8 +117,8 @@ export type EvidenceGrade = "high" | "medium" | "low";
 /** MCP source quality ratings */
 export type SourceQuality = "filing_direct" | "derived" | "estimated";
 
-/** Allowed MCP tool names */
-export type MCPToolName =
+/** Allowed KRW Ontology MCP tool names */
+export type KRWOntologyMCPToolName =
   | "krw_ontology_catalog"
   | "krw_ontology_company_context"
   | "krw_ontology_index_context"
@@ -128,6 +131,12 @@ export type MCPToolName =
   | "krw_ontology_compare"
   | "krw_ontology_plan_query"
   | "krw_ontology_chain";
+
+/** Allowed read-only web MCP tool names */
+export type WebSearchMCPToolName = "web_search_prime";
+
+/** Allowed MCP tool names */
+export type MCPToolName = KRWOntologyMCPToolName | WebSearchMCPToolName;
 
 /** Document types in the ontology */
 export type DocumentType =
@@ -818,6 +827,7 @@ export interface ChatRunRequest {
   content: string;            // 1-20000 chars, or 120000 when text attachments are included
   request_id: string;         // client-generated UUID
   research_mode?: "fast" | "standard" | "deep";
+  analysis_mode?: AnalysisMode;
   scope_type?: SessionScopeType;
   default_tickers?: string[];
   default_document_types?: string[];

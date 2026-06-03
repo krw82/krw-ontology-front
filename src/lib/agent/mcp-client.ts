@@ -6,10 +6,16 @@ import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { normalizeOntologyEnv, type OntologyEnv } from "@/lib/env";
+import type {
+  KRWOntologyMCPToolName,
+  WebSearchMCPToolName,
+} from "@/types/api-contracts";
 import type { Json } from "@/types/database";
 
 const KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX =
   "mcp__plugin_krw-ontology_krw-ontology__";
+const ZAI_WEB_SEARCH_PLUGIN_TOOL_PREFIX =
+  "mcp__plugin_krw-ontology_web-search-prime__";
 
 export const KRW_ONTOLOGY_MCP_TOOLS = [
   "krw_ontology_catalog",
@@ -24,13 +30,22 @@ export const KRW_ONTOLOGY_MCP_TOOLS = [
   "krw_ontology_compare",
   "krw_ontology_plan_query",
   "krw_ontology_chain",
-] as const;
+] as const satisfies readonly KRWOntologyMCPToolName[];
+
+export const ZAI_WEB_SEARCH_MCP_TOOLS = [
+  "web_search_prime",
+] as const satisfies readonly WebSearchMCPToolName[];
 
 export const KRW_ONTOLOGY_SDK_ALLOWED_TOOLS = KRW_ONTOLOGY_MCP_TOOLS.map(
   (toolName) => `${KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX}${toolName}`,
 );
 
+export const ZAI_WEB_SEARCH_SDK_ALLOWED_TOOLS = ZAI_WEB_SEARCH_MCP_TOOLS.map(
+  (toolName) => `${ZAI_WEB_SEARCH_PLUGIN_TOOL_PREFIX}${toolName}`,
+);
+
 const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
+const ZAI_WEB_SEARCH_MCP_TOOL_SET = new Set<string>(ZAI_WEB_SEARCH_MCP_TOOLS);
 const execFileAsync = promisify(execFile);
 const DEFAULT_MCP_HEALTH_TIMEOUT_MS = 30_000;
 
@@ -39,6 +54,36 @@ export function isKrwOntologySdkTool(toolName: string): boolean {
   const bareName = toolName.slice(KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX.length);
 
   return Boolean(bareName && KRW_ONTOLOGY_MCP_TOOL_SET.has(bareName));
+}
+
+export function isZaiWebSearchSdkTool(toolName: string): boolean {
+  if (!toolName.startsWith(ZAI_WEB_SEARCH_PLUGIN_TOOL_PREFIX)) return false;
+  const bareName = toolName.slice(ZAI_WEB_SEARCH_PLUGIN_TOOL_PREFIX.length);
+
+  return Boolean(bareName && ZAI_WEB_SEARCH_MCP_TOOL_SET.has(bareName));
+}
+
+export function isZaiWebSearchEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  if (truthyEnv(env.KRW_WEB_SEARCH_FORCE_DISABLED)) return false;
+  if (!truthyEnv(env.KRW_WEB_SEARCH_ENABLED)) return false;
+
+  const provider = env.KRW_WEB_SEARCH_PROVIDER?.trim().toLowerCase();
+  if (provider && provider !== "zai_mcp") return false;
+
+  return Boolean(env.ZAI_API_KEY?.trim());
+}
+
+export function getZaiWebSearchSdkAllowedTools(
+  env: Record<string, string | undefined> = process.env,
+): string[] {
+  return isZaiWebSearchEnabled(env) ? ZAI_WEB_SEARCH_SDK_ALLOWED_TOOLS : [];
+}
+
+function truthyEnv(value: string | undefined): boolean {
+  if (!value) return false;
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 }
 
 export interface McpHealthResult {
@@ -375,6 +420,7 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
   const mcpConfigPath = path.join(pluginPath, ".mcp.json");
   const requiredSkillPaths = [
     path.join(pluginPath, "skills", "krw-ontology-research", "SKILL.md"),
+    path.join(pluginPath, "skills", "krw-ontology-news-research", "SKILL.md"),
   ];
 
   try {

@@ -92,6 +92,7 @@ function request() {
       request_id: "550e8400-e29b-41d4-a716-446655440001",
       session_id: "11111111-1111-4111-8111-111111111111",
       research_mode: "fast",
+      analysis_mode: "news",
     }),
   });
 }
@@ -177,6 +178,7 @@ describe("POST /api/chat/run worker admission", () => {
           request_id: "550e8400-e29b-41d4-a716-446655440001",
           session_id: "11111111-1111-4111-8111-111111111111",
           research_mode: "fast",
+          analysis_mode: "news",
         },
       },
     });
@@ -301,6 +303,7 @@ describe("POST /api/chat/run worker admission", () => {
         model: expect.any(String),
         mcpHealth: readyMcpHealth,
         researchMode: "fast",
+        analysisMode: "news",
       }),
     );
     expect(getReadyAgentWorker).toHaveBeenCalledWith(

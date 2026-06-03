@@ -223,10 +223,11 @@ describe("validateRequest", () => {
       default_tickers: ["AAPL"],
       default_document_types: ["10-K"],
       research_mode: "deep",
+      analysis_mode: "company",
     });
   });
 
-  it("normalizes missing or invalid research mode to deep", async () => {
+  it("normalizes missing or invalid modes to defaults", async () => {
     const missingResult = await validateRequest(
       makeRequest({
         content: "hello",
@@ -238,6 +239,7 @@ describe("validateRequest", () => {
         content: "hello",
         request_id: SECOND_REQUEST_ID,
         research_mode: "slow",
+        analysis_mode: "auto",
       }),
     );
 
@@ -245,21 +247,25 @@ describe("validateRequest", () => {
     expect(invalidResult.ok).toBe(true);
     if (!missingResult.ok || !invalidResult.ok) return;
     expect(missingResult.data.body.research_mode).toBe("deep");
+    expect(missingResult.data.body.analysis_mode).toBe("company");
     expect(invalidResult.data.body.research_mode).toBe("deep");
+    expect(invalidResult.data.body.analysis_mode).toBe("company");
   });
 
-  it("accepts explicit research modes", async () => {
+  it("accepts explicit research and analysis modes", async () => {
     const result = await validateRequest(
       makeRequest({
         content: "hello",
         request_id: REQUEST_ID,
         research_mode: "deep",
+        analysis_mode: "news",
       }),
     );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.body.research_mode).toBe("deep");
+    expect(result.data.body.analysis_mode).toBe("news");
   });
 
   it("accepts valid markdown attachments after server-side validation", async () => {

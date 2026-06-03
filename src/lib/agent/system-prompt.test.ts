@@ -31,6 +31,54 @@ describe("buildSystemPrompt", () => {
     expect(researchPrompt).not.toContain("krw-ontology-answer-composer");
   });
 
+  it("uses the news research skill command for news analysis mode", () => {
+    const researchPrompt = buildResearchPassPrompt(
+      "AVGO 최근 뉴스까지 반영해줘",
+      "news",
+    );
+
+    expect(researchPrompt).toContain(
+      "/krw-ontology:krw-ontology-news-research AVGO 최근 뉴스까지 반영해줘",
+    );
+    expect(researchPrompt).not.toContain(
+      "/krw-ontology:krw-ontology-research AVGO",
+    );
+  });
+
+  it("keeps web search disabled in the prompt unless explicitly enabled", () => {
+    const disabledPrompt = buildSystemPrompt();
+    expect(disabledPrompt).toContain("Do not perform web searches");
+    expect(disabledPrompt).not.toContain("Z.AI Web Search MCP");
+
+    const enabledPrompt = buildSystemPrompt(undefined, [], {
+      webSearchEnabled: true,
+    });
+    expect(enabledPrompt).toContain("Do not use built-in WebSearch or WebFetch");
+    expect(enabledPrompt).toContain("Z.AI Web Search MCP");
+    expect(enabledPrompt).toContain("source provenance internally");
+  });
+
+  it("marks web search as required for news mode when the MCP is available", () => {
+    const prompt = buildSystemPrompt(undefined, [], {
+      webSearchEnabled: true,
+      webSearchRequired: true,
+    });
+
+    expect(prompt).toContain("This run is in news mode");
+    expect(prompt).toContain("attempt at least one current web search");
+    expect(prompt).toContain("If the web-search MCP call fails");
+  });
+
+  it("falls back cleanly when news mode is selected but web MCP is unavailable", () => {
+    const prompt = buildSystemPrompt(undefined, [], {
+      webSearchUnavailableForNews: true,
+    });
+
+    expect(prompt).toContain("selected news mode");
+    expect(prompt).toContain("web-search MCP tool is unavailable");
+    expect(prompt).toContain("Do not attempt web search");
+  });
+
   it("limits prompt history count and size before adding it to the system prompt", () => {
     const history = Array.from(
       { length: MAX_PROMPT_HISTORY_MESSAGES + 3 },

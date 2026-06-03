@@ -51,6 +51,7 @@ const toolTitleMap: Partial<Record<MCPToolName, string>> = {
   krw_ontology_chain: "주장-근거 체인 확인 중",
   krw_ontology_quality: "근거 품질 점검 중",
   krw_ontology_compare: "항목 비교 중",
+  web_search_prime: "최신 웹 정보 확인 중",
 };
 
 const documentLabels: Partial<Record<DocumentType, string>> = {
@@ -335,6 +336,7 @@ function getActiveNodeId({
     case "krw_ontology_query":
     case "krw_ontology_query_context":
     case "krw_ontology_retrieve":
+    case "web_search_prime":
       return topicNodes.at(-1)?.id ?? evidenceNodeId;
     case "krw_ontology_trace":
     case "krw_ontology_chain":

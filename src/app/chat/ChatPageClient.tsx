@@ -13,6 +13,7 @@ import { useChat } from "@/hooks/useChat";
 import { useChatMobileDock } from "@/hooks/useChatMobileDock";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { useResearchModePreference } from "@/hooks/useResearchModePreference";
+import { useAnalysisModePreference } from "@/hooks/useAnalysisModePreference";
 import {
   getSessionTickers,
   buildChatSessionHref,
@@ -101,12 +102,19 @@ type CompanyMeta = {
   sector: string | null;
 };
 
+type ShareStarter = {
+  question_content: string;
+  tickers: string[];
+  title?: string | null;
+};
+
 function ChatContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const ticker = searchParams.get("ticker");
   const queryParam = searchParams.get("query");
+  const shareToken = searchParams.get("shareToken");
   const templateId = searchParams.get("templateId");
   const draftMessageId = searchParams.get("draftMessageId");
   const templateTopic = templateId ? findQuestionTopic(templateId) : null;
@@ -114,6 +122,7 @@ function ChatContent() {
 
   const sessionId = existingSessionId;
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [shareStarter, setShareStarter] = useState<ShareStarter | null>(null);
   const [companyMetaByTicker, setCompanyMetaByTicker] = useState<
     Record<string, CompanyMeta>
   >({});
@@ -124,13 +133,18 @@ function ChatContent() {
   const lastRefreshedRunIdRef = useRef<string | null>(null);
   const budgetAlertTrackedRef = useRef<string | null>(null);
   const prefilledQuestionTrackedRef = useRef<string | null>(null);
+  const loadedShareTokenRef = useRef<string | null>(null);
   const startedDraftMessageIdsRef = useRef<Set<string>>(new Set());
   const prevMessagesCountRef = useRef(0);
   const { entitlement, refresh: refreshEntitlement } = useEntitlement();
   const [researchMode, setResearchMode] = useResearchModePreference(sessionId);
+  const [analysisMode, setAnalysisMode] = useAnalysisModePreference();
   const [composerDraftResetKey, setComposerDraftResetKey] = useState(0);
 
   const isDraftRoute = pathname === "/chat/new";
+  const shareStarterTicker =
+    shareStarter?.tickers[0]?.trim().toUpperCase() || null;
+  const activeTicker = ticker?.trim() || shareStarterTicker;
 
   // H-07: cleanup on unmount to prevent race condition
   useEffect(() => {
@@ -141,10 +155,10 @@ function ChatContent() {
   }, []);
 
   useEffect(() => {
-    if (existingSessionId || !ticker) return;
+    if (existingSessionId || !activeTicker) return;
 
     let stale = false;
-    const tickerToValidate = ticker;
+    const tickerToValidate = activeTicker;
 
     async function validateTicker() {
       const normalizedTicker = tickerToValidate.trim().toUpperCase();
@@ -194,9 +208,10 @@ function ChatContent() {
     return () => {
       stale = true;
     };
-  }, [ticker, existingSessionId]);
+  }, [activeTicker, existingSessionId]);
 
-  const effectiveSessionError = existingSessionId || !ticker ? null : sessionError;
+  const effectiveSessionError =
+    existingSessionId || !activeTicker ? null : sessionError;
 
   const handleSessionCreated = useCallback(
     (createdSessionId: string) => {
@@ -208,9 +223,10 @@ function ChatContent() {
 
   const chat = useChat({
     sessionId: sessionId ?? "",
-    scopeType: ticker ? "company" : "global",
-    defaultTickers: ticker ? [ticker.trim().toUpperCase()] : [],
+    scopeType: activeTicker ? "company" : "global",
+    defaultTickers: activeTicker ? [activeTicker.trim().toUpperCase()] : [],
     researchMode,
+    analysisMode,
     onSessionCreated: handleSessionCreated,
   });
   const sendMessage = chat.sendMessage;
@@ -382,7 +398,7 @@ function ChatContent() {
   // Context tickers & suggested prompts
   // ---------------------------------------------------------------------------
 
-  const contextTickers = getSessionTickers(chat.session, ticker);
+  const contextTickers = getSessionTickers(chat.session, activeTicker);
   const contextTickersKey = contextTickers.join(",");
   const contextCompanies = contextTickers.map((contextTicker) => {
     const normalizedTicker = contextTicker.trim().toUpperCase();
@@ -415,18 +431,24 @@ function ChatContent() {
   ).join(" / ");
   const suggestedPrompts = getSuggestedPromptsForTickers(contextTickers);
   const queryValue = queryParam?.trim() || null;
+  const shareQuestionValue = shareStarter?.question_content.trim() || null;
   const templateQuestion =
     templateTopic &&
-    ticker?.trim().toUpperCase() === templateTopic.questionChain.ticker
+    activeTicker?.trim().toUpperCase() === templateTopic.questionChain.ticker
       ? templateTopic.questionChain.primaryQuestion
       : (templateTopic?.question ?? null);
-  const initialComposerValue = queryValue ?? templateQuestion ?? undefined;
+  const initialComposerValue =
+    queryValue ?? shareQuestionValue ?? templateQuestion ?? undefined;
   const prefillSource = queryValue
     ? "url_query"
-    : templateTopic
+    : shareQuestionValue
+      ? "share_cta"
+      : templateTopic
       ? "template_id"
       : null;
-  const hasComposerPrefillParams = Boolean(queryParam || templateId);
+  const hasComposerPrefillParams = Boolean(
+    queryParam || templateId || shareToken || shareStarter,
+  );
   const serializedSearchParams = searchParams.toString();
 
   // ---------------------------------------------------------------------------
@@ -434,7 +456,7 @@ function ChatContent() {
   // ---------------------------------------------------------------------------
 
   const createSessionForDraft = useCallback(async (): Promise<string | null> => {
-    const normalizedTicker = ticker?.trim().toUpperCase();
+    const normalizedTicker = activeTicker?.trim().toUpperCase();
     const requestBody: CreateSessionRequest = {
       scope_type: normalizedTicker ? "company" : "global",
       default_tickers: normalizedTicker ? [normalizedTicker] : [],
@@ -457,7 +479,7 @@ function ChatContent() {
 
     const data = (await response.json()) as CreateSessionResponse;
     return data.session.id;
-  }, [setSessionError, ticker]);
+  }, [activeTicker, setSessionError]);
 
   const clearComposerPrefillParams = useCallback(() => {
     if (!hasComposerPrefillParams) return;
@@ -465,12 +487,76 @@ function ChatContent() {
     const nextParams = new URLSearchParams(serializedSearchParams);
     nextParams.delete("query");
     nextParams.delete("templateId");
+    nextParams.delete("shareToken");
     const nextQuery = nextParams.toString();
     const basePath = isDraftRoute ? "/chat/new" : "/chat";
+    setShareStarter(null);
     router.replace(`${basePath}${nextQuery ? `?${nextQuery}` : ""}`, {
       scroll: false,
     });
   }, [hasComposerPrefillParams, isDraftRoute, router, serializedSearchParams]);
+
+  useEffect(() => {
+    const token = shareToken?.trim();
+    if (!token) {
+      loadedShareTokenRef.current = null;
+      return;
+    }
+
+    if (loadedShareTokenRef.current === token) return;
+    loadedShareTokenRef.current = token;
+    const shareTokenValue = token;
+    setShareStarter(null);
+
+    let stale = false;
+
+    async function loadShareStarter() {
+      try {
+        const response = await fetch(
+          `/api/share/${encodeURIComponent(shareTokenValue)}/starter`,
+          { cache: "no-store" },
+        );
+        const data = (await response.json().catch(() => null)) as
+          | Partial<ShareStarter>
+          | { error?: { message?: string } }
+          | null;
+
+        if (stale || cancelledRef.current) return;
+
+        if (!response.ok || !data || !("question_content" in data)) {
+          setSessionError("공유된 질문을 불러오지 못했습니다.");
+          return;
+        }
+
+        const question = data.question_content?.trim();
+        if (!question) {
+          setSessionError("공유된 질문을 불러오지 못했습니다.");
+          return;
+        }
+
+        setSessionError(null);
+        setShareStarter({
+          question_content: question,
+          tickers: Array.isArray(data.tickers)
+            ? data.tickers.filter(
+                (value): value is string => typeof value === "string",
+              )
+            : [],
+          title: typeof data.title === "string" ? data.title : null,
+        });
+      } catch {
+        if (!stale && !cancelledRef.current) {
+          setSessionError("공유된 질문을 불러오지 못했습니다.");
+        }
+      }
+    }
+
+    loadShareStarter();
+
+    return () => {
+      stale = true;
+    };
+  }, [shareToken]);
 
   // ---------------------------------------------------------------------------
   // Analytics
@@ -600,6 +686,7 @@ function ChatContent() {
         }
 
         setComposerDraftResetKey((value) => value + 1);
+        setShareStarter(null);
 
         const nextParams = new URLSearchParams({
           sessionId: createdSessionId,
@@ -1016,6 +1103,8 @@ function ChatContent() {
               runStartedAt={chat.runStartedAt}
               researchMode={researchMode}
               onResearchModeChange={setResearchMode}
+              analysisMode={analysisMode}
+              onAnalysisModeChange={setAnalysisMode}
               focusRequestKey={composerFocusRequestKey}
               onFocusChange={handleComposerFocusChange}
             />

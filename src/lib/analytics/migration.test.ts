@@ -11,6 +11,10 @@ const suggestedQuestionMigrationPath = join(
   process.cwd(),
   "supabase/migrations/20260528000000_add_suggested_question_analytics_event.sql",
 );
+const shareAnalyticsMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260603002000_add_share_analytics_events.sql",
+);
 
 describe("analytics events migration", () => {
   const migration = readFileSync(migrationPath, "utf8");
@@ -37,6 +41,24 @@ describe("analytics events migration", () => {
     expect(suggestedQuestionMigration).toContain(
       "'suggested_question_clicked'",
     );
+  });
+
+  it("adds share-page analytics events to already-created databases", () => {
+    const shareAnalyticsMigration = readFileSync(
+      shareAnalyticsMigrationPath,
+      "utf8",
+    );
+
+    expect(shareAnalyticsMigration).toContain(
+      "DROP CONSTRAINT IF EXISTS analytics_events_event_name_check",
+    );
+    expect(shareAnalyticsMigration).toContain(
+      "ADD CONSTRAINT analytics_events_event_name_check",
+    );
+    expect(shareAnalyticsMigration).toContain("'share_viewed'");
+    expect(shareAnalyticsMigration).toContain("'share_answer_read'");
+    expect(shareAnalyticsMigration).toContain("'share_cta_clicked'");
+    expect(shareAnalyticsMigration).toContain("'share_starter_loaded'");
   });
 
   it("keeps analytics server-owned and indexed for dashboard queries", () => {

@@ -11,6 +11,11 @@ import {
   normalizeResearchMode,
   type ResearchMode,
 } from "@/lib/research-mode";
+import {
+  DEFAULT_ANALYSIS_MODE,
+  normalizeAnalysisMode,
+  type AnalysisMode,
+} from "@/lib/analysis-mode";
 
 const GLOBAL_CONCURRENT_LIMIT = readIntEnv("GLOBAL_CONCURRENT_RUN_LIMIT", 5, {
   min: 1,
@@ -38,11 +43,15 @@ export async function enqueueAgentRun(params: {
   model: string;
   mcpHealth: McpHealthResult;
   researchMode?: ResearchMode;
+  analysisMode?: AnalysisMode;
 }): Promise<EnqueueAgentRunResult> {
   const { session, history, requestId, model, mcpHealth } = params;
   const ontologyEnv = getOntologyEnv();
   const researchMode = normalizeResearchMode(
     params.researchMode ?? DEFAULT_RESEARCH_MODE,
+  );
+  const analysisMode = normalizeAnalysisMode(
+    params.analysisMode ?? DEFAULT_ANALYSIS_MODE,
   );
   const admin = getSupabaseAdmin();
 
@@ -124,6 +133,7 @@ export async function enqueueAgentRun(params: {
     request_id: requestId,
     started_at: queuedAt,
     research_mode: researchMode,
+    analysis_mode: analysisMode,
   });
   await appendAgentRunEvent(admin, run.id, "activity_update", {
     stage: "queued",

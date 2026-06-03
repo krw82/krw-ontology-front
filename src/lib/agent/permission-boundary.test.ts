@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
@@ -11,11 +11,48 @@ vi.mock("@/lib/ontology/catalog", () => ({
 import { canUseTool } from "./runner";
 import {
   isKrwOntologySdkTool,
+  isZaiWebSearchSdkTool,
   KRW_ONTOLOGY_MCP_TOOLS,
   KRW_ONTOLOGY_SDK_ALLOWED_TOOLS,
+  ZAI_WEB_SEARCH_SDK_ALLOWED_TOOLS,
 } from "./mcp-client";
 
 describe("agent permission boundary", () => {
+  beforeEach(() => {
+    delete process.env.KRW_WEB_SEARCH_ENABLED;
+    delete process.env.KRW_WEB_SEARCH_FORCE_DISABLED;
+    delete process.env.KRW_WEB_SEARCH_PROVIDER;
+    delete process.env.KRW_WEB_SEARCH_RESULT_COUNT;
+    delete process.env.ZAI_API_KEY;
+  });
+
+  it("denies raw Z.AI Web Search MCP by default", async () => {
+    for (const toolName of ZAI_WEB_SEARCH_SDK_ALLOWED_TOOLS) {
+      await expect(canUseTool(toolName)).resolves.toMatchObject({
+        behavior: "deny",
+      });
+      expect(isZaiWebSearchSdkTool(toolName)).toBe(true);
+    }
+  });
+
+  it("allows raw Z.AI Web Search MCP only behind the runtime feature flag", async () => {
+    process.env.KRW_WEB_SEARCH_ENABLED = "1";
+    process.env.KRW_WEB_SEARCH_PROVIDER = "zai_mcp";
+    process.env.ZAI_API_KEY = "zai-test-key";
+
+    try {
+      for (const toolName of ZAI_WEB_SEARCH_SDK_ALLOWED_TOOLS) {
+        await expect(canUseTool(toolName)).resolves.toEqual({
+          behavior: "allow",
+        });
+      }
+    } finally {
+      delete process.env.KRW_WEB_SEARCH_ENABLED;
+      delete process.env.KRW_WEB_SEARCH_PROVIDER;
+      delete process.env.ZAI_API_KEY;
+    }
+  });
+
   it("allows only plugin-namespaced KRW Ontology tools", async () => {
     for (const toolName of KRW_ONTOLOGY_SDK_ALLOWED_TOOLS) {
       await expect(canUseTool(toolName)).resolves.toEqual({ behavior: "allow" });
@@ -37,6 +74,7 @@ describe("agent permission boundary", () => {
       "WebSearch",
       "NotebookEdit",
       "TodoWrite",
+      "mcp__plugin_krw-ontology_other__web_search_prime",
     ];
 
     for (const toolName of deniedToolNames) {
@@ -60,5 +98,8 @@ describe("agent permission boundary", () => {
         (toolName) => `mcp__plugin_krw-ontology_krw-ontology__${toolName}`,
       ),
     );
+    expect(ZAI_WEB_SEARCH_SDK_ALLOWED_TOOLS).toEqual([
+      "mcp__plugin_krw-ontology_web-search-prime__web_search_prime",
+    ]);
   });
 });

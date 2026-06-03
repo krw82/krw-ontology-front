@@ -4,6 +4,7 @@ import { getAuthUser, forbiddenError, handleAuthError } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
   createMessageShare,
+  ensureMessageShareQuestionSnapshot,
   findExistingActiveShare,
 } from "@/lib/share/message-share";
 import { isUuid } from "@/lib/api/validation";
@@ -66,7 +67,11 @@ export async function POST(
 
   try {
     const existing = await findExistingActiveShare(message.id);
-    const share = existing ?? (await createMessageShare({ userId: user.id, message, session }));
+    if (existing && !existing.question_content) {
+      await ensureMessageShareQuestionSnapshot({ message, session });
+    }
+    const share =
+      existing ?? (await createMessageShare({ userId: user.id, message, session }));
     const shareUrl = `/share/${encodeURIComponent(share.token)}`;
 
     await recordAnalyticsEventFromRequest(request, {
@@ -87,7 +92,8 @@ export async function POST(
       share_url: shareUrl,
       url: new URL(shareUrl, request.url).toString(),
     });
-  } catch {
+  } catch (error) {
+    console.error("[share] failed to create message share", error);
     return errorResponse(500, "internal_error", "공유 링크를 만들지 못했습니다.");
   }
 }

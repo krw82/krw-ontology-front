@@ -263,6 +263,7 @@ describe("agent job queue", () => {
         session_id: "session-1",
         request_id: "req-1",
         research_mode: "deep",
+        analysis_mode: "company",
       }),
     );
     expect(appendAgentRunEvent).toHaveBeenNthCalledWith(
@@ -277,7 +278,7 @@ describe("agent job queue", () => {
     );
   });
 
-  it("persists explicit research mode on the initial run event", async () => {
+  it("persists explicit research and analysis modes on the initial run event", async () => {
     const fake = createQueueAdmin();
     vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
 
@@ -288,6 +289,7 @@ describe("agent job queue", () => {
       model: "sonnet",
       mcpHealth,
       researchMode: "deep",
+      analysisMode: "news",
     });
 
     expect(appendAgentRunEvent).toHaveBeenNthCalledWith(
@@ -297,6 +299,7 @@ describe("agent job queue", () => {
       "run_started",
       expect.objectContaining({
         research_mode: "deep",
+        analysis_mode: "news",
       }),
     );
   });

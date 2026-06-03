@@ -23,7 +23,7 @@ describe("company landing copy", () => {
     const copy = getCompanyLandingCopyForTicker("ABBV");
 
     expect(copy.companyNameKo).toBe("애브비");
-    expect(copy.description).toContain("Immunology");
+    expect(copy.description).toContain("면역질환");
     expect(copy.core_strength).toContain("리서치 초점");
     expect(copy.critical_risk).toContain("리스크 변수");
     expect(copy.suggested_prompts?.length).toBeGreaterThanOrEqual(3);

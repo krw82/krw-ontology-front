@@ -10,6 +10,7 @@ import {
   normalizeStringList,
 } from "@/lib/api/validation";
 import { normalizeResearchMode } from "@/lib/research-mode";
+import { normalizeAnalysisMode } from "@/lib/analysis-mode";
 
 interface ValidatedRequest {
   body: ChatRunRequest;
@@ -57,6 +58,7 @@ export async function validateRequest(
     content,
     request_id,
     research_mode,
+    analysis_mode,
     session_id,
     scope_type,
     default_tickers,
@@ -77,6 +79,7 @@ export async function validateRequest(
 
   const normalizedRequestId = request_id.trim();
   const normalizedResearchMode = normalizeResearchMode(research_mode);
+  const normalizedAnalysisMode = normalizeAnalysisMode(analysis_mode);
   if (content.trim().length === 0 || !normalizedRequestId) {
     return {
       ok: false,
@@ -184,6 +187,7 @@ export async function validateRequest(
     content,
     request_id: normalizedRequestId,
     research_mode: normalizedResearchMode,
+    analysis_mode: normalizedAnalysisMode,
     ...(session_id ? { session_id } : {}),
     ...(scope_type ? { scope_type } : {}),
     ...(default_tickers ? { default_tickers: normalizedDefaultTickers } : {}),

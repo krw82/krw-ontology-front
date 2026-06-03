@@ -27,6 +27,10 @@ import {
   DEFAULT_RESEARCH_MODE,
   type ResearchMode,
 } from "@/lib/research-mode";
+import {
+  DEFAULT_ANALYSIS_MODE,
+  type AnalysisMode,
+} from "@/lib/analysis-mode";
 
 interface UseChatOptions {
   sessionId: string;
@@ -34,6 +38,7 @@ interface UseChatOptions {
   defaultTickers?: string[];
   defaultDocumentTypes?: string[];
   researchMode?: ResearchMode;
+  analysisMode?: AnalysisMode;
   onSessionCreated?: (sessionId: string) => void;
 }
 
@@ -138,6 +143,13 @@ function latestCompletedAssistantMessageId(messages: Message[]) {
 }
 
 function activityForTool(toolName: MCPToolName): ResearchActivityUpdate {
+  if (toolName === "web_search_prime") {
+    return {
+      stage: "researching",
+      label: "최신 웹 정보 확인 중",
+    };
+  }
+
   if (
     toolName === "krw_ontology_catalog" ||
     toolName === "krw_ontology_company_context" ||
@@ -179,6 +191,7 @@ export function useChat({
   defaultTickers = [],
   defaultDocumentTypes = [],
   researchMode = DEFAULT_RESEARCH_MODE,
+  analysisMode = DEFAULT_ANALYSIS_MODE,
   onSessionCreated,
 }: UseChatOptions) {
   const [state, setState] = useState<ChatState>(() => createInitialChatState());
@@ -1009,6 +1022,7 @@ export function useChat({
             content: content.trim(),
             request_id: requestId,
             research_mode: researchMode,
+            analysis_mode: analysisMode,
             scope_type: scopeType,
             default_tickers: defaultTickers,
             default_document_types: defaultDocumentTypes,
@@ -1081,6 +1095,7 @@ export function useChat({
       onSessionCreated,
       reconnectUntilFinalized,
       readStream,
+      analysisMode,
       researchMode,
       scopeType,
       sessionId,

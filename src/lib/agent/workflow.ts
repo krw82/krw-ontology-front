@@ -1,8 +1,26 @@
+import type { AnalysisMode } from "@/types/api-contracts";
+
 export const KRW_ONTOLOGY_RESEARCH_SKILL =
   "/krw-ontology:krw-ontology-research";
 
-export function buildResearchPassPrompt(userMessage: string): string {
-  return `${KRW_ONTOLOGY_RESEARCH_SKILL} ${userMessage}
+export const KRW_ONTOLOGY_NEWS_RESEARCH_SKILL =
+  "/krw-ontology:krw-ontology-news-research";
+
+export function getKrwOntologySkillForAnalysisMode(
+  analysisMode: AnalysisMode = "company",
+): string {
+  return analysisMode === "news"
+    ? KRW_ONTOLOGY_NEWS_RESEARCH_SKILL
+    : KRW_ONTOLOGY_RESEARCH_SKILL;
+}
+
+export function buildResearchPassPrompt(
+  userMessage: string,
+  analysisMode: AnalysisMode = "company",
+): string {
+  const skillCommand = getKrwOntologySkillForAnalysisMode(analysisMode);
+
+  return `${skillCommand} ${userMessage}
 
 웹앱 출력 모드:
 - 최종 답변은 사용자에게 바로 보여줄 Markdown 본문만 작성합니다.

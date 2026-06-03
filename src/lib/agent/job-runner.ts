@@ -51,6 +51,10 @@ import {
   normalizeResearchMode,
   type ResearchMode,
 } from "@/lib/research-mode";
+import {
+  normalizeAnalysisMode,
+  type AnalysisMode,
+} from "@/lib/analysis-mode";
 
 const HEARTBEAT_INTERVAL_MS = readIntEnv("LEASE_HEARTBEAT_INTERVAL_MS", 60_000, {
   min: 1_000,
@@ -123,6 +127,7 @@ interface AgentJob {
   assistantMessageId: string;
   history: Array<{ role: string; content: string }>;
   researchMode: ResearchMode;
+  analysisMode: AnalysisMode;
 }
 
 export async function runAgentJob(runId: string, workerId: string) {
@@ -244,6 +249,7 @@ export async function runAgentJob(runId: string, workerId: string) {
             (job.session.default_document_types ?? []) as DocumentType[],
           history: job.history,
           researchMode: job.researchMode,
+          analysisMode: job.analysisMode,
           abortSignal: abortController.signal,
           onSdkDiagnostics: recordSdkDiagnostics,
           onTextDelta: async (delta, fullText) => {
@@ -485,6 +491,7 @@ async function loadAgentJob(
     assistantMessageId: run.assistant_message_id,
     history: [...(previousMessages ?? [])].reverse(),
     researchMode: normalizeResearchMode(startedPayload.research_mode),
+    analysisMode: normalizeAnalysisMode(startedPayload.analysis_mode),
   };
 }
 
@@ -808,6 +815,7 @@ async function handleCompletedJob(params: {
       tool_call_count: acc.toolCalls.length,
       estimated_cost_usd: estimatedCost,
       research_mode: job.researchMode,
+      analysis_mode: job.analysisMode,
     },
   });
 

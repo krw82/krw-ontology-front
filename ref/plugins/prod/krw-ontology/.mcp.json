@@ -4,6 +4,13 @@
       "type": "http",
       "url": "http://127.0.0.1:8765/mcp",
       "alwaysLoad": true
+    },
+    "web-search-prime": {
+      "type": "http",
+      "url": "https://api.z.ai/api/mcp/web_search_prime/mcp",
+      "headers": {
+        "Authorization": "Bearer ${ZAI_API_KEY}"
+      }
     }
   }
 }

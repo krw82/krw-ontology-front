@@ -15,6 +15,12 @@ export interface PromptContext {
   companies?: CompanyPromptContext[];
 }
 
+export interface PromptRuntimeFeatures {
+  webSearchEnabled?: boolean;
+  webSearchRequired?: boolean;
+  webSearchUnavailableForNews?: boolean;
+}
+
 export const MAX_PROMPT_HISTORY_MESSAGES = 12;
 export const MAX_PROMPT_HISTORY_MESSAGE_CHARS = 8_000;
 export const MAX_PROMPT_HISTORY_CONTEXT_CHARS = 48_000;
@@ -24,16 +30,41 @@ type PromptHistoryMessage = { role: string; content: string };
 export function buildSystemPrompt(
   context?: PromptContext,
   history: PromptHistoryMessage[] = [],
+  features: PromptRuntimeFeatures = {},
 ): string {
   const contextBlock = context ? `\n\n${buildRuntimeContext(context, history)}` : "";
+  const webSearchPolicy = buildWebSearchPolicy(features);
 
   return `You are the KRW Ontology web chat runtime.
 
 The user prompt begins with the exact KRW-AI skill command for the active pass. Follow that skill.
-Use only the configured read-only KRW Ontology tools for evidence retrieval.
-Do not perform web searches or mutate local files.
+Use configured read-only KRW Ontology tools for filing evidence retrieval and, when explicitly enabled, the configured read-only web-search MCP tool for current context.
+${webSearchPolicy}
 Use the runtime context only as scope and history for that active pass.
 Return only the final user-visible answer in Markdown. Do not include tool-use narration, hidden planning notes, or progress phrases such as "I will query", "Let me get", or "I'll check".${contextBlock}`;
+}
+
+function buildWebSearchPolicy(features: PromptRuntimeFeatures): string {
+  if (features.webSearchEnabled) {
+    return [
+      "Do not use built-in WebSearch or WebFetch.",
+      features.webSearchRequired
+        ? "This run is in news mode: attempt at least one current web search using only the configured read-only Z.AI Web Search MCP tool before the final answer."
+        : "When recent, current, post-filing, or explicitly web-based context is needed, use only the configured read-only Z.AI Web Search MCP tool.",
+      "Preserve filing-vs-web source provenance internally, but synthesize both into one Korean investor interpretation in the final answer.",
+      "If the web-search MCP call fails, times out, or returns no useful results, continue from filing evidence and state that no additional current web context was confirmed.",
+    ].join("\n");
+  }
+
+  if (features.webSearchUnavailableForNews) {
+    return [
+      "Do not use built-in WebSearch or WebFetch.",
+      "The user selected news mode, but the configured web-search MCP tool is unavailable in this runtime.",
+      "Do not attempt web search. Continue from filing evidence and state that current web context could not be checked.",
+    ].join("\n");
+  }
+
+  return "Do not perform web searches or mutate local files.";
 }
 
 function buildRuntimeContext(

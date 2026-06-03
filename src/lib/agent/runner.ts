@@ -12,8 +12,12 @@ import {
 import {
   KRW_ONTOLOGY_MCP_TOOLS,
   KRW_ONTOLOGY_SDK_ALLOWED_TOOLS,
+  ZAI_WEB_SEARCH_MCP_TOOLS,
   getKrwOntologyPluginPath,
+  getZaiWebSearchSdkAllowedTools,
   isKrwOntologySdkTool,
+  isZaiWebSearchEnabled,
+  isZaiWebSearchSdkTool,
 } from "./mcp-client";
 import { buildClaudeAgentEnv } from "./env";
 import {
@@ -33,6 +37,11 @@ import {
   type ResearchModeToolBudget,
 } from "@/lib/research-mode";
 import {
+  buildAnalysisModePrompt,
+  normalizeAnalysisMode,
+  type AnalysisMode,
+} from "@/lib/analysis-mode";
+import {
   createAccumulator,
   createSSEWriter,
   addToken,
@@ -44,13 +53,22 @@ import {
   type AccumulatedToolCall,
   type StreamWriter,
 } from "./stream-handler";
-import type { MCPToolName, DocumentType, StreamingCitation } from "@/types/api-contracts";
+import type {
+  DocumentType,
+  KRWOntologyMCPToolName,
+  MCPToolName,
+  StreamingCitation,
+  WebSearchMCPToolName,
+} from "@/types/api-contracts";
 
-const MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
+const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
+const ZAI_WEB_SEARCH_MCP_TOOL_SET = new Set<string>(ZAI_WEB_SEARCH_MCP_TOOLS);
 const DEFAULT_MAX_TURNS = 20;
 const DEFAULT_AGENT_WORKSPACE_DIR = ".agent-workspace";
 const TOOL_BUDGET_EXCEEDED = "tool_budget_exceeded";
 const TOOL_RESULT_MISSING = "tool_result_missing";
+const DEFAULT_WEB_SEARCH_MAX_CALLS = 2;
+const DEFAULT_WEB_SEARCH_MAX_RESULTS = 5;
 const DISALLOWED_SDK_TOOLS = [
   "Bash",
   "Read",
@@ -74,6 +92,7 @@ export interface AgentRunOptions {
   defaultTickers: string[];
   defaultDocumentTypes: string[];
   researchMode?: ResearchMode;
+  analysisMode?: AnalysisMode;
   history?: Array<{ role: string; content: string }>;
   abortSignal?: AbortSignal;
   onSdkDiagnostics?: (diagnostics: SdkDiagnostics) => Promise<void>;
@@ -128,6 +147,7 @@ export interface SdkDiagnostics {
   allowedTools?: string[];
   disallowedTools?: string[];
   researchMode?: ResearchMode;
+  analysisMode?: AnalysisMode;
   toolBudget?: ResearchModeToolBudget;
   plugins?: unknown;
   mcpServers?: unknown;
@@ -148,6 +168,9 @@ export async function runAgent(
   const cwd = await resolveClaudeAgentCwd();
   const abortController = new AbortController();
   const researchMode = normalizeResearchMode(options.researchMode);
+  const analysisMode = normalizeAnalysisMode(options.analysisMode);
+  const webSearchEnabledForRun =
+    analysisMode === "news" && isZaiWebSearchEnabled();
   const toolBudget = getResearchModeToolBudget(researchMode);
 
   const abortHandler = () => abortController.abort();
@@ -170,12 +193,24 @@ export async function runAgent(
   const systemPrompt = buildSystemPrompt(
     promptContext,
     shouldResume ? [] : (options.history ?? []),
+    {
+      webSearchEnabled: webSearchEnabledForRun,
+      webSearchRequired: analysisMode === "news" && webSearchEnabledForRun,
+      webSearchUnavailableForNews:
+        analysisMode === "news" && !webSearchEnabledForRun,
+    },
   );
   const researchPrompt = [
-    buildResearchPassPrompt(options.userMessage),
+    buildResearchPassPrompt(options.userMessage, analysisMode),
+    buildAnalysisModePrompt(analysisMode, {
+      webSearchAvailable: webSearchEnabledForRun,
+    }),
     buildResearchModePrompt(researchMode),
   ].join("\n\n");
-  const allowedTools = allowedSdkToolsForResearchMode(researchMode);
+  const allowedTools = allowedSdkToolsForResearchMode(
+    researchMode,
+    analysisMode,
+  );
 
   const requestedModel = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
   const baseSdkOptions: Options = {
@@ -227,6 +262,7 @@ export async function runAgent(
       observedModels,
       suppressTextDeltas: false,
       researchMode,
+      analysisMode,
       toolBudget,
     });
 
@@ -276,6 +312,7 @@ async function runSdkPass(params: {
   observedModels: Set<string>;
   suppressTextDeltas: boolean;
   researchMode: ResearchMode;
+  analysisMode: AnalysisMode;
   toolBudget: ResearchModeToolBudget;
 }): Promise<AgentRunResult> {
   const {
@@ -290,6 +327,7 @@ async function runSdkPass(params: {
     observedModels,
     suppressTextDeltas,
     researchMode,
+    analysisMode,
     toolBudget,
   } = params;
   const acc = createAccumulator();
@@ -299,12 +337,19 @@ async function runSdkPass(params: {
     readIntEnv("AGENT_MAX_TOOL_CALLS", toolBudget.maxToolCalls, { min: 1 }),
     toolBudget.maxToolCalls,
   );
+  const maxWebSearchCalls = readIntEnv(
+    "KRW_WEB_SEARCH_MAX_CALLS",
+    DEFAULT_WEB_SEARCH_MAX_CALLS,
+    { min: 1 },
+  );
 
   try {
     const passCanUseTool = createToolPermissionGuard(
       acc,
       researchMode,
+      analysisMode,
       maxToolCalls,
+      maxWebSearchCalls,
     );
     const sdkQuery = query({
       prompt,
@@ -326,6 +371,7 @@ async function runSdkPass(params: {
         canUseTool: passCanUseTool,
       },
       researchMode,
+      analysisMode,
       toolBudget,
     });
 
@@ -426,6 +472,7 @@ async function reportSdkInitialization(params: {
   prompt: string;
   sdkOptions: Options;
   researchMode: ResearchMode;
+  analysisMode: AnalysisMode;
   toolBudget: ResearchModeToolBudget;
 }) {
   const {
@@ -438,6 +485,7 @@ async function reportSdkInitialization(params: {
     prompt,
     sdkOptions,
     researchMode,
+    analysisMode,
     toolBudget,
   } = params;
 
@@ -458,6 +506,7 @@ async function reportSdkInitialization(params: {
     allowedTools: sdkOptions.allowedTools,
     disallowedTools: sdkOptions.disallowedTools,
     researchMode,
+    analysisMode,
     toolBudget,
     plugins: sdkOptions.plugins,
     mcpServers: sdkOptions.mcpServers,
@@ -496,41 +545,91 @@ export async function canUseTool(
   input: Record<string, unknown> = {},
 ): Promise<PermissionResult> {
   if (isKrwOntologySdkTool(toolName)) {
-    const mcpToolName = normalizeMcpToolName(toolName);
+    const mcpToolName = normalizeKrwOntologyToolName(toolName);
     return allowWithInputPolicy(mcpToolName, input);
+  }
+
+  if (isZaiWebSearchSdkTool(toolName)) {
+    if (!isZaiWebSearchEnabled()) {
+      return {
+        behavior: "deny",
+        message: "Z.AI Web Search MCP is disabled for this runtime.",
+      };
+    }
+
+    return allowWithWebSearchPolicy(normalizeZaiWebSearchToolName(toolName), input);
   }
 
   return {
     behavior: "deny",
-    message: "Only read-only KRW Ontology MCP tools are allowed in web chat.",
+    message:
+      "Only configured read-only KRW Ontology and Z.AI Web Search MCP tools are allowed in web chat.",
   };
 }
 
-function allowedSdkToolsForResearchMode(mode: ResearchMode): string[] {
+function allowedSdkToolsForResearchMode(
+  mode: ResearchMode,
+  analysisMode: AnalysisMode,
+): string[] {
   const allowedMcpTools = new Set(getAllowedMcpToolsForResearchMode(mode));
-  return KRW_ONTOLOGY_SDK_ALLOWED_TOOLS.filter((toolName) => {
-    const mcpToolName = normalizeMcpToolName(toolName);
+  const allowedOntologyTools = KRW_ONTOLOGY_SDK_ALLOWED_TOOLS.filter((toolName) => {
+    const mcpToolName = normalizeKrwOntologyToolName(toolName);
     return Boolean(mcpToolName && allowedMcpTools.has(mcpToolName));
   });
+
+  return [
+    ...allowedOntologyTools,
+    ...(analysisMode === "news" ? getZaiWebSearchSdkAllowedTools() : []),
+  ];
 }
 
 function createToolPermissionGuard(
   acc: AccumulatedRun,
   mode: ResearchMode,
+  analysisMode: AnalysisMode,
   maxToolCalls: number,
+  maxWebSearchCalls: number,
 ) {
   return async (
     toolName: string,
     input: Record<string, unknown> = {},
   ): Promise<PermissionResult> => {
-    if (!isKrwOntologySdkTool(toolName)) {
+    if (!isKrwOntologySdkTool(toolName) && !isZaiWebSearchSdkTool(toolName)) {
       return {
         behavior: "deny",
-        message: "Only read-only KRW Ontology MCP tools are allowed in web chat.",
+        message:
+          "Only configured read-only KRW Ontology and Z.AI Web Search MCP tools are allowed in web chat.",
       };
     }
 
-    const mcpToolName = normalizeMcpToolName(toolName);
+    if (isZaiWebSearchSdkTool(toolName)) {
+      const webToolName = normalizeZaiWebSearchToolName(toolName);
+      if (analysisMode !== "news") {
+        return {
+          behavior: "deny",
+          message: "News mode is required to use Z.AI Web Search MCP.",
+        };
+      }
+
+      if (!isZaiWebSearchEnabled() || !webToolName) {
+        return {
+          behavior: "deny",
+          message: "Z.AI Web Search MCP is disabled for this runtime.",
+        };
+      }
+
+      const nextWebSearchCalls = countToolCalls(acc.toolCalls, webToolName) + 1;
+      if (nextWebSearchCalls > maxWebSearchCalls) {
+        return {
+          behavior: "deny",
+          message: buildWebSearchBudgetDenyMessage(),
+        };
+      }
+
+      return allowWithWebSearchPolicy(webToolName, input);
+    }
+
+    const mcpToolName = normalizeKrwOntologyToolName(toolName);
     if (!mcpToolName) {
       return {
         behavior: "deny",
@@ -566,7 +665,7 @@ function createToolPermissionGuard(
 }
 
 function allowWithInputPolicy(
-  mcpToolName: MCPToolName | null,
+  mcpToolName: KRWOntologyMCPToolName | null,
   input: Record<string, unknown>,
 ): PermissionResult {
   const policy = normalizeKrwOntologyToolInput(mcpToolName, input);
@@ -576,6 +675,36 @@ function allowWithInputPolicy(
       updatedInput: policy.input,
     };
   }
+  return { behavior: "allow" };
+}
+
+function allowWithWebSearchPolicy(
+  mcpToolName: WebSearchMCPToolName | null,
+  input: Record<string, unknown>,
+): PermissionResult {
+  if (!mcpToolName) {
+    return {
+      behavior: "deny",
+      message: "Unknown Z.AI Web Search MCP tool.",
+    };
+  }
+
+  const maxResults = readIntEnv(
+    "KRW_WEB_SEARCH_RESULT_COUNT",
+    DEFAULT_WEB_SEARCH_MAX_RESULTS,
+    { min: 1, max: 50 },
+  );
+  const requestedCount = typeof input.count === "number" ? input.count : null;
+  if (requestedCount !== null && requestedCount > maxResults) {
+    return {
+      behavior: "allow",
+      updatedInput: {
+        ...input,
+        count: maxResults,
+      },
+    };
+  }
+
   return { behavior: "allow" };
 }
 
@@ -589,6 +718,13 @@ function prepareToolInputForRun(
   input: Record<string, unknown>,
   acc: AccumulatedRun,
 ): PreparedToolInput {
+  if (mcpToolName === "web_search_prime") {
+    const permission = allowWithWebSearchPolicy(mcpToolName, input);
+    return permission.behavior === "allow" && permission.updatedInput
+      ? { input: permission.updatedInput, changed: true }
+      : { input, changed: false };
+  }
+
   const inputWithContext = attachAgentContextInput(mcpToolName, input, acc);
   const policy = normalizeKrwOntologyToolInput(mcpToolName, inputWithContext.input);
   return {
@@ -637,6 +773,14 @@ function buildToolBudgetDenyMessage(): string {
     "No more KRW Ontology MCP tools can be called in this run.",
     "Do not call another tool.",
     "Write the final Korean Markdown answer from the evidence already collected.",
+  ].join(" ");
+}
+
+function buildWebSearchBudgetDenyMessage(): string {
+  return [
+    "No more Z.AI Web Search MCP tools can be called in this run.",
+    "Do not call another web search tool.",
+    "Continue with filing evidence and web results already collected.",
   ].join(" ");
 }
 
@@ -866,10 +1010,25 @@ function summarizeToolResult(text: string): string | null {
 }
 
 function normalizeMcpToolName(name: unknown): MCPToolName | null {
+  return normalizeKrwOntologyToolName(name) ?? normalizeZaiWebSearchToolName(name);
+}
+
+function normalizeKrwOntologyToolName(
+  name: unknown,
+): KRWOntologyMCPToolName | null {
   if (typeof name !== "string") return null;
   const bareName = name.includes("__") ? name.split("__").at(-1) : name;
-  if (!bareName || !MCP_TOOL_SET.has(bareName)) return null;
-  return bareName as MCPToolName;
+  if (!bareName || !KRW_ONTOLOGY_MCP_TOOL_SET.has(bareName)) return null;
+  return bareName as KRWOntologyMCPToolName;
+}
+
+function normalizeZaiWebSearchToolName(
+  name: unknown,
+): WebSearchMCPToolName | null {
+  if (typeof name !== "string") return null;
+  const bareName = name.includes("__") ? name.split("__").at(-1) : name;
+  if (!bareName || !ZAI_WEB_SEARCH_MCP_TOOL_SET.has(bareName)) return null;
+  return bareName as WebSearchMCPToolName;
 }
 
 function pendingToolResultsFailure(

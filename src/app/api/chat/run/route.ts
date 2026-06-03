@@ -196,6 +196,7 @@ export async function POST(request: NextRequest) {
       question_length: content.length,
       attachment_count: countAttachedFiles(content),
       research_mode: body.research_mode,
+      analysis_mode: body.analysis_mode,
       question_source: session.scopeType === "company" ? "company_context" : "custom",
       source_surface: session.scopeType === "company" ? "ticker_chat" : "chat",
     },
@@ -211,6 +212,7 @@ export async function POST(request: NextRequest) {
     model,
     mcpHealth,
     researchMode: body.research_mode,
+    analysisMode: body.analysis_mode,
   });
 
   if (!enqueueResult.ok) {

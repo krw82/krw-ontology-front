@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { MCPToolName } from "@/types/api-contracts";
+import type {
+  AnalysisMode,
+  MCPToolName,
+  WebSearchMCPToolName,
+} from "@/types/api-contracts";
 
 const sdkMocks = vi.hoisted(() => ({
   query: vi.fn(),
@@ -28,12 +32,28 @@ vi.mock("./mcp-client", () => {
   ];
   return {
     KRW_ONTOLOGY_MCP_TOOLS: tools,
+    ZAI_WEB_SEARCH_MCP_TOOLS: ["web_search_prime"],
     KRW_ONTOLOGY_SDK_ALLOWED_TOOLS: tools.map(
       (toolName) => `mcp__plugin_krw-ontology_krw-ontology__${toolName}`,
     ),
+    ZAI_WEB_SEARCH_SDK_ALLOWED_TOOLS: [
+      "mcp__plugin_krw-ontology_web-search-prime__web_search_prime",
+    ],
     getKrwOntologyPluginPath: () => "/tmp/krw-ontology-plugin",
+    getZaiWebSearchSdkAllowedTools: () =>
+      process.env.KRW_WEB_SEARCH_ENABLED === "1" &&
+      process.env.KRW_WEB_SEARCH_FORCE_DISABLED !== "1" &&
+      Boolean(process.env.ZAI_API_KEY)
+        ? ["mcp__plugin_krw-ontology_web-search-prime__web_search_prime"]
+        : [],
     isKrwOntologySdkTool: (toolName: string) =>
       toolName.startsWith("mcp__plugin_krw-ontology_krw-ontology__krw_ontology_"),
+    isZaiWebSearchEnabled: () =>
+      process.env.KRW_WEB_SEARCH_ENABLED === "1" &&
+      process.env.KRW_WEB_SEARCH_FORCE_DISABLED !== "1" &&
+      Boolean(process.env.ZAI_API_KEY),
+    isZaiWebSearchSdkTool: (toolName: string) =>
+      toolName === "mcp__plugin_krw-ontology_web-search-prime__web_search_prime",
   };
 });
 
@@ -82,7 +102,12 @@ function makeSdkQueryFromGenerator(generator: () => AsyncGenerator<unknown>) {
 }
 
 function sdkToolName(toolName: MCPToolName): string {
+  if (toolName === "web_search_prime") return webSearchSdkToolName(toolName);
   return `mcp__plugin_krw-ontology_krw-ontology__${toolName}`;
+}
+
+function webSearchSdkToolName(toolName: WebSearchMCPToolName): string {
+  return `mcp__plugin_krw-ontology_web-search-prime__${toolName}`;
 }
 
 function toolUseMessage(toolName: MCPToolName, index: number) {
@@ -129,6 +154,7 @@ async function probeToolPermission(params: {
   attemptedTool: MCPToolName;
   input?: Record<string, unknown>;
   researchMode?: ResearchMode;
+  analysisMode?: AnalysisMode;
 }): Promise<{
   permission: Awaited<ReturnType<typeof canUseTool>>;
   result: Awaited<ReturnType<typeof runAgent>>;
@@ -173,6 +199,7 @@ async function probeToolPermission(params: {
       defaultTickers: ["AAPL"],
       defaultDocumentTypes: [],
       researchMode: params.researchMode ?? "deep",
+      analysisMode: params.analysisMode ?? "company",
     },
     {
       write: vi.fn().mockResolvedValue(undefined),
@@ -188,6 +215,12 @@ describe("agent runner research budget recovery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sdkMocks.getSessionInfo.mockResolvedValue(undefined);
+    delete process.env.KRW_WEB_SEARCH_ENABLED;
+    delete process.env.KRW_WEB_SEARCH_FORCE_DISABLED;
+    delete process.env.KRW_WEB_SEARCH_PROVIDER;
+    delete process.env.KRW_WEB_SEARCH_MAX_CALLS;
+    delete process.env.KRW_WEB_SEARCH_RESULT_COUNT;
+    delete process.env.ZAI_API_KEY;
   });
 
   it("keeps the deep mode total tool budget unchanged", () => {
@@ -265,6 +298,184 @@ describe("agent runner research budget recovery", () => {
         "WebSearch",
       ]),
     );
+    expect(call.options.allowedTools).not.toContain(
+      webSearchSdkToolName("web_search_prime"),
+    );
+    expect(call.options.systemPrompt.append).toContain(
+      "Do not perform web searches",
+    );
+  });
+
+  it("allows raw Z.AI Web Search MCP only when the runtime flag and key are present", async () => {
+    await expect(
+      canUseTool(webSearchSdkToolName("web_search_prime"), {
+        search_query: "AVGO recent AI networking news",
+        count: 5,
+      }),
+    ).resolves.toMatchObject({
+      behavior: "deny",
+    });
+
+    process.env.KRW_WEB_SEARCH_ENABLED = "1";
+    process.env.KRW_WEB_SEARCH_PROVIDER = "zai_mcp";
+    process.env.ZAI_API_KEY = "zai-test-key";
+
+    await expect(
+      canUseTool(webSearchSdkToolName("web_search_prime"), {
+        search_query: "AVGO recent AI networking news",
+        count: 5,
+      }),
+    ).resolves.toEqual({ behavior: "allow" });
+
+    process.env.KRW_WEB_SEARCH_FORCE_DISABLED = "1";
+    await expect(
+      canUseTool(webSearchSdkToolName("web_search_prime"), {
+        search_query: "AVGO recent AI networking news",
+      }),
+    ).resolves.toMatchObject({
+      behavior: "deny",
+    });
+  });
+
+  it("keeps raw Z.AI Web Search MCP out of company mode even when enabled", async () => {
+    process.env.KRW_WEB_SEARCH_ENABLED = "1";
+    process.env.KRW_WEB_SEARCH_PROVIDER = "zai_mcp";
+    process.env.ZAI_API_KEY = "zai-test-key";
+
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        {
+          type: "result",
+          subtype: "success",
+          result: "공시 근거만으로 답변했습니다.",
+          usage: {
+            input_tokens: 10,
+            output_tokens: 12,
+          },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "AVGO를 공시 기준으로 정리해줘",
+        scopeType: "company",
+        defaultTickers: ["AVGO"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        analysisMode: "company",
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
+    expect(result.status).toBe("completed");
+    const call = sdkMocks.query.mock.calls[0]?.[0];
+    expect(call.options.allowedTools).not.toContain(
+      webSearchSdkToolName("web_search_prime"),
+    );
+    expect(call.options.systemPrompt.append).toContain(
+      "Do not perform web searches",
+    );
+    expect(call.options.systemPrompt.append).not.toContain(
+      "attempt at least one current web search",
+    );
+  });
+
+  it("adds the raw Z.AI Web Search MCP tool to SDK allowedTools in news mode when enabled", async () => {
+    process.env.KRW_WEB_SEARCH_ENABLED = "1";
+    process.env.KRW_WEB_SEARCH_PROVIDER = "zai_mcp";
+    process.env.ZAI_API_KEY = "zai-test-key";
+
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        {
+          type: "result",
+          subtype: "success",
+          result: "공시와 최신 웹 정보를 분리해 답변했습니다.",
+          usage: {
+            input_tokens: 10,
+            output_tokens: 12,
+          },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "AVGO 최근 뉴스까지 반영해서 정리해줘",
+        scopeType: "company",
+        defaultTickers: ["AVGO"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        analysisMode: "news",
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
+    expect(result.status).toBe("completed");
+    const call = sdkMocks.query.mock.calls[0]?.[0];
+    expect(call.options.allowedTools).toEqual(
+      expect.arrayContaining([webSearchSdkToolName("web_search_prime")]),
+    );
+    expect(call.options.disallowedTools).toEqual(
+      expect.arrayContaining(["WebFetch", "WebSearch"]),
+    );
+    expect(call.options.systemPrompt.append).toContain("Z.AI Web Search MCP");
+    expect(call.options.systemPrompt.append).toContain(
+      "attempt at least one current web search",
+    );
+    expect(call.options.systemPrompt.append).toContain(
+      "source provenance internally",
+    );
+    expect(call.prompt).toContain(
+      "/krw-ontology:krw-ontology-news-research",
+    );
+  });
+
+  it("caps raw Z.AI Web Search result count before execution", async () => {
+    process.env.KRW_WEB_SEARCH_ENABLED = "1";
+    process.env.KRW_WEB_SEARCH_PROVIDER = "zai_mcp";
+    process.env.ZAI_API_KEY = "zai-test-key";
+    process.env.KRW_WEB_SEARCH_RESULT_COUNT = "5";
+
+    const permission = await canUseTool(webSearchSdkToolName("web_search_prime"), {
+      search_query: "AAPL latest services news",
+      count: 25,
+    });
+
+    expect(permission.behavior).toBe("allow");
+    if (permission.behavior === "allow") {
+      expect(permission.updatedInput).toEqual({
+        search_query: "AAPL latest services news",
+        count: 5,
+      });
+    }
+  });
+
+  it("limits raw Z.AI Web Search MCP calls separately from ontology calls", async () => {
+    process.env.KRW_WEB_SEARCH_ENABLED = "1";
+    process.env.KRW_WEB_SEARCH_PROVIDER = "zai_mcp";
+    process.env.ZAI_API_KEY = "zai-test-key";
+    process.env.KRW_WEB_SEARCH_MAX_CALLS = "2";
+
+    const { permission, result } = await probeToolPermission({
+      existingTools: ["web_search_prime", "web_search_prime"],
+      attemptedTool: "web_search_prime",
+      analysisMode: "news",
+    });
+
+    expect(result.status).toBe("completed");
+    expect(permission.behavior).toBe("deny");
+    if (permission.behavior === "deny") {
+      expect(permission.message).toContain("No more Z.AI Web Search MCP tools");
+      expect(permission.message).toContain("filing evidence");
+    }
   });
 
   it("downgrades full response detail before KRW ontology tool execution", async () => {

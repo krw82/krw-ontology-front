@@ -159,7 +159,10 @@ async function createPublicShareUrl(messageId: string): Promise<string> {
   } | null;
 
   if (!response.ok) {
-    throw new Error(data?.error?.message || "공유 링크를 만들지 못했습니다.");
+    throw new ShareCreationError(
+      data?.error?.message || "공유 링크를 만들지 못했습니다.",
+      response.status,
+    );
   }
 
   const shareUrl = data?.share_url || data?.url;
@@ -168,6 +171,18 @@ async function createPublicShareUrl(messageId: string): Promise<string> {
   return new URL(shareUrl, window.location.origin).toString();
 }
 
+class ShareCreationError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ShareCreationError";
+  }
+}
+
+type ShareState = "idle" | "sharing" | "shared" | "failed" | "auth_required";
+
 function MessageActions({
   messageId,
   createdAt,
@@ -175,14 +190,18 @@ function MessageActions({
   messageId: string;
   createdAt: string;
 }) {
-  const [shareState, setShareState] = useState<
-    "idle" | "sharing" | "shared" | "failed"
-  >("idle");
+  const [shareState, setShareState] = useState<ShareState>("idle");
   const formattedTime = useMemo(() => formatMessageTime(createdAt), [createdAt]);
 
   useEffect(() => {
-    if (shareState !== "shared" && shareState !== "failed") return;
-    const timeoutId = window.setTimeout(() => setShareState("idle"), 1400);
+    if (
+      shareState !== "shared" &&
+      shareState !== "failed" &&
+      shareState !== "auth_required"
+    ) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => setShareState("idle"), 1800);
     return () => window.clearTimeout(timeoutId);
   }, [shareState]);
 
@@ -216,6 +235,10 @@ function MessageActions({
         setShareState("idle");
         return;
       }
+      if (error instanceof ShareCreationError && error.status === 401) {
+        setShareState("auth_required");
+        return;
+      }
       const copied = shareUrl ? await copyTextToClipboard(shareUrl) : false;
       setShareState(copied ? "shared" : "failed");
     }
@@ -228,17 +251,29 @@ function MessageActions({
       ? "check"
       : shareState === "failed"
         ? "error"
-        : shareState === "sharing"
-          ? "progress_activity"
-          : "ios_share";
+        : shareState === "auth_required"
+          ? "lock"
+          : shareState === "sharing"
+            ? "progress_activity"
+            : "ios_share";
   const shareLabel =
     shareState === "shared"
       ? "공유 링크 복사됨"
       : shareState === "failed"
         ? "공유 링크 생성 실패"
-        : shareState === "sharing"
-          ? "공유 링크 생성 중"
-          : "답변 공유";
+        : shareState === "auth_required"
+          ? "로그인이 필요합니다"
+          : shareState === "sharing"
+            ? "공유 링크 생성 중"
+            : "답변 공유";
+  const visibleShareStatus =
+    shareState === "shared"
+      ? "링크 복사됨"
+      : shareState === "failed"
+        ? "공유 실패"
+        : shareState === "auth_required"
+          ? "로그인이 필요합니다"
+          : "";
 
   return (
     <div className="mt-sm flex items-center gap-xs text-[13px] leading-none text-muted">
@@ -260,12 +295,17 @@ function MessageActions({
         </span>
       </button>
       <time dateTime={createdAt}>{formattedTime}</time>
-      <span className="sr-only" aria-live="polite">
-        {shareState === "shared"
-          ? "공유 링크가 복사되었습니다."
-          : shareState === "failed"
-            ? "공유 링크를 만들지 못했습니다."
-            : ""}
+      <span
+        aria-live="polite"
+        className={[
+          "min-w-0 text-[12px] leading-none transition-opacity",
+          visibleShareStatus ? "opacity-100" : "opacity-0",
+          shareState === "failed" || shareState === "auth_required"
+            ? "text-error"
+            : "text-muted",
+        ].join(" ")}
+      >
+        {visibleShareStatus || " "}
       </span>
     </div>
   );

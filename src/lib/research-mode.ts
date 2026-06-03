@@ -1,4 +1,4 @@
-import type { MCPToolName } from "@/types/api-contracts";
+import type { KRWOntologyMCPToolName } from "@/types/api-contracts";
 
 export type ResearchMode = "fast" | "standard" | "deep";
 
@@ -35,12 +35,12 @@ export const RESEARCH_MODE_TOOL_BUDGETS: Record<
   },
 };
 
-const FAST_ALLOWED_TOOLS: MCPToolName[] = [
+const FAST_ALLOWED_TOOLS: KRWOntologyMCPToolName[] = [
   "krw_ontology_query_context",
   "krw_ontology_query",
 ];
 
-const STANDARD_ALLOWED_TOOLS: MCPToolName[] = [
+const STANDARD_ALLOWED_TOOLS: KRWOntologyMCPToolName[] = [
   "krw_ontology_query_context",
   "krw_ontology_query",
   "krw_ontology_trace",
@@ -48,7 +48,7 @@ const STANDARD_ALLOWED_TOOLS: MCPToolName[] = [
   "krw_ontology_compare",
 ];
 
-const DEEP_ALLOWED_TOOLS: MCPToolName[] = [
+const DEEP_ALLOWED_TOOLS: KRWOntologyMCPToolName[] = [
   "krw_ontology_catalog",
   "krw_ontology_company_context",
   "krw_ontology_index_context",
@@ -77,7 +77,7 @@ export function getResearchModeToolBudget(
 
 export function getAllowedMcpToolsForResearchMode(
   mode: ResearchMode,
-): MCPToolName[] {
+): KRWOntologyMCPToolName[] {
   if (mode === "fast") return FAST_ALLOWED_TOOLS;
   if (mode === "deep") return DEEP_ALLOWED_TOOLS;
   return STANDARD_ALLOWED_TOOLS;

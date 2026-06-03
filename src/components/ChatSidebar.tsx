@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent, MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
@@ -21,6 +21,14 @@ import type { SessionSummary } from "@/types/api-contracts";
 interface ChatSidebarProps {
   activeSessionId: string | null;
   refreshSignal?: string | number;
+}
+
+function subscribePortalTarget() {
+  return () => undefined;
+}
+
+function getPortalTarget() {
+  return typeof document === "undefined" ? null : document.body;
 }
 
 interface SidebarContentProps {
@@ -632,11 +640,11 @@ function DeleteSessionDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
-
-  useEffect(() => {
-    setPortalTarget(document.body);
-  }, []);
+  const portalTarget = useSyncExternalStore(
+    subscribePortalTarget,
+    getPortalTarget,
+    () => null,
+  );
 
   if (!portalTarget) return null;
 

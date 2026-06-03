@@ -349,10 +349,14 @@ export interface MessageShareRow extends Record<string, unknown> {
   owner_user_id: string;
   source_session_id: string;
   source_message_id: string;
+  source_question_message_id: string | null;
   title: string;
+  question_content: string | null;
+  question_created_at: string | null;
   answer_content: string;
   answer_created_at: string;
   tickers: string[] | null;
+  snapshot_version: number;
   created_at: string;
   revoked_at: string | null;
 }
@@ -376,6 +380,10 @@ export interface AnalyticsEventRow extends Record<string, unknown> {
     | "answer_failed"
     | "citation_opened"
     | "share_created"
+    | "share_viewed"
+    | "share_answer_read"
+    | "share_cta_clicked"
+    | "share_starter_loaded"
     | "session_renamed"
     | "session_deleted"
     | "attachment_added"

@@ -13,6 +13,11 @@ import {
 import { createClientId } from "@/lib/client-id";
 import type { ResearchToolCallStatus } from "@/lib/chat/research-status";
 import type { ResearchMode } from "@/lib/research-mode";
+import {
+  ANALYSIS_MODE_DESCRIPTIONS,
+  ANALYSIS_MODE_LABELS,
+  type AnalysisMode,
+} from "@/lib/analysis-mode";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import type { ResearchActivityUpdate } from "@/types/api-contracts";
@@ -30,6 +35,8 @@ interface ComposerProps {
   runStartedAt?: string | null;
   researchMode?: ResearchMode;
   onResearchModeChange?: (mode: ResearchMode) => void;
+  analysisMode?: AnalysisMode;
+  onAnalysisModeChange?: (mode: AnalysisMode) => void;
   focusRequestKey?: number;
   onFocusChange?: (focused: boolean) => void;
 }
@@ -125,8 +132,8 @@ export default function Composer({
   disabled = false,
   isGenerating = false,
   placeholder = "기업에 대해 질문하세요...",
-  researchMode = "deep",
-  onResearchModeChange,
+  analysisMode = "company",
+  onAnalysisModeChange,
   initialValue,
   draftResetKey = 0,
   focusRequestKey = 0,
@@ -492,92 +499,72 @@ export default function Composer({
               : "mt-2 border-t border-hairline pt-3"
           }
         >
-          <div className="grid gap-1.5" aria-label="분석 모드">
-            <button
-              type="button"
-              className={[
-                isSheet
-                  ? "flex w-full cursor-not-allowed items-center gap-3 rounded-[14px] px-3 py-3.5 text-left text-muted opacity-55"
-                  : "flex min-h-[56px] w-full cursor-not-allowed items-center justify-between gap-3 rounded-[10px] px-2.5 py-2 text-left text-muted opacity-60",
-              ].join(" ")}
-              role="menuitem"
-              onClick={() => {
-                onResearchModeChange?.("fast");
-                setIsToolsOpen(false);
-              }}
-              aria-disabled="true"
-              disabled
-            >
-              <span className="min-w-0">
-                <span
-                  className={
-                    isSheet
-                      ? "block text-[17px] font-extrabold leading-6"
-                      : "block text-[14px] font-extrabold leading-5"
-                  }
-                >
-                  패스트 모드
-                </span>
-                <span
-                  className={
-                    isSheet
-                      ? "mt-0.5 block text-[13px] font-semibold leading-5 text-muted-soft"
-                      : "mt-0.5 block text-[12px] font-semibold leading-4 text-muted-soft"
-                  }
-                >
-                  빠른 요약은 준비 중입니다.
-                </span>
-              </span>
-              <span className="ml-auto rounded-full bg-surface-dim px-2 py-1 text-[11px] font-extrabold leading-none text-muted">
-                준비중
-              </span>
-            </button>
+          <div className="grid gap-1.5" aria-label="데이터 모드">
+            {(["company", "news"] as const).map((mode) => {
+              const selected = analysisMode === mode;
+              const icon = mode === "news" ? "newspaper" : "business_center";
 
-            <button
-              type="button"
-              className={[
-                isSheet
-                  ? "flex w-full items-center gap-3 rounded-[14px] bg-primary-container/10 px-3 py-3.5 text-left text-primary transition-colors active:bg-primary-container/14"
-                  : "flex min-h-[56px] w-full items-center justify-between gap-3 rounded-[10px] bg-primary-container/12 px-2.5 py-2 text-left text-primary transition-colors hover:bg-primary-container/16",
-              ].join(" ")}
-              onClick={() => {
-                onResearchModeChange?.("standard");
-                setIsToolsOpen(false);
-              }}
-              role="menuitem"
-              aria-current={researchMode === "standard"}
-            >
-              <span className="min-w-0">
-                <span
-                  className={
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  className={[
                     isSheet
-                      ? "block text-[17px] font-extrabold leading-6"
-                      : "block text-[14px] font-extrabold leading-5"
-                  }
+                      ? "flex w-full items-center gap-3 rounded-[14px] px-3 py-3.5 text-left transition-colors active:bg-primary-container/12"
+                      : "flex min-h-[58px] w-full items-center gap-3 rounded-[10px] px-2.5 py-2 text-left transition-colors hover:bg-surface-dim",
+                    selected
+                      ? "bg-primary-container/12 text-primary"
+                      : "text-ink",
+                  ].join(" ")}
+                  onClick={() => {
+                    onAnalysisModeChange?.(mode);
+                    setIsToolsOpen(false);
+                  }}
+                  role="menuitemradio"
+                  aria-checked={selected}
                 >
-                  스탠다드 모드
-                </span>
-                <span
-                  className={
-                    isSheet
-                      ? "mt-0.5 block text-[13px] font-semibold leading-5 text-primary/75"
-                      : "mt-0.5 block text-[12px] font-semibold leading-4 text-primary/75"
-                  }
-                >
-                  {researchMode === "standard"
-                    ? "공시 근거를 충분히 확인해 답변합니다."
-                    : "기본 분석 정책으로 답변합니다."}
-                </span>
-              </span>
-              {researchMode === "standard" && (
-                <span
-                  aria-hidden="true"
-                  className="material-symbols-outlined ml-auto flex-shrink-0 text-[20px]"
-                >
-                  check
-                </span>
-              )}
-            </button>
+                  <span
+                    aria-hidden="true"
+                    className={[
+                      "material-symbols-outlined flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[20px]",
+                      selected
+                        ? "bg-primary-container/18 text-primary"
+                        : "bg-surface-dim text-muted",
+                    ].join(" ")}
+                  >
+                    {icon}
+                  </span>
+                  <span className="min-w-0">
+                    <span
+                      className={
+                        isSheet
+                          ? "block text-[17px] font-extrabold leading-6"
+                          : "block text-[14px] font-extrabold leading-5"
+                      }
+                    >
+                      {ANALYSIS_MODE_LABELS[mode]}
+                    </span>
+                    <span
+                      className={
+                        isSheet
+                          ? "mt-0.5 block text-[13px] font-semibold leading-5 text-muted"
+                          : "mt-0.5 block text-[12px] font-semibold leading-4 text-muted"
+                      }
+                    >
+                      {ANALYSIS_MODE_DESCRIPTIONS[mode]}
+                    </span>
+                  </span>
+                  {selected && (
+                    <span
+                      aria-hidden="true"
+                      className="material-symbols-outlined ml-auto flex-shrink-0 text-[20px]"
+                    >
+                      check
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

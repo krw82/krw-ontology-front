@@ -30,6 +30,7 @@ const toolLabels: Partial<Record<MCPToolName, string>> = {
   krw_ontology_chain: "주장-근거 체인 확인",
   krw_ontology_quality: "근거 품질 점검",
   krw_ontology_compare: "항목 비교",
+  web_search_prime: "웹 정보 확인",
 };
 
 const toolStepMap: Record<MCPToolName, ResearchStepId> = {
@@ -45,6 +46,7 @@ const toolStepMap: Record<MCPToolName, ResearchStepId> = {
   krw_ontology_chain: "trace",
   krw_ontology_quality: "compose",
   krw_ontology_compare: "compose",
+  web_search_prime: "search",
 };
 
 const baseSteps: Array<{ id: ResearchStepId; label: string }> = [
