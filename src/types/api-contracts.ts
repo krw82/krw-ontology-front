@@ -42,6 +42,12 @@ export type SessionScopeType = "global" | "company";
 /** Chat analysis mode */
 export type AnalysisMode = "company" | "news";
 
+/** Durable agent run intent */
+export type RunKind =
+  | "company_research"
+  | "news_discovery"
+  | "news_research";
+
 /** SSE streaming event types */
 export type StreamingEventType =
   | "run_started"
@@ -50,6 +56,7 @@ export type StreamingEventType =
   | "tool_call_end"
   | "activity_update"
   | "citation"
+  | "artifact"
   | "state_sync"
   | "done"
   | "error"
@@ -241,6 +248,10 @@ export interface AgentRun {
   error_code: ErrorCode | null;
   error_message: string | null;
   sdk_diagnostics: Record<string, unknown> | null;
+  run_kind: RunKind;
+  selected_news_event_context?: Record<string, unknown> | null;
+  source_artifact_id?: string | null;
+  source_event_id?: string | null;
 }
 
 /** Agent run summary (returned in session fetch) */
@@ -267,6 +278,9 @@ export interface AgentRunSummary {
   agent_index_schema_version?: string | null;
   error_code: ErrorCode | null;
   error_message?: string | null;
+  run_kind?: RunKind;
+  source_artifact_id?: string | null;
+  source_event_id?: string | null;
 }
 
 // ============================================================
@@ -640,6 +654,81 @@ export interface ResearchArtifact extends ResearchArtifactEnvelope {
   readonly created_at: string;
 }
 
+export type ChatArtifactType =
+  | "news_event_selection"
+  | "verified_source_summary";
+
+export interface SourcePreview {
+  title?: string;
+  url?: string;
+  domain?: string;
+  publisher?: string | null;
+  published_at?: string | null;
+  snippet_summary?: string;
+  source_role?: string;
+  verification_status?: string;
+  [key: string]: unknown;
+}
+
+export interface AtomicNewsEventCard {
+  id: string;
+  ticker?: string;
+  company_name?: string;
+  event_title: string;
+  event_type?: string;
+  event_date?: string | null;
+  source_date?: string | null;
+  status?: string;
+  short_summary?: string;
+  key_facts?: Array<Record<string, unknown>>;
+  actors?: Record<string, unknown>;
+  instrument?: Record<string, unknown>;
+  investment_axes?: string[];
+  ontology_baseline_questions?: string[];
+  source_previews?: SourcePreview[];
+  reader_urls?: string[];
+  official_source_urls?: string[];
+  major_news_urls?: string[];
+  materiality_score?: number;
+  specificity_score?: number;
+  confidence?: string;
+  ontology_bridge_brief?: string;
+  [key: string]: unknown;
+}
+
+export interface NewsEventSelectionArtifactPayload {
+  kind: "news_event_selection";
+  version: 1;
+  original_question: string;
+  resolved_entities?: Array<Record<string, unknown>>;
+  lookback?: Record<string, unknown>;
+  events: AtomicNewsEventCard[];
+  discovery_summary?: Record<string, unknown>;
+  raw_result?: Record<string, unknown> | unknown[] | null;
+}
+
+export interface ChatArtifact {
+  readonly id: string;
+  session_id: string;
+  message_id: string;
+  run_id: string;
+  type: ChatArtifactType;
+  payload_json:
+    | NewsEventSelectionArtifactPayload
+    | Record<string, unknown>;
+  readonly created_at: string;
+}
+
+export interface ChatArtifactSelection {
+  readonly id: string;
+  artifact_id: string;
+  event_id: string;
+  selected_payload_json: Record<string, unknown>;
+  user_message_id: string | null;
+  research_run_id: string | null;
+  readonly created_at: string;
+}
+
 // ============================================================
 // Release Metadata Types
 // ============================================================
@@ -762,6 +851,11 @@ export interface StreamingCitationEvent extends StreamingEventBase {
   data: StreamingCitation;
 }
 
+export interface StreamingArtifactEvent extends StreamingEventBase {
+  event: "artifact";
+  data: ChatArtifact;
+}
+
 /** Server-side session state reconciliation after reconnect races */
 export interface StreamingStateSyncEvent extends StreamingEventBase {
   event: "state_sync";
@@ -782,6 +876,7 @@ export interface StreamingDoneEvent extends StreamingEventBase {
     content?: string;
     rich_answers?: ResearchArtifact[];
     artifacts?: ResearchArtifact[];
+    chat_artifacts?: ChatArtifact[];
     release: ReleaseMetadata;
     usage: {
       input_tokens: number;
@@ -820,6 +915,7 @@ export type StreamingEvent =
   | StreamingToolCallEndEvent
   | StreamingActivityUpdateEvent
   | StreamingCitationEvent
+  | StreamingArtifactEvent
   | StreamingStateSyncEvent
   | StreamingDoneEvent
   | StreamingErrorEvent
@@ -836,9 +932,19 @@ export interface ChatRunRequest {
   request_id: string;         // client-generated UUID
   research_mode?: "fast" | "standard" | "deep";
   analysis_mode?: AnalysisMode;
+  run_kind?: RunKind;
   scope_type?: SessionScopeType;
   default_tickers?: string[];
   default_document_types?: string[];
+}
+
+/** POST /api/chat/news-event-selection request body */
+export interface NewsEventSelectionRequest {
+  session_id: string;
+  artifact_id: string;
+  event_id: string;
+  request_id: string;
+  research_mode?: "fast" | "standard" | "deep";
 }
 
 /** POST /api/chat/[sessionId]/cancel - no request body */
@@ -891,6 +997,8 @@ export interface GetChatSessionResponse {
   runs: AgentRunSummary[];
   citations?: Citation[];
   tool_calls?: ToolCall[];
+  chat_artifacts?: ChatArtifact[];
+  artifact_selections?: ChatArtifactSelection[];
   rich_answers?: ResearchArtifact[];
   research_artifacts?: ResearchArtifact[];
 }

@@ -83,6 +83,10 @@ export interface AgentRunRow extends Record<string, unknown> {
   error_code: string | null;
   error_message: string | null;
   sdk_diagnostics: Json | null;
+  run_kind: "company_research" | "news_discovery" | "news_research";
+  selected_news_event_context: Json | null;
+  source_artifact_id: string | null;
+  source_event_id: string | null;
 }
 
 export interface AgentRunEventRow extends Record<string, unknown> {
@@ -331,6 +335,27 @@ export interface ResearchArtifactRow extends Record<string, unknown> {
   quality_json: Json | null;
   source_json: Json | null;
   html_snapshot: string | null;
+  created_at: string;
+}
+
+export interface ChatMessageArtifactRow extends Record<string, unknown> {
+  id: string;
+  session_id: string;
+  message_id: string;
+  run_id: string;
+  type: "news_event_selection" | "verified_source_summary";
+  payload_json: Json;
+  created_at: string;
+}
+
+export interface ChatMessageArtifactSelectionRow extends Record<string, unknown> {
+  id: string;
+  artifact_id: string;
+  event_id: string;
+  user_id: string;
+  selected_payload_json: Json;
+  user_message_id: string | null;
+  research_run_id: string | null;
   created_at: string;
 }
 
@@ -743,6 +768,38 @@ export interface Database {
           revoked_at?: string | null;
         };
         Update: Partial<Omit<MessageShareRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      chat_message_artifacts: {
+        Row: ChatMessageArtifactRow;
+        Insert: Omit<ChatMessageArtifactRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<ChatMessageArtifactRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      chat_message_artifact_selections: {
+        Row: ChatMessageArtifactSelectionRow;
+        Insert: Omit<ChatMessageArtifactSelectionRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<
+          Omit<ChatMessageArtifactSelectionRow, "id" | "created_at">
+        >;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];

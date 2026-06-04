@@ -158,7 +158,7 @@ export default async function QuestionTopicPage({
               {copy.home}
             </Link>
             <span className="mx-2 text-outline-variant">/</span>
-            <span className="text-ink">{topic.shortTitle}</span>
+            <span className="text-ink">{displayTopic.shortTitle}</span>
           </nav>
 
           <header className="border-b border-hairline pb-8">
@@ -187,7 +187,11 @@ export default async function QuestionTopicPage({
           </header>
 
           <div className="py-8">
-            <QuestionChainGraph topic={topic} displayTopic={displayTopic} />
+            <QuestionChainGraph
+              topic={topic}
+              displayTopic={displayTopic}
+              locale={locale}
+            />
           </div>
 
           <section className="border-t border-hairline py-8">

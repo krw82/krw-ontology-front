@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import ChatArtifacts from "@/components/ChatArtifacts";
 import EvidenceGraphPreview from "@/components/EvidenceGraphPreview";
 import ResearchMarkdown from "@/components/ResearchMarkdown";
 import ResearchProgress from "@/components/ResearchProgress";
 import type { ToolCallState } from "@/hooks/useChat";
 import type {
   ChatCitation,
+  ChatArtifact,
+  ChatArtifactSelection,
   MessageStatus,
   ResearchActivityUpdate,
 } from "@/types/api-contracts";
@@ -26,6 +29,13 @@ interface ChatMessageProps {
   isStreaming?: boolean;
   activity?: ResearchActivityUpdate | null;
   citations?: ChatCitation[];
+  artifacts?: ChatArtifact[];
+  artifactSelections?: ChatArtifactSelection[];
+  onSelectNewsEvent?: (params: {
+    artifactId: string;
+    eventId: string;
+  }) => void | Promise<void>;
+  newsEventSelectionDisabled?: boolean;
   showHeader?: boolean;
   toolCalls?: ToolCallState[];
   workDurationMs?: number | null;
@@ -219,8 +229,6 @@ function MessageActions({
       };
       const useNativeShare =
         Boolean(navigator.share) &&
-        (navigator.maxTouchPoints > 0 ||
-          window.matchMedia("(pointer: coarse)").matches) &&
         (!navigator.canShare || navigator.canShare(shareData));
 
       if (useNativeShare) {
@@ -258,7 +266,7 @@ function MessageActions({
             : "ios_share";
   const shareLabel =
     shareState === "shared"
-      ? "공유 링크 복사됨"
+      ? "공유 완료"
       : shareState === "failed"
         ? "공유 링크 생성 실패"
         : shareState === "auth_required"
@@ -268,7 +276,7 @@ function MessageActions({
             : "답변 공유";
   const visibleShareStatus =
     shareState === "shared"
-      ? "링크 복사됨"
+      ? "공유 완료"
       : shareState === "failed"
         ? "공유 실패"
         : shareState === "auth_required"
@@ -385,6 +393,10 @@ export default function ChatMessage({
   isStreaming,
   activity,
   citations,
+  artifacts,
+  artifactSelections,
+  onSelectNewsEvent,
+  newsEventSelectionDisabled,
   showHeader = true,
   toolCalls,
   workDurationMs,
@@ -486,6 +498,12 @@ export default function ChatMessage({
               {terminalAssistantContent(status)}
             </p>
           ) : null}
+          <ChatArtifacts
+            artifacts={artifacts}
+            selections={artifactSelections}
+            disabled={newsEventSelectionDisabled}
+            onSelectNewsEvent={onSelectNewsEvent}
+          />
           {messageId && createdAt && status === "completed" ? (
             <MessageActions messageId={messageId} createdAt={createdAt} />
           ) : null}

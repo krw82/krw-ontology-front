@@ -106,7 +106,7 @@ export default async function RootLayout({
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[999] focus:px-md focus:py-sm focus:bg-primary focus:text-on-primary focus:rounded"
         >
-          메인 콘텐츠로 이동
+          {locale === "ko" ? "메인 콘텐츠로 이동" : "Skip to main content"}
         </a>
         <Suspense fallback={children}>
           <AppShell>{children}</AppShell>

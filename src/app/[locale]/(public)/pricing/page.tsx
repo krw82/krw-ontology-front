@@ -84,6 +84,65 @@ const pricingCopy = {
   principles: Array<{ title: string; body: string }>;
 }>;
 
+type PublicBillingPlan = Awaited<
+  ReturnType<typeof listPublicBillingPlansFromStore>
+>[number];
+
+type BillingPlanDisplay = {
+  label: string;
+  statusLabel: string;
+  description: string;
+  limitLabel: string;
+};
+
+const englishPlanCopy: Record<string, BillingPlanDisplay> = {
+  free: {
+    label: "Free",
+    statusLabel: "Free beta",
+    description: "For individual testing and lightweight company research.",
+    limitLabel: "analysis credits/month",
+  },
+  pro: {
+    label: "Pro individual analysis",
+    statusLabel: "Free beta",
+    description: "For users who regularly perform company research.",
+    limitLabel: "analysis credits/month",
+  },
+  power: {
+    label: "Power high-frequency analysis",
+    statusLabel: "Free beta",
+    description:
+      "For repeated high-usage research across multiple companies and topics.",
+    limitLabel: "analysis credits/month",
+  },
+};
+
+function fallbackEnglishPlanLabel(key: string) {
+  return key
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function getPlanDisplay(plan: PublicBillingPlan, locale: Locale): BillingPlanDisplay {
+  if (locale === "ko") {
+    return {
+      label: plan.label,
+      statusLabel: plan.statusLabel,
+      description: plan.description,
+      limitLabel: getBillingPlanLimitLabel(plan),
+    };
+  }
+
+  return (
+    englishPlanCopy[plan.key] ?? {
+      label: fallbackEnglishPlanLabel(plan.key),
+      statusLabel: "Beta",
+      description: "Analysis credits for company research.",
+      limitLabel: "analysis credits/month",
+    }
+  );
+}
+
 export async function generateMetadata({
   params,
 }: PricingPageProps): Promise<Metadata> {
@@ -139,6 +198,7 @@ export default async function PricingPage({ params }: PricingPageProps) {
           <section className="grid gap-4 py-8 md:grid-cols-3">
             {plans.map((plan) => {
               const recommended = plan.key === "pro";
+              const planDisplay = getPlanDisplay(plan, locale);
 
               return (
                 <article
@@ -152,10 +212,10 @@ export default async function PricingPage({ params }: PricingPageProps) {
                   <div className="flex items-start justify-between gap-sm">
                     <div>
                       <h2 className="text-[20px] font-black leading-7 text-ink">
-                        {plan.label}
+                        {planDisplay.label}
                       </h2>
                       <p className="mt-1 text-[13px] font-bold leading-5 text-muted">
-                        {plan.statusLabel}
+                        {planDisplay.statusLabel}
                       </p>
                     </div>
                     {recommended && (
@@ -167,11 +227,11 @@ export default async function PricingPage({ params }: PricingPageProps) {
                   <p className="mt-5 text-[32px] font-black leading-[1.05] text-ink">
                     {getBillingPlanAnalysisCredits(plan).toLocaleString()}{" "}
                     <span className="ml-1 align-baseline text-[13px] font-bold leading-5 text-muted">
-                      {getBillingPlanLimitLabel(plan)}
+                      {planDisplay.limitLabel}
                     </span>
                   </p>
                   <p className="mt-4 text-[14px] font-medium leading-6 text-body">
-                    {plan.description}
+                    {planDisplay.description}
                   </p>
                   <MarketingCtaLink
                     href={localizedPath(locale, "/companies")}

@@ -16,6 +16,8 @@ import {
 } from "@/lib/animation";
 import { OPEN_CHAT_SIDEBAR_EVENT } from "@/lib/chat/sidebar-events";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
+import { getPathLocale } from "@/i18n/routing";
 import type { SessionSummary } from "@/types/api-contracts";
 
 interface ChatSidebarProps {
@@ -31,8 +33,64 @@ function getPortalTarget() {
   return typeof document === "undefined" ? null : document.body;
 }
 
+const sidebarCopy = {
+  ko: {
+    closeHistory: "채팅 기록 닫기",
+    history: "채팅 기록",
+    newChat: "새 채팅",
+    nameSaved: "채팅 이름을 저장했습니다.",
+    deleted: "채팅을 삭제했습니다.",
+    empty: "저장된 채팅이 없습니다.",
+    sessionTitle: "채팅 이름",
+    cancelRename: "이름 변경 취소",
+    saveName: "이름 저장",
+    noMessage: "아직 메시지가 없습니다.",
+    opening: "채팅 여는 중",
+    generating: "응답 생성 중",
+    menu: "메뉴",
+    rename: "이름 변경",
+    running: "실행 중",
+    delete: "삭제",
+    cannotDeleteWhileRunning: "응답 생성 중에는 삭제할 수 없습니다.",
+    confirmDeleteTitle: "채팅을 삭제할까요?",
+    confirmDeleteBody:
+      "목록에서 숨겨집니다. 이 작업은 현재 화면에서 바로 되돌릴 수 없습니다.",
+    cancel: "취소",
+    deleting: "삭제 중",
+  },
+  en: {
+    closeHistory: "Close chat history",
+    history: "Chat history",
+    newChat: "New chat",
+    nameSaved: "Chat name saved.",
+    deleted: "Chat deleted.",
+    empty: "No saved chats.",
+    sessionTitle: "Chat name",
+    cancelRename: "Cancel rename",
+    saveName: "Save name",
+    noMessage: "No messages yet.",
+    opening: "Opening chat",
+    generating: "Generating response",
+    menu: "menu",
+    rename: "Rename",
+    running: "Running",
+    delete: "Delete",
+    cannotDeleteWhileRunning:
+      "Cannot delete while a response is generating.",
+    confirmDeleteTitle: "Delete this chat?",
+    confirmDeleteBody:
+      "It will be hidden from the list. This cannot be undone from the current screen.",
+    cancel: "Cancel",
+    deleting: "Deleting",
+  },
+} satisfies Record<Locale, Record<string, string>>;
+
+type SidebarCopy = (typeof sidebarCopy)[Locale];
+
 interface SidebarContentProps {
   activeSessionId: string | null;
+  locale: Locale;
+  copy: SidebarCopy;
   loading: boolean;
   sessions: ReturnType<typeof useSessions>["sessions"];
   mutatingSessionId: ReturnType<typeof useSessions>["mutatingSessionId"];
@@ -44,12 +102,26 @@ interface SidebarContentProps {
   onDeleteActiveSession?: () => void;
 }
 
-function formatRelativeDate(value: string): string {
+function formatRelativeDate(value: string, locale: Locale): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
 
   const diffMs = Date.now() - date.getTime();
   const diffMinutes = Math.floor(diffMs / 60_000);
+  if (locale === "en") {
+    const formatter = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+    if (diffMinutes < 1) return "just now";
+    if (diffMinutes < 60) return formatter.format(-diffMinutes, "minute");
+
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return formatter.format(-diffHours, "hour");
+
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+    }).format(date);
+  }
+
   if (diffMinutes < 1) return "방금";
   if (diffMinutes < 60) return `${diffMinutes}분 전`;
 
@@ -80,6 +152,8 @@ export default function ChatSidebar({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pendingNavigationSessionId, setPendingNavigationSessionId] =
     useState<string | null>(null);
+  const locale = getPathLocale(pathname) ?? DEFAULT_LOCALE;
+  const copy = sidebarCopy[locale];
 
   const closeMobileSidebar = useCallback(() => {
     setMobileOpen(false);
@@ -161,7 +235,7 @@ export default function ChatSidebar({
             <motion.button
               type="button"
               className="absolute inset-0 bg-black/35"
-              aria-label="채팅 기록 닫기"
+              aria-label={copy.closeHistory}
               onClick={closeMobileSidebar}
               initial="hidden"
               animate="visible"
@@ -173,18 +247,20 @@ export default function ChatSidebar({
               className="absolute bottom-0 left-0 top-0 flex w-[min(88vw,340px)] flex-col border-r border-hairline bg-canvas shadow-2xl"
               role="dialog"
               aria-modal="true"
-              aria-label="채팅 기록"
+              aria-label={copy.history}
               initial="hidden"
               animate="visible"
               exit="exit"
               variants={sidebarPanel}
             >
               <div className="flex h-[64px] items-center justify-between border-b border-hairline px-md">
-                <p className="text-[15px] font-extrabold text-ink">채팅 기록</p>
+                <p className="text-[15px] font-extrabold text-ink">
+                  {copy.history}
+                </p>
                 <button
                   type="button"
                   className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-surface hover:text-ink"
-                  aria-label="채팅 기록 닫기"
+                  aria-label={copy.closeHistory}
                   onClick={closeMobileSidebar}
                 >
                   <span aria-hidden="true" className="material-symbols-outlined text-[20px]">
@@ -194,6 +270,8 @@ export default function ChatSidebar({
               </div>
               <SidebarContent
                 activeSessionId={activeSessionId}
+                locale={locale}
+                copy={copy}
                 loading={loading}
                 sessions={sessions}
                 mutatingSessionId={mutatingSessionId}
@@ -215,6 +293,8 @@ export default function ChatSidebar({
       <aside className="hidden w-[280px] shrink-0 flex-col border-r border-hairline bg-surface/80 md:sticky md:top-0 md:flex md:h-[100dvh] md:max-h-[100dvh]">
         <SidebarContent
           activeSessionId={activeSessionId}
+          locale={locale}
+          copy={copy}
           loading={loading}
           sessions={sessions}
           mutatingSessionId={mutatingSessionId}
@@ -231,6 +311,8 @@ export default function ChatSidebar({
 
 function SidebarContent({
   activeSessionId,
+  locale,
+  copy,
   loading,
   sessions,
   mutatingSessionId,
@@ -286,7 +368,7 @@ function SidebarContent({
   const beginRename = (session: SessionSummary) => {
     setMenuOpenId(null);
     setEditingSessionId(session.id);
-    setEditingTitle(session.title || "새 채팅");
+    setEditingTitle(session.title || copy.newChat);
   };
 
   const cancelRename = () => {
@@ -299,7 +381,7 @@ function SidebarContent({
     if (!editingSessionId) return;
     const updated = await renameSession(editingSessionId, editingTitle);
     if (!updated) return;
-    setNotice("채팅 이름을 저장했습니다.");
+    setNotice(copy.nameSaved);
     cancelRename();
   };
 
@@ -308,7 +390,7 @@ function SidebarContent({
     const deletingActiveSession = pendingDeleteSession.id === activeSessionId;
     const result = await deleteSession(pendingDeleteSession.id);
     if (!result) return;
-    setNotice("채팅을 삭제했습니다.");
+    setNotice(copy.deleted);
     setPendingDeleteSession(null);
     if (deletingActiveSession) {
       onDeleteActiveSession?.();
@@ -342,10 +424,10 @@ function SidebarContent({
           </div>
         ) : sessions.length === 0 ? (
           <div className="rounded-[8px] border border-dashed border-hairline bg-canvas px-sm py-md text-[13px] font-semibold leading-[1.45] text-muted">
-            저장된 채팅이 없습니다.
+            {copy.empty}
           </div>
         ) : (
-          <nav className="space-y-xs" aria-label="채팅 기록">
+          <nav className="space-y-xs" aria-label={copy.history}>
             {sessions.map((session) => {
               const isActive = session.id === activeSessionId;
               const isRunning =
@@ -364,6 +446,8 @@ function SidebarContent({
                   isBusy={mutatingSessionId === session.id}
                   editingTitle={editingTitle}
                   reducedMotion={reducedMotion}
+                  locale={locale}
+                  copy={copy}
                   onNavigate={onNavigate}
                   onMenuToggle={() =>
                     setMenuOpenId((current) =>
@@ -386,6 +470,7 @@ function SidebarContent({
       </div>
       <DeleteSessionDialog
         session={pendingDeleteSession}
+        copy={copy}
         isDeleting={
           Boolean(pendingDeleteSession) &&
           mutatingSessionId === pendingDeleteSession?.id
@@ -407,6 +492,8 @@ function SessionRow({
   isBusy,
   editingTitle,
   reducedMotion,
+  locale,
+  copy,
   onNavigate,
   onMenuToggle,
   onRename,
@@ -424,6 +511,8 @@ function SessionRow({
   isBusy: boolean;
   editingTitle: string;
   reducedMotion: boolean;
+  locale: Locale;
+  copy: SidebarCopy;
   onNavigate?: (sessionId: string) => void;
   onMenuToggle: () => void;
   onRename: () => void;
@@ -473,7 +562,7 @@ function SessionRow({
           onSubmit={onRenameSubmit}
         >
           <label className="sr-only" htmlFor={`session-title-${session.id}`}>
-            채팅 이름
+            {copy.sessionTitle}
           </label>
           <input
             id={`session-title-${session.id}`}
@@ -490,7 +579,7 @@ function SessionRow({
             <button
               type="button"
               className="inline-flex h-8 w-8 items-center justify-center rounded-[6px] text-muted transition-colors hover:bg-surface hover:text-ink"
-              aria-label="이름 변경 취소"
+              aria-label={copy.cancelRename}
               onClick={onCancelRename}
               disabled={isBusy}
             >
@@ -501,7 +590,7 @@ function SessionRow({
             <button
               type="submit"
               className="inline-flex h-8 w-8 items-center justify-center rounded-[6px] bg-surface-dark text-on-dark transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:bg-primary-disabled"
-              aria-label="이름 저장"
+              aria-label={copy.saveName}
               disabled={isBusy}
             >
               <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
@@ -526,21 +615,21 @@ function SessionRow({
             <div className="flex items-start justify-between gap-xs">
               <div className="min-w-0">
                 <p className="truncate text-[14px] font-semibold leading-[1.4] text-ink">
-                  {session.title || "새 채팅"}
+                  {session.title || copy.newChat}
                 </p>
                 <p className="mt-xxs line-clamp-2 text-[12px] leading-[1.35] text-muted">
-                  {session.last_message_preview || "아직 메시지가 없습니다."}
+                  {session.last_message_preview || copy.noMessage}
                 </p>
               </div>
               {isNavigating ? (
                 <span
                   className="mt-[3px] h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-primary-container/25 border-t-primary-container"
-                  aria-label="채팅 여는 중"
+                  aria-label={copy.opening}
                 />
               ) : isRunning && (
                 <span
                   className="relative mt-[3px] h-2.5 w-2.5 shrink-0"
-                  aria-label="응답 생성 중"
+                  aria-label={copy.generating}
                 >
                   <span className="absolute inset-[1px] rounded-full bg-primary-container" />
                   {!reducedMotion && (
@@ -559,7 +648,7 @@ function SessionRow({
               )}
             </div>
             <div className="mt-xs flex items-center justify-between gap-xs text-[11px] leading-[1.3] text-muted-soft">
-              <span>{formatRelativeDate(session.updated_at)}</span>
+              <span>{formatRelativeDate(session.updated_at, locale)}</span>
               {session.default_tickers.length > 0 && (
                 <span className="truncate font-mono">
                   {session.default_tickers.join(", ")}
@@ -574,7 +663,7 @@ function SessionRow({
               "absolute right-1.5 top-1.5 z-20 inline-flex h-8 w-8 items-center justify-center rounded-[6px] border border-transparent bg-canvas/80 text-muted shadow-sm backdrop-blur transition-all hover:border-hairline hover:bg-canvas hover:text-ink focus-visible:opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100",
               isActive || isMenuOpen ? "md:opacity-100" : "",
             ].join(" ")}
-            aria-label={`${session.title || "새 채팅"} 메뉴`}
+            aria-label={`${session.title || copy.newChat} ${copy.menu}`}
             aria-haspopup="menu"
             aria-expanded={isMenuOpen}
             onClick={onMenuToggle}
@@ -602,7 +691,7 @@ function SessionRow({
                   onClick={onRename}
                   disabled={isBusy}
                 >
-                  <span>이름 변경</span>
+                  <span>{copy.rename}</span>
                   <span aria-hidden="true" className="material-symbols-outlined text-[17px]">
                     edit
                   </span>
@@ -613,9 +702,9 @@ function SessionRow({
                   role="menuitem"
                   onClick={onDelete}
                   disabled={isBusy || isRunning}
-                  title={isRunning ? "응답 생성 중에는 삭제할 수 없습니다." : undefined}
+                  title={isRunning ? copy.cannotDeleteWhileRunning : undefined}
                 >
-                  <span>{isRunning ? "실행 중" : "삭제"}</span>
+                  <span>{isRunning ? copy.running : copy.delete}</span>
                   <span aria-hidden="true" className="material-symbols-outlined text-[17px]">
                     delete
                   </span>
@@ -631,11 +720,13 @@ function SessionRow({
 
 function DeleteSessionDialog({
   session,
+  copy,
   isDeleting,
   onCancel,
   onConfirm,
 }: {
   session: SessionSummary | null;
+  copy: SidebarCopy;
   isDeleting: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -674,13 +765,13 @@ function DeleteSessionDialog({
                   id="delete-session-title"
                   className="text-[16px] font-extrabold leading-[1.35] text-ink"
                 >
-                  채팅을 삭제할까요?
+                  {copy.confirmDeleteTitle}
                 </h2>
                 <p className="mt-xs text-[13px] font-medium leading-[1.55] text-body">
-                  목록에서 숨겨집니다. 이 작업은 현재 화면에서 바로 되돌릴 수 없습니다.
+                  {copy.confirmDeleteBody}
                 </p>
                 <p className="mt-xs truncate rounded-[6px] bg-surface px-xs py-xxs text-[12px] font-semibold text-muted">
-                  {session.title || "새 채팅"}
+                  {session.title || copy.newChat}
                 </p>
               </div>
             </div>
@@ -691,7 +782,7 @@ function DeleteSessionDialog({
                 onClick={onCancel}
                 disabled={isDeleting}
               >
-                취소
+                {copy.cancel}
               </button>
               <button
                 type="button"
@@ -699,7 +790,7 @@ function DeleteSessionDialog({
                 onClick={onConfirm}
                 disabled={isDeleting}
               >
-                {isDeleting ? "삭제 중" : "삭제"}
+                {isDeleting ? copy.deleting : copy.delete}
               </button>
             </div>
           </motion.div>

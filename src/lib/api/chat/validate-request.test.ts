@@ -224,6 +224,7 @@ describe("validateRequest", () => {
       default_document_types: ["10-K"],
       research_mode: "deep",
       analysis_mode: "company",
+      run_kind: "company_research",
     });
   });
 
@@ -248,8 +249,10 @@ describe("validateRequest", () => {
     if (!missingResult.ok || !invalidResult.ok) return;
     expect(missingResult.data.body.research_mode).toBe("deep");
     expect(missingResult.data.body.analysis_mode).toBe("company");
+    expect(missingResult.data.body.run_kind).toBe("company_research");
     expect(invalidResult.data.body.research_mode).toBe("deep");
     expect(invalidResult.data.body.analysis_mode).toBe("company");
+    expect(invalidResult.data.body.run_kind).toBe("company_research");
   });
 
   it("accepts explicit research and analysis modes", async () => {
@@ -266,6 +269,24 @@ describe("validateRequest", () => {
     if (!result.ok) return;
     expect(result.data.body.research_mode).toBe("deep");
     expect(result.data.body.analysis_mode).toBe("news");
+    expect(result.data.body.run_kind).toBe("news_discovery");
+  });
+
+  it("accepts explicit run kind for selected news research", async () => {
+    const result = await validateRequest(
+      makeRequest({
+        content: "선택 이벤트를 분석해줘",
+        request_id: REQUEST_ID,
+        research_mode: "standard",
+        analysis_mode: "news",
+        run_kind: "news_research",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.body.analysis_mode).toBe("news");
+    expect(result.data.body.run_kind).toBe("news_research");
   });
 
   it("accepts valid markdown attachments after server-side validation", async () => {

@@ -213,6 +213,7 @@ export async function POST(request: NextRequest) {
     mcpHealth,
     researchMode: body.research_mode,
     analysisMode: body.analysis_mode,
+    runKind: body.run_kind,
   });
 
   if (!enqueueResult.ok) {

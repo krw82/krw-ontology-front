@@ -55,6 +55,7 @@ const homeCopy = {
     privacy: "개인정보처리방침",
     terms: "서비스 약관",
     offerDescription: "무료 베타 플랜",
+    browseAria: "공개 페이지 둘러보기",
   },
   en: {
     metadataTitle: "Evidence-first company analysis AI",
@@ -80,6 +81,7 @@ const homeCopy = {
     privacy: "Privacy Policy",
     terms: "Terms of Service",
     offerDescription: "Free beta plan",
+    browseAria: "Browse public pages",
   },
 } satisfies Record<Locale, {
   metadataTitle: string;
@@ -99,6 +101,7 @@ const homeCopy = {
   privacy: string;
   terms: string;
   offerDescription: string;
+  browseAria: string;
 }>;
 
 const homeExperienceCopy = {
@@ -336,7 +339,7 @@ export default async function Home({ params }: HomePageProps) {
 
             <nav
               className="mt-5 border-y border-hairline md:hidden"
-              aria-label="공개 페이지 둘러보기"
+              aria-label={copy.browseAria}
             >
               {copy.browseLinks.map((item) => (
                 <Link
@@ -382,7 +385,7 @@ export default async function Home({ params }: HomePageProps) {
 
               <HomeEvidenceCards cards={experience.evidenceCards} />
 
-              <HomeTraceExplorer nodes={experience.traceNodes} />
+              <HomeTraceExplorer nodes={experience.traceNodes} locale={locale} />
             </div>
           </TraceCardEntrance>
         </section>

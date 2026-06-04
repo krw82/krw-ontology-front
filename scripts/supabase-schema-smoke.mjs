@@ -65,7 +65,8 @@ const checks = [
   },
   {
     table: "agent_runs",
-    select: "id,request_id,sdk_diagnostics",
+    select:
+      "id,request_id,sdk_diagnostics,run_kind,selected_news_event_context,source_artifact_id,source_event_id",
   },
   {
     table: "agent_worker_heartbeats",
@@ -102,6 +103,14 @@ const checks = [
   {
     table: "usage_ledger",
     select: "id,user_id,request_id,entry_type,amount_usd",
+  },
+  {
+    table: "chat_message_artifacts",
+    select: "id,session_id,message_id,run_id,type,payload_json",
+  },
+  {
+    table: "chat_message_artifact_selections",
+    select: "id,artifact_id,event_id,user_id,user_message_id,research_run_id",
   },
 ];
 

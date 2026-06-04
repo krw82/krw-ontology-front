@@ -47,6 +47,30 @@ function readableText(value: string, locale: Locale): string {
     .replace(/^Key external factors:\s*/i, "핵심 변수: ");
 }
 
+const englishSectorLabels: Record<string, string> = {
+  기술: "Technology",
+  헬스케어: "Healthcare",
+  필수소비재: "Consumer staples",
+  임의소비재: "Consumer discretionary",
+  소비재: "Consumer discretionary",
+  금융: "Financials",
+  "금융 서비스": "Financials",
+  커뮤니케이션: "Communication services",
+  "커뮤니케이션 서비스": "Communication services",
+  에너지: "Energy",
+  산업재: "Industrials",
+  소재: "Materials",
+  유틸리티: "Utilities",
+  부동산: "Real estate",
+};
+
+function displaySector(sector: string | null | undefined, locale: Locale) {
+  const normalized = sector?.trim();
+  if (!normalized) return null;
+  if (locale === "ko") return normalized;
+  return englishSectorLabels[normalized] ?? normalized;
+}
+
 export default function CompanyCard({
   company,
   motionDelay = 0,
@@ -62,18 +86,20 @@ export default function CompanyCard({
     : null;
   const companyLabel =
     company.name && company.name !== company.ticker ? company.name : "";
-  const companyNameKo = company.companyNameKo?.trim();
-  const secondaryLabel = [companyNameKo, company.sector]
+  const companyNameKo =
+    locale === "ko" ? company.companyNameKo?.trim() : undefined;
+  const sectorLabel = displaySector(company.sector, locale);
+  const secondaryLabel = [companyNameKo, sectorLabel]
     .filter(Boolean)
     .join(" · ");
   const accessibleSummary = [
     company.ticker,
     company.name && company.name !== company.ticker ? company.name : null,
     companyNameKo,
-    company.sector
+    sectorLabel
       ? locale === "ko"
-        ? `${company.sector} 섹터`
-        : `${company.sector} sector`
+        ? `${sectorLabel} 섹터`
+        : `${sectorLabel} sector`
       : null,
     company.coverage,
     coreStrength,

@@ -6,9 +6,12 @@ import { publicAgentErrorMessage } from "@/lib/api/chat/error-messages";
 import { sanitizeAssistantContent } from "@/lib/chat/assistant-content";
 import type {
   AgentRunRow,
+  ChatMessageArtifactRow,
+  ChatMessageArtifactSelectionRow,
   ChatSessionRow,
   MessageRow,
 } from "@/types/database";
+import { toPublicChatArtifact } from "@/lib/chat-artifacts/news-event-selection";
 
 function notFoundError(message: string) {
   return Response.json(
@@ -77,7 +80,7 @@ export async function GET(
   const { data: runs, error: runsError } = await supabase
     .from("agent_runs")
     .select(
-      "id, status, model, assistant_message_id, queued_at, started_at, finished_at, latency_ms, input_tokens, output_tokens, estimated_cost_usd, ontology_env, worker_env, ontology_release_id, index_generated_at, company_count, document_count, object_count, manifest_valid, agent_index_schema_version, error_code"
+      "id, status, model, assistant_message_id, queued_at, started_at, finished_at, latency_ms, input_tokens, output_tokens, estimated_cost_usd, ontology_env, worker_env, ontology_release_id, index_generated_at, company_count, document_count, object_count, manifest_valid, agent_index_schema_version, error_code, run_kind, source_artifact_id, source_event_id"
     )
     .eq("session_id", sessionId)
     .order("queued_at", { ascending: true, nullsFirst: true })
@@ -87,10 +90,40 @@ export async function GET(
     return internalError("채팅 실행 기록을 불러오지 못했습니다.");
   }
 
+  const { data: chatArtifacts, error: chatArtifactsError } = await supabase
+    .from("chat_message_artifacts")
+    .select("id, session_id, message_id, run_id, type, payload_json, created_at")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: true })
+    .returns<ChatMessageArtifactRow[]>();
+
+  if (chatArtifactsError) {
+    return internalError("채팅 artifact를 불러오지 못했습니다.");
+  }
+
+  const artifactIds = (chatArtifacts ?? []).map((artifact) => artifact.id);
+  const { data: artifactSelections, error: artifactSelectionsError } =
+    artifactIds.length > 0
+      ? await supabase
+          .from("chat_message_artifact_selections")
+          .select(
+            "id, artifact_id, event_id, selected_payload_json, user_message_id, research_run_id, created_at",
+          )
+          .in("artifact_id", artifactIds)
+          .order("created_at", { ascending: true })
+          .returns<ChatMessageArtifactSelectionRow[]>()
+      : { data: [], error: null };
+
+  if (artifactSelectionsError) {
+    return internalError("채팅 artifact 선택 기록을 불러오지 못했습니다.");
+  }
+
   return Response.json({
     session,
     messages: (messages ?? []).map(toPublicMessage),
     runs: (runs ?? []).map(toPublicRunSummary),
+    chat_artifacts: (chatArtifacts ?? []).map(toPublicChatArtifact),
+    artifact_selections: artifactSelections ?? [],
     rich_answers: [],
     research_artifacts: [],
   });
@@ -132,5 +165,8 @@ function toPublicRunSummary(run: Partial<AgentRunRow>) {
     error_message: errorCode
       ? publicAgentErrorMessage({ code: errorCode })
       : null,
+    run_kind: run.run_kind ?? undefined,
+    source_artifact_id: run.source_artifact_id ?? null,
+    source_event_id: run.source_event_id ?? null,
   };
 }

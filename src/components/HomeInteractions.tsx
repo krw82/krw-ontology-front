@@ -275,7 +275,9 @@ export function HomeQuestionForm({
       style={{
         borderColor: "var(--color-outline-variant)",
       }}
-      aria-label="기업 분석 예시"
+      aria-label={
+        locale === "ko" ? "기업 분석 예시" : "Company analysis example"
+      }
     >
       <div
         className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-[10px] pl-2 text-left sm:min-h-14 sm:pl-4"
@@ -432,7 +434,13 @@ export function HomeEvidenceCards({ cards }: { cards: HomeEvidenceCard[] }) {
   );
 }
 
-export function HomeTraceExplorer({ nodes }: { nodes: HomeTraceNode[] }) {
+export function HomeTraceExplorer({
+  nodes,
+  locale = DEFAULT_LOCALE,
+}: {
+  nodes: HomeTraceNode[];
+  locale?: Locale;
+}) {
   const demoStep = useHomeDemoStep();
   const reducedMotion = useReducedMotion();
   const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null);
@@ -460,21 +468,25 @@ export function HomeTraceExplorer({ nodes }: { nodes: HomeTraceNode[] }) {
     nodes.findIndex((node) => node.id === activeTrace.id),
     0,
   );
+  const flowLabel = locale === "ko" ? "근거 흐름" : "Evidence flow";
+  const groundedLabel = locale === "ko" ? "근거 기반" : "Evidence-backed";
+  const traceSelectorLabel =
+    locale === "ko" ? "근거 흐름 선택" : "Select evidence flow";
 
   return (
     <div className="home-trace-card relative mt-5 overflow-hidden rounded-[8px] border border-hairline bg-surface p-4 text-ink">
       <span className="home-trace-scan" aria-hidden="true" />
       <div className="mb-4 flex items-center justify-between">
         <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
-          근거 흐름
+          {flowLabel}
         </p>
         <p className="text-[12px] font-semibold text-primary">
-          근거 기반
+          {groundedLabel}
         </p>
       </div>
       <div
         className="relative grid grid-cols-[minmax(56px,1fr)_24px_minmax(56px,1fr)_24px_minmax(88px,1.25fr)] items-center gap-1.5 sm:grid-cols-[1fr_32px_1fr_32px_1fr] sm:gap-2"
-        aria-label="근거 흐름 선택"
+        aria-label={traceSelectorLabel}
         role="group"
       >
         {nodes.map((node, index) => (

@@ -38,6 +38,11 @@ import {
 } from "@/lib/research-mode";
 import { normalizeAnalysisMode, type AnalysisMode } from "@/lib/analysis-mode";
 import {
+  defaultRunKindForAnalysisMode,
+  normalizeRunKind,
+  type RunKind,
+} from "@/lib/run-kind";
+import {
   createAccumulator,
   createSSEWriter,
   addToken,
@@ -88,6 +93,8 @@ export interface AgentRunOptions {
   defaultDocumentTypes: string[];
   researchMode?: ResearchMode;
   analysisMode?: AnalysisMode;
+  runKind?: RunKind;
+  selectedNewsEventContext?: Record<string, unknown> | null;
   history?: Array<{ role: string; content: string }>;
   abortSignal?: AbortSignal;
   onSdkDiagnostics?: (diagnostics: SdkDiagnostics) => Promise<void>;
@@ -143,6 +150,7 @@ export interface SdkDiagnostics {
   disallowedTools?: string[];
   researchMode?: ResearchMode;
   analysisMode?: AnalysisMode;
+  runKind?: RunKind;
   toolBudget?: ResearchModeToolBudget;
   plugins?: unknown;
   mcpServers?: unknown;
@@ -164,6 +172,9 @@ export async function runAgent(
   const abortController = new AbortController();
   const researchMode = normalizeResearchMode(options.researchMode);
   const analysisMode = normalizeAnalysisMode(options.analysisMode);
+  const runKind = normalizeRunKind(
+    options.runKind ?? defaultRunKindForAnalysisMode(analysisMode),
+  );
   const stockNewsEnabledForRun =
     analysisMode === "news" && isStockNewsZaiEnabled();
   const toolBudget = getResearchModeToolBudget(researchMode);
@@ -196,12 +207,14 @@ export async function runAgent(
     },
   );
   const researchPrompt = [
-    buildResearchPassPrompt(options.userMessage, analysisMode),
+    buildResearchPassPrompt(options.userMessage, analysisMode, runKind),
     buildResearchModePrompt(researchMode),
+    buildSelectedNewsEventContextPrompt(runKind, options.selectedNewsEventContext),
   ].join("\n\n");
   const allowedTools = allowedSdkToolsForResearchMode(
     researchMode,
     analysisMode,
+    runKind,
   );
 
   const requestedModel = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
@@ -255,6 +268,7 @@ export async function runAgent(
       suppressTextDeltas: false,
       researchMode,
       analysisMode,
+      runKind,
       toolBudget,
     });
 
@@ -305,6 +319,7 @@ async function runSdkPass(params: {
   suppressTextDeltas: boolean;
   researchMode: ResearchMode;
   analysisMode: AnalysisMode;
+  runKind: RunKind;
   toolBudget: ResearchModeToolBudget;
 }): Promise<AgentRunResult> {
   const {
@@ -320,6 +335,7 @@ async function runSdkPass(params: {
     suppressTextDeltas,
     researchMode,
     analysisMode,
+    runKind,
     toolBudget,
   } = params;
   const acc = createAccumulator();
@@ -340,6 +356,7 @@ async function runSdkPass(params: {
       acc,
       researchMode,
       analysisMode,
+      runKind,
       maxToolCalls,
       maxStockNewsCalls,
     );
@@ -364,6 +381,7 @@ async function runSdkPass(params: {
       },
       researchMode,
       analysisMode,
+      runKind,
       toolBudget,
     });
 
@@ -465,6 +483,7 @@ async function reportSdkInitialization(params: {
   sdkOptions: Options;
   researchMode: ResearchMode;
   analysisMode: AnalysisMode;
+  runKind: RunKind;
   toolBudget: ResearchModeToolBudget;
 }) {
   const {
@@ -478,6 +497,7 @@ async function reportSdkInitialization(params: {
     sdkOptions,
     researchMode,
     analysisMode,
+    runKind,
     toolBudget,
   } = params;
 
@@ -499,6 +519,7 @@ async function reportSdkInitialization(params: {
     disallowedTools: sdkOptions.disallowedTools,
     researchMode,
     analysisMode,
+    runKind,
     toolBudget,
     plugins: sdkOptions.plugins,
     mcpServers: sdkOptions.mcpServers,
@@ -562,16 +583,24 @@ export async function canUseTool(
 function allowedSdkToolsForResearchMode(
   mode: ResearchMode,
   analysisMode: AnalysisMode,
+  runKind: RunKind,
 ): string[] {
   const allowedMcpTools = new Set(getAllowedMcpToolsForResearchMode(mode));
   const allowedOntologyTools = KRW_ONTOLOGY_SDK_ALLOWED_TOOLS.filter((toolName) => {
     const mcpToolName = normalizeKrwOntologyToolName(toolName);
     return Boolean(mcpToolName && allowedMcpTools.has(mcpToolName));
   });
+  const allowedStockNewsTools = getStockNewsZaiSdkAllowedTools().filter((toolName) => {
+    const stockNewsToolName = normalizeStockNewsZaiToolName(toolName);
+    return Boolean(
+      stockNewsToolName &&
+        isStockNewsToolAllowedForRunKind(stockNewsToolName, runKind),
+    );
+  });
 
   return [
-    ...allowedOntologyTools,
-    ...(analysisMode === "news" ? getStockNewsZaiSdkAllowedTools() : []),
+    ...(runKind === "news_discovery" ? [] : allowedOntologyTools),
+    ...(analysisMode === "news" ? allowedStockNewsTools : []),
   ];
 }
 
@@ -579,6 +608,7 @@ function createToolPermissionGuard(
   acc: AccumulatedRun,
   mode: ResearchMode,
   analysisMode: AnalysisMode,
+  runKind: RunKind,
   maxToolCalls: number,
   maxStockNewsCalls: number,
 ) {
@@ -610,6 +640,13 @@ function createToolPermissionGuard(
         };
       }
 
+      if (!isStockNewsToolAllowedForRunKind(stockNewsToolName, runKind)) {
+        return {
+          behavior: "deny",
+          message: stockNewsDenyMessageForRunKind(runKind),
+        };
+      }
+
       const nextStockNewsCalls =
         countStockNewsToolCalls(acc.toolCalls) + 1;
       if (nextStockNewsCalls > maxStockNewsCalls) {
@@ -627,6 +664,14 @@ function createToolPermissionGuard(
       return {
         behavior: "deny",
         message: "Unknown KRW Ontology MCP tool.",
+      };
+    }
+
+    if (runKind === "news_discovery") {
+      return {
+        behavior: "deny",
+        message:
+          "News discovery only creates event cards. Do not call KRW Ontology tools in this run.",
       };
     }
 
@@ -669,6 +714,50 @@ function allowWithInputPolicy(
     };
   }
   return { behavior: "allow" };
+}
+
+const NEWS_DISCOVERY_TOOLS = new Set<StockNewsMCPToolName>([
+  "route_news_question",
+  "resolve_news_entities",
+  "search_company_news_events",
+  "search_market_news_events",
+  "build_news_timeline",
+  "audit_news_sources",
+]);
+
+const NEWS_RESEARCH_TOOLS = new Set<StockNewsMCPToolName>([
+  "read_news_sources",
+  "search_news_by_domain",
+  "audit_news_sources",
+]);
+
+function isStockNewsToolAllowedForRunKind(
+  toolName: StockNewsMCPToolName,
+  runKind: RunKind,
+): boolean {
+  if (runKind === "news_discovery") return NEWS_DISCOVERY_TOOLS.has(toolName);
+  if (runKind === "news_research") return NEWS_RESEARCH_TOOLS.has(toolName);
+  return false;
+}
+
+function stockNewsDenyMessageForRunKind(runKind: RunKind): string {
+  if (runKind === "news_discovery") {
+    return "News discovery only finds event candidates. Do not read full sources or perform final research in this run.";
+  }
+  if (runKind === "news_research") {
+    return "News research already has a selected event. Verify selected sources instead of broad event discovery.";
+  }
+  return "News tools are only available in news mode.";
+}
+
+function buildSelectedNewsEventContextPrompt(
+  runKind: RunKind,
+  selectedNewsEventContext: Record<string, unknown> | null | undefined,
+): string {
+  if (runKind !== "news_research" || !selectedNewsEventContext) return "";
+  return `<selected_news_event_context>
+${JSON.stringify(selectedNewsEventContext)}
+</selected_news_event_context>`;
 }
 
 interface PreparedToolInput {

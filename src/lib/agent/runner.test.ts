@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   AnalysisMode,
   MCPToolName,
+  RunKind,
   StockNewsMCPToolName,
 } from "@/types/api-contracts";
 
@@ -176,6 +177,7 @@ async function probeToolPermission(params: {
   input?: Record<string, unknown>;
   researchMode?: ResearchMode;
   analysisMode?: AnalysisMode;
+  runKind?: RunKind;
 }): Promise<{
   permission: Awaited<ReturnType<typeof canUseTool>>;
   result: Awaited<ReturnType<typeof runAgent>>;
@@ -221,6 +223,7 @@ async function probeToolPermission(params: {
       defaultDocumentTypes: [],
       researchMode: params.researchMode ?? "deep",
       analysisMode: params.analysisMode ?? "company",
+      runKind: params.runKind,
     },
     {
       write: vi.fn().mockResolvedValue(undefined),
@@ -387,7 +390,7 @@ describe("agent runner research budget recovery", () => {
     );
   });
 
-  it("adds Stock News Z.ai MCP tools to SDK allowedTools in news mode", async () => {
+  it("uses discovery-only Stock News tools for the first news pass", async () => {
     sdkMocks.query.mockReturnValueOnce(
       makeSdkQuery([
         {
@@ -422,8 +425,14 @@ describe("agent runner research budget recovery", () => {
     expect(call.options.allowedTools).toEqual(
       expect.arrayContaining([
         stockNewsSdkToolName("search_company_news_events"),
-        stockNewsSdkToolName("read_news_sources"),
+        stockNewsSdkToolName("build_news_timeline"),
       ]),
+    );
+    expect(call.options.allowedTools).not.toContain(
+      stockNewsSdkToolName("read_news_sources"),
+    );
+    expect(call.options.allowedTools).not.toContain(
+      sdkToolName("krw_ontology_query_context"),
     );
     expect(call.options.disallowedTools).toEqual(
       expect.arrayContaining(["WebFetch", "WebSearch"]),
@@ -432,12 +441,62 @@ describe("agent runner research budget recovery", () => {
     expect(call.options.systemPrompt.append).toContain(
       "current news/event discovery",
     );
-    expect(call.options.systemPrompt.append).toContain(
-      "source provenance internally",
-    );
+    expect(call.prompt).toContain("웹앱 뉴스 discovery 실행");
+    expect(call.prompt).toContain("read_news_sources와 KRW Ontology 도구는 호출하지 않습니다");
     expect(call.prompt).toContain(
       "/krw-ontology:krw-ontology-news-research",
     );
+  });
+
+  it("uses selected-source news tools and ontology tools for the news research pass", async () => {
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        {
+          type: "result",
+          subtype: "success",
+          result: "선택된 뉴스와 공시 baseline을 연결했습니다.",
+          usage: {
+            input_tokens: 10,
+            output_tokens: 12,
+          },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "선택한 이벤트를 공시 기준으로 분석해줘",
+        scopeType: "company",
+        defaultTickers: ["AVGO"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        analysisMode: "news",
+        runKind: "news_research",
+        selectedNewsEventContext: {
+          id: "event-1",
+          event_title: "Broadcom AI networking order update",
+          source_previews: [{ title: "source", url: "https://example.test" }],
+        },
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
+    expect(result.status).toBe("completed");
+    const call = sdkMocks.query.mock.calls[0]?.[0];
+    expect(call.options.allowedTools).toEqual(
+      expect.arrayContaining([
+        stockNewsSdkToolName("read_news_sources"),
+        sdkToolName("krw_ontology_query_context"),
+      ]),
+    );
+    expect(call.options.allowedTools).not.toContain(
+      stockNewsSdkToolName("search_company_news_events"),
+    );
+    expect(call.prompt).toContain("웹앱 뉴스 research 실행");
+    expect(call.prompt).toContain("<selected_news_event_context>");
   });
 
   it("passes Stock News Z.ai MCP inputs unchanged before execution", async () => {
@@ -457,6 +516,7 @@ describe("agent runner research budget recovery", () => {
       existingTools: ["search_company_news_events", "read_news_sources"],
       attemptedTool: "audit_news_sources",
       analysisMode: "news",
+      runKind: "news_research",
     });
 
     expect(result.status).toBe("completed");

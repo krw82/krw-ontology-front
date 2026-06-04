@@ -140,6 +140,12 @@ function createSupabase(overrides: {
                   error: overrides.runsError ?? null,
                 });
               }
+              if (table === "chat_message_artifacts") {
+                return Promise.resolve({
+                  data: [],
+                  error: null,
+                });
+              }
               throw new Error(`Unexpected table: ${table}`);
             },
           };
@@ -208,7 +214,12 @@ describe("GET /api/chat/[sessionId]", () => {
       "chat_sessions",
       "messages",
       "agent_runs",
+      "chat_message_artifacts",
     ]);
+    expect(body).toMatchObject({
+      chat_artifacts: [],
+      artifact_selections: [],
+    });
     expect(body).not.toHaveProperty("tool_calls");
     expect(body).not.toHaveProperty("citations");
   });

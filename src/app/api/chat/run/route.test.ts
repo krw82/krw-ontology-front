@@ -179,6 +179,7 @@ describe("POST /api/chat/run worker admission", () => {
           session_id: "11111111-1111-4111-8111-111111111111",
           research_mode: "fast",
           analysis_mode: "news",
+          run_kind: "news_discovery",
         },
       },
     });
@@ -304,6 +305,7 @@ describe("POST /api/chat/run worker admission", () => {
         mcpHealth: readyMcpHealth,
         researchMode: "fast",
         analysisMode: "news",
+        runKind: "news_discovery",
       }),
     );
     expect(getReadyAgentWorker).toHaveBeenCalledWith(

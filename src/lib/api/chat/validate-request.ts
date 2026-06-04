@@ -11,6 +11,7 @@ import {
 } from "@/lib/api/validation";
 import { normalizeResearchMode } from "@/lib/research-mode";
 import { normalizeAnalysisMode } from "@/lib/analysis-mode";
+import { defaultRunKindForAnalysisMode, normalizeRunKind } from "@/lib/run-kind";
 
 interface ValidatedRequest {
   body: ChatRunRequest;
@@ -59,6 +60,7 @@ export async function validateRequest(
     request_id,
     research_mode,
     analysis_mode,
+    run_kind,
     session_id,
     scope_type,
     default_tickers,
@@ -80,6 +82,10 @@ export async function validateRequest(
   const normalizedRequestId = request_id.trim();
   const normalizedResearchMode = normalizeResearchMode(research_mode);
   const normalizedAnalysisMode = normalizeAnalysisMode(analysis_mode);
+  const normalizedRunKind =
+    run_kind === undefined
+      ? defaultRunKindForAnalysisMode(normalizedAnalysisMode)
+      : normalizeRunKind(run_kind);
   if (content.trim().length === 0 || !normalizedRequestId) {
     return {
       ok: false,
@@ -188,6 +194,7 @@ export async function validateRequest(
     request_id: normalizedRequestId,
     research_mode: normalizedResearchMode,
     analysis_mode: normalizedAnalysisMode,
+    run_kind: normalizedRunKind,
     ...(session_id ? { session_id } : {}),
     ...(scope_type ? { scope_type } : {}),
     ...(default_tickers ? { default_tickers: normalizedDefaultTickers } : {}),

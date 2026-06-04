@@ -230,6 +230,7 @@ function ChatContent() {
     onSessionCreated: handleSessionCreated,
   });
   const sendMessage = chat.sendMessage;
+  const sendNewsEventSelection = chat.sendNewsEventSelection;
   const cancelRun = chat.cancelRun;
   const isStreaming = chat.status === "running";
 
@@ -734,6 +735,13 @@ function ChatContent() {
     await cancelRun();
   }, [cancelRun]);
 
+  const handleNewsEventSelection = useCallback(
+    async (params: { artifactId: string; eventId: string }) => {
+      await sendNewsEventSelection(params);
+    },
+    [sendNewsEventSelection],
+  );
+
   // Escape key to cancel streaming
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -877,6 +885,14 @@ function ChatContent() {
                       citations={
                         isLatestAssistantMessage ? chat.citations : undefined
                       }
+                      artifacts={
+                        msg.role === "assistant"
+                          ? chat.artifactsByMessageId[msg.id]
+                          : undefined
+                      }
+                      artifactSelections={chat.artifactSelections}
+                      onSelectNewsEvent={handleNewsEventSelection}
+                      newsEventSelectionDisabled={isStreaming || isBudgetBlocked}
                       showHeader={idx === 0 || arr[idx - 1]?.role !== "assistant"}
                       toolCalls={
                         isLatestAssistantMessage ? chat.toolCalls : undefined

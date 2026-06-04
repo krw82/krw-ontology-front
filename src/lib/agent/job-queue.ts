@@ -16,6 +16,11 @@ import {
   normalizeAnalysisMode,
   type AnalysisMode,
 } from "@/lib/analysis-mode";
+import {
+  defaultRunKindForAnalysisMode,
+  normalizeRunKind,
+  type RunKind,
+} from "@/lib/run-kind";
 
 const GLOBAL_CONCURRENT_LIMIT = readIntEnv("GLOBAL_CONCURRENT_RUN_LIMIT", 5, {
   min: 1,
@@ -44,6 +49,10 @@ export async function enqueueAgentRun(params: {
   mcpHealth: McpHealthResult;
   researchMode?: ResearchMode;
   analysisMode?: AnalysisMode;
+  runKind?: RunKind;
+  selectedNewsEventContext?: Record<string, unknown> | null;
+  sourceArtifactId?: string | null;
+  sourceEventId?: string | null;
 }): Promise<EnqueueAgentRunResult> {
   const { session, history, requestId, model, mcpHealth } = params;
   const ontologyEnv = getOntologyEnv();
@@ -52,6 +61,9 @@ export async function enqueueAgentRun(params: {
   );
   const analysisMode = normalizeAnalysisMode(
     params.analysisMode ?? DEFAULT_ANALYSIS_MODE,
+  );
+  const runKind = normalizeRunKind(
+    params.runKind ?? defaultRunKindForAnalysisMode(analysisMode),
   );
   const admin = getSupabaseAdmin();
 
@@ -104,6 +116,11 @@ export async function enqueueAgentRun(params: {
       manifest_valid: mcpHealth.manifestValid,
       agent_index_schema_version: mcpHealth.agentIndexSchemaVersion,
       ontology_manifest: releaseSnapshot(mcpHealth),
+      run_kind: runKind,
+      selected_news_event_context:
+        params.selectedNewsEventContext ?? null,
+      source_artifact_id: params.sourceArtifactId ?? null,
+      source_event_id: params.sourceEventId ?? null,
     })
     .select("id")
     .single<Pick<AgentRunRow, "id">>();
@@ -134,6 +151,7 @@ export async function enqueueAgentRun(params: {
     started_at: queuedAt,
     research_mode: researchMode,
     analysis_mode: analysisMode,
+    run_kind: runKind,
   });
   await appendAgentRunEvent(admin, run.id, "activity_update", {
     stage: "queued",

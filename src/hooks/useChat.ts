@@ -18,6 +18,9 @@ import type {
   ResearchActivityUpdate,
   MCPToolName,
   ToolCall,
+  ChatArtifact,
+  ChatArtifactSelection,
+  AtomicNewsEventCard,
 } from "@/types/api-contracts";
 import { getChatContentLimit } from "@/lib/chat-limits";
 import { deriveLoadedChatState } from "@/lib/chat/history-state";
@@ -47,6 +50,13 @@ interface SendMessageOptions {
   requestId?: string;
 }
 
+interface SendNewsEventSelectionOptions {
+  artifactId: string;
+  eventId: string;
+  sessionId?: string;
+  requestId?: string;
+}
+
 export type SendMessageResult =
   | { ok: true }
   | { ok: false; message: string };
@@ -72,6 +82,8 @@ export interface ChatState {
   activity: ResearchActivityUpdate | null;
   toolCalls: ToolCallState[];
   citations: ChatCitation[];
+  artifactsByMessageId: Record<string, ChatArtifact[]>;
+  artifactSelections: ChatArtifactSelection[];
   runDurationsByMessageId: Record<string, number>;
   runId: string | null;
   runStartedAt: string | null;
@@ -96,6 +108,8 @@ function createInitialChatState(): ChatState {
     activity: null,
     toolCalls: [],
     citations: [],
+    artifactsByMessageId: {},
+    artifactSelections: [],
     runDurationsByMessageId: {},
     runId: null,
     runStartedAt: null,
@@ -140,6 +154,56 @@ function latestCompletedAssistantMessageId(messages: Message[]) {
     .reverse()
     .find((message) => message.role === "assistant" && message.status === "completed")
     ?.id;
+}
+
+function groupArtifactsByMessageId(
+  artifacts: ChatArtifact[] | undefined,
+): Record<string, ChatArtifact[]> {
+  const grouped: Record<string, ChatArtifact[]> = {};
+  for (const artifact of artifacts ?? []) {
+    grouped[artifact.message_id] = [
+      ...(grouped[artifact.message_id] ?? []),
+      artifact,
+    ];
+  }
+  return grouped;
+}
+
+function addArtifactToState(
+  artifactsByMessageId: Record<string, ChatArtifact[]>,
+  artifact: ChatArtifact,
+) {
+  const current = artifactsByMessageId[artifact.message_id] ?? [];
+  if (current.some((item) => item.id === artifact.id)) return artifactsByMessageId;
+  return {
+    ...artifactsByMessageId,
+    [artifact.message_id]: [...current, artifact],
+  };
+}
+
+function findNewsEventSelection(
+  artifactsByMessageId: Record<string, ChatArtifact[]>,
+  artifactId: string,
+  eventId: string,
+): { artifact: ChatArtifact; event: AtomicNewsEventCard } | null {
+  const artifact = Object.values(artifactsByMessageId)
+    .flat()
+    .find((item) => item.id === artifactId);
+  if (!artifact) return null;
+
+  const payload = artifact.payload_json;
+  if (
+    !isPlainObject(payload) ||
+    payload.kind !== "news_event_selection" ||
+    !Array.isArray(payload.events)
+  ) {
+    return null;
+  }
+
+  const event = (payload.events as AtomicNewsEventCard[]).find(
+    (item) => item.id === eventId,
+  );
+  return event ? { artifact, event } : null;
 }
 
 function activityForTool(toolName: MCPToolName): ResearchActivityUpdate {
@@ -368,11 +432,20 @@ export function useChat({
         }));
         break;
       }
+      case "artifact": {
+        const d = data as ChatArtifact;
+        setState((prev) => ({
+          ...prev,
+          artifactsByMessageId: addArtifactToState(prev.artifactsByMessageId, d),
+        }));
+        break;
+      }
       case "done": {
         const d = data as {
           run_id: string;
           message_id: string;
           content?: string;
+          chat_artifacts?: ChatArtifact[];
           release: ReleaseMetadata;
           usage: {
             input_tokens: number;
@@ -432,6 +505,10 @@ export function useChat({
             release: d.release,
             usage: d.usage,
             executionBudget: d.execution_budget,
+            artifactsByMessageId: (d.chat_artifacts ?? []).reduce(
+              addArtifactToState,
+              prev.artifactsByMessageId,
+            ),
             status: "completed",
             isHydratingSession: false,
           };
@@ -589,6 +666,8 @@ export function useChat({
         runStartedAt: loaded.activeRunStartedAt,
         toolCalls: [],
         citations: [],
+        artifactsByMessageId: groupArtifactsByMessageId(data.chat_artifacts),
+        artifactSelections: data.artifact_selections ?? [],
         runDurationsByMessageId: Object.fromEntries(
           (data.runs ?? [])
             .filter(
@@ -826,6 +905,136 @@ export function useChat({
     [readStream],
   );
 
+  const processRunResponse = useCallback(
+    async (
+      response: Response,
+      context: {
+        targetSessionId?: string | null;
+        requestId: string;
+        generation: number;
+        abortController: AbortController;
+      },
+    ) => {
+      const { targetSessionId, requestId, generation, abortController } =
+        context;
+
+      try {
+        const responseSessionId = response.headers.get("x-chat-session-id");
+        if (!targetSessionId && responseSessionId) {
+          if (
+            abortController.signal.aborted ||
+            streamGenerationRef.current !== generation ||
+            activeRequestIdRef.current !== requestId
+          ) {
+            return;
+          }
+          activeSessionIdRef.current = responseSessionId;
+          onSessionCreated?.(responseSessionId);
+          setState((prev) => ({
+            ...prev,
+            messages: prev.messages.map((message) => ({
+              ...message,
+              session_id:
+                message.session_id === "pending"
+                  ? responseSessionId
+                  : message.session_id,
+            })),
+          }));
+        }
+
+        const wasFinalized = await readStream(response, {
+          sessionId: responseSessionId || targetSessionId || null,
+          requestId,
+          generation,
+        });
+
+        // If the transport ends early, keep reconnecting until the server sends
+        // an explicit terminal event. A closed SSE connection is not completion.
+        if (!wasFinalized && !abortController.signal.aborted) {
+          const runId = activeRunIdRef.current;
+          const reconnectSessionId =
+            activeSessionIdRef.current || targetSessionId;
+
+          if (runId && reconnectSessionId) {
+            setState((prev) => {
+              if (prev.status !== "running") return prev;
+              return {
+                ...prev,
+                activity: {
+                  stage: "preparing",
+                  label: "분석 상태 복원 중",
+                },
+              };
+            });
+            await reconnectUntilFinalized(
+              reconnectSessionId,
+              runId,
+              abortController.signal,
+              generation,
+            );
+          } else if (!finalizedRef.current) {
+            throw new Error("실행 정보를 확인하지 못했습니다. 다시 시도해주세요.");
+          }
+        }
+      } catch (err) {
+        if ((err as Error).name === "AbortError") {
+          setState((prev) => ({
+            ...prev,
+            status: "cancelled",
+            isHydratingSession: false,
+            activity: null,
+            runStartedAt: null,
+          }));
+        } else {
+          const runId = activeRunIdRef.current;
+          const reconnectSessionId =
+            activeSessionIdRef.current || targetSessionId;
+
+          if (
+            runId &&
+            reconnectSessionId &&
+            streamGenerationRef.current === generation
+          ) {
+            setState((prev) => ({
+              ...prev,
+              activity: {
+                stage: "preparing",
+                label: "분석 상태 복원 중",
+              },
+            }));
+
+            const recovered = await reconnectUntilFinalized(
+              reconnectSessionId,
+              runId,
+              abortController.signal,
+              generation,
+            );
+            if (recovered) return;
+
+            const synced = await syncSessionFromServer(reconnectSessionId);
+            if (synced) return;
+          }
+
+          setState((prev) => ({
+            ...prev,
+            status: "failed",
+            isHydratingSession: false,
+            error: (err as Error).message,
+            activity: null,
+            runStartedAt: null,
+          }));
+        }
+      } finally {
+        abortRef.current = null;
+        if (activeRequestIdRef.current === requestId) {
+          activeRequestIdRef.current = null;
+        }
+        sendInFlightRef.current = false;
+      }
+    },
+    [onSessionCreated, readStream, reconnectUntilFinalized, syncSessionFromServer],
+  );
+
   const sendMessage = useCallback(
     async (
       content: string,
@@ -904,120 +1113,6 @@ export function useChat({
       const abortController = new AbortController();
       abortRef.current = abortController;
 
-      const processRun = async (response: Response) => {
-        try {
-          const responseSessionId = response.headers.get("x-chat-session-id");
-          if (!targetSessionId && responseSessionId) {
-            if (
-              abortController.signal.aborted ||
-              streamGenerationRef.current !== generation ||
-              activeRequestIdRef.current !== requestId
-            ) {
-              return;
-            }
-            activeSessionIdRef.current = responseSessionId;
-            onSessionCreated?.(responseSessionId);
-            setState((prev) => ({
-              ...prev,
-              messages: prev.messages.map((message) => ({
-                ...message,
-                session_id:
-                  message.session_id === "pending"
-                    ? responseSessionId
-                    : message.session_id,
-              })),
-            }));
-          }
-
-          const wasFinalized = await readStream(response, {
-            sessionId: responseSessionId || targetSessionId || null,
-            requestId,
-            generation,
-          });
-
-          // If the transport ends early, keep reconnecting until the server sends
-          // an explicit terminal event. A closed SSE connection is not completion.
-          if (!wasFinalized && !abortController.signal.aborted) {
-            const runId = activeRunIdRef.current;
-            const reconnectSessionId = activeSessionIdRef.current || targetSessionId;
-
-            if (runId && reconnectSessionId) {
-              setState((prev) => {
-                if (prev.status !== "running") return prev;
-                return {
-                  ...prev,
-                  activity: {
-                    stage: "preparing",
-                    label: "분석 상태 복원 중",
-                  },
-                };
-              });
-              await reconnectUntilFinalized(
-                reconnectSessionId,
-                runId,
-                abortController.signal,
-                generation,
-              );
-            } else if (!finalizedRef.current) {
-              throw new Error("실행 정보를 확인하지 못했습니다. 다시 시도해주세요.");
-            }
-          }
-        } catch (err) {
-          if ((err as Error).name === "AbortError") {
-            setState((prev) => ({
-              ...prev,
-              status: "cancelled",
-              isHydratingSession: false,
-              activity: null,
-              runStartedAt: null,
-            }));
-          } else {
-            const runId = activeRunIdRef.current;
-            const reconnectSessionId = activeSessionIdRef.current || targetSessionId;
-
-            if (
-              runId &&
-              reconnectSessionId &&
-              streamGenerationRef.current === generation
-            ) {
-              setState((prev) => ({
-                ...prev,
-                activity: {
-                  stage: "preparing",
-                  label: "분석 상태 복원 중",
-                },
-              }));
-
-              const recovered = await reconnectUntilFinalized(
-                reconnectSessionId,
-                runId,
-                abortController.signal,
-                generation,
-              );
-              if (recovered) return;
-
-              const synced = await syncSessionFromServer(reconnectSessionId);
-              if (synced) return;
-            }
-
-            setState((prev) => ({
-              ...prev,
-              status: "failed",
-              isHydratingSession: false,
-              error: (err as Error).message,
-              activity: null,
-              runStartedAt: null,
-            }));
-          }
-        } finally {
-          abortRef.current = null;
-          if (activeRequestIdRef.current === requestId) {
-            activeRequestIdRef.current = null;
-          }
-          sendInFlightRef.current = false;
-        }
-      };
-
       let response: Response;
       try {
         response = await fetch("/api/chat/run", {
@@ -1095,21 +1190,223 @@ export function useChat({
         return { ok: false, message };
       }
 
-      void processRun(response);
+      void processRunResponse(response, {
+        targetSessionId,
+        requestId,
+        generation,
+        abortController,
+      });
       return { ok: true };
     },
     [
       defaultDocumentTypes,
       defaultTickers,
-      onSessionCreated,
-      reconnectUntilFinalized,
-      readStream,
       analysisMode,
+      processRunResponse,
       researchMode,
       scopeType,
       sessionId,
-      syncSessionFromServer,
     ],
+  );
+
+  const sendNewsEventSelection = useCallback(
+    async (
+      options: SendNewsEventSelectionOptions,
+    ): Promise<SendMessageResult> => {
+      if (statusRef.current === "running" || sendInFlightRef.current) {
+        return {
+          ok: false,
+          message: "현재 답변 생성 중입니다.",
+        };
+      }
+
+      const targetSessionId =
+        options.sessionId || sessionId || activeSessionIdRef.current;
+      if (!targetSessionId) {
+        return {
+          ok: false,
+          message: "채팅 세션을 확인하지 못했습니다.",
+        };
+      }
+
+      const selected = findNewsEventSelection(
+        state.artifactsByMessageId,
+        options.artifactId,
+        options.eventId,
+      );
+      if (!selected) {
+        return {
+          ok: false,
+          message: "선택한 뉴스 이벤트를 찾지 못했습니다.",
+        };
+      }
+
+      const requestId = options.requestId || createClientId();
+      const createdAt = new Date().toISOString();
+      const optimisticSelectionId = createClientId();
+      const optimisticUserMessageId = createClientId();
+      const userContent = `선택 이벤트: ${selected.event.event_title}\n이 이벤트를 공시 기준으로 분석해줘.`;
+
+      sendInFlightRef.current = true;
+      statusRef.current = "running";
+      activeRequestIdRef.current = requestId;
+      activeSessionIdRef.current = targetSessionId;
+      streamGenerationRef.current += 1;
+      const generation = streamGenerationRef.current;
+
+      finalizedRef.current = false;
+      streamingContentRef.current = "";
+      lastEventIdRef.current = "";
+      activeRunIdRef.current = null;
+      activeAssistantMessageIdRef.current = null;
+      sessionSyncRequestedRef.current = false;
+
+      const userMessage: Message = {
+        id: optimisticUserMessageId,
+        session_id: targetSessionId,
+        role: "user",
+        content: userContent,
+        status: "completed",
+        created_at: createdAt,
+      };
+
+      setState((prev) => ({
+        ...prev,
+        messages: [...prev.messages, userMessage],
+        status: "running",
+        isHydratingSession: false,
+        streamingContent: "",
+        error: null,
+        activity: {
+          stage: "preparing",
+          label: "분석 준비 중",
+        },
+        toolCalls: [],
+        citations: [],
+        artifactSelections: [
+          ...prev.artifactSelections,
+          {
+            id: optimisticSelectionId,
+            artifact_id: selected.artifact.id,
+            event_id: selected.event.id,
+            selected_payload_json: selected.event,
+            user_message_id: optimisticUserMessageId,
+            research_run_id: null,
+            created_at: createdAt,
+          },
+        ],
+        runId: null,
+        runStartedAt: null,
+        usage: null,
+        release: null,
+        executionBudget: null,
+      }));
+
+      const abortController = new AbortController();
+      abortRef.current = abortController;
+
+      let response: Response;
+      try {
+        response = await fetch("/api/chat/news-event-selection", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+          },
+          body: JSON.stringify({
+            session_id: targetSessionId,
+            artifact_id: selected.artifact.id,
+            event_id: selected.event.id,
+            request_id: requestId,
+            research_mode: researchMode,
+          }),
+          signal: abortController.signal,
+        });
+      } catch (err) {
+        sendInFlightRef.current = false;
+        activeRequestIdRef.current = null;
+        abortRef.current = null;
+        if ((err as Error).name === "AbortError") {
+          setState((prev) => ({
+            ...prev,
+            messages: removeOptimisticUserMessage(
+              prev.messages,
+              optimisticUserMessageId,
+            ),
+            artifactSelections: prev.artifactSelections.filter(
+              (selection) => selection.id !== optimisticSelectionId,
+            ),
+            status: "cancelled",
+            isHydratingSession: false,
+            activity: null,
+            runStartedAt: null,
+          }));
+          return {
+            ok: false,
+            message: "응답 생성을 취소했습니다.",
+          };
+        }
+
+        const message =
+          err instanceof Error
+            ? err.message
+            : "뉴스 이벤트 분석을 시작하지 못했습니다. 네트워크 상태를 확인해주세요.";
+        setState((prev) => ({
+          ...prev,
+          messages: removeOptimisticUserMessage(
+            prev.messages,
+            optimisticUserMessageId,
+          ),
+          artifactSelections: prev.artifactSelections.filter(
+            (selection) => selection.id !== optimisticSelectionId,
+          ),
+          status: "failed",
+          isHydratingSession: false,
+          error: message,
+          activity: null,
+          runStartedAt: null,
+        }));
+        return {
+          ok: false,
+          message,
+        };
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const message =
+          errorData?.error?.message || `요청에 실패했습니다: ${response.status}`;
+        sendInFlightRef.current = false;
+        if (activeRequestIdRef.current === requestId) {
+          activeRequestIdRef.current = null;
+        }
+        setState((prev) => ({
+          ...prev,
+          messages: removeOptimisticUserMessage(
+            prev.messages,
+            optimisticUserMessageId,
+          ),
+          artifactSelections: prev.artifactSelections.filter(
+            (selection) => selection.id !== optimisticSelectionId,
+          ),
+          status: "failed",
+          isHydratingSession: false,
+          error: message,
+          activity: null,
+          runStartedAt: null,
+        }));
+        return { ok: false, message };
+      }
+
+      void processRunResponse(response, {
+        targetSessionId,
+        requestId,
+        generation,
+        abortController,
+      });
+      return { ok: true };
+    },
+    [processRunResponse, researchMode, sessionId, state.artifactsByMessageId],
   );
 
   const cancelRun = useCallback(async () => {
@@ -1209,9 +1506,10 @@ export function useChat({
     () => ({
       ...state,
       sendMessage,
+      sendNewsEventSelection,
       cancelRun,
       loadSession,
     }),
-    [state, sendMessage, cancelRun, loadSession]
+    [state, sendMessage, sendNewsEventSelection, cancelRun, loadSession]
   );
 }

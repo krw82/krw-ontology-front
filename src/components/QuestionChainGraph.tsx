@@ -5,19 +5,39 @@ import {
   type QuestionChainNode,
   type QuestionTopicPage,
 } from "@/lib/marketing/site";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 
 interface QuestionChainGraphProps {
   topic: QuestionTopicPage;
   displayTopic?: QuestionTopicPage;
+  locale?: Locale;
 }
 
-function AnswerHint({ value }: { value?: string }) {
+const graphCopy = {
+  ko: {
+    answerHint: "분기 기준",
+    startQuestion: "질문 시작",
+    stages: "단계",
+  },
+  en: {
+    answerHint: "Reference",
+    startQuestion: "Start question",
+    stages: "stages",
+  },
+} satisfies Record<Locale, Record<string, string>>;
+
+function formatQuestionCount(count: number, locale: Locale) {
+  if (locale === "ko") return `${count}개 질문`;
+  return `${count} ${count === 1 ? "question" : "questions"}`;
+}
+
+function AnswerHint({ value, locale }: { value?: string; locale: Locale }) {
   if (!value) return null;
 
   return (
     <div className="mt-3 border-t border-hairline pt-3">
       <p className="font-mono text-[10px] font-black uppercase leading-4 tracking-[0.14em] text-muted">
-        분기 기준
+        {graphCopy[locale].answerHint}
       </p>
       <p className="mt-1 text-[12px] font-semibold leading-5 text-muted">
         {value}
@@ -32,6 +52,7 @@ function QuestionNode({
   topic,
   index,
   isEntry,
+  locale,
   animationDelay = 0,
 }: {
   node: QuestionChainNode;
@@ -39,6 +60,7 @@ function QuestionNode({
   topic: QuestionTopicPage;
   index: number;
   isEntry?: boolean;
+  locale: Locale;
   animationDelay?: number;
 }) {
   const motionStyle = {
@@ -69,12 +91,12 @@ function QuestionNode({
           </span>
           {isEntry && (
             <span className="mt-2 block font-mono text-[10px] font-black uppercase leading-4 tracking-[0.14em] text-muted group-hover:text-primary">
-              질문 시작
+              {graphCopy[locale].startQuestion}
             </span>
           )}
         </span>
       </div>
-      <AnswerHint value={node.answerHint} />
+      <AnswerHint value={node.answerHint} locale={locale} />
     </>
   );
 
@@ -106,6 +128,7 @@ function QuestionNode({
 export default function QuestionChainGraph({
   topic,
   displayTopic = topic,
+  locale = DEFAULT_LOCALE,
 }: QuestionChainGraphProps) {
   const chain = topic.questionChain;
   const displayChain = displayTopic.questionChain;
@@ -137,7 +160,9 @@ export default function QuestionChainGraph({
           </p>
         </div>
         <p className="font-mono text-[12px] font-black leading-5 text-muted">
-          {chain.stages.length} stages · {totalNodeCount} questions
+          {locale === "ko"
+            ? `${chain.stages.length}${graphCopy[locale].stages} · ${formatQuestionCount(totalNodeCount, locale)}`
+            : `${chain.stages.length} ${graphCopy[locale].stages} · ${formatQuestionCount(totalNodeCount, locale)}`}
         </p>
       </div>
 
@@ -165,7 +190,7 @@ export default function QuestionChainGraph({
                   {displayStage.label}
                 </h3>
                 <p className="mt-1 text-[12px] font-semibold leading-5 text-muted">
-                  {stage.nodes.length}개 질문
+                  {formatQuestionCount(stage.nodes.length, locale)}
                 </p>
               </div>
               <div className="space-y-2 border-t border-hairline pt-2">
@@ -180,6 +205,7 @@ export default function QuestionChainGraph({
                       topic={topic}
                       index={absoluteIndex}
                       isEntry={stageIndex === 0 && absoluteIndex === 0}
+                      locale={locale}
                       animationDelay={120 + stageIndex * 90 + index * 35}
                     />
                   );
@@ -221,6 +247,7 @@ export default function QuestionChainGraph({
                     topic={topic}
                     index={absoluteIndex}
                     isEntry={stageIndex === 0 && absoluteIndex === 0}
+                    locale={locale}
                     animationDelay={100 + stageIndex * 80 + index * 35}
                   />
                 );

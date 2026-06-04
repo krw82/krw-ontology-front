@@ -35,6 +35,7 @@ import {
 import { MAX_PROMPT_HISTORY_MESSAGES } from "@/lib/agent/system-prompt";
 import type {
   AgentRunRow,
+  ChatMessageArtifactRow,
   ChatSessionRow,
   Json,
   MessageRow,
@@ -55,6 +56,15 @@ import {
   normalizeAnalysisMode,
   type AnalysisMode,
 } from "@/lib/analysis-mode";
+import {
+  defaultRunKindForAnalysisMode,
+  normalizeRunKind,
+  type RunKind,
+} from "@/lib/run-kind";
+import {
+  buildNewsEventSelectionArtifact,
+  toPublicChatArtifact,
+} from "@/lib/chat-artifacts/news-event-selection";
 
 const HEARTBEAT_INTERVAL_MS = readIntEnv("LEASE_HEARTBEAT_INTERVAL_MS", 60_000, {
   min: 1_000,
@@ -128,6 +138,8 @@ interface AgentJob {
   history: Array<{ role: string; content: string }>;
   researchMode: ResearchMode;
   analysisMode: AnalysisMode;
+  runKind: RunKind;
+  selectedNewsEventContext: Record<string, unknown> | null;
 }
 
 export async function runAgentJob(runId: string, workerId: string) {
@@ -250,6 +262,8 @@ export async function runAgentJob(runId: string, workerId: string) {
           history: job.history,
           researchMode: job.researchMode,
           analysisMode: job.analysisMode,
+          runKind: job.runKind,
+          selectedNewsEventContext: job.selectedNewsEventContext,
           abortSignal: abortController.signal,
           onSdkDiagnostics: recordSdkDiagnostics,
           onTextDelta: async (delta, fullText) => {
@@ -384,9 +398,12 @@ async function loadAgentJob(
 ): Promise<AgentJob | null> {
   const { data: run, error: runError } = await admin
     .from("agent_runs")
-    .select("id, session_id, user_message_id, assistant_message_id, request_id, started_at")
+    .select("id, session_id, user_message_id, assistant_message_id, request_id, started_at, run_kind, selected_news_event_context")
     .eq("id", runId)
-    .maybeSingle<AgentJob["run"]>();
+    .maybeSingle<
+      AgentJob["run"] &
+        Pick<AgentRunRow, "run_kind" | "selected_news_event_context">
+    >();
 
   if (runError) {
     throw new AgentJobLoadError(
@@ -492,6 +509,16 @@ async function loadAgentJob(
     history: [...(previousMessages ?? [])].reverse(),
     researchMode: normalizeResearchMode(startedPayload.research_mode),
     analysisMode: normalizeAnalysisMode(startedPayload.analysis_mode),
+    runKind: normalizeRunKind(
+      startedPayload.run_kind ??
+        run.run_kind ??
+        defaultRunKindForAnalysisMode(
+          normalizeAnalysisMode(startedPayload.analysis_mode),
+        ),
+    ),
+    selectedNewsEventContext: isRecord(run.selected_news_event_context)
+      ? run.selected_news_event_context
+      : null,
   };
 }
 
@@ -757,6 +784,14 @@ async function handleCompletedJob(params: {
   const estimatedCost = estimateCost(acc.inputTokens, acc.outputTokens);
   const finishedAt = new Date().toISOString();
   const latencyMs = Date.now() - new Date(runStartedAt).getTime();
+  const chatArtifacts =
+    job.runKind === "news_discovery"
+      ? await persistNewsDiscoveryArtifacts({
+          admin,
+          job,
+          acc,
+        })
+      : [];
 
   await admin
     .from("messages")
@@ -808,16 +843,21 @@ async function handleCompletedJob(params: {
       tickers: job.session.default_tickers ?? [],
       duration_ms: latencyMs,
       citation_count: acc.citations.length,
-      artifact_count: 0,
-      artifact_created: false,
+      artifact_count: chatArtifacts.length,
+      artifact_created: chatArtifacts.length > 0,
       input_tokens: acc.inputTokens,
       output_tokens: acc.outputTokens,
       tool_call_count: acc.toolCalls.length,
       estimated_cost_usd: estimatedCost,
       research_mode: job.researchMode,
       analysis_mode: job.analysisMode,
+      run_kind: job.runKind,
     },
   });
+
+  for (const artifact of chatArtifacts) {
+    await sendEvent("artifact", artifact);
+  }
 
   await sendEvent("done", {
     run_id: job.run.id,
@@ -825,6 +865,7 @@ async function handleCompletedJob(params: {
     content: visibleAnswer,
     rich_answers: [],
     artifacts: [],
+    chat_artifacts: chatArtifacts,
     release: publicReleaseMetadata(release),
     usage: {
       input_tokens: acc.inputTokens,
@@ -834,6 +875,41 @@ async function handleCompletedJob(params: {
     },
     execution_budget: await loadExecutionBudgetStatus(job.session.user_id),
   });
+}
+
+async function persistNewsDiscoveryArtifacts(params: {
+  admin: SupabaseAdmin;
+  job: AgentJob;
+  acc: AccumulatedRun;
+}) {
+  const { admin, job, acc } = params;
+  const artifact = buildNewsEventSelectionArtifact({
+    acc,
+    originalQuestion: job.userMessage.content,
+  });
+  if (!artifact) return [];
+
+  const { data, error } = await admin
+    .from("chat_message_artifacts")
+    .insert({
+      session_id: job.session.id,
+      message_id: job.assistantMessageId,
+      run_id: job.run.id,
+      type: artifact.type,
+      payload_json: jsonForDb(artifact.payload) ?? {},
+    })
+    .select("id, session_id, message_id, run_id, type, payload_json, created_at")
+    .single<ChatMessageArtifactRow>();
+
+  if (error || !data) {
+    console.warn("[agent-worker] failed to persist chat artifact", {
+      runId: job.run.id,
+      error: error?.message,
+    });
+    return [];
+  }
+
+  return [toPublicChatArtifact(data)];
 }
 
 function mcpHealthReadinessError(mcpHealth: McpHealthResult): string | null {
