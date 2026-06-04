@@ -2,6 +2,7 @@
 
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import process from "node:process";
@@ -119,6 +120,7 @@ let stockNewsMcp = null;
 let shuttingDown = false;
 let workerStartQueued = false;
 let workerRestarting = false;
+let expectedStockNewsCoverageCount = null;
 
 function childEnv() {
   const env = { ...process.env };
@@ -154,6 +156,8 @@ function materializeDevPlugin() {
       process.env.KRW_ONTOLOGY_PLUGIN_PATH,
       "--mcp-url",
       process.env.KRW_ONTOLOGY_MCP_URL,
+      "--stock-news-url",
+      process.env.STOCK_NEWS_ZAI_MCP_URL,
     ],
     {
       env: process.env,
@@ -162,6 +166,52 @@ function materializeDevPlugin() {
   );
   if (result.status !== 0) {
     throw new Error("Failed to materialize dev KRW Ontology plugin");
+  }
+
+  exportDevStockNewsCoverage();
+}
+
+function exportDevStockNewsCoverage() {
+  const coveragePath = join(
+    process.env.KRW_ONTOLOGY_PLUGIN_PATH,
+    "stock-news",
+    "coverage_companies.json",
+  );
+  const result = spawnSync(
+    process.execPath,
+    [
+      "scripts/export-stock-news-coverage.mjs",
+      "--env",
+      process.env.KRW_ONTOLOGY_ENV || "dev",
+      "--out",
+      coveragePath,
+      "--min-companies",
+      "1",
+    ],
+    {
+      env: process.env,
+      stdio: "inherit",
+    },
+  );
+
+  if (result.status !== 0) {
+    console.warn(
+      "[dev:stock-news-mcp] failed to export ontology catalog coverage; using stock-news package fallback coverage",
+    );
+    return;
+  }
+
+  process.env.STOCK_NEWS_COVERAGE_PATH = coveragePath;
+  expectedStockNewsCoverageCount = readCoverageCount(coveragePath);
+}
+
+function readCoverageCount(filePath) {
+  try {
+    if (!existsSync(filePath)) return null;
+    const parsed = JSON.parse(readFileSync(filePath, "utf8"));
+    return Array.isArray(parsed) ? parsed.length : null;
+  } catch {
+    return null;
   }
 }
 
@@ -348,13 +398,28 @@ async function ensureStockNewsMcpServer() {
     if (
       existing?.response.status === 200 &&
       existing.payload?.ok === true &&
-      existing.payload?.name === "stock-news-zai-mcp"
+      existing.payload?.name === "stock-news-zai-mcp" &&
+      stockNewsCoverageMatches(existing.payload)
     ) {
       console.info("[dev:stock-news-mcp] reusing existing server", {
         coverageCount: existing.payload.coverage_count,
         hasZaiApiKey: existing.payload.has_zai_api_key,
       });
       return;
+    }
+    if (
+      existing?.response.status === 200 &&
+      existing.payload?.ok === true &&
+      existing.payload?.name === "stock-news-zai-mcp" &&
+      !stockNewsCoverageMatches(existing.payload)
+    ) {
+      console.info("[dev:stock-news-mcp] replacing existing server with stale coverage", {
+        coverageCount: existing.payload.coverage_count,
+        expectedCoverageCount: expectedStockNewsCoverageCount,
+      });
+      stopManagedStockNewsListener();
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 1000));
+      break;
     }
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 500));
   }
@@ -380,6 +445,35 @@ async function ensureStockNewsMcpServer() {
     },
   );
   await waitForStockNewsMcpHealth();
+}
+
+function stockNewsCoverageMatches(payload) {
+  if (!expectedStockNewsCoverageCount) return true;
+  return payload?.coverage_count === expectedStockNewsCoverageCount;
+}
+
+function stopManagedStockNewsListener() {
+  const port = new URL(process.env.STOCK_NEWS_ZAI_MCP_URL).port || "8776";
+  const result = spawnSync("lsof", ["-nP", `-tiTCP:${port}`, "-sTCP:LISTEN"], {
+    encoding: "utf8",
+  });
+  const pids = result.stdout
+    .split(/\s+/)
+    .map((pid) => pid.trim())
+    .filter(Boolean);
+  for (const pid of pids) {
+    const command = spawnSync("ps", ["-p", pid, "-o", "command="], {
+      encoding: "utf8",
+    }).stdout;
+    if (!command.includes("stock-news-zai-mcp") && !command.includes("dist/server.js")) {
+      throw new Error(`Port ${port} is occupied by an unmanaged process: pid=${pid}`);
+    }
+    try {
+      process.kill(Number(pid), "SIGTERM");
+    } catch {
+      // Process may have exited between lsof and kill.
+    }
+  }
 }
 
 const workerRestartPlugin = {

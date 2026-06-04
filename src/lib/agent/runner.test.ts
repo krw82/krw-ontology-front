@@ -444,7 +444,7 @@ describe("agent runner research budget recovery", () => {
     expect(call.prompt).toContain("웹앱 뉴스 discovery 실행");
     expect(call.prompt).toContain("read_news_sources와 KRW Ontology 도구는 호출하지 않습니다");
     expect(call.prompt).toContain(
-      "/krw-ontology:krw-ontology-news-research",
+      "/krw-ontology:krw-ontology-news-discovery",
     );
   });
 
@@ -496,6 +496,12 @@ describe("agent runner research budget recovery", () => {
       stockNewsSdkToolName("search_company_news_events"),
     );
     expect(call.prompt).toContain("웹앱 뉴스 research 실행");
+    expect(call.prompt).toContain(
+      "/krw-ontology:krw-ontology-research",
+    );
+    expect(call.prompt).not.toContain(
+      "/krw-ontology:krw-ontology-news-research",
+    );
     expect(call.prompt).toContain("<selected_news_event_context>");
   });
 

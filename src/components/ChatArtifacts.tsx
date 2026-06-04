@@ -5,7 +5,6 @@ import type {
   ChatArtifact,
   ChatArtifactSelection,
   NewsEventSelectionArtifactPayload,
-  SourcePreview,
 } from "@/types/api-contracts";
 
 type NewsEventSelectionParams = {
@@ -42,45 +41,23 @@ function compactDate(value?: string | null): string {
   }).format(date);
 }
 
-function asText(value: unknown): string {
-  if (typeof value === "string") return value.trim();
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return "";
-  }
-
-  const record = value as Record<string, unknown>;
-  const keys = [
-    "text",
-    "fact",
-    "summary",
-    "claim",
-    "value",
-    "description",
-    "label",
-  ];
-  for (const key of keys) {
-    const text = asText(record[key]);
-    if (text) return text;
-  }
-
-  const entries = Object.entries(record)
-    .map(([key, item]) => {
-      const text = asText(item);
-      return text ? `${key}: ${text}` : "";
-    })
-    .filter(Boolean);
-  return entries.slice(0, 2).join(" · ");
+function impactBadgeLabel(
+  direction?: AtomicNewsEventCard["price_impact_direction"],
+): string | null {
+  if (direction === "negative") return "약세 요인";
+  if (direction === "positive") return "강세 요인";
+  if (direction === "mixed") return "혼재";
+  if (direction === "unclear") return "확인 필요";
+  return null;
 }
 
-function sourceLabel(source: SourcePreview): string {
-  return (
-    source.publisher ||
-    source.domain ||
-    source.title ||
-    source.url ||
-    "source"
-  );
+function impactBadgeClass(
+  direction?: AtomicNewsEventCard["price_impact_direction"],
+): string {
+  if (direction === "negative") return "border-red-200 bg-red-50 text-red-700";
+  if (direction === "positive") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (direction === "mixed") return "border-amber-200 bg-amber-50 text-amber-700";
+  return "border-hairline bg-surface-dim text-muted";
 }
 
 function selectedEventIdsForArtifact(
@@ -107,10 +84,16 @@ function EventCard({
   disabled?: boolean;
   onSelectNewsEvent?: ChatArtifactsProps["onSelectNewsEvent"];
 }) {
-  const dateText = compactDate(event.event_date || event.source_date);
-  const facts = (event.key_facts ?? []).map(asText).filter(Boolean).slice(0, 3);
-  const sources = (event.source_previews ?? []).slice(0, 2);
-  const axes = (event.investment_axes ?? []).slice(0, 3);
+  const source = event.primary_source ?? event.source_previews?.[0];
+  const dateText = compactDate(
+    source?.published_at || event.event_date || event.source_date,
+  );
+  const eventTitle = event.event_title_ko || event.event_title;
+  const summary = event.summary_ko || event.short_summary;
+  const originalHeadline =
+    event.original_headline || source?.title_original || source?.title;
+  const sourceName = source?.publisher || source?.domain;
+  const impactLabel = event.ui?.badge_ko || impactBadgeLabel(event.price_impact_direction);
 
   return (
     <article className="rounded-[8px] border border-hairline bg-canvas p-base transition-colors hover:border-primary/35 sm:p-lg">
@@ -120,9 +103,19 @@ function EventCard({
             {event.ticker}
           </span>
         ) : null}
-        {event.event_type ? (
+        {sourceName ? (
           <span className="rounded-full border border-hairline px-2 py-1 text-[11px] font-bold leading-none text-muted">
-            {event.event_type}
+            {sourceName}
+          </span>
+        ) : null}
+        {impactLabel ? (
+          <span
+            className={[
+              "rounded-full border px-2 py-1 text-[11px] font-bold leading-none",
+              impactBadgeClass(event.price_impact_direction),
+            ].join(" ")}
+          >
+            {impactLabel}
           </span>
         ) : null}
         {dateText ? (
@@ -133,62 +126,37 @@ function EventCard({
       </div>
 
       <h3 className="mt-sm text-[16px] font-black leading-[1.35] text-ink sm:text-[17px]">
-        {event.event_title}
+        {eventTitle}
       </h3>
 
-      {event.short_summary ? (
-        <p className="mt-xs text-[14px] leading-[1.55] text-body">
-          {event.short_summary}
-        </p>
-      ) : null}
-
-      {facts.length > 0 ? (
-        <ul className="mt-sm space-y-xs text-[13px] leading-[1.5] text-body">
-          {facts.map((fact, index) => (
-            <li key={`${event.id}-fact-${index}`} className="flex gap-xs">
-              <span
-                aria-hidden="true"
-                className="mt-[0.62em] h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
-              />
-              <span>{fact}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {axes.length > 0 ? (
-        <div className="mt-sm flex flex-wrap gap-xs">
-          {axes.map((axis) => (
-            <span
-              key={`${event.id}-${axis}`}
-              className="rounded-full bg-surface-dim px-2 py-1 text-[11px] font-bold leading-none text-body"
-            >
-              {axis}
-            </span>
-          ))}
+      {originalHeadline ? (
+        <div className="mt-base border-t border-hairline pt-sm">
+          <p className="font-mono text-[11px] font-black leading-none tracking-[0.08em] text-primary">
+            원문 기사
+          </p>
+          <div className="mt-xs text-[13px] font-bold leading-[1.45] text-ink">
+            {source?.url ? (
+              <a
+                href={source.url}
+                target="_blank"
+                rel="noreferrer"
+                className="underline decoration-hairline underline-offset-4 hover:text-primary"
+              >
+                {originalHeadline}
+              </a>
+            ) : (
+              <span>{originalHeadline}</span>
+            )}
+          </div>
         </div>
       ) : null}
 
-      {sources.length > 0 ? (
+      {summary ? (
         <div className="mt-base border-t border-hairline pt-sm">
-          <div className="grid gap-xs">
-            {sources.map((source, index) => {
-              const label = sourceLabel(source);
-              const sourceDate = compactDate(source.published_at);
-              return (
-                <div
-                  key={`${event.id}-source-${index}`}
-                  className="min-w-0 text-[12px] leading-[1.45] text-muted"
-                >
-                  <span className="font-bold text-body">{label}</span>
-                  {sourceDate ? <span> · {sourceDate}</span> : null}
-                  {source.title && source.title !== label ? (
-                    <span className="block truncate">{source.title}</span>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
+          <p className="font-mono text-[11px] font-black leading-none tracking-[0.08em] text-primary">
+            내용 요약
+          </p>
+          <p className="mt-xs text-[14px] leading-[1.6] text-body">{summary}</p>
         </div>
       ) : null}
 
@@ -205,7 +173,7 @@ function EventCard({
           disabled={Boolean(disabled || selected)}
           onClick={() => onSelectNewsEvent?.({ artifactId, eventId: event.id })}
         >
-          <span>{selected ? "분석 시작됨" : "공시 기준으로 분석"}</span>
+          <span>{selected ? "분석 시작됨" : "이 뉴스 공시 기준으로 분석"}</span>
           <span
             aria-hidden="true"
             className="material-symbols-outlined text-[16px]"

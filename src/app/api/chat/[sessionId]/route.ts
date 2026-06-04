@@ -107,7 +107,7 @@ export async function GET(
       ? await supabase
           .from("chat_message_artifact_selections")
           .select(
-            "id, artifact_id, event_id, selected_payload_json, user_message_id, research_run_id, created_at",
+            "id, artifact_id, session_id, event_id, user_id, selected_payload_json, user_message_id, research_run_id, status, created_at, updated_at",
           )
           .in("artifact_id", artifactIds)
           .order("created_at", { ascending: true })

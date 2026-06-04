@@ -42,7 +42,26 @@ FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 
 if [ "$DB_CHECK" = "1" ]; then
   echo "Checking Supabase migration drift..."
-  (cd "$FRONT_DIR" && "$SCRIPT_DIR/supabase-cli.sh" db push --dry-run)
+  MIGRATION_DRY_RUN_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/krw-supabase-dry-run.XXXXXX")
+  if (cd "$FRONT_DIR" && "$SCRIPT_DIR/supabase-cli.sh" db push --dry-run) >"$MIGRATION_DRY_RUN_OUTPUT" 2>&1; then
+    cat "$MIGRATION_DRY_RUN_OUTPUT"
+  else
+    cat "$MIGRATION_DRY_RUN_OUTPUT" >&2
+    rm -f "$MIGRATION_DRY_RUN_OUTPUT"
+    exit 1
+  fi
+
+  if grep -q "Would push these migrations" "$MIGRATION_DRY_RUN_OUTPUT"; then
+    if [ "$DRY_RUN" = "1" ]; then
+      echo "Dry run: pending Supabase migrations detected; production code deploy would stop before schema smoke."
+    else
+      echo "Pending Supabase migrations detected. prod:deploy:code does not apply migrations, so the remote schema cannot pass the new code smoke test yet." >&2
+      echo "Run npm run prod:deploy:full to apply migrations and deploy, or apply migrations first with scripts/deploy-all-production.sh --apply-migrations." >&2
+      rm -f "$MIGRATION_DRY_RUN_OUTPUT"
+      exit 1
+    fi
+  fi
+  rm -f "$MIGRATION_DRY_RUN_OUTPUT"
 
   if [ "$DRY_RUN" = "1" ]; then
     echo "Dry run: skipping Supabase schema smoke test."

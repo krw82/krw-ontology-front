@@ -62,6 +62,7 @@ describe("production deploy scripts", () => {
     expect(packageJson).toContain('"mcp:dev:verify": "scripts/verify-mcp-server-dev.sh"');
     expect(packageJson).toContain('"mcp:dev:logs": "scripts/tail-mcp-logs.sh dev"');
     expect(packageJson).toContain('"mcp:dev:launchd:install": "scripts/install-mcp-server-dev-launchd.sh"');
+    expect(packageJson).toContain('"stock-news:coverage:export": "node scripts/export-stock-news-coverage.mjs"');
 
     expect(restartCompose).toContain("restart reverse-proxy web");
     expect(restartCompose).not.toContain("restart reverse-proxy web agent-worker");
@@ -329,9 +330,15 @@ describe("production deploy scripts", () => {
 
     expect(deployPluginWorker).toContain("KRW_ONTOLOGY_PLUGIN_PATH mismatch");
     expect(deployPluginWorker).toContain("materialize-ontology-plugin.mjs");
+    expect(deployPluginWorker).toContain("export-stock-news-coverage.mjs");
+    expect(deployPluginWorker).toContain("stock-news/coverage_companies.json");
     expect(deployPluginWorker).toContain("install-mcp-server-launchd.sh");
+    expect(deployPluginWorker).toContain("install-stock-news-zai-mcp-launchd.sh");
     expect(deployPluginWorker).toContain("deploy-worker-production.sh");
     expect(deployPluginWorker).toContain("does not sync plugin code to the GCP VM");
+    expect(read("scripts/export-stock-news-coverage.mjs")).toContain("ontology_companies");
+    expect(read("scripts/start-stock-news-zai-mcp-production.sh")).toContain("STOCK_NEWS_COVERAGE_PATH");
+    expect(read("scripts/start-stock-news-zai-mcp-dev.sh")).toContain("STOCK_NEWS_COVERAGE_PATH");
 
     expect(verifyHeartbeats).toContain("agent_worker_heartbeats");
     expect(verifyHeartbeats).toContain("EXPECTED_CLAUDE_CODE_VERSION");
@@ -359,7 +366,9 @@ describe("production deploy scripts", () => {
 
     expect(devScript).toContain("configureDevOntologyEnv");
     expect(devScript).toContain("materializeDevPlugin");
+    expect(devScript).toContain("exportDevStockNewsCoverage");
     expect(devScript).toContain("ensureDevMcpServer");
+    expect(devScript).toContain("expectedStockNewsCoverageCount");
     expect(devScript).toContain("http://127.0.0.1:8766/mcp");
     expect(devScript).toContain("ref\", \"plugins\", \"dev\", \"krw-ontology");
     expect(devScript).toContain("homedir()");

@@ -26,6 +26,7 @@ import { getChatContentLimit } from "@/lib/chat-limits";
 import { deriveLoadedChatState } from "@/lib/chat/history-state";
 import { removeOptimisticUserMessage } from "@/lib/chat/optimistic-message";
 import { createClientId } from "@/lib/client-id";
+import { buildNewsEventSelectionUserMessage } from "@/lib/chat-artifacts/news-event-selection";
 import {
   DEFAULT_RESEARCH_MODE,
   type ResearchMode,
@@ -1245,7 +1246,7 @@ export function useChat({
       const createdAt = new Date().toISOString();
       const optimisticSelectionId = createClientId();
       const optimisticUserMessageId = createClientId();
-      const userContent = `선택 이벤트: ${selected.event.event_title}\n이 이벤트를 공시 기준으로 분석해줘.`;
+      const userContent = buildNewsEventSelectionUserMessage(selected.event);
 
       sendInFlightRef.current = true;
       statusRef.current = "running";

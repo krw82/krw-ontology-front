@@ -351,12 +351,15 @@ export interface ChatMessageArtifactRow extends Record<string, unknown> {
 export interface ChatMessageArtifactSelectionRow extends Record<string, unknown> {
   id: string;
   artifact_id: string;
+  session_id: string;
   event_id: string;
   user_id: string;
   selected_payload_json: Json;
   user_message_id: string | null;
   research_run_id: string | null;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
   created_at: string;
+  updated_at: string;
 }
 
 export interface RateLimitCounterRow extends Record<string, unknown> {

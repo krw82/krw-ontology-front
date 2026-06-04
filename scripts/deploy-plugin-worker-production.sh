@@ -68,10 +68,19 @@ node "$SCRIPT_DIR/materialize-ontology-plugin.mjs" \
   --env prod \
   --source "$PLUGIN_SOURCE_PATH" \
   --out "$KRW_ONTOLOGY_PLUGIN_PATH" \
-  --mcp-url "$KRW_ONTOLOGY_MCP_URL" >/dev/null
+  --mcp-url "$KRW_ONTOLOGY_MCP_URL" \
+  --stock-news-url "${STOCK_NEWS_ZAI_MCP_URL:-http://127.0.0.1:8775/mcp}" >/dev/null
+
+STOCK_NEWS_COVERAGE_PATH=${STOCK_NEWS_COVERAGE_PATH:-"$KRW_ONTOLOGY_PLUGIN_PATH/stock-news/coverage_companies.json"}
+node "$SCRIPT_DIR/export-stock-news-coverage.mjs" \
+  --env prod \
+  --env-file "$ENV_PATH" \
+  --out "$STOCK_NEWS_COVERAGE_PATH"
+export STOCK_NEWS_COVERAGE_PATH
 
 require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.mcp.json"
 require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.claude-plugin/plugin.json"
+require_path "$STOCK_NEWS_COVERAGE_PATH"
 
 SKILL_COUNT=$(
   find "$KRW_ONTOLOGY_PLUGIN_PATH/skills" \
@@ -102,6 +111,7 @@ echo "Plugin path: $KRW_ONTOLOGY_PLUGIN_PATH"
 echo "Skill files: $SKILL_COUNT"
 echo "MCP URL: ${KRW_ONTOLOGY_MCP_URL:-unset}"
 echo "Stock News MCP URL: ${STOCK_NEWS_ZAI_MCP_URL:-http://127.0.0.1:8775/mcp}"
+echo "Stock News coverage: $STOCK_NEWS_COVERAGE_PATH"
 
 if [ "$DRY_RUN" = "1" ]; then
   "$SCRIPT_DIR/install-mcp-server-launchd.sh" --env-file "$ENV_PATH" --dry-run

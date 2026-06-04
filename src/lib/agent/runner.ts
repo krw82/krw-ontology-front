@@ -656,6 +656,18 @@ function createToolPermissionGuard(
         };
       }
 
+      const preparedInput = prepareStockNewsToolInputForRun(
+        stockNewsToolName,
+        input,
+        runKind,
+      );
+      if (preparedInput.changed) {
+        return {
+          behavior: "allow",
+          updatedInput: preparedInput.input,
+        };
+      }
+
       return { behavior: "allow" };
     }
 
@@ -755,7 +767,9 @@ function buildSelectedNewsEventContextPrompt(
   selectedNewsEventContext: Record<string, unknown> | null | undefined,
 ): string {
   if (runKind !== "news_research" || !selectedNewsEventContext) return "";
-  return `<selected_news_event_context>
+  return `Use this selected market-news context as the input brief for KRW Ontology filing research. Treat it as market narrative, not confirmed company fact. Start KRW ontology retrieval from ontology_bridge_brief_en when present.
+
+<selected_news_event_context>
 ${JSON.stringify(selectedNewsEventContext)}
 </selected_news_event_context>`;
 }
@@ -780,6 +794,63 @@ function prepareToolInputForRun(
     input: policy.input,
     changed: inputWithContext.changed || policy.changed,
   };
+}
+
+function prepareStockNewsToolInputForRun(
+  toolName: StockNewsMCPToolName,
+  input: Record<string, unknown>,
+  runKind: RunKind,
+): PreparedToolInput {
+  if (
+    runKind !== "news_discovery" ||
+    (toolName !== "search_company_news_events" &&
+      toolName !== "search_market_news_events")
+  ) {
+    return { input, changed: false };
+  }
+
+  const next = { ...input };
+  let changed = false;
+  if (next.mode !== "market_narrative_discovery") {
+    next.mode = "market_narrative_discovery";
+    changed = true;
+  }
+  if (next.exclude_official_sources !== true) {
+    next.exclude_official_sources = true;
+    changed = true;
+  }
+  if (
+    next.price_move_direction !== "down" &&
+    next.price_move_direction !== "up" &&
+    next.price_move_direction !== "unknown"
+  ) {
+    next.price_move_direction = inferPriceMoveDirectionFromQuestion(
+      typeof next.question === "string" ? next.question : "",
+    );
+    changed = true;
+  }
+
+  return { input: next, changed };
+}
+
+function inferPriceMoveDirectionFromQuestion(
+  question: string,
+): "down" | "up" | "unknown" {
+  if (
+    /왜\s*(떨어|빠|내려)|하락|급락|약세|조정|빠졌|떨어졌|why\s+(?:is\s+)?(?:.*\s)?(?:down|falling|dropping)|stock\s+(?:drops?|falls?|slips?|sinks?)/i.test(
+      question,
+    )
+  ) {
+    return "down";
+  }
+  if (
+    /왜\s*(올라|상승)|급등|강세|반등|올랐|why\s+(?:is\s+)?(?:.*\s)?(?:up|rising|rallying)|stock\s+(?:jumps?|gains?|rallies|rises?)/i.test(
+      question,
+    )
+  ) {
+    return "up";
+  }
+  return "unknown";
 }
 
 function attachAgentContextInput(

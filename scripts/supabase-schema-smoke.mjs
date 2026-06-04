@@ -110,7 +110,8 @@ const checks = [
   },
   {
     table: "chat_message_artifact_selections",
-    select: "id,artifact_id,event_id,user_id,user_message_id,research_run_id",
+    select:
+      "id,artifact_id,session_id,event_id,user_id,user_message_id,research_run_id,status,updated_at",
   },
 ];
 

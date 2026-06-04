@@ -43,6 +43,7 @@
     "stock-news:dev:start": "scripts/start-stock-news-zai-mcp-dev.sh",
     "stock-news:dev:verify": "scripts/verify-stock-news-zai-mcp-dev.sh",
     "stock-news:dev:status": "scripts/verify-stock-news-zai-mcp-dev.sh",
+    "stock-news:coverage:export": "node scripts/export-stock-news-coverage.mjs",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run test:unit && npm run build",
     "docker:build:mcp": "docker build --build-context krw-ontology-src=${KRW_ONTOLOGY_SOURCE_DIR:-../krw-ontology} -f Dockerfile.mcp .",

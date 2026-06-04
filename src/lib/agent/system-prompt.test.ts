@@ -31,17 +31,33 @@ describe("buildSystemPrompt", () => {
     expect(researchPrompt).not.toContain("krw-ontology-answer-composer");
   });
 
-  it("uses the news research skill command for news analysis mode", () => {
+  it("uses the news discovery skill command for the first news analysis pass", () => {
     const researchPrompt = buildResearchPassPrompt(
       "AVGO 최근 뉴스까지 반영해줘",
       "news",
     );
 
     expect(researchPrompt).toContain(
-      "/krw-ontology:krw-ontology-news-research AVGO 최근 뉴스까지 반영해줘",
+      "/krw-ontology:krw-ontology-news-discovery AVGO 최근 뉴스까지 반영해줘",
     );
     expect(researchPrompt).not.toContain(
       "/krw-ontology:krw-ontology-research AVGO",
+    );
+  });
+
+  it("uses the normal KRW ontology research skill after a news event is selected", () => {
+    const researchPrompt = buildResearchPassPrompt(
+      "선택한 뉴스 이벤트를 공시 기준으로 분석해줘",
+      "news",
+      "news_research",
+    );
+
+    expect(researchPrompt).toContain(
+      "/krw-ontology:krw-ontology-research 선택한 뉴스 이벤트를 공시 기준으로 분석해줘",
+    );
+    expect(researchPrompt).toContain("웹앱 뉴스 research 실행");
+    expect(researchPrompt).not.toContain(
+      "/krw-ontology:krw-ontology-news-research",
     );
   });
 

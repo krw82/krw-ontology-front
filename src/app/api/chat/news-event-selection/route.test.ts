@@ -65,9 +65,26 @@ const EVENT_ID = "alphabet-ai-capex";
 const selectedEvent = {
   id: EVENT_ID,
   ticker: "GOOGL",
-  event_title: "Alphabet raises AI infrastructure spending plan",
-  short_summary: "CapEx guidance moved higher with cloud demand.",
-  source_previews: [{ title: "Reuters", url: "https://example.test/news" }],
+  event_title: "AI 투자 부담 우려로 알파벳 주가 약세",
+  event_title_ko: "AI 투자 부담 우려로 알파벳 주가 약세",
+  original_headline: "Alphabet shares fall as investors weigh AI capex pressure",
+  summary_ko:
+    "시장 뉴스는 알파벳의 AI 데이터센터 투자 확대가 잉여현금흐름과 주주환원 여력을 압박할 수 있다고 다뤘습니다.",
+  primary_source: {
+    publisher: "Reuters",
+    domain: "reuters.com",
+    url: "https://example.test/news",
+    published_at: "2026-06-04T12:00:00.000Z",
+  },
+  source_previews: [
+    {
+      publisher: "Reuters",
+      domain: "reuters.com",
+      title_original: "Alphabet shares fall as investors weigh AI capex pressure",
+      url: "https://example.test/news",
+      published_at: "2026-06-04T12:00:00.000Z",
+    },
+  ],
 };
 
 function request(body: Record<string, unknown> = {}) {
@@ -256,7 +273,17 @@ describe("POST /api/chat/news-event-selection", () => {
     expect(response.headers.get("X-Chat-Session-Id")).toBe(SESSION_ID);
     expect(fetchHistory).toHaveBeenCalledWith(
       SESSION_ID,
-      expect.stringContaining(selectedEvent.event_title),
+      expect.stringContaining("선택 뉴스:"),
+      REQUEST_ID,
+    );
+    expect(fetchHistory).toHaveBeenCalledWith(
+      SESSION_ID,
+      expect.stringContaining("원문 기사:"),
+      REQUEST_ID,
+    );
+    expect(fetchHistory).toHaveBeenCalledWith(
+      SESSION_ID,
+      expect.stringContaining("내용 요약:"),
       REQUEST_ID,
     );
     expect(enqueueAgentRun).toHaveBeenCalledWith(
@@ -272,10 +299,12 @@ describe("POST /api/chat/news-event-selection", () => {
     expect(fake.upserts).toEqual([
       expect.objectContaining({
         artifact_id: ARTIFACT_ID,
+        session_id: SESSION_ID,
         event_id: EVENT_ID,
         selected_payload_json: selectedEvent,
         user_message_id: "user-message-selected",
         research_run_id: "research-run-1",
+        status: "queued",
       }),
     ]);
     expect(streamAgentRunEventsResponse).toHaveBeenCalledWith(

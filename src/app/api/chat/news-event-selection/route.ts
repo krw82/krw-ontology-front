@@ -14,6 +14,7 @@ import { getActiveOntologyCatalogRelease } from "@/lib/ontology/catalog";
 import { normalizeResearchMode } from "@/lib/research-mode";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isPlainObject, isUuid } from "@/lib/api/validation";
+import { buildNewsEventSelectionUserMessage } from "@/lib/chat-artifacts/news-event-selection";
 import type {
   ChatMessageArtifactRow,
   ChatMessageArtifactSelectionRow,
@@ -218,6 +219,7 @@ export async function POST(request: NextRequest) {
 
   await upsertSelection({
     artifactId: artifactResult.artifact.id,
+    sessionId: session.id,
     event: artifactResult.event,
     userId: user.id,
     userMessageId: historyResult.result.userMessageId,
@@ -310,6 +312,7 @@ async function loadSelectableEvent(params: {
 
 async function upsertSelection(params: {
   artifactId: string;
+  sessionId: string;
   event: AtomicNewsEventCard;
   userId: string;
   userMessageId: string;
@@ -317,11 +320,14 @@ async function upsertSelection(params: {
 }) {
   const payload = {
     artifact_id: params.artifactId,
+    session_id: params.sessionId,
     event_id: params.event.id,
     user_id: params.userId,
     selected_payload_json: params.event,
     user_message_id: params.userMessageId,
     research_run_id: params.researchRunId,
+    status: "queued",
+    updated_at: new Date().toISOString(),
   };
 
   await getSupabaseAdmin()
@@ -332,10 +338,7 @@ async function upsertSelection(params: {
 }
 
 function selectedEventUserMessage(event: AtomicNewsEventCard): string {
-  return [
-    `선택 이벤트: ${event.event_title}`,
-    "이 이벤트를 공시 기준으로 분석해줘.",
-  ].join("\n");
+  return buildNewsEventSelectionUserMessage(event);
 }
 
 function stringValue(value: unknown): string | null {

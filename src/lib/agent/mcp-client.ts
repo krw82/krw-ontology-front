@@ -429,7 +429,7 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
   const mcpConfigPath = path.join(pluginPath, ".mcp.json");
   const requiredSkillPaths = [
     path.join(pluginPath, "skills", "krw-ontology-research", "SKILL.md"),
-    path.join(pluginPath, "skills", "krw-ontology-news-research", "SKILL.md"),
+    path.join(pluginPath, "skills", "krw-ontology-news-discovery", "SKILL.md"),
   ];
 
   try {

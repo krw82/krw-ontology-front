@@ -4,6 +4,7 @@ import type {
   AtomicNewsEventCard,
   ChatArtifact,
   NewsEventSelectionArtifactPayload,
+  SourcePreview,
 } from "@/types/api-contracts";
 
 type UnknownRecord = Record<string, unknown>;
@@ -38,7 +39,11 @@ export function buildNewsEventSelectionArtifact(params: {
       original_question: params.originalQuestion,
       resolved_entities: readRecordArray(result.resolved_entities),
       lookback: isRecord(result.lookback) ? result.lookback : undefined,
+      discovery_policy: isRecord(result.discovery_policy)
+        ? result.discovery_policy
+        : undefined,
       events,
+      cards: events,
       discovery_summary: {
         event_count: events.length,
         source_count: countSourcePreviews(events),
@@ -92,6 +97,7 @@ function findLatestNewsEventResult(acc: AccumulatedRun): UnknownRecord | null {
 
 function findEventArray(result: UnknownRecord): UnknownRecord[] {
   const directCandidates = [
+    result.cards,
     result.atomic_events,
     result.events,
     result.event_candidates,
@@ -114,17 +120,39 @@ function findEventArray(result: UnknownRecord): UnknownRecord[] {
 }
 
 function normalizeEvents(events: UnknownRecord[]): AtomicNewsEventCard[] {
-  return events
+  const normalizedEvents = events
     .map((event, index) => normalizeEvent(event, index))
     .filter((event): event is AtomicNewsEventCard => event !== null)
-    .slice(0, 5);
+    .filter((event) => !isExcludedCard(event))
+    .filter(isUsableMarketNewsEvent);
+
+  return dedupeEvents(normalizedEvents).slice(0, 5);
 }
 
 function normalizeEvent(
   event: UnknownRecord,
   index: number,
 ): AtomicNewsEventCard | null {
+  const sourcePreviews = readRecordArray(event.source_previews)
+    .filter((source) => !isExcludedSourcePreview(source))
+    .map(normalizeSourcePreview);
+  const primarySource = findPrimarySource(sourcePreviews, event);
+  const originalHeadline = firstString(
+    event.original_headline,
+    event.original_title,
+    event.source_headline,
+    event.article_title_original,
+    event.headline_original,
+    primarySource?.title_original,
+    primarySource?.title,
+  );
+  const koreanTitle = firstString(
+    event.event_title_ko,
+    event.title_ko,
+    event.headline_ko,
+  );
   const eventTitle = firstString(
+    koreanTitle,
     event.event_title,
     event.title,
     event.headline,
@@ -140,23 +168,83 @@ function normalizeEvent(
     ...event,
     id,
     event_title: eventTitle,
+    event_title_ko: koreanTitle,
+    original_headline: originalHeadline,
+    primary_source: primarySource,
     ticker: firstString(event.ticker, event.symbol),
     company_name: firstString(event.company_name, event.company),
     short_summary: firstString(
+      cleanKoreanNewsSummary(event.summary_ko),
+      cleanKoreanNewsSummary(event.korean_summary),
+      cleanKoreanNewsSummary(event.news_summary_ko),
       event.short_summary,
       event.summary,
       event.description,
       event.snippet,
+      primarySource?.summary_ko,
+      primarySource?.snippet_summary,
     ),
+    summary_ko: firstString(
+      cleanKoreanNewsSummary(event.summary_ko),
+      cleanKoreanNewsSummary(event.korean_summary),
+      cleanKoreanNewsSummary(event.news_summary_ko),
+      primarySource?.summary_ko,
+    ),
+    price_impact_direction: normalizeImpactDirection(event.price_impact_direction),
+    source_summary: isRecord(event.source_summary) ? event.source_summary : undefined,
     investment_axes: readStringArray(event.investment_axes),
     ontology_baseline_questions: readStringArray(
       event.ontology_baseline_questions,
     ),
-    source_previews: readRecordArray(event.source_previews),
+    source_previews: sourcePreviews,
     reader_urls: readStringArray(event.reader_urls),
     official_source_urls: readStringArray(event.official_source_urls),
     major_news_urls: readStringArray(event.major_news_urls),
+    ontology_bridge_brief_en: isRecord(event.ontology_bridge_brief_en)
+      ? event.ontology_bridge_brief_en
+      : undefined,
+    ui: isRecord(event.ui) ? event.ui : undefined,
+    ranking: isRecord(event.ranking) ? event.ranking : undefined,
   };
+}
+
+export function buildNewsEventSelectionUserMessage(
+  event: AtomicNewsEventCard,
+): string {
+  const source = event.primary_source ?? findPrimarySource(
+    event.source_previews ?? [],
+    event,
+  );
+  const sourceLabel = firstString(source?.publisher, source?.domain);
+  const sourceDate = firstString(source?.published_at, event.source_date, event.event_date);
+  const originalHeadline = firstString(
+    event.original_headline,
+    source?.title_original,
+    source?.title,
+  );
+  const summary = firstString(event.summary_ko, event.short_summary);
+  const lines = [
+    "선택 뉴스:",
+    event.event_title_ko || event.event_title,
+  ];
+
+  if (sourceLabel || sourceDate) {
+    lines.push(
+      "",
+      `출처: ${[sourceLabel, sourceDate].filter(Boolean).join(" · ")}`,
+    );
+  }
+
+  if (originalHeadline) {
+    lines.push("", "원문 기사:", originalHeadline);
+  }
+
+  if (summary) {
+    lines.push("", "내용 요약:", summary);
+  }
+
+  lines.push("", "이 뉴스를 공시 기준으로 분석해줘.");
+  return lines.join("\n");
 }
 
 function countSourcePreviews(events: AtomicNewsEventCard[]): number {
@@ -182,6 +270,162 @@ function readStringArray(value: unknown): string[] {
 
 function readRecordArray(value: unknown): UnknownRecord[] {
   return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function normalizeSourcePreview(source: UnknownRecord): SourcePreview {
+  return {
+    ...source,
+    title: firstString(source.title),
+    title_original: firstString(source.title_original),
+    title_ko: firstString(source.title_ko),
+    url: firstString(source.url),
+    domain: firstString(source.domain),
+    publisher: firstString(source.publisher),
+    published_at: firstString(source.published_at, source.date, source.source_date),
+    summary_ko: cleanKoreanNewsSummary(source.summary_ko),
+    snippet_summary: firstString(source.snippet_summary, source.summary, source.snippet),
+  };
+}
+
+function normalizeImpactDirection(
+  value: unknown,
+): AtomicNewsEventCard["price_impact_direction"] | undefined {
+  return value === "negative" ||
+    value === "positive" ||
+    value === "mixed" ||
+    value === "unclear"
+    ? value
+    : undefined;
+}
+
+function isExcludedCard(event: AtomicNewsEventCard): boolean {
+  const sourceText = (event.source_previews ?? [])
+    .map((source) =>
+      [
+        source.title,
+        source.title_original,
+        source.title_ko,
+        source.url,
+        source.domain,
+        source.publisher,
+      ].join(" "),
+    )
+    .join(" ");
+  const text = [
+    event.event_title,
+    event.event_title_ko,
+    event.short_summary,
+    event.summary_ko,
+    sourceText,
+  ].join(" ");
+  return isExcludedDiscoveryText(text);
+}
+
+function isUsableMarketNewsEvent(event: AtomicNewsEventCard): boolean {
+  const source = event.primary_source ?? findPrimarySource(
+    event.source_previews ?? [],
+    event,
+  );
+  const originalHeadline = firstString(
+    event.original_headline,
+    source?.title_original,
+    source?.title,
+  );
+  const summary = event.summary_ko;
+
+  return Boolean(
+    event.event_title_ko &&
+      source &&
+      originalHeadline &&
+      !isLowInformationHeadline(originalHeadline) &&
+      summary &&
+      !isLowInformationSummary(summary),
+  );
+}
+
+function findPrimarySource(
+  sources: UnknownRecord[],
+  event: UnknownRecord,
+): SourcePreview | undefined {
+  return sources.find((source) => {
+    const headline = firstString(source.title_original, source.title);
+    const sourceIdentity = firstString(
+      source.publisher,
+      source.domain,
+      source.url,
+      event.publisher,
+      event.domain,
+    );
+    if (!headline || !sourceIdentity) return false;
+    if (isExcludedSourcePreview(source)) return false;
+    return !isLowInformationHeadline(headline);
+  }) as SourcePreview | undefined;
+}
+
+function dedupeEvents(events: AtomicNewsEventCard[]): AtomicNewsEventCard[] {
+  const seen = new Set<string>();
+  const deduped: AtomicNewsEventCard[] = [];
+
+  for (const event of events) {
+    const key = [
+      event.ticker ?? "",
+      event.primary_source?.domain ?? event.primary_source?.publisher ?? "",
+      (event.original_headline ?? event.event_title).toLowerCase(),
+    ].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(event);
+  }
+
+  return deduped;
+}
+
+function isExcludedSourcePreview(source: UnknownRecord): boolean {
+  if (source.excluded === true) return true;
+  return isExcludedDiscoveryText(
+    [
+      source.title,
+      source.title_original,
+      source.title_ko,
+      source.url,
+      source.domain,
+      source.publisher,
+    ].join(" "),
+  );
+}
+
+function isExcludedDiscoveryText(text: string): boolean {
+  return /\b(sec filings?|form\s+(8-k|10-k|10-q)|investor relations|annual report|quarterly report)\b|sec\.gov|annualreports\.com|\/investor-relations|(^|\s)ir\./i.test(text);
+}
+
+function cleanKoreanNewsSummary(value: unknown): string | undefined {
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  const cleaned = value
+    .replace(/공시 기준(?:으로)?\s*분석(?:에서는|은)?.*?(?:확인합니다|분석합니다|설명합니다)\.?/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || undefined;
+}
+
+function isLowInformationHeadline(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return true;
+  if (/^[a-z0-9.-]+\.(com|net|org|co|io|kr)$/i.test(normalized)) return true;
+  if (/보도:\s*(강세|약세|혼재|확인 필요)\s*요인\s*후보/i.test(value)) {
+    return true;
+  }
+  if (/^(market news|source|news|article)$/i.test(normalized)) return true;
+  return false;
+}
+
+function isLowInformationSummary(value: string): boolean {
+  const normalized = value.trim();
+  if (normalized.length < 24) return true;
+  if (/최근\s+\S+\s+등\s+시장\s+뉴스는\s+이\s+이슈를/i.test(normalized)) {
+    return true;
+  }
+  if (/공시 기준(?:으로)?\s*분석/i.test(normalized)) return true;
+  return false;
 }
 
 function isRecord(value: unknown): value is UnknownRecord {

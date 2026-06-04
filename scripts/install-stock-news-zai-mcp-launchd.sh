@@ -66,9 +66,14 @@ set -a
 . "$ENV_PATH"
 set +a
 
-STOCK_NEWS_MCP_NICE=${STOCK_NEWS_MCP_NICE:-${MCP_SERVER_NICE:-${MAC_WORKER_NICE:--5}}}
+# Keep this service at normal priority unless explicitly configured. A user
+# launchd service cannot raise priority with a negative nice value, and reusing
+# MAC_WORKER_NICE=-5 here makes bootstrap look successful while the process
+# immediately fails with "nice: setpriority: Permission denied".
+STOCK_NEWS_MCP_NICE=${STOCK_NEWS_MCP_NICE:-0}
 MCP_SERVER_MAXFILES=${MCP_SERVER_MAXFILES:-4096}
 MCP_LOG_DIR=${MCP_LOG_DIR:-"$HOME/Library/Logs/krw-ontology"}
+STOCK_NEWS_ZAI_MCP_PORT=${STOCK_NEWS_ZAI_MCP_PORT:-8775}
 
 case "$STOCK_NEWS_MCP_NICE" in
   -[0-9]*|[0-9]*) ;;
@@ -82,9 +87,90 @@ case "$MCP_SERVER_MAXFILES" in
   [0-9]*) ;;
   *) echo "MCP_SERVER_MAXFILES must be a positive integer: $MCP_SERVER_MAXFILES" >&2; exit 1 ;;
 esac
+if [ "$MCP_SERVER_MAXFILES" -lt 256 ]; then
+  echo "MCP_SERVER_MAXFILES must be at least 256: $MCP_SERVER_MAXFILES" >&2
+  exit 1
+fi
+case "$STOCK_NEWS_ZAI_MCP_PORT" in
+  [0-9]*) ;;
+  *) echo "STOCK_NEWS_ZAI_MCP_PORT must be a positive integer: $STOCK_NEWS_ZAI_MCP_PORT" >&2; exit 1 ;;
+esac
+if [ "$STOCK_NEWS_ZAI_MCP_PORT" -lt 1 ] || [ "$STOCK_NEWS_ZAI_MCP_PORT" -gt 65535 ]; then
+  echo "STOCK_NEWS_ZAI_MCP_PORT must be between 1 and 65535: $STOCK_NEWS_ZAI_MCP_PORT" >&2
+  exit 1
+fi
+
+stock_news_listener_pids() {
+  if ! command -v lsof >/dev/null 2>&1; then
+    return 0
+  fi
+  lsof -nP -tiTCP:"$STOCK_NEWS_ZAI_MCP_PORT" -sTCP:LISTEN 2>/dev/null || true
+}
+
+is_managed_stock_news_listener() {
+  pid=$1
+  command=$(ps -p "$pid" -o command= 2>/dev/null || true)
+  case "$command" in
+    *"stock-news-zai-mcp"*|*"node"*"dist/server.js"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+wait_for_stock_news_port_release() {
+  attempts=${1:-10}
+  for _ in $(seq 1 "$attempts"); do
+    if [ -z "$(stock_news_listener_pids)" ]; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+stop_lingering_stock_news_listeners() {
+  pids=$(stock_news_listener_pids)
+  if [ -z "$pids" ]; then
+    return 0
+  fi
+
+  for pid in $pids; do
+    if ! is_managed_stock_news_listener "$pid"; then
+      echo "Port $STOCK_NEWS_ZAI_MCP_PORT is occupied by an unmanaged process: pid=$pid" >&2
+      ps -p "$pid" -o pid,command= >&2 || true
+      return 1
+    fi
+    echo "Stopping lingering Stock News Z.ai MCP listener pid=$pid on port $STOCK_NEWS_ZAI_MCP_PORT"
+    kill "$pid" >/dev/null 2>&1 || true
+  done
+
+  if wait_for_stock_news_port_release 5; then
+    return 0
+  fi
+
+  pids=$(stock_news_listener_pids)
+  for pid in $pids; do
+    if ! is_managed_stock_news_listener "$pid"; then
+      echo "Port $STOCK_NEWS_ZAI_MCP_PORT is still occupied by an unmanaged process: pid=$pid" >&2
+      ps -p "$pid" -o pid,command= >&2 || true
+      return 1
+    fi
+    echo "Force stopping lingering Stock News Z.ai MCP listener pid=$pid on port $STOCK_NEWS_ZAI_MCP_PORT"
+    kill -KILL "$pid" >/dev/null 2>&1 || true
+  done
+
+  wait_for_stock_news_port_release 5
+}
+
+print_recent_stock_news_logs() {
+  echo "Recent Stock News Z.ai MCP stdout:" >&2
+  tail -40 "$MCP_LOG_DIR/stock-news-zai-mcp-prod.out.log" >&2 2>/dev/null || true
+  echo "Recent Stock News Z.ai MCP stderr:" >&2
+  tail -40 "$MCP_LOG_DIR/stock-news-zai-mcp-prod.err.log" >&2 2>/dev/null || true
+}
 
 if [ "$DRY_RUN" = "1" ]; then
   echo "Dry run: would install $PLIST and load com.krwontology.stock-news-zai-mcp=$LOAD"
+  echo "  nice=$STOCK_NEWS_MCP_NICE port=$STOCK_NEWS_ZAI_MCP_PORT logs=$MCP_LOG_DIR"
   exit 0
 fi
 
@@ -107,39 +193,43 @@ if [ "$LOAD" != "1" ]; then
 fi
 
 launchctl bootout "$DOMAIN/com.krwontology.stock-news-zai-mcp" >/dev/null 2>&1 || true
-BOOTSTRAP_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/stock-news-zai-mcp-bootstrap.XXXXXX")
-trap 'rm -f "$BOOTSTRAP_OUTPUT"' EXIT INT TERM
+launchctl bootout "$DOMAIN" "$PLIST" >/dev/null 2>&1 || true
+if ! wait_for_stock_news_port_release 10; then
+  stop_lingering_stock_news_listeners
+fi
 
-BOOTSTRAPPED=0
-for _ in 1 2 3 4 5; do
-  if launchctl bootstrap "$DOMAIN" "$PLIST" >"$BOOTSTRAP_OUTPUT" 2>&1; then
-    BOOTSTRAPPED=1
-    break
-  fi
-  if launchctl print "$DOMAIN/com.krwontology.stock-news-zai-mcp" >/dev/null 2>&1; then
-    BOOTSTRAPPED=1
-    break
-  fi
-  sleep 1
-done
-if [ "$BOOTSTRAPPED" != "1" ]; then
+BOOTSTRAP_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/stock-news-zai-mcp-bootstrap.XXXXXX")
+VERIFY_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/stock-news-zai-mcp-verify.XXXXXX")
+trap 'rm -f "$BOOTSTRAP_OUTPUT" "$VERIFY_OUTPUT"' EXIT INT TERM
+
+if ! launchctl bootstrap "$DOMAIN" "$PLIST" >"$BOOTSTRAP_OUTPUT" 2>&1; then
   cat "$BOOTSTRAP_OUTPUT" >&2
+  print_recent_stock_news_logs
   exit 1
 fi
 
 launchctl enable "$DOMAIN/com.krwontology.stock-news-zai-mcp"
+launchctl kickstart -k "$DOMAIN/com.krwontology.stock-news-zai-mcp"
 
-VERIFY_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/stock-news-zai-mcp-verify.XXXXXX")
-trap 'rm -f "$BOOTSTRAP_OUTPUT" "$VERIFY_OUTPUT"' EXIT INT TERM
-for _ in 1 2 3 4 5 6 7 8 9 10; do
+verified=0
+for _ in $(seq 1 30); do
   if "$SCRIPT_DIR/verify-stock-news-zai-mcp-production.sh" --env-file "$ENV_PATH" >"$VERIFY_OUTPUT" 2>&1; then
-    cat "$VERIFY_OUTPUT"
-    echo "OK Stock News Z.ai MCP launchd service loaded"
-    exit 0
+    verified=1
+    break
   fi
   sleep 1
 done
 
-cat "$VERIFY_OUTPUT" >&2
+if [ "$verified" != "1" ]; then
+  cat "$VERIFY_OUTPUT" >&2
+  if ! launchctl print "$DOMAIN/com.krwontology.stock-news-zai-mcp" | sed -n '1,80p'; then
+    echo "Stock News Z.ai MCP launchd service is not registered after bootstrap." >&2
+  fi
+  print_recent_stock_news_logs
+  echo "Stock News Z.ai MCP server did not become healthy." >&2
+  exit 1
+fi
+
+cat "$VERIFY_OUTPUT"
 launchctl print "$DOMAIN/com.krwontology.stock-news-zai-mcp" | sed -n '1,50p'
-exit 1
+echo "OK Stock News Z.ai MCP launchd service loaded"

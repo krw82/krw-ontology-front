@@ -67,7 +67,7 @@ Recommended pattern:
 question classification, likely ontology objects, likely MCP tool order, and answer structure.
 
 Hard constraints:
-no internal tool/schema/pack terms, no unsupported direct claims, no response_detail="full" in normal web chat, no repeated broad search after sufficient evidence, no non-covered company introductions, and no user-facing overflow/tool-failure caveats.
+no internal tool/schema/pack terms, no unsupported direct claims, no response_detail="full" in normal web chat, no repeated broad search after sufficient evidence, and no user-facing overflow/tool-failure caveats.
 ```
 
 Hard constraints:
@@ -80,7 +80,6 @@ Do not loop over similar query_context/query/retrieve/trace/chain calls.
 Do not use response_detail="full" in normal web chat.
 If a tool result overflows, treat it as a too-broad signal and split the research path; do not stop, apologize, or expose overflow.
 Always end a normal answer with exactly 3 related Korean follow-up questions.
-Do not introduce non-covered companies, tickers, or peers in normal answers, comparisons, or follow-up questions unless the user explicitly asks or coverage is confirmed.
 ```
 
 ### 2.1 First classify the question
@@ -987,7 +986,6 @@ Rules:
 - no extra tool calls to create them
 - derive from the current answer's business mechanism, risk channel, metric gap, or comparison axis
 - prefer investment interpretation follow-ups: business mechanism, margin durability, cash-flow conversion, capital allocation, risk channel, valuation-assumption sensitivity
-- do not introduce non-covered companies, tickers, or peers unless the user asked for them or coverage was confirmed
 - avoid follow-ups that are merely raw numeric table requests unless the current answer genuinely depends on a missing metric
 - do not expose chain, trace, object, pack, mode, or tool terminology
 - do not phrase them as "관련 체인"

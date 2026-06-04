@@ -28,12 +28,17 @@ create table if not exists public.chat_message_artifacts (
 create table if not exists public.chat_message_artifact_selections (
   id uuid primary key default gen_random_uuid(),
   artifact_id uuid not null references public.chat_message_artifacts(id) on delete cascade,
+  session_id uuid not null references public.chat_sessions(id) on delete cascade,
   event_id text not null,
   user_id uuid not null references auth.users(id) on delete cascade,
   selected_payload_json jsonb not null default '{}'::jsonb,
   user_message_id uuid references public.messages(id) on delete set null,
   research_run_id uuid references public.agent_runs(id) on delete set null,
-  created_at timestamptz not null default now()
+  status text not null default 'queued',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint chat_message_artifact_selections_status_check
+    check (status in ('queued', 'running', 'completed', 'failed', 'cancelled'))
 );
 
 alter table public.agent_runs
@@ -67,6 +72,9 @@ create index if not exists idx_chat_artifact_selections_research_run
 create index if not exists idx_chat_artifact_selections_user_created
   on public.chat_message_artifact_selections (user_id, created_at);
 
+create index if not exists idx_chat_artifact_selections_session_created
+  on public.chat_message_artifact_selections (session_id, created_at);
+
 alter table public.chat_message_artifacts enable row level security;
 alter table public.chat_message_artifact_selections enable row level security;
 
@@ -93,41 +101,13 @@ create policy "chat_message_artifacts_update_own" on public.chat_message_artifac
 
 drop policy if exists "chat_message_artifact_selections_select_own" on public.chat_message_artifact_selections;
 create policy "chat_message_artifact_selections_select_own" on public.chat_message_artifact_selections
-  for select using (
-    exists (
-      select 1
-      from public.chat_message_artifacts a
-      where a.id = artifact_id
-        and public.session_owner(a.session_id) = auth.uid()
-    )
-  );
+  for select using (public.session_owner(session_id) = auth.uid());
 
 drop policy if exists "chat_message_artifact_selections_insert_own" on public.chat_message_artifact_selections;
 create policy "chat_message_artifact_selections_insert_own" on public.chat_message_artifact_selections
-  for insert with check (
-    exists (
-      select 1
-      from public.chat_message_artifacts a
-      where a.id = artifact_id
-        and public.session_owner(a.session_id) = auth.uid()
-    )
-  );
+  for insert with check (public.session_owner(session_id) = auth.uid());
 
 drop policy if exists "chat_message_artifact_selections_update_own" on public.chat_message_artifact_selections;
 create policy "chat_message_artifact_selections_update_own" on public.chat_message_artifact_selections
-  for update using (
-    exists (
-      select 1
-      from public.chat_message_artifacts a
-      where a.id = artifact_id
-        and public.session_owner(a.session_id) = auth.uid()
-    )
-  )
-  with check (
-    exists (
-      select 1
-      from public.chat_message_artifacts a
-      where a.id = artifact_id
-        and public.session_owner(a.session_id) = auth.uid()
-    )
-  );
+  for update using (public.session_owner(session_id) = auth.uid())
+  with check (public.session_owner(session_id) = auth.uid());

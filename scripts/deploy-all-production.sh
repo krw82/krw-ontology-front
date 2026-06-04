@@ -83,7 +83,27 @@ FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 
 if [ "$DB_CHECK" = "1" ]; then
   echo "Checking Supabase migration drift..."
-  (cd "$FRONT_DIR" && "$SCRIPT_DIR/supabase-cli.sh" db push --dry-run)
+  MIGRATION_DRY_RUN_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/krw-supabase-dry-run.XXXXXX")
+  if (cd "$FRONT_DIR" && "$SCRIPT_DIR/supabase-cli.sh" db push --dry-run) >"$MIGRATION_DRY_RUN_OUTPUT" 2>&1; then
+    cat "$MIGRATION_DRY_RUN_OUTPUT"
+  else
+    cat "$MIGRATION_DRY_RUN_OUTPUT" >&2
+    rm -f "$MIGRATION_DRY_RUN_OUTPUT"
+    exit 1
+  fi
+
+  if grep -q "Would push these migrations" "$MIGRATION_DRY_RUN_OUTPUT"; then
+    if [ "$APPLY_MIGRATIONS" = "0" ]; then
+      if [ "$DRY_RUN" = "1" ]; then
+        echo "Dry run: pending Supabase migrations detected; non-dry deployment would require --apply-migrations before schema smoke."
+      else
+        echo "Pending Supabase migrations detected. Re-run with --apply-migrations, or apply migrations before deploying code." >&2
+        rm -f "$MIGRATION_DRY_RUN_OUTPUT"
+        exit 1
+      fi
+    fi
+  fi
+  rm -f "$MIGRATION_DRY_RUN_OUTPUT"
 
   if [ "$APPLY_MIGRATIONS" = "1" ]; then
     if [ "$DRY_RUN" = "1" ]; then

@@ -660,10 +660,14 @@ export type ChatArtifactType =
 
 export interface SourcePreview {
   title?: string;
+  title_original?: string;
+  title_ko?: string;
   url?: string;
   domain?: string;
   publisher?: string | null;
   published_at?: string | null;
+  summary_ko?: string;
+  source_kind?: string;
   snippet_summary?: string;
   source_role?: string;
   verification_status?: string;
@@ -675,11 +679,22 @@ export interface AtomicNewsEventCard {
   ticker?: string;
   company_name?: string;
   event_title: string;
+  event_title_ko?: string;
+  original_headline?: string;
+  primary_source?: SourcePreview;
   event_type?: string;
   event_date?: string | null;
   source_date?: string | null;
   status?: string;
   short_summary?: string;
+  summary_ko?: string;
+  price_impact_direction?: "negative" | "positive" | "mixed" | "unclear";
+  source_summary?: {
+    publishers_ko?: string[];
+    source_count?: number;
+    latest_published_at?: string | null;
+    display_time_ko?: string;
+  };
   key_facts?: Array<Record<string, unknown>>;
   actors?: Record<string, unknown>;
   instrument?: Record<string, unknown>;
@@ -693,6 +708,21 @@ export interface AtomicNewsEventCard {
   specificity_score?: number;
   confidence?: string;
   ontology_bridge_brief?: string;
+  ontology_bridge_brief_en?: {
+    ticker?: string;
+    company_name?: string;
+    event?: string;
+    likely_financial_axes?: string[];
+    likely_business_axes?: string[];
+    suggested_ontology_questions?: string[];
+    source_urls?: string[];
+  };
+  ui?: {
+    button_label_ko?: string;
+    badge_ko?: string;
+    confidence_label_ko?: string;
+  };
+  ranking?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -702,8 +732,11 @@ export interface NewsEventSelectionArtifactPayload {
   original_question: string;
   resolved_entities?: Array<Record<string, unknown>>;
   lookback?: Record<string, unknown>;
+  discovery_policy?: Record<string, unknown>;
   events: AtomicNewsEventCard[];
+  cards?: AtomicNewsEventCard[];
   discovery_summary?: Record<string, unknown>;
+  empty_state?: Record<string, unknown>;
   raw_result?: Record<string, unknown> | unknown[] | null;
 }
 
@@ -722,10 +755,14 @@ export interface ChatArtifact {
 export interface ChatArtifactSelection {
   readonly id: string;
   artifact_id: string;
+  session_id?: string;
   event_id: string;
+  user_id?: string;
   selected_payload_json: Record<string, unknown>;
   user_message_id: string | null;
   research_run_id: string | null;
+  status?: RunStatus;
+  updated_at?: string;
   readonly created_at: string;
 }
 
