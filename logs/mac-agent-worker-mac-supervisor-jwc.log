@@ -1558,3 +1558,264 @@ See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode de
 [agent-supervisor] listening for queued runs { channel: 'agent_run_queued' }
 [agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'listen_connected' }
 [agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] stopped { workerId: 'mac-supervisor-jwc' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+[agent-supervisor] listening for queued runs { channel: 'agent_run_queued' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'listen_connected' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] stopped { workerId: 'mac-supervisor-jwc' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+[agent-supervisor] listening for queued runs { channel: 'agent_run_queued' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'listen_connected' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] claimed {
+  workerId: 'mac-supervisor-jwc',
+  runId: '5fb5763c-5d90-4243-92f8-26dc563f7fb4',
+  activeJobs: 1
+}
+[agent-run-cancel] listening for cancel requests { channel: 'agent_run_cancel' }
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 976,
+  duration_s: 0.976,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_trdN4dnKCS05rzr9x6sA5461',
+  tool_name: 'krw_ontology_index_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 769,
+  duration_s: 0.769,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_F2CtQMfcUuqCoO6aAQJL6887',
+  tool_name: 'krw_ontology_catalog'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    tickers: [ 'NVDA', 'AVGO', 'AMZN', 'MSFT', 'MU' ],
+    question: 'AI data center investment beneficiary analysis: AI data center capex surge, GPU demand, HBM memory, cloud hyperscaler...'
+  },
+  duration_ms: 19920,
+  duration_s: 19.92,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_UsYYL5sYX4bPjK61VekZ4513',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NVDA',
+    topic: 'AI data center revenue, GPU demand, data center segment growth, latest MD&A commentary'
+  },
+  duration_ms: 5084,
+  duration_s: 5.084,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_nT1wajIxtqmIauw5VAQO9764',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AVGO',
+    topic: 'AI data center revenue, AI networking and ASIC, VMware AI infrastructure, data center segment growth'
+  },
+  duration_ms: 5070,
+  duration_s: 5.07,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_GyGdALkPglg7D7p7eYDH0861',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AMZN',
+    topic: 'AWS AI infrastructure capex, data center investment, AI revenue growth, latest MD&A commentary'
+  },
+  duration_ms: 4377,
+  duration_s: 4.377,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_VqeVhlplLERKnCzaC50N9401',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'MSFT',
+    topic: 'Azure AI infrastructure capex, data center investment, AI revenue growth, latest MD&A commentary'
+  },
+  duration_ms: 3862,
+  duration_s: 3.862,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_03_2w1Xdx7RA5yRdkzJQ7Ow5094',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'MU',
+    topic: 'HBM memory, AI data center memory demand, data center revenue growth, latest MD&A commentary'
+  },
+  duration_ms: 3347,
+  duration_s: 3.347,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_04_J6ICiShMTRGbzG7Ew8Z22794',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'ANET',
+    topic: 'AI data center networking, data center switching revenue, AI infrastructure demand, latest MD&A commentary'
+  },
+  duration_ms: 6188,
+  duration_s: 6.188,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_qbxokEL4wQc0jaGpd7IC4046',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AMD',
+    topic: 'AI GPU data center revenue, MI series, AI accelerator demand, latest MD&A commentary'
+  },
+  duration_ms: 2462,
+  duration_s: 2.462,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_05_z31M49N3gJEzNS2PJU1F6803',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'EQIX',
+    topic: 'AI data center demand, data center leasing, AI colocation, latest MD&A commentary'
+  },
+  duration_ms: 3368,
+  duration_s: 3.368,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_04_dwHEMOh3aypqxmN7RWKf4918',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'CEG',
+    topic: 'AI data center power demand, data center electricity, nuclear power for data centers, latest MD&A commentary'
+  },
+  duration_ms: 4372,
+  duration_s: 4.372,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_03_Q0RA2XKvpoaXsYzd0lQV6776',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'META',
+    topic: 'AI infrastructure capex, data center investment, AI revenue, latest MD&A commentary'
+  },
+  duration_ms: 5398,
+  duration_s: 5.398,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_hR7iEgmBknHsEVwZ5S0B5122',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'ORCL',
+    topic: 'AI data center revenue, cloud infrastructure capex, OCI AI growth, data center demand, latest MD&A commentary'
+  },
+  duration_ms: 6359,
+  duration_s: 6.359,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_OnHnumB7Fyu02OVx8iJX0616',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'NVDA',
+    topic: 'data center segment revenue growth margin'
+  },
+  duration_ms: 4095,
+  duration_s: 4.095,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_L4YIJTOJRPPLTBV5Gshg2607',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AVGO',
+    topic: 'AI revenue networking semiconductor data center'
+  },
+  duration_ms: 3994,
+  duration_s: 3.994,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_vbwMxB7Ka2NjoWeYoucL6694',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'META',
+    topic: 'capex infrastructure spending AI data center 2025 2026'
+  },
+  duration_ms: 3840,
+  duration_s: 3.84,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_237ccB5OzGJxqN3osFbQ7538',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AMZN',
+    topic: 'AWS revenue growth capex data center AI investment 2025 2026'
+  },
+  duration_ms: 3380,
+  duration_s: 3.38,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_03_ZcAffaQU5Wj0rFTpb8x71291',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'MSFT',
+    topic: 'Azure revenue growth capex AI data center investment 2025 2026'
+  },
+  duration_ms: 3012,
+  duration_s: 3.012,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_04_QXI5wDaJFyhdp1aFOkww0426',
+  tool_name: 'krw_ontology_query'
+}
+[agent-supervisor] finished {
+  workerId: 'mac-supervisor-jwc',
+  runId: '5fb5763c-5d90-4243-92f8-26dc563f7fb4',
+  activeJobs: 0
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'slot_available' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
