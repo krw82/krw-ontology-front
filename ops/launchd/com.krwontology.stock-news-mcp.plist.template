@@ -4,14 +4,14 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.krwontology.stock-news-zai-mcp</string>
+  <string>com.krwontology.stock-news-mcp</string>
 
   <key>ProgramArguments</key>
   <array>
     <string>/usr/bin/nice</string>
     <string>-n</string>
     <string>__NICE__</string>
-    <string>__FRONT_DIR__/scripts/start-stock-news-zai-mcp-production.sh</string>
+    <string>__FRONT_DIR__/scripts/start-stock-news-mcp-production.sh</string>
   </array>
 
   <key>WorkingDirectory</key>
@@ -33,9 +33,9 @@
   </dict>
 
   <key>StandardOutPath</key>
-  <string>__LOG_DIR__/stock-news-zai-mcp-prod.out.log</string>
+  <string>__LOG_DIR__/stock-news-mcp-prod.out.log</string>
 
   <key>StandardErrorPath</key>
-  <string>__LOG_DIR__/stock-news-zai-mcp-prod.err.log</string>
+  <string>__LOG_DIR__/stock-news-mcp-prod.err.log</string>
 </dict>
 </plist>

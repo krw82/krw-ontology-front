@@ -1,5 +1,6 @@
 "use client";
 
+import { buildNewsEventDisplayText } from "@/lib/chat-artifacts/news-event-selection";
 import type {
   AtomicNewsEventCard,
   ChatArtifact,
@@ -60,6 +61,46 @@ function impactBadgeClass(
   return "border-hairline bg-surface-dim text-muted";
 }
 
+const AXIS_LABELS: Record<string, string> = {
+  revenue: "매출",
+  sales: "매출",
+  demand: "수요",
+  pricing: "가격",
+  gross_margin: "매출총이익률",
+  operating_margin: "영업마진",
+  margin: "마진",
+  cash_flow: "현금흐름",
+  free_cash_flow: "FCF",
+  capex: "CAPEX",
+  guidance: "가이던스",
+  risk_factors: "리스크",
+  competition: "경쟁",
+  supply_chain: "공급망",
+  ai_infrastructure: "AI 인프라",
+};
+
+function analysisAxisLabels(event: AtomicNewsEventCard): string[] {
+  const bridge = event.ontology_bridge_brief_en;
+  const axes = [
+    ...(event.investment_axes ?? []),
+    ...(bridge?.likely_financial_axes ?? []),
+    ...(bridge?.likely_business_axes ?? []),
+  ];
+  const labels: string[] = [];
+  const seen = new Set<string>();
+
+  for (const axis of axes) {
+    const key = axis.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+    const label = AXIS_LABELS[key] ?? AXIS_LABELS[axis.toLowerCase()] ?? axis;
+    if (!label || seen.has(label)) continue;
+    seen.add(label);
+    labels.push(label);
+    if (labels.length >= 4) break;
+  }
+
+  return labels;
+}
+
 function selectedEventIdsForArtifact(
   artifactId: string,
   selections?: ChatArtifactSelection[],
@@ -76,38 +117,46 @@ function EventCard({
   event,
   selected,
   disabled,
+  index,
   onSelectNewsEvent,
 }: {
   artifactId: string;
   event: AtomicNewsEventCard;
   selected: boolean;
   disabled?: boolean;
+  index: number;
   onSelectNewsEvent?: ChatArtifactsProps["onSelectNewsEvent"];
 }) {
   const source = event.primary_source ?? event.source_previews?.[0];
   const dateText = compactDate(
     source?.published_at || event.event_date || event.source_date,
   );
-  const eventTitle = event.event_title_ko || event.event_title;
-  const summary = event.summary_ko || event.short_summary;
-  const originalHeadline =
-    event.original_headline || source?.title_original || source?.title;
+  const display = buildNewsEventDisplayText(event);
+  const eventTitle = display.title;
+  const summary = display.summary;
+  const originalHeadline = display.originalHeadline;
   const sourceName = source?.publisher || source?.domain;
   const impactLabel = event.ui?.badge_ko || impactBadgeLabel(event.price_impact_direction);
+  const axisLabels = analysisAxisLabels(event);
 
   return (
-    <article className="rounded-[8px] border border-hairline bg-canvas p-base transition-colors hover:border-primary/35 sm:p-lg">
-      <div className="flex flex-wrap items-center gap-xs">
-        {event.ticker ? (
-          <span className="font-mono text-[12px] font-black leading-none tracking-[0.08em] text-primary">
-            {event.ticker}
-          </span>
-        ) : null}
-        {sourceName ? (
-          <span className="rounded-full border border-hairline px-2 py-1 text-[11px] font-bold leading-none text-muted">
-            {sourceName}
-          </span>
-        ) : null}
+    <article
+      className="animate-fade-in-up group relative overflow-hidden rounded-[8px] border border-hairline bg-canvas p-base opacity-0 shadow-[0_1px_0_rgba(15,23,42,0.04)] transition-[background-color,border-color,transform] duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/35 hover:bg-surface/45 sm:p-lg"
+      style={{ animationDelay: `${index * 70}ms` }}
+    >
+      <div className="flex flex-wrap items-center gap-x-sm gap-y-xs">
+        <div className="flex min-w-0 items-center gap-xs">
+          {event.ticker ? (
+            <span className="font-mono text-[12px] font-black leading-none tracking-[0.08em] text-primary">
+              {event.ticker}
+            </span>
+          ) : null}
+          {sourceName ? (
+            <span className="rounded-full border border-hairline bg-canvas px-2 py-1 text-[11px] font-bold leading-none text-muted">
+              {sourceName}
+            </span>
+          ) : null}
+        </div>
         {impactLabel ? (
           <span
             className={[
@@ -125,49 +174,71 @@ function EventCard({
         ) : null}
       </div>
 
-      <h3 className="mt-sm text-[16px] font-black leading-[1.35] text-ink sm:text-[17px]">
+      <h3 className="mt-sm max-w-[72ch] text-[17px] font-black leading-[1.38] text-ink text-wrap-pretty sm:text-[18px]">
         {eventTitle}
       </h3>
 
-      {originalHeadline ? (
-        <div className="mt-base border-t border-hairline pt-sm">
-          <p className="font-mono text-[11px] font-black leading-none tracking-[0.08em] text-primary">
-            원문 기사
-          </p>
-          <div className="mt-xs text-[13px] font-bold leading-[1.45] text-ink">
-            {source?.url ? (
-              <a
-                href={source.url}
-                target="_blank"
-                rel="noreferrer"
-                className="underline decoration-hairline underline-offset-4 hover:text-primary"
-              >
-                {originalHeadline}
-              </a>
-            ) : (
-              <span>{originalHeadline}</span>
-            )}
+      <div className="mt-base grid gap-sm border-t border-hairline pt-sm">
+        {originalHeadline ? (
+          <div className="grid gap-1 sm:grid-cols-[96px_minmax(0,1fr)] sm:gap-base">
+            <p className="font-mono text-[11px] font-black leading-[1.4] tracking-[0.08em] text-primary">
+              원문
+            </p>
+            <div className="min-w-0 text-[13px] font-bold leading-[1.5] text-ink">
+              {source?.url ? (
+                <a
+                  href={source.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline decoration-hairline underline-offset-4 hover:text-primary"
+                >
+                  {originalHeadline}
+                </a>
+              ) : (
+                <span>{originalHeadline}</span>
+              )}
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {summary ? (
-        <div className="mt-base border-t border-hairline pt-sm">
-          <p className="font-mono text-[11px] font-black leading-none tracking-[0.08em] text-primary">
-            내용 요약
-          </p>
-          <p className="mt-xs text-[14px] leading-[1.6] text-body">{summary}</p>
-        </div>
-      ) : null}
+        {summary ? (
+          <div className="grid gap-1 sm:grid-cols-[96px_minmax(0,1fr)] sm:gap-base">
+            <p className="font-mono text-[11px] font-black leading-[1.4] tracking-[0.08em] text-primary">
+              {display.isSourceLanguageFallback ? "원문 요약" : "내용"}
+            </p>
+            <p className="min-w-0 text-[14px] leading-[1.62] text-body">
+              {summary}
+            </p>
+          </div>
+        ) : null}
 
-      <div className="mt-base flex justify-end">
+        {axisLabels.length > 0 ? (
+          <div className="grid gap-1 sm:grid-cols-[96px_minmax(0,1fr)] sm:gap-base">
+            <p className="font-mono text-[11px] font-black leading-[1.4] tracking-[0.08em] text-primary">
+              분석 포인트
+            </p>
+            <div className="flex min-w-0 flex-wrap gap-xs">
+              {axisLabels.map((label) => (
+                <span
+                  key={label}
+                  className="rounded-full border border-hairline bg-surface px-2 py-1 text-[11px] font-bold leading-none text-muted"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mt-base flex justify-end border-t border-hairline pt-sm">
         <button
           type="button"
           className={[
-            "inline-flex min-h-9 items-center gap-xs rounded-[8px] px-3 text-[13px] font-extrabold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+            "inline-flex min-h-10 items-center gap-xs rounded-[8px] px-3 text-[13px] font-extrabold transition-[background-color,border-color,color,transform] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary active:scale-[0.985]",
             selected
-              ? "bg-primary-container/12 text-primary"
-              : "border border-hairline bg-surface text-ink hover:border-primary/35 hover:text-primary",
+              ? "border border-primary-container bg-primary-container/20 text-primary"
+              : "border border-hairline bg-surface text-ink hover:border-primary/35 hover:bg-canvas hover:text-primary",
             disabled && !selected ? "cursor-not-allowed opacity-55" : "",
           ].join(" ")}
           disabled={Boolean(disabled || selected)}
@@ -214,13 +285,14 @@ function NewsEventSelectionArtifact({
         </span>
       </div>
       <div className="grid gap-sm">
-        {events.map((event) => (
+        {events.map((event, index) => (
           <EventCard
             key={event.id}
             artifactId={artifact.id}
             event={event}
             selected={selectedIds.has(event.id)}
             disabled={disabled}
+            index={index}
             onSelectNewsEvent={onSelectNewsEvent}
           />
         ))}

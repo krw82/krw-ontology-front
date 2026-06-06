@@ -49,7 +49,9 @@ export async function GET(
 
   const { data: session, error: sessionError } = await supabase
     .from("chat_sessions")
-    .select("*")
+    .select(
+      "id, user_id, title, scope_type, default_tickers, default_document_types, last_message_preview, last_message_at, latest_run_status, created_at, updated_at, deleted_at",
+    )
     .eq("id", sessionId)
     .is("deleted_at", null)
     .maybeSingle<ChatSessionRow>();

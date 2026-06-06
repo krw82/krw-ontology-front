@@ -177,22 +177,6 @@ export default function ChatSidebar({
   }, []);
 
   useEffect(() => {
-    const hasRunningSession = sessions.some(
-      (session) =>
-        session.latest_run_status === "running" ||
-        session.latest_run_status === "queued" ||
-        session.latest_run_status === "pending",
-    );
-    if (!hasRunningSession) return;
-
-    const intervalId = window.setInterval(() => {
-      listSessions(1, 30);
-    }, 2500);
-
-    return () => window.clearInterval(intervalId);
-  }, [listSessions, sessions]);
-
-  useEffect(() => {
     if (!mobileOpen) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {

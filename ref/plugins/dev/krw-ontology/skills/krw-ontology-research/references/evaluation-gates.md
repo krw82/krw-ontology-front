@@ -16,7 +16,6 @@ a newer 10-Q beats an older 10-K for current drivers; a latest 10-K is primary o
 three follow-up questions present
 strong claims traceable or metric-lineage grounded
 direct vs related context separated
-normal answers, comparison tables, and follow-up questions do not introduce non-covered companies or tickers unless explicitly requested by the user
 normal answers are interpretation-first, not raw-number dumps
 tables use interpretation columns unless exact numbers are requested or required for the conclusion
 exact numbers are limited to the few figures needed to support, qualify, or correct the conclusion

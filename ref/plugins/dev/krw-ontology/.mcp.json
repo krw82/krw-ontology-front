@@ -5,7 +5,7 @@
       "url": "http://127.0.0.1:8766/mcp",
       "alwaysLoad": true
     },
-    "stock-news-zai": {
+    "stock-news": {
       "type": "http",
       "url": "http://127.0.0.1:8776/mcp"
     }

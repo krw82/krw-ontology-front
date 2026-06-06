@@ -107,8 +107,8 @@ export async function PATCH(
     })
     .eq("id", sessionId)
     .is("deleted_at", null)
-    .select("*")
-    .single<ChatSessionRow>();
+    .select("id, title, updated_at")
+    .single<Pick<ChatSessionRow, "id" | "title" | "updated_at">>();
 
   if (error || !session) {
     return errorResponse(500, "internal_error", "채팅 이름을 저장하지 못했습니다.");
@@ -120,9 +120,6 @@ export async function PATCH(
     sessionId,
     properties: {
       title_length: title.length,
-      scope_type: session.scope_type,
-      ticker: session.default_tickers?.[0] ?? null,
-      tickers: session.default_tickers ?? [],
     },
   });
 

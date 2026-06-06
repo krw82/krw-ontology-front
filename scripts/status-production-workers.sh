@@ -7,7 +7,7 @@ usage() {
   cat <<'EOF'
 Usage: scripts/status-production-workers.sh [--env-file FILE] [--skip-gcp]
 
-Print local Mac worker process status and remote GCP Docker Compose status.
+Print local Mac supervisor process status and remote GCP Docker Compose status.
 EOF
 }
 
@@ -41,7 +41,7 @@ REMOTE_FRONT_DIR=${REMOTE_FRONT_DIR:-/home/username/krw-ontology-front}
 COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-krw-ontology-front}
 REMOTE_ENV_FILE=${REMOTE_ENV_FILE:-.env}
 
-echo "Local Mac worker processes:"
+echo "Local Mac worker/supervisor processes:"
 ps eww -axo pid,etime,nice,command \
   | awk '
     /[.]worker\/agent-worker[.]mjs/ && !/awk/ {
@@ -61,11 +61,15 @@ if [ -f "$ENV_FILE" ]; then
   set +a
   echo
   echo "Local config:"
+  echo "  AGENT_SUPERVISOR_ID=${AGENT_SUPERVISOR_ID:-unset}"
+  echo "  AGENT_SUPERVISOR_CONCURRENCY=${AGENT_SUPERVISOR_CONCURRENCY:-unset}"
   echo "  AGENT_WORKER_ID=${AGENT_WORKER_ID:-unset}"
   echo "  AGENT_WORKER_ID_PREFIX=${AGENT_WORKER_ID_PREFIX:-unset}"
   echo "  MAC_WORKER_COUNT=${MAC_WORKER_COUNT:-unset}"
   echo "  MAC_WORKER_NICE=${MAC_WORKER_NICE:-unset}"
   echo "  GLOBAL_CONCURRENT_RUN_LIMIT=${GLOBAL_CONCURRENT_RUN_LIMIT:-unset}"
+  echo "  AGENT_QUEUE_LISTEN_ENABLED=${AGENT_QUEUE_LISTEN_ENABLED:-unset}"
+  echo "  AGENT_QUEUE_RECONCILE_INTERVAL_MS=${AGENT_QUEUE_RECONCILE_INTERVAL_MS:-unset}"
   echo "  KRW_ONTOLOGY_ROOT=${KRW_ONTOLOGY_ROOT:-unset}"
   echo "  KRW_ONTOLOGY_PLUGIN_PATH=${KRW_ONTOLOGY_PLUGIN_PATH:-unset}"
 else

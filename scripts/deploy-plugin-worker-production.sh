@@ -69,7 +69,7 @@ node "$SCRIPT_DIR/materialize-ontology-plugin.mjs" \
   --source "$PLUGIN_SOURCE_PATH" \
   --out "$KRW_ONTOLOGY_PLUGIN_PATH" \
   --mcp-url "$KRW_ONTOLOGY_MCP_URL" \
-  --stock-news-url "${STOCK_NEWS_ZAI_MCP_URL:-http://127.0.0.1:8775/mcp}" >/dev/null
+  --stock-news-url "${STOCK_NEWS_MCP_URL:-http://127.0.0.1:8775/mcp}" >/dev/null
 
 STOCK_NEWS_COVERAGE_PATH=${STOCK_NEWS_COVERAGE_PATH:-"$KRW_ONTOLOGY_PLUGIN_PATH/stock-news/coverage_companies.json"}
 node "$SCRIPT_DIR/export-stock-news-coverage.mjs" \
@@ -110,18 +110,32 @@ echo "Ontology source: $ONTOLOGY_SOURCE_DIR"
 echo "Plugin path: $KRW_ONTOLOGY_PLUGIN_PATH"
 echo "Skill files: $SKILL_COUNT"
 echo "MCP URL: ${KRW_ONTOLOGY_MCP_URL:-unset}"
-echo "Stock News MCP URL: ${STOCK_NEWS_ZAI_MCP_URL:-http://127.0.0.1:8775/mcp}"
+echo "Stock News MCP URL: ${STOCK_NEWS_MCP_URL:-http://127.0.0.1:8775/mcp}"
 echo "Stock News coverage: $STOCK_NEWS_COVERAGE_PATH"
+
+if [ "${NEWS_CARD_TRANSLATION_PROVIDER:-googletrans}" != "off" ] &&
+   [ "${NEWS_CARD_TRANSLATION_PROVIDER:-googletrans}" != "none" ] &&
+   [ "${NEWS_CARD_TRANSLATION_PROVIDER:-googletrans}" != "0" ]; then
+  NEWS_TRANSLATION_PYTHON=${NEWS_TRANSLATION_PYTHON:-python3}
+  if ! "$NEWS_TRANSLATION_PYTHON" - <<'PY' >/dev/null 2>&1
+import googletrans
+PY
+  then
+    echo "Warning: googletrans is not installed for $NEWS_TRANSLATION_PYTHON." >&2
+    echo "  Run: scripts/install-news-translation-deps.sh" >&2
+    echo "  News discovery will still work, but fallback cards may stay in English." >&2
+  fi
+fi
 
 if [ "$DRY_RUN" = "1" ]; then
   "$SCRIPT_DIR/install-mcp-server-launchd.sh" --env-file "$ENV_PATH" --dry-run
-  "$SCRIPT_DIR/install-stock-news-zai-mcp-launchd.sh" --env-file "$ENV_PATH" --dry-run
+  "$SCRIPT_DIR/install-stock-news-mcp-launchd.sh" --env-file "$ENV_PATH" --dry-run
   "$SCRIPT_DIR/deploy-worker-production.sh" --env-file "$ENV_PATH" --dry-run
   exit 0
 fi
 
 "$SCRIPT_DIR/install-mcp-server-launchd.sh" --env-file "$ENV_PATH" --load
-"$SCRIPT_DIR/install-stock-news-zai-mcp-launchd.sh" --env-file "$ENV_PATH" --load
+"$SCRIPT_DIR/install-stock-news-mcp-launchd.sh" --env-file "$ENV_PATH" --load
 "$SCRIPT_DIR/deploy-worker-production.sh" --env-file "$ENV_PATH"
 
 echo "Plugin/MCP Mac worker deployment complete."

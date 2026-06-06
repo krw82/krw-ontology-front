@@ -249,6 +249,7 @@ describe("agent job queue", () => {
           document_count: 300,
           object_count: 1000,
           manifest_valid: true,
+          executor_type: "claude_agent",
         }),
       },
     ]);
@@ -264,6 +265,7 @@ describe("agent job queue", () => {
         request_id: "req-1",
         research_mode: "deep",
         analysis_mode: "company",
+        executor_type: "claude_agent",
       }),
     );
     expect(appendAgentRunEvent).toHaveBeenNthCalledWith(
@@ -300,6 +302,45 @@ describe("agent job queue", () => {
       expect.objectContaining({
         research_mode: "deep",
         analysis_mode: "news",
+      }),
+    );
+  });
+
+  it("persists server pipeline executor type for queued runs", async () => {
+    const fake = createQueueAdmin();
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+
+    await enqueueAgentRun({
+      session,
+      history,
+      requestId: "req-1",
+      model: "sonnet",
+      mcpHealth,
+      analysisMode: "news",
+      runKind: "news_discovery",
+      executorType: "server_pipeline",
+    });
+
+    expect(fake.inserted).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: "agent_runs",
+          payload: expect.objectContaining({
+            run_kind: "news_discovery",
+            executor_type: "server_pipeline",
+          }),
+        }),
+      ]),
+    );
+    expect(appendAgentRunEvent).toHaveBeenNthCalledWith(
+      1,
+      fake.admin,
+      "run-1",
+      "run_started",
+      expect.objectContaining({
+        analysis_mode: "news",
+        run_kind: "news_discovery",
+        executor_type: "server_pipeline",
       }),
     );
   });

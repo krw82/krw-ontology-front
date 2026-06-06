@@ -1,15 +1,41 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { readIntEnv } from "@/lib/env";
 import { publicAgentErrorMessage } from "@/lib/api/chat/error-messages";
+import {
+  getAgentRunEventWaiter,
+  type AgentRunEventWaiter,
+} from "@/lib/agent/run-event-listener";
 import type { Json } from "@/types/database";
 import type { RunStatus, StreamingEventType } from "@/types/api-contracts";
 
-const EVENT_POLL_INTERVAL_MS = readIntEnv("AGENT_EVENT_POLL_INTERVAL_MS", 800, {
-  min: 100,
-});
+const EVENT_RECONCILE_INTERVAL_MS = readIntEnv(
+  "AGENT_EVENT_RECONCILE_INTERVAL_MS",
+  15_000,
+  {
+    min: 1_000,
+  },
+);
 const EVENT_STREAM_MAX_MS = readIntEnv("AGENT_EVENT_STREAM_MAX_MS", 120_000, {
   min: 10_000,
 });
+
+const EVENT_PAGE_SIZE = 100;
+
+type ReconcileResult = "closed" | "continue" | "open";
+
+export interface StreamAgentRunEventsOptions {
+  eventWaiter?: AgentRunEventWaiter;
+  reconcileIntervalMs?: number;
+  streamMaxMs?: number;
+}
+
+interface StreamAgentRunEventsParams extends StreamAgentRunEventsOptions {
+  userId: string;
+  sessionId: string;
+  runId?: string | null;
+  requestId?: string | null;
+  lastEventId?: number;
+}
 
 type SupabaseAdmin = ReturnType<typeof getSupabaseAdmin>;
 
@@ -71,6 +97,7 @@ export function createAgentRunEventWriter(
     }
 
     if (!eventType || dataLines.length === 0) return;
+    if (isIgnoredDurableEvent(eventType)) return;
 
     let payload: unknown;
     try {
@@ -101,17 +128,18 @@ export function createAgentRunEventWriter(
   };
 }
 
-export function streamAgentRunEventsResponse(params: {
-  userId: string;
-  sessionId: string;
-  runId?: string | null;
-  requestId?: string | null;
-  lastEventId?: number;
-}): Response {
+export function streamAgentRunEventsResponse(
+  params: StreamAgentRunEventsParams,
+): Response {
   const { userId, sessionId, runId, requestId, lastEventId = 0 } = params;
   const admin = getSupabaseAdmin();
+  const getEventWaiter = () => params.eventWaiter ?? getAgentRunEventWaiter();
+  const reconcileIntervalMs =
+    params.reconcileIntervalMs ?? EVENT_RECONCILE_INTERVAL_MS;
+  const streamMaxMs = params.streamMaxMs ?? EVENT_STREAM_MAX_MS;
   const encoder = new TextEncoder();
   let clientConnected = true;
+  let waitAbortController: AbortController | null = null;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -132,6 +160,56 @@ export function streamAgentRunEventsResponse(params: {
         await write(
           `${id != null ? `id: ${id}\n` : ""}event: ${eventType}\ndata: ${JSON.stringify(payload)}\n\n`,
         );
+      };
+
+      const reconcileRunStatus = async (
+        currentRunId: string,
+        cursor: number,
+      ): Promise<ReconcileResult> => {
+        const latestStatus = await loadRunStatus(admin, currentRunId, sessionId);
+        if (!latestStatus || !isTerminalStatus(latestStatus.status)) {
+          return "open";
+        }
+
+        if (latestStatus.status === "completed") {
+          await sendEvent("state_sync", {
+            session_id: sessionId,
+            run_id: currentRunId,
+            status: "completed",
+            reason: "session_synced",
+          });
+          controller.close();
+          return "closed";
+        }
+
+        const terminalEventId = await loadEarliestTerminalEventId(
+          admin,
+          currentRunId,
+        );
+        if (terminalEventId != null) {
+          if (terminalEventId <= cursor) {
+            controller.close();
+            return "closed";
+          }
+          return "continue";
+        }
+
+        const syntheticEvent = await createSyntheticTerminalEvent({
+          admin,
+          runId: currentRunId,
+          sessionId,
+          userId,
+          status: latestStatus.status,
+          errorCode: latestStatus.error_code,
+          requestId: latestStatus.request_id,
+        });
+        await sendEvent(
+          syntheticEvent.eventType,
+          syntheticEvent.payload,
+          syntheticEvent.id ?? undefined,
+        );
+        controller.close();
+        return "closed";
       };
 
       let currentRunId = runId?.trim() || null;
@@ -165,11 +243,12 @@ export function streamAgentRunEventsResponse(params: {
       let cursor = Math.max(0, Math.floor(lastEventId));
       const startedAt = Date.now();
 
-      while (Date.now() - startedAt < EVENT_STREAM_MAX_MS) {
+      while (Date.now() - startedAt < streamMaxMs) {
         const events = await loadEventsAfter(admin, currentRunId, cursor);
 
         for (const event of events) {
           cursor = Math.max(cursor, event.id);
+          if (isIgnoredDurableEvent(event.event_type)) continue;
           await sendEvent(
             event.event_type,
             sanitizeStreamingPayload(event.event_type, event.payload),
@@ -182,52 +261,24 @@ export function streamAgentRunEventsResponse(params: {
           }
         }
 
-        const latestStatus = await loadRunStatus(admin, currentRunId, sessionId);
-        if (latestStatus && isTerminalStatus(latestStatus.status)) {
-          if (latestStatus.status === "completed") {
-            await sendEvent("state_sync", {
-              session_id: sessionId,
-              run_id: currentRunId,
-              status: "completed",
-              reason: "session_synced",
-            });
-            controller.close();
-            return;
-          }
+        if (events.length >= EVENT_PAGE_SIZE) continue;
 
-          const terminalEventId = await loadEarliestTerminalEventId(
-            admin,
-            currentRunId,
-          );
-          if (terminalEventId != null) {
-            if (terminalEventId <= cursor) {
-              controller.close();
-              return;
-            }
-            continue;
-          }
+        const remainingMs = streamMaxMs - (Date.now() - startedAt);
+        if (remainingMs <= 0) break;
 
-          const syntheticEvent = await createSyntheticTerminalEvent({
-            admin,
-            runId: currentRunId,
-            sessionId,
-            userId,
-            status: latestStatus.status,
-            errorCode: latestStatus.error_code,
-            requestId: latestStatus.request_id,
-          });
-          await sendEvent(
-            syntheticEvent.eventType,
-            syntheticEvent.payload,
-            syntheticEvent.id ?? undefined,
-          );
-          controller.close();
-          return;
-        }
-
-        await new Promise((resolve) =>
-          setTimeout(resolve, EVENT_POLL_INTERVAL_MS),
+        waitAbortController = new AbortController();
+        const waitResult = await getEventWaiter().waitForRunEvent(
+          currentRunId,
+          Math.min(Math.max(0, reconcileIntervalMs), remainingMs),
+          waitAbortController.signal,
         );
+        waitAbortController = null;
+        if (!clientConnected || waitResult === "aborted") return;
+        if (waitResult === "notification") continue;
+
+        const reconcileResult = await reconcileRunStatus(currentRunId, cursor);
+        if (reconcileResult === "closed") return;
+        if (reconcileResult === "continue") continue;
       }
 
       const latestStatus = await loadRunStatus(admin, currentRunId, sessionId);
@@ -241,6 +292,7 @@ export function streamAgentRunEventsResponse(params: {
     },
     cancel() {
       clientConnected = false;
+      waitAbortController?.abort();
     },
   });
 
@@ -305,7 +357,7 @@ async function loadEventsAfter(
     .eq("run_id", runId)
     .gt("id", cursor)
     .order("id", { ascending: true })
-    .limit(100)
+    .limit(EVENT_PAGE_SIZE)
     .returns<AgentRunEventRow[]>();
 
   return data ?? [];
@@ -431,6 +483,10 @@ async function releaseExecutionBudget(
 
 function isTerminalEvent(eventType: StreamingEventType): boolean {
   return eventType === "done" || eventType === "error" || eventType === "cancelled";
+}
+
+function isIgnoredDurableEvent(eventType: StreamingEventType): boolean {
+  return eventType === "token";
 }
 
 function isTerminalStatus(status: RunStatus): boolean {

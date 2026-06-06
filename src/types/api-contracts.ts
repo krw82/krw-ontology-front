@@ -48,6 +48,8 @@ export type RunKind =
   | "news_discovery"
   | "news_research";
 
+export type AgentRunExecutorType = "claude_agent" | "server_pipeline";
+
 /** SSE streaming event types */
 export type StreamingEventType =
   | "run_started"
@@ -249,6 +251,7 @@ export interface AgentRun {
   error_message: string | null;
   sdk_diagnostics: Record<string, unknown> | null;
   run_kind: RunKind;
+  executor_type?: AgentRunExecutorType;
   selected_news_event_context?: Record<string, unknown> | null;
   source_artifact_id?: string | null;
   source_event_id?: string | null;
@@ -717,6 +720,27 @@ export interface AtomicNewsEventCard {
     suggested_ontology_questions?: string[];
     source_urls?: string[];
   };
+  source_pack?: {
+    version: "news-source-pack/v1";
+    selected_event_id: string;
+    read_at: string;
+    source_urls: string[];
+    source_previews: SourcePreview[];
+    reads: Array<{
+      url: string;
+      ok: boolean;
+      title?: string;
+      text?: string;
+      published_at?: string | null;
+      error?: string;
+      truncated?: boolean;
+      [key: string]: unknown;
+    }>;
+    original_text_for_ontology: string;
+    ontology_search_brief_en: string;
+    source_read_status: "read" | "partial" | "fallback";
+    claims_ko: string[];
+  };
   ui?: {
     button_label_ko?: string;
     badge_ko?: string;
@@ -1063,7 +1087,7 @@ export interface CreateSessionResponse {
 
 /** PATCH /api/sessions/[sessionId] response */
 export interface UpdateSessionResponse {
-  session: Session;
+  session: Pick<SessionSummary, "id" | "title" | "updated_at">;
 }
 
 /** DELETE /api/sessions/[sessionId] response */
@@ -1227,7 +1251,7 @@ export interface WebContainerEnv {
   WEB_COMMIT: string;
   KRW_ONTOLOGY_COMMIT: string;
   GLOBAL_CONCURRENT_RUN_LIMIT: string;  // "5"
-  CLAUDE_MODEL: string;                 // "claude-sonnet-4-6"
+  CLAUDE_MODEL: string;                 // "sonnet"
   CLAUDE_AGENT_MAX_TURNS: string;        // "20"
   AGENT_MAX_TOOL_CALLS: string;          // "18"
   AGENT_MAX_TOOL_RESULT_CHARS: string;   // "100000"

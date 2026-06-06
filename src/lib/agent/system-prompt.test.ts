@@ -64,13 +64,13 @@ describe("buildSystemPrompt", () => {
   it("keeps current-news search disabled in the prompt unless explicitly enabled", () => {
     const disabledPrompt = buildSystemPrompt();
     expect(disabledPrompt).toContain("Do not perform web searches");
-    expect(disabledPrompt).not.toContain("Stock News Z.ai MCP");
+    expect(disabledPrompt).not.toContain("Stock News MCP");
 
     const enabledPrompt = buildSystemPrompt(undefined, [], {
       stockNewsEnabled: true,
     });
     expect(enabledPrompt).toContain("Do not use built-in WebSearch or WebFetch");
-    expect(enabledPrompt).toContain("Stock News Z.ai MCP");
+    expect(enabledPrompt).toContain("Stock News MCP");
     expect(enabledPrompt).toContain("source provenance internally");
   });
 

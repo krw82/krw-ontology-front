@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { createClient } from "@/lib/supabase/client";
 import { easeOutExpo } from "@/lib/animation";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
@@ -137,64 +136,18 @@ export function HomeHeaderActions({
 }: {
   locale?: Locale;
 }) {
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
-  const supabase = useMemo(() => createClient(), []);
-
-  useEffect(() => {
-    if (!supabase) return;
-
-    let isMounted = true;
-
-    supabase.auth
-      .getUser()
-      .then(({ data: { user } }) => {
-        if (isMounted) setUserEmail(user?.email ?? null);
-      })
-      .catch(() => {
-        if (isMounted) setUserEmail(null);
-      })
-      .finally(() => {
-        if (isMounted) setAuthChecked(true);
-      });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!isMounted) return;
-      setAuthChecked(true);
-      setUserEmail(session?.user.email ?? null);
-    });
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
-  }, [supabase]);
-
   const companiesHref = localizedPath(locale, "/companies");
   const startLabel = locale === "ko" ? "무료로 시작" : "Start free";
   const loginLabel = locale === "ko" ? "로그인" : "Log in";
 
   return (
     <div className="flex min-w-0 items-center gap-3">
-      {userEmail ? (
-        <span className="hidden max-w-[180px] truncate text-sm font-semibold text-muted sm:inline">
-          {userEmail}
-        </span>
-      ) : authChecked ? (
-        <Link
-          href="/login"
-          className="hidden rounded-[8px] border border-hairline px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-primary hover:text-primary sm:inline-flex"
-        >
-          {loginLabel}
-        </Link>
-      ) : (
-        <span
-          aria-hidden="true"
-          className="hidden h-10 w-[74px] rounded-[8px] bg-surface sm:inline-flex"
-        />
-      )}
+      <Link
+        href="/login"
+        className="hidden rounded-[8px] border border-hairline px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-primary hover:text-primary sm:inline-flex"
+      >
+        {loginLabel}
+      </Link>
       <Link
         href={companiesHref}
         onClick={() => {

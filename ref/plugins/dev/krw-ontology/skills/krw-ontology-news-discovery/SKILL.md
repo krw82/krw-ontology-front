@@ -122,22 +122,21 @@ Use `"unknown"` for neutral latest-news questions.
 
 ## Card Quality
 
-Each card should describe a market-news article clearly enough for the user to know what they are selecting.
+Each card should describe a market narrative, not a raw page title.
 
 Bad:
 
 ```text
 SEC Filings - Apple Investor Relations
 Form 8-K - SEC.gov
-tradingview.com 보도: 약세 요인 후보
-최근 시장 반응이 GOOGL 약세 요인으로 부각
+Apple shares rise after ...
 ```
 
 Good:
 
 ```text
-AI 투자 부담 우려로 알파벳 주가 약세
-중국 수요 둔화 우려로 애플 주가 약세
+중국 경쟁과 아이폰 판매 둔화 우려가 AAPL 약세 요인으로 부각
+AI 투자 부담과 서비스 성장 기대가 엇갈리며 밸류에이션 논쟁
 ```
 
 Cards are market narrative candidates. Use cautious wording:
@@ -148,35 +147,6 @@ Cards are market narrative candidates. Use cautious wording:
 ```
 
 Do not state a news narrative as confirmed company fact.
-
-## User-Facing Card Payload
-
-Every usable card must provide these user-facing fields:
-
-```text
-event_title_ko: Korean news title
-original_headline: original article headline
-summary_ko: 2-3 Korean sentences explaining what the article says and why it matters to the market move
-primary_source or source_previews[0]: publisher/domain, URL, and published_at when available
-```
-
-The visible card must not include a filing-analysis checklist or "공시 기준으로 확인할 내용" section. Do not expose ontology questions, investment axes, or internal analysis steps to the user-facing card. The user should see only:
-
-```text
-한국어 뉴스 제목
-원문 기사
-내용 요약
-```
-
-Example:
-
-```text
-event_title_ko: AI 투자 부담 우려로 알파벳 주가 약세
-original_headline: Alphabet shares fall as investors weigh AI capex pressure
-summary_ko: 시장 뉴스는 알파벳의 AI 데이터센터 투자 확대가 잉여현금흐름과 주주환원 여력을 압박할 수 있다고 다뤘습니다. 투자자들은 Cloud 성장보다 CapEx 증가 속도와 자금 조달 부담에 민감하게 반응했습니다.
-```
-
-Do not create a card when the source only identifies a domain or generic narrative without an article headline.
 
 ## Required Hidden Brief
 

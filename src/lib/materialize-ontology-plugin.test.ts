@@ -75,28 +75,28 @@ describe("materialize-ontology-plugin", () => {
     }
   });
 
-  it("adds Stock News Z.ai MCP by default", () => {
+  it("adds Stock News MCP by default", () => {
     const { stdout, mcpConfig } = runMaterialize({
       ZAI_API_KEY: undefined,
     });
 
     expect(Object.keys(mcpConfig.mcpServers)).toEqual([
       "krw-ontology",
-      "stock-news-zai",
+      "stock-news",
     ]);
-    expect(mcpConfig.mcpServers["stock-news-zai"]).toEqual({
+    expect(mcpConfig.mcpServers["stock-news"]).toEqual({
       type: "http",
       url: "http://127.0.0.1:8775/mcp",
     });
-    expect(stdout).toContain("Stock News Z.ai MCP: enabled");
+    expect(stdout).toContain("Stock News MCP: enabled");
   });
 
-  it("keeps Stock News Z.ai MCP absent when explicitly disabled", () => {
+  it("keeps Stock News MCP absent when explicitly disabled", () => {
     const { stdout, mcpConfig } = runMaterialize({
-      STOCK_NEWS_ZAI_FORCE_DISABLED: "1",
+      STOCK_NEWS_FORCE_DISABLED: "1",
     });
 
     expect(Object.keys(mcpConfig.mcpServers)).toEqual(["krw-ontology"]);
-    expect(stdout).toContain("Stock News Z.ai MCP: disabled");
+    expect(stdout).toContain("Stock News MCP: disabled");
   });
 });

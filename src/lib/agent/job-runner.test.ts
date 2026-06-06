@@ -23,23 +23,33 @@ vi.mock("@/lib/agent/run-events", () => ({
     flush: vi.fn().mockResolvedValue(undefined),
   })),
 }));
+vi.mock("@/lib/news-discovery/discovery", () => ({
+  discoverNewsCards: vi.fn(),
+}));
+vi.mock("@/lib/news-discovery/source-pack", () => ({
+  buildSelectedNewsSourcePack: vi.fn(),
+}));
 
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
-import { checkMcpHealth } from "@/lib/agent/mcp-client";
+import { checkMcpHealth, type McpHealthResult } from "@/lib/agent/mcp-client";
 import { runAgent } from "@/lib/agent/runner";
 import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { discoverNewsCards } from "@/lib/news-discovery/discovery";
+import { buildSelectedNewsSourcePack } from "@/lib/news-discovery/source-pack";
 import { runAgentJob } from "./job-runner";
 
 function createRunnerAdmin(params: {
   openToolCalls?: Array<{ id: string; error_message: string | null }>;
   previousMessagesError?: { code?: string; message: string } | null;
+  runOverrides?: Record<string, unknown>;
 } = {}) {
   const updates: Array<{
     table: string;
     payload: Record<string, unknown>;
     filters: Record<string, unknown>;
   }> = [];
+  const inserted: Array<{ table: string; payload: Record<string, unknown> }> = [];
   const rpc = vi.fn((fn: string, args: Record<string, unknown>) => {
     if (fn === "mark_agent_run_terminal") {
       updates.push({
@@ -71,6 +81,10 @@ function createRunnerAdmin(params: {
         assistant_message_id: "assistant-message-1",
         request_id: "req-1",
         started_at: "2026-05-25T00:00:00.000Z",
+        run_kind: "company_research",
+        executor_type: "claude_agent",
+        selected_news_event_context: null,
+        ...params.runOverrides,
       },
     ],
     chat_sessions: [
@@ -98,6 +112,33 @@ function createRunnerAdmin(params: {
     rpc,
     from(table: string) {
       return {
+        insert(payload: Record<string, unknown>) {
+          inserted.push({ table, payload });
+          return {
+            select() {
+              return {
+                single() {
+                  if (table === "chat_message_artifacts") {
+                    return Promise.resolve({
+                      data: {
+                        id: "artifact-row-1",
+                        session_id: payload.session_id,
+                        message_id: payload.message_id,
+                        run_id: payload.run_id,
+                        type: payload.type,
+                        payload_json: payload.payload_json,
+                        created_at: "2026-05-25T00:00:02.000Z",
+                      },
+                      error: null,
+                    });
+                  }
+
+                  return Promise.resolve({ data: null, error: null });
+                },
+              };
+            },
+          };
+        },
         update(payload: Record<string, unknown>) {
           const filters: Record<string, unknown> = {};
           const query = {
@@ -194,7 +235,37 @@ function createRunnerAdmin(params: {
   return {
     admin: admin as unknown as ReturnType<typeof getSupabaseAdmin>,
     updates,
+    inserted,
     rpc,
+  };
+}
+
+function readyMcpHealth(): McpHealthResult {
+  return {
+    connected: true,
+    staticOk: true,
+    commandOk: true,
+    liveOk: true,
+    sqliteOk: true,
+    env: "dev",
+    releaseId: "release-1",
+    manifestPath: "/srv/krw-ontology-data/current/manifest.json",
+    manifestValid: true,
+    agentIndexSchemaVersion: "agent_index_v1",
+    indexGeneratedAt: "2026-05-25T00:00:00.000Z",
+    companyCount: 10,
+    documentCount: 20,
+    objectCount: 30,
+    toolCount: 12,
+    tools: ["krw_ontology_query_context"],
+    root: "/srv/krw-ontology-data/current",
+    indexPath: "/srv/krw-ontology-data/current/indexes/agent_index.sqlite",
+    pluginPath: "/srv/krw-ontology/plugins/krw-ontology",
+    releaseMetadata: {
+      env: "dev",
+      release_id: "release-1",
+      manifest_valid: true,
+    },
   };
 }
 
@@ -224,6 +295,238 @@ describe("agent job runner", () => {
       releaseMetadata: null,
       error: "MCP unavailable",
     });
+  });
+
+  it("runs queued server pipeline news discovery inside the worker", async () => {
+    const fake = createRunnerAdmin({
+      runOverrides: {
+        run_kind: "news_discovery",
+        executor_type: "server_pipeline",
+      },
+    });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+    vi.mocked(checkMcpHealth).mockResolvedValue(readyMcpHealth());
+    vi.mocked(discoverNewsCards).mockResolvedValue({
+      discovery: {
+        intent: {
+          originalQuestion: "Apple 오늘 왜 올라?",
+          englishQuestion: "Why is Apple stock rising today?",
+          direction: "up",
+          ticker: "AAPL",
+          companyName: "Apple Inc.",
+          resolvedEntities: [{ ticker: "AAPL" }],
+          lookbackHours: 48,
+        },
+        rawSearchResult: { events: [] },
+        selectedSourcePolicy: {
+          allowed_domains: ["reuters.com"],
+          excluded_domains: ["sec.gov"],
+          market_news_only: true,
+        },
+      },
+      composition: {
+        cards: [
+          {
+            id: "apple-market-news",
+            ticker: "AAPL",
+            event_title: "Apple shares rise after market news",
+            event_title_ko: "시장 뉴스 이후 애플 주가 상승",
+            short_summary:
+              "시장 뉴스는 애플 주가 상승 요인을 신제품 기대와 연결했습니다.",
+            summary_ko:
+              "로이터 시장 뉴스는 애플 주가 상승을 신제품 수요 기대와 투자자 위험 선호 회복에 연결했습니다.",
+            source_previews: [
+              {
+                publisher: "Reuters",
+                domain: "reuters.com",
+                title_original: "Apple shares rise after market news",
+                url: "https://example.test/apple",
+              },
+            ],
+          },
+        ],
+        usage: {
+          input_tokens: 100,
+          output_tokens: 50,
+          estimated_cost_usd: 0.001,
+        },
+      },
+    });
+
+    await runAgentJob("run-1", "worker-1");
+
+    expect(runAgent).not.toHaveBeenCalled();
+    expect(discoverNewsCards).toHaveBeenCalledWith(
+      expect.objectContaining({
+        question: "Apple 매출 알려줘",
+        session: expect.objectContaining({
+          id: "session-1",
+          userId: "user-1",
+          scopeType: "company",
+          defaultTickers: ["AAPL"],
+        }),
+      }),
+    );
+    expect(fake.inserted).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: "chat_message_artifacts",
+          payload: expect.objectContaining({
+            session_id: "session-1",
+            message_id: "assistant-message-1",
+            run_id: "run-1",
+            type: "news_event_selection",
+          }),
+        }),
+      ]),
+    );
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: "messages",
+          payload: expect.objectContaining({
+            status: "completed",
+          }),
+          filters: { id: "assistant-message-1" },
+        }),
+        expect.objectContaining({
+          table: "agent_runs",
+          payload: expect.objectContaining({
+            status: "completed",
+            input_tokens: 100,
+            output_tokens: 50,
+            estimated_cost_usd: 0.001,
+            lease_expires_at: null,
+          }),
+          filters: { id: "run-1" },
+        }),
+      ]),
+    );
+    expect(fake.rpc).toHaveBeenCalledWith("settle_execution_budget", {
+      p_user_id: "user-1",
+      p_request_id: "req-1",
+      p_run_id: "run-1",
+      p_actual_cost_usd: 0.001,
+      p_terminal_status: "completed",
+      p_metadata: expect.objectContaining({
+        executor_type: "server_pipeline",
+        run_kind: "news_discovery",
+        card_count: 1,
+      }),
+    });
+    expect(appendAgentRunEvent).toHaveBeenCalledWith(
+      fake.admin,
+      "run-1",
+      "done",
+      expect.objectContaining({
+        run_id: "run-1",
+        chat_artifacts: expect.arrayContaining([
+          expect.objectContaining({ type: "news_event_selection" }),
+        ]),
+      }),
+    );
+  });
+
+  it("builds selected news source packs inside the worker before news research", async () => {
+    const selectedEvent = {
+      id: "apple-market-news",
+      ticker: "AAPL",
+      event_title: "Apple shares rise after market news",
+      event_title_ko: "시장 뉴스 이후 애플 주가 상승",
+      source_previews: [
+        {
+          publisher: "Reuters",
+          domain: "reuters.com",
+          url: "https://example.test/apple",
+        },
+      ],
+    };
+    const fake = createRunnerAdmin({
+      runOverrides: {
+        run_kind: "news_research",
+        executor_type: "claude_agent",
+        selected_news_event_context: selectedEvent,
+      },
+    });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+    vi.mocked(checkMcpHealth).mockResolvedValue(readyMcpHealth());
+    vi.mocked(buildSelectedNewsSourcePack).mockResolvedValue({
+      version: "news-source-pack/v1",
+      selected_event_id: "apple-market-news",
+      read_at: "2026-05-25T00:00:02.000Z",
+      source_urls: ["https://example.test/apple"],
+      source_previews: selectedEvent.source_previews,
+      reads: [
+        {
+          url: "https://example.test/apple",
+          ok: true,
+          text: "Original market news text",
+        },
+      ],
+      original_text_for_ontology: "Original market news text",
+      ontology_search_brief_en:
+        "Use the article text to verify Apple market narrative against filings.",
+      source_read_status: "read",
+      claims_ko: ["시장 뉴스 이후 애플 주가 상승"],
+    });
+    vi.mocked(runAgent).mockResolvedValue({
+      status: "completed",
+      acc: {
+        fullText: "공시 기준 분석 결과",
+        structuredOutput: null,
+        researchSynthesisOutput: null,
+        researchSynthesisText: null,
+        displayPlanOutput: null,
+        toolCalls: [],
+        citations: [],
+        inputTokens: 10,
+        outputTokens: 20,
+      },
+    });
+
+    await runAgentJob("run-1", "worker-1");
+
+    expect(buildSelectedNewsSourcePack).toHaveBeenCalledWith(selectedEvent);
+    expect(runAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runKind: "news_research",
+        selectedNewsEventContext: expect.objectContaining({
+          ...selectedEvent,
+          source_pack: expect.objectContaining({
+            original_text_for_ontology: "Original market news text",
+            ontology_search_brief_en:
+              "Use the article text to verify Apple market narrative against filings.",
+          }),
+        }),
+      }),
+      expect.any(Object),
+    );
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: "agent_runs",
+          payload: {
+            selected_news_event_context: expect.objectContaining({
+              source_pack: expect.objectContaining({
+                source_read_status: "read",
+              }),
+            }),
+          },
+          filters: { id: "run-1" },
+        }),
+        expect.objectContaining({
+          table: "chat_message_artifact_selections",
+          payload: expect.objectContaining({
+            selected_payload_json: expect.objectContaining({
+              source_pack: expect.objectContaining({
+                source_read_status: "read",
+              }),
+            }),
+          }),
+          filters: { research_run_id: "run-1" },
+        }),
+      ]),
+    );
   });
 
   it("fails safely before invoking Claude when MCP is unavailable", async () => {

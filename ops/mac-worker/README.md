@@ -4,11 +4,12 @@ This setup keeps `krwontology.com` on GCP for web/API, but moves agent execution
 to this Mac.
 
 ```text
-User -> GCP web/API -> Supabase queue -> Mac agent-workers -> Supabase events
+User -> GCP web/API -> Supabase durable queue -> Postgres NOTIFY -> Mac supervisor -> Supabase events
 ```
 
-The Mac does not need inbound networking. It only connects out to Supabase,
-Claude, and local MCP processes.
+The Mac does not need inbound networking. It keeps one long-lived Postgres
+LISTEN session open to Supabase, then connects out to Claude and local MCP
+processes only when queued work is claimed.
 
 ## First-Time Setup
 
@@ -40,20 +41,20 @@ Claude, and local MCP processes.
    scripts/stop-gcp-agent-worker.sh
    ```
 
-5. Start one Mac worker in the foreground:
+5. Start the Mac supervisor in the foreground:
 
    ```sh
    scripts/start-mac-worker-production.sh
    ```
 
-6. For stable operation, install five launchd workers:
+6. For stable operation, install the launchd supervisor:
 
    ```sh
    scripts/install-mac-worker-launchd.sh --load
    ```
 
-   This starts `mac-worker-jwc-1` through `mac-worker-jwc-5`, each with its own
-   launchd label, lock, log file, and heartbeat row.
+   This starts one `com.krwontology.agent-worker` launchd service. The
+   supervisor controls concurrency with `AGENT_SUPERVISOR_CONCURRENCY`.
 
 7. Test `1Q -> 3Q -> 30Q` from `https://krwontology.com`.
 
@@ -82,7 +83,7 @@ compatibility. Normal plugin, skill, and MCP changes should use
 
 ## Rollback
 
-Stop the Mac foreground worker with `Ctrl-C`, or stop all launchd workers:
+Stop the Mac foreground supervisor with `Ctrl-C`, or stop launchd:
 
 ```sh
 scripts/uninstall-mac-worker-launchd.sh
@@ -96,15 +97,17 @@ scripts/start-gcp-agent-worker.sh
 
 ## Stable Operation
 
-After foreground testing passes, install the launchd plists generated from
+After foreground testing passes, install the launchd plist generated from
 `ops/launchd/com.krwontology.agent-worker.plist.template`.
 
 Keep these invariants:
 
 - only one production worker class claims jobs at a time
-- `MAC_WORKER_COUNT=8` and `GLOBAL_CONCURRENT_RUN_LIMIT=8` for the current Mac
-  worker setup
+- one Mac supervisor process owns production execution
+- `GLOBAL_CONCURRENT_RUN_LIMIT` is at least `AGENT_SUPERVISOR_CONCURRENCY`
+- worker wakeup uses Postgres `LISTEN/NOTIFY`; Supabase Realtime is not used for
+  worker wakeup
 - local queue writer is stopped while Mac worker serves production
 - GCP web keeps valid plugin/data until web admission no longer depends on local
   MCP health
-- GCP `agent-worker` stays stopped while Mac workers own production execution
+- GCP `agent-worker` stays stopped while the Mac supervisor owns production execution

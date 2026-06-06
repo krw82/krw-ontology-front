@@ -59,6 +59,49 @@ export function buildNewsEventSelectionArtifact(params: {
   };
 }
 
+export function buildNewsEventSelectionArtifactFromDiscoveryResult(params: {
+  result: UnknownRecord;
+  originalQuestion: string;
+}): BuiltNewsEventSelectionArtifact | null {
+  const rawEvents = findEventArray(params.result);
+  const events = normalizeEvents(rawEvents);
+  const emptyState = isRecord(params.result.empty_state)
+    ? params.result.empty_state
+    : undefined;
+  if (events.length === 0 && !emptyState) return null;
+
+  return {
+    type: "news_event_selection",
+    payload: {
+      kind: "news_event_selection",
+      version: 1,
+      original_question: params.originalQuestion,
+      resolved_entities: readRecordArray(params.result.resolved_entities),
+      lookback: isRecord(params.result.lookback)
+        ? params.result.lookback
+        : undefined,
+      discovery_policy: isRecord(params.result.discovery_policy)
+        ? params.result.discovery_policy
+        : undefined,
+      events,
+      cards: events,
+      discovery_summary: {
+        event_count: events.length,
+        source_count: countSourcePreviews(events),
+        has_official_candidates: events.some(
+          (event) => (event.official_source_urls ?? []).length > 0,
+        ),
+        has_major_news_candidates: events.some(
+          (event) => (event.major_news_urls ?? []).length > 0,
+        ),
+        direct_pipeline: true,
+      },
+      empty_state: emptyState,
+      raw_result: jsonClone(params.result) as Record<string, unknown>,
+    },
+  };
+}
+
 export function toPublicChatArtifact(row: {
   id: string;
   session_id: string;
@@ -151,8 +194,10 @@ function normalizeEvent(
     event.title_ko,
     event.headline_ko,
   );
+  const displayKoreanTitle =
+    koreanTitle && !isEnglishHeavy(koreanTitle) ? koreanTitle : undefined;
   const eventTitle = firstString(
-    koreanTitle,
+    displayKoreanTitle,
     event.event_title,
     event.title,
     event.headline,
@@ -163,33 +208,44 @@ function normalizeEvent(
   const id =
     firstString(event.id, event.event_id, event.slug) ??
     buildStableEventId(eventTitle, index);
+  const rawSummary = firstString(
+    event.summary_ko,
+    event.korean_summary,
+    event.news_summary_ko,
+    event.short_summary,
+    event.summary,
+    event.description,
+    event.snippet,
+    primarySource?.summary_ko,
+    primarySource?.snippet_summary,
+  );
+  const koreanSummary = firstKoreanString(
+    cleanKoreanNewsSummary(event.summary_ko),
+    cleanKoreanNewsSummary(event.korean_summary),
+    cleanKoreanNewsSummary(event.news_summary_ko),
+    primarySource?.summary_ko,
+  );
 
   return {
     ...event,
     id,
     event_title: eventTitle,
-    event_title_ko: koreanTitle,
+    event_title_ko: displayKoreanTitle,
     original_headline: originalHeadline,
     primary_source: primarySource,
     ticker: firstString(event.ticker, event.symbol),
     company_name: firstString(event.company_name, event.company),
     short_summary: firstString(
-      cleanKoreanNewsSummary(event.summary_ko),
-      cleanKoreanNewsSummary(event.korean_summary),
-      cleanKoreanNewsSummary(event.news_summary_ko),
+      koreanSummary,
       event.short_summary,
       event.summary,
       event.description,
       event.snippet,
       primarySource?.summary_ko,
       primarySource?.snippet_summary,
+      rawSummary,
     ),
-    summary_ko: firstString(
-      cleanKoreanNewsSummary(event.summary_ko),
-      cleanKoreanNewsSummary(event.korean_summary),
-      cleanKoreanNewsSummary(event.news_summary_ko),
-      primarySource?.summary_ko,
-    ),
+    summary_ko: koreanSummary,
     price_impact_direction: normalizeImpactDirection(event.price_impact_direction),
     source_summary: isRecord(event.source_summary) ? event.source_summary : undefined,
     investment_axes: readStringArray(event.investment_axes),
@@ -217,15 +273,10 @@ export function buildNewsEventSelectionUserMessage(
   );
   const sourceLabel = firstString(source?.publisher, source?.domain);
   const sourceDate = firstString(source?.published_at, event.source_date, event.event_date);
-  const originalHeadline = firstString(
-    event.original_headline,
-    source?.title_original,
-    source?.title,
-  );
-  const summary = firstString(event.summary_ko, event.short_summary);
+  const display = buildNewsEventDisplayText(event);
   const lines = [
     "선택 뉴스:",
-    event.event_title_ko || event.event_title,
+    display.title,
   ];
 
   if (sourceLabel || sourceDate) {
@@ -235,16 +286,56 @@ export function buildNewsEventSelectionUserMessage(
     );
   }
 
-  if (originalHeadline) {
-    lines.push("", "원문 기사:", originalHeadline);
+  if (display.originalHeadline) {
+    lines.push("", "원문 기사:", display.originalHeadline);
   }
 
-  if (summary) {
-    lines.push("", "내용 요약:", summary);
+  if (display.summary) {
+    lines.push("", "내용 요약:", display.summary);
   }
 
   lines.push("", "이 뉴스를 공시 기준으로 분석해줘.");
   return lines.join("\n");
+}
+
+export function buildNewsEventDisplayText(
+  event: AtomicNewsEventCard,
+): {
+  title: string;
+  summary?: string;
+  originalHeadline?: string;
+  isSourceLanguageFallback: boolean;
+} {
+  const source = event.primary_source ?? findPrimarySource(
+    event.source_previews ?? [],
+    event,
+  );
+  const originalHeadline = firstString(
+    event.original_headline,
+    source?.title_original,
+    source?.title,
+  );
+  const koreanTitle = firstString(event.event_title_ko, source?.title_ko);
+  const title =
+    koreanTitle && !isEnglishHeavy(koreanTitle)
+      ? koreanTitle
+      : firstString(event.event_title, originalHeadline, source?.title) ??
+        "원문 뉴스 후보";
+  const koreanSummary = firstString(event.summary_ko, source?.summary_ko);
+  const summary =
+    koreanSummary && !isEnglishHeavy(koreanSummary)
+      ? koreanSummary
+      : firstString(event.short_summary, source?.snippet_summary);
+
+  return {
+    title,
+    summary,
+    originalHeadline,
+    isSourceLanguageFallback:
+      isEnglishHeavy(title) ||
+      Boolean(summary && isEnglishHeavy(summary)) ||
+      !koreanTitle,
+  };
 }
 
 function countSourcePreviews(events: AtomicNewsEventCard[]): number {
@@ -257,6 +348,15 @@ function countSourcePreviews(events: AtomicNewsEventCard[]): number {
 function firstString(...values: unknown[]): string | undefined {
   for (const value of values) {
     if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function firstKoreanString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value !== "string" || !value.trim()) continue;
+    const trimmed = value.trim();
+    if (!isEnglishHeavy(trimmed)) return trimmed;
   }
   return undefined;
 }
@@ -331,10 +431,11 @@ function isUsableMarketNewsEvent(event: AtomicNewsEventCard): boolean {
     source?.title_original,
     source?.title,
   );
-  const summary = event.summary_ko;
+  const displayTitle = firstString(event.event_title_ko, event.event_title);
+  const summary = firstString(event.summary_ko, event.short_summary);
 
   return Boolean(
-    event.event_title_ko &&
+    displayTitle &&
       source &&
       originalHeadline &&
       !isLowInformationHeadline(originalHeadline) &&
@@ -426,6 +527,12 @@ function isLowInformationSummary(value: string): boolean {
   }
   if (/공시 기준(?:으로)?\s*분석/i.test(normalized)) return true;
   return false;
+}
+
+function isEnglishHeavy(value: string): boolean {
+  const latinCount = (value.match(/[A-Za-z]/g) ?? []).length;
+  const hangulCount = (value.match(/[가-힣]/g) ?? []).length;
+  return latinCount >= 24 && latinCount > Math.max(8, hangulCount * 1.4);
 }
 
 function isRecord(value: unknown): value is UnknownRecord {

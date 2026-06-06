@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import { createServerClient } from "@supabase/ssr";
@@ -491,9 +492,8 @@ function buildRequestBody(testCase, args, requestId) {
   };
 }
 
-function makeRequestId(testCase) {
-  const safeId = testCase.id.toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
-  return `prod-e2e-${RUN_TAG}-${safeId}`;
+function makeRequestId() {
+  return randomUUID();
 }
 
 async function runCase(testCase, args, auth) {

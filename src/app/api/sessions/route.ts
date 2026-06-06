@@ -36,28 +36,25 @@ export async function GET(request: NextRequest) {
   });
   const offset = (page - 1) * limit;
 
-  const {
-    data: sessions,
-    error,
-    count,
-  } = await supabase
+  const { data: sessionRows, error } = await supabase
     .from("chat_sessions")
     .select(
       "id, title, scope_type, default_tickers, last_message_preview, last_message_at, latest_run_status, created_at, updated_at",
-      { count: "exact" },
     )
     .eq("user_id", user.id)
     .is("deleted_at", null)
     .or("last_message_at.not.is.null,latest_run_status.in.(pending,queued,running)")
     .order("updated_at", { ascending: false })
-    .range(offset, offset + limit - 1)
+    .range(offset, offset + limit)
     .returns<ChatSessionRow[]>();
 
   if (error) {
     return internalError("채팅 목록을 불러오지 못했습니다.");
   }
 
-  const summaries = (sessions ?? []).map((s) => ({
+  const sessions = sessionRows ?? [];
+  const hasMore = sessions.length > limit;
+  const summaries = sessions.slice(0, limit).map((s) => ({
     id: s.id,
     title: s.title,
     scope_type: s.scope_type,
@@ -73,7 +70,7 @@ export async function GET(request: NextRequest) {
 
   return Response.json({
     sessions: summaries,
-    total: count ?? summaries.length,
+    total: offset + summaries.length + (hasMore ? 1 : 0),
     page,
     limit,
   });
@@ -221,7 +218,9 @@ export async function POST(request: NextRequest) {
       default_tickers: body.default_tickers ?? [],
       default_document_types: body.default_document_types ?? [],
     })
-    .select()
+    .select(
+      "id, user_id, title, scope_type, default_tickers, default_document_types, deleted_at, created_at, updated_at",
+    )
     .single();
 
   if (error || !session) {

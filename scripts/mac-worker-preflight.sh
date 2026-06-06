@@ -99,8 +99,15 @@ set -a
 set +a
 
 if [ -n "$WORKER_ID_OVERRIDE" ]; then
-  AGENT_WORKER_ID=$WORKER_ID_OVERRIDE
-  export AGENT_WORKER_ID
+  AGENT_SUPERVISOR_ID=$WORKER_ID_OVERRIDE
+fi
+AGENT_SUPERVISOR_ID=${AGENT_SUPERVISOR_ID:-${AGENT_WORKER_ID:-mac-supervisor-jwc}}
+AGENT_WORKER_ID=$AGENT_SUPERVISOR_ID
+export AGENT_SUPERVISOR_ID
+export AGENT_WORKER_ID
+if [ -z "${AGENT_SUPERVISOR_CONCURRENCY:-}" ]; then
+  AGENT_SUPERVISOR_CONCURRENCY=${MAC_WORKER_COUNT:-1}
+  export AGENT_SUPERVISOR_CONCURRENCY
 fi
 
 KRW_ONTOLOGY_QUEUE_ROOT=${KRW_ONTOLOGY_QUEUE_ROOT:-"$HOME/krw-ontology-data-running"}
@@ -147,22 +154,21 @@ for key in \
   CLAUDE_CODE_EXECUTABLE \
   CLAUDE_CONFIG_DIR \
   EXPECTED_CLAUDE_CODE_VERSION \
-  AGENT_WORKER_ID \
+  AGENT_SUPERVISOR_ID \
   GLOBAL_CONCURRENT_RUN_LIMIT \
   LEASE_TIMEOUT_MINUTES
 do
   require_env "$key"
 done
 
-MAC_WORKER_COUNT=${MAC_WORKER_COUNT:-1}
-case "$MAC_WORKER_COUNT" in
+case "$AGENT_SUPERVISOR_CONCURRENCY" in
   ''|*[!0-9]*)
-    echo "MAC_WORKER_COUNT must be a positive integer: $MAC_WORKER_COUNT" >&2
+    echo "AGENT_SUPERVISOR_CONCURRENCY must be a positive integer: $AGENT_SUPERVISOR_CONCURRENCY" >&2
     exit 1
     ;;
 esac
-if [ "$MAC_WORKER_COUNT" -lt 1 ]; then
-  echo "MAC_WORKER_COUNT must be at least 1." >&2
+if [ "$AGENT_SUPERVISOR_CONCURRENCY" -lt 1 ]; then
+  echo "AGENT_SUPERVISOR_CONCURRENCY must be at least 1." >&2
   exit 1
 fi
 
@@ -198,9 +204,9 @@ case "$GLOBAL_CONCURRENT_RUN_LIMIT" in
     exit 1
     ;;
 esac
-if [ "$GLOBAL_CONCURRENT_RUN_LIMIT" -lt "$MAC_WORKER_COUNT" ]; then
-  echo "Refusing to start $MAC_WORKER_COUNT workers with GLOBAL_CONCURRENT_RUN_LIMIT=$GLOBAL_CONCURRENT_RUN_LIMIT." >&2
-  echo "GLOBAL_CONCURRENT_RUN_LIMIT must be at least MAC_WORKER_COUNT." >&2
+if [ "$GLOBAL_CONCURRENT_RUN_LIMIT" -lt "$AGENT_SUPERVISOR_CONCURRENCY" ]; then
+  echo "Refusing supervisor concurrency $AGENT_SUPERVISOR_CONCURRENCY with GLOBAL_CONCURRENT_RUN_LIMIT=$GLOBAL_CONCURRENT_RUN_LIMIT." >&2
+  echo "GLOBAL_CONCURRENT_RUN_LIMIT must be at least AGENT_SUPERVISOR_CONCURRENCY." >&2
   exit 1
 fi
 
@@ -301,10 +307,10 @@ NODE
 if [ "$SKIP_WORKER_DUPLICATE_CHECK" != "1" ]; then
   worker_processes=$(
     ps eww -axo pid,command \
-      | awk -v id="AGENT_WORKER_ID=$AGENT_WORKER_ID" '/[.]worker\/agent-worker[.]mjs/ && index($0, id) > 0 && !/awk/ { print $1 }'
+      | awk -v id="AGENT_WORKER_ID=$AGENT_SUPERVISOR_ID" '/[.]worker\/agent-worker[.]mjs/ && index($0, id) > 0 && !/awk/ { print $1 }'
   )
   if [ -n "$worker_processes" ]; then
-    echo "A Mac agent worker with id $AGENT_WORKER_ID is already running. Refusing duplicate worker id. Existing PID(s):" >&2
+    echo "A Mac agent supervisor with id $AGENT_SUPERVISOR_ID is already running. Refusing duplicate supervisor id. Existing PID(s):" >&2
     echo "$worker_processes" >&2
     exit 1
   fi
@@ -323,6 +329,8 @@ export KRW_ONTOLOGY_MCP_HEALTH_URL
 export CLAUDE_AGENT_CWD
 export CLAUDE_CODE_EXECUTABLE
 export CLAUDE_CONFIG_DIR
+export AGENT_SUPERVISOR_ID
+export AGENT_SUPERVISOR_CONCURRENCY
 
 echo "Checking plugin MCP config..."
 node <<'NODE'
@@ -343,9 +351,9 @@ if (server.type === "http" || server.type === "sse") {
     throw new Error(`Plugin .mcp.json MCP URL mismatch: ${server.url} !== ${expectedUrl}`);
   }
   console.log(`OK plugin MCP URL: ${server.url}`);
-  const stockNewsServer = config.mcpServers && config.mcpServers["stock-news-zai"];
-  const expectedStockNewsUrl = process.env.STOCK_NEWS_ZAI_MCP_URL || "http://127.0.0.1:8775/mcp";
-  if (!stockNewsServer) throw new Error("Missing mcpServers.stock-news-zai");
+  const stockNewsServer = config.mcpServers && config.mcpServers["stock-news"];
+  const expectedStockNewsUrl = process.env.STOCK_NEWS_MCP_URL || "http://127.0.0.1:8775/mcp";
+  if (!stockNewsServer) throw new Error("Missing mcpServers.stock-news");
   if (stockNewsServer.type !== "http") {
     throw new Error(`Stock News MCP must use streamable HTTP MCP, got: ${stockNewsServer.type}`);
   }
@@ -567,6 +575,44 @@ const client = createClient(url, key, {
   console.error(error.message || error);
   process.exit(1);
 });
+NODE
+
+echo "Checking Postgres LISTEN config..."
+node <<'NODE'
+const enabled = process.env.AGENT_QUEUE_LISTEN_ENABLED !== "0";
+const channel = process.env.AGENT_QUEUE_LISTEN_CHANNEL || "agent_run_queued";
+if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(channel)) {
+  throw new Error(`Invalid AGENT_QUEUE_LISTEN_CHANNEL: ${channel}`);
+}
+if (!enabled) {
+  console.log("Postgres LISTEN disabled; supervisor will use slow reconcile only");
+  process.exit(0);
+}
+
+const explicit =
+  process.env.AGENT_QUEUE_LISTEN_DATABASE_URL ||
+  process.env.SUPABASE_LISTEN_DATABASE_URL ||
+  process.env.SUPABASE_DB_URL ||
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL;
+if (explicit) {
+  console.log(`OK Postgres LISTEN config: channel=${channel} connection=explicit`);
+  process.exit(0);
+}
+
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+if (!supabaseUrl) throw new Error("Missing SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL");
+const parsed = new URL(supabaseUrl);
+if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+  console.log(`OK Postgres LISTEN config: channel=${channel} connection=local`);
+  process.exit(0);
+}
+if (!process.env.SUPABASE_DB_PASSWORD) {
+  throw new Error(
+    "Missing SUPABASE_DB_PASSWORD or explicit AGENT_QUEUE_LISTEN_DATABASE_URL for Postgres LISTEN",
+  );
+}
+console.log(`OK Postgres LISTEN config: channel=${channel} connection=derived`);
 NODE
 
 echo "Mac worker preflight passed."

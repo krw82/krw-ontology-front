@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import type { McpHealthResult } from "@/lib/agent/mcp-client";
 import { getReadyAgentWorker } from "@/lib/agent/worker-heartbeat";
 import { enqueueAgentRun, findRunByRequestId } from "@/lib/agent/job-queue";
+import { getClaudeAgentModel } from "@/lib/agent/model";
 import { streamAgentRunEventsResponse } from "@/lib/agent/run-events";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
 import { fetchHistory, reserveBudgetStep, resolveSession } from "@/lib/api/chat";
@@ -167,7 +168,8 @@ export async function POST(request: NextRequest) {
   );
   if (!budgetResult.ok) return budgetResult.response;
 
-  const visibleUserMessage = selectedEventUserMessage(artifactResult.event);
+  const selectedEvent = artifactResult.event;
+  const visibleUserMessage = selectedEventUserMessage(selectedEvent);
   const historyResult = await fetchHistory(
     session.id,
     visibleUserMessage,
@@ -178,7 +180,7 @@ export async function POST(request: NextRequest) {
     return historyResult.response;
   }
 
-  const model = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
+  const model = getClaudeAgentModel();
   const enqueueResult = await enqueueAgentRun({
     session,
     requestId,
@@ -188,9 +190,9 @@ export async function POST(request: NextRequest) {
     researchMode,
     analysisMode: "news",
     runKind: "news_research",
-    selectedNewsEventContext: artifactResult.event,
+    selectedNewsEventContext: selectedEvent,
     sourceArtifactId: artifactResult.artifact.id,
-    sourceEventId: artifactResult.event.id,
+    sourceEventId: selectedEvent.id,
   });
 
   if (!enqueueResult.ok) {
@@ -220,7 +222,7 @@ export async function POST(request: NextRequest) {
   await upsertSelection({
     artifactId: artifactResult.artifact.id,
     sessionId: session.id,
-    event: artifactResult.event,
+    event: selectedEvent,
     userId: user.id,
     userMessageId: historyResult.result.userMessageId,
     researchRunId: enqueueResult.runId,

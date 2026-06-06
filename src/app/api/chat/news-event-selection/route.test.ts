@@ -291,7 +291,9 @@ describe("POST /api/chat/news-event-selection", () => {
         requestId: REQUEST_ID,
         analysisMode: "news",
         runKind: "news_research",
-        selectedNewsEventContext: selectedEvent,
+        selectedNewsEventContext: expect.objectContaining({
+          ...selectedEvent,
+        }),
         sourceArtifactId: ARTIFACT_ID,
         sourceEventId: EVENT_ID,
       }),
@@ -301,7 +303,9 @@ describe("POST /api/chat/news-event-selection", () => {
         artifact_id: ARTIFACT_ID,
         session_id: SESSION_ID,
         event_id: EVENT_ID,
-        selected_payload_json: selectedEvent,
+        selected_payload_json: expect.objectContaining({
+          ...selectedEvent,
+        }),
         user_message_id: "user-message-selected",
         research_run_id: "research-run-1",
         status: "queued",

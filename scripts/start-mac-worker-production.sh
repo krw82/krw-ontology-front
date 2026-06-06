@@ -7,8 +7,9 @@ usage() {
   cat <<'EOF'
 Usage: scripts/start-mac-worker-production.sh [--env-file FILE] [--worker-id ID] [--log-file FILE] [--no-build] [--skip-preflight]
 
-Run one production agent worker process on this Mac. Use launchd for long-lived
-operation.
+Run the production agent supervisor process on this Mac. Use launchd for
+long-lived operation. The --worker-id flag is kept for compatibility and sets
+the supervisor heartbeat id.
 EOF
 }
 
@@ -67,9 +68,16 @@ set -a
 set +a
 
 if [ -n "$WORKER_ID_OVERRIDE" ]; then
-  AGENT_WORKER_ID=$WORKER_ID_OVERRIDE
-  export AGENT_WORKER_ID
+  AGENT_SUPERVISOR_ID=$WORKER_ID_OVERRIDE
 fi
+AGENT_SUPERVISOR_ID=${AGENT_SUPERVISOR_ID:-${AGENT_WORKER_ID:-mac-supervisor-jwc}}
+AGENT_WORKER_ID=$AGENT_SUPERVISOR_ID
+if [ -z "${AGENT_SUPERVISOR_CONCURRENCY:-}" ]; then
+  AGENT_SUPERVISOR_CONCURRENCY=${MAC_WORKER_COUNT:-1}
+fi
+export AGENT_SUPERVISOR_ID
+export AGENT_SUPERVISOR_CONCURRENCY
+export AGENT_WORKER_ID
 
 if [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ -f "$CLAUDE_CONFIG_DIR/deepseek.env" ]; then
   set -a
@@ -100,13 +108,13 @@ if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${ANTHROPIC_AUTH_TOKEN:-}" ]; then
   exit 1
 fi
 
-require_worker_id=${AGENT_WORKER_ID:-}
+require_worker_id=${AGENT_SUPERVISOR_ID:-}
 if [ -z "$require_worker_id" ]; then
-  echo "Missing AGENT_WORKER_ID." >&2
+  echo "Missing AGENT_SUPERVISOR_ID." >&2
   exit 1
 fi
 
-safe_worker_id=$(printf '%s' "$AGENT_WORKER_ID" | tr -cs 'A-Za-z0-9_.-' '-' | sed 's/^-//; s/-$//')
+safe_worker_id=$(printf '%s' "$AGENT_SUPERVISOR_ID" | tr -cs 'A-Za-z0-9_.-' '-' | sed 's/^-//; s/-$//')
 LOCK_DIR=${MAC_WORKER_LOCK_DIR:-/tmp/krw-ontology-agent-worker-$safe_worker_id.lock}
 if [ -z "$LOG_FILE" ]; then
   LOG_FILE="$FRONT_DIR/logs/mac-agent-worker-$safe_worker_id.log"
@@ -115,11 +123,11 @@ fi
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   existing_worker=$(
     ps eww -axo pid,command \
-      | awk -v id="AGENT_WORKER_ID=$AGENT_WORKER_ID" '/[.]worker\/agent-worker[.]mjs/ && index($0, id) > 0 && !/awk/ { print $1 }'
+      | awk -v id="AGENT_WORKER_ID=$AGENT_SUPERVISOR_ID" '/[.]worker\/agent-worker[.]mjs/ && index($0, id) > 0 && !/awk/ { print $1 }'
   )
   if [ -n "$existing_worker" ]; then
     echo "Mac worker lock already exists: $LOCK_DIR" >&2
-    echo "Refusing to start duplicate worker id $AGENT_WORKER_ID. Existing PID(s):" >&2
+    echo "Refusing to start duplicate supervisor id $AGENT_SUPERVISOR_ID. Existing PID(s):" >&2
     echo "$existing_worker" >&2
     exit 1
   fi
@@ -149,8 +157,11 @@ if [ "$BUILD" = "1" ]; then
   (cd "$FRONT_DIR" && npm run build:worker)
 fi
 
-echo "Starting Mac production agent worker..."
-echo "Worker id: $AGENT_WORKER_ID"
+echo "Starting Mac production agent supervisor..."
+echo "Supervisor id: $AGENT_SUPERVISOR_ID"
+echo "Supervisor concurrency: $AGENT_SUPERVISOR_CONCURRENCY"
+echo "Queue reconcile interval: ${AGENT_QUEUE_RECONCILE_INTERVAL_MS:-60000}"
+echo "Queue listen enabled: ${AGENT_QUEUE_LISTEN_ENABLED:-1}"
 echo "Ontology env: ${KRW_ONTOLOGY_ENV:-unset}"
 echo "Release root: ${KRW_ONTOLOGY_RELEASE_ROOT:-${KRW_ONTOLOGY_ROOT:-unset}}"
 echo "Index path: ${KRW_ONTOLOGY_INDEX_PATH:-unset}"

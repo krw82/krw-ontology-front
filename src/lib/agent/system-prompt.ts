@@ -49,8 +49,8 @@ function buildStockNewsPolicy(features: PromptRuntimeFeatures): string {
     return [
       "Do not use built-in WebSearch or WebFetch.",
       features.stockNewsRequired
-        ? "This run is in news mode: use only the configured read-only Stock News Z.ai MCP tool for current news/event discovery before the final answer."
-        : "When recent, current, post-filing, or explicitly news-based context is needed, use only the configured read-only Stock News Z.ai MCP tool.",
+        ? "This run is in news mode: use only the configured read-only Stock News MCP tool for current news/event discovery before the final answer."
+        : "When recent, current, post-filing, or explicitly news-based context is needed, use only the configured read-only Stock News MCP tool.",
       "Preserve filing-vs-news source provenance internally, but synthesize both into one Korean investor interpretation in the final answer.",
       "If the stock-news MCP call fails, times out, or returns no useful results, continue from filing evidence and state that no additional current news context was confirmed.",
     ].join("\n");

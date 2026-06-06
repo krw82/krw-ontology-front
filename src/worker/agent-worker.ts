@@ -5,14 +5,22 @@ import { runAgentJob } from "@/lib/agent/job-runner";
 import {
   isReadyMcpHealth,
   startAgentWorkerHeartbeat,
-  type AgentWorkerStatus,
 } from "@/lib/agent/worker-heartbeat";
 import { readIntEnv } from "@/lib/env";
+import { AgentSupervisor } from "@/worker/agent-supervisor";
+import { createPostgresQueueListenerFromEnv } from "@/worker/postgres-queue-listener";
 
-const WORKER_ID = process.env.AGENT_WORKER_ID || `agent-worker-${randomUUID()}`;
-const POLL_INTERVAL_MS = readIntEnv("AGENT_WORKER_POLL_INTERVAL_MS", 1000, {
-  min: 100,
-});
+const WORKER_ID =
+  process.env.AGENT_SUPERVISOR_ID ||
+  process.env.AGENT_WORKER_ID ||
+  `agent-supervisor-${randomUUID()}`;
+
+const SUPERVISOR_CONCURRENCY = readSupervisorConcurrency();
+const RECONCILE_INTERVAL_MS = readIntEnv(
+  "AGENT_QUEUE_RECONCILE_INTERVAL_MS",
+  60_000,
+  { min: 5_000 },
+);
 const IDLE_LOG_INTERVAL_MS = readIntEnv("AGENT_WORKER_IDLE_LOG_INTERVAL_MS", 60_000, {
   min: 5_000,
 });
@@ -22,81 +30,55 @@ const CLAIM_HEALTH_INTERVAL_MS = readIntEnv(
   { min: 1_000 },
 );
 
-let stopping = false;
-let workerStatus: AgentWorkerStatus = "idle";
-let lastReadyHealthCheckAt = 0;
-let lastReadyHealthOk = false;
-
-process.on("SIGINT", () => {
-  stopping = true;
-});
-process.on("SIGTERM", () => {
-  stopping = true;
-});
-
-async function sleep(ms: number) {
-  await new Promise((resolve) => setTimeout(resolve, ms));
+function readSupervisorConcurrency(): number {
+  if (process.env.AGENT_SUPERVISOR_CONCURRENCY?.trim()) {
+    return readIntEnv("AGENT_SUPERVISOR_CONCURRENCY", 1, { min: 1 });
+  }
+  if (process.env.MAC_WORKER_COUNT?.trim()) {
+    return readIntEnv("MAC_WORKER_COUNT", 1, { min: 1 });
+  }
+  return 1;
 }
 
-async function workerCanClaim(): Promise<boolean> {
-  const now = Date.now();
-  if (now - lastReadyHealthCheckAt < CLAIM_HEALTH_INTERVAL_MS) {
-    return lastReadyHealthOk;
-  }
-  const mcpHealth = await checkMcpHealth();
-  lastReadyHealthCheckAt = now;
-  lastReadyHealthOk = isReadyMcpHealth(mcpHealth);
-  if (lastReadyHealthOk) return true;
-  console.warn("[agent-worker] refusing to claim; MCP release is not ready", {
-    env: mcpHealth.env,
-    releaseId: mcpHealth.releaseId,
-    manifestValid: mcpHealth.manifestValid,
-    connected: mcpHealth.connected,
-    error: mcpHealth.error,
+async function waitForStopSignal(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    let resolved = false;
+    const stop = () => {
+      if (resolved) return;
+      resolved = true;
+      resolve();
+    };
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
   });
-  return false;
 }
 
 async function main() {
-  console.info("[agent-worker] started", { workerId: WORKER_ID });
-  const stopWorkerHeartbeat = startAgentWorkerHeartbeat(
-    WORKER_ID,
-    () => workerStatus,
-  );
-  let lastIdleLogAt = 0;
+  process.env.AGENT_WORKER_ID = WORKER_ID;
+  process.env.AGENT_SUPERVISOR_ID = WORKER_ID;
 
-  try {
-    while (!stopping) {
-      workerStatus = "idle";
-      if (!(await workerCanClaim())) {
-        await sleep(POLL_INTERVAL_MS);
-        continue;
-      }
-      const runId = await claimNextAgentRun(WORKER_ID);
+  const supervisor = new AgentSupervisor({
+    workerId: WORKER_ID,
+    concurrency: SUPERVISOR_CONCURRENCY,
+    reconcileIntervalMs: RECONCILE_INTERVAL_MS,
+    claimHealthIntervalMs: CLAIM_HEALTH_INTERVAL_MS,
+    idleLogIntervalMs: IDLE_LOG_INTERVAL_MS,
+    checkMcpHealth,
+    isReadyMcpHealth,
+    claimNextAgentRun,
+    runAgentJob,
+    startHeartbeat: startAgentWorkerHeartbeat,
+    createQueueListener: () => createPostgresQueueListenerFromEnv(console),
+    logger: console,
+  });
 
-      if (!runId) {
-        if (Date.now() - lastIdleLogAt > IDLE_LOG_INTERVAL_MS) {
-          console.info("[agent-worker] idle", { workerId: WORKER_ID });
-          lastIdleLogAt = Date.now();
-        }
-        await sleep(POLL_INTERVAL_MS);
-        continue;
-      }
-
-      workerStatus = "running";
-      console.info("[agent-worker] claimed", { workerId: WORKER_ID, runId });
-      await runAgentJob(runId, WORKER_ID);
-      console.info("[agent-worker] finished", { workerId: WORKER_ID, runId });
-    }
-  } finally {
-    await stopWorkerHeartbeat();
-  }
-
-  console.info("[agent-worker] stopped", { workerId: WORKER_ID });
+  await supervisor.start();
+  await waitForStopSignal();
+  await supervisor.stop();
 }
 
 main().catch((error) => {
-  console.error("[agent-worker] fatal", {
+  console.error("[agent-supervisor] fatal", {
     error: error instanceof Error ? error.stack ?? error.message : String(error),
   });
   process.exit(1);

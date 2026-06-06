@@ -14,8 +14,8 @@ import type { Json } from "@/types/database";
 
 const KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX =
   "mcp__plugin_krw-ontology_krw-ontology__";
-const STOCK_NEWS_ZAI_PLUGIN_TOOL_PREFIX =
-  "mcp__plugin_krw-ontology_stock-news-zai__";
+const STOCK_NEWS_PLUGIN_TOOL_PREFIX =
+  "mcp__plugin_krw-ontology_stock-news__";
 
 export const KRW_ONTOLOGY_MCP_TOOLS = [
   "krw_ontology_catalog",
@@ -32,7 +32,7 @@ export const KRW_ONTOLOGY_MCP_TOOLS = [
   "krw_ontology_chain",
 ] as const satisfies readonly KRWOntologyMCPToolName[];
 
-export const STOCK_NEWS_ZAI_MCP_TOOLS = [
+export const STOCK_NEWS_MCP_TOOLS = [
   "route_news_question",
   "resolve_news_entities",
   "search_company_news_events",
@@ -47,12 +47,12 @@ export const KRW_ONTOLOGY_SDK_ALLOWED_TOOLS = KRW_ONTOLOGY_MCP_TOOLS.map(
   (toolName) => `${KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX}${toolName}`,
 );
 
-export const STOCK_NEWS_ZAI_SDK_ALLOWED_TOOLS = STOCK_NEWS_ZAI_MCP_TOOLS.map(
-  (toolName) => `${STOCK_NEWS_ZAI_PLUGIN_TOOL_PREFIX}${toolName}`,
+export const STOCK_NEWS_SDK_ALLOWED_TOOLS = STOCK_NEWS_MCP_TOOLS.map(
+  (toolName) => `${STOCK_NEWS_PLUGIN_TOOL_PREFIX}${toolName}`,
 );
 
 const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
-const STOCK_NEWS_ZAI_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_ZAI_MCP_TOOLS);
+const STOCK_NEWS_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_MCP_TOOLS);
 const execFileAsync = promisify(execFile);
 const DEFAULT_MCP_HEALTH_TIMEOUT_MS = 30_000;
 
@@ -63,26 +63,26 @@ export function isKrwOntologySdkTool(toolName: string): boolean {
   return Boolean(bareName && KRW_ONTOLOGY_MCP_TOOL_SET.has(bareName));
 }
 
-export function isStockNewsZaiSdkTool(toolName: string): boolean {
-  if (!toolName.startsWith(STOCK_NEWS_ZAI_PLUGIN_TOOL_PREFIX)) return false;
-  const bareName = toolName.slice(STOCK_NEWS_ZAI_PLUGIN_TOOL_PREFIX.length);
+export function isStockNewsSdkTool(toolName: string): boolean {
+  if (!toolName.startsWith(STOCK_NEWS_PLUGIN_TOOL_PREFIX)) return false;
+  const bareName = toolName.slice(STOCK_NEWS_PLUGIN_TOOL_PREFIX.length);
 
-  return Boolean(bareName && STOCK_NEWS_ZAI_MCP_TOOL_SET.has(bareName));
+  return Boolean(bareName && STOCK_NEWS_MCP_TOOL_SET.has(bareName));
 }
 
-export function isStockNewsZaiEnabled(
+export function isStockNewsEnabled(
   env: Record<string, string | undefined> = process.env,
 ): boolean {
-  if (truthyEnv(env.STOCK_NEWS_ZAI_FORCE_DISABLED)) return false;
-  if (falseyEnv(env.STOCK_NEWS_ZAI_ENABLED)) return false;
+  if (truthyEnv(env.STOCK_NEWS_FORCE_DISABLED)) return false;
+  if (falseyEnv(env.STOCK_NEWS_ENABLED)) return false;
 
   return true;
 }
 
-export function getStockNewsZaiSdkAllowedTools(
+export function getStockNewsSdkAllowedTools(
   env: Record<string, string | undefined> = process.env,
 ): string[] {
-  return isStockNewsZaiEnabled(env) ? STOCK_NEWS_ZAI_SDK_ALLOWED_TOOLS : [];
+  return isStockNewsEnabled(env) ? STOCK_NEWS_SDK_ALLOWED_TOOLS : [];
 }
 
 function truthyEnv(value: string | undefined): boolean {

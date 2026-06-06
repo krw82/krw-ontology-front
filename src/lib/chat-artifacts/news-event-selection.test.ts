@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { createAccumulator } from "@/lib/agent/stream-handler";
-import { buildNewsEventSelectionArtifact } from "./news-event-selection";
+import type { AtomicNewsEventCard } from "@/types/api-contracts";
+import {
+  buildNewsEventDisplayText,
+  buildNewsEventSelectionArtifact,
+  buildNewsEventSelectionArtifactFromDiscoveryResult,
+  buildNewsEventSelectionUserMessage,
+} from "./news-event-selection";
 
 describe("buildNewsEventSelectionArtifact", () => {
   it("builds a news event selection artifact from the latest Stock News event result", () => {
@@ -243,5 +249,113 @@ describe("buildNewsEventSelectionArtifact", () => {
         event.event_title.includes("SEC Filings"),
       ),
     ).toBe(false);
+  });
+
+  it("builds a news event selection artifact from direct discovery cards", () => {
+    const artifact = buildNewsEventSelectionArtifactFromDiscoveryResult({
+      originalQuestion: "MU 오늘 왜 떨어져?",
+      result: {
+        cards: [
+          {
+            id: "mu-margin-pressure",
+            ticker: "MU",
+            event_title_ko: "HBM 마진 우려가 MU 약세 요인으로 부각",
+            summary_ko:
+              "Reuters는 HBM 투자 부담과 단기 마진 우려를 MU 약세 요인으로 다뤘습니다.",
+            original_headline: "Micron shares fall on HBM margin concerns",
+            source_previews: [
+              {
+                publisher: "Reuters",
+                domain: "reuters.com",
+                title_original: "Micron shares fall on HBM margin concerns",
+                url: "https://www.reuters.com/markets/mu-drop",
+              },
+            ],
+            ontology_bridge_brief_en: {
+              ticker: "MU",
+              event: "MU shares fell on HBM margin concerns.",
+              likely_financial_axes: ["gross_margin"],
+              likely_business_axes: ["demand"],
+              suggested_ontology_questions: [
+                "Check Micron filings for HBM margin disclosures.",
+              ],
+              source_urls: ["https://www.reuters.com/markets/mu-drop"],
+            },
+          },
+        ],
+        resolved_entities: [{ ticker: "MU" }],
+        discovery_policy: {
+          market_news_only: true,
+          english_question: "MU why shares are falling",
+        },
+      },
+    });
+
+    expect(artifact).toMatchObject({
+      type: "news_event_selection",
+      payload: {
+        original_question: "MU 오늘 왜 떨어져?",
+        discovery_summary: {
+          direct_pipeline: true,
+          event_count: 1,
+        },
+        events: [
+          expect.objectContaining({
+            id: "mu-margin-pressure",
+            primary_source: expect.objectContaining({
+              publisher: "Reuters",
+            }),
+          }),
+        ],
+      },
+    });
+  });
+
+  it("treats English-heavy composer output as source-language fallback", () => {
+    const event = {
+      id: "aapl-intel-foxconn",
+      ticker: "AAPL",
+      event_title:
+        "Intel Stock Drops After It Scores AI Partnership With Apple Supplier Foxconn",
+      event_title_ko:
+        "AAPL 관련 시장 뉴스: Intel Stock Drops After It Scores AI Partnership With Apple Supplier Foxconn",
+      summary_ko:
+        "Intel is teaming up with Apple supplier Foxconn to develop artificial-intelligence infrastructure, but that was not enough to stop the chip manufacturer stock from sliding.",
+      short_summary:
+        "Intel is teaming up with Apple supplier Foxconn to develop artificial-intelligence infrastructure.",
+      original_headline:
+        "Intel Stock Drops After It Scores AI Partnership With Apple Supplier Foxconn",
+      price_impact_direction: "negative",
+      source_previews: [
+        {
+          publisher: "Yahoo",
+          domain: "finance.yahoo.com",
+          title_original:
+            "Intel Stock Drops After It Scores AI Partnership With Apple Supplier Foxconn",
+          title:
+            "Intel Stock Drops After It Scores AI Partnership With Apple Supplier Foxconn",
+          snippet_summary:
+            "Intel is teaming up with Apple supplier Foxconn to develop artificial-intelligence infrastructure.",
+        },
+      ],
+    } satisfies AtomicNewsEventCard;
+
+    const display = buildNewsEventDisplayText(event);
+
+    expect(display).toMatchObject({
+      title:
+        "Intel Stock Drops After It Scores AI Partnership With Apple Supplier Foxconn",
+      originalHeadline:
+        "Intel Stock Drops After It Scores AI Partnership With Apple Supplier Foxconn",
+      isSourceLanguageFallback: true,
+    });
+    expect(display.title).not.toContain("AAPL 관련 시장 뉴스");
+    expect(display.summary).toContain("Intel is teaming up");
+
+    const userMessage = buildNewsEventSelectionUserMessage(event);
+    expect(userMessage).toContain(
+      "Intel Stock Drops After It Scores AI Partnership With Apple Supplier Foxconn",
+    );
+    expect(userMessage).not.toContain("AAPL 관련 시장 뉴스");
   });
 });

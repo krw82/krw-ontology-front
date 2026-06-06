@@ -12,12 +12,12 @@ import {
 import {
   KRW_ONTOLOGY_MCP_TOOLS,
   KRW_ONTOLOGY_SDK_ALLOWED_TOOLS,
-  STOCK_NEWS_ZAI_MCP_TOOLS,
-  getStockNewsZaiSdkAllowedTools,
+  STOCK_NEWS_MCP_TOOLS,
+  getStockNewsSdkAllowedTools,
   getKrwOntologyPluginPath,
   isKrwOntologySdkTool,
-  isStockNewsZaiEnabled,
-  isStockNewsZaiSdkTool,
+  isStockNewsEnabled,
+  isStockNewsSdkTool,
 } from "./mcp-client";
 import { buildClaudeAgentEnv } from "./env";
 import {
@@ -26,6 +26,7 @@ import {
 } from "./system-prompt";
 import { normalizeKrwOntologyToolInput } from "./tool-input-policy";
 import { buildResearchPassPrompt } from "./workflow";
+import { getClaudeAgentModel } from "./model";
 import { getIndexedCompanies } from "@/lib/ontology/catalog";
 import { readIntEnv } from "@/lib/env";
 import {
@@ -63,7 +64,7 @@ import type {
 } from "@/types/api-contracts";
 
 const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
-const STOCK_NEWS_ZAI_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_ZAI_MCP_TOOLS);
+const STOCK_NEWS_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_MCP_TOOLS);
 const DEFAULT_MAX_TURNS = 20;
 const DEFAULT_AGENT_WORKSPACE_DIR = ".agent-workspace";
 const TOOL_BUDGET_EXCEEDED = "tool_budget_exceeded";
@@ -98,7 +99,6 @@ export interface AgentRunOptions {
   history?: Array<{ role: string; content: string }>;
   abortSignal?: AbortSignal;
   onSdkDiagnostics?: (diagnostics: SdkDiagnostics) => Promise<void>;
-  onTextDelta?: (delta: string, fullText: string) => Promise<void>;
   onToolCallStart?: (toolCall: AccumulatedToolCall) => Promise<void>;
   onToolCallEnd?: (toolCall: AccumulatedToolCall) => Promise<void>;
   onCitation?: (citation: StreamingCitation) => Promise<void>;
@@ -176,7 +176,7 @@ export async function runAgent(
     options.runKind ?? defaultRunKindForAnalysisMode(analysisMode),
   );
   const stockNewsEnabledForRun =
-    analysisMode === "news" && isStockNewsZaiEnabled();
+    analysisMode === "news" && isStockNewsEnabled();
   const toolBudget = getResearchModeToolBudget(researchMode);
 
   const abortHandler = () => abortController.abort();
@@ -217,7 +217,7 @@ export async function runAgent(
     runKind,
   );
 
-  const requestedModel = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
+  const requestedModel = getClaudeAgentModel();
   const baseSdkOptions: Options = {
     cwd,
     model: requestedModel,
@@ -405,7 +405,6 @@ async function runSdkPass(params: {
         acc,
         openToolCalls,
         sendEvent,
-        onTextDelta: options.onTextDelta,
         onToolCallStart: options.onToolCallStart,
         onToolCallEnd: options.onToolCallEnd,
         onCitation: options.onCitation,
@@ -562,11 +561,11 @@ export async function canUseTool(
     return allowWithInputPolicy(mcpToolName, input);
   }
 
-  if (isStockNewsZaiSdkTool(toolName)) {
-    if (!isStockNewsZaiEnabled()) {
+  if (isStockNewsSdkTool(toolName)) {
+    if (!isStockNewsEnabled()) {
       return {
         behavior: "deny",
-        message: "Stock News Z.ai MCP is disabled for this runtime.",
+        message: "Stock News MCP is disabled for this runtime.",
       };
     }
 
@@ -576,7 +575,7 @@ export async function canUseTool(
   return {
     behavior: "deny",
     message:
-      "Only configured read-only KRW Ontology and Stock News Z.ai MCP tools are allowed in web chat.",
+      "Only configured read-only KRW Ontology and Stock News MCP tools are allowed in web chat.",
   };
 }
 
@@ -590,8 +589,8 @@ function allowedSdkToolsForResearchMode(
     const mcpToolName = normalizeKrwOntologyToolName(toolName);
     return Boolean(mcpToolName && allowedMcpTools.has(mcpToolName));
   });
-  const allowedStockNewsTools = getStockNewsZaiSdkAllowedTools().filter((toolName) => {
-    const stockNewsToolName = normalizeStockNewsZaiToolName(toolName);
+  const allowedStockNewsTools = getStockNewsSdkAllowedTools().filter((toolName) => {
+    const stockNewsToolName = normalizeStockNewsToolName(toolName);
     return Boolean(
       stockNewsToolName &&
         isStockNewsToolAllowedForRunKind(stockNewsToolName, runKind),
@@ -616,27 +615,27 @@ function createToolPermissionGuard(
     toolName: string,
     input: Record<string, unknown> = {},
   ): Promise<PermissionResult> => {
-    if (!isKrwOntologySdkTool(toolName) && !isStockNewsZaiSdkTool(toolName)) {
+    if (!isKrwOntologySdkTool(toolName) && !isStockNewsSdkTool(toolName)) {
       return {
         behavior: "deny",
         message:
-          "Only configured read-only KRW Ontology and Stock News Z.ai MCP tools are allowed in web chat.",
+          "Only configured read-only KRW Ontology and Stock News MCP tools are allowed in web chat.",
       };
     }
 
-    if (isStockNewsZaiSdkTool(toolName)) {
-      const stockNewsToolName = normalizeStockNewsZaiToolName(toolName);
+    if (isStockNewsSdkTool(toolName)) {
+      const stockNewsToolName = normalizeStockNewsToolName(toolName);
       if (analysisMode !== "news") {
         return {
           behavior: "deny",
-          message: "News mode is required to use Stock News Z.ai MCP.",
+          message: "News mode is required to use Stock News MCP.",
         };
       }
 
-      if (!isStockNewsZaiEnabled() || !stockNewsToolName) {
+      if (!isStockNewsEnabled() || !stockNewsToolName) {
         return {
           behavior: "deny",
-          message: "Stock News Z.ai MCP is disabled for this runtime.",
+          message: "Stock News MCP is disabled for this runtime.",
         };
       }
 
@@ -767,7 +766,7 @@ function buildSelectedNewsEventContextPrompt(
   selectedNewsEventContext: Record<string, unknown> | null | undefined,
 ): string {
   if (runKind !== "news_research" || !selectedNewsEventContext) return "";
-  return `Use this selected market-news context as the input brief for KRW Ontology filing research. Treat it as market narrative, not confirmed company fact. Start KRW ontology retrieval from ontology_bridge_brief_en when present.
+  return `Use this selected market-news context as the input brief for KRW Ontology filing research. Treat it as market narrative, not confirmed company fact. Start KRW ontology retrieval from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology when present; otherwise use ontology_bridge_brief_en.
 
 <selected_news_event_context>
 ${JSON.stringify(selectedNewsEventContext)}
@@ -898,7 +897,7 @@ function buildToolBudgetDenyMessage(): string {
 
 function buildStockNewsBudgetDenyMessage(): string {
   return [
-    "No more Stock News Z.ai MCP tools can be called in this run.",
+    "No more Stock News MCP tools can be called in this run.",
     "Do not call another current-news tool.",
     "Continue with filing evidence and news results already collected.",
   ].join(" ");
@@ -928,7 +927,6 @@ async function consumeSdkMessage(params: {
   acc: AccumulatedRun;
   openToolCalls: Set<string>;
   sendEvent: (event: Parameters<ReturnType<typeof createSSEWriter>["sendEvent"]>[0], data: unknown) => Promise<void>;
-  onTextDelta?: (delta: string, fullText: string) => Promise<void>;
   onToolCallStart?: (toolCall: AccumulatedToolCall) => Promise<void>;
   onToolCallEnd?: (toolCall: AccumulatedToolCall) => Promise<void>;
   onCitation?: (citation: StreamingCitation) => Promise<void>;
@@ -940,7 +938,6 @@ async function consumeSdkMessage(params: {
     acc,
     openToolCalls,
     sendEvent,
-    onTextDelta,
     onToolCallStart,
     onToolCallEnd,
     onCitation,
@@ -956,8 +953,6 @@ async function consumeSdkMessage(params: {
       if (block.type === "text" && typeof block.text === "string") {
         if (containsToolUse || suppressTextDeltas) continue;
         addToken(acc, block.text);
-        await onTextDelta?.(block.text, acc.fullText);
-        await sendEvent("token", { text: block.text });
       }
 
       if (block.type === "tool_use") {
@@ -1130,7 +1125,7 @@ function summarizeToolResult(text: string): string | null {
 }
 
 function normalizeMcpToolName(name: unknown): MCPToolName | null {
-  return normalizeKrwOntologyToolName(name) ?? normalizeStockNewsZaiToolName(name);
+  return normalizeKrwOntologyToolName(name) ?? normalizeStockNewsToolName(name);
 }
 
 function normalizeKrwOntologyToolName(
@@ -1142,12 +1137,12 @@ function normalizeKrwOntologyToolName(
   return bareName as KRWOntologyMCPToolName;
 }
 
-function normalizeStockNewsZaiToolName(
+function normalizeStockNewsToolName(
   name: unknown,
 ): StockNewsMCPToolName | null {
   if (typeof name !== "string") return null;
   const bareName = name.includes("__") ? name.split("__").at(-1) : name;
-  if (!bareName || !STOCK_NEWS_ZAI_MCP_TOOL_SET.has(bareName)) return null;
+  if (!bareName || !STOCK_NEWS_MCP_TOOL_SET.has(bareName)) return null;
   return bareName as StockNewsMCPToolName;
 }
 
@@ -1207,7 +1202,7 @@ function countStockNewsToolCalls(
 function isStockNewsMcpToolName(
   toolName: MCPToolName | null,
 ): toolName is StockNewsMCPToolName {
-  return Boolean(toolName && STOCK_NEWS_ZAI_MCP_TOOL_SET.has(toolName));
+  return Boolean(toolName && STOCK_NEWS_MCP_TOOL_SET.has(toolName));
 }
 
 const SAFE_TOOL_ARGUMENT_KEYS = [

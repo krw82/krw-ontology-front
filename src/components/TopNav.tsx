@@ -106,15 +106,19 @@ export default function TopNav({
     initialUserProfile ?? null,
   );
   const [authChecked, setAuthChecked] = useState(
-    Boolean(initialUserProfile),
+    Boolean(initialUserProfile) || hideAccountMenu,
   );
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [clientReady, setClientReady] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
-  const { entitlement } = useEntitlement(Boolean(userProfile));
+  const shouldLoadAccount = !hideAccountMenu;
+  const { entitlement } = useEntitlement(shouldLoadAccount && Boolean(userProfile));
 
   // M-07: useMemo to cache Supabase client
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(
+    () => (shouldLoadAccount ? createClient() : null),
+    [shouldLoadAccount],
+  );
   const query = searchParams.toString();
   const currentPath = normalizeInternalNextPath(
     query ? `${pathname}?${query}` : pathname,
@@ -130,6 +134,7 @@ export default function TopNav({
 
   // M-08: onAuthStateChange listener
   useEffect(() => {
+    if (!shouldLoadAccount) return;
     if (!supabase) return;
 
     let isMounted = true;
@@ -163,7 +168,7 @@ export default function TopNav({
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [initialUserProfile, preserveInitialUserProfile, supabase]);
+  }, [initialUserProfile, preserveInitialUserProfile, shouldLoadAccount, supabase]);
 
   useEffect(() => {
     if (!accountMenuOpen) return;

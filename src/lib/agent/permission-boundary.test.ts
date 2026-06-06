@@ -11,33 +11,33 @@ vi.mock("@/lib/ontology/catalog", () => ({
 import { canUseTool } from "./runner";
 import {
   isKrwOntologySdkTool,
-  isStockNewsZaiSdkTool,
+  isStockNewsSdkTool,
   KRW_ONTOLOGY_MCP_TOOLS,
   KRW_ONTOLOGY_SDK_ALLOWED_TOOLS,
-  STOCK_NEWS_ZAI_MCP_TOOLS,
-  STOCK_NEWS_ZAI_SDK_ALLOWED_TOOLS,
+  STOCK_NEWS_MCP_TOOLS,
+  STOCK_NEWS_SDK_ALLOWED_TOOLS,
 } from "./mcp-client";
 
 describe("agent permission boundary", () => {
   beforeEach(() => {
-    delete process.env.STOCK_NEWS_ZAI_ENABLED;
-    delete process.env.STOCK_NEWS_ZAI_FORCE_DISABLED;
+    delete process.env.STOCK_NEWS_ENABLED;
+    delete process.env.STOCK_NEWS_FORCE_DISABLED;
     delete process.env.ZAI_API_KEY;
   });
 
-  it("allows Stock News Z.ai MCP by default at the global MCP boundary", async () => {
-    for (const toolName of STOCK_NEWS_ZAI_SDK_ALLOWED_TOOLS) {
+  it("allows Stock News MCP by default at the global MCP boundary", async () => {
+    for (const toolName of STOCK_NEWS_SDK_ALLOWED_TOOLS) {
       await expect(canUseTool(toolName)).resolves.toEqual({
         behavior: "allow",
       });
-      expect(isStockNewsZaiSdkTool(toolName)).toBe(true);
+      expect(isStockNewsSdkTool(toolName)).toBe(true);
     }
   });
 
-  it("denies Stock News Z.ai MCP when explicitly disabled", async () => {
-    process.env.STOCK_NEWS_ZAI_FORCE_DISABLED = "1";
+  it("denies Stock News MCP when explicitly disabled", async () => {
+    process.env.STOCK_NEWS_FORCE_DISABLED = "1";
 
-    for (const toolName of STOCK_NEWS_ZAI_SDK_ALLOWED_TOOLS) {
+    for (const toolName of STOCK_NEWS_SDK_ALLOWED_TOOLS) {
       await expect(canUseTool(toolName)).resolves.toMatchObject({
         behavior: "deny",
       });
@@ -89,9 +89,9 @@ describe("agent permission boundary", () => {
         (toolName) => `mcp__plugin_krw-ontology_krw-ontology__${toolName}`,
       ),
     );
-    expect(STOCK_NEWS_ZAI_SDK_ALLOWED_TOOLS).toEqual(
-      STOCK_NEWS_ZAI_MCP_TOOLS.map(
-        (toolName) => `mcp__plugin_krw-ontology_stock-news-zai__${toolName}`,
+    expect(STOCK_NEWS_SDK_ALLOWED_TOOLS).toEqual(
+      STOCK_NEWS_MCP_TOOLS.map(
+        (toolName) => `mcp__plugin_krw-ontology_stock-news__${toolName}`,
       ),
     );
   });

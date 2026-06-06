@@ -19,6 +19,7 @@ import {
   getClientIp,
 } from "@/lib/api/chat/rate-limit";
 import { enqueueAgentRun } from "@/lib/agent/job-queue";
+import { getClaudeAgentModel } from "@/lib/agent/model";
 import { streamAgentRunEventsResponse } from "@/lib/agent/run-events";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
 import { parseChatAttachmentContent } from "@/lib/chat/attachments";
@@ -101,11 +102,11 @@ export async function POST(request: NextRequest) {
   });
   if (!rateLimitResult.ok) return rateLimitResult.response;
 
-  // 4. Check worker readiness before reserving execution budget. The web/API
-  // server should not need to run the heavy local MCP health path when agent
-  // execution is delegated to a separate worker, such as the production Mac
-  // worker. Require the ready worker to report the same release as the active
-  // web catalog so prod answers cannot mix catalog and SQLite releases.
+  const isServerPipelineNewsDiscovery =
+    body.analysis_mode === "news" && body.run_kind === "news_discovery";
+
+  // 4. Check catalog/worker readiness before reserving execution budget. The
+  // web route only queues durable work; MCP calls run inside the Mac worker.
   let mcpHealth: McpHealthResult;
   try {
     const activeCatalog = await getActiveOntologyCatalogRelease();
@@ -204,7 +205,7 @@ export async function POST(request: NextRequest) {
 
   // 9. Queue durable agent work. The HTTP response only streams persisted
   // run events; Claude Agent SDK execution is owned by agent-worker.
-  const model = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
+  const model = getClaudeAgentModel();
   const enqueueResult = await enqueueAgentRun({
     session,
     requestId: request_id,
@@ -214,6 +215,9 @@ export async function POST(request: NextRequest) {
     researchMode: body.research_mode,
     analysisMode: body.analysis_mode,
     runKind: body.run_kind,
+    executorType: isServerPipelineNewsDiscovery
+      ? "server_pipeline"
+      : "claude_agent",
   });
 
   if (!enqueueResult.ok) {

@@ -27,6 +27,7 @@ export async function updateSession(
   const isProtected = protectedPaths.some((p) =>
     request.nextUrl.pathname.startsWith(p),
   );
+  const isLogin = request.nextUrl.pathname === "/login";
   const hasOAuthCode = request.nextUrl.searchParams.has("code");
 
   if (
@@ -50,6 +51,10 @@ export async function updateSession(
       return NextResponse.redirect(url);
     }
 
+    return supabaseResponse;
+  }
+
+  if (!isProtected && !isLogin) {
     return supabaseResponse;
   }
 
@@ -88,7 +93,7 @@ export async function updateSession(
   }
 
   // Redirect authenticated users away from login
-  if (user && request.nextUrl.pathname === "/login") {
+  if (user && isLogin) {
     const url = new URL(
       normalizeInternalNextPath(request.nextUrl.searchParams.get("next")),
       request.nextUrl.origin,

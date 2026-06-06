@@ -3,9 +3,9 @@ set -eu
 
 usage() {
   cat <<'EOF'
-Usage: scripts/uninstall-stock-news-zai-mcp-launchd.sh [--keep-plist]
+Usage: scripts/uninstall-stock-news-mcp-launchd.sh [--keep-plist]
 
-Stop the local Stock News Z.ai MCP launchd service. By default the plist is
+Stop the local Stock News MCP launchd service. By default the plist is
 removed after unloading.
 EOF
 }
@@ -29,12 +29,12 @@ while [ "$#" -gt 0 ]; do
 done
 
 DOMAIN="gui/$(id -u)"
-PLIST="$HOME/Library/LaunchAgents/com.krwontology.stock-news-zai-mcp.plist"
+PLIST="$HOME/Library/LaunchAgents/com.krwontology.stock-news-mcp.plist"
 
-launchctl bootout "$DOMAIN/com.krwontology.stock-news-zai-mcp" >/dev/null 2>&1 || true
+launchctl bootout "$DOMAIN/com.krwontology.stock-news-mcp" >/dev/null 2>&1 || true
 
 if [ "$KEEP_PLIST" != "1" ] && [ -f "$PLIST" ]; then
   rm -f "$PLIST"
 fi
 
-echo "OK Stock News Z.ai MCP launchd service stopped."
+echo "OK Stock News MCP launchd service stopped."

@@ -5,9 +5,9 @@ usage() {
   cat <<'EOF'
 Usage: scripts/deploy-worker-production.sh [--env-file FILE] [--release-id ID] [--dry-run]
 
-Rebuild and restart only the Mac production agent workers. The long-running MCP
-HTTP server must already be healthy. Use prod:deploy:runtime when plugin/MCP code
-changes too.
+Rebuild and restart only the Mac production agent supervisor. The long-running
+MCP HTTP server must already be healthy. Use prod:deploy:runtime when
+plugin/MCP code changes too.
 
 This does not deploy or restart the GCP web container.
 EOF
@@ -77,7 +77,7 @@ if [ -n "$EXPECTED_RELEASE_ID" ]; then
 fi
 
 if [ "$DRY_RUN" = "1" ]; then
-  echo "Dry run: would run Mac worker preflight, install launchd workers, and verify heartbeats."
+  echo "Dry run: would run Mac supervisor preflight, install launchd supervisor, and verify heartbeat."
   exit 0
 fi
 
@@ -105,4 +105,4 @@ fi
   --env-file "$ENV_PATH" \
   --skip-gcp
 
-echo "Mac worker deployment complete."
+echo "Mac supervisor deployment complete."

@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
 import { isAnalyticsEventName } from "@/lib/analytics/events";
 import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
-import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -28,18 +27,13 @@ export async function POST(request: NextRequest) {
     return errorResponse(400, "validation_error", "이벤트 이름이 올바르지 않습니다.");
   }
 
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
   const properties = isRecord(body.properties) ? body.properties : {};
 
   const result = await recordAnalyticsEventFromRequest(request, {
     eventName: body.event_name,
-    userId: userData.user?.id ?? null,
+    userId: null,
     anonymousId: typeof body.anonymous_id === "string" ? body.anonymous_id : null,
-    properties: {
-      auth_state: userData.user ? "authenticated" : "anonymous",
-      ...properties,
-    },
+    properties,
     path: typeof body.path === "string" ? body.path : null,
     referrer: typeof body.referrer === "string" ? body.referrer : null,
     utm: isRecord(body.utm) ? normalizeUtmBody(body.utm) : null,

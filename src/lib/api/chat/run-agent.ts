@@ -11,6 +11,7 @@ import {
   checkExecutionBudget,
 } from "@/lib/concurrency/execution-budget";
 import { registerRun, cleanupRun } from "@/lib/agent/abort-manager";
+import { getClaudeAgentModel } from "@/lib/agent/model";
 import { runAgent } from "@/lib/agent/runner";
 import { closeOpenToolCallsForRun } from "@/lib/agent/tool-call-cleanup";
 import { markAgentRunTerminal } from "@/lib/agent/run-lifecycle";
@@ -94,7 +95,7 @@ export function executeRun(params: RunAgentParams): Response {
   } = params;
 
   const admin = getSupabaseAdmin();
-  const model = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
+  const model = getClaudeAgentModel();
   const encoder = new TextEncoder();
 
   let streamAbortController: AbortController | null = null;
@@ -139,7 +140,6 @@ export function executeRun(params: RunAgentParams): Response {
             sessionId: session.id,
             userId: session.userId,
             requestId,
-            initialContentLength: 0,
           });
           controller.close();
           return;
@@ -271,10 +271,6 @@ export function executeRun(params: RunAgentParams): Response {
           label: "분석 준비 중",
         });
         const recordSdkDiagnostics = createDevSdkDiagnosticsRecorder(admin, runId);
-        const persistPartialText = createPartialMessagePersister(
-          admin,
-          assistantMessageId,
-        );
         const persistRunEvents = createRunEventPersister(
           admin,
           runId,
@@ -291,7 +287,6 @@ export function executeRun(params: RunAgentParams): Response {
             history: history.history,
             abortSignal: streamAbortController!.signal,
             onSdkDiagnostics: recordSdkDiagnostics,
-            onTextDelta: persistPartialText,
             onToolCallStart: persistRunEvents.persistToolCallStart,
             onToolCallEnd: persistRunEvents.persistToolCallEnd,
             onCitation: persistRunEvents.persistCitation,
@@ -299,7 +294,6 @@ export function executeRun(params: RunAgentParams): Response {
           writer
         );
 
-        await persistPartialText.flush();
         await persistRunEvents.backfill(result.acc);
         await persistRunEvents.flush();
 
@@ -483,9 +477,8 @@ export function streamPersistedRunResponse(params: {
   sessionId: string;
   runId?: string | null;
   requestId?: string;
-  initialContentLength?: number;
 }): Response {
-  const { userId, sessionId, runId, requestId, initialContentLength = 0 } = params;
+  const { userId, sessionId, runId, requestId } = params;
   const encoder = new TextEncoder();
   const admin = getSupabaseAdmin();
   let clientConnected = true;
@@ -511,7 +504,6 @@ export function streamPersistedRunResponse(params: {
         sessionId,
         userId,
         requestId,
-        initialContentLength,
       });
 
       try {
@@ -545,7 +537,6 @@ export async function streamPersistedRunEvents(params: {
   sessionId: string;
   userId: string;
   requestId?: string;
-  initialContentLength?: number;
 }) {
   const {
     admin,
@@ -555,10 +546,8 @@ export async function streamPersistedRunEvents(params: {
     sessionId,
     userId,
     requestId,
-    initialContentLength = 0,
   } = params;
   let currentRunId = runId?.trim() || null;
-  let sentLength = initialContentLength;
   let sentRunStarted = false;
   const startedAt = Date.now();
 
@@ -586,7 +575,6 @@ export async function streamPersistedRunEvents(params: {
       }
 
       currentRunId = activeRun.id;
-      sentLength = 0;
       sentRunStarted = false;
       run = activeRun;
       await sendEvent("state_sync", {
@@ -616,13 +604,6 @@ export async function streamPersistedRunEvents(params: {
         label: run.status === "running" ? "분석 상태 복원 중" : "결과 불러오는 중",
       });
       sentRunStarted = true;
-    }
-
-    if (message && message.content.length > sentLength) {
-      await sendEvent("token", {
-        text: message.content.slice(sentLength),
-      });
-      sentLength = message.content.length;
     }
 
     if (run.status === "completed") {
@@ -845,50 +826,6 @@ function createDevSdkDiagnosticsRecorder(
       });
     }
   };
-}
-
-function createPartialMessagePersister(
-  admin: ReturnType<typeof getSupabaseAdmin>,
-  messageId: string,
-) {
-  const MIN_INTERVAL_MS = 750;
-  let latestText = "";
-  let lastPersistedText = "";
-  let lastPersistAt = 0;
-  let pending: Promise<void> = Promise.resolve();
-
-  const persist = async (force = false) => {
-    if (!force && Date.now() - lastPersistAt < MIN_INTERVAL_MS) return;
-    if (latestText === lastPersistedText) return;
-
-    const textToPersist = latestText;
-    lastPersistedText = textToPersist;
-    lastPersistAt = Date.now();
-
-    pending = pending.then(async () => {
-      await admin
-        .from("messages")
-        .update({
-          content: textToPersist,
-          status: "streaming",
-        })
-        .eq("id", messageId);
-    });
-
-    await pending;
-  };
-
-  const callback = async (_delta: string, fullText: string) => {
-    latestText = fullText;
-    await persist(false);
-  };
-
-  callback.flush = async () => {
-    await persist(true);
-    await pending;
-  };
-
-  return callback;
 }
 
 function createRunEventPersister(

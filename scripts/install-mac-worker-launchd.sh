@@ -7,8 +7,9 @@ usage() {
   cat <<'EOF'
 Usage: scripts/install-mac-worker-launchd.sh [--env-file FILE] [--load] [--skip-preflight]
 
-Install launchd plists for the configured production Mac workers. Pass --load
-to start them immediately after installing.
+Install one launchd plist for the production agent supervisor. Pass --load to
+start it immediately after installing. The supervisor owns an internal
+concurrency pool; launchd should not start one process per slot.
 EOF
 }
 
@@ -44,7 +45,8 @@ FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 TEMPLATE="$FRONT_DIR/ops/launchd/com.krwontology.agent-worker.plist.template"
 PLIST_DIR="$HOME/Library/LaunchAgents"
 DOMAIN="gui/$(id -u)"
-LEGACY_PLIST="$PLIST_DIR/com.krwontology.agent-worker.plist"
+LABEL="com.krwontology.agent-worker"
+PLIST="$PLIST_DIR/$LABEL.plist"
 case "$ENV_FILE" in
   /*) ENV_PATH=$ENV_FILE ;;
   *) ENV_PATH="$FRONT_DIR/$ENV_FILE" ;;
@@ -74,6 +76,15 @@ wait_for_worker_id_to_stop() {
   return 1
 }
 
+bootout_existing_agent_worker_plists() {
+  for plist in "$PLIST_DIR"/com.krwontology.agent-worker*.plist; do
+    if [ ! -e "$plist" ]; then
+      continue
+    fi
+    launchctl bootout "$DOMAIN" "$plist" >/dev/null 2>&1 || true
+  done
+}
+
 if [ ! -f "$ENV_PATH" ]; then
   echo "Missing Mac worker env file: $ENV_PATH. Run scripts/init-mac-worker-env.sh first." >&2
   exit 1
@@ -84,22 +95,24 @@ set -a
 . "$ENV_PATH"
 set +a
 
-MAC_WORKER_COUNT=${MAC_WORKER_COUNT:-1}
+AGENT_SUPERVISOR_ID=${AGENT_SUPERVISOR_ID:-${AGENT_WORKER_ID:-mac-supervisor-jwc}}
+AGENT_WORKER_ID=$AGENT_SUPERVISOR_ID
+AGENT_SUPERVISOR_CONCURRENCY=${AGENT_SUPERVISOR_CONCURRENCY:-${MAC_WORKER_COUNT:-1}}
 MAC_WORKER_NICE=${MAC_WORKER_NICE:--5}
-AGENT_WORKER_ID_PREFIX=${AGENT_WORKER_ID_PREFIX:-${AGENT_WORKER_ID:-}}
+AGENT_WORKER_ID_PREFIX=${AGENT_WORKER_ID_PREFIX:-mac-worker-jwc}
 AGENT_WORKER_ID_PREFIX=${AGENT_WORKER_ID_PREFIX%-1}
-if [ -z "$AGENT_WORKER_ID_PREFIX" ]; then
-  AGENT_WORKER_ID_PREFIX=mac-worker-jwc
-fi
+export AGENT_SUPERVISOR_ID
+export AGENT_WORKER_ID
+export AGENT_SUPERVISOR_CONCURRENCY
 
-case "$MAC_WORKER_COUNT" in
+case "$AGENT_SUPERVISOR_CONCURRENCY" in
   ''|*[!0-9]*)
-    echo "MAC_WORKER_COUNT must be a positive integer: $MAC_WORKER_COUNT" >&2
+    echo "AGENT_SUPERVISOR_CONCURRENCY must be a positive integer: $AGENT_SUPERVISOR_CONCURRENCY" >&2
     exit 1
     ;;
 esac
-if [ "$MAC_WORKER_COUNT" -lt 1 ]; then
-  echo "MAC_WORKER_COUNT must be at least 1." >&2
+if [ "$AGENT_SUPERVISOR_CONCURRENCY" -lt 1 ]; then
+  echo "AGENT_SUPERVISOR_CONCURRENCY must be at least 1." >&2
   exit 1
 fi
 case "$MAC_WORKER_NICE" in
@@ -117,60 +130,54 @@ fi
 if [ "$SKIP_PREFLIGHT" != "1" ]; then
   "$SCRIPT_DIR/mac-worker-preflight.sh" \
     --env-file "$ENV_PATH" \
-    --worker-id "$AGENT_WORKER_ID_PREFIX-1" \
+    --worker-id "$AGENT_SUPERVISOR_ID" \
     --skip-worker-duplicate-check
 fi
 
 mkdir -p "$PLIST_DIR" "$FRONT_DIR/logs"
 
-installed_labels=""
-for index in $(seq 1 "$MAC_WORKER_COUNT"); do
-  worker_id="$AGENT_WORKER_ID_PREFIX-$index"
-  label="com.krwontology.agent-worker.$index"
-  plist="$PLIST_DIR/$label.plist"
-  sed \
-    -e "s#__LABEL__#$label#g" \
-    -e "s#__WORKER_ID__#$worker_id#g" \
-    -e "s#__NICE__#$MAC_WORKER_NICE#g" \
-    -e "s#__ENV_FILE__#$ENV_PATH#g" \
-    -e "s#__FRONT_DIR__#$FRONT_DIR#g" \
-    "$TEMPLATE" > "$plist"
-  installed_labels="$installed_labels $label"
-  echo "Installed $plist for $worker_id"
-done
+sed \
+  -e "s#__LABEL__#$LABEL#g" \
+  -e "s#__WORKER_ID__#$AGENT_SUPERVISOR_ID#g" \
+  -e "s#__NICE__#$MAC_WORKER_NICE#g" \
+  -e "s#__ENV_FILE__#$ENV_PATH#g" \
+  -e "s#__FRONT_DIR__#$FRONT_DIR#g" \
+  "$TEMPLATE" > "$PLIST"
+echo "Installed $PLIST for supervisor $AGENT_SUPERVISOR_ID"
 
 if [ "$LOAD" != "1" ]; then
   echo "Not loaded. Start later with:"
-  for label in $installed_labels; do
-    echo "  launchctl bootstrap $DOMAIN $PLIST_DIR/$label.plist"
-    echo "  launchctl kickstart -k $DOMAIN/$label"
-  done
+  echo "  launchctl bootstrap $DOMAIN $PLIST"
+  echo "  launchctl kickstart -k $DOMAIN/$LABEL"
   exit 0
 fi
 
-launchctl bootout "$DOMAIN" "$LEGACY_PLIST" >/dev/null 2>&1 || true
-rm -f "$LEGACY_PLIST"
+bootout_existing_agent_worker_plists
 
-for label in $installed_labels; do
-  plist="$PLIST_DIR/$label.plist"
-  worker_id=${label#com.krwontology.agent-worker.}
-  worker_id="$AGENT_WORKER_ID_PREFIX-$worker_id"
-  launchctl bootout "$DOMAIN" "$plist" >/dev/null 2>&1 || true
-  wait_for_worker_id_to_stop "$worker_id" \
-    || wait_for_worker_id_to_stop "$worker_id" TERM \
-    || wait_for_worker_id_to_stop "$worker_id" KILL
+wait_for_worker_id_to_stop "$AGENT_SUPERVISOR_ID" \
+  || wait_for_worker_id_to_stop "$AGENT_SUPERVISOR_ID" TERM \
+  || wait_for_worker_id_to_stop "$AGENT_SUPERVISOR_ID" KILL
+
+legacy_count=${MAC_WORKER_COUNT:-8}
+case "$legacy_count" in
+  ''|*[!0-9]*) legacy_count=8 ;;
+esac
+if [ "$legacy_count" -lt 8 ]; then
+  legacy_count=8
+fi
+for index in $(seq 1 "$legacy_count"); do
+  legacy_worker_id="$AGENT_WORKER_ID_PREFIX-$index"
+  wait_for_worker_id_to_stop "$legacy_worker_id" \
+    || wait_for_worker_id_to_stop "$legacy_worker_id" TERM \
+    || wait_for_worker_id_to_stop "$legacy_worker_id" KILL
 done
 
-for label in $installed_labels; do
-  plist="$PLIST_DIR/$label.plist"
-  launchctl bootstrap "$DOMAIN" "$plist"
-  launchctl enable "$DOMAIN/$label"
-  launchctl kickstart -k "$DOMAIN/$label"
-done
+rm -f "$PLIST_DIR"/com.krwontology.agent-worker.[0-9]*.plist
+
+launchctl bootstrap "$DOMAIN" "$PLIST"
+launchctl enable "$DOMAIN/$LABEL"
+launchctl kickstart -k "$DOMAIN/$LABEL"
 
 sleep 2
-for label in $installed_labels; do
-  echo "--- $label ---"
-  launchctl print "$DOMAIN/$label" | sed -n '1,50p'
-done
-echo "OK Mac worker launchd services loaded: $MAC_WORKER_COUNT"
+launchctl print "$DOMAIN/$LABEL" | sed -n '1,50p'
+echo "OK Mac worker supervisor launchd service loaded: $AGENT_SUPERVISOR_ID concurrency=$AGENT_SUPERVISOR_CONCURRENCY"

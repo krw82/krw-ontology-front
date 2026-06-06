@@ -66,7 +66,7 @@ const checks = [
   {
     table: "agent_runs",
     select:
-      "id,request_id,sdk_diagnostics,run_kind,selected_news_event_context,source_artifact_id,source_event_id",
+      "id,request_id,sdk_diagnostics,run_kind,executor_type,selected_news_event_context,source_artifact_id,source_event_id",
   },
   {
     table: "agent_worker_heartbeats",

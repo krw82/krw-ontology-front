@@ -6,6 +6,10 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import type {
+  AgentRunEventWaiter,
+  AgentRunEventWaitResult,
+} from "@/lib/agent/run-event-listener";
 import type { StreamingEventType } from "@/types/api-contracts";
 import {
   appendAgentRunEvent,
@@ -38,6 +42,7 @@ function createEventAdmin(params: {
     table: string;
     payload: Record<string, unknown>;
   }> = [];
+  const selects: string[] = [];
   const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
 
   const admin = {
@@ -68,6 +73,7 @@ function createEventAdmin(params: {
           };
         },
         select() {
+          selects.push(table);
           const filters: Record<string, unknown> = {};
           const inFilters: Record<string, unknown[]> = {};
           const nullFilters: Record<string, null> = {};
@@ -177,6 +183,7 @@ function createEventAdmin(params: {
     admin: admin as unknown as ReturnType<typeof getSupabaseAdmin>,
     events,
     inserts,
+    selects,
     rpc,
   };
 }
@@ -194,6 +201,42 @@ async function readStream(response: Response): Promise<string> {
   }
   text += decoder.decode();
   return text;
+}
+
+function immediateTimeoutWaiter(): AgentRunEventWaiter {
+  return {
+    waitForRunEvent: vi.fn().mockResolvedValue("timeout"),
+  };
+}
+
+function deferredNotificationWaiter() {
+  let wake: (() => void) | null = null;
+  const waiter: AgentRunEventWaiter = {
+    waitForRunEvent: vi.fn(
+      () =>
+        new Promise<AgentRunEventWaitResult>((resolve) => {
+          wake = () => resolve("notification");
+        }),
+    ),
+  };
+
+  return {
+    waiter,
+    wake() {
+      if (!wake) throw new Error("waiter has not started waiting");
+      wake();
+    },
+  };
+}
+
+async function waitForCondition(predicate: () => boolean) {
+  const startedAt = Date.now();
+  while (!predicate()) {
+    if (Date.now() - startedAt > 1_000) {
+      throw new Error("Timed out waiting for test condition");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
 }
 
 describe("agent run events", () => {
@@ -224,7 +267,7 @@ describe("agent run events", () => {
     ]);
   });
 
-  it("converts SDK SSE blocks into durable event rows", async () => {
+  it("drops token SSE blocks while preserving durable state events", async () => {
     const fake = createEventAdmin();
     const writer = createAgentRunEventWriter(fake.admin, "run-1");
     const encoder = new TextEncoder();
@@ -242,11 +285,10 @@ describe("agent run events", () => {
     await writer.flush();
 
     expect(fake.events.map((event) => event.event_type)).toEqual([
-      "token",
       "activity_update",
       "done",
     ]);
-    expect(fake.events[1]?.payload).toEqual({
+    expect(fake.events[0]?.payload).toEqual({
       stage: "retrieving",
       label: "검색 중",
     });
@@ -287,6 +329,7 @@ describe("agent run events", () => {
       userId: "user-1",
       sessionId: "session-1",
       runId: "run-1",
+      eventWaiter: immediateTimeoutWaiter(),
     });
 
     await expect(readStream(response)).resolves.toContain(
@@ -336,6 +379,7 @@ describe("agent run events", () => {
       userId: "user-1",
       sessionId: "session-1",
       runId: "run-1",
+      eventWaiter: immediateTimeoutWaiter(),
     });
 
     const text = await readStream(response);
@@ -377,6 +421,7 @@ describe("agent run events", () => {
       userId: "user-1",
       sessionId: "session-1",
       runId: "run-1",
+      eventWaiter: immediateTimeoutWaiter(),
     });
 
     const text = await readStream(response);
@@ -406,11 +451,57 @@ describe("agent run events", () => {
       userId: "user-1",
       sessionId: "session-1",
       runId: "run-1",
+      eventWaiter: immediateTimeoutWaiter(),
     });
 
     await expect(readStream(response)).resolves.toBe(
       'event: state_sync\ndata: {"session_id":"session-1","run_id":"run-1","status":"idle","reason":"stale_run"}\n\n',
     );
+  });
+
+  it("waits for run notifications instead of polling run status while open", async () => {
+    const fake = createEventAdmin({
+      runs: [
+        {
+          id: "run-1",
+          session_id: "session-1",
+          request_id: "req-1",
+          status: "running",
+          error_code: null,
+        },
+      ],
+      sessions: [{ id: "session-1", user_id: "user-1", deleted_at: null }],
+    });
+    const deferred = deferredNotificationWaiter();
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+
+    const response = streamAgentRunEventsResponse({
+      userId: "user-1",
+      sessionId: "session-1",
+      runId: "run-1",
+      eventWaiter: deferred.waiter,
+    });
+    const streamText = readStream(response);
+
+    await waitForCondition(
+      () => vi.mocked(deferred.waiter.waitForRunEvent).mock.calls.length === 1,
+    );
+    expect(fake.selects.filter((table) => table === "agent_runs")).toHaveLength(1);
+
+    fake.events.push({
+      id: 1,
+      run_id: "run-1",
+      event_type: "done",
+      payload: { run_id: "run-1", message_id: "message-1" },
+      created_at: "2026-05-25T00:00:01.000Z",
+    });
+    deferred.wake();
+
+    await expect(streamText).resolves.toContain(
+      'id: 1\nevent: done\ndata: {"run_id":"run-1","message_id":"message-1"}',
+    );
+    expect(fake.selects.filter((table) => table === "agent_run_events")).toHaveLength(2);
+    expect(fake.selects.filter((table) => table === "agent_runs")).toHaveLength(1);
   });
 
   it("syncs completed runs without terminal events once and closes", async () => {
@@ -435,12 +526,14 @@ describe("agent run events", () => {
         },
       ],
     });
+    const waiter = immediateTimeoutWaiter();
     vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
 
     const response = streamAgentRunEventsResponse({
       userId: "user-1",
       sessionId: "session-1",
       runId: "run-1",
+      eventWaiter: waiter,
     });
 
     await expect(readStream(response)).resolves.toBe(
@@ -448,6 +541,8 @@ describe("agent run events", () => {
         'event: state_sync\ndata: {"session_id":"session-1","run_id":"run-1","status":"completed","reason":"session_synced"}\n\n',
     );
     expect(fake.events).toHaveLength(1);
+    expect(waiter.waitForRunEvent).toHaveBeenCalledTimes(1);
+    expect(fake.selects.filter((table) => table === "agent_runs")).toHaveLength(2);
   });
 
   it("does not append a duplicate synthetic terminal event when the existing terminal event is past the first page", async () => {
@@ -487,6 +582,7 @@ describe("agent run events", () => {
       sessionId: "session-1",
       runId: "run-1",
       lastEventId: 101,
+      eventWaiter: immediateTimeoutWaiter(),
     });
 
     await expect(readStream(response)).resolves.toBe("");

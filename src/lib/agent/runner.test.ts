@@ -43,26 +43,26 @@ vi.mock("./mcp-client", () => {
   ];
   return {
     KRW_ONTOLOGY_MCP_TOOLS: tools,
-    STOCK_NEWS_ZAI_MCP_TOOLS: stockNewsTools,
+    STOCK_NEWS_MCP_TOOLS: stockNewsTools,
     KRW_ONTOLOGY_SDK_ALLOWED_TOOLS: tools.map(
       (toolName) => `mcp__plugin_krw-ontology_krw-ontology__${toolName}`,
     ),
-    STOCK_NEWS_ZAI_SDK_ALLOWED_TOOLS: stockNewsTools.map(
-      (toolName) => `mcp__plugin_krw-ontology_stock-news-zai__${toolName}`,
+    STOCK_NEWS_SDK_ALLOWED_TOOLS: stockNewsTools.map(
+      (toolName) => `mcp__plugin_krw-ontology_stock-news__${toolName}`,
     ),
     getKrwOntologyPluginPath: () => "/tmp/krw-ontology-plugin",
-    getStockNewsZaiSdkAllowedTools: () =>
-      process.env.STOCK_NEWS_ZAI_FORCE_DISABLED !== "1"
+    getStockNewsSdkAllowedTools: () =>
+      process.env.STOCK_NEWS_FORCE_DISABLED !== "1"
         ? stockNewsTools.map(
-            (toolName) => `mcp__plugin_krw-ontology_stock-news-zai__${toolName}`,
+            (toolName) => `mcp__plugin_krw-ontology_stock-news__${toolName}`,
           )
         : [],
     isKrwOntologySdkTool: (toolName: string) =>
       toolName.startsWith("mcp__plugin_krw-ontology_krw-ontology__krw_ontology_"),
-    isStockNewsZaiEnabled: () =>
-      process.env.STOCK_NEWS_ZAI_FORCE_DISABLED !== "1",
-    isStockNewsZaiSdkTool: (toolName: string) =>
-      toolName.startsWith("mcp__plugin_krw-ontology_stock-news-zai__"),
+    isStockNewsEnabled: () =>
+      process.env.STOCK_NEWS_FORCE_DISABLED !== "1",
+    isStockNewsSdkTool: (toolName: string) =>
+      toolName.startsWith("mcp__plugin_krw-ontology_stock-news__"),
   };
 });
 
@@ -116,7 +116,7 @@ function sdkToolName(toolName: MCPToolName): string {
 }
 
 function stockNewsSdkToolName(toolName: StockNewsMCPToolName): string {
-  return `mcp__plugin_krw-ontology_stock-news-zai__${toolName}`;
+  return `mcp__plugin_krw-ontology_stock-news__${toolName}`;
 }
 
 function isStockNewsToolName(toolName: MCPToolName): toolName is StockNewsMCPToolName {
@@ -239,8 +239,8 @@ describe("agent runner research budget recovery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sdkMocks.getSessionInfo.mockResolvedValue(undefined);
-    delete process.env.STOCK_NEWS_ZAI_FORCE_DISABLED;
-    delete process.env.STOCK_NEWS_ZAI_ENABLED;
+    delete process.env.STOCK_NEWS_FORCE_DISABLED;
+    delete process.env.STOCK_NEWS_ENABLED;
     delete process.env.STOCK_NEWS_MAX_CALLS;
     delete process.env.ZAI_API_KEY;
   });
@@ -328,7 +328,7 @@ describe("agent runner research budget recovery", () => {
     );
   });
 
-  it("allows Stock News Z.ai MCP by default unless explicitly disabled", async () => {
+  it("allows Stock News MCP by default unless explicitly disabled", async () => {
     await expect(
       canUseTool(stockNewsSdkToolName("search_company_news_events"), {
         ticker: "AVGO",
@@ -336,7 +336,7 @@ describe("agent runner research budget recovery", () => {
       }),
     ).resolves.toEqual({ behavior: "allow" });
 
-    process.env.STOCK_NEWS_ZAI_FORCE_DISABLED = "1";
+    process.env.STOCK_NEWS_FORCE_DISABLED = "1";
     await expect(
       canUseTool(stockNewsSdkToolName("search_company_news_events"), {
         ticker: "AVGO",
@@ -347,7 +347,7 @@ describe("agent runner research budget recovery", () => {
     });
   });
 
-  it("keeps Stock News Z.ai MCP out of company mode", async () => {
+  it("keeps Stock News MCP out of company mode", async () => {
     sdkMocks.query.mockReturnValueOnce(
       makeSdkQuery([
         {
@@ -437,7 +437,7 @@ describe("agent runner research budget recovery", () => {
     expect(call.options.disallowedTools).toEqual(
       expect.arrayContaining(["WebFetch", "WebSearch"]),
     );
-    expect(call.options.systemPrompt.append).toContain("Stock News Z.ai MCP");
+    expect(call.options.systemPrompt.append).toContain("Stock News MCP");
     expect(call.options.systemPrompt.append).toContain(
       "current news/event discovery",
     );
@@ -505,7 +505,7 @@ describe("agent runner research budget recovery", () => {
     expect(call.prompt).toContain("<selected_news_event_context>");
   });
 
-  it("passes Stock News Z.ai MCP inputs unchanged before execution", async () => {
+  it("passes Stock News MCP inputs unchanged before execution", async () => {
     const permission = await canUseTool(stockNewsSdkToolName("search_company_news_events"), {
       ticker: "AAPL",
       question: "AAPL latest services news",
@@ -515,7 +515,7 @@ describe("agent runner research budget recovery", () => {
     expect(permission).toEqual({ behavior: "allow" });
   });
 
-  it("limits Stock News Z.ai MCP calls separately from ontology calls", async () => {
+  it("limits Stock News MCP calls separately from ontology calls", async () => {
     process.env.STOCK_NEWS_MAX_CALLS = "2";
 
     const { permission, result } = await probeToolPermission({
@@ -528,7 +528,7 @@ describe("agent runner research budget recovery", () => {
     expect(result.status).toBe("completed");
     expect(permission.behavior).toBe("deny");
     if (permission.behavior === "deny") {
-      expect(permission.message).toContain("No more Stock News Z.ai MCP tools");
+      expect(permission.message).toContain("No more Stock News MCP tools");
       expect(permission.message).toContain("filing evidence");
     }
   });

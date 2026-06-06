@@ -92,7 +92,7 @@ function request() {
       request_id: "550e8400-e29b-41d4-a716-446655440001",
       session_id: "11111111-1111-4111-8111-111111111111",
       research_mode: "fast",
-      analysis_mode: "news",
+      analysis_mode: "company",
     }),
   });
 }
@@ -178,8 +178,8 @@ describe("POST /api/chat/run worker admission", () => {
           request_id: "550e8400-e29b-41d4-a716-446655440001",
           session_id: "11111111-1111-4111-8111-111111111111",
           research_mode: "fast",
-          analysis_mode: "news",
-          run_kind: "news_discovery",
+          analysis_mode: "company",
+          run_kind: "company_research",
         },
       },
     });
@@ -304,13 +304,58 @@ describe("POST /api/chat/run worker admission", () => {
         model: expect.any(String),
         mcpHealth: readyMcpHealth,
         researchMode: "fast",
-        analysisMode: "news",
-        runKind: "news_discovery",
+        analysisMode: "company",
+        runKind: "company_research",
       }),
     );
     expect(getReadyAgentWorker).toHaveBeenCalledWith(
       expect.any(Date),
       "release-1",
+    );
+    expect(streamAgentRunEventsResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user-1",
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        runId: "run-1",
+        requestId: "550e8400-e29b-41d4-a716-446655440001",
+      }),
+    );
+  });
+
+  it("queues news discovery for the worker server pipeline", async () => {
+    vi.mocked(getReadyAgentWorker).mockResolvedValue({
+      ok: true,
+      worker: { worker_id: "mac-worker-jwc-1" } as never,
+      mcpHealth: readyMcpHealth,
+    });
+    vi.mocked(validateRequest).mockResolvedValue({
+      ok: true,
+      data: {
+        userId: "user-1",
+        userEmail: "user@example.test",
+        body: {
+          content: "오늘 왜 떨어져?",
+          request_id: "550e8400-e29b-41d4-a716-446655440001",
+          session_id: "11111111-1111-4111-8111-111111111111",
+          research_mode: "fast",
+          analysis_mode: "news",
+          run_kind: "news_discovery",
+        },
+      },
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(enqueueAgentRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: "550e8400-e29b-41d4-a716-446655440001",
+        mcpHealth: readyMcpHealth,
+        researchMode: "fast",
+        analysisMode: "news",
+        runKind: "news_discovery",
+        executorType: "server_pipeline",
+      }),
     );
     expect(streamAgentRunEventsResponse).toHaveBeenCalledWith(
       expect.objectContaining({

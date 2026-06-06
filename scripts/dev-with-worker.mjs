@@ -46,7 +46,7 @@ function configureDevOntologyEnv() {
   const pluginPath = join(frontDir, "ref", "plugins", "dev", "krw-ontology");
   const mcpUrl = process.env.KRW_DEV_MCP_URL || "http://127.0.0.1:8766/mcp";
   const stockNewsMcpUrl =
-    process.env.STOCK_NEWS_ZAI_MCP_URL || "http://127.0.0.1:8776/mcp";
+    process.env.STOCK_NEWS_MCP_URL || "http://127.0.0.1:8776/mcp";
 
   if (!allowProdOntology || !process.env.KRW_ONTOLOGY_ENV) {
     process.env.KRW_ONTOLOGY_ENV = "dev";
@@ -69,10 +69,10 @@ function configureDevOntologyEnv() {
   process.env.KRW_ONTOLOGY_MCP_HOST = new URL(mcpUrl).hostname;
   process.env.KRW_ONTOLOGY_MCP_PORT = new URL(mcpUrl).port || "80";
   process.env.KRW_ONTOLOGY_MCP_PATH = new URL(mcpUrl).pathname || "/mcp";
-  process.env.STOCK_NEWS_ZAI_MCP_URL = stockNewsMcpUrl;
-  process.env.STOCK_NEWS_ZAI_MCP_HOST = new URL(stockNewsMcpUrl).hostname;
-  process.env.STOCK_NEWS_ZAI_MCP_PORT = new URL(stockNewsMcpUrl).port || "80";
-  process.env.STOCK_NEWS_ZAI_MCP_PATH =
+  process.env.STOCK_NEWS_MCP_URL = stockNewsMcpUrl;
+  process.env.STOCK_NEWS_MCP_HOST = new URL(stockNewsMcpUrl).hostname;
+  process.env.STOCK_NEWS_MCP_PORT = new URL(stockNewsMcpUrl).port || "80";
+  process.env.STOCK_NEWS_MCP_PATH =
     new URL(stockNewsMcpUrl).pathname || "/mcp";
   if (process.env.KRW_DEV_ALLOW_CUSTOM_MCP_BASE_URL !== "1") {
     process.env.MCP_BASE_URL = new URL(mcpUrl).origin;
@@ -81,7 +81,7 @@ function configureDevOntologyEnv() {
     releaseRoot: process.env.KRW_ONTOLOGY_RELEASE_ROOT,
     pluginPath: process.env.KRW_ONTOLOGY_PLUGIN_PATH,
     mcpUrl: process.env.KRW_ONTOLOGY_MCP_URL,
-    stockNewsMcpUrl: process.env.STOCK_NEWS_ZAI_MCP_URL,
+    stockNewsMcpUrl: process.env.STOCK_NEWS_MCP_URL,
   });
 }
 
@@ -111,7 +111,6 @@ function healthUrlFromMcpUrl(mcpUrl) {
 }
 
 configureDevOntologyEnv();
-materializeDevPlugin();
 
 let worker = null;
 let nextDev = null;
@@ -121,6 +120,8 @@ let shuttingDown = false;
 let workerStartQueued = false;
 let workerRestarting = false;
 let expectedStockNewsCoverageCount = null;
+
+materializeDevPlugin();
 
 function childEnv() {
   const env = { ...process.env };
@@ -157,7 +158,7 @@ function materializeDevPlugin() {
       "--mcp-url",
       process.env.KRW_ONTOLOGY_MCP_URL,
       "--stock-news-url",
-      process.env.STOCK_NEWS_ZAI_MCP_URL,
+      process.env.STOCK_NEWS_MCP_URL,
     ],
     {
       env: process.env,
@@ -295,7 +296,7 @@ async function readDevMcpHealth() {
 
 async function readStockNewsMcpHealth() {
   try {
-    const response = await fetch(healthUrlFromMcpUrl(process.env.STOCK_NEWS_ZAI_MCP_URL), {
+    const response = await fetch(healthUrlFromMcpUrl(process.env.STOCK_NEWS_MCP_URL), {
       headers: { accept: "application/json" },
       signal: AbortSignal.timeout(5_000),
     });
@@ -378,7 +379,7 @@ async function waitForStockNewsMcpHealth() {
     if (
       result?.response.status === 200 &&
       result.payload?.ok === true &&
-      result.payload?.name === "stock-news-zai-mcp"
+      result.payload?.name === "stock-news-mcp"
     ) {
       console.info("[dev:stock-news-mcp] ready", {
         coverageCount: result.payload.coverage_count,
@@ -388,7 +389,7 @@ async function waitForStockNewsMcpHealth() {
     }
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 500));
   }
-  throw new Error("Stock News Z.ai dev MCP server did not become healthy");
+  throw new Error("Stock News dev MCP server did not become healthy");
 }
 
 async function ensureStockNewsMcpServer() {
@@ -398,7 +399,7 @@ async function ensureStockNewsMcpServer() {
     if (
       existing?.response.status === 200 &&
       existing.payload?.ok === true &&
-      existing.payload?.name === "stock-news-zai-mcp" &&
+      existing.payload?.name === "stock-news-mcp" &&
       stockNewsCoverageMatches(existing.payload)
     ) {
       console.info("[dev:stock-news-mcp] reusing existing server", {
@@ -410,7 +411,7 @@ async function ensureStockNewsMcpServer() {
     if (
       existing?.response.status === 200 &&
       existing.payload?.ok === true &&
-      existing.payload?.name === "stock-news-zai-mcp" &&
+      existing.payload?.name === "stock-news-mcp" &&
       !stockNewsCoverageMatches(existing.payload)
     ) {
       console.info("[dev:stock-news-mcp] replacing existing server with stale coverage", {
@@ -427,13 +428,13 @@ async function ensureStockNewsMcpServer() {
   stockNewsMcp = spawnLabeled(
     "stock-news-mcp",
     "nice",
-    ["-n", String(devMcpNice), "scripts/start-stock-news-zai-mcp-dev.sh"],
+    ["-n", String(devMcpNice), "scripts/start-stock-news-mcp-dev.sh"],
     async (code) => {
       const existing = await readStockNewsMcpHealth();
       if (
         existing?.response.status === 200 &&
         existing.payload?.ok === true &&
-        existing.payload?.name === "stock-news-zai-mcp"
+        existing.payload?.name === "stock-news-mcp"
       ) {
         console.info("[dev:stock-news-mcp] spawned server exited; reusing existing server", {
           coverageCount: existing.payload.coverage_count,
@@ -453,7 +454,7 @@ function stockNewsCoverageMatches(payload) {
 }
 
 function stopManagedStockNewsListener() {
-  const port = new URL(process.env.STOCK_NEWS_ZAI_MCP_URL).port || "8776";
+  const port = new URL(process.env.STOCK_NEWS_MCP_URL).port || "8776";
   const result = spawnSync("lsof", ["-nP", `-tiTCP:${port}`, "-sTCP:LISTEN"], {
     encoding: "utf8",
   });
@@ -465,7 +466,7 @@ function stopManagedStockNewsListener() {
     const command = spawnSync("ps", ["-p", pid, "-o", "command="], {
       encoding: "utf8",
     }).stdout;
-    if (!command.includes("stock-news-zai-mcp") && !command.includes("dist/server.js")) {
+    if (!command.includes("stock-news-mcp") && !command.includes("dist/server.js")) {
       throw new Error(`Port ${port} is occupied by an unmanaged process: pid=${pid}`);
     }
     try {

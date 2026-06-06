@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 
 interface FloatingAskBarProps {
   selectedTicker?: string | null;
@@ -10,30 +9,7 @@ interface FloatingAskBarProps {
 
 export default function FloatingAskBar({ selectedTicker }: FloatingAskBarProps) {
   const [query, setQuery] = useState("");
-  const [visible, setVisible] = useState(false);
   const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
-
-  // M-06: reactive auth state via onAuthStateChange
-  useEffect(() => {
-    if (!supabase) return;
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setVisible(!!session?.user);
-      }
-    );
-
-    supabase.auth.getUser().then(({ data }) => {
-      setVisible(!!data.user);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [supabase]);
-
-  if (!visible) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

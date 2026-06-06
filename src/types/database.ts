@@ -84,6 +84,7 @@ export interface AgentRunRow extends Record<string, unknown> {
   error_message: string | null;
   sdk_diagnostics: Json | null;
   run_kind: "company_research" | "news_discovery" | "news_research";
+  executor_type: "claude_agent" | "server_pipeline";
   selected_news_event_context: Json | null;
   source_artifact_id: string | null;
   source_event_id: string | null;

@@ -18,7 +18,7 @@ let env = "";
 let source = process.env.KRW_ONTOLOGY_PLUGIN_SOURCE_PATH || defaultSource;
 let out = "";
 let mcpUrl = process.env.KRW_ONTOLOGY_MCP_URL || "";
-let stockNewsMcpUrl = process.env.STOCK_NEWS_ZAI_MCP_URL || "";
+let stockNewsMcpUrl = process.env.STOCK_NEWS_MCP_URL || "";
 
 function usage() {
   console.error(`Usage: scripts/materialize-ontology-plugin.mjs --env dev|prod [--source DIR] [--out DIR] [--mcp-url URL] [--stock-news-url URL]`);
@@ -93,8 +93,8 @@ const mcpServers = {
   },
 };
 
-if (isStockNewsZaiEnabled()) {
-  mcpServers["stock-news-zai"] = {
+if (isStockNewsEnabled()) {
+  mcpServers["stock-news"] = {
     type: "http",
     url: stockNewsMcpUrl,
   };
@@ -113,11 +113,11 @@ writeFileSync(
 
 console.log(`Materialized ${env} KRW Ontology plugin: ${resolvedOut}`);
 console.log(`MCP URL: ${mcpUrl}`);
-console.log(`Stock News Z.ai MCP: ${isStockNewsZaiEnabled() ? "enabled" : "disabled"}`);
+console.log(`Stock News MCP: ${isStockNewsEnabled() ? "enabled" : "disabled"}`);
 
-function isStockNewsZaiEnabled() {
-  if (truthyEnv(process.env.STOCK_NEWS_ZAI_FORCE_DISABLED)) return false;
-  if (falseyEnv(process.env.STOCK_NEWS_ZAI_ENABLED)) return false;
+function isStockNewsEnabled() {
+  if (truthyEnv(process.env.STOCK_NEWS_FORCE_DISABLED)) return false;
+  if (falseyEnv(process.env.STOCK_NEWS_ENABLED)) return false;
   return true;
 }
 

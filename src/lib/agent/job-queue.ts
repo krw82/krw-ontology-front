@@ -5,7 +5,7 @@ import type { McpHealthResult } from "@/lib/agent/mcp-client";
 import type { ResolvedSession } from "@/lib/api/chat/resolve-session";
 import type { HistoryResult } from "@/lib/api/chat/fetch-history";
 import type { AgentRunRow, Json, MessageRow } from "@/types/database";
-import type { RunStatus } from "@/types/api-contracts";
+import type { AgentRunExecutorType, RunStatus } from "@/types/api-contracts";
 import {
   DEFAULT_RESEARCH_MODE,
   normalizeResearchMode,
@@ -50,6 +50,7 @@ export async function enqueueAgentRun(params: {
   researchMode?: ResearchMode;
   analysisMode?: AnalysisMode;
   runKind?: RunKind;
+  executorType?: AgentRunExecutorType;
   selectedNewsEventContext?: Record<string, unknown> | null;
   sourceArtifactId?: string | null;
   sourceEventId?: string | null;
@@ -65,6 +66,7 @@ export async function enqueueAgentRun(params: {
   const runKind = normalizeRunKind(
     params.runKind ?? defaultRunKindForAnalysisMode(analysisMode),
   );
+  const executorType = params.executorType ?? "claude_agent";
   const admin = getSupabaseAdmin();
 
   const existingRun = await findRunByRequestId(requestId, session.id);
@@ -117,6 +119,7 @@ export async function enqueueAgentRun(params: {
       agent_index_schema_version: mcpHealth.agentIndexSchemaVersion,
       ontology_manifest: releaseSnapshot(mcpHealth),
       run_kind: runKind,
+      executor_type: executorType,
       selected_news_event_context:
         params.selectedNewsEventContext ?? null,
       source_artifact_id: params.sourceArtifactId ?? null,
@@ -152,6 +155,7 @@ export async function enqueueAgentRun(params: {
     research_mode: researchMode,
     analysis_mode: analysisMode,
     run_kind: runKind,
+    executor_type: executorType,
   });
   await appendAgentRunEvent(admin, run.id, "activity_update", {
     stage: "queued",

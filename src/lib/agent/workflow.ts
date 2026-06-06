@@ -35,7 +35,7 @@ export function buildResearchPassPrompt(
       : runKind === "news_research"
         ? `웹앱 뉴스 research 실행:
 - 사용자가 이미 선택한 하나의 시장 뉴스 내러티브를 공시 기준으로 해석하는 실행입니다.
-- selected_news_event_context 안의 ontology_bridge_brief_en을 내부 영어 투자 brief로 사용해 KRW Ontology query_context를 시작합니다.
+- selected_news_event_context 안의 source_pack.ontology_search_brief_en/source_pack.original_text_for_ontology를 우선 사용하고, 없으면 ontology_bridge_brief_en을 내부 영어 투자 brief로 사용해 KRW Ontology query_context를 시작합니다.
 - 뉴스 내러티브를 회사가 확인한 사실처럼 단정하지 말고, 공시 baseline 기준의 의미와 한계를 설명합니다.
 - 새로운 broad news discovery는 하지 않습니다.
 - 최종 답변은 사용자에게 바로 보여줄 한국어 Markdown 투자 해석만 작성합니다.`

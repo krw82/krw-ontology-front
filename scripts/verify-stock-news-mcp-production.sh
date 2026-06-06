@@ -5,9 +5,9 @@ export PATH
 
 usage() {
   cat <<'EOF'
-Usage: scripts/verify-stock-news-zai-mcp-production.sh [--env-file FILE]
+Usage: scripts/verify-stock-news-mcp-production.sh [--env-file FILE]
 
-Check the Stock News Z.ai MCP HTTP server /health endpoint.
+Check the Stock News MCP HTTP server /health endpoint.
 EOF
 }
 
@@ -48,8 +48,8 @@ set -a
 . "$ENV_PATH"
 set +a
 
-STOCK_NEWS_ZAI_MCP_URL=${STOCK_NEWS_ZAI_MCP_URL:-http://127.0.0.1:8775/mcp}
-export STOCK_NEWS_ZAI_MCP_URL
+STOCK_NEWS_MCP_URL=${STOCK_NEWS_MCP_URL:-http://127.0.0.1:8775/mcp}
+export STOCK_NEWS_MCP_URL
 
 node <<'NODE'
 function healthUrlFromMcpUrl(mcpUrl) {
@@ -60,7 +60,7 @@ function healthUrlFromMcpUrl(mcpUrl) {
   return parsed.toString();
 }
 
-const healthUrl = healthUrlFromMcpUrl(process.env.STOCK_NEWS_ZAI_MCP_URL);
+const healthUrl = healthUrlFromMcpUrl(process.env.STOCK_NEWS_MCP_URL);
 const expectedTools = [
   "route_news_question",
   "resolve_news_entities",
@@ -84,13 +84,15 @@ const expectedTools = [
     name: payload.name,
     coverage_count: payload.coverage_count,
     provider_enabled: payload.provider_enabled,
+    primary_provider: payload.primary_provider,
+    has_finnhub_api_key: payload.has_finnhub_api_key,
     has_zai_api_key: payload.has_zai_api_key,
     tools: Array.isArray(payload.tools) ? payload.tools.length : null,
   }));
-  if (response.status !== 200 || payload.ok !== true) throw new Error("Stock News Z.ai MCP health is not ok");
-  if (payload.name !== "stock-news-zai-mcp") throw new Error(`Unexpected MCP name: ${payload.name}`);
-  if (!payload.has_zai_api_key) throw new Error("Stock News Z.ai MCP is missing ZAI_API_KEY");
-  if (!Array.isArray(payload.tools)) throw new Error("Stock News Z.ai MCP health is missing tools");
+  if (response.status !== 200 || payload.ok !== true) throw new Error("Stock News MCP health is not ok");
+  if (payload.name !== "stock-news-mcp") throw new Error(`Unexpected MCP name: ${payload.name}`);
+  if (!payload.has_finnhub_api_key) throw new Error("Stock News MCP is missing FINNHUB_API_KEY");
+  if (!Array.isArray(payload.tools)) throw new Error("Stock News MCP health is missing tools");
   for (const tool of expectedTools) {
     if (!payload.tools.includes(tool)) throw new Error(`Missing stock-news tool: ${tool}`);
   }
@@ -100,4 +102,4 @@ const expectedTools = [
 });
 NODE
 
-echo "OK Stock News Z.ai production MCP health"
+echo "OK Stock News production MCP health"

@@ -175,6 +175,18 @@ describe("production deploy scripts", () => {
     expect(workerSection).toContain(
       "LEASE_HEARTBEAT_INTERVAL_MS=${LEASE_HEARTBEAT_INTERVAL_MS:-30000}",
     );
+    expect(webSection).toContain(
+      "AGENT_RUN_EVENT_LISTEN_DATABASE_URL=${AGENT_RUN_EVENT_LISTEN_DATABASE_URL:-}",
+    );
+    expect(webSection).toContain(
+      "AGENT_EVENT_RECONCILE_INTERVAL_MS=${AGENT_EVENT_RECONCILE_INTERVAL_MS:-15000}",
+    );
+    expect(workerSection).toContain(
+      "AGENT_QUEUE_LISTEN_DATABASE_URL=${AGENT_QUEUE_LISTEN_DATABASE_URL:-}",
+    );
+    expect(workerSection).toContain(
+      "AGENT_QUEUE_RECONCILE_INTERVAL_MS=${AGENT_QUEUE_RECONCILE_INTERVAL_MS:-60000}",
+    );
     expect(workerSection).toContain("healthcheck:");
     expect(workerSection).toContain(".worker/agent-worker.mjs");
     expect(workerSection).toContain("agent_index.sqlite");
@@ -207,14 +219,18 @@ describe("production deploy scripts", () => {
     const packageJson = read("package.json");
 
     expect(preflight).toContain("GLOBAL_CONCURRENT_RUN_LIMIT");
-    expect(preflight).toContain("MAC_WORKER_COUNT");
-    expect(preflight).toContain("GLOBAL_CONCURRENT_RUN_LIMIT must be at least MAC_WORKER_COUNT");
+    expect(preflight).toContain("AGENT_SUPERVISOR_CONCURRENCY");
+    expect(preflight).toContain(
+      "GLOBAL_CONCURRENT_RUN_LIMIT must be at least AGENT_SUPERVISOR_CONCURRENCY",
+    );
     expect(preflight).toContain("queue status");
     expect(preflight).toContain("--json");
     expect(preflight).toContain("Local ontology queue can mutate prod/current");
     expect(preflight).toContain("OK local ontology queue status via CLI");
-    expect(preflight).toContain("A Mac agent worker with id");
+    expect(preflight).toContain("A Mac agent supervisor with id");
     expect(preflight).toContain("--skip-worker-duplicate-check");
+    expect(preflight).toContain("Checking Postgres LISTEN config");
+    expect(preflight).toContain("AGENT_QUEUE_LISTEN_DATABASE_URL");
     expect(preflight).toContain("Missing Claude auth after placeholder cleanup");
     expect(preflight).toContain("ANTHROPIC_AUTH_TOKEN");
     expect(preflight).toContain("EXPECTED_CLAUDE_CODE_VERSION");
@@ -234,6 +250,8 @@ describe("production deploy scripts", () => {
     expect(start).toContain("safe_worker_id");
     expect(start).toContain("--worker-id");
     expect(start).toContain("--log-file");
+    expect(start).toContain("AGENT_SUPERVISOR_ID");
+    expect(start).toContain("AGENT_SUPERVISOR_CONCURRENCY");
     expect(start).toContain("DEEPSEEK_API_KEY");
     expect(start).toContain("mac-worker-preflight.sh");
     expect(start).toContain(".worker/agent-worker.mjs");
@@ -248,22 +266,30 @@ describe("production deploy scripts", () => {
     expect(initEnv).toContain("KRW_ONTOLOGY_PLUGIN_SOURCE_PATH");
     expect(initEnv).toContain("KRW_ONTOLOGY_MCP_URL=http://127.0.0.1:8765/mcp");
     expect(initEnv).toContain("KRW_ONTOLOGY_MCP_HEALTH_URL=http://127.0.0.1:8765/health");
-    expect(initEnv).toContain("MAC_WORKER_COUNT=8");
+    expect(initEnv).toContain("AGENT_SUPERVISOR_ID=mac-supervisor-jwc");
+    expect(initEnv).toContain("AGENT_SUPERVISOR_CONCURRENCY=1");
+    expect(initEnv).toContain("MAC_WORKER_COUNT=1");
     expect(initEnv).toContain("MAC_WORKER_NICE=-5");
     expect(initEnv).toContain("MCP_SERVER_NICE=-5");
-    expect(initEnv).toContain("GLOBAL_CONCURRENT_RUN_LIMIT=8");
+    expect(initEnv).toContain("GLOBAL_CONCURRENT_RUN_LIMIT=1");
+    expect(initEnv).toContain("AGENT_QUEUE_LISTEN_ENABLED=1");
+    expect(initEnv).toContain("AGENT_QUEUE_RECONCILE_INTERVAL_MS=60000");
     expect(initEnv).toContain("KRW_SQLITE_READ_CACHE_MIB=512");
     expect(initEnv).toContain("KRW_SQLITE_READ_MMAP_MIB=2048");
 
     expect(installLaunchd).toContain("mac-worker-preflight.sh");
     expect(installLaunchd).toContain("--env-file");
     expect(installLaunchd).toContain("__ENV_FILE__");
-    expect(installLaunchd).toContain("MAC_WORKER_COUNT");
+    expect(installLaunchd).toContain("AGENT_SUPERVISOR_CONCURRENCY");
     expect(installLaunchd).toContain("MAC_WORKER_NICE");
     expect(installLaunchd).toContain("__NICE__");
-    expect(installLaunchd).toContain("com.krwontology.agent-worker.$index");
+    expect(installLaunchd).toContain('LABEL="com.krwontology.agent-worker"');
+    expect(installLaunchd).toContain("launchd should not start one process per slot");
     expect(installLaunchd).toContain("sending SIG$signal");
-    expect(installLaunchd).toContain("wait_for_worker_id_to_stop \"$worker_id\" KILL");
+    expect(installLaunchd).toContain(
+      "wait_for_worker_id_to_stop \"$AGENT_SUPERVISOR_ID\" KILL",
+    );
+    expect(installLaunchd).toContain("legacy_worker_id");
     expect(read("ops/launchd/com.krwontology.agent-worker.plist.template")).toContain(
       "--skip-preflight",
     );
@@ -326,25 +352,26 @@ describe("production deploy scripts", () => {
     expect(deployWorker).toContain("install-mac-worker-launchd.sh");
     expect(deployWorker).toContain("verify-mac-worker-heartbeats.mjs");
     expect(deployWorker).toContain("does not deploy or restart the GCP web container");
-    expect(deployWorker).toContain("long-running MCP");
+    expect(deployWorker).toContain("MCP HTTP server must already be healthy");
 
     expect(deployPluginWorker).toContain("KRW_ONTOLOGY_PLUGIN_PATH mismatch");
     expect(deployPluginWorker).toContain("materialize-ontology-plugin.mjs");
     expect(deployPluginWorker).toContain("export-stock-news-coverage.mjs");
     expect(deployPluginWorker).toContain("stock-news/coverage_companies.json");
     expect(deployPluginWorker).toContain("install-mcp-server-launchd.sh");
-    expect(deployPluginWorker).toContain("install-stock-news-zai-mcp-launchd.sh");
+    expect(deployPluginWorker).toContain("install-stock-news-mcp-launchd.sh");
     expect(deployPluginWorker).toContain("deploy-worker-production.sh");
     expect(deployPluginWorker).toContain("does not sync plugin code to the GCP VM");
     expect(read("scripts/export-stock-news-coverage.mjs")).toContain("ontology_companies");
-    expect(read("scripts/start-stock-news-zai-mcp-production.sh")).toContain("STOCK_NEWS_COVERAGE_PATH");
-    expect(read("scripts/start-stock-news-zai-mcp-dev.sh")).toContain("STOCK_NEWS_COVERAGE_PATH");
+    expect(read("scripts/start-stock-news-mcp-production.sh")).toContain("STOCK_NEWS_COVERAGE_PATH");
+    expect(read("scripts/start-stock-news-mcp-dev.sh")).toContain("STOCK_NEWS_COVERAGE_PATH");
 
     expect(verifyHeartbeats).toContain("agent_worker_heartbeats");
     expect(verifyHeartbeats).toContain("EXPECTED_CLAUDE_CODE_VERSION");
     expect(verifyHeartbeats).toContain("--release-id");
-    expect(verifyHeartbeats).toContain("OK Mac worker heartbeats");
+    expect(verifyHeartbeats).toContain("OK Mac supervisor heartbeat");
     expect(statusWorkers).toContain("nice=");
+    expect(statusWorkers).toContain("AGENT_SUPERVISOR_CONCURRENCY");
     expect(statusWorkers).toContain("MAC_WORKER_NICE");
 
     expect(stopGcp).toContain("stop agent-worker");

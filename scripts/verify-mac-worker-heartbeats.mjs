@@ -11,8 +11,8 @@ let expectedReleaseId = "";
 function usage() {
   console.log(`Usage: scripts/verify-mac-worker-heartbeats.mjs [--env-file FILE] [--timeout-ms MS] [--interval-ms MS] [--release-id ID]
 
-Verify that all configured Mac production workers have fresh Supabase
-heartbeats. Secrets are read from the env file but never printed.`);
+Verify that the configured Mac production supervisor has a fresh Supabase
+heartbeat. Secrets are read from the env file but never printed.`);
 }
 
 for (let index = 0; index < args.length; index += 1) {
@@ -72,24 +72,13 @@ if (!supabaseUrl) {
   throw new Error("Missing SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL");
 }
 
-const workerCount = Number(process.env.MAC_WORKER_COUNT || "1");
-if (!Number.isInteger(workerCount) || workerCount < 1) {
-  throw new Error(`MAC_WORKER_COUNT must be a positive integer: ${workerCount}`);
-}
-
-let workerPrefix =
-  process.env.AGENT_WORKER_ID_PREFIX || process.env.AGENT_WORKER_ID || "";
-workerPrefix = workerPrefix.replace(/-\d+$/, "");
-if (!workerPrefix) {
-  throw new Error("Missing AGENT_WORKER_ID_PREFIX or AGENT_WORKER_ID");
-}
-
 const expectedClaudeVersion = process.env.EXPECTED_CLAUDE_CODE_VERSION || "";
 const expectedOntologyEnv = process.env.KRW_ONTOLOGY_ENV || "prod";
-const expectedWorkerIds = Array.from(
-  { length: workerCount },
-  (_, index) => `${workerPrefix}-${index + 1}`,
-);
+const expectedWorkerId =
+  process.env.AGENT_SUPERVISOR_ID ||
+  process.env.AGENT_WORKER_ID ||
+  "mac-supervisor-jwc";
+const expectedWorkerIds = [expectedWorkerId];
 
 const client = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -189,4 +178,4 @@ if (lastProblems.length > 0) {
   process.exit(1);
 }
 
-console.log(`OK Mac worker heartbeats: ${expectedWorkerIds.join(", ")}`);
+console.log(`OK Mac supervisor heartbeat: ${expectedWorkerIds.join(", ")}`);
