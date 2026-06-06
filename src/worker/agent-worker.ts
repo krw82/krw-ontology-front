@@ -29,6 +29,11 @@ const CLAIM_HEALTH_INTERVAL_MS = readIntEnv(
   30_000,
   { min: 1_000 },
 );
+const SHUTDOWN_GRACE_MS = readIntEnv(
+  "AGENT_SUPERVISOR_SHUTDOWN_GRACE_MS",
+  120_000,
+  { min: 5_000 },
+);
 
 function readSupervisorConcurrency(): number {
   if (process.env.AGENT_SUPERVISOR_CONCURRENCY?.trim()) {
@@ -74,7 +79,17 @@ async function main() {
 
   await supervisor.start();
   await waitForStopSignal();
+  const forceExitTimer = setTimeout(() => {
+    console.warn("[agent-supervisor] shutdown grace elapsed; exiting", {
+      workerId: WORKER_ID,
+      shutdownGraceMs: SHUTDOWN_GRACE_MS,
+    });
+    process.exit(0);
+  }, SHUTDOWN_GRACE_MS);
+  forceExitTimer.unref?.();
+
   await supervisor.stop();
+  clearTimeout(forceExitTimer);
 }
 
 main().catch((error) => {

@@ -579,40 +579,90 @@ NODE
 
 echo "Checking Postgres LISTEN config..."
 node <<'NODE'
-const enabled = process.env.AGENT_QUEUE_LISTEN_ENABLED !== "0";
-const channel = process.env.AGENT_QUEUE_LISTEN_CHANNEL || "agent_run_queued";
-if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(channel)) {
-  throw new Error(`Invalid AGENT_QUEUE_LISTEN_CHANNEL: ${channel}`);
-}
-if (!enabled) {
-  console.log("Postgres LISTEN disabled; supervisor will use slow reconcile only");
-  process.exit(0);
+const { Client } = require("pg");
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+});
+
+async function main() {
+  const enabled = process.env.AGENT_QUEUE_LISTEN_ENABLED !== "0";
+  const channel = process.env.AGENT_QUEUE_LISTEN_CHANNEL || "agent_run_queued";
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(channel)) {
+    throw new Error(`Invalid AGENT_QUEUE_LISTEN_CHANNEL: ${channel}`);
+  }
+  if (!enabled) {
+    console.log("Postgres LISTEN disabled; supervisor will use slow reconcile only");
+    return;
+  }
+
+  const explicit =
+    process.env.AGENT_QUEUE_LISTEN_DATABASE_URL ||
+    process.env.SUPABASE_LISTEN_DATABASE_URL ||
+    process.env.SUPABASE_DB_URL ||
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL;
+  if (explicit) {
+    await smokeListen(explicit, channel, "explicit");
+  } else {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!supabaseUrl) throw new Error("Missing SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL");
+    const parsed = new URL(supabaseUrl);
+    let connectionString;
+    let connectionKind;
+    if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+      const port = process.env.SUPABASE_DB_PORT || "54322";
+      connectionString = `postgresql://postgres:${encodeURIComponent(
+        process.env.SUPABASE_DB_PASSWORD || "postgres",
+      )}@${parsed.hostname}:${port}/postgres`;
+      connectionKind = "local";
+    } else {
+      if (!process.env.SUPABASE_DB_PASSWORD) {
+        throw new Error(
+          "Missing SUPABASE_DB_PASSWORD or explicit AGENT_QUEUE_LISTEN_DATABASE_URL for Postgres LISTEN",
+        );
+      }
+      const match = parsed.hostname.match(/^([a-z0-9-]+)\.supabase\.co$/i);
+      if (!match) throw new Error(`Cannot derive Supabase database host from ${parsed.hostname}`);
+      connectionString = `postgresql://postgres:${encodeURIComponent(
+        process.env.SUPABASE_DB_PASSWORD,
+      )}@db.${match[1]}.supabase.co:5432/postgres?sslmode=require`;
+      connectionKind = "derived";
+    }
+    await smokeListen(connectionString, channel, connectionKind);
+  }
 }
 
-const explicit =
-  process.env.AGENT_QUEUE_LISTEN_DATABASE_URL ||
-  process.env.SUPABASE_LISTEN_DATABASE_URL ||
-  process.env.SUPABASE_DB_URL ||
-  process.env.DATABASE_URL ||
-  process.env.POSTGRES_URL;
-if (explicit) {
-  console.log(`OK Postgres LISTEN config: channel=${channel} connection=explicit`);
-  process.exit(0);
+function shouldUseSsl(connectionString) {
+  try {
+    const parsed = new URL(connectionString);
+    if (parsed.searchParams.get("sslmode") === "disable") return false;
+    return parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1";
+  } catch {
+    return true;
+  }
 }
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-if (!supabaseUrl) throw new Error("Missing SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL");
-const parsed = new URL(supabaseUrl);
-if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
-  console.log(`OK Postgres LISTEN config: channel=${channel} connection=local`);
-  process.exit(0);
+async function smokeListen(connectionString, listenChannel, connectionKind) {
+  const client = new Client({
+    connectionString,
+    application_name: "krw-ontology-agent-supervisor-preflight",
+    connectionTimeoutMillis: Number(process.env.AGENT_QUEUE_LISTEN_CONNECT_TIMEOUT_MS || 10_000),
+    ssl: shouldUseSsl(connectionString) ? { rejectUnauthorized: false } : undefined,
+  });
+
+  try {
+    await client.connect();
+    await client.query(`LISTEN ${listenChannel}`);
+    await client.query(`UNLISTEN ${listenChannel}`);
+    console.log(
+      `OK Postgres LISTEN smoke: channel=${listenChannel} connection=${connectionKind}`,
+    );
+  } finally {
+    await client.end().catch(() => undefined);
+  }
 }
-if (!process.env.SUPABASE_DB_PASSWORD) {
-  throw new Error(
-    "Missing SUPABASE_DB_PASSWORD or explicit AGENT_QUEUE_LISTEN_DATABASE_URL for Postgres LISTEN",
-  );
-}
-console.log(`OK Postgres LISTEN config: channel=${channel} connection=derived`);
 NODE
 
 echo "Mac worker preflight passed."

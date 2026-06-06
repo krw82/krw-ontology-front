@@ -74,6 +74,10 @@ cat > ./krw-ontology/plugins/krw-ontology/.mcp.json <<'JSON'
       "env": {
         "KRW_ONTOLOGY_ENV": "prod"
       }
+    },
+    "stock-news": {
+      "type": "http",
+      "url": "http://127.0.0.1:8775/mcp"
     }
   }
 }

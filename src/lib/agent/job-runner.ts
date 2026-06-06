@@ -11,6 +11,7 @@ import {
   appendAgentRunEvent,
   createAgentRunEventWriter,
 } from "@/lib/agent/run-events";
+import { getAgentRunCancelWaiter } from "@/lib/agent/run-cancel-listener";
 import {
   budgetUsdToAnalysisCredits,
   getEffectiveDailyBudgetUsd,
@@ -76,9 +77,11 @@ import type { ResolvedSession } from "@/lib/api/chat/resolve-session";
 const HEARTBEAT_INTERVAL_MS = readIntEnv("LEASE_HEARTBEAT_INTERVAL_MS", 60_000, {
   min: 1_000,
 });
-const CANCEL_POLL_INTERVAL_MS = readIntEnv("AGENT_CANCEL_POLL_INTERVAL_MS", 1000, {
-  min: 250,
-});
+const CANCEL_RECONCILE_INTERVAL_MS = readIntEnv(
+  "AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS",
+  10_000,
+  { min: 1_000 },
+);
 const AGENT_RUN_HARD_TIMEOUT_MS =
   readIntEnv("AGENT_RUN_HARD_TIMEOUT_MINUTES", 6, { min: 1 }) * 60_000;
 const RUN_TIMEOUT_MESSAGE =
@@ -195,7 +198,7 @@ export async function runAgentJob(runId: string, workerId: string) {
   };
 
   const stopHeartbeat = startHeartbeat(runId, workerId, abortController);
-  const stopCancelPolling = startCancelPolling(
+  const stopCancelWatcher = startCancelWatcher(
     admin,
     runId,
     abortController,
@@ -402,7 +405,7 @@ export async function runAgentJob(runId: string, workerId: string) {
     });
   } finally {
     stopHeartbeat();
-    stopCancelPolling();
+    stopCancelWatcher();
   }
 }
 
@@ -632,25 +635,55 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function startCancelPolling(
+function startCancelWatcher(
   admin: SupabaseAdmin,
   runId: string,
   abortController: AbortController,
 ) {
-  const interval = setInterval(async () => {
-    const { data } = await admin
-      .from("agent_runs")
-      .select("cancel_requested_at, status")
-      .eq("id", runId)
-      .maybeSingle<{ cancel_requested_at: string | null; status: string }>();
+  const stopController = new AbortController();
+  const cancelWaiter = getAgentRunCancelWaiter();
+  const stop = () => stopController.abort();
+  abortController.signal.addEventListener("abort", stop, { once: true });
 
-    if (data?.cancel_requested_at || data?.status === "cancelled") {
-      abortController.abort();
+  void (async () => {
+    while (!stopController.signal.aborted && !abortController.signal.aborted) {
+      if (await isRunCancelRequested(admin, runId)) {
+        abortController.abort();
+        break;
+      }
+
+      await cancelWaiter.waitForRunCancel(
+        runId,
+        CANCEL_RECONCILE_INTERVAL_MS,
+        stopController.signal,
+      );
     }
-  }, CANCEL_POLL_INTERVAL_MS);
-  (interval as { unref?: () => void }).unref?.();
+  })().catch((error) => {
+    if (!stopController.signal.aborted) {
+      console.warn("[agent-worker] cancel watcher failed", {
+        runId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
 
-  return () => clearInterval(interval);
+  return () => {
+    abortController.signal.removeEventListener("abort", stop);
+    stopController.abort();
+  };
+}
+
+async function isRunCancelRequested(
+  admin: SupabaseAdmin,
+  runId: string,
+): Promise<boolean> {
+  const { data } = await admin
+    .from("agent_runs")
+    .select("cancel_requested_at, status")
+    .eq("id", runId)
+    .maybeSingle<{ cancel_requested_at: string | null; status: string }>();
+
+  return Boolean(data?.cancel_requested_at || data?.status === "cancelled");
 }
 
 function createSdkDiagnosticsRecorder(

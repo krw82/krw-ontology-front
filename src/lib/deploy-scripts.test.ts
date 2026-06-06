@@ -35,6 +35,12 @@ describe("production deploy scripts", () => {
     expect(deployAll).toContain("deploy-plugin-worker-production.sh");
     expect(deployAll).toContain("deploy-data-release-production.sh");
     expect(deployAll).toContain("Mac worker/plugin validation");
+    expect(deployAll.indexOf("Applying Supabase migrations")).toBeLessThan(
+      deployAll.indexOf("deploy-web-production.sh"),
+    );
+    expect(deployAll.indexOf("npm run supabase:schema:smoke")).toBeLessThan(
+      deployAll.indexOf("deploy-web-production.sh"),
+    );
 
     expect(packageJson).toContain('"prod:status": "npm run mcp:prod:status && npm run worker:prod:status"');
     expect(packageJson).toContain('"prod:deploy:web": "scripts/deploy-web-production.sh"');
@@ -63,6 +69,7 @@ describe("production deploy scripts", () => {
     expect(packageJson).toContain('"mcp:dev:logs": "scripts/tail-mcp-logs.sh dev"');
     expect(packageJson).toContain('"mcp:dev:launchd:install": "scripts/install-mcp-server-dev-launchd.sh"');
     expect(packageJson).toContain('"stock-news:coverage:export": "node scripts/export-stock-news-coverage.mjs"');
+    expect(packageJson).toContain('"@modelcontextprotocol/sdk"');
 
     expect(restartCompose).toContain("restart reverse-proxy web");
     expect(restartCompose).not.toContain("restart reverse-proxy web agent-worker");
@@ -187,6 +194,13 @@ describe("production deploy scripts", () => {
     expect(workerSection).toContain(
       "AGENT_QUEUE_RECONCILE_INTERVAL_MS=${AGENT_QUEUE_RECONCILE_INTERVAL_MS:-60000}",
     );
+    expect(workerSection).toContain(
+      "AGENT_RUN_CANCEL_LISTEN_DATABASE_URL=${AGENT_RUN_CANCEL_LISTEN_DATABASE_URL:-}",
+    );
+    expect(workerSection).toContain(
+      "AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS=${AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS:-10000}",
+    );
+    expect(workerSection).not.toContain("AGENT_WORKER_POLL_INTERVAL_MS");
     expect(workerSection).toContain("healthcheck:");
     expect(workerSection).toContain(".worker/agent-worker.mjs");
     expect(workerSection).toContain("agent_index.sqlite");
@@ -198,6 +212,8 @@ describe("production deploy scripts", () => {
     expect(dockerfileWeb).toContain(
       '"/opt/krw-ontology-venv/bin/krw-ontology-mcp"',
     );
+    expect(dockerfileWeb).toContain('"stock-news"');
+    expect(dockerfileWeb).toContain('"http://127.0.0.1:8775/mcp"');
     expect(dockerfileWeb).not.toContain("krw-ontology-mcp-stdio");
   });
 
@@ -231,6 +247,8 @@ describe("production deploy scripts", () => {
     expect(preflight).toContain("--skip-worker-duplicate-check");
     expect(preflight).toContain("Checking Postgres LISTEN config");
     expect(preflight).toContain("AGENT_QUEUE_LISTEN_DATABASE_URL");
+    expect(preflight).toContain("OK Postgres LISTEN smoke");
+    expect(preflight).toContain("await client.query(`LISTEN ${listenChannel}`)");
     expect(preflight).toContain("Missing Claude auth after placeholder cleanup");
     expect(preflight).toContain("ANTHROPIC_AUTH_TOKEN");
     expect(preflight).toContain("EXPECTED_CLAUDE_CODE_VERSION");
@@ -274,6 +292,9 @@ describe("production deploy scripts", () => {
     expect(initEnv).toContain("GLOBAL_CONCURRENT_RUN_LIMIT=1");
     expect(initEnv).toContain("AGENT_QUEUE_LISTEN_ENABLED=1");
     expect(initEnv).toContain("AGENT_QUEUE_RECONCILE_INTERVAL_MS=60000");
+    expect(initEnv).toContain("AGENT_RUN_CANCEL_LISTEN_ENABLED=1");
+    expect(initEnv).toContain("AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS=10000");
+    expect(initEnv).toContain("AGENT_SUPERVISOR_SHUTDOWN_GRACE_MS=120000");
     expect(initEnv).toContain("KRW_SQLITE_READ_CACHE_MIB=512");
     expect(initEnv).toContain("KRW_SQLITE_READ_MMAP_MIB=2048");
 
@@ -372,6 +393,7 @@ describe("production deploy scripts", () => {
     expect(verifyHeartbeats).toContain("OK Mac supervisor heartbeat");
     expect(statusWorkers).toContain("nice=");
     expect(statusWorkers).toContain("AGENT_SUPERVISOR_CONCURRENCY");
+    expect(statusWorkers).toContain("AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS");
     expect(statusWorkers).toContain("MAC_WORKER_NICE");
 
     expect(stopGcp).toContain("stop agent-worker");
