@@ -1825,3 +1825,16 @@ See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode de
   runId: 'dfd427a4-6a2d-474e-95df-cfa128bade49',
   activeJobs: 1
 }
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'MU',
+    question: 'Micron Technology (MU) business model, recent financial performance, memory market dynamics, CY2025/CY2026 outlook, D...'
+  },
+  duration_ms: 1411,
+  duration_s: 1.411,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_gGosLvCKNHrpvnj1AjtR1978',
+  tool_name: 'krw_ontology_query_context'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
