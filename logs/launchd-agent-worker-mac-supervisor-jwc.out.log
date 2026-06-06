@@ -208,3 +208,33 @@ Release root: ~/krw-ontology-data/releases/prod/current
 Index path: ~/krw-ontology-data/releases/prod/current/indexes/agent_index.sqlite
 Plugin path: ~/krw-ontology-front/ref/plugins/prod/krw-ontology
 Log file: ~/krw-ontology-front/logs/mac-agent-worker-mac-supervisor-jwc.log
+Starting Mac production agent supervisor...
+Supervisor id: mac-supervisor-jwc
+Supervisor concurrency: 8
+Queue reconcile interval: 60000
+Queue listen enabled: 1
+Ontology env: prod
+Release root: ~/krw-ontology-data/releases/prod/current
+Index path: ~/krw-ontology-data/releases/prod/current/indexes/agent_index.sqlite
+Plugin path: ~/krw-ontology-front/ref/plugins/prod/krw-ontology
+Log file: ~/krw-ontology-front/logs/mac-agent-worker-mac-supervisor-jwc.log
+Starting Mac production agent supervisor...
+Supervisor id: mac-supervisor-jwc
+Supervisor concurrency: 8
+Queue reconcile interval: 60000
+Queue listen enabled: 1
+Ontology env: prod
+Release root: ~/krw-ontology-data/releases/prod/current
+Index path: ~/krw-ontology-data/releases/prod/current/indexes/agent_index.sqlite
+Plugin path: ~/krw-ontology-front/ref/plugins/prod/krw-ontology
+Log file: ~/krw-ontology-front/logs/mac-agent-worker-mac-supervisor-jwc.log
+Starting Mac production agent supervisor...
+Supervisor id: mac-supervisor-jwc
+Supervisor concurrency: 8
+Queue reconcile interval: 60000
+Queue listen enabled: 1
+Ontology env: prod
+Release root: ~/krw-ontology-data/releases/prod/current
+Index path: ~/krw-ontology-data/releases/prod/current/indexes/agent_index.sqlite
+Plugin path: ~/krw-ontology-front/ref/plugins/prod/krw-ontology
+Log file: ~/krw-ontology-front/logs/mac-agent-worker-mac-supervisor-jwc.log

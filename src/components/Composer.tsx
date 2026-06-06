@@ -502,7 +502,6 @@ export default function Composer({
           <div className="grid gap-1.5" aria-label="데이터 모드">
             {(["company", "news"] as const).map((mode) => {
               const selected = analysisMode === mode;
-              const icon = mode === "news" ? "newspaper" : "business_center";
 
               return (
                 <button
@@ -523,17 +522,6 @@ export default function Composer({
                   role="menuitemradio"
                   aria-checked={selected}
                 >
-                  <span
-                    aria-hidden="true"
-                    className={[
-                      "material-symbols-outlined flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[20px]",
-                      selected
-                        ? "bg-primary-container/18 text-primary"
-                        : "bg-surface-dim text-muted",
-                    ].join(" ")}
-                  >
-                    {icon}
-                  </span>
                   <span className="min-w-0">
                     <span
                       className={

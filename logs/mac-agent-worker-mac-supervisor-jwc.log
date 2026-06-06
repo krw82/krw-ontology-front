@@ -1400,3 +1400,161 @@ See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode de
 [agent-supervisor] listening for queued runs { channel: 'agent_run_queued' }
 [agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'listen_connected' }
 [agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] stopped { workerId: 'mac-supervisor-jwc' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+[agent-supervisor] listening for queued runs { channel: 'agent_run_queued' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'listen_connected' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] claimed {
+  workerId: 'mac-supervisor-jwc',
+  runId: '1028777f-a240-429e-a635-b61cb582ea87',
+  activeJobs: 1
+}
+[agent-run-cancel] listening for cancel requests { channel: 'agent_run_cancel' }
+[agent-supervisor] finished {
+  workerId: 'mac-supervisor-jwc',
+  runId: '1028777f-a240-429e-a635-b61cb582ea87',
+  activeJobs: 0
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'slot_available' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] claimed {
+  workerId: 'mac-supervisor-jwc',
+  runId: 'c212ae63-b1d1-48cc-a288-d0614d2e5f4a',
+  activeJobs: 1
+}
+[agent-supervisor] finished {
+  workerId: 'mac-supervisor-jwc',
+  runId: 'c212ae63-b1d1-48cc-a288-d0614d2e5f4a',
+  activeJobs: 0
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] claimed {
+  workerId: 'mac-supervisor-jwc',
+  runId: 'fb9aafec-e2f5-4ffa-a8d4-9feb3dc6e724',
+  activeJobs: 1
+}
+[agent-supervisor] finished {
+  workerId: 'mac-supervisor-jwc',
+  runId: 'fb9aafec-e2f5-4ffa-a8d4-9feb3dc6e724',
+  activeJobs: 0
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'slot_available' }
+[agent-supervisor] claimed {
+  workerId: 'mac-supervisor-jwc',
+  runId: '7dfb6c53-97f0-494a-a006-67784e5e7181',
+  activeJobs: 1
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'AMBA' },
+  duration_ms: 175,
+  duration_s: 0.175,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_cILTpGU5QC4mGEXU7q5U5767',
+  tool_name: 'krw_ontology_catalog'
+}
+[agent-supervisor] finished {
+  workerId: 'mac-supervisor-jwc',
+  runId: '7dfb6c53-97f0-494a-a006-67784e5e7181',
+  activeJobs: 0
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] stopped { workerId: 'mac-supervisor-jwc' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+[agent-supervisor] listening for queued runs { channel: 'agent_run_queued' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'listen_connected' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] stopped { workerId: 'mac-supervisor-jwc' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+[agent-supervisor] listening for queued runs { channel: 'agent_run_queued' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'listen_connected' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }

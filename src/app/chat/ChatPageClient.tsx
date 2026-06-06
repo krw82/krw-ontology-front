@@ -138,7 +138,7 @@ function ChatContent() {
   const prevMessagesCountRef = useRef(0);
   const { entitlement, refresh: refreshEntitlement } = useEntitlement();
   const [researchMode, setResearchMode] = useResearchModePreference(sessionId);
-  const [analysisMode, setAnalysisMode] = useAnalysisModePreference();
+  const [analysisMode, setAnalysisMode] = useAnalysisModePreference(sessionId);
   const [composerDraftResetKey, setComposerDraftResetKey] = useState(0);
 
   const isDraftRoute = pathname === "/chat/new";

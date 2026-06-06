@@ -4015,9 +4015,9 @@ export function listCompanyLandingCopyTickers(): string[] {
 
 // UI guardrail: each Korean prompt must be concise to avoid compact layout overflow.
 export const DEFAULT_SUGGESTED_PROMPTS: SuggestedPromptSet = [
-  "핵심 성장 동력은 무엇인가요?",
-  "최근 공시에서 가장 중요한 실적 변수는 무엇인가요?",
-  "주요 리스크 요인은 어디에서 확인되나요?",
+  "AI 데이터센터 투자 확대는 어떤 기업에 가장 큰 수혜인가요?",
+  "메모리 가격 상승은 어떤 반도체 기업에 유리한가요?",
+  "소비 둔화에도 마진을 방어할 수 있는 기업은 어디인가요?",
 ];
 
 function normalizeTicker(ticker: string): string {
