@@ -1,0 +1,1402 @@
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+(node:55612) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[agent-supervisor] failed to start Postgres LISTEN {
+  error: 'connect EHOSTUNREACH 2406:da12:5ca:b701:2a88:ba16:3c93:8218:5432 - Local (:::65078)'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'startup' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+(node:55835) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[agent-supervisor] failed to start Postgres LISTEN {
+  error: 'connect EHOSTUNREACH 2406:da12:5ca:b701:2a88:ba16:3c93:8218:5432 - Local (:::65083)'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'startup' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+(node:56752) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[agent-supervisor] failed to start Postgres LISTEN {
+  error: 'connect EHOSTUNREACH 2406:da12:5ca:b701:2a88:ba16:3c93:8218:5432 - Local (:::65101)'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'startup' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+(node:57766) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[agent-supervisor] failed to start Postgres LISTEN {
+  error: 'connect EHOSTUNREACH 2406:da12:5ca:b701:2a88:ba16:3c93:8218:5432 - Local (:::65109)'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'startup' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+(node:58823) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[agent-supervisor] failed to start Postgres LISTEN {
+  error: 'connect EHOSTUNREACH 2406:da12:5ca:b701:2a88:ba16:3c93:8218:5432 - Local (:::65121)'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'startup' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+(node:59023) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[agent-supervisor] failed to start Postgres LISTEN {
+  error: 'connect EHOSTUNREACH 2406:da12:5ca:b701:2a88:ba16:3c93:8218:5432 - Local (:::65128)'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'startup' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+(node:59862) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[agent-supervisor] failed to start Postgres LISTEN {
+  error: 'connect EHOSTUNREACH 2406:da12:5ca:b701:2a88:ba16:3c93:8218:5432 - Local (:::65136)'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'startup' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+(node:59925) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[agent-supervisor] failed to start Postgres LISTEN {
+  error: 'connect EHOSTUNREACH 2406:da12:5ca:b701:2a88:ba16:3c93:8218:5432 - Local (:::65143)'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'startup' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+(node:60021) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[agent-supervisor] failed to start Postgres LISTEN {
+  error: 'connect EHOSTUNREACH 2406:da12:5ca:b701:2a88:ba16:3c93:8218:5432 - Local (:::65151)'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'startup' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+(node:60102) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[agent-supervisor] failed to start Postgres LISTEN {
+  error: 'connect EHOSTUNREACH 2406:da12:5ca:b701:2a88:ba16:3c93:8218:5432 - Local (:::65165)'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'startup' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+(node:60165) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[agent-supervisor] failed to start Postgres LISTEN {
+  error: 'connect EHOSTUNREACH 2406:da12:5ca:b701:2a88:ba16:3c93:8218:5432 - Local (:::65171)'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'startup' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+(node:60230) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[agent-supervisor] failed to start Postgres LISTEN {
+  error: 'connect EHOSTUNREACH 2406:da12:5ca:b701:2a88:ba16:3c93:8218:5432 - Local (:::65178)'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'startup' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+[agent-supervisor] listening for queued runs { channel: 'agent_run_queued' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'listen_connected' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] stopped { workerId: 'mac-supervisor-jwc' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+[agent-supervisor] listening for queued runs { channel: 'agent_run_queued' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'listen_connected' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] stopped { workerId: 'mac-supervisor-jwc' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+[agent-supervisor] listening for queued runs { channel: 'agent_run_queued' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'listen_connected' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] claimed {
+  workerId: 'mac-supervisor-jwc',
+  runId: '8aaf5a56-2ca4-4b2e-83d1-997765de2aa5',
+  activeJobs: 1
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    question: 'AAPL iPhone vs Services revenue mix shift, segment gross margin comparison, Services mix impact on overall company ma...'
+  },
+  duration_ms: 848,
+  duration_s: 0.848,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_ga37nKWNAWWhypPz1Yfh5746',
+  tool_name: 'krw_ontology_query_context'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    question: 'AAPL Products vs Services gross margin percentage by segment, iPhone revenue as percentage of total revenue, Services...'
+  },
+  duration_ms: 24284,
+  duration_s: 24.284,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_2c5k5Aa1l4zbnoUGFemZ4434',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'iPhone revenue as percentage of total, Services revenue and gross margin, Products vs Services segment margin, revenu...'
+  },
+  duration_ms: 2063,
+  duration_s: 2.063,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_dgZ1pUHx8ciV2s3N6BCC2971',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'net sales by product category iPhone Services segment revenue breakdown'
+  },
+  duration_ms: 1010,
+  duration_s: 1.01,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_q7rs5SoYgxsJMoG7V0T06107',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'AAPL' },
+  duration_ms: 175,
+  duration_s: 0.175,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_RMFxraAQNwp4gUvn888i8789',
+  tool_name: 'krw_ontology_company_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Products gross margin Services gross margin segment costs and expenses'
+  },
+  duration_ms: 852,
+  duration_s: 0.852,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_f4909nDq84t7BHgRSx7f4436',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'segment reporting net sales iPhone Services Wearables Mac iPad'
+  },
+  duration_ms: 609,
+  duration_s: 0.609,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_DwcITPPH9yS2LrPozTg52461',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Services net sales gross margin 2025 2024 2023'
+  },
+  duration_ms: 735,
+  duration_s: 0.735,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_ttd712Xqe3il1sLCpqyP6273',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'AAPL', topic: 'iPhone net sales 2025 2024 2023' },
+  duration_ms: 1567,
+  duration_s: 1.567,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_MBiqvOE2e09iYkGzR3CX9474',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'AAPL', topic: 'Services net sales 2024 2023 2022 2021' },
+  duration_ms: 3108,
+  duration_s: 3.108,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_jyFhozPf4DKdCmiuM5Pz6411',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Products gross margin percentage 2025 2024 2023 2022 2021'
+  },
+  duration_ms: 2894,
+  duration_s: 2.894,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_VKpPfyOMfTkgf1rbKta20915',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'total company gross margin 2023 2024 2025 2026Q1'
+  },
+  duration_ms: 2685,
+  duration_s: 2.685,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_5ifA8EXRQFFI1nnPhE8X4790',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Products gross margin percentage 2025 2024'
+  },
+  duration_ms: 1701,
+  duration_s: 1.701,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_iiWDVLS7QoGxeyvkcJf53026',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'AAPL', topic: 'Services net sales 2023' },
+  duration_ms: 1553,
+  duration_s: 1.553,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_Fzr52IlxBPv5ThdF4lbN2372',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'AAPL', topic: 'iPhone net sales 2023 2022 2021' },
+  duration_ms: 1410,
+  duration_s: 1.41,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_6YIpoa5atgIJzXi6P9cz2426',
+  tool_name: 'krw_ontology_query'
+}
+[agent-supervisor] finished {
+  workerId: 'mac-supervisor-jwc',
+  runId: '8aaf5a56-2ca4-4b2e-83d1-997765de2aa5',
+  activeJobs: 0
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'slot_available' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] claimed {
+  workerId: 'mac-supervisor-jwc',
+  runId: 'ad058bef-3c9c-46a2-9c4b-7f7af2abe9aa',
+  activeJobs: 1
+}
+[agent-supervisor] finished {
+  workerId: 'mac-supervisor-jwc',
+  runId: 'ad058bef-3c9c-46a2-9c4b-7f7af2abe9aa',
+  activeJobs: 0
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'slot_available' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] stopped { workerId: 'mac-supervisor-jwc' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+[agent-supervisor] listening for queued runs { channel: 'agent_run_queued' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'listen_connected' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] stopped { workerId: 'mac-supervisor-jwc' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+[agent-supervisor] listening for queued runs { channel: 'agent_run_queued' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'listen_connected' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] claimed {
+  workerId: 'mac-supervisor-jwc',
+  runId: 'ede0ead8-728b-4198-a5ef-ee4379ce2a19',
+  activeJobs: 1
+}
+[agent-run-cancel] listening for cancel requests { channel: 'agent_run_cancel' }
+[agent-supervisor] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'This operation was aborted'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    question: 'Apple iPhone vs Services revenue mix evolution over recent periods, Services margin vs product margin, revenue share...'
+  },
+  duration_ms: 99742,
+  duration_s: 99.742,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_42XPgmI25KKG2ymUuNsF1078',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'iPhone revenue, Services revenue, segment revenue mix, gross margin by segment, product vs services margin'
+  },
+  duration_ms: 890,
+  duration_s: 0.89,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_n3FLFG2IMgwxQtf9eFes2793',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Services revenue, segment gross margin, total company revenue, product gross margin, services gross margin'
+  },
+  duration_ms: 968,
+  duration_s: 0.968,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_21ph7xSCqcMZpivEIyUG4814',
+  tool_name: 'krw_ontology_query'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'Services gross margin percentage, Services gross margin dollars, total company gross margin, segment margin trend'
+  },
+  duration_ms: 788,
+  duration_s: 0.788,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_aZ8zlxTnWBtNDzX4aDja1787',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 831,
+  duration_s: 0.831,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_GWCkxSBXXBQjXT1WESKT7752',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'CY2026Q1 revenue, iPhone revenue, Services revenue, gross margin, segment margin'
+  },
+  duration_ms: 843,
+  duration_s: 0.843,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_n3DpmbKrEw7rYkQuUXr87124',
+  tool_name: 'krw_ontology_query'
+}
+[agent-supervisor] finished {
+  workerId: 'mac-supervisor-jwc',
+  runId: 'ede0ead8-728b-4198-a5ef-ee4379ce2a19',
+  activeJobs: 0
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] stopped { workerId: 'mac-supervisor-jwc' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+[agent-supervisor] listening for queued runs { channel: 'agent_run_queued' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'listen_connected' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] refusing to claim; MCP release is not ready {
+  env: null,
+  releaseId: null,
+  manifestValid: false,
+  connected: false,
+  error: 'fetch failed'
+}
+[agent-supervisor] stopped { workerId: 'mac-supervisor-jwc' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+[agent-supervisor] listening for queued runs { channel: 'agent_run_queued' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'listen_connected' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] claimed {
+  workerId: 'mac-supervisor-jwc',
+  runId: 'fbcde776-aa8c-4c74-85ce-a6b1340debcc',
+  activeJobs: 1
+}
+[agent-run-cancel] listening for cancel requests { channel: 'agent_run_cancel' }
+[agent-supervisor] finished {
+  workerId: 'mac-supervisor-jwc',
+  runId: 'fbcde776-aa8c-4c74-85ce-a6b1340debcc',
+  activeJobs: 0
+}
+[agent-supervisor] claimed {
+  workerId: 'mac-supervisor-jwc',
+  runId: '3047c6d0-bd73-4219-b39b-82ca96ab117a',
+  activeJobs: 1
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    periods: [ 'CY2026Q1', 'CY2025', 'CY2024' ],
+    document_types: [ '10-K', '10-Q' ],
+    question: 'AAPL Apple Inc. - market narrative about AI-powered Siri at WWDC 2026 as a do-over. Need filing evidence on: revenue...'
+  },
+  duration_ms: 89519,
+  duration_s: 89.519,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_S8Q80EWgOyfhUciRyJBW8973',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    question: 'AAPL Apple Inc. - market narrative about AI-powered Siri at WWDC 2026 as a do-over. Need filing evidence on: revenue...'
+  },
+  duration_ms: 634,
+  duration_s: 0.634,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_fwNM76l3yMgtobaeGVh95126',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'AI investment, R&D spending, product innovation, capital spending'
+  },
+  duration_ms: 4100,
+  duration_s: 4.1,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_WadkGAledoiBgGNIa8Uz5597',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'gross margin, operating margin, cost trends, component costs, margin drivers'
+  },
+  duration_ms: 2728,
+  duration_s: 2.728,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_59V6sbPSHIRUzYSW6Lv43236',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'revenue trends, Services vs Products, iPhone demand, latest MD&A commentary'
+  },
+  duration_ms: 4112,
+  duration_s: 4.112,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_ISeTR041kNcEAbWha6Hj0673',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 22989,
+  duration_s: 22.989,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_M04uz5QO7pxE2HipaMGs7959',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'capital return, share repurchase, dividend, cash flow, free cash flow'
+  },
+  duration_ms: 21499,
+  duration_s: 21.499,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_8hZjHo7VWIhRPooLSUg09629',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'iPhone revenue, Services revenue, total revenue, product sales latest quarterly'
+  },
+  duration_ms: 22587,
+  duration_s: 22.587,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_oIMzvDBZyXrF7DzBr9qL0277',
+  tool_name: 'krw_ontology_query'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 20425,
+  duration_s: 20.425,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_YtnwrLd4bwD4PdQ0IeDr9212',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 20100,
+  duration_s: 20.1,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_zVisIxApYLCUVbgFTKfC0505',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    question: 'Apple WWDC 2026 AI Siri announcement pressure stock',
+    company: 'Apple Inc.',
+    lookback_hours: 72,
+    max_events: 5
+  },
+  duration_ms: 170,
+  duration_s: 0.17,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_CCxuK6MAA7beCpKF7fUm8937',
+  tool_name: 'search_company_news_events'
+}
+[agent-supervisor] finished {
+  workerId: 'mac-supervisor-jwc',
+  runId: '3047c6d0-bd73-4219-b39b-82ca96ab117a',
+  activeJobs: 0
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] claimed {
+  workerId: 'mac-supervisor-jwc',
+  runId: 'e0525f24-4647-4870-bdc2-8ef4d568f5aa',
+  activeJobs: 1
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    question: 'GOOGL current situation and future outlook: latest revenue trends, segment performance (Search, YouTube, Cloud), marg...'
+  },
+  duration_ms: 2057,
+  duration_s: 2.057,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_89zuLZ1ui33mW0186l2w8246',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'latest MD&A management discussion revenue performance segment trends',
+    periods: [ 'CY2026Q1', 'CY2025', 'CY2024' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 14354,
+  duration_s: 14.354,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_WOD4VmjchRXv803KjWTD8934',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'business model revenue streams Search YouTube Cloud subscription',
+    periods: [ 'CY2026Q1', 'CY2025', 'CY2024' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 11507,
+  duration_s: 11.507,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_03_qxncShK1gNN4cpRzvn3k6835',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'cash flow capital allocation share repurchase free cash flow',
+    periods: [ 'CY2026Q1', 'CY2025', 'CY2024' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 12849,
+  duration_s: 12.849,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_ryRZppJQ6IVkAV5UCwzT9783',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'AI investment capital expenditure cloud growth competitive position',
+    periods: [ 'CY2026Q1', 'CY2025', 'CY2024' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 14197,
+  duration_s: 14.197,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_ZoQOvBujBenYTSkHnTFj6599',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'GOOGL' },
+  duration_ms: 9150,
+  duration_s: 9.15,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_woPMvlji6R0cR4Hp3kTZ4580',
+  tool_name: 'krw_ontology_company_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'operating margin cost of revenue gross margin operating expenses headcount',
+    periods: [ 'CY2026Q1', 'CY2025', 'CY2024' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 5683,
+  duration_s: 5.683,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_03_tv0uJDpXdS0iOyevTegW3489',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'revenue segment trends Google Search YouTube advertising Google Cloud subscription platforms',
+    periods: [ 'CY2026Q1', 'CY2025', 'CY2024' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 8277,
+  duration_s: 8.277,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_6zEulXLV982IKcyl4NE26785',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'Google Services revenue advertising Search YouTube Google Network',
+    periods: [ 'CY2026Q1', 'CY2025', 'CY2024' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 7409,
+  duration_s: 7.409,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_pL2vQ26Rp3ES3FzORsQf4329',
+  tool_name: 'krw_ontology_query'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'Google Services segment revenue Google Cloud revenue Other Bets revenue',
+    periods: [ 'CY2026Q1', 'CY2025' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 4892,
+  duration_s: 4.892,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_gjlB87aiNifaXq3esgxh8810',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'capital expenditure capex technical infrastructure investment data center AI infrastructure',
+    periods: [ 'CY2026Q1', 'CY2025' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 2136,
+  duration_s: 2.136,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_03_yxjZWTCjeK1sK3yVvJCV9011',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'Alphabet-level activities AI research DeepMind Gemini corporate costs',
+    periods: [ 'CY2026Q1', 'CY2025' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 3434,
+  duration_s: 3.434,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_02_eWu31n9hVtM9156BY2GZ1398',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'revenue growth total revenue advertising revenue subscription platforms',
+    periods: [ 'CY2026Q1', 'CY2025' ],
+    document_types: [ '10-Q', '10-K' ]
+  },
+  duration_ms: 4953,
+  duration_s: 4.953,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_ofxV1W7ZE9V0Z1wvczJW7658',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: undefined,
+  duration_ms: 12565,
+  duration_s: 12.565,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_vgFJWPfligwU3zeVSeoq3978',
+  tool_name: 'krw_ontology_trace'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'GOOGL',
+    topic: 'operating income operating margin 2025 consolidated revenue income statement',
+    periods: [ 'CY2025' ],
+    document_types: [ '10-K' ]
+  },
+  duration_ms: 1459,
+  duration_s: 1.459,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_jeAwuG2QxsIO0xdHgaKE7877',
+  tool_name: 'krw_ontology_query'
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] finished {
+  workerId: 'mac-supervisor-jwc',
+  runId: 'e0525f24-4647-4870-bdc2-8ef4d568f5aa',
+  activeJobs: 0
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] stopped { workerId: 'mac-supervisor-jwc' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+[agent-supervisor] listening for queued runs { channel: 'agent_run_queued' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'listen_connected' }
+[agent-supervisor] claimed {
+  workerId: 'mac-supervisor-jwc',
+  runId: 'aebf6b75-b2f9-41a7-91ec-ac23ec88f43a',
+  activeJobs: 1
+}
+[agent-run-cancel] listening for cancel requests { channel: 'agent_run_cancel' }
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    question: 'Why is Apple (AAPL) stock falling? What recent events or news are affecting AAPL?'
+  },
+  duration_ms: 1183,
+  duration_s: 1.183,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_RJ5eiKL5Re3Ky5ttPuZG6466',
+  tool_name: 'route_news_question'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    question: 'Why is AAPL stock falling? Recent negative developments, demand weakness, competitive pressure, regulatory risks, mar...'
+  },
+  duration_ms: 1031,
+  duration_s: 1.031,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_jef5cPg1m3iDgwcL05ra3763',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'AAPL' },
+  duration_ms: 142,
+  duration_s: 0.142,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_hxKgfNEBtIM240l5nfaq7434',
+  tool_name: 'krw_ontology_company_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'demand weakness, revenue decline, iPhone sales, China market, competitive pressure, gross margin pressure, product cy...'
+  },
+  duration_ms: 1885,
+  duration_s: 1.885,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_LybIIHSxXSJCXQZSTpUc2206',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'revenue performance, iPhone revenue, services revenue, segment performance, MD&A, management discussion, operating pe...',
+    periods: [ 'CY2026Q1', 'CY2025' ],
+    document_types: [ '10-K', '10-Q' ]
+  },
+  duration_ms: 11410,
+  duration_s: 11.41,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_RmRtjHIknrd694y3bST82188',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'product cycle, iPhone cycle, AI features, Apple Intelligence, competitive landscape, China competition, Huawei, regul...',
+    periods: [ 'CY2026Q1', 'CY2025' ],
+    document_types: [ '10-K', '10-Q' ]
+  },
+  duration_ms: 10616,
+  duration_s: 10.616,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_NgQnbvXc3GHf4SE2hqIT1688',
+  tool_name: 'krw_ontology_query'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'AAPL' },
+  duration_ms: 136,
+  duration_s: 0.136,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_01_ErBpZsE9tEHXJXMX3VKz4321',
+  tool_name: 'krw_ontology_catalog'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'AAPL',
+    topic: 'net sales, revenue, iPhone, services, segment revenue, gross margin, operating income, earnings, financial results',
+    periods: [ 'CY2026Q1' ],
+    document_types: [ '10-Q' ]
+  },
+  duration_ms: 2192,
+  duration_s: 2.192,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_a7s8WBJTpsYa32NO2eFd2802',
+  tool_name: 'krw_ontology_query'
+}
+[agent-supervisor] finished {
+  workerId: 'mac-supervisor-jwc',
+  runId: 'aebf6b75-b2f9-41a7-91ec-ac23ec88f43a',
+  activeJobs: 0
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'slot_available' }
+[agent-supervisor] claimed {
+  workerId: 'mac-supervisor-jwc',
+  runId: '923bea8e-c600-4e34-bc6a-fdf3e352cdc0',
+  activeJobs: 1
+}
+[agent-supervisor] finished {
+  workerId: 'mac-supervisor-jwc',
+  runId: '923bea8e-c600-4e34-bc6a-fdf3e352cdc0',
+  activeJobs: 0
+}
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] stopped { workerId: 'mac-supervisor-jwc' }
+[agent-supervisor] started {
+  workerId: 'mac-supervisor-jwc',
+  concurrency: 8,
+  reconcileIntervalMs: 60000
+}
+[agent-supervisor] listening for queued runs { channel: 'agent_run_queued' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'listen_connected' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
