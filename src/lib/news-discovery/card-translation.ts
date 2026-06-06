@@ -18,7 +18,7 @@ export interface NewsCardTranslationResult {
   };
 }
 
-const DEFAULT_TRANSLATION_TIMEOUT_MS = 2500;
+const DEFAULT_TRANSLATION_TIMEOUT_MS = 7000;
 const DEFAULT_MAX_TRANSLATED_TEXTS = 10;
 
 export async function translateFallbackNewsCards(
@@ -43,8 +43,11 @@ export async function translateFallbackNewsCards(
   }
 
   try {
-    const translateTexts = options.translateTexts ?? translateTextsWithGoogletrans;
-    const translations = await translateTexts(requests.map((request) => request.text));
+    const translateTexts =
+      options.translateTexts ?? translateTextsWithGoogletrans;
+    const translations = await translateTexts(
+      requests.map((request) => request.text),
+    );
     const byKey = new Map<string, string>();
 
     requests.forEach((request, index) => {
@@ -132,7 +135,12 @@ function collectTranslationRequests(cards: AtomicNewsEventCard[]) {
   const seen = new Set<string>();
 
   for (const card of cards) {
-    addRequest(requests, seen, titleKey(card.id), card.original_headline || card.event_title);
+    addRequest(
+      requests,
+      seen,
+      titleKey(card.id),
+      card.original_headline || card.event_title,
+    );
     addRequest(requests, seen, summaryKey(card.id), card.short_summary);
     if (requests.length >= maxTexts) break;
   }
@@ -180,8 +188,9 @@ function applyTranslations(
             ? "약세 요인"
             : card.price_impact_direction === "positive"
               ? "강세 요인"
-              : card.ui?.badge_ko ?? "시장 뉴스",
-        confidence_label_ko: titleKo || summaryKo ? "번역 후보" : card.ui?.confidence_label_ko,
+              : (card.ui?.badge_ko ?? "시장 뉴스"),
+        confidence_label_ko:
+          titleKo || summaryKo ? "번역 후보" : card.ui?.confidence_label_ko,
       },
     };
   });
@@ -211,7 +220,9 @@ function runPythonTranslator(params: {
   script: string;
   payload: string;
   timeoutMs: number;
-}): Promise<{ ok: true; translations: string[] } | { ok: false; error: string }> {
+}): Promise<
+  { ok: true; translations: string[] } | { ok: false; error: string }
+> {
   return new Promise((resolve) => {
     const child = spawn(params.python, [params.script], {
       stdio: ["pipe", "pipe", "pipe"],
@@ -242,16 +253,18 @@ function runPythonTranslator(params: {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+
+      const parsed = parsePythonTranslatorOutput(stdout);
       if (code !== 0) {
-        resolve({ ok: false, error: stderr.trim() || `python_exit_${code}` });
+        resolve({
+          ok: false,
+          error:
+            translatorError(parsed) || stderr.trim() || `python_exit_${code}`,
+        });
         return;
       }
+
       try {
-        const parsed = JSON.parse(stdout) as {
-          ok?: boolean;
-          translations?: unknown;
-          error?: unknown;
-        };
         if (parsed.ok === true && Array.isArray(parsed.translations)) {
           resolve({
             ok: true,
@@ -263,10 +276,7 @@ function runPythonTranslator(params: {
         }
         resolve({
           ok: false,
-          error:
-            typeof parsed.error === "string"
-              ? parsed.error
-              : "invalid_googletrans_output",
+          error: translatorError(parsed) || "invalid_googletrans_output",
         });
       } catch (error) {
         resolve({
@@ -278,6 +288,37 @@ function runPythonTranslator(params: {
 
     child.stdin.end(params.payload);
   });
+}
+
+function parsePythonTranslatorOutput(stdout: string): {
+  ok?: boolean;
+  translations?: unknown;
+  error?: unknown;
+  message?: unknown;
+} {
+  try {
+    return JSON.parse(stdout) as {
+      ok?: boolean;
+      translations?: unknown;
+      error?: unknown;
+      message?: unknown;
+    };
+  } catch {
+    return {};
+  }
+}
+
+function translatorError(parsed: {
+  error?: unknown;
+  message?: unknown;
+}): string | undefined {
+  if (typeof parsed.error !== "string" || !parsed.error.trim())
+    return undefined;
+  const message =
+    typeof parsed.message === "string" && parsed.message.trim()
+      ? parsed.message.trim()
+      : undefined;
+  return message ? `${parsed.error.trim()}: ${message}` : parsed.error.trim();
 }
 
 function titleKey(id: string): string {

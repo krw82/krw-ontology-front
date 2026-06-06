@@ -113,19 +113,8 @@ echo "MCP URL: ${KRW_ONTOLOGY_MCP_URL:-unset}"
 echo "Stock News MCP URL: ${STOCK_NEWS_MCP_URL:-http://127.0.0.1:8775/mcp}"
 echo "Stock News coverage: $STOCK_NEWS_COVERAGE_PATH"
 
-if [ "${NEWS_CARD_TRANSLATION_PROVIDER:-googletrans}" != "off" ] &&
-   [ "${NEWS_CARD_TRANSLATION_PROVIDER:-googletrans}" != "none" ] &&
-   [ "${NEWS_CARD_TRANSLATION_PROVIDER:-googletrans}" != "0" ]; then
-  NEWS_TRANSLATION_PYTHON=${NEWS_TRANSLATION_PYTHON:-python3}
-  if ! "$NEWS_TRANSLATION_PYTHON" - <<'PY' >/dev/null 2>&1
-import googletrans
-PY
-  then
-    echo "Warning: googletrans is not installed for $NEWS_TRANSLATION_PYTHON." >&2
-    echo "  Run: scripts/install-news-translation-deps.sh" >&2
-    echo "  News discovery will still work, but fallback cards may stay in English." >&2
-  fi
-fi
+echo "Checking news translation readiness..."
+(cd "$FRONT_DIR" && node scripts/verify-news-translation.mjs)
 
 if [ "$DRY_RUN" = "1" ]; then
   "$SCRIPT_DIR/install-mcp-server-launchd.sh" --env-file "$ENV_PATH" --dry-run

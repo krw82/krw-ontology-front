@@ -218,7 +218,7 @@ trap cleanup EXIT INT TERM
   echo "NEWS_DISCOVERY_CARD_COMPOSER=fallback"
   echo "NEWS_CARD_TRANSLATION_PROVIDER=googletrans"
   echo "NEWS_TRANSLATION_PYTHON=~/.local/share/krw-ontology/news-translation-venv/bin/python"
-  echo "NEWS_TRANSLATION_TIMEOUT_MS=2500"
+  echo "NEWS_TRANSLATION_TIMEOUT_MS=7000"
   echo "NEWS_TRANSLATION_MAX_TEXTS=10"
   echo "STOCK_NEWS_MCP_HOST=127.0.0.1"
   echo "STOCK_NEWS_MCP_PORT=8775"

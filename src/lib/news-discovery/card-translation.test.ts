@@ -1,8 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AtomicNewsEventCard } from "@/types/api-contracts";
-import { translateFallbackNewsCards } from "./card-translation";
+import {
+  translateFallbackNewsCards,
+  translateTextsWithGoogletrans,
+} from "./card-translation";
 
 vi.mock("server-only", () => ({}));
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 const card = {
   id: "aapl-intel-foxconn",
@@ -66,8 +76,7 @@ describe("translateFallbackNewsCards", () => {
     expect(result.cards[0]).toMatchObject({
       event_title:
         "Intel Stock Drops After It Scores AI Partnership With Apple Supplier Foxconn",
-      event_title_ko:
-        "인텔 주가, 애플 공급업체 폭스콘과 AI 파트너십에도 하락",
+      event_title_ko: "인텔 주가, 애플 공급업체 폭스콘과 AI 파트너십에도 하락",
       original_headline:
         "Intel Stock Drops After It Scores AI Partnership With Apple Supplier Foxconn",
       short_summary:
@@ -77,8 +86,7 @@ describe("translateFallbackNewsCards", () => {
       primary_source: {
         title_original:
           "Intel Stock Drops After It Scores AI Partnership With Apple Supplier Foxconn",
-        title_ko:
-          "인텔 주가, 애플 공급업체 폭스콘과 AI 파트너십에도 하락",
+        title_ko: "인텔 주가, 애플 공급업체 폭스콘과 AI 파트너십에도 하락",
         summary_ko:
           "인텔은 애플 공급업체 폭스콘과 AI 인프라 개발 협력을 발표했지만 주가는 하락했습니다.",
       },
@@ -102,5 +110,37 @@ describe("translateFallbackNewsCards", () => {
       error: "translate failed",
     });
     expect(result.cards[0]).toBe(card);
+  });
+
+  it("preserves structured translator errors from non-zero exits", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "news-translation-test-"));
+    const script = path.join(dir, "translator.mjs");
+    await writeFile(
+      script,
+      [
+        "process.stdin.resume();",
+        "process.stdin.on('end', () => {",
+        "  console.log(JSON.stringify({",
+        "    ok: false,",
+        "    error: 'googletrans_unavailable',",
+        "    message: 'No module named googletrans',",
+        "  }));",
+        "  process.exitCode = 1;",
+        "});",
+      ].join("\n"),
+      "utf8",
+    );
+
+    vi.stubEnv("NEWS_TRANSLATION_PYTHON", process.execPath);
+    vi.stubEnv("NEWS_TRANSLATION_GOOGLETRANS_SCRIPT", script);
+    vi.stubEnv("NEWS_TRANSLATION_TIMEOUT_MS", "7000");
+
+    try {
+      await expect(
+        translateTextsWithGoogletrans(["Apple stock fell today."]),
+      ).rejects.toThrow("googletrans_unavailable: No module named googletrans");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

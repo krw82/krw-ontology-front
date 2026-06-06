@@ -69,6 +69,9 @@ describe("production deploy scripts", () => {
     expect(packageJson).toContain('"mcp:dev:logs": "scripts/tail-mcp-logs.sh dev"');
     expect(packageJson).toContain('"mcp:dev:launchd:install": "scripts/install-mcp-server-dev-launchd.sh"');
     expect(packageJson).toContain('"stock-news:coverage:export": "node scripts/export-stock-news-coverage.mjs"');
+    expect(packageJson).toContain(
+      '"news:translation:verify": "node scripts/verify-news-translation.mjs --env-file .env.mac-worker.production"',
+    );
     expect(packageJson).toContain('"@modelcontextprotocol/sdk"');
 
     expect(restartCompose).toContain("restart reverse-proxy web");
@@ -249,6 +252,8 @@ describe("production deploy scripts", () => {
     expect(preflight).toContain("AGENT_QUEUE_LISTEN_DATABASE_URL");
     expect(preflight).toContain("OK Postgres LISTEN smoke");
     expect(preflight).toContain("await client.query(`LISTEN ${listenChannel}`)");
+    expect(preflight).toContain("Checking news translation readiness");
+    expect(preflight).toContain("verify-news-translation.mjs");
     expect(preflight).toContain("Missing Claude auth after placeholder cleanup");
     expect(preflight).toContain("ANTHROPIC_AUTH_TOKEN");
     expect(preflight).toContain("EXPECTED_CLAUDE_CODE_VERSION");
@@ -295,6 +300,7 @@ describe("production deploy scripts", () => {
     expect(initEnv).toContain("AGENT_RUN_CANCEL_LISTEN_ENABLED=1");
     expect(initEnv).toContain("AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS=10000");
     expect(initEnv).toContain("AGENT_SUPERVISOR_SHUTDOWN_GRACE_MS=120000");
+    expect(initEnv).toContain("NEWS_TRANSLATION_TIMEOUT_MS=7000");
     expect(initEnv).toContain("KRW_SQLITE_READ_CACHE_MIB=512");
     expect(initEnv).toContain("KRW_SQLITE_READ_MMAP_MIB=2048");
 
@@ -382,6 +388,11 @@ describe("production deploy scripts", () => {
     expect(deployPluginWorker).toContain("install-mcp-server-launchd.sh");
     expect(deployPluginWorker).toContain("install-stock-news-mcp-launchd.sh");
     expect(deployPluginWorker).toContain("deploy-worker-production.sh");
+    expect(deployPluginWorker).toContain("Checking news translation readiness");
+    expect(deployPluginWorker).toContain("verify-news-translation.mjs");
+    expect(deployPluginWorker).not.toContain(
+      "News discovery will still work, but fallback cards may stay in English",
+    );
     expect(deployPluginWorker).toContain("does not sync plugin code to the GCP VM");
     expect(read("scripts/export-stock-news-coverage.mjs")).toContain("ontology_companies");
     expect(read("scripts/start-stock-news-mcp-production.sh")).toContain("STOCK_NEWS_COVERAGE_PATH");
@@ -394,6 +405,8 @@ describe("production deploy scripts", () => {
     expect(statusWorkers).toContain("nice=");
     expect(statusWorkers).toContain("AGENT_SUPERVISOR_CONCURRENCY");
     expect(statusWorkers).toContain("AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS");
+    expect(statusWorkers).toContain("NEWS_TRANSLATION_PYTHON");
+    expect(statusWorkers).toContain("verify-news-translation.mjs");
     expect(statusWorkers).toContain("MAC_WORKER_NICE");
 
     expect(stopGcp).toContain("stop agent-worker");

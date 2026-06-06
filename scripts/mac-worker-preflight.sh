@@ -17,6 +17,7 @@ Checks:
   - SQLite serving indexes exist
   - worker bundle builds
   - Claude executable and MCP health work
+  - enabled news translation provider can translate a smoke sentence
   - Supabase service role can read the production schema
 
 --deep also runs PRAGMA quick_check on the SQLite index. It can take time on
@@ -226,6 +227,9 @@ require_path "$KRW_ONTOLOGY_SOURCE_DIR/pyproject.toml"
 require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.mcp.json"
 require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.claude-plugin/plugin.json"
 mkdir -p "$CLAUDE_AGENT_CWD" "$CLAUDE_CONFIG_DIR"
+
+echo "Checking news translation readiness..."
+(cd "$FRONT_DIR" && node scripts/verify-news-translation.mjs)
 
 if [ ! -L "$KRW_ONTOLOGY_RELEASE_ROOT" ]; then
   echo "KRW_ONTOLOGY_RELEASE_ROOT must be the prod/current symlink: $KRW_ONTOLOGY_RELEASE_ROOT" >&2

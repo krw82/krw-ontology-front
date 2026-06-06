@@ -13,6 +13,8 @@ EOF
 
 ENV_FILE=.env.mac-worker.production
 SKIP_GCP=0
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -72,8 +74,15 @@ if [ -f "$ENV_FILE" ]; then
   echo "  AGENT_QUEUE_RECONCILE_INTERVAL_MS=${AGENT_QUEUE_RECONCILE_INTERVAL_MS:-unset}"
   echo "  AGENT_RUN_CANCEL_LISTEN_ENABLED=${AGENT_RUN_CANCEL_LISTEN_ENABLED:-unset}"
   echo "  AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS=${AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS:-unset}"
+  echo "  NEWS_CARD_TRANSLATION_PROVIDER=${NEWS_CARD_TRANSLATION_PROVIDER:-unset}"
+  echo "  NEWS_TRANSLATION_PYTHON=${NEWS_TRANSLATION_PYTHON:-unset}"
+  echo "  NEWS_TRANSLATION_TIMEOUT_MS=${NEWS_TRANSLATION_TIMEOUT_MS:-unset}"
   echo "  KRW_ONTOLOGY_ROOT=${KRW_ONTOLOGY_ROOT:-unset}"
   echo "  KRW_ONTOLOGY_PLUGIN_PATH=${KRW_ONTOLOGY_PLUGIN_PATH:-unset}"
+
+  echo
+  echo "News translation readiness:"
+  (cd "$FRONT_DIR" && node scripts/verify-news-translation.mjs)
 else
   echo
   echo "Local env file not found: $ENV_FILE"
