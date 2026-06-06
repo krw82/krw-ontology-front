@@ -1838,3 +1838,24 @@ See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode de
   tool_name: 'krw_ontology_query_context'
 }
 [agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[krw-ontology:mcp-tool-duration] {
+  args: {
+    ticker: 'MU',
+    question: 'Micron Technology (MU) latest MD&A, revenue, margin, DRAM NAND pricing, volume, demand, capex, cash flow, management...'
+  },
+  duration_ms: 16397,
+  duration_s: 16.397,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_snF2rpdDPny6YUmUYeNT3778',
+  tool_name: 'krw_ontology_query_context'
+}
+[krw-ontology:mcp-tool-duration] {
+  args: { ticker: 'MU' },
+  duration_ms: 234,
+  duration_s: 0.234,
+  pass: 'research',
+  status: 'completed',
+  tool_call_id: 'call_00_KP2OJotqg1YSQ70Uplgw5806',
+  tool_name: 'krw_ontology_company_context'
+}
