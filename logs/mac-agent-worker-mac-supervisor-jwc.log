@@ -1819,3 +1819,9 @@ See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode de
 [agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
 [agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
 [agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] idle { workerId: 'mac-supervisor-jwc', reason: 'reconcile' }
+[agent-supervisor] claimed {
+  workerId: 'mac-supervisor-jwc',
+  runId: 'dfd427a4-6a2d-474e-95df-cfa128bade49',
+  activeJobs: 1
+}
