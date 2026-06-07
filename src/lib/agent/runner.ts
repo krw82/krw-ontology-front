@@ -22,8 +22,10 @@ import {
 import { buildClaudeAgentEnv } from "./env";
 import {
   buildSystemPrompt,
+  type FilingAnchorContext,
   type CompanyPromptContext,
 } from "./system-prompt";
+import type { IndexedCompanyDocument } from "@/lib/ontology/catalog";
 import { normalizeKrwOntologyToolInput } from "./tool-input-policy";
 import { buildResearchPassPrompt } from "./workflow";
 import { getClaudeAgentModel } from "./model";
@@ -919,7 +921,44 @@ async function getCompanyPromptContexts(
       latestPeriod: company.latest_period,
       latestPeriods: company.periods.slice(0, 6),
       indexedFilingCount: company.document_count,
+      filingAnchor: buildFilingAnchor(company.documents),
     }));
+}
+
+function buildFilingAnchor(
+  documents: IndexedCompanyDocument[],
+): FilingAnchorContext | undefined {
+  if (documents.length === 0) return undefined;
+
+  const latestAvailable = documents[0];
+  const latestAnnual = documents.find(isAnnualFiling) ?? null;
+  const excluded = new Set(
+    [latestAvailable, latestAnnual].filter(
+      (document): document is IndexedCompanyDocument => Boolean(document),
+    ),
+  );
+  const historicalContext = documents
+    .filter((document) => !excluded.has(document))
+    .slice(0, 4)
+    .map(formatFilingLabel);
+
+  return {
+    latestAvailable: formatFilingLabel(latestAvailable),
+    currentDriver: formatFilingLabel(latestAvailable),
+    annualBaseline: latestAnnual ? formatFilingLabel(latestAnnual) : null,
+    historicalContext,
+  };
+}
+
+function isAnnualFiling(document: IndexedCompanyDocument): boolean {
+  return (
+    document.document_type.toUpperCase() === "10-K" ||
+    document.doc_type_key?.toUpperCase() === "10K"
+  );
+}
+
+function formatFilingLabel(document: IndexedCompanyDocument): string {
+  return `${document.period} ${document.document_type}`;
 }
 
 async function consumeSdkMessage(params: {

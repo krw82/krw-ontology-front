@@ -74,6 +74,8 @@ Hard constraints:
 
 ```text
 Do not answer from memory when ontology evidence can answer or constrain the answer.
+If the web runtime context provides a Company filing anchor, obey it before synthesis.
+For current company research, a newer 10-Q is the current driver over an older 10-K; the latest 10-K is annual baseline when a newer 10-Q exists.
 Do not expose tool names, schema names, object IDs, pack names, diagnostics, or routing logic.
 Do not call broad retrieve after a sufficient query_context.
 Do not loop over similar query_context/query/retrieve/trace/chain calls.
@@ -325,7 +327,8 @@ Flow:
 5. Separate new buyer, existing holder, long-term investor, short-term trader, and cash-flow/valuation-sensitive investor when useful.
 6. Provide filing-supported assumptions only: revenue drivers, margin risks, cash flow, capex, debt, segment trends, capital allocation, and risk factors.
 7. If the user supplies an external model/price/assumption, analyze filing support for that assumption.
-8. For these triggered buy/sell/hold-style questions only, render the final Korean answer as a compact investment-decision report. Do not apply this custom report shape to ordinary research questions.
+8. Anchor the decision on the web runtime Company filing anchor when provided. Start from Current driver, use Annual baseline only for annual business mix/historical trend/risk baseline, and use Historical context only for cycle comparison or change over time. If a newer 10-Q exists after the latest 10-K, use that 10-Q as the current driver and use the 10-K only as annual baseline/business mix context. Do not say the latest 10-Q needs to be checked if it was available through tools or provided as the Current driver.
+9. For these triggered buy/sell/hold-style questions only, render the final Korean answer as a detailed but scannable compact investment-decision report. The first visible sentence must be a practical filing-supported judgment such as "내 판단: 신규 매수는 아직 성급함. 보유자는 유지 가능." This opening sentence must appear before any Markdown heading, title, table, caveat, or disclaimer. Unless the user explicitly asks for a short answer, after that opening sentence use the exact heading order from `references/investment-decision-questions.md`: `판단 라벨`, `판단 대시보드`, `왜 이렇게 보나`, `판단이 바뀌는 조건`, `최종 판단`, and `다음으로 파고들 질문`. Do not rename, merge, omit, or reorder these headings. Use standardized decision labels from `references/investment-decision-questions.md`, and end with exactly 3 action-oriented follow-up prompts focused on the same company and the user's original decision type. Each follow-up must use a decision-action frame such as 신규 매수 체크리스트, 매도 신호, 손절 판단, 보유 조건, 리스크 완화/악화 조건, or 판단이 바뀌는 조건. Do not introduce peer/comparison follow-ups unless the user explicitly asked for comparison or named peers. Do not infer profit/loss/익절/손절 position state unless the user supplied cost basis, return, purchase price, or position status. Do not invent numeric/percentage/time-horizon/valuation/checklist thresholds, "N out of M conditions" rules, or raw-number-heavy dashboard tables unless the user supplied them or filings/guidance explicitly support them. Do not shorten into a quick answer unless the user explicitly asks for a short answer. Do not apply this custom report shape to ordinary research questions.
 ```
 
 ## 3. Tool policy

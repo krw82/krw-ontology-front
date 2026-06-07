@@ -72,6 +72,7 @@ import {
   getResearchModeToolBudget,
   type ResearchMode,
 } from "@/lib/research-mode";
+import { getIndexedCompanies } from "@/lib/ontology/catalog";
 import { canUseTool, runAgent } from "./runner";
 
 function makeSdkQuery(messages: unknown[]) {
@@ -387,6 +388,88 @@ describe("agent runner research budget recovery", () => {
     );
     expect(call.options.systemPrompt.append).not.toContain(
       "current news/event discovery",
+    );
+  });
+
+  it("passes company filing anchors from the catalog into the runtime prompt", async () => {
+    vi.mocked(getIndexedCompanies).mockResolvedValueOnce([
+      {
+        ticker: "MU",
+        name: "Micron Technology, Inc.",
+        sector: "반도체",
+        description: "Memory semiconductor company.",
+        latest_period: "CY2026Q1",
+        coverage: "3개 공시 인덱싱 · 10-K, 10-Q · 최신 CY2026Q1",
+        icon: "memory",
+        document_count: 3,
+        document_types: ["10-K", "10-Q"],
+        periods: ["CY2026Q1", "CY2025", "CY2024"],
+        documents: [
+          {
+            period: "CY2026Q1",
+            document_type: "10-Q",
+            doc_type_key: "10Q",
+            generated_at: "2026-05-23T00:35:58.500Z",
+          },
+          {
+            period: "CY2025",
+            document_type: "10-K",
+            doc_type_key: "10K",
+            generated_at: "2026-05-23T00:25:03.839Z",
+          },
+          {
+            period: "CY2024",
+            document_type: "10-K",
+            doc_type_key: "10K",
+            generated_at: "2026-05-23T00:08:51.723Z",
+          },
+        ],
+        generated_at: "2026-05-23T00:35:58.500Z",
+      },
+    ]);
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        {
+          type: "result",
+          subtype: "success",
+          result: "MU는 최신 분기 공시 기준으로 분석했습니다.",
+          usage: {
+            input_tokens: 10,
+            output_tokens: 12,
+          },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "MU 지금 손절할까?",
+        scopeType: "company",
+        defaultTickers: ["MU"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        analysisMode: "company",
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
+    expect(result.status).toBe("completed");
+    const call = sdkMocks.query.mock.calls[0]?.[0];
+    expect(call.options.systemPrompt.append).toContain("Company filing anchor");
+    expect(call.options.systemPrompt.append).toContain(
+      "latest available filing: CY2026Q1 10-Q",
+    );
+    expect(call.options.systemPrompt.append).toContain(
+      "current driver: CY2026Q1 10-Q",
+    );
+    expect(call.options.systemPrompt.append).toContain(
+      "annual baseline: CY2025 10-K",
+    );
+    expect(call.options.systemPrompt.append).toContain(
+      "historical context: CY2024 10-K",
     );
   });
 

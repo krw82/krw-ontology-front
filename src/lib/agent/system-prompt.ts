@@ -1,11 +1,19 @@
 import { sanitizeAssistantContent } from "@/lib/chat/assistant-content";
 
+export interface FilingAnchorContext {
+  latestAvailable: string | null;
+  currentDriver: string | null;
+  annualBaseline: string | null;
+  historicalContext: string[];
+}
+
 export interface CompanyPromptContext {
   ticker: string;
   documentTypes: string[];
   latestPeriod: string | null;
   latestPeriods: string[];
   indexedFilingCount: number;
+  filingAnchor?: FilingAnchorContext;
 }
 
 export interface PromptContext {
@@ -83,10 +91,7 @@ function buildRuntimeContext(
   const companyCatalogContext =
     context.companies && context.companies.length > 0
       ? `\nCompany catalog context:\n${context.companies
-          .map(
-            (company) =>
-              `- ${company.ticker}: ${company.indexedFilingCount} indexed filings; document types: ${company.documentTypes.join(", ") || "unknown"}; latest period: ${company.latestPeriod ?? "unknown"}; recent periods: ${company.latestPeriods.join(", ") || "unknown"}.`,
-          )
+          .map(formatCompanyContext)
           .join("\n")}`
       : "";
   const historyContext = buildHistoryContext(history);
@@ -95,6 +100,18 @@ function buildRuntimeContext(
 ${scopeContext}${docTypeContext}
 ${companyCatalogContext}${historyContext}
 </web_runtime_context>`;
+}
+
+function formatCompanyContext(company: CompanyPromptContext): string {
+  const base = `- ${company.ticker}: ${company.indexedFilingCount} indexed filings; document types: ${company.documentTypes.join(", ") || "unknown"}; latest period: ${company.latestPeriod ?? "unknown"}; recent periods: ${company.latestPeriods.join(", ") || "unknown"}.`;
+  const anchor = company.filingAnchor;
+  if (!anchor) return base;
+
+  return [
+    base,
+    `  Company filing anchor: latest available filing: ${anchor.latestAvailable ?? "unknown"}; current driver: ${anchor.currentDriver ?? "unknown"}; annual baseline: ${anchor.annualBaseline ?? "unknown"}; historical context: ${anchor.historicalContext.join(", ") || "none"}.`,
+    "  Anchor instruction: Start current company and investment-decision judgments from Current driver. Use Annual baseline only for annual business mix, historical trend, and risk baseline. Use Historical context only for cycle comparison or change over time.",
+  ].join("\n");
 }
 
 function buildHistoryContext(

@@ -74,6 +74,37 @@ describe("buildSystemPrompt", () => {
     expect(enabledPrompt).toContain("source provenance internally");
   });
 
+  it("injects company filing anchors when catalog documents are available", () => {
+    const prompt = buildSystemPrompt({
+      scopeType: "company",
+      defaultTickers: ["MU"],
+      defaultDocumentTypes: [],
+      companies: [
+        {
+          ticker: "MU",
+          documentTypes: ["10-K", "10-Q"],
+          latestPeriod: "CY2026Q1",
+          latestPeriods: ["CY2026Q1", "CY2025", "CY2024"],
+          indexedFilingCount: 3,
+          filingAnchor: {
+            latestAvailable: "CY2026Q1 10-Q",
+            currentDriver: "CY2026Q1 10-Q",
+            annualBaseline: "CY2025 10-K",
+            historicalContext: ["CY2024 10-K"],
+          },
+        },
+      ],
+    });
+
+    expect(prompt).not.toContain("Runtime current date:");
+    expect(prompt).toContain("Company filing anchor");
+    expect(prompt).toContain("latest available filing: CY2026Q1 10-Q");
+    expect(prompt).toContain("current driver: CY2026Q1 10-Q");
+    expect(prompt).toContain("annual baseline: CY2025 10-K");
+    expect(prompt).toContain("historical context: CY2024 10-K");
+    expect(prompt).toContain("Start current company and investment-decision judgments");
+  });
+
   it("marks stock-news discovery as required for news mode when the MCP is available", () => {
     const prompt = buildSystemPrompt(undefined, [], {
       stockNewsEnabled: true,

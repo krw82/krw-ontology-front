@@ -22,6 +22,14 @@ export interface IndexedCompany {
   document_count: number;
   document_types: string[];
   periods: string[];
+  documents: IndexedCompanyDocument[];
+  generated_at: string | null;
+}
+
+export interface IndexedCompanyDocument {
+  period: string;
+  document_type: string;
+  doc_type_key: string | null;
   generated_at: string | null;
 }
 
@@ -192,6 +200,26 @@ function textListFromJson(json: Json, key: string): string | undefined {
   return values.length ? values.join(", ") : undefined;
 }
 
+function documentArrayValue(value: Json): IndexedCompanyDocument[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (!isRecord(item)) return null;
+      const period = stringValue(item.period);
+      const documentType = stringValue(item.document_type);
+      if (!period || !documentType) return null;
+
+      return {
+        period,
+        document_type: documentType,
+        doc_type_key: stringValue(item.doc_type_key),
+        generated_at: stringValue(item.generated_at),
+      };
+    })
+    .filter((document): document is IndexedCompanyDocument => Boolean(document));
+}
+
 function companyFromRow(row: OntologyCompanyRow): IndexedCompany {
   const company = isRecord(row.company_json) ? row.company_json : {};
   const name =
@@ -221,6 +249,7 @@ function companyFromRow(row: OntologyCompanyRow): IndexedCompany {
     document_count: row.document_count,
     document_types: row.document_types,
     periods: row.periods,
+    documents: documentArrayValue(row.documents_json),
     generated_at: row.generated_at,
   };
 }

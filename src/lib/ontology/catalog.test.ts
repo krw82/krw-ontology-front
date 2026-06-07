@@ -53,7 +53,20 @@ const companyRows: OntologyCompanyRow[] = [
     document_types: ["10-K", "10-Q"],
     periods: ["FY2025", "CY2025Q3"],
     coverage_json: {},
-    documents_json: [],
+    documents_json: [
+      {
+        period: "CY2025Q3",
+        document_type: "10-Q",
+        doc_type_key: "10Q",
+        generated_at: "2026-05-28T14:55:00.000Z",
+      },
+      {
+        period: "FY2025",
+        document_type: "10-K",
+        doc_type_key: "10K",
+        generated_at: "2026-05-28T14:50:00.000Z",
+      },
+    ],
     company_json: {
       primary_business_activities: ["Devices", "Services"],
       key_external_factors: ["China demand"],
@@ -210,6 +223,20 @@ describe("ontology catalog", () => {
       core_strength: "Devices, Services",
       critical_risk: "China demand",
       icon: "hub",
+      documents: [
+        {
+          period: "CY2025Q3",
+          document_type: "10-Q",
+          doc_type_key: "10Q",
+          generated_at: "2026-05-28T14:55:00.000Z",
+        },
+        {
+          period: "FY2025",
+          document_type: "10-K",
+          doc_type_key: "10K",
+          generated_at: "2026-05-28T14:50:00.000Z",
+        },
+      ],
     });
   });
 
