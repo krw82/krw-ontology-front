@@ -43,6 +43,7 @@ function createRunnerAdmin(params: {
   openToolCalls?: Array<{ id: string; error_message: string | null }>;
   previousMessagesError?: { code?: string; message: string } | null;
   runOverrides?: Record<string, unknown>;
+  queuedEventPayload?: Record<string, unknown>;
 } = {}) {
   const updates: Array<{
     table: string;
@@ -189,7 +190,15 @@ function createRunnerAdmin(params: {
                   ? rows.agent_runs
                   : table === "chat_sessions"
                     ? rows.chat_sessions
-                    : rows.messages;
+                    : table === "agent_run_events"
+                      ? [
+                          {
+                            run_id: "run-1",
+                            event_type: "run_queued",
+                            payload: params.queuedEventPayload ?? {},
+                          },
+                        ]
+                      : rows.messages;
               const row =
                 candidates.find((candidate) => {
                   const record = candidate as Record<string, unknown>;
@@ -447,6 +456,11 @@ describe("agent job runner", () => {
         executor_type: "claude_agent",
         selected_news_event_context: selectedEvent,
       },
+      queuedEventPayload: {
+        analysis_mode: "news",
+        run_kind: "news_research",
+        response_locale: "en",
+      },
     });
     vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
     vi.mocked(checkMcpHealth).mockResolvedValue(readyMcpHealth());
@@ -490,6 +504,7 @@ describe("agent job runner", () => {
     expect(runAgent).toHaveBeenCalledWith(
       expect.objectContaining({
         runKind: "news_research",
+        responseLocale: "en",
         selectedNewsEventContext: expect.objectContaining({
           ...selectedEvent,
           source_pack: expect.objectContaining({

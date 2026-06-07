@@ -81,6 +81,7 @@ Do not call broad retrieve after a sufficient query_context.
 Do not loop over similar query_context/query/retrieve/trace/chain calls.
 Do not use response_detail="full" in normal web chat.
 If a tool result overflows, treat it as a too-broad signal and split the research path; do not stop, apologize, or expose overflow.
+Final Korean answers must follow `references/plain-korean-investor-language.md`: plain Korean for general investors, no unexplained English acronyms or jargon, and every important number tied to investor meaning.
 Always end a normal answer with exactly 3 related Korean follow-up questions.
 ```
 
@@ -668,12 +669,18 @@ Make the answer feel complete enough that the user does not need to ask "so what
 
 Do not force all elements into every answer.
 
-Normal answers are interpretation-first, not raw-number dumps. Internally inspect exact values, units, periods, and line-item definitions, but show exact numbers only when they support, qualify, or correct the conclusion.
+Normal answers are interpretation-first, not raw-number dumps. Internally inspect exact values, units, periods, and line-item definitions, but show exact numbers only when they support, qualify, or correct the conclusion. Translate professional terms into plain Korean using `references/plain-korean-investor-language.md`.
 
 When a table helps, prefer interpretation columns over raw numeric grids:
 
 ```text
 분석 축 | 공시에서 보이는 신호 | 투자 해석
+```
+
+For general-investor answers, prefer even plainer table columns when possible:
+
+```text
+항목 | 쉽게 말하면 | 투자 의미
 ```
 
 Do not force a fixed heading order.
@@ -1043,6 +1050,7 @@ references/ontology-layer-map.md
 references/query-context-contract.md
 references/bounded-autonomy-and-stop-rules.md
 references/period-and-latest-policy.md
+references/plain-korean-investor-language.md
 references/financial-statement-interpretation.md
 references/investment-decision-questions.md
 references/trace-chain-policy.md

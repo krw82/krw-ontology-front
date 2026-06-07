@@ -252,6 +252,47 @@ describe("agent runner research budget recovery", () => {
     });
   });
 
+  it("uses the English KRW ontology research skill when responseLocale is English", async () => {
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        {
+          type: "result",
+          subtype: "success",
+          result: "English answer.",
+          usage: {
+            input_tokens: 10,
+            output_tokens: 12,
+          },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "Analyze Apple",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "standard",
+        responseLocale: "en",
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
+    expect(result.status).toBe("completed");
+    const call = sdkMocks.query.mock.calls[0]?.[0];
+    expect(call.prompt).toContain(
+      "/krw-ontology:krw-ontology-research-en Analyze Apple",
+    );
+    expect(call.options.systemPrompt.append).toContain("English Markdown only");
+    expect(call.options.systemPrompt.append).toContain(
+      "do not answer in Korean",
+    );
+  });
+
   it("keeps retrieve available in the current deep web-chat tool set", () => {
     expect(getAllowedMcpToolsForResearchMode("deep")).toContain(
       "krw_ontology_retrieve",

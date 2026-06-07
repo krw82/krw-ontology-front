@@ -8,7 +8,7 @@ KRW ontology evidence is not the final answer. It is the research state the anal
 
 ```text
 MCP output = evidence workbench
-AI agent = analyst judgment and final Korean explanation
+AI agent = analyst judgment and final English explanation
 Final answer = business interpretation grounded in filing evidence
 ```
 

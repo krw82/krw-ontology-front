@@ -1,4 +1,5 @@
 import { sanitizeAssistantContent } from "@/lib/chat/assistant-content";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 
 export interface FilingAnchorContext {
   latestAvailable: string | null;
@@ -27,6 +28,7 @@ export interface PromptRuntimeFeatures {
   stockNewsEnabled?: boolean;
   stockNewsRequired?: boolean;
   stockNewsUnavailableForNews?: boolean;
+  responseLocale?: Locale;
 }
 
 export const MAX_PROMPT_HISTORY_MESSAGES = 12;
@@ -42,24 +44,34 @@ export function buildSystemPrompt(
 ): string {
   const contextBlock = context ? `\n\n${buildRuntimeContext(context, history)}` : "";
   const stockNewsPolicy = buildStockNewsPolicy(features);
+  const responseLanguagePolicy = buildResponseLanguagePolicy(
+    features.responseLocale ?? DEFAULT_LOCALE,
+  );
 
   return `You are the KRW Ontology web chat runtime.
 
 The user prompt begins with the exact KRW-AI skill command for the active pass. Follow that skill.
 Use configured read-only KRW Ontology tools for filing evidence retrieval and, when explicitly enabled, the configured read-only stock-news MCP tool for current context.
 ${stockNewsPolicy}
+${responseLanguagePolicy}
 Use the runtime context only as scope and history for that active pass.
 Return only the final user-visible answer in Markdown. Do not include tool-use narration, hidden planning notes, or progress phrases such as "I will query", "Let me get", or "I'll check".${contextBlock}`;
 }
 
 function buildStockNewsPolicy(features: PromptRuntimeFeatures): string {
+  const responseLocale = features.responseLocale ?? DEFAULT_LOCALE;
+  const investorInterpretation =
+    responseLocale === "en"
+      ? "English investor interpretation"
+      : "Korean investor interpretation";
+
   if (features.stockNewsEnabled) {
     return [
       "Do not use built-in WebSearch or WebFetch.",
       features.stockNewsRequired
         ? "This run is in news mode: use only the configured read-only Stock News MCP tool for current news/event discovery before the final answer."
         : "When recent, current, post-filing, or explicitly news-based context is needed, use only the configured read-only Stock News MCP tool.",
-      "Preserve filing-vs-news source provenance internally, but synthesize both into one Korean investor interpretation in the final answer.",
+      `Preserve filing-vs-news source provenance internally, but synthesize both into one ${investorInterpretation} in the final answer.`,
       "If the stock-news MCP call fails, times out, or returns no useful results, continue from filing evidence and state that no additional current news context was confirmed.",
     ].join("\n");
   }
@@ -73,6 +85,14 @@ function buildStockNewsPolicy(features: PromptRuntimeFeatures): string {
   }
 
   return "Do not perform web searches or mutate local files.";
+}
+
+function buildResponseLanguagePolicy(responseLocale: Locale): string {
+  if (responseLocale === "en") {
+    return "Final user-visible answers must be English Markdown only. Keep internal evidence-retrieval briefs in English as needed, and do not answer in Korean.";
+  }
+
+  return "Final user-visible answers must be Korean Markdown only. Internal evidence-retrieval briefs may be English, but do not expose them.";
 }
 
 function buildRuntimeContext(

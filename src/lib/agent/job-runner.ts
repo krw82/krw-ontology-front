@@ -1,4 +1,5 @@
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { checkMcpHealth, type McpHealthResult } from "@/lib/agent/mcp-client";
 import { runAgent, type SdkDiagnostics } from "@/lib/agent/runner";
@@ -149,6 +150,7 @@ interface AgentJob {
   researchMode: ResearchMode;
   analysisMode: AnalysisMode;
   runKind: RunKind;
+  responseLocale: Locale;
   executorType: AgentRunExecutorType;
   selectedNewsEventContext: Record<string, unknown> | null;
 }
@@ -314,6 +316,7 @@ export async function runAgentJob(runId: string, workerId: string) {
           researchMode: job.researchMode,
           analysisMode: job.analysisMode,
           runKind: job.runKind,
+          responseLocale: job.responseLocale,
           selectedNewsEventContext,
           abortSignal: abortController.signal,
           onSdkDiagnostics: recordSdkDiagnostics,
@@ -565,6 +568,7 @@ async function loadAgentJob(
           normalizeAnalysisMode(queuedPayload.analysis_mode),
         ),
     ),
+    responseLocale: normalizeResponseLocale(queuedPayload.response_locale),
     executorType: normalizeExecutorType(
       queuedPayload.executor_type ?? run.executor_type,
     ),
@@ -576,6 +580,11 @@ async function loadAgentJob(
 
 function normalizeExecutorType(value: unknown): AgentRunExecutorType {
   return value === "server_pipeline" ? "server_pipeline" : "claude_agent";
+}
+
+function normalizeResponseLocale(value: unknown): Locale {
+  if (typeof value !== "string") return DEFAULT_LOCALE;
+  return isLocale(value) ? value : DEFAULT_LOCALE;
 }
 
 function formatSupabaseError(error: { code?: string; message?: string }) {
@@ -1165,6 +1174,7 @@ async function handleCompletedJob(params: {
       research_mode: job.researchMode,
       analysis_mode: job.analysisMode,
       run_kind: job.runKind,
+      response_locale: job.responseLocale,
     },
   });
 

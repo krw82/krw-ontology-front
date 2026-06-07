@@ -142,6 +142,7 @@ export default async function QuestionsIndexPage({
                 href={buildQuestionChatHref(QUESTION_TOPIC_PAGES[0], {
                   ticker: QUESTION_TOPIC_PAGES[0].questionChain.ticker,
                   question: QUESTION_TOPIC_PAGES[0].questionChain.primaryQuestion,
+                  locale,
                 })}
                 ctaId="questions_index_apple_start"
                 ctaLabel="Apple 매출 그래프 시작"

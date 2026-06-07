@@ -8,7 +8,7 @@ import {
   getCompanyDisplayCopyForTicker,
   getSuggestedPromptDisplaysForTickers,
 } from "@/content/companies/display";
-import { isLocale } from "@/i18n/config";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
 import { localizedPageMetadata } from "@/i18n/metadata";
 import { localizedPath } from "@/i18n/routing";
 import { getAuthUser } from "@/lib/auth";
@@ -27,9 +27,10 @@ type CompanyPageProps = {
   params: Promise<{ locale: string; ticker: string }>;
 };
 
-function chatHref(ticker: string, query?: string): string {
+function chatHref(ticker: string, query?: string, locale?: Locale): string {
   const params = new URLSearchParams({ ticker });
   if (query) params.set("query", query);
+  if (locale && locale !== DEFAULT_LOCALE) params.set("locale", locale);
   return `/chat/new?${params.toString()}`;
 }
 
@@ -113,7 +114,7 @@ export default async function CompanyLandingPage({
   const canonicalPrompts = getSuggestedPromptsForTickers([company.ticker]);
   const prompts = getSuggestedPromptDisplaysForTickers(locale, [company.ticker]);
   const promptHrefs = prompts.map((_, index) =>
-    chatHref(company.ticker, canonicalPrompts[index]),
+    chatHref(company.ticker, canonicalPrompts[index], locale),
   );
   const copy = getCompanyDisplayCopyForTicker(locale, company.ticker);
   const displayCompany = { ...company, ...copy };
@@ -204,7 +205,7 @@ export default async function CompanyLandingPage({
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <MarketingCtaLink
-                href={chatHref(displayCompany.ticker)}
+                href={chatHref(displayCompany.ticker, undefined, locale)}
                 ctaId="company_start_analysis"
                 ctaLabel={pageCopy.startCta}
                 surface="company_hero"

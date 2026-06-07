@@ -111,6 +111,28 @@ describe("proxy gross-abuse guard", () => {
     expect(pageOptions?.requestHeaderOverrides?.get("x-krw-locale")).toBe("en");
   });
 
+  it("forwards an explicit locale header for chat run API requests", async () => {
+    await proxy(
+      request("/api/chat/run", {
+        "x-krw-locale": "en",
+      }),
+    );
+
+    const apiOptions = vi.mocked(updateSession).mock.calls.at(-1)?.[1];
+    expect(apiOptions?.requestHeaderOverrides?.get("x-krw-locale")).toBe("en");
+  });
+
+  it("uses the referer locale when API requests have no path locale", async () => {
+    await proxy(
+      request("/api/chat/run", {
+        referer: "http://localhost/en/companies/AAPL",
+      }),
+    );
+
+    const apiOptions = vi.mocked(updateSession).mock.calls.at(-1)?.[1];
+    expect(apiOptions?.requestHeaderOverrides?.get("x-krw-locale")).toBe("en");
+  });
+
   it("lets normal chat run requests pass through to session middleware", async () => {
     const response = await proxy(
       request("/api/chat/run", {

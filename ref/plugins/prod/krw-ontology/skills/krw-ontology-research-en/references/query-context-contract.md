@@ -87,7 +87,7 @@ do not force a conclusion
 
 ## Internal English investment brief
 
-For normal KRW ontology research, query_context should receive a concise internal English investment brief. Do not send broad Korean topic text directly to query_context.
+For normal KRW ontology research, query_context should receive a concise internal English investment brief. Do not send broad raw user topic text directly to query_context.
 
 The brief is not a literal translation. Build it with awareness of the KRW ontology schema, evidence types, research packs, and MCP retrieval surface so it is optimized for ontology evidence retrieval.
 

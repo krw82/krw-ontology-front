@@ -2,7 +2,7 @@
 
 This is not the default web-chat runtime.
 
-Default web chat returns Korean Markdown only.
+Default English web chat returns English Markdown only.
 
 Use structured handoff only when the runtime or user explicitly asks for frontend display planning, exportable structured output, audit payloads, or canonical answer units.
 

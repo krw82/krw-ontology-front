@@ -187,6 +187,8 @@ For triggered buy/sell/hold-style questions only, write a detailed but scannable
 
 Do not make it a short quick answer unless the user explicitly asks for "짧게", "한 줄로", or "간단히".
 
+Follow `references/plain-korean-investor-language.md` more strictly than in normal answers. The user is asking for a practical investment judgment, so translate professional filing analysis into plain Korean before presenting it.
+
 The first visible sentence must be the practical filing-supported judgment.
 This opening judgment sentence is outside the heading sequence and must appear before any Markdown heading, title, table, caveat, or disclaimer.
 
@@ -227,13 +229,13 @@ Start with the opening `내 판단:` sentence, then use the exact Korean heading
 | 기존 보유 | {standardized label} | {one-line filing-supported reason} |
 
 ## 판단 대시보드
-| 항목 | 판단 | 이유 |
+| 항목 | 쉽게 말하면 | 투자 의미 |
 |---|---|---|
-| 성장/수요 | {positive/neutral/risk interpretation} | {filing-supported reason, not a raw number dump} |
-| 마진/수익성 | {positive/neutral/risk interpretation} | {filing-supported reason, not a raw number dump} |
-| 현금흐름/투자 부담 | {positive/neutral/risk interpretation} | {filing-supported reason, not a raw number dump} |
-| 재무 안정성/희석 | {positive/neutral/risk interpretation} | {filing-supported reason, not a raw number dump} |
-| 핵심 리스크 | {positive/neutral/risk interpretation} | {filing-supported reason, not a raw number dump} |
+| 성장/수요 | {plain Korean signal} | {what it means for buy/hold/sell judgment} |
+| 수익성 | {plain Korean signal} | {what it means for earnings durability} |
+| 현금흐름/투자 부담 | {plain Korean signal} | {what it means for financial flexibility or entry timing} |
+| 재무 안정성/희석 | {plain Korean signal} | {what it means for shareholder risk} |
+| 핵심 리스크 | {plain Korean signal} | {what would make the judgment worse or better} |
 
 ## 왜 이렇게 보나
 Separate positive filing evidence from risk or confirmation points in Korean prose.
@@ -266,7 +268,9 @@ Good opening for 손절 questions:
 내 판단: 공시 근거만 보면 손절은 아직 성급함. 보유자는 실적 추세가 꺾이는 신호를 확인할 때까지 유지 가능.
 ```
 
-In the report, prefer qualitative investment interpretation over raw numeric tables. Use numbers only when they materially change the judgment. The dashboard should read like an investment judgment table, not a filing data table; avoid columns that are primarily raw figures such as "공시 근거" packed with numbers.
+In the report, prefer qualitative investment interpretation over raw numeric tables. Use numbers only when they materially change the judgment. The dashboard should read like a general-investor judgment table, not a filing data table; use columns like `쉽게 말하면` and `투자 의미`, and avoid columns that are primarily raw figures such as "공시 근거" packed with numbers.
+
+Avoid unexplained English terms and acronyms in this report. If a term like FCF, CapEx, SBC, gross margin, RPO, backlog, dilution, or WFE is necessary, explain it once in Korean and then use the Korean expression.
 
 Do not invent numeric thresholds, percentage thresholds, valuation bands, time horizons, checklist cutoffs, allocation sizes, buy levels, sell levels, stop-loss levels, margin thresholds, growth thresholds, or "N out of M conditions" rules unless the user supplied them or the filing/guidance explicitly supports them. Use qualitative condition language instead.
 

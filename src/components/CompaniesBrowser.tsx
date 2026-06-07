@@ -10,6 +10,7 @@ import { easeOutExpo } from "@/lib/animation";
 import { filterAndSortCompanies } from "@/lib/companies/filter";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
+import { buildNewChatHref } from "@/lib/chat/history-state";
 
 interface CompaniesBrowserProps {
   initialCompanies: CompanyCardData[];
@@ -185,7 +186,7 @@ export default function CompaniesBrowser({
 
           {/* CTA: 아이디어 하나로 여러 회사 리서치 */}
           <Link
-            href="/chat/new"
+            href={buildNewChatHref(undefined, { locale })}
             className="group mt-3 grid min-h-[72px] w-full grid-cols-[minmax(0,1fr)_56px] items-center gap-3 rounded-[8px] bg-ink px-6 py-5 text-[15px] font-extrabold leading-6 text-canvas shadow-sm transition-all hover:bg-ink/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas sm:min-h-[80px] sm:grid-cols-[minmax(0,1fr)_64px] sm:gap-4 sm:px-7 sm:text-[16px]"
             aria-label={copy.multiCompanyCta}
           >

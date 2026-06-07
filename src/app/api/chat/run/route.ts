@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
 import type { McpHealthResult } from "@/lib/agent/mcp-client";
 import { getReadyAgentWorker } from "@/lib/agent/worker-heartbeat";
 import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
@@ -68,6 +69,11 @@ function errorResponse(
   );
 }
 
+function getRequestResponseLocale(request: NextRequest): Locale {
+  const locale = request.headers.get("x-krw-locale");
+  return isLocale(locale) ? locale : DEFAULT_LOCALE;
+}
+
 // --- POST handler ---
 
 export async function POST(request: NextRequest) {
@@ -77,6 +83,7 @@ export async function POST(request: NextRequest) {
   const { body, userId, userEmail } = validation.data;
 
   const { content, request_id } = body;
+  const responseLocale = getRequestResponseLocale(request);
 
   // 2. Idempotency: a browser retry with the same request_id must not create
   // another session/message/run. Reattach to the existing run instead.
@@ -198,6 +205,7 @@ export async function POST(request: NextRequest) {
       attachment_count: countAttachedFiles(content),
       research_mode: body.research_mode,
       analysis_mode: body.analysis_mode,
+      response_locale: responseLocale,
       question_source: session.scopeType === "company" ? "company_context" : "custom",
       source_surface: session.scopeType === "company" ? "ticker_chat" : "chat",
     },
@@ -215,6 +223,7 @@ export async function POST(request: NextRequest) {
     researchMode: body.research_mode,
     analysisMode: body.analysis_mode,
     runKind: body.run_kind,
+    responseLocale,
     executorType: isServerPipelineNewsDiscovery
       ? "server_pipeline"
       : "claude_agent",

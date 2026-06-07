@@ -265,6 +265,7 @@ describe("agent job queue", () => {
         request_id: "req-1",
         research_mode: "deep",
         analysis_mode: "company",
+        response_locale: "ko",
         executor_type: "claude_agent",
         queue: expect.objectContaining({
           concurrency_limit: expect.any(Number),
@@ -308,6 +309,30 @@ describe("agent job queue", () => {
       expect.objectContaining({
         research_mode: "deep",
         analysis_mode: "news",
+      }),
+    );
+  });
+
+  it("persists an explicit response locale on the initial run event", async () => {
+    const fake = createQueueAdmin();
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+
+    await enqueueAgentRun({
+      session,
+      history,
+      requestId: "req-1",
+      model: "sonnet",
+      mcpHealth,
+      responseLocale: "en",
+    });
+
+    expect(appendAgentRunEvent).toHaveBeenNthCalledWith(
+      1,
+      fake.admin,
+      "run-1",
+      "run_queued",
+      expect.objectContaining({
+        response_locale: "en",
       }),
     );
   });

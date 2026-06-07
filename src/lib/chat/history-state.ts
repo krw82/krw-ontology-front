@@ -1,4 +1,5 @@
 import type { AgentRunSummary, Message, RunStatus, Session } from "@/types/api-contracts";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 
 export interface LoadedChatState {
   messages: Message[];
@@ -9,13 +10,31 @@ export interface LoadedChatState {
   status: RunStatus | "idle";
 }
 
-export function buildChatSessionHref(sessionId: string): string {
-  return `/chat?sessionId=${encodeURIComponent(sessionId)}`;
+export function buildChatSessionHref(
+  sessionId: string,
+  options: { locale?: Locale } = {},
+): string {
+  const params = new URLSearchParams();
+  appendLocaleParam(params, options.locale);
+  const localeQuery = params.toString();
+  return `/chat?sessionId=${encodeURIComponent(sessionId)}${
+    localeQuery ? `&${localeQuery}` : ""
+  }`;
 }
 
-export function buildNewChatHref(params?: URLSearchParams): string {
-  const query = params?.toString();
+export function buildNewChatHref(
+  params?: URLSearchParams,
+  options: { locale?: Locale } = {},
+): string {
+  const nextParams = new URLSearchParams(params);
+  appendLocaleParam(nextParams, options.locale);
+  const query = nextParams.toString();
   return `/chat/new${query ? `?${query}` : ""}`;
+}
+
+function appendLocaleParam(params: URLSearchParams, locale?: Locale): void {
+  if (!locale || locale === DEFAULT_LOCALE) return;
+  params.set("locale", locale);
 }
 
 export function getSessionTickers(

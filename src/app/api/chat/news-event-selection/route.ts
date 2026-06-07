@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
 import type { McpHealthResult } from "@/lib/agent/mcp-client";
 import { getReadyAgentWorker } from "@/lib/agent/worker-heartbeat";
 import { enqueueAgentRun, findRunByRequestId } from "@/lib/agent/job-queue";
@@ -45,6 +46,11 @@ function errorResponse(
   );
 }
 
+function getRequestResponseLocale(request: NextRequest): Locale {
+  const locale = request.headers.get("x-krw-locale");
+  return isLocale(locale) ? locale : DEFAULT_LOCALE;
+}
+
 export async function POST(request: NextRequest) {
   let parsedBody: unknown;
   try {
@@ -62,6 +68,7 @@ export async function POST(request: NextRequest) {
   const eventId = stringValue(parsedBody.event_id);
   const requestId = stringValue(parsedBody.request_id);
   const researchMode = normalizeResearchMode(parsedBody.research_mode);
+  const responseLocale = getRequestResponseLocale(request);
 
   if (!requestId || !isUuid(requestId)) {
     return errorResponse(
@@ -190,6 +197,7 @@ export async function POST(request: NextRequest) {
     researchMode,
     analysisMode: "news",
     runKind: "news_research",
+    responseLocale,
     selectedNewsEventContext: selectedEvent,
     sourceArtifactId: artifactResult.artifact.id,
     sourceEventId: selectedEvent.id,

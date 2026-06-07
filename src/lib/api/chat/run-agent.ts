@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import type { Locale } from "@/i18n/config";
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { tryAcquireLease, releaseLease, startLeaseHeartbeat } from "@/lib/concurrency/lease";
@@ -76,6 +77,7 @@ export interface RunAgentParams {
   budget: ExecutionBudgetCheckResult;
   mcpHealth: McpHealthResult;
   researchMode?: ResearchMode;
+  responseLocale?: Locale;
 }
 
 /**
@@ -284,6 +286,7 @@ export function executeRun(params: RunAgentParams): Response {
             defaultTickers: session.defaultTickers,
             defaultDocumentTypes: session.defaultDocumentTypes,
             researchMode: params.researchMode,
+            responseLocale: params.responseLocale,
             history: history.history,
             abortSignal: streamAbortController!.signal,
             onSdkDiagnostics: recordSdkDiagnostics,

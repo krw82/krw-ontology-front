@@ -2,6 +2,7 @@ import "server-only";
 
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import {
   getSessionInfo,
   query,
@@ -97,6 +98,7 @@ export interface AgentRunOptions {
   researchMode?: ResearchMode;
   analysisMode?: AnalysisMode;
   runKind?: RunKind;
+  responseLocale?: Locale;
   selectedNewsEventContext?: Record<string, unknown> | null;
   history?: Array<{ role: string; content: string }>;
   abortSignal?: AbortSignal;
@@ -153,6 +155,7 @@ export interface SdkDiagnostics {
   researchMode?: ResearchMode;
   analysisMode?: AnalysisMode;
   runKind?: RunKind;
+  responseLocale?: Locale;
   toolBudget?: ResearchModeToolBudget;
   plugins?: unknown;
   mcpServers?: unknown;
@@ -177,6 +180,7 @@ export async function runAgent(
   const runKind = normalizeRunKind(
     options.runKind ?? defaultRunKindForAnalysisMode(analysisMode),
   );
+  const responseLocale = options.responseLocale ?? DEFAULT_LOCALE;
   const stockNewsEnabledForRun =
     analysisMode === "news" && isStockNewsEnabled();
   const toolBudget = getResearchModeToolBudget(researchMode);
@@ -206,10 +210,16 @@ export async function runAgent(
       stockNewsRequired: analysisMode === "news" && stockNewsEnabledForRun,
       stockNewsUnavailableForNews:
         analysisMode === "news" && !stockNewsEnabledForRun,
+      responseLocale,
     },
   );
   const researchPrompt = [
-    buildResearchPassPrompt(options.userMessage, analysisMode, runKind),
+    buildResearchPassPrompt(
+      options.userMessage,
+      analysisMode,
+      runKind,
+      responseLocale,
+    ),
     buildResearchModePrompt(researchMode),
     buildSelectedNewsEventContextPrompt(runKind, options.selectedNewsEventContext),
   ].join("\n\n");
@@ -271,6 +281,7 @@ export async function runAgent(
       researchMode,
       analysisMode,
       runKind,
+      responseLocale,
       toolBudget,
     });
 
@@ -322,6 +333,7 @@ async function runSdkPass(params: {
   researchMode: ResearchMode;
   analysisMode: AnalysisMode;
   runKind: RunKind;
+  responseLocale: Locale;
   toolBudget: ResearchModeToolBudget;
 }): Promise<AgentRunResult> {
   const {
@@ -338,6 +350,7 @@ async function runSdkPass(params: {
     researchMode,
     analysisMode,
     runKind,
+    responseLocale,
     toolBudget,
   } = params;
   const acc = createAccumulator();
@@ -384,6 +397,7 @@ async function runSdkPass(params: {
       researchMode,
       analysisMode,
       runKind,
+      responseLocale,
       toolBudget,
     });
 
@@ -485,6 +499,7 @@ async function reportSdkInitialization(params: {
   researchMode: ResearchMode;
   analysisMode: AnalysisMode;
   runKind: RunKind;
+  responseLocale: Locale;
   toolBudget: ResearchModeToolBudget;
 }) {
   const {
@@ -499,6 +514,7 @@ async function reportSdkInitialization(params: {
     researchMode,
     analysisMode,
     runKind,
+    responseLocale,
     toolBudget,
   } = params;
 
@@ -521,6 +537,7 @@ async function reportSdkInitialization(params: {
     researchMode,
     analysisMode,
     runKind,
+    responseLocale,
     toolBudget,
     plugins: sdkOptions.plugins,
     mcpServers: sdkOptions.mcpServers,

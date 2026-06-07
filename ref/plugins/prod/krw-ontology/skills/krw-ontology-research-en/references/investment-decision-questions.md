@@ -1,6 +1,6 @@
 # Investment Decision Brief Rules
 
-Use this reference only to convert vague buy/sell/hold-style Korean questions into an internal English investment brief before KRW ontology MCP calls.
+Use this reference only to convert vague buy/sell/hold-style questions, including Korean phrasing, into an internal English investment brief before KRW ontology MCP calls.
 
 This file is primarily an internal English brief rule.
 
@@ -44,7 +44,7 @@ For normal research questions, keep the normal KRW ontology classification and n
 
 ## Core Action
 
-Do not translate the Korean question literally.
+Do not translate the user's question literally.
 
 Convert it into a concise ontology-friendly English investment brief that asks what filing evidence is needed to judge the decision frame.
 
@@ -52,6 +52,7 @@ The internal brief should:
 
 ```text
 - preserve ticker, company name, period, price, valuation, portfolio, or comparison assumptions from the user
+- follow the web runtime Company filing anchor when provided
 - use latest available filing evidence first
 - treat the latest 10-Q as the current driver when available
 - use the latest 10-K as annual business baseline when a newer 10-Q exists
@@ -59,7 +60,9 @@ The internal brief should:
 - avoid definitive buy/sell recommendations, target prices, or ratings
 ```
 
-Do not expose the internal English brief in the final Korean answer.
+Do not expose the internal English brief in the final English answer.
+
+For investment-decision answers, the final judgment must be anchored on the web runtime Company filing anchor when provided. Start from `Current driver`, use `Annual baseline` only for business mix/annual trend/risk baseline, and use `Historical context` only for cycle comparison or change over time. If a newer 10-Q exists after the latest 10-K, use the 10-Q as the current driver and use the 10-K only as annual baseline/business mix context. Do not say the latest 10-Q needs to be checked if it was available through tools or provided as the Current driver.
 
 ## Evidence Dimensions For The Brief
 
@@ -180,16 +183,17 @@ Internal brief:
 
 After using the internal brief, follow the normal KRW ontology research answer rules.
 
-For triggered buy/sell/hold-style questions only, write a detailed but scannable compact investment-decision report.
+For triggered buy/sell/hold-style questions only, write a detailed but scannable compact investment-decision report in English.
 
 Do not make it a short quick answer unless the user explicitly asks for "짧게", "한 줄로", or "간단히".
 
 The first visible sentence must be the practical filing-supported judgment.
+This opening judgment sentence is outside the heading sequence and must appear before any Markdown heading, title, table, caveat, or disclaimer.
 
 Good opening:
 
 ```text
-내 판단: 신규 매수는 아직 성급함. 보유자는 유지 가능.
+My view: a new buy still looks premature; existing holders can continue holding.
 ```
 
 Do not start with a disclaimer such as "공시자료만으로는 판단할 수 없습니다" unless the user explicitly asks for a target price, personalized portfolio instruction, or exact valuation.
@@ -197,97 +201,137 @@ Do not start with a disclaimer such as "공시자료만으로는 판단할 수 �
 Use standardized decision labels:
 
 ```text
-매수 후보
-분할 관심
-확인 후 접근
-관망 우위
-보유 가능
-비중 축소 검토
-리스크 우위
-피하는 쪽
+Buy candidate
+Worth staged interest
+Wait for confirmation
+Better to wait
+Holdable
+Consider trimming
+Risk outweighs reward
+Better to avoid
 ```
 
-Required report shape for triggered buy/sell/hold-style questions:
+Exact output contract for triggered buy/sell/hold-style questions:
+
+Start with the opening `My view:` sentence, then use the exact English heading order below. The heading order begins after the opening judgment sentence. Do not rename, omit, merge, or reorder these headings unless the user explicitly asks for a short answer.
 
 ```text
-내 판단: {new buyer judgment}. {holder judgment}.
+My view: {filing-supported decision}. {new buyer and/or holder split judgment}.
 
-# {Company} 투자 판단 요약
+# {Ticker or Company} Investment Decision Summary
 
-## 판단 라벨
-Use a compact table such as 구분 / 판단 / 이유.
-Must cover 신규 매수 and 기존 보유. Add 장기 관점 or 단기 관점 when useful.
+## Decision Label
+| Investor type | Decision | Reason |
+|---|---|---|
+| New buyer | {standardized label} | {one-line filing-supported reason} |
+| Existing holder | {standardized label} | {one-line filing-supported reason} |
 
-## 판단 대시보드
-Use a compact qualitative table with columns like 항목 / 판단 / 이유.
-Prefer interpretation labels over raw numbers.
+## Decision Dashboard
+| Area | Judgment | Reason |
+|---|---|---|
+| Growth/demand | {positive/neutral/risk interpretation} | {filing-supported reason, not a raw number dump} |
+| Margin/profitability | {positive/neutral/risk interpretation} | {filing-supported reason, not a raw number dump} |
+| Cash flow/investment burden | {positive/neutral/risk interpretation} | {filing-supported reason, not a raw number dump} |
+| Financial stability/dilution | {positive/neutral/risk interpretation} | {filing-supported reason, not a raw number dump} |
+| Key risk | {positive/neutral/risk interpretation} | {filing-supported reason, not a raw number dump} |
 
-## 왜 이렇게 보나
-Separate positive filing evidence from risk or confirmation points.
-Use KRW ontology strengths: latest filing drivers, revenue durability, margin direction, cash-flow conversion, capex/reinvestment burden, balance sheet/liquidity, dilution/SBC/buybacks, capital allocation, and material risk channels.
+## Why I See It This Way
+Separate positive filing evidence from risk or confirmation points in English prose.
 
-## 판단이 바뀌는 조건
-Explain what future filing/earnings evidence would make the view more positive or more negative.
+## What Would Change The View
+Explain what future filing/earnings evidence would make the view more positive or more negative. Use qualitative condition language unless the user supplied a threshold or filings/guidance explicitly provide one.
 
-## 최종 판단
+## Final View
 Separate good company, good stock, and good entry timing.
 
-## 다음으로 파고들 질문
-End with exactly 3 action-oriented Korean follow-up prompts.
+## Next Questions To Dig Into
+End with exactly 3 action-oriented English follow-up prompts.
 ```
 
 Do not apply this report shape to ordinary research questions.
 
-For triggered buy/sell/hold-style questions, do not omit `판단 라벨`, `판단 대시보드`, `왜 이렇게 보나`, `판단이 바뀌는 조건`, `최종 판단`, or `다음으로 파고들 질문` unless the user explicitly asks for a short answer.
+For triggered buy/sell/hold-style questions, do not omit `Decision Label`, `Decision Dashboard`, `Why I See It This Way`, `What Would Change The View`, `Final View`, or `Next Questions To Dig Into` unless the user explicitly asks for a short answer.
 
-In the report, prefer qualitative investment interpretation over raw numeric tables. Use numbers only when they materially change the judgment.
+Never start the final answer with `#`, `##`, a table, or a section label. The opening sentence must be visible first:
 
-Do not invent numeric buy, sell, stop-loss, margin, growth, valuation, or allocation thresholds unless the user supplied them or the filing/guidance explicitly supports them. Use qualitative condition language instead.
+```text
+My view: ...
+```
 
-For these triggered questions, the three final follow-ups must be action-oriented decision continuations, not generic research questions or raw metric prompts.
+Do not infer whether the user is in profit, loss, take-profit, or stop-loss state unless the user states cost basis, return, purchase price, or position status. For "Should I cut losses?" or "손절할까?" questions, answer from filing-supported thesis-break risk and hold/sell risk, not assumed profit/loss.
+
+Good opening for stop-loss or cut-loss questions:
+
+```text
+My view: based on filing evidence alone, cutting losses still looks premature. Existing holders can keep holding until there is clearer evidence that the operating trend is breaking.
+```
+
+In the report, prefer qualitative investment interpretation over raw numeric tables. Use numbers only when they materially change the judgment. The dashboard should read like an investment judgment table, not a filing data table; avoid columns that are primarily raw figures such as "공시 근거" packed with numbers.
+
+Do not invent numeric thresholds, percentage thresholds, valuation bands, time horizons, checklist cutoffs, allocation sizes, buy levels, sell levels, stop-loss levels, margin thresholds, growth thresholds, or "N out of M conditions" rules unless the user supplied them or the filing/guidance explicitly supports them. Use qualitative condition language instead.
+
+Bad threshold:
+
+```text
+HBM 수주 가시성이 12개월 이상 확보되면 추가 매수.
+Cut losses if margin falls below 60%.
+조건 중 2개 이상이 발생하면 비중 축소.
+```
+
+Good condition language:
+
+```text
+The view becomes more positive if HBM order visibility improves and evidence builds that the high-margin product mix is holding.
+The thesis-break risk rises if margin recovery stalls and demand improvement does not translate into pricing or inventory improvement.
+```
+
+For these triggered questions, the three final follow-ups must be action-oriented decision continuations, not generic research questions or raw metric prompts. Each follow-up must stay on the same company and include one of these decision-action frames: `new-buy checklist`, `sell signals`, `thesis-break judgment`, `hold conditions`, `risk improvement/deterioration conditions`, or `view-change conditions`.
 
 Keep follow-ups focused on the same company and the user's original decision type. Do not introduce new peer companies, tickers, or comparison prompts unless the user explicitly asked for comparison or named peers.
 
 Good follow-ups:
 
 ```text
-{Ticker} 신규 매수 체크리스트 5개만 볼까?
-{Ticker} 보유자 기준 매도 신호만 볼까?
-{Ticker} 손절 판단이 강해지는 신호만 따로 볼까?
-{Ticker} 신규 매수자는 어떤 조건 확인 후 접근하는 게 나은지 볼까?
-{Ticker} 리스크가 완화되는 조건과 악화되는 조건을 나눠볼까?
+Should we build a {Ticker} new-buy checklist?
+Should we look only at {Ticker} sell signals for existing holders?
+Should we isolate the signals that would make a {Ticker} thesis-break judgment stronger?
+Should we define what a new {Ticker} buyer should confirm before entering?
+Should we separate the conditions that would improve versus worsen {Ticker}'s risk profile?
 ```
 
 Bad follow-ups:
 
 ```text
-{Ticker} vs {Peer} 중 지금 더 나은 쪽을 비교해볼까?
-{Ticker}의 AI 수익화는 어떻게 봐야 하나요?
-마진 영향은 무엇인가요?
-리스크는 무엇인가요?
+Should we compare {Ticker} vs {Peer} right now?
+How should we think about {Ticker}'s AI monetization?
+What is the margin impact?
+What are the risks?
+What is {Ticker}'s HBM revenue mix?
+What is {Ticker}'s capex level?
+What are {Ticker}'s cash and debt balances?
 ```
 
-The final Korean answer may use clear non-prescriptive judgment labels such as:
+The final English answer may use clear non-prescriptive judgment labels such as:
 
 ```text
-매수 후보로 볼 수 있음
-공격적 매수보다는 확인 후 접근
-기존 보유자는 유지 가능
-신규 진입자는 관망에 가까움
-장기 성장 투자자에게 더 맞음
-현금흐름 중시 투자자에게는 부담이 큼
-단기 반등 근거는 약함
-공시상 thesis가 깨졌다는 신호는 아직 약함
+Can be viewed as a buy candidate
+Better to wait for confirmation than buy aggressively
+Existing holders can continue holding
+New entrants are closer to wait-and-see
+Better suited to long-term growth investors
+Still burdensome for cash-flow-focused investors
+Weak basis for a short-term rebound call
+The filings do not yet show a clear thesis break
 ```
 
 Avoid:
 
 ```text
-무조건 매수
-무조건 매도
-지금 사세요
-팔아야 합니다
-목표가는 얼마입니다
-투자의견 매수/보유/매도
-개인 투자 조언
+Definitely buy
+Definitely sell
+Buy it now
+You must sell
+The target price is X
+Formal buy/hold/sell rating
+Personalized investment advice
 ```

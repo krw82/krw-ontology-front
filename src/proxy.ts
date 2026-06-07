@@ -2,7 +2,7 @@ import { updateSession } from "@/lib/supabase/middleware";
 import { getClientIp } from "@/lib/http/client-ip";
 import { getConfiguredAppOrigin } from "@/lib/auth/origin";
 import { buildContentSecurityPolicy } from "@/lib/security/headers";
-import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
 import {
   getPathLocale,
   isPublicLocalizedPathname,
@@ -74,8 +74,24 @@ function getCanonicalRedirectUrl(request: NextRequest): URL | null {
   return redirectUrl;
 }
 
-function getRequestLocale(pathname: string): Locale {
-  return getPathLocale(pathname) ?? DEFAULT_LOCALE;
+function getRequestLocale(request: NextRequest): Locale {
+  const explicitLocale = request.headers.get("x-krw-locale");
+  if (isLocale(explicitLocale)) return explicitLocale;
+
+  const pathLocale = getPathLocale(request.nextUrl.pathname);
+  if (pathLocale) return pathLocale;
+
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try {
+      const refererLocale = getPathLocale(new URL(referer).pathname);
+      if (refererLocale) return refererLocale;
+    } catch {
+      // Ignore malformed Referer headers and fall back to the default locale.
+    }
+  }
+
+  return DEFAULT_LOCALE;
 }
 
 function getLocaleRedirectUrl(request: NextRequest): URL | null {
@@ -149,7 +165,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(localeRedirectUrl, 308);
   }
 
-  const requestLocale = getRequestLocale(request.nextUrl.pathname);
+  const requestLocale = getRequestLocale(request);
   const csp = shouldApplyContentSecurityPolicy(request.nextUrl.pathname)
     ? createCspRequestHeaders()
     : null;

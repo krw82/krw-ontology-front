@@ -35,6 +35,7 @@ import {
   DEFAULT_ANALYSIS_MODE,
   type AnalysisMode,
 } from "@/lib/analysis-mode";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 
 interface UseChatOptions {
   sessionId: string;
@@ -43,6 +44,7 @@ interface UseChatOptions {
   defaultDocumentTypes?: string[];
   researchMode?: ResearchMode;
   analysisMode?: AnalysisMode;
+  responseLocale?: Locale;
   onSessionCreated?: (sessionId: string) => void;
 }
 
@@ -275,6 +277,7 @@ export function useChat({
   defaultDocumentTypes = [],
   researchMode = DEFAULT_RESEARCH_MODE,
   analysisMode = DEFAULT_ANALYSIS_MODE,
+  responseLocale = DEFAULT_LOCALE,
   onSessionCreated,
 }: UseChatOptions) {
   const [state, setState] = useState<ChatState>(() => createInitialChatState());
@@ -1180,6 +1183,7 @@ export function useChat({
           headers: {
             "Content-Type": "application/json",
             Accept: "text/event-stream",
+            "X-KRW-Locale": responseLocale,
           },
           body: JSON.stringify({
             ...(targetSessionId ? { session_id: targetSessionId } : {}),
@@ -1264,6 +1268,7 @@ export function useChat({
       analysisMode,
       processRunResponse,
       researchMode,
+      responseLocale,
       scopeType,
       sessionId,
     ],
@@ -1372,6 +1377,7 @@ export function useChat({
           headers: {
             "Content-Type": "application/json",
             Accept: "text/event-stream",
+            "X-KRW-Locale": responseLocale,
           },
           body: JSON.stringify({
             session_id: targetSessionId,
@@ -1466,7 +1472,13 @@ export function useChat({
       });
       return { ok: true };
     },
-    [processRunResponse, researchMode, sessionId, state.artifactsByMessageId],
+    [
+      processRunResponse,
+      researchMode,
+      responseLocale,
+      sessionId,
+      state.artifactsByMessageId,
+    ],
   );
 
   const cancelRun = useCallback(async () => {

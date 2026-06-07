@@ -61,6 +61,23 @@ describe("buildSystemPrompt", () => {
     );
   });
 
+  it("uses the English research skill and English runtime instructions for English responses", () => {
+    const researchPrompt = buildResearchPassPrompt(
+      "Analyze AAPL",
+      "company",
+      "company_research",
+      "en",
+    );
+
+    expect(researchPrompt).toContain(
+      "/krw-ontology:krw-ontology-research-en Analyze AAPL",
+    );
+    expect(researchPrompt).toContain("English Markdown only");
+    expect(researchPrompt).not.toContain(
+      "/krw-ontology:krw-ontology-research Analyze AAPL",
+    );
+  });
+
   it("keeps current-news search disabled in the prompt unless explicitly enabled", () => {
     const disabledPrompt = buildSystemPrompt();
     expect(disabledPrompt).toContain("Do not perform web searches");
@@ -72,6 +89,17 @@ describe("buildSystemPrompt", () => {
     expect(enabledPrompt).toContain("Do not use built-in WebSearch or WebFetch");
     expect(enabledPrompt).toContain("Stock News MCP");
     expect(enabledPrompt).toContain("source provenance internally");
+  });
+
+  it("adds an English-only final answer policy when requested", () => {
+    const prompt = buildSystemPrompt(undefined, [], {
+      responseLocale: "en",
+      stockNewsEnabled: true,
+    });
+
+    expect(prompt).toContain("English Markdown only");
+    expect(prompt).toContain("do not answer in Korean");
+    expect(prompt).toContain("English investor interpretation");
   });
 
   it("injects company filing anchors when catalog documents are available", () => {

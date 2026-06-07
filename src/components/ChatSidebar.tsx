@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent, MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
-import { buildChatSessionHref } from "@/lib/chat/history-state";
+import { buildChatSessionHref, buildNewChatHref } from "@/lib/chat/history-state";
 import { useSessions } from "@/hooks/useSessions";
 import {
   easeOutExpo,
@@ -16,7 +16,7 @@ import {
 } from "@/lib/animation";
 import { OPEN_CHAT_SIDEBAR_EVENT } from "@/lib/chat/sidebar-events";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
-import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
 import { getPathLocale } from "@/i18n/routing";
 import type { SessionSummary } from "@/types/api-contracts";
 
@@ -140,6 +140,7 @@ export default function ChatSidebar({
 }: ChatSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const {
     sessions,
     loading,
@@ -152,7 +153,10 @@ export default function ChatSidebar({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pendingNavigationSessionId, setPendingNavigationSessionId] =
     useState<string | null>(null);
-  const locale = getPathLocale(pathname) ?? DEFAULT_LOCALE;
+  const queryLocale = searchParams.get("locale");
+  const locale =
+    getPathLocale(pathname) ??
+    (isLocale(queryLocale) ? queryLocale : DEFAULT_LOCALE);
   const copy = sidebarCopy[locale];
 
   const closeMobileSidebar = useCallback(() => {
@@ -208,7 +212,7 @@ export default function ChatSidebar({
     }
 
     setPendingNavigationSessionId(sessionId);
-    router.push(buildChatSessionHref(sessionId), { scroll: false });
+    router.push(buildChatSessionHref(sessionId, { locale }), { scroll: false });
   };
 
   return (
@@ -266,7 +270,7 @@ export default function ChatSidebar({
                 onNavigate={handleMobileSessionNavigate}
                 onDeleteActiveSession={() => {
                   closeMobileSidebar();
-                  router.replace("/chat/new");
+                  router.replace(buildNewChatHref(undefined, { locale }));
                 }}
               />
             </motion.aside>
@@ -286,7 +290,9 @@ export default function ChatSidebar({
           renameSession={renameSession}
           deleteSession={deleteSession}
           pendingNavigationSessionId={null}
-          onDeleteActiveSession={() => router.replace("/chat/new")}
+          onDeleteActiveSession={() =>
+            router.replace(buildNewChatHref(undefined, { locale }))
+          }
         />
       </aside>
     </>
@@ -586,7 +592,7 @@ function SessionRow({
       ) : (
         <>
           <Link
-            href={buildChatSessionHref(session.id)}
+            href={buildChatSessionHref(session.id, { locale })}
             className={[
               "block rounded-[8px] border py-xs pl-sm pr-10 transition-colors",
               isActive || isNavigating

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import { APPLE_QUESTION_CHAINS } from "@/lib/companies/landing-copy";
 
 export const SITE_NAME = "KRW Ontology";
@@ -430,7 +431,7 @@ export function getQuestionTopicGroups(): Array<{
 
 export function buildQuestionChatHref(
   topic: QuestionTopicPage,
-  options: { ticker?: string; question?: string } = {},
+  options: { ticker?: string; question?: string; locale?: Locale } = {},
 ): string {
   const params = new URLSearchParams();
   const question = options.question?.trim();
@@ -439,6 +440,9 @@ export function buildQuestionChatHref(
   params.set("templateId", topic.slug);
   if (ticker) params.set("ticker", ticker);
   if (question && question !== topic.question) params.set("query", question);
+  if (options.locale && options.locale !== DEFAULT_LOCALE) {
+    params.set("locale", options.locale);
+  }
 
   return `/chat/new?${params.toString()}`;
 }
@@ -569,7 +573,7 @@ export function findUseCase(slug: string): UseCasePage | null {
 
 export function buildUseCaseChatHref(
   useCase: UseCasePage,
-  options: { ticker?: string; question?: string } = {},
+  options: { ticker?: string; question?: string; locale?: Locale } = {},
 ): string {
   const params = new URLSearchParams();
   const firstTopic = useCase.recommendedQuestionSlugs
@@ -581,6 +585,9 @@ export function buildUseCaseChatHref(
   if (ticker) params.set("ticker", ticker);
   params.set("query", options.question?.trim() || useCase.primaryQuestion);
   params.set("useCase", useCase.slug);
+  if (options.locale && options.locale !== DEFAULT_LOCALE) {
+    params.set("locale", options.locale);
+  }
 
   return `/chat/new?${params.toString()}`;
 }

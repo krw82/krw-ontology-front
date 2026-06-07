@@ -116,6 +116,7 @@ function QuestionNode({
       href={buildQuestionChatHref(topic, {
         ticker: topic.questionChain.ticker,
         question: canonicalNode?.question ?? node.question,
+        locale,
       })}
       className="question-chain-node question-chain-entry group block rounded-[8px] border border-primary bg-surface px-3 py-3 transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
       style={motionStyle}

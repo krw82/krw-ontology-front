@@ -19,6 +19,7 @@ import {
   getSessionTickers,
   buildChatSessionHref,
 } from "@/lib/chat/history-state";
+import { DEFAULT_LOCALE, isLocale } from "@/i18n/config";
 import { getSuggestedPromptsForTickers } from "@/lib/companies/landing-copy";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import { findQuestionTopic } from "@/lib/marketing/site";
@@ -118,8 +119,10 @@ function ChatContent() {
   const shareToken = searchParams.get("shareToken");
   const templateId = searchParams.get("templateId");
   const draftMessageId = searchParams.get("draftMessageId");
+  const localeParam = searchParams.get("locale");
   const templateTopic = templateId ? findQuestionTopic(templateId) : null;
   const existingSessionId = searchParams.get("sessionId");
+  const responseLocale = isLocale(localeParam) ? localeParam : DEFAULT_LOCALE;
 
   const sessionId = existingSessionId;
   const [sessionError, setSessionError] = useState<string | null>(null);
@@ -217,9 +220,12 @@ function ChatContent() {
   const handleSessionCreated = useCallback(
     (createdSessionId: string) => {
       if (!isDraftRoute && existingSessionId) return;
-      router.replace(buildChatSessionHref(createdSessionId), { scroll: false });
+      router.replace(
+        buildChatSessionHref(createdSessionId, { locale: responseLocale }),
+        { scroll: false },
+      );
     },
-    [existingSessionId, isDraftRoute, router],
+    [existingSessionId, isDraftRoute, responseLocale, router],
   );
 
   const chat = useChat({
@@ -228,6 +234,7 @@ function ChatContent() {
     defaultTickers: activeTicker ? [activeTicker.trim().toUpperCase()] : [],
     researchMode,
     analysisMode,
+    responseLocale,
     onSessionCreated: handleSessionCreated,
   });
   const sendMessage = chat.sendMessage;
@@ -307,13 +314,13 @@ function ChatContent() {
         window.history.replaceState(
           window.history.state,
           "",
-          buildChatSessionHref(sessionId),
+          buildChatSessionHref(sessionId, { locale: responseLocale }),
         );
       });
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [draftMessageId, sendMessage, sessionId]);
+  }, [draftMessageId, responseLocale, sendMessage, sessionId]);
 
   useEffect(() => {
     if (!sessionId || hasLoadedRef.current) return;
@@ -696,6 +703,9 @@ function ChatContent() {
           sessionId: createdSessionId,
           draftMessageId: nextDraftMessageId,
         });
+        if (responseLocale !== DEFAULT_LOCALE) {
+          nextParams.set("locale", responseLocale);
+        }
         router.replace(`/chat?${nextParams.toString()}`, {
           scroll: false,
         });
@@ -723,6 +733,7 @@ function ChatContent() {
       router,
       sendMessage,
       sessionId,
+      responseLocale,
       setComposerExpanded,
       setSessionError,
       shouldStickToBottomRef,

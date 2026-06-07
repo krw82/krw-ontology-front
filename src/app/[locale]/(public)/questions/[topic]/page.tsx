@@ -178,6 +178,7 @@ export default async function QuestionTopicPage({
                 href={buildQuestionChatHref(topic, {
                   ticker: topic.questionChain.ticker,
                   question: topic.questionChain.primaryQuestion,
+                  locale,
                 })}
                 className="inline-flex min-h-12 items-center justify-center rounded-[8px] bg-surface-dark px-5 py-3 text-[15px] font-extrabold leading-5 text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >

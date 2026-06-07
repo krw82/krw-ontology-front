@@ -291,6 +291,7 @@ describe("POST /api/chat/news-event-selection", () => {
         requestId: REQUEST_ID,
         analysisMode: "news",
         runKind: "news_research",
+        responseLocale: "ko",
         selectedNewsEventContext: expect.objectContaining({
           ...selectedEvent,
         }),

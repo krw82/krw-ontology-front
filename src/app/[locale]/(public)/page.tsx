@@ -23,6 +23,7 @@ import {
 import { isLocale, type Locale } from "@/i18n/config";
 import { localizedPageMetadata } from "@/i18n/metadata";
 import { localizedPath } from "@/i18n/routing";
+import { buildNewChatHref } from "@/lib/chat/history-state";
 import { absoluteUrl, SITE_NAME } from "@/lib/marketing/site";
 import { getCspNonce } from "@/lib/security/csp-nonce";
 
@@ -291,7 +292,10 @@ export default async function Home({ params }: HomePageProps) {
           <KrwBrand href={localizedPath(locale)} compact />
 
           <div className="hidden items-center gap-8 text-sm font-semibold text-muted md:flex">
-            <Link href="/chat/new" className="transition-colors hover:text-ink">
+            <Link
+              href={buildNewChatHref(undefined, { locale })}
+              className="transition-colors hover:text-ink"
+            >
               {copy.navResearch}
             </Link>
             <Link

@@ -39,6 +39,20 @@ describe("chat history state", () => {
     expect(buildNewChatHref(params)).toBe("/chat/new?ticker=AAPL&query=margin");
   });
 
+  it("adds a locale query only for non-default chat URLs", () => {
+    const params = new URLSearchParams({ ticker: "AAPL" });
+
+    expect(buildChatSessionHref("abc 123", { locale: "ko" })).toBe(
+      "/chat?sessionId=abc%20123",
+    );
+    expect(buildChatSessionHref("abc 123", { locale: "en" })).toBe(
+      "/chat?sessionId=abc%20123&locale=en",
+    );
+    expect(buildNewChatHref(params, { locale: "en" })).toBe(
+      "/chat/new?ticker=AAPL&locale=en",
+    );
+  });
+
   it("prefers persisted session tickers over URL fallback", () => {
     expect(
       getSessionTickers(

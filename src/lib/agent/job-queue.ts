@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import { getOntologyEnv, readIntEnv } from "@/lib/env";
 import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import {
@@ -57,6 +58,7 @@ export async function enqueueAgentRun(params: {
   runKind?: RunKind;
   executorType?: AgentRunExecutorType;
   selectedNewsEventContext?: Record<string, unknown> | null;
+  responseLocale?: Locale;
   sourceArtifactId?: string | null;
   sourceEventId?: string | null;
 }): Promise<EnqueueAgentRunResult> {
@@ -72,6 +74,7 @@ export async function enqueueAgentRun(params: {
     params.runKind ?? defaultRunKindForAnalysisMode(analysisMode),
   );
   const executorType = params.executorType ?? "claude_agent";
+  const responseLocale = params.responseLocale ?? DEFAULT_LOCALE;
   const admin = getSupabaseAdmin();
 
   const existingRun = await findRunByRequestId(requestId, session.id);
@@ -165,6 +168,7 @@ export async function enqueueAgentRun(params: {
     research_mode: researchMode,
     analysis_mode: analysisMode,
     run_kind: runKind,
+    response_locale: responseLocale,
     executor_type: executorType,
     queue,
   });

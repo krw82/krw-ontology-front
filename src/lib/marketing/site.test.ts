@@ -83,10 +83,16 @@ describe("marketing site content model", () => {
     expect(buildQuestionChatHref(topic, { question: "custom question" })).toBe(
       `/chat/new?templateId=${topic.slug}&query=custom+question`,
     );
+    expect(buildQuestionChatHref(topic, { locale: "en" })).toBe(
+      `/chat/new?templateId=${topic.slug}&locale=en`,
+    );
 
     const useCaseHref = buildUseCaseChatHref(useCase);
     expect(useCaseHref).toContain(`useCase=${useCase.slug}`);
     expect(useCaseHref).toContain("query=");
+    expect(buildUseCaseChatHref(useCase, { locale: "en" })).toContain(
+      "locale=en",
+    );
   });
 
   it("builds noindex metadata for non-search utility pages", () => {
