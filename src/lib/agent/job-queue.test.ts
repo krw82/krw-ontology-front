@@ -257,7 +257,7 @@ describe("agent job queue", () => {
       1,
       fake.admin,
       "run-1",
-      "run_started",
+      "run_queued",
       expect.objectContaining({
         run_id: "run-1",
         message_id: "assistant-message-1",
@@ -266,6 +266,9 @@ describe("agent job queue", () => {
         research_mode: "deep",
         analysis_mode: "company",
         executor_type: "claude_agent",
+        queue: expect.objectContaining({
+          concurrency_limit: expect.any(Number),
+        }),
       }),
     );
     expect(appendAgentRunEvent).toHaveBeenNthCalledWith(
@@ -275,7 +278,10 @@ describe("agent job queue", () => {
       "activity_update",
       {
         stage: "queued",
-        label: "분석 대기 중",
+        label: "대기열에 추가됨",
+        queue: expect.objectContaining({
+          concurrency_limit: expect.any(Number),
+        }),
       },
     );
   });
@@ -298,7 +304,7 @@ describe("agent job queue", () => {
       1,
       fake.admin,
       "run-1",
-      "run_started",
+      "run_queued",
       expect.objectContaining({
         research_mode: "deep",
         analysis_mode: "news",
@@ -336,7 +342,7 @@ describe("agent job queue", () => {
       1,
       fake.admin,
       "run-1",
-      "run_started",
+      "run_queued",
       expect.objectContaining({
         analysis_mode: "news",
         run_kind: "news_discovery",

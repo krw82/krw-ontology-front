@@ -45,6 +45,7 @@ export function buildContentSecurityPolicy({
     "form-action 'self'",
     "img-src 'self' data: blob: https://lh3.googleusercontent.com",
     "font-src 'self' data:",
+    "media-src 'self' data: blob:",
     "style-src 'self' 'unsafe-inline'",
     `script-src ${scriptSources.join(" ")}`,
     `connect-src ${

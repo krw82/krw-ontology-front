@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "motion/react";
 import TopNav from "@/components/TopNav";
 import ChatMessage from "@/components/ChatMessage";
 import Composer, { type ComposerSendResult } from "@/components/Composer";
+import QueueRemotionAnimation from "@/components/QueueRemotionAnimation";
 import SuggestedPromptActions from "@/components/SuggestedPromptActions";
 import RunStatusDock from "@/components/RunStatusDock";
 import { useChat } from "@/hooks/useChat";
@@ -232,7 +233,9 @@ function ChatContent() {
   const sendMessage = chat.sendMessage;
   const sendNewsEventSelection = chat.sendNewsEventSelection;
   const cancelRun = chat.cancelRun;
-  const isStreaming = chat.status === "running";
+  const isQueued = chat.status === "queued" || chat.activity?.stage === "queued";
+  const isRunning = chat.status === "running";
+  const isActiveRun = isQueued || isRunning;
 
   // ---------------------------------------------------------------------------
   // Mobile dock state machine
@@ -259,7 +262,7 @@ function ChatContent() {
     scrollRef,
     composerHostRef,
     messageCount: chat.messages.length,
-    isStreaming,
+    isStreaming: isActiveRun,
   });
 
   // ---------------------------------------------------------------------------
@@ -327,7 +330,7 @@ function ChatContent() {
   const hasConversationContent =
     chat.messages.length > 0 ||
     Boolean(chat.streamingContent) ||
-    isStreaming ||
+    isActiveRun ||
     Boolean(chat.error);
   const streamingTransition = {
     duration: 0.14,
@@ -342,7 +345,7 @@ function ChatContent() {
   useEffect(() => {
     if (!hasConversationContent) return;
     if (!shouldStickToBottomRef.current) return;
-    if (!isStreaming && chat.messages.length === prevMessagesCountRef.current) {
+    if (!isActiveRun && chat.messages.length === prevMessagesCountRef.current) {
       return;
     }
 
@@ -352,7 +355,7 @@ function ChatContent() {
     chat.messages.length,
     chat.streamingContent,
     hasConversationContent,
-    isStreaming,
+    isActiveRun,
     scrollToBottom,
     shouldStickToBottomRef,
   ]);
@@ -745,13 +748,13 @@ function ChatContent() {
   // Escape key to cancel streaming
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && chat.status === "running") {
+      if (e.key === "Escape" && isActiveRun) {
         handleCancel();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [chat.status, handleCancel]);
+  }, [handleCancel, isActiveRun]);
 
   useEffect(() => {
     const alertLevel = entitlement?.usage.alert_level;
@@ -892,7 +895,7 @@ function ChatContent() {
                       }
                       artifactSelections={chat.artifactSelections}
                       onSelectNewsEvent={handleNewsEventSelection}
-                      newsEventSelectionDisabled={isStreaming || isBudgetBlocked}
+                      newsEventSelectionDisabled={isActiveRun || isBudgetBlocked}
                       showHeader={idx === 0 || arr[idx - 1]?.role !== "assistant"}
                       toolCalls={
                         isLatestAssistantMessage ? chat.toolCalls : undefined
@@ -907,7 +910,7 @@ function ChatContent() {
                 })}
 
               <AnimatePresence mode="wait" initial={false}>
-                {isStreaming && chat.streamingContent && (
+                {isActiveRun && chat.streamingContent && (
                   <motion.div
                     key="streaming-content"
                     initial={{ opacity: 0, y: streamingTransition.y }}
@@ -933,7 +936,7 @@ function ChatContent() {
                     />
                   </motion.div>
                 )}
-                {isStreaming && !chat.streamingContent && (
+                {isActiveRun && !chat.streamingContent && (
                   <motion.div
                     key="streaming-loading"
                     initial={{ opacity: 0, y: streamingTransition.y }}
@@ -993,7 +996,7 @@ function ChatContent() {
               {/* Empty state */}
               {chat.messages.length === 0 &&
                 !isHydratingSession &&
-                !isStreaming &&
+                !isActiveRun &&
                 !sessionError && (
                   <div className="mx-auto grid w-full max-w-4xl gap-7 py-lg sm:py-xxl md:grid-cols-[minmax(0,1fr)_320px] md:items-start">
                   <motion.div
@@ -1022,7 +1025,7 @@ function ChatContent() {
                     <SuggestedPromptActions
                       prompts={suggestedPrompts}
                       groupId="empty-state-prompts"
-                      disabled={isStreaming || Boolean(effectiveSessionError)}
+                      disabled={isActiveRun || Boolean(effectiveSessionError)}
                       analytics={{
                         sourceSurface: "chat_empty_state",
                         ticker: contextTickers[0] ?? null,
@@ -1070,13 +1073,14 @@ function ChatContent() {
             </div>
           )}
 
-          {isStreaming && (
+          {isActiveRun && (
             <div className="hidden md:block">
               <RunStatusDock
                 onCancel={handleCancel}
                 activity={chat.activity}
                 toolCalls={chat.toolCalls}
                 runStartedAt={chat.runStartedAt}
+                variant={isQueued ? "queued" : "running"}
               />
             </div>
           )}
@@ -1087,7 +1091,7 @@ function ChatContent() {
             className={[
               "pointer-events-none fixed inset-x-0 bottom-0 z-30 transform-gpu transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:pointer-events-auto md:static md:z-auto md:translate-y-0 md:opacity-100 md:transition-none",
               isComposerCompact ? "opacity-0" : "opacity-100",
-              isStreaming ? "md:hidden" : "",
+              isActiveRun ? "md:hidden" : "",
             ].join(" ")}
             style={{
               transform: isBodyScrollChat
@@ -1105,7 +1109,7 @@ function ChatContent() {
               onCancel={handleCancel}
               activity={chat.activity}
               disabled={Boolean(effectiveSessionError) || isBudgetBlocked}
-              isGenerating={isStreaming}
+              isGenerating={isActiveRun}
               placeholder={
                 effectiveSessionError
                   ? "인덱스에 있는 회사만 채팅할 수 있습니다."
@@ -1147,22 +1151,28 @@ function ChatContent() {
                   <button
                     type="button"
                     className="inline-flex h-10 items-center gap-2 rounded-full px-4 text-[14px] font-extrabold text-ink active:bg-surface-dim"
-                    onClick={isStreaming ? revealComposer : revealComposerForTyping}
-                    aria-label={isStreaming ? "분석 상태 보기" : "질문 입력"}
+                    onClick={isActiveRun ? revealComposer : revealComposerForTyping}
+                    aria-label={isActiveRun ? "분석 상태 보기" : "질문 입력"}
                   >
-                    <span
-                      aria-hidden="true"
-                      className={[
-                        "material-symbols-outlined text-[19px]",
-                        isStreaming ? "animate-spin" : "",
-                      ].join(" ")}
-                    >
-                      {isStreaming ? "progress_activity" : "edit"}
+                    {isQueued ? (
+                      <QueueRemotionAnimation size="compact" />
+                    ) : (
+                      <span
+                        aria-hidden="true"
+                        className={[
+                          "material-symbols-outlined text-[19px]",
+                          isRunning ? "animate-spin" : "",
+                        ].join(" ")}
+                      >
+                        {isRunning ? "progress_activity" : "edit"}
+                      </span>
+                    )}
+                    <span>
+                      {isQueued ? "대기 중" : isRunning ? "분석 진행중" : "질문 입력"}
                     </span>
-                    <span>{isStreaming ? "분석 진행중" : "질문 입력"}</span>
                   </button>
 
-                  {isStreaming && (
+                  {isActiveRun && (
                     <button
                       type="button"
                       className="inline-flex h-10 items-center rounded-full bg-surface-dim px-3 text-[13px] font-extrabold text-error active:scale-95"

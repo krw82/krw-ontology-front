@@ -37,6 +37,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+/logs/
+/_temp/
+home-*.png
+home-trace-console-demo*.png
 
 # env files (can opt-in for committing if needed)
 .env*

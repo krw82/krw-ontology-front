@@ -1,5 +1,6 @@
 import type {
   MCPToolName,
+  QueueStatus,
   ResearchActivityUpdate,
 } from "@/types/api-contracts";
 
@@ -89,7 +90,7 @@ export function getResearchActivityLabel(
 ): string {
   switch (activity?.stage) {
     case "queued":
-      return "분석 대기";
+      return "대기열 대기";
     case "connecting":
       return "자료 연결";
     case "checking_evidence":
@@ -104,6 +105,20 @@ export function getResearchActivityLabel(
     default:
       return "근거 확인";
   }
+}
+
+export function getQueueStatusLabel(queue?: QueueStatus | null): string {
+  if (!queue) return "앞 작업이 끝나면 자동으로 시작됩니다";
+
+  const running = Math.min(queue.running_count, queue.concurrency_limit);
+  const limit = queue.concurrency_limit;
+  const ahead = queue.queued_ahead;
+
+  if (ahead <= 0) {
+    return `현재 ${running}/${limit}개 분석 중 · 다음 순서`;
+  }
+
+  return `현재 ${running}/${limit}개 분석 중 · 앞에 ${ahead}개 대기`;
 }
 
 export function getActiveResearchLabel(

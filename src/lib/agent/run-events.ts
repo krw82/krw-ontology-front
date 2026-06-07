@@ -2,6 +2,10 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { readIntEnv } from "@/lib/env";
 import { publicAgentErrorMessage } from "@/lib/api/chat/error-messages";
 import {
+  loadAgentRunQueueState,
+  toQueueStatus,
+} from "@/lib/agent/queue-state";
+import {
   getAgentRunEventWaiter,
   type AgentRunEventWaiter,
 } from "@/lib/agent/run-event-listener";
@@ -167,7 +171,21 @@ export function streamAgentRunEventsResponse(
         cursor: number,
       ): Promise<ReconcileResult> => {
         const latestStatus = await loadRunStatus(admin, currentRunId, sessionId);
-        if (!latestStatus || !isTerminalStatus(latestStatus.status)) {
+        if (!latestStatus) {
+          return "open";
+        }
+
+        if (!isTerminalStatus(latestStatus.status)) {
+          if (isQueuedStatus(latestStatus.status)) {
+            const queue = toQueueStatus(
+              await loadAgentRunQueueState(admin, currentRunId),
+            );
+            await sendEvent("activity_update", {
+              stage: "queued",
+              label: "대기열에 추가됨",
+              queue,
+            });
+          }
           return "open";
         }
 
@@ -282,11 +300,15 @@ export function streamAgentRunEventsResponse(
       }
 
       const latestStatus = await loadRunStatus(admin, currentRunId, sessionId);
+      const queue = latestStatus && isQueuedStatus(latestStatus.status)
+        ? toQueueStatus(await loadAgentRunQueueState(admin, currentRunId))
+        : null;
       await sendEvent("state_sync", {
         session_id: sessionId,
         run_id: currentRunId,
         status: latestStatus?.status ?? "running",
         reason: "poll_timeout",
+        queue,
       });
       controller.close();
     },
@@ -496,6 +518,10 @@ function isTerminalStatus(status: RunStatus): boolean {
     status === "cancelled" ||
     status === "expired"
   );
+}
+
+function isQueuedStatus(status: RunStatus | "idle"): boolean {
+  return status === "queued" || status === "pending";
 }
 
 function sanitizeStreamingPayload(

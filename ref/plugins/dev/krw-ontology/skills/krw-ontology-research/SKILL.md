@@ -309,17 +309,23 @@ Flow:
 4. Answer narrowly and avoid broader thesis if not asked.
 ```
 
-### 2.10 Path I: valuation/price target/investment opinion question
+### 2.10 Path I: valuation/price target/investment decision question
 
-Use for target price, fair value, investment recommendation, buy/sell/hold, 12-month target, or final valuation conclusion.
+Use for target price, fair value, investment recommendation, buy/sell/hold, 12-month target, final valuation conclusion, or vague decision questions such as "지금 사?", "사 말아?", "보유해?", "팔까?", "지금 들어가도 돼?", or "장기적으로 괜찮아?".
+
+This path does not change normal metric, business model, risk/thesis, direct exposure, comparison, or factual lookup questions. Use this investment decision frame only when the user is asking for buy/sell/hold/timing judgment or a valuation/recommendation-like conclusion.
 
 Flow:
 
 ```text
-1. Treat final valuation or investment recommendation as out of scope for filing-only ontology.
-2. Do not force a target price or rating.
-3. Provide filing-supported assumptions only: revenue drivers, margin risks, cash flow, capex, debt, segment trends, and risk factors.
-4. If the user supplies an external model/price/assumption, analyze filing support for that assumption.
+1. Treat final target price, rating, personalized advice, or definitive buy/sell recommendation as out of scope for filing-only ontology.
+2. Do not stop at a refusal. Convert the user request into a filing-supported investment decision frame.
+3. For vague buy/sell/hold questions, use `references/investment-decision-questions.md`.
+4. Answer with a clear but non-prescriptive judgment: buy candidate, watch/confirm first, holdable, risk rising, or avoid-if conditions.
+5. Separate new buyer, existing holder, long-term investor, short-term trader, and cash-flow/valuation-sensitive investor when useful.
+6. Provide filing-supported assumptions only: revenue drivers, margin risks, cash flow, capex, debt, segment trends, capital allocation, and risk factors.
+7. If the user supplies an external model/price/assumption, analyze filing support for that assumption.
+8. For these triggered buy/sell/hold-style questions only, render the final Korean answer as a compact investment-decision report. Do not apply this custom report shape to ordinary research questions.
 ```
 
 ## 3. Tool policy
@@ -540,7 +546,7 @@ no direct evidence
 
 Do not promote broad commodity, margin, cost, supply-chain, geopolitical, or revenue matches into direct exposure unless the requested narrow factor is explicitly connected.
 
-For target price, fair value, investment recommendation, or 12-month target questions, stop with filing-supported assumptions only. Do not force a valuation conclusion from filing ontology data.
+For target price, fair value, definitive investment recommendation, or 12-month target questions, stop short of a price/rating conclusion but still provide a useful filing-supported decision frame. Do not force a valuation conclusion from filing ontology data.
 
 ## 9. Trace and chain policy
 
@@ -1035,6 +1041,7 @@ references/query-context-contract.md
 references/bounded-autonomy-and-stop-rules.md
 references/period-and-latest-policy.md
 references/financial-statement-interpretation.md
+references/investment-decision-questions.md
 references/trace-chain-policy.md
 references/forbidden-user-facing-language.md
 references/structured-handoff-contract.md

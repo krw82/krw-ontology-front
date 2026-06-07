@@ -116,9 +116,10 @@ describe("chat history state", () => {
 
     const state = deriveLoadedChatState(messages, runs);
 
-    expect(state.status).toBe("running");
+    expect(state.status).toBe("queued");
     expect(state.activeRunId).toBe("run-1");
     expect(state.activeAssistantMessageId).toBe("assistant-1");
+    expect(state.activeRunStartedAt).toBeNull();
     expect(state.streamingContent).toBe("");
     expect(state.messages.map((message) => message.id)).toEqual(["user-1"]);
   });

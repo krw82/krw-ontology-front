@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import ChatArtifacts from "@/components/ChatArtifacts";
 import EvidenceGraphPreview from "@/components/EvidenceGraphPreview";
+import QueueRemotionAnimation from "@/components/QueueRemotionAnimation";
 import ResearchMarkdown from "@/components/ResearchMarkdown";
 import ResearchProgress from "@/components/ResearchProgress";
 import type { ToolCallState } from "@/hooks/useChat";
@@ -83,6 +84,7 @@ function useStreamingMotionOffset() {
 
 function LoadingDots({ label = "분석 준비 중" }: { label?: string }) {
   const verticalOffset = useStreamingMotionOffset();
+  const isQueued = label.includes("대기");
 
   return (
     <motion.div
@@ -91,17 +93,21 @@ function LoadingDots({ label = "분석 준비 중" }: { label?: string }) {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.16, ease: statusTransition.ease }}
     >
-      <div className="flex gap-1">
-        {[0, 1, 2].map((index) => (
-          <motion.span
-            key={index}
-            className="h-2 w-2 rounded-full bg-muted"
-            initial={{ opacity: 0.2 }}
-            animate={{ opacity: [0.2, 1, 0.2] }}
-            transition={{ ...dotTransition, delay: index * 0.14 }}
-          />
-        ))}
-      </div>
+      {isQueued ? (
+        <QueueRemotionAnimation className="-my-2 -ml-2" size="regular" />
+      ) : (
+        <div className="flex gap-1">
+          {[0, 1, 2].map((index) => (
+            <motion.span
+              key={index}
+              className="h-2 w-2 rounded-full bg-muted"
+              initial={{ opacity: 0.2 }}
+              animate={{ opacity: [0.2, 1, 0.2] }}
+              transition={{ ...dotTransition, delay: index * 0.14 }}
+            />
+          ))}
+        </div>
+      )}
       <AnimatePresence mode="wait">
         <motion.span
           key={label}
@@ -322,7 +328,7 @@ function MessageActions({
 function activityLabel(activity?: ResearchActivityUpdate | null): string {
   switch (activity?.stage) {
     case "queued":
-      return "분석 대기 중";
+      return "대기열에 추가됨";
     case "connecting":
       return "자료 연결 중";
     case "checking_evidence":

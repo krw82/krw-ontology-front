@@ -259,6 +259,15 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isActiveRunStatus(status: ChatState["status"]): boolean {
+  return status === "pending" || status === "queued" || status === "running";
+}
+
+function activeStatusFromRunStatus(status: RunStatus | "idle"): ChatState["status"] {
+  if (status === "pending") return "queued";
+  return status;
+}
+
 export function useChat({
   sessionId,
   scopeType = "global",
@@ -336,6 +345,43 @@ export function useChat({
 
   const handleSSEEvent = useCallback((eventType: StreamingEventType, data: unknown) => {
     switch (eventType) {
+      case "run_queued": {
+        const d = data as {
+          run_id: string;
+          message_id: string;
+          session_id?: string;
+          request_id?: string;
+          queued_at?: string;
+          queue?: ResearchActivityUpdate["queue"];
+        };
+        if (
+          !sessionId &&
+          d.session_id &&
+          activeSessionIdRef.current !== d.session_id
+        ) {
+          activeSessionIdRef.current = d.session_id;
+          onSessionCreated?.(d.session_id);
+        }
+        activeRunIdRef.current = d.run_id;
+        activeAssistantMessageIdRef.current = d.message_id;
+        setState((prev) => ({
+          ...prev,
+          messages: prev.messages.map((message) => ({
+            ...message,
+            session_id: d.session_id ?? message.session_id,
+          })),
+          runId: d.run_id,
+          runStartedAt: null,
+          activity: {
+            stage: "queued",
+            label: "대기열에 추가됨",
+            queue: d.queue ?? null,
+          },
+          status: "queued",
+          isHydratingSession: false,
+        }));
+        break;
+      }
       case "run_started": {
         const d = data as {
           run_id: string;
@@ -375,6 +421,16 @@ export function useChat({
         const d = data as ResearchActivityUpdate;
         setState((prev) => ({
           ...prev,
+          status:
+            d.stage === "queued"
+              ? "queued"
+              : prev.status === "queued"
+                ? "running"
+                : prev.status,
+          runStartedAt:
+            d.stage !== "queued" && prev.status === "queued"
+              ? prev.runStartedAt ?? new Date().toISOString()
+              : prev.runStartedAt,
           activity: d,
         }));
         break;
@@ -522,6 +578,7 @@ export function useChat({
           run_id?: string | null;
           status: RunStatus | "idle";
           reason?: string;
+          queue?: ResearchActivityUpdate["queue"];
         };
         if (
           d.session_id &&
@@ -534,10 +591,8 @@ export function useChat({
         sessionSyncRequestedRef.current = true;
         if (d.run_id) activeRunIdRef.current = d.run_id;
 
-        const isActiveStatus =
-          d.status === "queued" ||
-          d.status === "running" ||
-          d.status === "pending";
+        const nextStatus = activeStatusFromRunStatus(d.status);
+        const isActiveStatus = isActiveRunStatus(nextStatus);
 
         if (!isActiveStatus) {
           finalizedRef.current = true;
@@ -549,27 +604,23 @@ export function useChat({
 
         setState((prev) => ({
           ...prev,
-          status:
-            d.status === "pending" || d.status === "queued"
-              ? "running"
-              : d.status === "idle"
-                ? "idle"
-                : d.status,
+          status: nextStatus,
           isHydratingSession: false,
           activity:
             isActiveStatus
               ? {
-                  stage: d.status === "queued" ? "queued" : "preparing",
+                  stage: nextStatus === "queued" ? "queued" : "preparing",
                   label:
-                    d.status === "queued"
-                      ? "분석 대기 중"
+                    nextStatus === "queued"
+                      ? "대기열에 추가됨"
                       : "분석 상태 복원 중",
+                  queue: d.queue ?? null,
                 }
               : null,
           streamingContent: isActiveStatus ? prev.streamingContent : "",
           runId: d.run_id ?? null,
           runStartedAt:
-            isActiveStatus
+            nextStatus === "running"
               ? prev.runStartedAt
               : null,
           error: d.status === "failed" ? prev.error : null,
@@ -636,11 +687,11 @@ export function useChat({
       if (activeSessionIdRef.current !== targetSessionId) return false;
 
       const loaded = deriveLoadedChatState(data.messages || [], data.runs || []);
-      finalizedRef.current = loaded.status !== "running";
+      const loadedIsActive = isActiveRunStatus(loaded.status);
+      finalizedRef.current = !loadedIsActive;
       activeRunIdRef.current = loaded.activeRunId;
       activeAssistantMessageIdRef.current = loaded.activeAssistantMessageId;
-      streamingContentRef.current =
-        loaded.status === "running" ? "" : loaded.streamingContent;
+      streamingContentRef.current = loadedIsActive ? "" : loaded.streamingContent;
       sessionSyncRequestedRef.current = false;
       const evidenceMessageId =
         loaded.status === "completed"
@@ -655,14 +706,22 @@ export function useChat({
         isHydratingSession: false,
         error: null,
         activity:
-          loaded.status === "running"
+          loaded.status === "queued"
+            ? {
+                stage: "queued",
+                label: "대기열에 추가됨",
+                queue:
+                  prev.activity?.stage === "queued"
+                    ? prev.activity.queue ?? null
+                    : null,
+              }
+            : loaded.status === "running"
             ? {
                 stage: "preparing",
                 label: "분석 상태 복원 중",
               }
             : null,
-        streamingContent:
-          loaded.status === "running" ? "" : loaded.streamingContent,
+        streamingContent: loadedIsActive ? "" : loaded.streamingContent,
         runId: loaded.activeRunId,
         runStartedAt: loaded.activeRunStartedAt,
         toolCalls: [],
@@ -1043,7 +1102,7 @@ export function useChat({
     ): Promise<SendMessageResult> => {
       if (
         !content.trim() ||
-        statusRef.current === "running" ||
+        isActiveRunStatus(statusRef.current) ||
         sendInFlightRef.current
       ) {
         return {
@@ -1214,7 +1273,7 @@ export function useChat({
     async (
       options: SendNewsEventSelectionOptions,
     ): Promise<SendMessageResult> => {
-      if (statusRef.current === "running" || sendInFlightRef.current) {
+      if (isActiveRunStatus(statusRef.current) || sendInFlightRef.current) {
         return {
           ok: false,
           message: "현재 답변 생성 중입니다.",

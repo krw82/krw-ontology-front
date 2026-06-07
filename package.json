@@ -97,6 +97,7 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.2.141",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@remotion/player": "^4.0.473",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
     "clsx": "^2.1.1",
@@ -107,6 +108,7 @@
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "remotion": "^4.0.473",
     "tailwind-merge": "^3.6.0",
     "ws": "^8.21.0"
   },

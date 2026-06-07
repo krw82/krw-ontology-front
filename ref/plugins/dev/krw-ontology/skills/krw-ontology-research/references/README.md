@@ -35,6 +35,9 @@ period-and-latest-policy.md
 financial-statement-interpretation.md
 - cash-flow, FCF, R&D, M&A, buyback, SBC, and capital-allocation interpretation guardrails
 
+investment-decision-questions.md
+- vague buy/sell/hold questions and filing-supported decision frames
+
 trace-chain-policy.md
 - trace vs chain use cases and boundaries
 

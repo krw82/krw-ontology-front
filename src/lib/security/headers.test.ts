@@ -22,6 +22,7 @@ describe("security headers", () => {
     expect(contentSecurityPolicy).toContain("frame-ancestors 'none'");
     expect(contentSecurityPolicy).toContain("object-src 'none'");
     expect(contentSecurityPolicy).toContain("https://*.supabase.co");
+    expect(contentSecurityPolicy).toContain("media-src 'self' data: blob:");
     expect(contentSecurityPolicy).toContain("upgrade-insecure-requests");
     expect(contentSecurityPolicy).not.toContain("http://localhost:*");
     expect(cspDirective(contentSecurityPolicy, "script-src")).not.toContain(

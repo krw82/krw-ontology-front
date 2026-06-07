@@ -967,6 +967,19 @@ export interface Database {
         };
         Returns: Array<{ id: string }>;
       };
+      get_agent_run_queue_state: {
+        Args: {
+          p_run_id: string;
+          p_global_limit: number;
+        };
+        Returns: Array<{
+          status: AgentRunRow["status"];
+          queued_ahead: number;
+          running_count: number;
+          concurrency_limit: number;
+          queued_at: string | null;
+        }>;
+      };
       heartbeat_agent_run: {
         Args: {
           p_run_id: string;

@@ -217,6 +217,10 @@ await expectAnonRpcBlocked("claim_agent_run", {
   p_lease_seconds: 300,
   p_global_limit: 1,
 });
+await expectAnonRpcBlocked("get_agent_run_queue_state", {
+  p_run_id: zeroUuid,
+  p_global_limit: 1,
+});
 await expectAnonRpcBlocked("heartbeat_agent_run", {
   p_run_id: zeroUuid,
   p_worker_id: "schema-smoke",

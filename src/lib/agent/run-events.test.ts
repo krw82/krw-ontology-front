@@ -36,6 +36,13 @@ function createEventAdmin(params: {
   runs?: FakeRun[];
   sessions?: FakeSession[];
   events?: AgentRunEventRow[];
+  queueState?: {
+    status: FakeRun["status"];
+    queued_ahead: number;
+    running_count: number;
+    concurrency_limit: number;
+    queued_at: string | null;
+  };
 } = {}) {
   const events: AgentRunEventRow[] = [...(params.events ?? [])];
   const inserts: Array<{
@@ -43,7 +50,15 @@ function createEventAdmin(params: {
     payload: Record<string, unknown>;
   }> = [];
   const selects: string[] = [];
-  const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+  const rpc = vi.fn((fn: string) => {
+    if (fn === "get_agent_run_queue_state") {
+      return Promise.resolve({
+        data: params.queueState ? [params.queueState] : [],
+        error: null,
+      });
+    }
+    return Promise.resolve({ data: null, error: null });
+  });
 
   const admin = {
     rpc,
@@ -502,6 +517,46 @@ describe("agent run events", () => {
     );
     expect(fake.selects.filter((table) => table === "agent_run_events")).toHaveLength(2);
     expect(fake.selects.filter((table) => table === "agent_runs")).toHaveLength(1);
+  });
+
+  it("sends queued position updates on reconcile timeouts", async () => {
+    const fake = createEventAdmin({
+      runs: [
+        {
+          id: "run-1",
+          session_id: "session-1",
+          request_id: "req-1",
+          status: "queued",
+          error_code: null,
+        },
+      ],
+      sessions: [{ id: "session-1", user_id: "user-1", deleted_at: null }],
+      queueState: {
+        status: "queued",
+        queued_ahead: 2,
+        running_count: 8,
+        concurrency_limit: 8,
+        queued_at: "2026-06-07T00:00:00.000Z",
+      },
+    });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+
+    const response = streamAgentRunEventsResponse({
+      userId: "user-1",
+      sessionId: "session-1",
+      runId: "run-1",
+      eventWaiter: immediateTimeoutWaiter(),
+      reconcileIntervalMs: 15,
+      streamMaxMs: 15,
+    });
+
+    const text = await readStream(response);
+    expect(text).toContain('event: activity_update\ndata: {"stage":"queued","label":"대기열에 추가됨","queue":{"queued_ahead":2,"running_count":8,"concurrency_limit":8,"queued_at":"2026-06-07T00:00:00.000Z"}}');
+    expect(text).toContain('event: state_sync\ndata: {"session_id":"session-1","run_id":"run-1","status":"queued","reason":"poll_timeout","queue":{"queued_ahead":2,"running_count":8,"concurrency_limit":8,"queued_at":"2026-06-07T00:00:00.000Z"}}');
+    expect(fake.rpc).toHaveBeenCalledWith("get_agent_run_queue_state", {
+      p_run_id: "run-1",
+      p_global_limit: expect.any(Number),
+    });
   });
 
   it("syncs completed runs without terminal events once and closes", async () => {

@@ -129,6 +129,7 @@ function composeMessage(
 export default function Composer({
   onSend,
   onCancel,
+  activity,
   disabled = false,
   isGenerating = false,
   placeholder = "기업에 대해 질문하세요...",
@@ -166,6 +167,8 @@ export default function Composer({
   const isInputBusy = disabled || isSubmitting || !isClientReady;
   const canSubmit =
     composedLength > 0 && !isOverLimit && !isInputBusy && !isGenerating;
+  const generatingLabel =
+    activity?.stage === "queued" ? "대기 중" : "분석 진행중";
   const showGeneratingOverlay = isGenerating && !isComposerFocused && !value.trim();
 
   const syncTextareaValue = useCallback((nextValue: string) => {
@@ -760,7 +763,9 @@ export default function Composer({
                   ease: motionConfig.ease,
                 }}
               >
-                <span className="min-w-0 truncate text-muted">분석 진행중</span>
+                <span className="min-w-0 truncate text-muted">
+                  {generatingLabel}
+                </span>
               </motion.div>
             )}
           </AnimatePresence>

@@ -210,6 +210,13 @@ export async function runAgentJob(runId: string, workerId: string) {
       .update({ status: "streaming" })
       .eq("id", job.assistantMessageId);
 
+    await sendEvent("run_started", {
+      run_id: runId,
+      message_id: job.assistantMessageId,
+      session_id: job.session.id,
+      request_id: job.run.request_id,
+      started_at: runStartedAt,
+    });
     await sendEvent("activity_update", {
       stage: "preparing",
       label: "분석 준비 중",
@@ -460,7 +467,7 @@ async function loadAgentJob(
     sessionResult,
     userMessageResult,
     previousMessagesResult,
-    runStartedEventResult,
+    runQueuedEventResult,
   ] =
     await Promise.all([
       admin
@@ -488,7 +495,7 @@ async function loadAgentJob(
         .from("agent_run_events")
         .select("payload")
         .eq("run_id", runId)
-        .eq("event_type", "run_started")
+        .eq("event_type", "run_queued")
         .order("id", { ascending: true })
         .limit(1)
         .maybeSingle<{ payload: Json }>(),
@@ -524,10 +531,10 @@ async function loadAgentJob(
     );
   }
 
-  if (runStartedEventResult.error) {
+  if (runQueuedEventResult.error) {
     throw new AgentJobLoadError(
-      `Agent run started event load failed: ${formatSupabaseError(
-        runStartedEventResult.error,
+      `Agent run queued event load failed: ${formatSupabaseError(
+        runQueuedEventResult.error,
       )}`,
       loadContext,
     );
@@ -536,11 +543,11 @@ async function loadAgentJob(
   const session = sessionResult.data;
   const userMessage = userMessageResult.data;
   const previousMessages = previousMessagesResult.data;
-  const runStartedEvent = runStartedEventResult.data;
+  const runQueuedEvent = runQueuedEventResult.data;
 
   if (!session || !userMessage) return null;
-  const startedPayload = isRecord(runStartedEvent?.payload)
-    ? runStartedEvent.payload
+  const queuedPayload = isRecord(runQueuedEvent?.payload)
+    ? runQueuedEvent.payload
     : {};
 
   return {
@@ -549,17 +556,17 @@ async function loadAgentJob(
     userMessage,
     assistantMessageId: run.assistant_message_id,
     history: [...(previousMessages ?? [])].reverse(),
-    researchMode: normalizeResearchMode(startedPayload.research_mode),
-    analysisMode: normalizeAnalysisMode(startedPayload.analysis_mode),
+    researchMode: normalizeResearchMode(queuedPayload.research_mode),
+    analysisMode: normalizeAnalysisMode(queuedPayload.analysis_mode),
     runKind: normalizeRunKind(
-      startedPayload.run_kind ??
+      queuedPayload.run_kind ??
         run.run_kind ??
         defaultRunKindForAnalysisMode(
-          normalizeAnalysisMode(startedPayload.analysis_mode),
+          normalizeAnalysisMode(queuedPayload.analysis_mode),
         ),
     ),
     executorType: normalizeExecutorType(
-      startedPayload.executor_type ?? run.executor_type,
+      queuedPayload.executor_type ?? run.executor_type,
     ),
     selectedNewsEventContext: isRecord(run.selected_news_event_context)
       ? run.selected_news_event_context

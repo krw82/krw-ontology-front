@@ -52,6 +52,7 @@ export type AgentRunExecutorType = "claude_agent" | "server_pipeline";
 
 /** SSE streaming event types */
 export type StreamingEventType =
+  | "run_queued"
   | "run_started"
   | "token"
   | "tool_call_start"
@@ -333,6 +334,14 @@ export type ResearchActivityStage =
 export interface ResearchActivityUpdate {
   stage: ResearchActivityStage;
   label: string;
+  queue?: QueueStatus | null;
+}
+
+export interface QueueStatus {
+  queued_ahead: number;
+  running_count: number;
+  concurrency_limit: number;
+  queued_at: string | null;
 }
 
 // ============================================================
@@ -877,6 +886,23 @@ export interface StreamingTokenEvent extends StreamingEventBase {
 }
 
 /** Run accepted and assistant message placeholder created */
+export interface StreamingRunQueuedEvent extends StreamingEventBase {
+  event: "run_queued";
+  data: {
+    run_id: string;
+    message_id: string;
+    session_id: string;
+    request_id?: string;
+    queued_at?: string;
+    research_mode?: string;
+    analysis_mode?: AnalysisMode;
+    run_kind?: RunKind;
+    executor_type?: AgentRunExecutorType;
+    queue?: QueueStatus | null;
+  };
+}
+
+/** Worker claimed the run and started execution */
 export interface StreamingRunStartedEvent extends StreamingEventBase {
   event: "run_started";
   data: {
@@ -921,12 +947,13 @@ export interface StreamingArtifactEvent extends StreamingEventBase {
 export interface StreamingStateSyncEvent extends StreamingEventBase {
   event: "state_sync";
   data: {
-    session_id: string;
-    run_id?: string | null;
-    status: RunStatus | "idle";
-    reason?: "stale_run" | "poll_timeout" | "session_synced";
-  };
-}
+	    session_id: string;
+	    run_id?: string | null;
+	    status: RunStatus | "idle";
+	    reason?: "stale_run" | "poll_timeout" | "session_synced";
+	    queue?: QueueStatus | null;
+	  };
+	}
 
 /** Run completed successfully */
 export interface StreamingDoneEvent extends StreamingEventBase {
@@ -970,6 +997,7 @@ export interface StreamingCancelledEvent extends StreamingEventBase {
 
 /** Union of all streaming events */
 export type StreamingEvent =
+  | StreamingRunQueuedEvent
   | StreamingRunStartedEvent
   | StreamingTokenEvent
   | StreamingToolCallStartEvent

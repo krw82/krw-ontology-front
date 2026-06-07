@@ -66,6 +66,7 @@ export function deriveLoadedChatState(
     messages,
     latestRun.assistant_message_id,
   );
+  const activeStatus = latestRun.status === "pending" ? "queued" : latestRun.status;
 
   return {
     messages: streamingAssistant
@@ -74,8 +75,8 @@ export function deriveLoadedChatState(
     streamingContent: "",
     activeRunId: latestRun.id,
     activeAssistantMessageId: streamingAssistant?.id ?? latestRun.assistant_message_id,
-    activeRunStartedAt: latestRun.started_at,
-    status: "running",
+    activeRunStartedAt: activeStatus === "running" ? latestRun.started_at : null,
+    status: activeStatus,
   };
 }
 

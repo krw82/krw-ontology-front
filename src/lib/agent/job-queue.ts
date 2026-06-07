@@ -1,6 +1,11 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getOntologyEnv, readIntEnv } from "@/lib/env";
 import { appendAgentRunEvent } from "@/lib/agent/run-events";
+import {
+  fallbackQueueState,
+  loadAgentRunQueueState,
+  toQueueStatus,
+} from "@/lib/agent/queue-state";
 import type { McpHealthResult } from "@/lib/agent/mcp-client";
 import type { ResolvedSession } from "@/lib/api/chat/resolve-session";
 import type { HistoryResult } from "@/lib/api/chat/fetch-history";
@@ -146,20 +151,27 @@ export async function enqueueAgentRun(params: {
     return { ok: false, reason: "internal_error" };
   }
 
-  await appendAgentRunEvent(admin, run.id, "run_started", {
+  const queueState =
+    (await loadAgentRunQueueState(admin, run.id)) ??
+    fallbackQueueState({ status: "queued", queued_at: queuedAt });
+  const queue = toQueueStatus(queueState);
+
+  await appendAgentRunEvent(admin, run.id, "run_queued", {
     run_id: run.id,
     message_id: assistantMessage.id,
     session_id: session.id,
     request_id: requestId,
-    started_at: queuedAt,
+    queued_at: queuedAt,
     research_mode: researchMode,
     analysis_mode: analysisMode,
     run_kind: runKind,
     executor_type: executorType,
+    queue,
   });
   await appendAgentRunEvent(admin, run.id, "activity_update", {
     stage: "queued",
-    label: "분석 대기 중",
+    label: "대기열에 추가됨",
+    queue,
   });
 
   return {
