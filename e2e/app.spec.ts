@@ -237,6 +237,207 @@ test.describe("dev auth bypass", () => {
     expect(new Set(runRequestIds).size).toBe(1);
   });
 
+  test("saves a completed ticker answer into personal research assets", async ({
+    page,
+  }) => {
+    const sessionId = "11111111-1111-4111-8111-111111111112";
+    const runId = "22222222-2222-4222-8222-222222222223";
+    const assistantMessageId = "44444444-4444-4444-8444-444444444445";
+    const createdAt = new Date().toISOString();
+    const answer = "AMZN의 공시 기준 종목 카드와 thesis 초안입니다.";
+    let noteBody: Record<string, unknown> | null = null;
+    let cardBody: Record<string, unknown> | null = null;
+    let thesisBody: Record<string, unknown> | null = null;
+
+    await page.route("**/api/companies?**", async (route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get("ticker") !== "AMZN") {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          companies: [
+            {
+              ticker: "AMZN",
+              name: "Amazon.com, Inc.",
+              sector: "기술",
+            },
+          ],
+          count: 1,
+        }),
+      });
+    });
+
+    await page.route("**/api/sessions", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          session: {
+            id: sessionId,
+            title: "AMZN 리서치",
+            scope_type: "company",
+            default_tickers: ["AMZN"],
+            default_document_types: [],
+            created_at: createdAt,
+            updated_at: createdAt,
+          },
+        }),
+      });
+    });
+
+    await page.route(`**/api/chat/${sessionId}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          session: {
+            id: sessionId,
+            title: "AMZN 리서치",
+            scope_type: "company",
+            default_tickers: ["AMZN"],
+            default_document_types: [],
+            created_at: createdAt,
+            updated_at: createdAt,
+          },
+          messages: [],
+          runs: [],
+          tool_calls: [],
+          citations: [],
+          rich_answers: [],
+          research_artifacts: [],
+        }),
+      });
+    });
+
+    await page.route("**/api/chat/run", async (route) => {
+      const event = (type: string, data: unknown) =>
+        `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
+      await route.fulfill({
+        status: 200,
+        headers: {
+          "content-type": "text/event-stream",
+          "x-chat-session-id": sessionId,
+        },
+        body: [
+          event("run_started", {
+            run_id: runId,
+            message_id: assistantMessageId,
+            session_id: sessionId,
+            started_at: createdAt,
+          }),
+          event("done", {
+            run_id: runId,
+            message_id: assistantMessageId,
+            content: answer,
+            release: {
+              ontology_release_id: "test",
+              index_generated_at: createdAt,
+              company_count: 1,
+              document_count: 1,
+              krw_ontology_commit: "test",
+              web_commit: "test",
+            },
+            usage: {
+              input_tokens: 1,
+              output_tokens: 1,
+              estimated_cost_usd: 0,
+              latency_ms: 10,
+            },
+            execution_budget: {
+              budget_used_usd: 0,
+              budget_reserved_usd: 0,
+              budget_limit_usd: 1,
+              remaining_budget_usd: 1,
+              daily_budget_used_usd: 0,
+              daily_budget_reserved_usd: 0,
+              daily_budget_limit_usd: 1,
+              per_run_reserve_usd: 0,
+              analysis_credits_used: 0,
+              analysis_credits_reserved: 0,
+              analysis_credits_limit: 10,
+              remaining_analysis_credits: 10,
+              daily_analysis_credits_used: 0,
+              daily_analysis_credits_reserved: 0,
+              daily_analysis_credits_limit: 10,
+              per_run_analysis_credits: 1,
+              run_count: 0,
+              percent_used: 0,
+              can_run: true,
+            },
+          }),
+        ].join(""),
+      });
+    });
+
+    await page.route("**/api/watchlist/AMZN/notes", async (route) => {
+      noteBody = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({ note: { id: "note-1", ticker: "AMZN" } }),
+      });
+    });
+    await page.route("**/api/watchlist/AMZN/card", async (route) => {
+      cardBody = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ card: { id: "card-1", ticker: "AMZN" } }),
+      });
+    });
+    await page.route("**/api/watchlist/AMZN/theses", async (route) => {
+      thesisBody = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({ thesis: { id: "thesis-1", ticker: "AMZN" } }),
+      });
+    });
+
+    await page.goto("/chat/new?ticker=AMZN");
+    await page.getByLabel("메시지 입력").fill("AMZN 종목 카드 만들어줘");
+    await page.getByRole("button", { name: "메시지 보내기" }).click();
+    await expect(page.getByText(answer)).toBeVisible();
+
+    await page.getByRole("button", { name: "리서치 노트로 저장" }).click();
+    await page.getByRole("button", { name: "종목 카드로 저장" }).click();
+    await page.getByRole("button", { name: "Thesis로 저장" }).click();
+
+    await expect.poll(() => noteBody).not.toBeNull();
+    await expect.poll(() => cardBody).not.toBeNull();
+    await expect.poll(() => thesisBody).not.toBeNull();
+    expect(noteBody).toMatchObject({
+      title: "AMZN 채팅 요약",
+      body: answer,
+      note_type: "chat_summary",
+      tags: ["chat"],
+      source_chat_session_id: sessionId,
+      source_message_id: assistantMessageId,
+    });
+    expect(cardBody).toMatchObject({
+      title: "AMZN 종목 카드",
+      content_md: answer,
+      source_chat_session_id: sessionId,
+      source_message_id: assistantMessageId,
+    });
+    expect(thesisBody).toMatchObject({
+      title: "AMZN 채팅 기반 Thesis",
+      thesis_text: answer,
+      status: "needs_review",
+      tags: ["chat"],
+      source_chat_session_id: sessionId,
+      source_message_id: assistantMessageId,
+    });
+  });
+
   test("mobile chat history opens a session without flashing the previous page or empty state", async ({
     page,
   }, testInfo) => {

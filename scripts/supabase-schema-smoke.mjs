@@ -113,6 +113,41 @@ const checks = [
     select:
       "id,artifact_id,session_id,event_id,user_id,user_message_id,research_run_id,status,updated_at",
   },
+  {
+    table: "user_company_marks",
+    select:
+      "user_id,ticker,is_watchlisted,is_holding,priority,interest_reason,tags,last_activity_at,created_at,updated_at",
+  },
+  {
+    table: "user_company_questions",
+    select:
+      "id,user_id,ticker,question,status,source,source_chat_session_id,source_message_id,answered_at,created_at,updated_at",
+  },
+  {
+    table: "user_company_cards",
+    select:
+      "id,user_id,ticker,title,summary,content_md,basis_release_id,basis_period,basis_document_type,source_chat_session_id,source_message_id,created_at,updated_at",
+  },
+  {
+    table: "user_company_theses",
+    select:
+      "id,user_id,ticker,title,thesis_text,status,tags,archived_at,source_chat_session_id,source_message_id,created_at,updated_at",
+  },
+  {
+    table: "user_thesis_checks",
+    select:
+      "id,thesis_id,user_id,ticker,result_status,summary,strengthening_points,weakening_points,neutral_points,next_questions,basis_release_id,basis_period,source_chat_session_id,source_message_id,created_at",
+  },
+  {
+    table: "user_research_notes",
+    select:
+      "id,user_id,ticker,title,body,note_type,tags,source_chat_session_id,source_message_id,created_at,updated_at",
+  },
+  {
+    table: "user_research_note_sources",
+    select:
+      "id,note_id,user_id,ticker,citation_id,run_id,message_id,ontology_object_id,document_type,filing_period,created_at",
+  },
 ];
 
 for (const check of checks) {

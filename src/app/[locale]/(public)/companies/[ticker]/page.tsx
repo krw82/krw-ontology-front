@@ -123,6 +123,7 @@ export default async function CompanyLandingPage({
           breadcrumbCompanies: "회사 목록",
           heroHeading: `${companyTitleName} 공시 기반 리서치`,
           startCta: `${displayCompany.ticker} 무료 분석 시작`,
+          watchlistCta: "내 종목장에 저장",
           scopeEyebrow: "분석 범위",
           scopeHeading: `${companyTitleName} 리서치 초점`,
           businessActivity: "사업 활동",
@@ -135,6 +136,7 @@ export default async function CompanyLandingPage({
           breadcrumbCompanies: "Companies",
           heroHeading: `${displayCompany.name} filing-grounded research`,
           startCta: `Start ${displayCompany.ticker} analysis`,
+          watchlistCta: "Save to my research",
           scopeEyebrow: "Analysis scope",
           scopeHeading: `${displayCompany.name} research focus`,
           businessActivity: "Business activity",
@@ -159,6 +161,10 @@ export default async function CompanyLandingPage({
       tickerSymbol: displayCompany.ticker,
     },
   };
+  const watchlistPath = `/watchlist/${displayCompany.ticker}`;
+  const watchlistHref = user
+    ? watchlistPath
+    : `/login?next=${encodeURIComponent(watchlistPath)}`;
 
   return (
     <div className="min-h-[100dvh] bg-canvas text-ink">
@@ -213,6 +219,18 @@ export default async function CompanyLandingPage({
               >
                 {pageCopy.startCta}
               </MarketingCtaLink>
+              <Link
+                href={watchlistHref}
+                className="inline-flex min-h-12 items-center justify-center gap-1 rounded-[8px] border border-hairline bg-canvas px-5 py-3 text-[15px] font-extrabold leading-5 text-ink transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+              >
+                <span
+                  aria-hidden="true"
+                  className="material-symbols-outlined text-[18px]"
+                >
+                  bookmark
+                </span>
+                {pageCopy.watchlistCta}
+              </Link>
             </div>
             <SuggestedPromptActions
               prompts={prompts}

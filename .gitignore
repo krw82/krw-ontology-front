@@ -41,6 +41,7 @@ yarn-error.log*
 /_temp/
 home-*.png
 home-trace-console-demo*.png
+/ref/plugins/dev/krw-ontology/stock-news/coverage_companies.json
 
 # env files (can opt-in for committing if needed)
 .env*

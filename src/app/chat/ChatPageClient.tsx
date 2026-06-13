@@ -221,11 +221,14 @@ function ChatContent() {
     (createdSessionId: string) => {
       if (!isDraftRoute && existingSessionId) return;
       router.replace(
-        buildChatSessionHref(createdSessionId, { locale: responseLocale }),
+        buildChatSessionHref(createdSessionId, {
+          locale: responseLocale,
+          ticker: activeTicker,
+        }),
         { scroll: false },
       );
     },
-    [existingSessionId, isDraftRoute, responseLocale, router],
+    [activeTicker, existingSessionId, isDraftRoute, responseLocale, router],
   );
 
   const chat = useChat({
@@ -314,13 +317,16 @@ function ChatContent() {
         window.history.replaceState(
           window.history.state,
           "",
-          buildChatSessionHref(sessionId, { locale: responseLocale }),
+          buildChatSessionHref(sessionId, {
+            locale: responseLocale,
+            ticker: activeTicker,
+          }),
         );
       });
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [draftMessageId, responseLocale, sendMessage, sessionId]);
+  }, [activeTicker, draftMessageId, responseLocale, sendMessage, sessionId]);
 
   useEffect(() => {
     if (!sessionId || hasLoadedRef.current) return;
@@ -410,6 +416,8 @@ function ChatContent() {
   // ---------------------------------------------------------------------------
 
   const contextTickers = getSessionTickers(chat.session, activeTicker);
+  const researchNoteTicker =
+    contextTickers.length === 1 ? contextTickers[0] : undefined;
   const contextTickersKey = contextTickers.join(",");
   const contextCompanies = contextTickers.map((contextTicker) => {
     const normalizedTicker = contextTicker.trim().toUpperCase();
@@ -724,6 +732,9 @@ function ChatContent() {
           sessionId: createdSessionId,
           draftMessageId: nextDraftMessageId,
         });
+        if (activeTicker) {
+          nextParams.set("ticker", activeTicker);
+        }
         if (responseLocale !== DEFAULT_LOCALE) {
           nextParams.set("locale", responseLocale);
         }
@@ -749,6 +760,7 @@ function ChatContent() {
       }
     },
     [
+      activeTicker,
       clearComposerPrefillParams,
       createSessionForDraft,
       router,
@@ -916,6 +928,12 @@ function ChatContent() {
                       messageId={msg.role === "assistant" ? msg.id : undefined}
                       createdAt={
                         msg.role === "assistant" ? msg.created_at : undefined
+                      }
+                      researchNoteTicker={
+                        msg.role === "assistant" ? researchNoteTicker : undefined
+                      }
+                      researchNoteSessionId={
+                        msg.role === "assistant" ? sessionId : undefined
                       }
                       citations={
                         isLatestAssistantMessage ? chat.citations : undefined

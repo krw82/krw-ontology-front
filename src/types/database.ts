@@ -246,6 +246,127 @@ export interface OntologyCompanyRow extends Record<string, unknown> {
   updated_at: string;
 }
 
+export interface UserCompanyMarkRow extends Record<string, unknown> {
+  user_id: string;
+  ticker: string;
+  is_watchlisted: boolean;
+  is_holding: boolean;
+  priority: number;
+  interest_reason: string | null;
+  tags: string[];
+  last_activity_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserCompanyQuestionRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  ticker: string;
+  question: string;
+  status: "open" | "answered" | "dismissed";
+  source:
+    | "manual"
+    | "generated_from_tearsheet"
+    | "generated_from_thesis_check"
+    | "saved_from_chat";
+  source_chat_session_id: string | null;
+  source_message_id: string | null;
+  answered_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserCompanyCardRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  ticker: string;
+  title: string;
+  summary: string | null;
+  content_md: string;
+  basis_release_id: string | null;
+  basis_period: string | null;
+  basis_document_type: string | null;
+  source_chat_session_id: string | null;
+  source_message_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserCompanyThesisRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  ticker: string;
+  title: string;
+  thesis_text: string;
+  status: "active" | "needs_review" | "weakened" | "mixed" | "archived";
+  tags: string[];
+  archived_at: string | null;
+  source_chat_session_id: string | null;
+  source_message_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserThesisCheckRow extends Record<string, unknown> {
+  id: string;
+  thesis_id: string;
+  user_id: string;
+  ticker: string;
+  result_status:
+    | "strengthened"
+    | "weakened"
+    | "mixed"
+    | "insufficient"
+    | "needs_review";
+  summary: string;
+  strengthening_points: string[];
+  weakening_points: string[];
+  neutral_points: string[];
+  next_questions: string[];
+  basis_release_id: string | null;
+  basis_period: string | null;
+  source_chat_session_id: string | null;
+  source_message_id: string | null;
+  created_at: string;
+}
+
+export interface UserResearchNoteRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  ticker: string;
+  title: string;
+  body: string;
+  note_type:
+    | "manual"
+    | "chat_summary"
+    | "thesis_check"
+    | "filing_check"
+    | "risk_memo"
+    | "earnings_setup"
+    | "earnings_review"
+    | "tearsheet";
+  tags: string[];
+  source_chat_session_id: string | null;
+  source_message_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserResearchNoteSourceRow extends Record<string, unknown> {
+  id: string;
+  note_id: string;
+  user_id: string;
+  ticker: string;
+  citation_id: string | null;
+  run_id: string | null;
+  message_id: string | null;
+  ontology_object_id: string | null;
+  document_type: string | null;
+  filing_period: string | null;
+  created_at: string;
+}
+
 export interface ToolCallRow extends Record<string, unknown> {
   id: string;
   run_id: string;
@@ -790,6 +911,237 @@ export interface Database {
         Update: Partial<
           Omit<OntologyCompanyRow, "env" | "release_id" | "ticker" | "created_at">
         >;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_company_marks: {
+        Row: UserCompanyMarkRow;
+        Insert: Omit<
+          UserCompanyMarkRow,
+          | "is_watchlisted"
+          | "is_holding"
+          | "priority"
+          | "interest_reason"
+          | "tags"
+          | "last_activity_at"
+          | "created_at"
+          | "updated_at"
+        > & {
+          is_watchlisted?: boolean;
+          is_holding?: boolean;
+          priority?: number;
+          interest_reason?: string | null;
+          tags?: string[];
+          last_activity_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<UserCompanyMarkRow, "user_id" | "ticker" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_company_questions: {
+        Row: UserCompanyQuestionRow;
+        Insert: Omit<
+          UserCompanyQuestionRow,
+          | "id"
+          | "status"
+          | "source"
+          | "source_chat_session_id"
+          | "source_message_id"
+          | "answered_at"
+          | "created_at"
+          | "updated_at"
+        > & {
+          id?: string;
+          status?: UserCompanyQuestionRow["status"];
+          source?: UserCompanyQuestionRow["source"];
+          source_chat_session_id?: string | null;
+          source_message_id?: string | null;
+          answered_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<UserCompanyQuestionRow, "id" | "user_id" | "ticker" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_company_cards: {
+        Row: UserCompanyCardRow;
+        Insert: Omit<
+          UserCompanyCardRow,
+          | "id"
+          | "title"
+          | "summary"
+          | "content_md"
+          | "basis_release_id"
+          | "basis_period"
+          | "basis_document_type"
+          | "source_chat_session_id"
+          | "source_message_id"
+          | "created_at"
+          | "updated_at"
+        > & {
+          id?: string;
+          title?: string;
+          summary?: string | null;
+          content_md?: string;
+          basis_release_id?: string | null;
+          basis_period?: string | null;
+          basis_document_type?: string | null;
+          source_chat_session_id?: string | null;
+          source_message_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<UserCompanyCardRow, "id" | "user_id" | "ticker" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_company_theses: {
+        Row: UserCompanyThesisRow;
+        Insert: Omit<
+          UserCompanyThesisRow,
+          | "id"
+          | "status"
+          | "tags"
+          | "archived_at"
+          | "source_chat_session_id"
+          | "source_message_id"
+          | "created_at"
+          | "updated_at"
+        > & {
+          id?: string;
+          status?: UserCompanyThesisRow["status"];
+          tags?: string[];
+          archived_at?: string | null;
+          source_chat_session_id?: string | null;
+          source_message_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<UserCompanyThesisRow, "id" | "user_id" | "ticker" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_thesis_checks: {
+        Row: UserThesisCheckRow;
+        Insert: Omit<
+          UserThesisCheckRow,
+          | "id"
+          | "result_status"
+          | "summary"
+          | "strengthening_points"
+          | "weakening_points"
+          | "neutral_points"
+          | "next_questions"
+          | "basis_release_id"
+          | "basis_period"
+          | "source_chat_session_id"
+          | "source_message_id"
+          | "created_at"
+        > & {
+          id?: string;
+          result_status?: UserThesisCheckRow["result_status"];
+          summary?: string;
+          strengthening_points?: string[];
+          weakening_points?: string[];
+          neutral_points?: string[];
+          next_questions?: string[];
+          basis_release_id?: string | null;
+          basis_period?: string | null;
+          source_chat_session_id?: string | null;
+          source_message_id?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Omit<UserThesisCheckRow, "id" | "thesis_id" | "user_id" | "ticker" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_research_notes: {
+        Row: UserResearchNoteRow;
+        Insert: Omit<
+          UserResearchNoteRow,
+          | "id"
+          | "body"
+          | "note_type"
+          | "tags"
+          | "source_chat_session_id"
+          | "source_message_id"
+          | "created_at"
+          | "updated_at"
+        > & {
+          id?: string;
+          body?: string;
+          note_type?: UserResearchNoteRow["note_type"];
+          tags?: string[];
+          source_chat_session_id?: string | null;
+          source_message_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<UserResearchNoteRow, "id" | "user_id" | "ticker" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_research_note_sources: {
+        Row: UserResearchNoteSourceRow;
+        Insert: Omit<
+          UserResearchNoteSourceRow,
+          | "id"
+          | "citation_id"
+          | "run_id"
+          | "message_id"
+          | "ontology_object_id"
+          | "document_type"
+          | "filing_period"
+          | "created_at"
+        > & {
+          id?: string;
+          citation_id?: string | null;
+          run_id?: string | null;
+          message_id?: string | null;
+          ontology_object_id?: string | null;
+          document_type?: string | null;
+          filing_period?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Omit<UserResearchNoteSourceRow, "id" | "note_id" | "user_id" | "ticker" | "created_at">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];

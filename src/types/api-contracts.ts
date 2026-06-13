@@ -199,6 +199,167 @@ export interface SessionSummary {
 }
 
 // ============================================================
+// Personal Research Workspace Types
+// ============================================================
+
+export type UserCompanyQuestionStatus = "open" | "answered" | "dismissed";
+export type UserCompanyQuestionSource =
+  | "manual"
+  | "generated_from_tearsheet"
+  | "generated_from_thesis_check"
+  | "saved_from_chat";
+export type UserCompanyThesisStatus =
+  | "active"
+  | "needs_review"
+  | "weakened"
+  | "mixed"
+  | "archived";
+export type UserThesisCheckResultStatus =
+  | "strengthened"
+  | "weakened"
+  | "mixed"
+  | "insufficient"
+  | "needs_review";
+export type UserResearchNoteType =
+  | "manual"
+  | "chat_summary"
+  | "thesis_check"
+  | "filing_check"
+  | "risk_memo"
+  | "earnings_setup"
+  | "earnings_review"
+  | "tearsheet";
+
+export interface UserCompanyMark {
+  user_id: string;
+  ticker: string;
+  is_watchlisted: boolean;
+  is_holding: boolean;
+  priority: number;
+  interest_reason: string | null;
+  tags: string[];
+  last_activity_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserCompanyQuestion {
+  id: string;
+  user_id: string;
+  ticker: string;
+  question: string;
+  status: UserCompanyQuestionStatus;
+  source: UserCompanyQuestionSource;
+  source_chat_session_id: string | null;
+  source_message_id: string | null;
+  answered_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserCompanyCard {
+  id: string;
+  user_id: string;
+  ticker: string;
+  title: string;
+  summary: string | null;
+  content_md: string;
+  basis_release_id: string | null;
+  basis_period: string | null;
+  basis_document_type: string | null;
+  source_chat_session_id: string | null;
+  source_message_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserCompanyThesis {
+  id: string;
+  user_id: string;
+  ticker: string;
+  title: string;
+  thesis_text: string;
+  status: UserCompanyThesisStatus;
+  tags: string[];
+  archived_at: string | null;
+  source_chat_session_id: string | null;
+  source_message_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserThesisCheck {
+  id: string;
+  thesis_id: string;
+  user_id: string;
+  ticker: string;
+  result_status: UserThesisCheckResultStatus;
+  summary: string;
+  strengthening_points: string[];
+  weakening_points: string[];
+  neutral_points: string[];
+  next_questions: string[];
+  basis_release_id: string | null;
+  basis_period: string | null;
+  source_chat_session_id: string | null;
+  source_message_id: string | null;
+  created_at: string;
+}
+
+export interface UserResearchNote {
+  id: string;
+  user_id: string;
+  ticker: string;
+  title: string;
+  body: string;
+  note_type: UserResearchNoteType;
+  tags: string[];
+  source_chat_session_id: string | null;
+  source_message_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WatchlistCompanySummary {
+  ticker: string;
+  name: string;
+  companyNameKo?: string;
+  sector: string | null;
+  description: string;
+  latest_period: string | null;
+  coverage: string;
+  document_count: number;
+  document_types: string[];
+  mark: UserCompanyMark;
+  open_question_count: number;
+  note_count: number;
+  recent_chat_count: number;
+  latest_activity_at: string | null;
+}
+
+export interface WatchlistOverviewResponse {
+  companies: WatchlistCompanySummary[];
+  stats: {
+    total: number;
+    watchlisted: number;
+    holding: number;
+    open_questions: number;
+    notes: number;
+    recent_activity: number;
+  };
+}
+
+export interface WatchlistCompanyDetailResponse {
+  company: WatchlistCompanySummary;
+  questions: UserCompanyQuestion[];
+  card: UserCompanyCard | null;
+  theses: UserCompanyThesis[];
+  thesis_checks: UserThesisCheck[];
+  notes: UserResearchNote[];
+  recent_sessions: SessionSummary[];
+}
+
+// ============================================================
 // Message Types
 // ============================================================
 

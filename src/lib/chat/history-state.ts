@@ -13,9 +13,11 @@ export interface LoadedChatState {
 
 export function buildChatSessionHref(
   sessionId: string,
-  options: { locale?: Locale } = {},
+  options: { locale?: Locale; ticker?: string | null } = {},
 ): string {
   const params = new URLSearchParams();
+  const ticker = normalizeTicker(options.ticker ?? "");
+  if (ticker) params.set("ticker", ticker);
   appendLocaleParam(params, options.locale);
   const localeQuery = params.toString();
   return `/chat?sessionId=${encodeURIComponent(sessionId)}${

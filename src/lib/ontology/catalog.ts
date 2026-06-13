@@ -44,6 +44,31 @@ const COMPANY_SELECT_COLUMNS =
   "env, release_id, ticker, name, sector, description, latest_period, document_count, document_types, periods, coverage_json, documents_json, company_json, generated_at, created_at, updated_at";
 const DEFAULT_COMPANY_SEARCH_LIMIT = 50;
 const MAX_COMPANY_SEARCH_LIMIT = 100;
+const STATIC_E2E_COMPANIES: IndexedCompany[] = [
+  {
+    ticker: "AMZN",
+    name: "Amazon.com, Inc.",
+    sector: "기술",
+    description: "E2E static ontology coverage for Amazon.com, Inc.",
+    latest_period: "FY2025",
+    coverage: "1개 공시 인덱싱 · 10-K · 최신 FY2025",
+    core_strength: "Cloud and marketplace scale",
+    critical_risk: "Margin and consumer demand sensitivity",
+    icon: "hub",
+    document_count: 1,
+    document_types: ["10-K"],
+    periods: ["FY2025"],
+    documents: [
+      {
+        period: "FY2025",
+        document_type: "10-K",
+        doc_type_key: "10K",
+        generated_at: "2026-06-10T00:00:00.000Z",
+      },
+    ],
+    generated_at: "2026-06-10T00:00:00.000Z",
+  },
+];
 
 const SECTOR_LABELS: Record<string, string> = {
   consumer: "소비재",
@@ -146,6 +171,36 @@ function clampCompanySearchLimit(limit: number | undefined): number {
     return DEFAULT_COMPANY_SEARCH_LIMIT;
   }
   return Math.min(limit, MAX_COMPANY_SEARCH_LIMIT);
+}
+
+function shouldUseStaticE2ECatalog(): boolean {
+  return (
+    process.env.KRW_E2E_STATIC_CATALOG === "1" &&
+    process.env.DEV_AUTH_BYPASS === "1" &&
+    process.env.NODE_ENV !== "production"
+  );
+}
+
+function searchStaticE2ECompanies(
+  options: SearchIndexedCompaniesOptions = {},
+): IndexedCompany[] {
+  const query = normalizeCompanySearchQuery(options.query).toLowerCase();
+  const limit = clampCompanySearchLimit(options.limit);
+  const filtered = query
+    ? STATIC_E2E_COMPANIES.filter((company) =>
+        [
+          company.ticker,
+          company.name,
+          company.description,
+          company.sector,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(query),
+      )
+    : STATIC_E2E_COMPANIES;
+  return filtered.slice(0, limit);
 }
 
 function companySearchFilter(query: string): string {
@@ -277,6 +332,8 @@ export async function getActiveOntologyCatalogRelease(
 }
 
 export async function listIndexedCompanies(): Promise<IndexedCompany[]> {
+  if (shouldUseStaticE2ECatalog()) return searchStaticE2ECompanies();
+
   const env = getOntologyEnv();
   const release = await getActiveOntologyCatalogRelease(env);
   if (!release) return [];
@@ -299,6 +356,8 @@ export async function listIndexedCompanies(): Promise<IndexedCompany[]> {
 export async function searchIndexedCompanies(
   options: SearchIndexedCompaniesOptions = {},
 ): Promise<IndexedCompany[]> {
+  if (shouldUseStaticE2ECatalog()) return searchStaticE2ECompanies(options);
+
   const env = getOntologyEnv();
   const release = await getActiveOntologyCatalogRelease(env);
   if (!release) return [];
@@ -330,6 +389,14 @@ export async function getIndexedCompanies(
 ): Promise<IndexedCompany[]> {
   const normalizedTickers = normalizeTickers(tickers);
   if (normalizedTickers.length === 0) return [];
+  if (shouldUseStaticE2ECatalog()) {
+    const companiesByTicker = new Map(
+      STATIC_E2E_COMPANIES.map((company) => [company.ticker, company]),
+    );
+    return normalizedTickers
+      .map((ticker) => companiesByTicker.get(ticker))
+      .filter((company): company is IndexedCompany => Boolean(company));
+  }
 
   const env = getOntologyEnv();
   const release = await getActiveOntologyCatalogRelease(env);
@@ -360,6 +427,12 @@ export async function getIndexedCompany(
 ): Promise<IndexedCompany | null> {
   const normalized = normalizeTicker(ticker);
   if (!normalized) return null;
+  if (shouldUseStaticE2ECatalog()) {
+    return (
+      STATIC_E2E_COMPANIES.find((company) => company.ticker === normalized) ??
+      null
+    );
+  }
 
   const env = getOntologyEnv();
   const release = await getActiveOntologyCatalogRelease(env);

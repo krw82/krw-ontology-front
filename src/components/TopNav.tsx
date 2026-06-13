@@ -8,7 +8,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { KrwBrand } from "@/components/KrwBrand";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import UsageStatus from "@/components/UsageStatus";
-import { getPathLocale } from "@/i18n/routing";
+import { getPathLocale, localizedPath } from "@/i18n/routing";
 import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
 import { dispatchOpenChatSidebar } from "@/lib/chat/sidebar-events";
 import { createClient } from "@/lib/supabase/client";
@@ -123,6 +123,23 @@ export default function TopNav({
   const currentPath = normalizeInternalNextPath(
     query ? `${pathname}?${query}` : pathname,
   );
+  const navLinks = [
+    {
+      href: localizedPath(currentLocale, "/companies"),
+      label: currentLocale === "ko" ? "회사" : "Companies",
+      active: pathname.includes("/companies"),
+    },
+    {
+      href: "/watchlist",
+      label: currentLocale === "ko" ? "내 종목장" : "My Research",
+      active: pathname.startsWith("/watchlist"),
+    },
+    {
+      href: currentLocale === "ko" ? "/chat/new" : "/chat/new?locale=en",
+      label: currentLocale === "ko" ? "채팅" : "Chat",
+      active: pathname.startsWith("/chat"),
+    },
+  ];
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -206,13 +223,13 @@ export default function TopNav({
     setAccountMenuOpen(false);
     router.replace("/login");
     router.refresh();
-  }, [supabase, router]);
+  }, [router, setAccountMenuOpen, setUserProfile, supabase]);
 
   const handleAvatarError = useCallback(() => {
     setUserProfile((profile) =>
       profile ? { ...profile, avatarUrl: null } : profile,
     );
-  }, []);
+  }, [setUserProfile]);
 
   return (
     <header
@@ -248,6 +265,22 @@ export default function TopNav({
             compact
             ariaLabel={brandAriaLabel}
           />
+          <nav className="hidden items-center gap-1 md:flex" aria-label="Primary">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={[
+                  "rounded-[8px] px-sm py-xs text-[13px] font-extrabold leading-5 transition-colors",
+                  link.active
+                    ? "bg-surface text-ink"
+                    : "text-muted hover:bg-surface-soft hover:text-primary",
+                ].join(" ")}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
         </div>
 
         <div className="flex shrink-0 items-center justify-end gap-xs sm:gap-md">

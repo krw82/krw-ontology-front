@@ -19,6 +19,8 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 const ORIGINAL_ENV = process.env.KRW_ONTOLOGY_ENV;
+const ORIGINAL_E2E_STATIC_CATALOG = process.env.KRW_E2E_STATIC_CATALOG;
+const ORIGINAL_DEV_AUTH_BYPASS = process.env.DEV_AUTH_BYPASS;
 
 const releaseRow: OntologyCatalogReleaseRow = {
   env: "prod",
@@ -192,6 +194,8 @@ class QueryMock {
 describe("ontology catalog", () => {
   beforeEach(() => {
     process.env.KRW_ONTOLOGY_ENV = "prod";
+    process.env.KRW_E2E_STATIC_CATALOG = "0";
+    process.env.DEV_AUTH_BYPASS = "0";
     vi.mocked(getSupabaseAdmin).mockReturnValue({
       from: (table: string) => new QueryMock(table),
     } as unknown as ReturnType<typeof getSupabaseAdmin>);
@@ -199,6 +203,8 @@ describe("ontology catalog", () => {
 
   afterEach(() => {
     process.env.KRW_ONTOLOGY_ENV = ORIGINAL_ENV;
+    process.env.KRW_E2E_STATIC_CATALOG = ORIGINAL_E2E_STATIC_CATALOG;
+    process.env.DEV_AUTH_BYPASS = ORIGINAL_DEV_AUTH_BYPASS;
     vi.clearAllMocks();
   });
 
@@ -287,6 +293,32 @@ describe("ontology catalog", () => {
     expect(companies[0]).toMatchObject({
       ticker: "AAPL",
       name: "Apple Inc.",
+    });
+  });
+
+  it("uses the static E2E catalog across catalog entrypoints", async () => {
+    process.env.KRW_E2E_STATIC_CATALOG = "1";
+    process.env.DEV_AUTH_BYPASS = "1";
+    vi.mocked(getSupabaseAdmin).mockImplementation(() => {
+      throw new Error("Supabase should not be used for the static E2E catalog");
+    });
+
+    await expect(listIndexedCompanies()).resolves.toMatchObject([
+      {
+        ticker: "AMZN",
+        name: "Amazon.com, Inc.",
+        latest_period: "FY2025",
+      },
+    ]);
+    await expect(searchIndexedCompanies({ query: "amazon" })).resolves.toHaveLength(
+      1,
+    );
+    await expect(getIndexedCompanies(["amzn", "aapl"])).resolves.toMatchObject([
+      { ticker: "AMZN" },
+    ]);
+    await expect(getIndexedCompany("amzn")).resolves.toMatchObject({
+      ticker: "AMZN",
+      document_types: ["10-K"],
     });
   });
 });
