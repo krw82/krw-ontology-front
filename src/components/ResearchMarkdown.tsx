@@ -3,6 +3,7 @@
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { normalizeTicker } from "@/lib/ontology/ticker";
 
 interface ResearchMarkdownProps {
   content: string;
@@ -49,13 +50,27 @@ function getSafeMarkdownUrl(
 export function getSafeMarkdownHref(
   href: unknown,
 ): string | undefined {
-  return getSafeMarkdownUrl(href, SAFE_LINK_PROTOCOLS);
+  const safeHref = getSafeMarkdownUrl(href, SAFE_LINK_PROTOCOLS);
+  return safeHref && !hasInvalidCompanyTicker(safeHref) ? safeHref : undefined;
 }
 
 export function getSafeMarkdownImageSrc(
   src: unknown,
 ): string | undefined {
   return getSafeMarkdownUrl(src, SAFE_IMAGE_PROTOCOLS);
+}
+
+function hasInvalidCompanyTicker(href: string): boolean {
+  try {
+    const url = new URL(href, "https://krwontology.local");
+    const match = url.pathname.match(
+      /^\/(?:[a-z]{2}\/)?companies\/([^/]+)\/?$/i,
+    );
+    if (!match?.[1]) return false;
+    return !normalizeTicker(decodeURIComponent(match[1]));
+  } catch {
+    return true;
+  }
 }
 
 function isExistingMarkdownBlock(line: string): boolean {

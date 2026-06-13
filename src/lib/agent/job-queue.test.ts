@@ -53,7 +53,7 @@ const mcpHealth = {
   toolCount: 12,
   tools: ["krw_ontology_query"],
   root: "/srv/krw-ontology-data/current",
-  indexPath: "/srv/krw-ontology-data/current/indexes/agent_index.sqlite",
+  indexPath: "/srv/krw-ontology-data/current/indexes/global_spine.sqlite",
   pluginPath: "/srv/krw-ontology/plugins/krw-ontology",
   releaseMetadata: {
     env: "dev",

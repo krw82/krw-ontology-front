@@ -14,9 +14,6 @@ import { localizedPath } from "@/i18n/routing";
 import { getAuthUser } from "@/lib/auth";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { normalizeTicker } from "@/lib/ontology/ticker";
-import {
-  getSuggestedPromptsForTickers,
-} from "@/lib/companies/landing-copy";
 import { absoluteUrl, SITE_NAME } from "@/lib/marketing/site";
 import { getCspNonce } from "@/lib/security/csp-nonce";
 
@@ -111,10 +108,9 @@ export default async function CompanyLandingPage({
   const preserveInitialUserProfile =
     user?.app_metadata?.provider === "dev-auth-bypass";
 
-  const canonicalPrompts = getSuggestedPromptsForTickers([company.ticker]);
   const prompts = getSuggestedPromptDisplaysForTickers(locale, [company.ticker]);
-  const promptHrefs = prompts.map((_, index) =>
-    chatHref(company.ticker, canonicalPrompts[index], locale),
+  const promptHrefs = prompts.map((prompt) =>
+    chatHref(company.ticker, prompt, locale),
   );
   const copy = getCompanyDisplayCopyForTicker(locale, company.ticker);
   const displayCompany = { ...company, ...copy };

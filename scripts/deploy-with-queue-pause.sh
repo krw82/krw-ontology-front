@@ -204,7 +204,7 @@ start_queue() {
     --root "$QUEUE_ROOT" \
     --poll-interval "$QUEUE_POLL_INTERVAL" \
     --no-publish-prod \
-    --no-rebuild-agent-index
+    --no-refresh-index
 }
 
 restart_queue_on_exit() {
@@ -215,7 +215,7 @@ restart_queue_on_exit() {
       queue_status || true
     else
       echo "Failed to restart queue worker. Start it manually with:" >&2
-      echo "  cd '$ONTOLOGY_SOURCE_DIR' && uv run krw-ontology queue start --root '$QUEUE_ROOT' --poll-interval '$QUEUE_POLL_INTERVAL' --no-publish-prod --no-rebuild-agent-index" >&2
+      echo "  cd '$ONTOLOGY_SOURCE_DIR' && uv run krw-ontology queue start --root '$QUEUE_ROOT' --poll-interval '$QUEUE_POLL_INTERVAL' --no-publish-prod --no-refresh-index" >&2
     fi
   fi
 

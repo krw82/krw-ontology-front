@@ -6,7 +6,7 @@ vi.mock("@/lib/supabase/middleware", () => ({
 }));
 
 import { updateSession } from "@/lib/supabase/middleware";
-import { proxy, resetProxyRateLimitForTests } from "./proxy";
+import { proxy } from "./proxy";
 
 const ORIGINAL_NEXT_PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
 const ORIGINAL_NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL;
@@ -41,11 +41,9 @@ function cspDirective(csp: string, name: string) {
     .find((directive) => directive.startsWith(`${name} `));
 }
 
-describe("proxy gross-abuse guard", () => {
+describe("proxy", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetProxyRateLimitForTests();
-    delete process.env.CHAT_RUN_PROXY_GROSS_ABUSE_PER_MINUTE;
     delete process.env.NEXT_PUBLIC_SITE_URL;
     delete process.env.NEXT_PUBLIC_APP_URL;
   });
@@ -143,38 +141,6 @@ describe("proxy gross-abuse guard", () => {
     expect(response.status).toBe(200);
     expect(await json(response)).toEqual({ ok: true });
     expect(updateSession).toHaveBeenCalledOnce();
-  });
-
-  it("uses a high-threshold gross-abuse guard with API-shaped errors", async () => {
-    process.env.CHAT_RUN_PROXY_GROSS_ABUSE_PER_MINUTE = "2";
-
-    await proxy(request("/api/chat/run", { "x-krw-client-ip": "198.51.100.8" }));
-    await proxy(request("/api/chat/run", { "x-krw-client-ip": "198.51.100.8" }));
-    const response = await proxy(
-      request("/api/chat/run", { "x-krw-client-ip": "198.51.100.8" }),
-    );
-
-    expect(response.status).toBe(429);
-    expect(response.headers.get("Retry-After")).toBe("60");
-    expect(response.headers.get("X-Rate-Limit-Scope")).toBe(
-      "proxy-gross-abuse",
-    );
-    expect(await json(response)).toMatchObject({
-      error: { code: "rate_limited" },
-    });
-    expect(updateSession).toHaveBeenCalledTimes(2);
-  });
-
-  it("does not rate-limit unrelated routes in proxy", async () => {
-    process.env.CHAT_RUN_PROXY_GROSS_ABUSE_PER_MINUTE = "1";
-
-    await proxy(request("/api/companies", { "x-krw-client-ip": "198.51.100.8" }));
-    const response = await proxy(
-      request("/api/companies", { "x-krw-client-ip": "198.51.100.8" }),
-    );
-
-    expect(response.status).toBe(200);
-    expect(updateSession).toHaveBeenCalledTimes(2);
   });
 
   it("adds nonce CSP only to non-API document routes", async () => {

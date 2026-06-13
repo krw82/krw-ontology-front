@@ -323,6 +323,7 @@ function parseMcpHealthPayload(
   const documentCount =
     asNumber(payload.documents) ?? asNumber(payload.document_count);
   const objectCount = asNumber(payload.objects) ?? asNumber(payload.object_count);
+  const globalSpinePath = asString(payload.global_spine_path);
   const releaseMetadata = {
     env: ontologyEnv,
     release_id: asString(payload.release_id),
@@ -331,7 +332,8 @@ function parseMcpHealthPayload(
     agent_index_schema_version: asString(payload.agent_index_schema_version),
     index_generated_at: indexGeneratedAt,
     root: asString(payload.root) ?? root,
-    index_path: asString(payload.index_path),
+    index_path: globalSpinePath,
+    global_spine_path: globalSpinePath,
     company_count: companyCount,
     document_count: documentCount,
     object_count: objectCount,
@@ -342,7 +344,7 @@ function parseMcpHealthPayload(
     sqliteOk:
       status === 200 &&
       payload.ok === true &&
-      typeof payload.index_path === "string" &&
+      typeof payload.global_spine_path === "string" &&
       documentCount !== null &&
       objectCount !== null,
     env: ontologyEnv,
@@ -357,7 +359,7 @@ function parseMcpHealthPayload(
     toolCount: tools.length,
     tools,
     root: asString(payload.root) ?? root,
-    indexPath: asString(payload.index_path),
+    indexPath: globalSpinePath,
     releaseMetadata: (asRecord(payload.manifest) as Json | null) ?? releaseMetadata,
   });
 }
@@ -405,9 +407,12 @@ async function runStdioMcpHealth(
           KRW_ONTOLOGY_MANIFEST_PATH:
             process.env.KRW_ONTOLOGY_MANIFEST_PATH ||
             path.join(root, "manifest.json"),
-          KRW_ONTOLOGY_INDEX_PATH:
-            process.env.KRW_ONTOLOGY_INDEX_PATH ||
-            path.join(root, "indexes", "agent_index.sqlite"),
+          KRW_ONTOLOGY_GLOBAL_SPINE_PATH:
+            process.env.KRW_ONTOLOGY_GLOBAL_SPINE_PATH ||
+            path.join(root, "indexes", "global_spine.sqlite"),
+          KRW_ONTOLOGY_SHARD_MANIFEST_PATH:
+            process.env.KRW_ONTOLOGY_SHARD_MANIFEST_PATH ||
+            path.join(root, "indexes", "shard_manifest.json"),
         }
       : {}),
   };
@@ -490,11 +495,15 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
       };
     }
 
-    if (root || process.env.KRW_ONTOLOGY_INDEX_PATH || serverConfig.env?.KRW_ONTOLOGY_INDEX_PATH) {
+    if (
+      root ||
+      process.env.KRW_ONTOLOGY_GLOBAL_SPINE_PATH ||
+      serverConfig.env?.KRW_ONTOLOGY_GLOBAL_SPINE_PATH
+    ) {
       const indexPath =
-        process.env.KRW_ONTOLOGY_INDEX_PATH ||
-        serverConfig.env?.KRW_ONTOLOGY_INDEX_PATH ||
-        path.join(root ?? "", "indexes", "agent_index.sqlite");
+        process.env.KRW_ONTOLOGY_GLOBAL_SPINE_PATH ||
+        serverConfig.env?.KRW_ONTOLOGY_GLOBAL_SPINE_PATH ||
+        path.join(root ?? "", "indexes", "global_spine.sqlite");
       if (!(await exists(indexPath))) {
         return {
           ...baseHealthResult(pluginPath, root),
@@ -502,7 +511,7 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
           commandOk: true,
           indexPath,
           connected: false,
-          error: `Ontology agent index not found at ${indexPath}`,
+          error: `Ontology global spine not found at ${indexPath}`,
         };
       }
     }

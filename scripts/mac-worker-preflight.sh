@@ -14,14 +14,14 @@ Checks:
   - local ontology data, plugin, and agent workspace paths exist
   - local ontology queue status is safe according to krw-ontology CLI
   - no duplicate Mac agent worker with the same worker id is already running
-  - SQLite serving indexes exist
+  - prod/current satisfies the KRW Ontology v3 startup contract
   - worker bundle builds
   - Claude executable and MCP health work
   - enabled news translation provider can translate a smoke sentence
   - Supabase service role can read the production schema
 
---deep also runs PRAGMA quick_check on the SQLite index. It can take time on
-large indexes, so it is off by default.
+--deep is accepted for compatibility. KRW Ontology v3 deep release checks run
+offline during release publish; this preflight remains startup-safe.
 EOF
 }
 
@@ -147,7 +147,6 @@ for key in \
   KRW_ONTOLOGY_RELEASE_ROOT \
   KRW_ONTOLOGY_ROOT \
   KRW_ONTOLOGY_MANIFEST_PATH \
-  KRW_ONTOLOGY_INDEX_PATH \
   KRW_ONTOLOGY_SOURCE_DIR \
   KRW_ONTOLOGY_PLUGIN_PATH \
   KRW_ONTOLOGY_MCP_URL \
@@ -213,7 +212,6 @@ fi
 
 require_command npm
 require_command node
-require_command sqlite3
 require_command ps
 require_command awk
 require_command uv
@@ -222,7 +220,6 @@ require_command "$CLAUDE_CODE_EXECUTABLE"
 require_path "$KRW_ONTOLOGY_ROOT"
 require_path "$KRW_ONTOLOGY_RELEASE_ROOT"
 require_path "$KRW_ONTOLOGY_MANIFEST_PATH"
-require_path "$KRW_ONTOLOGY_INDEX_PATH"
 require_path "$KRW_ONTOLOGY_SOURCE_DIR/pyproject.toml"
 require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.mcp.json"
 require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.claude-plugin/plugin.json"
@@ -236,12 +233,13 @@ if [ ! -L "$KRW_ONTOLOGY_RELEASE_ROOT" ]; then
   exit 1
 fi
 
-echo "Checking prod release manifest..."
+echo "Checking prod v3 release startup contract..."
 uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology release verify \
+  --startup-check \
   --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
   --env prod \
   --require-current-symlink >/dev/null
-echo "OK prod release manifest"
+echo "OK prod v3 release startup contract"
 
 echo "Checking local ontology queue status..."
 queue_status_json=$(uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology queue status \
@@ -324,7 +322,8 @@ export KRW_ONTOLOGY_ENV
 export KRW_ONTOLOGY_RELEASE_ROOT
 export KRW_ONTOLOGY_ROOT
 export KRW_ONTOLOGY_MANIFEST_PATH
-export KRW_ONTOLOGY_INDEX_PATH
+export KRW_ONTOLOGY_GLOBAL_SPINE_PATH
+export KRW_ONTOLOGY_SHARD_MANIFEST_PATH
 export KRW_ONTOLOGY_QUEUE_ROOT
 export KRW_ONTOLOGY_SOURCE_DIR
 export KRW_ONTOLOGY_PLUGIN_PATH
@@ -379,50 +378,8 @@ if (actualRoot && actualRoot !== expectedRoot) {
 console.log(`OK plugin MCP root: ${actualRoot || expectedRoot}`);
 NODE
 
-echo "Checking SQLite serving indexes..."
-sqlite3 "$KRW_ONTOLOGY_INDEX_PATH" <<'SQL' > /tmp/krw-mac-worker-indexes.$$
-.headers off
-.mode list
-SELECT name
-FROM sqlite_master
-WHERE type = 'index'
-  AND name IN (
-    'idx_object_traceability_status',
-    'idx_company_topic_ticker',
-    'idx_company_topic_scope',
-    'idx_company_topic_source_object',
-    'idx_company_topic_source_topic'
-  )
-ORDER BY name;
-SQL
-
-missing_indexes=""
-for index_name in \
-  idx_company_topic_scope \
-  idx_company_topic_source_object \
-  idx_company_topic_source_topic \
-  idx_company_topic_ticker \
-  idx_object_traceability_status
-do
-  if ! grep -qx "$index_name" /tmp/krw-mac-worker-indexes.$$; then
-    missing_indexes="$missing_indexes $index_name"
-  fi
-done
-rm -f /tmp/krw-mac-worker-indexes.$$
-if [ -n "$missing_indexes" ]; then
-  echo "Missing required SQLite serving indexes:$missing_indexes" >&2
-  exit 1
-fi
-echo "OK SQLite serving indexes"
-
 if [ "$DEEP_CHECK" = "1" ]; then
-  echo "Running deep SQLite quick_check..."
-  quick_check=$(sqlite3 "$KRW_ONTOLOGY_INDEX_PATH" "PRAGMA quick_check;")
-  if [ "$quick_check" != "ok" ]; then
-    echo "SQLite quick_check failed: $quick_check" >&2
-    exit 1
-  fi
-  echo "OK SQLite quick_check"
+  echo "Deep check requested; KRW Ontology v3 deep checks are release-publish offline gates."
 fi
 
 echo "Building worker bundle..."
@@ -489,8 +446,11 @@ function printHealth(response, payload) {
     env: payload.env,
     release_id: payload.release_id,
     manifest_valid: payload.manifest_valid,
+    index_layout: payload.index_layout,
+    global_spine_present: payload.global_spine_present,
+    company_shard_count: payload.company_shard_count,
     root: payload.root,
-    index_path: payload.index_path,
+    global_spine_path: payload.global_spine_path,
     documents: payload.documents,
     objects: payload.objects,
     tools: Array.isArray(payload.tools) ? payload.tools.length : null,
@@ -502,6 +462,12 @@ function assertHealth(response, payload) {
   if (payload.env !== "prod") throw new Error("MCP health env is not prod");
   if (!payload.release_id) throw new Error("MCP health is missing release_id");
   if (payload.manifest_valid !== true) throw new Error("MCP health manifest_valid is not true");
+  if (payload.index_layout !== "global-spine-and-company-shards") {
+    throw new Error(`MCP health index_layout is not v3: ${payload.index_layout}`);
+  }
+  if (payload.global_spine_present !== true) {
+    throw new Error("MCP health global_spine_present is not true");
+  }
   if (expectedRoot && !samePath(payload.root, expectedRoot)) {
     throw new Error(`MCP root mismatch: ${payload.root} !== ${expectedRoot}`);
   }
@@ -542,8 +508,11 @@ print(json.dumps({
     "env": payload.get("env"),
     "release_id": payload.get("release_id"),
     "manifest_valid": payload.get("manifest_valid"),
+    "index_layout": payload.get("index_layout"),
+    "global_spine_present": payload.get("global_spine_present"),
+    "company_shard_count": payload.get("company_shard_count"),
     "root": payload.get("root"),
-    "index_path": payload.get("index_path"),
+    "global_spine_path": payload.get("global_spine_path"),
     "documents": payload.get("documents"),
     "objects": payload.get("objects"),
     "tools": len(payload.get("tools") or []),
@@ -556,6 +525,10 @@ if not payload.get("release_id"):
     raise SystemExit("MCP health is missing release_id")
 if payload.get("manifest_valid") is not True:
     raise SystemExit("MCP health manifest_valid is not true")
+if payload.get("index_layout") != "global-spine-and-company-shards":
+    raise SystemExit(f"MCP health index_layout is not v3: {payload.get('index_layout')}")
+if payload.get("global_spine_present") is not True:
+    raise SystemExit("MCP health global_spine_present is not true")
 PY
 fi
 

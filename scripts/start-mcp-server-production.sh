@@ -75,13 +75,20 @@ export KRW_MCP_STORE_POOL_MAX
 require_path "$KRW_ONTOLOGY_SOURCE_DIR/pyproject.toml"
 require_path "$KRW_ONTOLOGY_RELEASE_ROOT"
 require_path "$KRW_ONTOLOGY_MANIFEST_PATH"
-require_path "$KRW_ONTOLOGY_INDEX_PATH"
 mkdir -p "$FRONT_DIR/logs" "$MCP_LOG_DIR"
 
 if [ "${KRW_ONTOLOGY_ENV:-}" != "prod" ]; then
   echo "MCP production server requires KRW_ONTOLOGY_ENV=prod, got: ${KRW_ONTOLOGY_ENV:-unset}" >&2
   exit 1
 fi
+
+echo "Checking KRW Ontology v3 startup contract..."
+uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology release verify \
+  --startup-check \
+  --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
+  --env prod \
+  --require-current-symlink >/dev/null
+echo "OK KRW Ontology v3 startup contract"
 
 echo "Starting KRW Ontology MCP HTTP server..."
 echo "Source: $KRW_ONTOLOGY_SOURCE_DIR"
@@ -94,7 +101,6 @@ exec uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology-mcp \
   --host "$KRW_ONTOLOGY_MCP_HOST" \
   --port "$KRW_ONTOLOGY_MCP_PORT" \
   --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
-  --index-path "$KRW_ONTOLOGY_INDEX_PATH" \
   --require-current-symlink \
   --mcp-path "$KRW_ONTOLOGY_MCP_PATH" \
   --store-mode "$KRW_MCP_STORE_MODE" \

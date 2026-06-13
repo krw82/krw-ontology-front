@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { normalizeTicker } from "@/lib/ontology/ticker";
 
 interface FloatingAskBarProps {
   selectedTicker?: string | null;
@@ -15,7 +16,8 @@ export default function FloatingAskBar({ selectedTicker }: FloatingAskBarProps) 
     e.preventDefault();
     if (!query.trim()) return;
     const params = new URLSearchParams();
-    if (selectedTicker) params.set("ticker", selectedTicker);
+    const ticker = normalizeTicker(selectedTicker ?? "");
+    if (ticker) params.set("ticker", ticker);
     params.set("query", query.trim());
     router.push(`/chat/new?${params.toString()}`);
   };

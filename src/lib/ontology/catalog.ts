@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getOntologyEnv, type OntologyEnv } from "@/lib/env";
-import { normalizeTicker } from "@/lib/ontology/ticker";
+import { normalizeTicker, normalizeTickers } from "@/lib/ontology/ticker";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type {
   Json,
@@ -99,10 +99,6 @@ function isRecord(value: unknown): value is UnknownRecord {
 
 function stringValue(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function isNonEmptyString(value: string | null): value is string {
-  return typeof value === "string" && value.length > 0;
 }
 
 function stringArrayValue(value: unknown): string[] {
@@ -254,6 +250,14 @@ function companyFromRow(row: OntologyCompanyRow): IndexedCompany {
   };
 }
 
+function companiesFromRows(rows: OntologyCompanyRow[]): IndexedCompany[] {
+  return rows.flatMap((row) => {
+    const ticker = normalizeTicker(row.ticker);
+    if (!ticker) return [];
+    return [companyFromRow(ticker === row.ticker ? row : { ...row, ticker })];
+  });
+}
+
 export async function getActiveOntologyCatalogRelease(
   env: OntologyEnv = getOntologyEnv(),
 ): Promise<OntologyCatalogReleaseRow | null> {
@@ -289,7 +293,7 @@ export async function listIndexedCompanies(): Promise<IndexedCompany[]> {
     throw new Error(`Failed to read ontology catalog companies: ${error.message}`);
   }
 
-  return (data ?? []).map(companyFromRow);
+  return companiesFromRows(data ?? []);
 }
 
 export async function searchIndexedCompanies(
@@ -318,15 +322,13 @@ export async function searchIndexedCompanies(
     throw new Error(`Failed to search ontology catalog companies: ${error.message}`);
   }
 
-  return (data ?? []).map(companyFromRow);
+  return companiesFromRows(data ?? []);
 }
 
 export async function getIndexedCompanies(
   tickers: string[],
 ): Promise<IndexedCompany[]> {
-  const normalizedTickers = Array.from(
-    new Set(tickers.map(normalizeTicker).filter(isNonEmptyString)),
-  );
+  const normalizedTickers = normalizeTickers(tickers);
   if (normalizedTickers.length === 0) return [];
 
   const env = getOntologyEnv();
@@ -346,7 +348,7 @@ export async function getIndexedCompanies(
   }
 
   const companiesByTicker = new Map(
-    (data ?? []).map((row) => [row.ticker, companyFromRow(row)]),
+    companiesFromRows(data ?? []).map((company) => [company.ticker, company]),
   );
   return normalizedTickers
     .map((ticker) => companiesByTicker.get(ticker))
@@ -374,5 +376,5 @@ export async function getIndexedCompany(
   if (error) {
     throw new Error(`Failed to read ontology catalog company ${normalized}: ${error.message}`);
   }
-  return data ? companyFromRow(data) : null;
+  return data ? companiesFromRows([data])[0] ?? null : null;
 }

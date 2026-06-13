@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import { APPLE_QUESTION_CHAINS } from "@/lib/companies/landing-copy";
+import { normalizeTicker } from "@/lib/ontology/ticker";
 
 export const SITE_NAME = "KRW Ontology";
 export const DEFAULT_SITE_ORIGIN = "https://krwontology.com";
@@ -435,7 +436,7 @@ export function buildQuestionChatHref(
 ): string {
   const params = new URLSearchParams();
   const question = options.question?.trim();
-  const ticker = options.ticker?.trim().toUpperCase();
+  const ticker = normalizeTicker(options.ticker ?? "");
 
   params.set("templateId", topic.slug);
   if (ticker) params.set("ticker", ticker);
@@ -579,7 +580,7 @@ export function buildUseCaseChatHref(
   const firstTopic = useCase.recommendedQuestionSlugs
     .map(findQuestionTopic)
     .find((topic): topic is QuestionTopicPage => Boolean(topic));
-  const ticker = options.ticker?.trim().toUpperCase();
+  const ticker = normalizeTicker(options.ticker ?? "");
 
   if (firstTopic) params.set("templateId", firstTopic.slug);
   if (ticker) params.set("ticker", ticker);

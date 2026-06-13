@@ -74,7 +74,7 @@ const readyMcpHealth = {
   tools: ["krw_ontology_query_context"],
   root: "~/krw-ontology-data",
   indexPath:
-    "~/krw-ontology-data/indexes/agent_index.sqlite",
+    "~/krw-ontology-data/indexes/global_spine.sqlite",
   pluginPath: "~/krw-ontology/plugins/krw-ontology",
   releaseMetadata: {
     env: "dev",

@@ -1,3 +1,5 @@
+import { normalizeTicker } from "@/lib/ontology/ticker";
+
 export type AnalyticsPageType =
   | "home"
   | "companies_index"
@@ -82,8 +84,11 @@ export function tickerFromPathOrSearch(
   const candidate = companyTicker ?? toSearchParams(search).get("ticker");
   if (!candidate) return null;
 
-  const normalized = decodeURIComponent(candidate).trim().toUpperCase();
-  return /^[A-Z0-9.-]{1,12}$/.test(normalized) ? normalized : null;
+  try {
+    return normalizeTicker(decodeURIComponent(candidate));
+  } catch {
+    return null;
+  }
 }
 
 export function getAnalyticsDeviceType(): AnalyticsDeviceType {

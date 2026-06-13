@@ -29,7 +29,7 @@ export default function LocaleSwitcher({
         "inline-flex shrink-0 items-center rounded-[8px] border border-hairline bg-canvas p-[3px]",
         compact ? "h-9" : "h-10",
       ].join(" ")}
-      aria-label="언어 선택"
+      aria-label={currentLocale === "ko" ? "언어 선택" : "Language switcher"}
     >
       {SUPPORTED_LOCALES.map((locale) => {
         const active = locale === currentLocale;

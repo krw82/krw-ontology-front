@@ -44,6 +44,8 @@ DOMAIN="gui/$(id -u)"
 MCP_LOG_DIR=${MCP_LOG_DIR:-"$HOME/Library/Logs/krw-ontology"}
 MCP_SERVER_DEV_NICE=${MCP_SERVER_DEV_NICE:-${KRW_DEV_MCP_NICE:-10}}
 MCP_SERVER_MAXFILES=${MCP_SERVER_MAXFILES:-4096}
+KRW_ONTOLOGY_SOURCE_DIR=${KRW_ONTOLOGY_SOURCE_DIR:-"$HOME/krw-ontology"}
+KRW_ONTOLOGY_RELEASE_ROOT=${KRW_ONTOLOGY_RELEASE_ROOT:-"$HOME/krw-ontology-data/releases/dev/current"}
 
 if [ ! -f "$TEMPLATE" ]; then
   echo "Missing launchd template: $TEMPLATE" >&2
@@ -94,6 +96,24 @@ if [ "$LOAD" != "1" ]; then
   exit 0
 fi
 
+PREFLIGHT_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/krw-mcp-dev-preflight.XXXXXX")
+if ! uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology release verify \
+  --startup-check \
+  --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
+  --env dev >"$PREFLIGHT_OUTPUT" 2>&1; then
+  cat "$PREFLIGHT_OUTPUT" >&2
+  rm -f "$PREFLIGHT_OUTPUT"
+  echo "Refusing to restart dev MCP: target dev/current is not a valid v3 startup release." >&2
+  exit 1
+fi
+TARGET_RELEASE_ID=$(awk -F': ' '/^release_id:/{print $2; exit}' "$PREFLIGHT_OUTPUT")
+cat "$PREFLIGHT_OUTPUT"
+rm -f "$PREFLIGHT_OUTPUT"
+if [ -z "$TARGET_RELEASE_ID" ] || [ "$TARGET_RELEASE_ID" = "<missing>" ]; then
+  echo "Refusing to restart dev MCP: target release_id is missing." >&2
+  exit 1
+fi
+
 launchctl bootout "$DOMAIN" "$PLIST" >/dev/null 2>&1 || true
 launchctl bootstrap "$DOMAIN" "$PLIST"
 launchctl enable "$DOMAIN/com.krwontology.mcp-server-dev"
@@ -102,7 +122,7 @@ launchctl kickstart -k "$DOMAIN/com.krwontology.mcp-server-dev"
 VERIFY_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/krw-mcp-dev-verify.XXXXXX")
 verified=0
 for _ in $(seq 1 30); do
-  if "$SCRIPT_DIR/verify-mcp-server-dev.sh" >"$VERIFY_OUTPUT" 2>&1; then
+  if EXPECTED_RELEASE_ID="$TARGET_RELEASE_ID" "$SCRIPT_DIR/verify-mcp-server-dev.sh" >"$VERIFY_OUTPUT" 2>&1; then
     verified=1
     break
   fi

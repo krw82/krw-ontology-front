@@ -55,7 +55,7 @@ Use configured read-only KRW Ontology tools for filing evidence retrieval and, w
 ${stockNewsPolicy}
 ${responseLanguagePolicy}
 Use the runtime context only as scope and history for that active pass.
-Return only the final user-visible answer in Markdown. Do not include tool-use narration, hidden planning notes, or progress phrases such as "I will query", "Let me get", or "I'll check".${contextBlock}`;
+Return only the final user-visible answer in Markdown. Do not include tool-use narration, hidden planning notes, or progress phrases such as "I will query", "Let me get", "Let me verify", "Now let me", or "I'll check". Do not expose internal provenance labels such as "verified by trace", "trace", "chain", "query_context", "tool", or "MCP".${contextBlock}`;
 }
 
 function buildStockNewsPolicy(features: PromptRuntimeFeatures): string {

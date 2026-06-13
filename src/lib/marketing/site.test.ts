@@ -80,6 +80,9 @@ describe("marketing site content model", () => {
     expect(buildQuestionChatHref(topic, { ticker: "aapl" })).toContain(
       "ticker=AAPL",
     );
+    expect(buildQuestionChatHref(topic, { ticker: "UNKNOWN" })).not.toContain(
+      "ticker=",
+    );
     expect(buildQuestionChatHref(topic, { question: "custom question" })).toBe(
       `/chat/new?templateId=${topic.slug}&query=custom+question`,
     );
@@ -92,6 +95,9 @@ describe("marketing site content model", () => {
     expect(useCaseHref).toContain("query=");
     expect(buildUseCaseChatHref(useCase, { locale: "en" })).toContain(
       "locale=en",
+    );
+    expect(buildUseCaseChatHref(useCase, { ticker: "unknown" })).not.toContain(
+      "ticker=",
     );
   });
 

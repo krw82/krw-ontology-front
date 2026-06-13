@@ -9,6 +9,7 @@ import { trackClientEventWithTimeout } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import { localizedPath } from "@/i18n/routing";
+import { normalizeTicker } from "@/lib/ontology/ticker";
 
 export interface CompanyCardData {
   ticker: string;
@@ -64,6 +65,40 @@ const englishSectorLabels: Record<string, string> = {
   부동산: "Real estate",
 };
 
+function toEnglishCoverage(coverage: string | null | undefined): string | null {
+  const normalized = coverage?.trim();
+  if (!normalized) return null;
+  if (/^\d+\s+filings\s+indexed/i.test(normalized)) return normalized;
+
+  const coverageMatch = normalized.match(
+    /^(\d+)개\s*공시\s*인덱싱(?:\s*·\s*([^·]+?))?(?:\s*·\s*최신\s*(.+))?$/,
+  );
+  if (!coverageMatch) return normalized;
+
+  const [, filingCount, docTypes, latestPeriod] = coverageMatch;
+  return `${filingCount} filings indexed${docTypes ? ` · ${docTypes.trim()}` : ""}${latestPeriod ? ` · latest ${latestPeriod.trim()}` : ""}`;
+}
+
+function toEnglishCoverageTextFallback(coverage: string): string {
+  if (!/[가-힣]/.test(coverage)) {
+    return coverage;
+  }
+
+  const indexedText = coverage
+    .replace(/(\d+)개\s*공시\s*인덱싱/gi, "$1 filings indexed")
+    .replace(/\s*·\s*최신\s*/gi, " · latest ")
+    .replace(/\b공시\b/gi, "filing")
+    .replace(/최신/gi, "latest")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  if (indexedText !== coverage) {
+    return indexedText;
+  }
+
+  return coverage;
+}
+
 function displaySector(sector: string | null | undefined, locale: Locale) {
   const normalized = sector?.trim();
   if (!normalized) return null;
@@ -78,6 +113,8 @@ export default function CompanyCard({
 }: CompanyCardProps) {
   const router = useRouter();
   const reducedMotion = useReducedMotion();
+  const ticker = normalizeTicker(company.ticker);
+  if (!ticker) return null;
   const coreStrength = company.core_strength
     ? readableText(company.core_strength, locale)
     : null;
@@ -85,23 +122,27 @@ export default function CompanyCard({
     ? readableText(company.critical_risk, locale)
     : null;
   const companyLabel =
-    company.name && company.name !== company.ticker ? company.name : "";
+    company.name && company.name !== ticker ? company.name : "";
   const companyNameKo =
     locale === "ko" ? company.companyNameKo?.trim() : undefined;
   const sectorLabel = displaySector(company.sector, locale);
+  const coverageLabel =
+    locale === "en"
+      ? toEnglishCoverageTextFallback(toEnglishCoverage(company.coverage) ?? company.coverage ?? "")
+      : company.coverage;
   const secondaryLabel = [companyNameKo, sectorLabel]
     .filter(Boolean)
     .join(" · ");
   const accessibleSummary = [
-    company.ticker,
-    company.name && company.name !== company.ticker ? company.name : null,
+    ticker,
+    company.name && company.name !== ticker ? company.name : null,
     companyNameKo,
     sectorLabel
       ? locale === "ko"
         ? `${sectorLabel} 섹터`
         : `${sectorLabel} sector`
       : null,
-    company.coverage,
+    coverageLabel,
     coreStrength,
   ]
     .filter(Boolean)
@@ -123,11 +164,11 @@ export default function CompanyCard({
       className="border-b border-hairline-soft last:border-b-0"
     >
       <Link
-        href={localizedPath(locale, `/companies/${encodeURIComponent(company.ticker)}`)}
+        href={localizedPath(locale, `/companies/${encodeURIComponent(ticker)}`)}
         onClick={(event) => {
           const destination = localizedPath(
             locale,
-            `/companies/${encodeURIComponent(company.ticker)}`,
+            `/companies/${encodeURIComponent(ticker)}`,
           );
           const shouldNavigateAfterTracking =
             shouldHandleClientNavigation(event);
@@ -137,11 +178,11 @@ export default function CompanyCard({
 
           const tracking = trackClientEventWithTimeout("cta_clicked", {
             cta_id: "company_card",
-            cta_label: company.ticker,
+            cta_label: ticker,
             surface: "companies_index",
             source_surface: "companies_index",
             destination,
-            ticker: company.ticker,
+            ticker,
             company_name: company.name,
             sector: company.sector ?? null,
           });
@@ -166,7 +207,7 @@ export default function CompanyCard({
           <div className="flex min-w-0 items-start justify-between gap-4 2xl:block">
             <div>
               <h2 className="font-mono text-[22px] font-black leading-none text-ink transition-colors group-hover:text-primary group-active:text-primary sm:text-[24px] 2xl:text-[22px]">
-                {company.ticker}
+                {ticker}
               </h2>
             </div>
             <span

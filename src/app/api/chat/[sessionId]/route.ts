@@ -13,6 +13,9 @@ import type {
 } from "@/types/database";
 import { toPublicChatArtifact } from "@/lib/chat-artifacts/news-event-selection";
 
+const DEFAULT_CHAT_DETAIL_MESSAGE_LIMIT = 200;
+const MAX_CHAT_DETAIL_MESSAGE_LIMIT = 500;
+
 function notFoundError(message: string) {
   return Response.json(
     { error: { code: "not_found" as const, message } },
@@ -27,11 +30,36 @@ function internalError(message: string) {
   );
 }
 
+function parsePositiveIntParam(
+  value: string | null,
+  defaultValue: number,
+  maxValue: number,
+) {
+  if (!value) return defaultValue;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isSafeInteger(parsed) || parsed < 1) return defaultValue;
+  return Math.min(parsed, maxValue);
+}
+
+function parseBeforeParam(value: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
   const { sessionId } = await params;
+  const messageLimit = parsePositiveIntParam(
+    request.nextUrl.searchParams.get("limit"),
+    DEFAULT_CHAT_DETAIL_MESSAGE_LIMIT,
+    MAX_CHAT_DETAIL_MESSAGE_LIMIT,
+  );
+  const beforeCreatedAt = parseBeforeParam(
+    request.nextUrl.searchParams.get("before"),
+  );
 
   if (!isUuid(sessionId)) {
     return notFoundError("채팅을 찾지 못했습니다.");
@@ -68,36 +96,51 @@ export async function GET(
     return forbiddenError("이 채팅에 접근할 권한이 없습니다.");
   }
 
-  const { data: messages, error: messagesError } = await supabase
+  const messagesBaseQuery = supabase
     .from("messages")
     .select("id, session_id, role, content, status, created_at, updated_at")
-    .eq("session_id", sessionId)
-    .order("created_at", { ascending: true })
+    .eq("session_id", sessionId);
+  const messagesQuery = beforeCreatedAt
+    ? messagesBaseQuery.lt("created_at", beforeCreatedAt)
+    : messagesBaseQuery;
+  const { data: messagesPage, error: messagesError } = await messagesQuery
+    .order("created_at", { ascending: false })
+    .limit(messageLimit + 1)
     .returns<MessageRow[]>();
 
   if (messagesError) {
     return internalError("채팅 메시지를 불러오지 못했습니다.");
   }
 
-  const { data: runs, error: runsError } = await supabase
+  const hasMoreMessages = (messagesPage?.length ?? 0) > messageLimit;
+  const messages = (messagesPage ?? []).slice(0, messageLimit).reverse();
+  const messageIds = messages.map((message) => message.id);
+
+  const { data: runsPage, error: runsError } = await supabase
     .from("agent_runs")
     .select(
       "id, status, model, assistant_message_id, queued_at, started_at, finished_at, latency_ms, input_tokens, output_tokens, estimated_cost_usd, ontology_env, worker_env, ontology_release_id, index_generated_at, company_count, document_count, object_count, manifest_valid, agent_index_schema_version, error_code, run_kind, source_artifact_id, source_event_id"
     )
     .eq("session_id", sessionId)
-    .order("queued_at", { ascending: true, nullsFirst: true })
+    .order("queued_at", { ascending: false, nullsFirst: false })
+    .limit(messageLimit + 1)
     .returns<Partial<AgentRunRow>[]>();
 
   if (runsError) {
     return internalError("채팅 실행 기록을 불러오지 못했습니다.");
   }
 
-  const { data: chatArtifacts, error: chatArtifactsError } = await supabase
-    .from("chat_message_artifacts")
-    .select("id, session_id, message_id, run_id, type, payload_json, created_at")
-    .eq("session_id", sessionId)
-    .order("created_at", { ascending: true })
-    .returns<ChatMessageArtifactRow[]>();
+  const runs = (runsPage ?? []).slice(0, messageLimit).reverse();
+  const { data: chatArtifacts, error: chatArtifactsError } =
+    messageIds.length > 0
+      ? await supabase
+          .from("chat_message_artifacts")
+          .select("id, session_id, message_id, run_id, type, payload_json, created_at")
+          .eq("session_id", sessionId)
+          .in("message_id", messageIds)
+          .order("created_at", { ascending: true })
+          .returns<ChatMessageArtifactRow[]>()
+      : { data: [], error: null };
 
   if (chatArtifactsError) {
     return internalError("채팅 artifact를 불러오지 못했습니다.");
@@ -126,6 +169,12 @@ export async function GET(
     runs: (runs ?? []).map(toPublicRunSummary),
     chat_artifacts: (chatArtifacts ?? []).map(toPublicChatArtifact),
     artifact_selections: artifactSelections ?? [],
+    message_pagination: {
+      limit: messageLimit,
+      has_more: hasMoreMessages,
+      before: beforeCreatedAt,
+      next_before: hasMoreMessages ? messages[0]?.created_at ?? null : null,
+    },
     rich_answers: [],
     research_artifacts: [],
   });

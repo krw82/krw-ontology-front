@@ -126,6 +126,87 @@ export interface AgentWorkerHeartbeatRow extends Record<string, unknown> {
   updated_at: string;
 }
 
+export interface DesktopDeviceRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  device_name: string;
+  platform: string | null;
+  arch: string | null;
+  app_version: string | null;
+  protocol_version: string;
+  status: "active" | "revoked";
+  last_seen_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DesktopDeviceLoginCodeRow extends Record<string, unknown> {
+  id: string;
+  device_code_hash: string;
+  user_code_hash: string;
+  user_code_display: string;
+  device_name: string;
+  platform: string | null;
+  arch: string | null;
+  app_version: string | null;
+  protocol_version: string;
+  status: "pending" | "approved" | "denied" | "expired" | "complete";
+  user_id: string | null;
+  device_id: string | null;
+  expires_at: string;
+  approved_at: string | null;
+  consumed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DesktopAccessTokenRow extends Record<string, unknown> {
+  id: string;
+  device_id: string;
+  user_id: string;
+  token_hash: string;
+  status: "active" | "revoked" | "expired";
+  expires_at: string;
+  last_used_at: string | null;
+  created_at: string;
+  revoked_at: string | null;
+}
+
+export interface DesktopRefreshTokenRow extends Record<string, unknown> {
+  id: string;
+  device_id: string;
+  user_id: string;
+  token_hash: string;
+  status: "active" | "revoked" | "rotated" | "expired";
+  expires_at: string;
+  last_used_at: string | null;
+  created_at: string;
+  rotated_at: string | null;
+  revoked_at: string | null;
+}
+
+export interface DesktopOntologyToolCallRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  device_id: string | null;
+  local_session_id: string;
+  local_run_id: string;
+  tool_call_id: string;
+  tool_name: string;
+  arguments_hash: string;
+  arguments_summary: Json;
+  desktop_context: Json;
+  ontology_release_id: string | null;
+  latency_ms: number | null;
+  result_count: number | null;
+  result_size_bytes: number | null;
+  status: "running" | "succeeded" | "failed";
+  error_code: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
 export interface OntologyCatalogReleaseRow extends Record<string, unknown> {
   env: "dev" | "staging" | "prod";
   release_id: string;
@@ -551,6 +632,143 @@ export interface Database {
         };
         Update: Partial<Omit<AgentWorkerHeartbeatRow, "worker_id" | "created_at">>;
         Relationships: [];
+      };
+      desktop_devices: {
+        Row: DesktopDeviceRow;
+        Insert: Omit<
+          DesktopDeviceRow,
+          "id" | "created_at" | "updated_at" | "last_seen_at" | "revoked_at"
+        > & {
+          id?: string;
+          last_seen_at?: string | null;
+          revoked_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<DesktopDeviceRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      desktop_device_login_codes: {
+        Row: DesktopDeviceLoginCodeRow;
+        Insert: Omit<
+          DesktopDeviceLoginCodeRow,
+          | "id"
+          | "status"
+          | "user_id"
+          | "device_id"
+          | "approved_at"
+          | "consumed_at"
+          | "created_at"
+          | "updated_at"
+        > & {
+          id?: string;
+          status?: DesktopDeviceLoginCodeRow["status"];
+          user_id?: string | null;
+          device_id?: string | null;
+          approved_at?: string | null;
+          consumed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<DesktopDeviceLoginCodeRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      desktop_access_tokens: {
+        Row: DesktopAccessTokenRow;
+        Insert: Omit<
+          DesktopAccessTokenRow,
+          "id" | "status" | "last_used_at" | "created_at" | "revoked_at"
+        > & {
+          id?: string;
+          status?: DesktopAccessTokenRow["status"];
+          last_used_at?: string | null;
+          created_at?: string;
+          revoked_at?: string | null;
+        };
+        Update: Partial<Omit<DesktopAccessTokenRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      desktop_refresh_tokens: {
+        Row: DesktopRefreshTokenRow;
+        Insert: Omit<
+          DesktopRefreshTokenRow,
+          | "id"
+          | "status"
+          | "last_used_at"
+          | "created_at"
+          | "rotated_at"
+          | "revoked_at"
+        > & {
+          id?: string;
+          status?: DesktopRefreshTokenRow["status"];
+          last_used_at?: string | null;
+          created_at?: string;
+          rotated_at?: string | null;
+          revoked_at?: string | null;
+        };
+        Update: Partial<Omit<DesktopRefreshTokenRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      desktop_ontology_tool_calls: {
+        Row: DesktopOntologyToolCallRow;
+        Insert: Omit<
+          DesktopOntologyToolCallRow,
+          | "id"
+          | "arguments_summary"
+          | "desktop_context"
+          | "ontology_release_id"
+          | "latency_ms"
+          | "result_count"
+          | "result_size_bytes"
+          | "status"
+          | "error_code"
+          | "created_at"
+          | "completed_at"
+        > & {
+          id?: string;
+          arguments_summary?: Json;
+          desktop_context?: Json;
+          ontology_release_id?: string | null;
+          latency_ms?: number | null;
+          result_count?: number | null;
+          result_size_bytes?: number | null;
+          status?: DesktopOntologyToolCallRow["status"];
+          error_code?: string | null;
+          created_at?: string;
+          completed_at?: string | null;
+        };
+        Update: Partial<Omit<DesktopOntologyToolCallRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
       };
       ontology_catalog_releases: {
         Row: OntologyCatalogReleaseRow;

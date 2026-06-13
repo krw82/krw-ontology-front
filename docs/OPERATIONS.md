@@ -14,9 +14,9 @@ User
   -> ~/krw-ontology-data/releases/prod/current
 ```
 
-GCP web/API must not read the full ontology SQLite index. It reads only
-Supabase control-plane data such as the active web catalog. The full
-`agent_index.sqlite` is served only by the Mac prod runtime.
+GCP web/API must not read the full ontology SQLite indexes. It reads only
+Supabase control-plane data such as the active web catalog. The v3
+`global_spine.sqlite` and company shards are served only by the Mac prod runtime.
 
 The detailed deploy command reference is
 [`docs/DEPLOY_COMMANDS.md`](./DEPLOY_COMMANDS.md).
@@ -42,27 +42,28 @@ rebuild or overwrite `prod/current` in place.
 
 ```bash
 cd ~/krw-ontology
-uv run krw-ontology release prepare-dev <release_id>
-uv run krw-ontology queue start
-uv run krw-ontology queue status
-uv run krw-ontology release finalize-dev <release_id>
+uv run krw-ontology release force
+uv run krw-ontology release watch
+uv run krw-ontology quality check
 uv run krw-ontology release materialize-prod <release_id>
 
 cd ~/krw-ontology-front
 npm run prod:release:publish -- --release-id <release_id>
 ```
 
-The expected production index path is:
+The expected production index paths are:
 
 ```text
-~/krw-ontology-data/releases/prod/current/indexes/agent_index.sqlite
+~/krw-ontology-data/releases/prod/current/indexes/global_spine.sqlite
+~/krw-ontology-data/releases/prod/current/indexes/shard_manifest.json
+~/krw-ontology-data/releases/prod/current/indexes/companies/<TICKER>.sqlite
 ```
 
 `prod:release:publish` verifies the release, exports a compact
 `web_catalog.json`, publishes that catalog to Supabase, restarts prod MCP, then
 restarts Mac workers.
 
-It does not upload the full SQLite index to GCP.
+It does not upload the v3 SQLite indexes to GCP.
 
 ## Web And Plugin Deploy
 
@@ -106,7 +107,8 @@ curl -fsS \
   https://krwontology.com/api/healthz/deep
 ```
 
-Deep health must verify Supabase, plugin files, MCP command execution, SQLite index access, and MCP tool exposure.
+Deep health must verify Supabase, plugin files, MCP command execution, v3 global
+spine/company shard access, and MCP tool exposure.
 
 ## SDK Freeze
 
@@ -186,6 +188,6 @@ limit 50;
 
 Durable chat-run policy is enforced through `increment_rate_limit` using
 `CHAT_RUNS_PER_USER_PER_MINUTE`, `CHAT_RUNS_PER_IP_PER_MINUTE`, and
-`CHAT_RUNS_PER_SESSION_PER_MINUTE`. The Next proxy keeps only a high-threshold
-in-process gross-abuse guard, configured by
-`CHAT_RUN_PROXY_GROSS_ABUSE_PER_MINUTE`; do not use it as product policy.
+`CHAT_RUNS_PER_SESSION_PER_MINUTE`. The Next proxy does not keep an
+in-process rate-limit bucket; do not add product policy there because Proxy can
+run independently of application render workers.

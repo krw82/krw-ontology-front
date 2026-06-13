@@ -1,7 +1,7 @@
 const MAX_STRIP_ITERATIONS = 24;
 
 const INTERNAL_PROGRESS_VERBS =
-  "(?:read|retrieve|trace|run|query|check|search|inspect|get|gather|look\\s+up|analy[sz]e|compare|review|open)";
+  "(?:read|retrieve|trace|run|query|check|verify|search|inspect|get|gather|look\\s+up|analy[sz]e|compare|review|open)";
 
 const LEADING_ENGLISH_PROGRESS_START = new RegExp(
   `^\\s*(?:let\\s+me\\s+${INTERNAL_PROGRESS_VERBS}\\b|(?:i'll|i\\s+will|i\\s+need\\s+to|i\\s+should)\\s+${INTERNAL_PROGRESS_VERBS}\\b|(?:now|next,?)\\s+(?:let\\s+me|i'll|i\\s+will)\\s+${INTERNAL_PROGRESS_VERBS}\\b)`,
@@ -36,6 +36,12 @@ function isLikelyFollowupBoundary(value: string): boolean {
   return /^\s*(?:-{3,}|\*{3,}|_{3,}|#{1,6}\s|\n+\s*\S)/.test(value);
 }
 
+function isLikelyAnswerSentenceStart(value: string): boolean {
+  return /^\s*(?:Based|Overall|In|For|The|This|These|Those|My|I|At|From|Against|Compared|However|Therefore|So)\b/.test(
+    value,
+  );
+}
+
 function stripLeadingToolXml(value: string): string {
   for (const pattern of LEADING_TOOL_XML_PATTERNS) {
     const match = value.match(pattern);
@@ -68,12 +74,19 @@ function stripLeadingEnglishProgress(value: string): string {
     if (char !== "." && char !== "!" && char !== "?") continue;
 
     const after = value.slice(index + 1);
-    if (isLikelyFollowupBoundary(after)) {
+    if (isLikelyFollowupBoundary(after) || isLikelyAnswerSentenceStart(after)) {
       return after;
     }
   }
 
   return value.trim().length <= 240 ? "" : value;
+}
+
+function stripInternalEvidencePhrases(value: string): string {
+  return value
+    .replace(/,\s*verified\s+(?:by|from)\s+trace\b/gi, "")
+    .replace(/\s*\((?:verified\s+(?:by|from)\s+trace)\)/gi, "")
+    .replace(/\bverified\s+(?:by|from)\s+trace\b/gi, "supported by filing evidence");
 }
 
 /**
@@ -118,7 +131,7 @@ export function sanitizeAssistantContent(content: string): string {
     break;
   }
 
-  return output.trimStart();
+  return stripInternalEvidencePhrases(output).trimStart();
 }
 
 export function sanitizeAssistantPreviewContent(content: string): string {

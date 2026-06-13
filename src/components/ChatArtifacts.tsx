@@ -1,6 +1,7 @@
 "use client";
 
 import { buildNewsEventDisplayText } from "@/lib/chat-artifacts/news-event-selection";
+import { normalizeTicker } from "@/lib/ontology/ticker";
 import type {
   AtomicNewsEventCard,
   ChatArtifact,
@@ -138,6 +139,7 @@ function EventCard({
   const sourceName = source?.publisher || source?.domain;
   const impactLabel = event.ui?.badge_ko || impactBadgeLabel(event.price_impact_direction);
   const axisLabels = analysisAxisLabels(event);
+  const ticker = normalizeTicker(event.ticker ?? "");
 
   return (
     <article
@@ -146,9 +148,9 @@ function EventCard({
     >
       <div className="flex flex-wrap items-center gap-x-sm gap-y-xs">
         <div className="flex min-w-0 items-center gap-xs">
-          {event.ticker ? (
+          {ticker ? (
             <span className="font-mono text-[12px] font-black leading-none tracking-[0.08em] text-primary">
-              {event.ticker}
+              {ticker}
             </span>
           ) : null}
           {sourceName ? (

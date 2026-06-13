@@ -1,5 +1,4 @@
 import { updateSession } from "@/lib/supabase/middleware";
-import { getClientIp } from "@/lib/http/client-ip";
 import { getConfiguredAppOrigin } from "@/lib/auth/origin";
 import { buildContentSecurityPolicy } from "@/lib/security/headers";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
@@ -12,31 +11,7 @@ import {
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const rateLimitMap = new Map<string, { count: number; lastReset: number }>();
-const WINDOW_MS = 60_000;
-const DEFAULT_GROSS_ABUSE_LIMIT = 300;
 const isDevelopment = process.env.NODE_ENV === "development";
-
-function getGrossAbuseLimit(): number {
-  const raw = process.env.CHAT_RUN_PROXY_GROSS_ABUSE_PER_MINUTE;
-  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
-  return Number.isSafeInteger(parsed) && parsed >= 1
-    ? parsed
-    : DEFAULT_GROSS_ABUSE_LIMIT;
-}
-
-function isRateLimited(ip: string, limit = getGrossAbuseLimit()): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-
-  if (!entry || now - entry.lastReset > WINDOW_MS) {
-    rateLimitMap.set(ip, { count: 1, lastReset: now });
-    return false;
-  }
-
-  entry.count++;
-  return entry.count > limit;
-}
 
 function shouldApplyContentSecurityPolicy(pathname: string) {
   return !pathname.startsWith("/api/");
@@ -137,23 +112,6 @@ function createRequestHeaderOverrides({
   return requestHeaderOverrides;
 }
 
-declare global {
-  var _rateLimitCleanup: ReturnType<typeof setInterval> | undefined;
-}
-
-if (typeof globalThis._rateLimitCleanup === "undefined") {
-  const cleanup = setInterval(() => {
-    const now = Date.now();
-    for (const [ip, entry] of rateLimitMap) {
-      if (now - entry.lastReset > WINDOW_MS * 2) {
-        rateLimitMap.delete(ip);
-      }
-    }
-  }, WINDOW_MS);
-  cleanup.unref?.();
-  globalThis._rateLimitCleanup = cleanup;
-}
-
 export async function proxy(request: NextRequest) {
   const canonicalRedirectUrl = getCanonicalRedirectUrl(request);
   if (canonicalRedirectUrl) {
@@ -169,27 +127,6 @@ export async function proxy(request: NextRequest) {
   const csp = shouldApplyContentSecurityPolicy(request.nextUrl.pathname)
     ? createCspRequestHeaders()
     : null;
-
-  if (request.nextUrl.pathname === "/api/chat/run") {
-    const ip = getClientIp(request.headers);
-    if (isRateLimited(ip)) {
-      return NextResponse.json(
-        {
-          error: {
-            code: "rate_limited" as const,
-            message: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
-          },
-        },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": "60",
-            "X-Rate-Limit-Scope": "proxy-gross-abuse",
-          },
-        },
-      );
-    }
-  }
 
   const response = await updateSession(request, {
     requestHeaderOverrides: createRequestHeaderOverrides({
@@ -216,7 +153,3 @@ export const config = {
     },
   ],
 };
-
-export function resetProxyRateLimitForTests() {
-  rateLimitMap.clear();
-}

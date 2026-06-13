@@ -20,10 +20,11 @@ import {
   buildChatSessionHref,
 } from "@/lib/chat/history-state";
 import { DEFAULT_LOCALE, isLocale } from "@/i18n/config";
-import { getSuggestedPromptsForTickers } from "@/lib/companies/landing-copy";
+import { getSuggestedPromptDisplaysForTickers } from "@/content/companies/display";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import { findQuestionTopic } from "@/lib/marketing/site";
 import { createClientId } from "@/lib/client-id";
+import { normalizeTicker } from "@/lib/ontology/ticker";
 import type {
   CreateSessionRequest,
   CreateSessionResponse,
@@ -146,9 +147,8 @@ function ChatContent() {
   const [composerDraftResetKey, setComposerDraftResetKey] = useState(0);
 
   const isDraftRoute = pathname === "/chat/new";
-  const shareStarterTicker =
-    shareStarter?.tickers[0]?.trim().toUpperCase() || null;
-  const activeTicker = ticker?.trim() || shareStarterTicker;
+  const shareStarterTicker = normalizeTicker(shareStarter?.tickers[0] ?? "");
+  const activeTicker = normalizeTicker(ticker ?? "") ?? shareStarterTicker;
 
   // H-07: cleanup on unmount to prevent race condition
   useEffect(() => {
@@ -231,7 +231,7 @@ function ChatContent() {
   const chat = useChat({
     sessionId: sessionId ?? "",
     scopeType: activeTicker ? "company" : "global",
-    defaultTickers: activeTicker ? [activeTicker.trim().toUpperCase()] : [],
+    defaultTickers: activeTicker ? [activeTicker] : [],
     researchMode,
     analysisMode,
     responseLocale,
@@ -440,7 +440,28 @@ function ChatContent() {
         .filter((sector): sector is string => Boolean(sector)),
     ),
   ).join(" / ");
-  const suggestedPrompts = getSuggestedPromptsForTickers(contextTickers);
+  const suggestedPrompts = getSuggestedPromptDisplaysForTickers(
+    responseLocale,
+    contextTickers,
+  );
+  const emptyStateCopy =
+    responseLocale === "ko"
+      ? {
+          headingWithContext: `${contextTickerText}에서 무엇을 확인할까요?`,
+          headingWithoutContext: "무엇을 확인할까요?",
+          introWithContext:
+            "매출 변화, 마진 흐름, 리스크 요인을 회사 보고서 기준으로 정리합니다.",
+          introWithoutContext:
+            "기업, 기간, 사업 흐름을 함께 적어 리서치를 시작하세요.",
+        }
+      : {
+          headingWithContext: `What should we check for ${contextTickerText}?`,
+          headingWithoutContext: "What should we check?",
+          introWithContext:
+            "Review revenue changes, margin trends, and risk factors from company filings.",
+          introWithoutContext:
+            "Start with a company, period, or business trend to begin the research.",
+        };
   const queryValue = queryParam?.trim() || null;
   const shareQuestionValue = shareStarter?.question_content.trim() || null;
   const templateQuestion =
@@ -1018,13 +1039,13 @@ function ChatContent() {
                   >
                     <h2 className="text-balance text-[24px] font-black leading-[1.16] text-ink sm:text-[38px]">
                       {contextTickers.length > 0
-                        ? `${contextTickerText}에서 무엇을 확인할까요?`
-                        : "무엇을 확인할까요?"}
+                        ? emptyStateCopy.headingWithContext
+                        : emptyStateCopy.headingWithoutContext}
                     </h2>
                     <p className="mt-4 max-w-2xl text-[15px] leading-7 text-body sm:text-[16px]">
                       {contextTickers.length > 0
-                        ? "매출 변화, 마진 흐름, 리스크 요인을 회사 보고서 기준으로 정리합니다."
-                        : "기업, 기간, 사업 흐름을 함께 적어 리서치를 시작하세요."}
+                        ? emptyStateCopy.introWithContext
+                        : emptyStateCopy.introWithoutContext}
                     </p>
                   </motion.div>
 

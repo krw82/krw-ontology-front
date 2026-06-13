@@ -45,10 +45,20 @@ function LoginContent() {
   const reducedMotion = useReducedMotion();
   const initialError = searchParams.get("error") === "oauth";
   const nextPath = normalizeInternalNextPath(searchParams.get("next"));
+  const desktopCode = normalizeDesktopCode(searchParams.get("desktop_code"));
+  const desktopNextPath = desktopCode
+    ? `/login?desktop_code=${encodeURIComponent(desktopCode)}`
+    : nextPath;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(
     initialError ? "Google 인증을 완료하지 못했습니다. 다시 시도해주세요." : null,
   );
+  const [desktopApprovalStatus, setDesktopApprovalStatus] = useState<
+    "idle" | "checking" | "signed_out" | "ready" | "approving" | "approved" | "error"
+  >(desktopCode ? "checking" : "idle");
+  const [desktopApprovalMessage, setDesktopApprovalMessage] = useState<
+    string | null
+  >(null);
   const [errorVisible, setErrorVisible] = useState(false);
   const errorRef = useRef<HTMLDivElement | null>(null);
   const oauthInFlightRef = useRef(false);
@@ -71,6 +81,62 @@ function LoginContent() {
     };
   }, [error]);
 
+  useEffect(() => {
+    if (!desktopCode) return;
+
+    let didCancel = false;
+    void Promise.resolve()
+      .then(async () => {
+        if (didCancel) return;
+        setDesktopApprovalStatus("checking");
+        setDesktopApprovalMessage(null);
+        const { data } = await supabase.auth.getUser();
+        if (!didCancel) {
+          setDesktopApprovalStatus(data.user ? "ready" : "signed_out");
+        }
+      })
+      .catch(() => {
+        if (!didCancel) setDesktopApprovalStatus("signed_out");
+      });
+
+    return () => {
+      didCancel = true;
+    };
+  }, [desktopCode, supabase]);
+
+  const handleDesktopApprove = async () => {
+    if (!desktopCode || desktopApprovalStatus === "approving") return;
+    setDesktopApprovalStatus("approving");
+    setDesktopApprovalMessage(null);
+
+    try {
+      const response = await fetch("/api/desktop/auth/device/approve", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ user_code: desktopCode }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.ok === false) {
+        throw new Error(
+          payload?.error?.public_message ??
+            payload?.error?.message ??
+            "Desktop 연결을 승인하지 못했습니다.",
+        );
+      }
+      setDesktopApprovalStatus("approved");
+      setDesktopApprovalMessage("승인 완료. KRW Desktop 앱으로 돌아가세요.");
+    } catch (approvalError) {
+      setDesktopApprovalStatus("error");
+      setDesktopApprovalMessage(
+        approvalError instanceof Error
+          ? approvalError.message
+          : "Desktop 연결을 승인하지 못했습니다.",
+      );
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     if (oauthInFlightRef.current) return;
     oauthInFlightRef.current = true;
@@ -83,10 +149,10 @@ function LoginContent() {
         "/auth/callback",
         getConfiguredAppOrigin() ?? window.location.origin,
       );
-      redirectTo.searchParams.set("next", nextPath);
+      redirectTo.searchParams.set("next", desktopNextPath);
       await trackClientEventWithTimeout("signup_started", {
         provider: "google",
-        next_path: nextPath,
+        next_path: desktopNextPath,
       });
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -212,34 +278,88 @@ function LoginContent() {
               </div>
             )}
 
-            <motion.button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-              aria-busy={loading}
-              whileTap={reducedMotion || loading ? undefined : { scale: 0.985 }}
-              className={`relative flex h-[52px] w-full items-center justify-center gap-sm rounded-[8px] border px-base text-[16px] font-extrabold leading-[1.15] text-ink shadow-[0_8px_20px_rgba(10,11,13,0.08)] transition-all duration-150 ease-out hover:border-primary hover:bg-primary-fixed disabled:cursor-not-allowed disabled:opacity-70 ${
-                loading ? "border-primary bg-primary-fixed" : "border-hairline bg-canvas"
-              }`}
-            >
-              <span className="pointer-events-none relative h-5 w-5 shrink-0">
-                <span
-                  aria-hidden="true"
-                  className={`absolute inset-0 transition-all duration-150 ease-out ${
-                    loading ? "opacity-0 scale-95" : "opacity-100 scale-100"
-                  }`}
-                >
-                  <GoogleMark />
+            {desktopCode && (
+              <div className="rounded-[8px] border border-primary/25 bg-primary-fixed/55 p-sm text-left">
+                <p className="text-[14px] font-extrabold leading-5 text-ink">
+                  KRW Desktop 연결 승인
+                </p>
+                <p className="mt-1 text-[13px] font-semibold leading-5 text-body">
+                  승인 코드 <span className="font-black text-ink">{desktopCode}</span>
+                </p>
+                {desktopApprovalStatus === "checking" && (
+                  <p className="mt-2 text-[13px] font-semibold leading-5 text-muted">
+                    로그인 상태 확인 중...
+                  </p>
+                )}
+                {desktopApprovalStatus === "signed_out" && (
+                  <p className="mt-2 text-[13px] font-semibold leading-5 text-muted">
+                    Google 로그인 후 이 Desktop 연결을 승인할 수 있습니다.
+                  </p>
+                )}
+                {(desktopApprovalStatus === "ready" ||
+                  desktopApprovalStatus === "approving" ||
+                  desktopApprovalStatus === "error") && (
+                  <button
+                    type="button"
+                    onClick={handleDesktopApprove}
+                    disabled={desktopApprovalStatus === "approving"}
+                    className="mt-3 h-[44px] w-full rounded-[8px] border border-primary bg-primary px-base text-[14px] font-extrabold leading-[1.15] text-on-primary transition-opacity disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {desktopApprovalStatus === "approving"
+                      ? "승인 중..."
+                      : "Desktop 연결 승인"}
+                  </button>
+                )}
+                {desktopApprovalMessage && (
+                  <p
+                    className={`mt-2 text-[13px] font-semibold leading-5 ${
+                      desktopApprovalStatus === "approved"
+                        ? "text-success"
+                        : "text-error"
+                    }`}
+                  >
+                    {desktopApprovalMessage}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {(!desktopCode ||
+              desktopApprovalStatus === "checking" ||
+              desktopApprovalStatus === "signed_out") && (
+              <motion.button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={loading || desktopApprovalStatus === "checking"}
+                aria-busy={loading}
+                whileTap={reducedMotion || loading ? undefined : { scale: 0.985 }}
+                className={`relative flex h-[52px] w-full items-center justify-center gap-sm rounded-[8px] border px-base text-[16px] font-extrabold leading-[1.15] text-ink shadow-[0_8px_20px_rgba(10,11,13,0.08)] transition-all duration-150 ease-out hover:border-primary hover:bg-primary-fixed disabled:cursor-not-allowed disabled:opacity-70 ${
+                  loading ? "border-primary bg-primary-fixed" : "border-hairline bg-canvas"
+                }`}
+              >
+                <span className="pointer-events-none relative h-5 w-5 shrink-0">
+                  <span
+                    aria-hidden="true"
+                    className={`absolute inset-0 transition-all duration-150 ease-out ${
+                      loading ? "opacity-0 scale-95" : "opacity-100 scale-100"
+                    }`}
+                  >
+                    <GoogleMark />
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className={`absolute inset-0 rounded-full border-2 border-primary border-t-transparent transition-all duration-150 ease-out ${
+                      loading ? "opacity-100 scale-100 animate-spin" : "opacity-0 scale-95"
+                    }`}
+                  />
                 </span>
-                <span
-                  aria-hidden="true"
-                  className={`absolute inset-0 rounded-full border-2 border-primary border-t-transparent transition-all duration-150 ease-out ${
-                    loading ? "opacity-100 scale-100 animate-spin" : "opacity-0 scale-95"
-                  }`}
-                />
-              </span>
-              {loading ? "Google로 이동 중..." : "Google로 무료 시작"}
-            </motion.button>
+                {loading
+                  ? "Google로 이동 중..."
+                  : desktopCode
+                    ? "Google로 로그인하고 계속"
+                    : "Google로 무료 시작"}
+              </motion.button>
+            )}
 
             <p className="text-center text-[13px] font-semibold leading-5 text-muted">
               무료 베타 · 카드 불필요 · 로그인 후 이전 화면으로 돌아갑니다.
@@ -261,6 +381,16 @@ function LoginContent() {
       </footer>
     </div>
   );
+}
+
+function normalizeDesktopCode(value: string | null): string | null {
+  if (!value) return null;
+  const normalized = value
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toUpperCase()
+    .slice(0, 8);
+  if (normalized.length !== 8) return null;
+  return `${normalized.slice(0, 4)}-${normalized.slice(4)}`;
 }
 
 export default function LoginPage() {

@@ -36,7 +36,8 @@ function configureDevOntologyEnv() {
       ? configuredRoot
       : defaultReleaseRoot;
   const manifestPath = join(releaseRoot, "manifest.json");
-  const indexPath = join(releaseRoot, "indexes", "agent_index.sqlite");
+  const globalSpinePath = join(releaseRoot, "indexes", "global_spine.sqlite");
+  const shardManifestPath = join(releaseRoot, "indexes", "shard_manifest.json");
   const pluginSourcePath = join(
     homedir(),
     "krw-ontology",
@@ -56,8 +57,11 @@ function configureDevOntologyEnv() {
   if (!isInsideRoot(process.env.KRW_ONTOLOGY_MANIFEST_PATH, releaseRoot)) {
     process.env.KRW_ONTOLOGY_MANIFEST_PATH = manifestPath;
   }
-  if (!isInsideRoot(process.env.KRW_ONTOLOGY_INDEX_PATH, releaseRoot)) {
-    process.env.KRW_ONTOLOGY_INDEX_PATH = indexPath;
+  if (!isInsideRoot(process.env.KRW_ONTOLOGY_GLOBAL_SPINE_PATH, releaseRoot)) {
+    process.env.KRW_ONTOLOGY_GLOBAL_SPINE_PATH = globalSpinePath;
+  }
+  if (!isInsideRoot(process.env.KRW_ONTOLOGY_SHARD_MANIFEST_PATH, releaseRoot)) {
+    process.env.KRW_ONTOLOGY_SHARD_MANIFEST_PATH = shardManifestPath;
   }
   process.env.KRW_ONTOLOGY_PLUGIN_SOURCE_PATH =
     process.env.KRW_ONTOLOGY_PLUGIN_SOURCE_PATH || pluginSourcePath;

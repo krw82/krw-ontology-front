@@ -268,7 +268,7 @@ function readyMcpHealth(): McpHealthResult {
     toolCount: 12,
     tools: ["krw_ontology_query_context"],
     root: "/srv/krw-ontology-data/current",
-    indexPath: "/srv/krw-ontology-data/current/indexes/agent_index.sqlite",
+    indexPath: "/srv/krw-ontology-data/current/indexes/global_spine.sqlite",
     pluginPath: "/srv/krw-ontology/plugins/krw-ontology",
     releaseMetadata: {
       env: "dev",
@@ -299,7 +299,7 @@ describe("agent job runner", () => {
       toolCount: null,
       tools: [],
       root: "/srv/krw-ontology-data/current",
-      indexPath: "/srv/krw-ontology-data/current/indexes/agent_index.sqlite",
+      indexPath: "/srv/krw-ontology-data/current/indexes/global_spine.sqlite",
       pluginPath: "/srv/krw-ontology/plugins/krw-ontology",
       releaseMetadata: null,
       error: "MCP unavailable",
@@ -433,6 +433,62 @@ describe("agent job runner", () => {
           expect.objectContaining({ type: "news_event_selection" }),
         ]),
       }),
+    );
+  });
+
+  it("marks server pipeline news discovery cancelled when a cancel is requested", async () => {
+    const fake = createRunnerAdmin({
+      runOverrides: {
+        run_kind: "news_discovery",
+        executor_type: "server_pipeline",
+        cancel_requested_at: "2026-05-25T00:00:01.000Z",
+      },
+    });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+    vi.mocked(checkMcpHealth).mockResolvedValue(readyMcpHealth());
+
+    await runAgentJob("run-1", "worker-1");
+
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: "messages",
+          payload: expect.objectContaining({
+            status: "cancelled",
+          }),
+          filters: { id: "assistant-message-1" },
+        }),
+        expect.objectContaining({
+          table: "agent_runs",
+          payload: expect.objectContaining({
+            status: "cancelled",
+            error_code: "cancelled",
+            lease_expires_at: null,
+          }),
+          filters: { id: "run-1" },
+        }),
+      ]),
+    );
+    expect(fake.rpc).toHaveBeenCalledWith("settle_execution_budget", {
+      p_user_id: "user-1",
+      p_request_id: "req-1",
+      p_run_id: "run-1",
+      p_actual_cost_usd: expect.any(Number),
+      p_terminal_status: "cancelled",
+      p_metadata: expect.objectContaining({
+        input_tokens: expect.any(Number),
+        output_tokens: expect.any(Number),
+        tool_call_count: 0,
+      }),
+    });
+    expect(appendAgentRunEvent).toHaveBeenCalledWith(
+      fake.admin,
+      "run-1",
+      "cancelled",
+      {
+        run_id: "run-1",
+        message_id: "assistant-message-1",
+      },
     );
   });
 
@@ -702,7 +758,7 @@ describe("agent job runner", () => {
       toolCount: 12,
       tools: ["krw_ontology_query_context"],
       root: "/srv/krw-ontology-data/current",
-      indexPath: "/srv/krw-ontology-data/current/indexes/agent_index.sqlite",
+      indexPath: "/srv/krw-ontology-data/current/indexes/global_spine.sqlite",
       pluginPath: "/srv/krw-ontology/plugins/krw-ontology",
       releaseMetadata: {
         env: "dev",

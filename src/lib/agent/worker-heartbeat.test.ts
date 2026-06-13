@@ -40,7 +40,7 @@ const mcpHealth = {
   tools: ["krw_ontology_query_context"],
   root: "~/krw-ontology-data",
   indexPath:
-    "~/krw-ontology-data/indexes/agent_index.sqlite",
+    "~/krw-ontology-data/indexes/global_spine.sqlite",
   pluginPath: "~/krw-ontology/plugins/krw-ontology",
   releaseMetadata: {
     env: "dev",
@@ -195,7 +195,7 @@ describe("agent worker heartbeat", () => {
         object_count: 30,
         tool_count: 12,
         root: "/data",
-        index_path: "/data/indexes/agent_index.sqlite",
+        index_path: "/data/indexes/global_spine.sqlite",
         manifest_path: "/data/manifest.json",
         manifest_valid: true,
         agent_index_schema_version: "agent_index_v1",
@@ -264,7 +264,7 @@ describe("agent worker heartbeat", () => {
         object_count: 30,
         tool_count: 12,
         root: "/data",
-        index_path: "/data/indexes/agent_index.sqlite",
+        index_path: "/data/indexes/global_spine.sqlite",
         manifest_path: "/data/manifest.json",
         manifest_valid: true,
         agent_index_schema_version: "agent_index_v1",

@@ -39,6 +39,15 @@ describe("chat history state", () => {
     expect(buildNewChatHref(params)).toBe("/chat/new?ticker=AAPL&query=margin");
   });
 
+  it("removes placeholder tickers from new chat URLs", () => {
+    const params = new URLSearchParams({
+      ticker: "UNKNOWN",
+      query: "margin",
+    });
+
+    expect(buildNewChatHref(params)).toBe("/chat/new?query=margin");
+  });
+
   it("adds a locale query only for non-default chat URLs", () => {
     const params = new URLSearchParams({ ticker: "AAPL" });
 
@@ -64,6 +73,16 @@ describe("chat history state", () => {
 
   it("uses the URL ticker while a new session is still loading", () => {
     expect(getSessionTickers(null, "005930")).toEqual(["005930"]);
+  });
+
+  it("removes placeholder tickers from session context", () => {
+    expect(
+      getSessionTickers(
+        { default_tickers: ["UNKNOWN", " aapl ", "unknown"] },
+        null,
+      ),
+    ).toEqual(["AAPL"]);
+    expect(getSessionTickers(null, "UNKNOWN")).toEqual([]);
   });
 
   it("hides active assistant draft content from visible history", () => {

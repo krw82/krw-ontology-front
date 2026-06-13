@@ -105,6 +105,25 @@ function createSupabase(overrides: {
       queriedTables.push(table);
       return {
         select() {
+          let orderKey: string | null = null;
+          let orderAscending = true;
+          let rowLimit: number | null = null;
+          const applyQueryWindow = <T extends Record<string, unknown>>(
+            rows: T[],
+          ) => {
+            const result = [...rows];
+            const activeOrderKey = orderKey;
+            if (activeOrderKey) {
+              result.sort((a, b) => {
+                const left = String(a[activeOrderKey] ?? "");
+                const right = String(b[activeOrderKey] ?? "");
+                return orderAscending
+                  ? left.localeCompare(right)
+                  : right.localeCompare(left);
+              });
+            }
+            return rowLimit == null ? result : result.slice(0, rowLimit);
+          };
           const query = {
             eq() {
               return query;
@@ -115,7 +134,16 @@ function createSupabase(overrides: {
             in() {
               return query;
             },
-            order() {
+            lt() {
+              return query;
+            },
+            order(key: string, options?: { ascending?: boolean }) {
+              orderKey = key;
+              orderAscending = options?.ascending ?? true;
+              return query;
+            },
+            limit(count: number) {
+              rowLimit = count;
               return query;
             },
             maybeSingle() {
@@ -130,13 +158,15 @@ function createSupabase(overrides: {
             returns() {
               if (table === "messages") {
                 return Promise.resolve({
-                  data: overrides.messagesError ? null : messages,
+                  data: overrides.messagesError
+                    ? null
+                    : applyQueryWindow(messages),
                   error: overrides.messagesError ?? null,
                 });
               }
               if (table === "agent_runs") {
                 return Promise.resolve({
-                  data: overrides.runsError ? null : runs,
+                  data: overrides.runsError ? null : applyQueryWindow(runs),
                   error: overrides.runsError ?? null,
                 });
               }
@@ -163,6 +193,12 @@ async function json(response: Response) {
     error?: { code: string; message: string };
     messages?: Array<Record<string, unknown>>;
     runs?: Array<Record<string, unknown>>;
+    message_pagination?: {
+      limit: number;
+      has_more: boolean;
+      before: string | null;
+      next_before: string | null;
+    };
     tool_calls?: Array<Record<string, unknown>>;
     citations?: Array<Record<string, unknown>>;
   }>;
@@ -219,6 +255,12 @@ describe("GET /api/chat/[sessionId]", () => {
     expect(body).toMatchObject({
       chat_artifacts: [],
       artifact_selections: [],
+      message_pagination: {
+        limit: 200,
+        has_more: false,
+        before: null,
+        next_before: null,
+      },
     });
     expect(body).not.toHaveProperty("tool_calls");
     expect(body).not.toHaveProperty("citations");

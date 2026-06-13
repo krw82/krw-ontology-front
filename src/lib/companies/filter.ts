@@ -1,3 +1,5 @@
+import { normalizeTicker } from "@/lib/ontology/ticker";
+
 export type CompanySortMode = "relevance" | "ticker";
 
 export interface CompanySearchRecord {
@@ -16,7 +18,9 @@ export function filterAndSortCompanies<T extends CompanySearchRecord>(
   search: string,
   sortBy: CompanySortMode = "relevance",
 ): T[] {
-  let nextCompanies = companies;
+  let nextCompanies = companies.filter((company) =>
+    Boolean(normalizeTicker(company.ticker)),
+  );
   const query = search.trim().toLowerCase();
 
   if (query) {

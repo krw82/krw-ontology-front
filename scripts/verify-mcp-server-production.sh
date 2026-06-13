@@ -96,8 +96,11 @@ function samePath(left, right) {
       env: payload.env,
       release_id: payload.release_id,
       manifest_valid: payload.manifest_valid,
+      index_layout: payload.index_layout,
+      global_spine_present: payload.global_spine_present,
+      company_shard_count: payload.company_shard_count,
       root: payload.root,
-      index_path: payload.index_path,
+      global_spine_path: payload.global_spine_path,
       documents: payload.documents,
       objects: payload.objects,
       tools: Array.isArray(payload.tools) ? payload.tools.length : null,
@@ -109,6 +112,12 @@ function samePath(left, right) {
       throw new Error(`MCP release mismatch: ${payload.release_id} !== ${expectedReleaseId}`);
     }
     if (payload.manifest_valid !== true) throw new Error("MCP health manifest_valid is not true");
+    if (payload.index_layout !== "global-spine-and-company-shards") {
+      throw new Error(`MCP health index_layout is not v3: ${payload.index_layout}`);
+    }
+    if (payload.global_spine_present !== true) {
+      throw new Error("MCP health global_spine_present is not true");
+    }
     if (expectedRoot && !samePath(payload.root, expectedRoot)) {
       throw new Error(`MCP root mismatch: ${payload.root} !== ${expectedRoot}`);
     }

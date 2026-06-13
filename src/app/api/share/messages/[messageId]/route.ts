@@ -7,6 +7,7 @@ import {
   ensureMessageShareQuestionSnapshot,
   findExistingActiveShare,
 } from "@/lib/share/message-share";
+import { buildSharePath, inferShareLocale } from "@/lib/share/share-locale";
 import { isUuid } from "@/lib/api/validation";
 import type { ChatSessionRow, MessageRow } from "@/types/database";
 
@@ -72,7 +73,8 @@ export async function POST(
     }
     const share =
       existing ?? (await createMessageShare({ userId: user.id, message, session }));
-    const shareUrl = `/share/${encodeURIComponent(share.token)}`;
+    const shareLocale = inferShareLocale({ answerContent: message.content });
+    const shareUrl = buildSharePath(share.token, shareLocale);
 
     await recordAnalyticsEventFromRequest(request, {
       eventName: "share_created",

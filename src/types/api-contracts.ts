@@ -1084,6 +1084,12 @@ export interface GetChatSessionResponse {
   session: Session;
   messages: Message[];
   runs: AgentRunSummary[];
+  message_pagination?: {
+    limit: number;
+    has_more: boolean;
+    before: string | null;
+    next_before: string | null;
+  };
   citations?: Citation[];
   tool_calls?: ToolCall[];
   chat_artifacts?: ChatArtifact[];

@@ -19,6 +19,7 @@ import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
 import { getPathLocale } from "@/i18n/routing";
 import type { SessionSummary } from "@/types/api-contracts";
+import { normalizeTickers } from "@/lib/ontology/ticker";
 
 interface ChatSidebarProps {
   activeSessionId: string | null;
@@ -511,6 +512,7 @@ function SessionRow({
   onEditingTitleChange: (value: string) => void;
   onRenameSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const visibleTickers = normalizeTickers(session.default_tickers);
   const handleSessionClick = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!onNavigate) return;
     if (
@@ -639,9 +641,9 @@ function SessionRow({
             </div>
             <div className="mt-xs flex items-center justify-between gap-xs text-[11px] leading-[1.3] text-muted-soft">
               <span>{formatRelativeDate(session.updated_at, locale)}</span>
-              {session.default_tickers.length > 0 && (
+              {visibleTickers.length > 0 && (
                 <span className="truncate font-mono">
-                  {session.default_tickers.join(", ")}
+                  {visibleTickers.join(", ")}
                 </span>
               )}
             </div>

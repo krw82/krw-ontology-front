@@ -126,7 +126,8 @@ if [ -n "$RELEASE_ID" ]; then
 fi
 
 if [ -z "$CATALOG_FILE" ]; then
-  CATALOG_FILE=$(mktemp "${TMPDIR:-/tmp}/krw-web-catalog.XXXXXX.json")
+  CATALOG_FILE="$(mktemp "${TMPDIR:-/tmp}/krw-web-catalog.XXXXXX")"
+  CATALOG_FILE="${CATALOG_FILE}.json"
   CLEAN_CATALOG=1
 else
   case "$CATALOG_FILE" in

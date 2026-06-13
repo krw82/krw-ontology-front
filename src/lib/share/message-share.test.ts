@@ -124,6 +124,32 @@ describe("findPublicMessageShare", () => {
       title: "최종 답변입니다.",
       question_content: "AAPL 서비스 매출 리스크를 정리해줘.",
       answer_content: "최종 답변입니다.",
+      locale: "ko",
+    });
+  });
+
+  it("infers English locale and removes internal trace labels for shared answers", async () => {
+    vi.mocked(getSupabaseAdmin).mockReturnValue(
+      createPublicShareAdmin({
+        token: "share-token",
+        title:
+          "Now let me verify the key MD&A quotes from the CY2025 10-K and get the CY2026Q1 10-Q segment details.",
+        question_content: "Should I cut losses on MU now?",
+        question_created_at: "2026-05-31T00:00:00.000Z",
+        answer_content:
+          "Now let me verify the key MD&A quotes from the CY2025 10-K and get the CY2026Q1 10-Q segment details.Based on Micron's latest filing, cutting losses now looks premature. *(Source: CY2025 10-K, Item 7 MD&A, verified by trace)*",
+        answer_created_at: "2026-05-31T00:00:00.000Z",
+        tickers: ["MU"],
+        created_at: "2026-05-31T00:00:00.000Z",
+      }),
+    );
+
+    await expect(findPublicMessageShare("share-token")).resolves.toMatchObject({
+      title: "Based on Micron's latest filing, cutting losses now looks premature. (Source: CY2025 10-K...",
+      question_content: "Should I cut losses on MU now?",
+      answer_content:
+        "Based on Micron's latest filing, cutting losses now looks premature. *(Source: CY2025 10-K, Item 7 MD&A)*",
+      locale: "en",
     });
   });
 });
@@ -151,6 +177,25 @@ describe("findPublicShareStarter", () => {
       token: "share-token",
       title: "답변 본문",
       question_content: "AAPL 서비스 매출 리스크를 정리해줘.",
+      tickers: ["AAPL"],
+    });
+  });
+
+  it("removes placeholder tickers from shared starter data", async () => {
+    vi.mocked(getSupabaseAdmin).mockReturnValue(
+      createPublicShareAdmin({
+        token: "share-token",
+        title: "공유된 답변",
+        question_content: "서비스 매출 리스크를 정리해줘.",
+        question_created_at: "2026-05-31T00:00:00.000Z",
+        answer_content: "답변 본문",
+        answer_created_at: "2026-05-31T00:00:00.000Z",
+        tickers: ["UNKNOWN", " aapl ", "unknown"],
+        created_at: "2026-05-31T00:00:00.000Z",
+      }),
+    );
+
+    await expect(findPublicShareStarter("share-token")).resolves.toMatchObject({
       tickers: ["AAPL"],
     });
   });
@@ -187,7 +232,7 @@ describe("createMessageShare", () => {
       claude_session_id: null,
       client_request_id: null,
       scope_type: "company",
-      default_tickers: ["AAPL"],
+      default_tickers: ["UNKNOWN", "AAPL"],
       default_document_types: [],
       last_message_preview: null,
       last_message_at: null,

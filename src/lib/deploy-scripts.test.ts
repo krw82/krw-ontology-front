@@ -6,19 +6,6 @@ function read(path: string) {
 }
 
 describe("production deploy scripts", () => {
-  it("keeps legacy GCP agent-worker stopped during ontology data switches", () => {
-    const script = read("scripts/deploy-data-production.sh");
-
-    expect(script).toContain("stop agent-worker web");
-    expect(script).toContain("stop agent-worker || true");
-    expect(script).toContain("up -d web");
-    expect(script).toContain("restart web");
-    expect(script).not.toContain("up -d web agent-worker");
-    expect(script).not.toContain("restart web agent-worker");
-    expect(script).not.toContain("exec -T agent-worker node");
-    expect(script).toContain("https://www.krwontology.com/api/healthz");
-  });
-
   it("routes production code deploys through split web and Mac worker lanes", () => {
     const deployProd = read("scripts/deploy-production.sh");
     const deployAll = read("scripts/deploy-all-production.sh");
@@ -54,10 +41,9 @@ describe("production deploy scripts", () => {
     expect(packageJson).toContain('"deploy:plugin": "scripts/deploy-plugin-worker-production.sh"');
     expect(packageJson).toContain('"deploy:mcp": "scripts/deploy-plugin-worker-production.sh"');
     expect(packageJson).toContain('"legacy:gcp-mcp": "scripts/deploy-plugin-production.sh"');
-    expect(packageJson).toContain('"legacy:data-gcp": "scripts/deploy-data-production.sh"');
+    expect(packageJson).not.toContain("deploy-data-production.sh");
     expect(packageJson).toContain('"deploy:plugin:gcp": "scripts/deploy-plugin-production.sh"');
     expect(packageJson).toContain('"deploy:legacy:gcp-mcp": "scripts/deploy-plugin-production.sh"');
-    expect(packageJson).toContain('"deploy:legacy:data-gcp": "scripts/deploy-data-production.sh"');
     expect(packageJson).toContain('"publish:web-catalog": "node scripts/publish-web-catalog.mjs"');
     expect(packageJson).toContain('"verify:web-catalog": "node scripts/verify-web-catalog-release.mjs"');
     expect(packageJson).toContain('"mcp:prod:start": "scripts/start-mcp-server-production.sh"');
@@ -158,7 +144,8 @@ describe("production deploy scripts", () => {
     expect(script).toContain("--release-id");
     expect(script).toContain("DEPLOY_ARGS=\"$DEPLOY_ARGS --release-id $1\"");
     expect(script).toContain("--no-publish-prod");
-    expect(script).toContain("--no-rebuild-agent-index");
+    expect(script).toContain("--no-refresh-index");
+    expect(script).not.toContain("--no-rebuild-agent-index");
     expect(script).toContain("ONTOLOGY_SOURCE_DIR=");
     expect(script).toContain("uv run krw-ontology");
     expect(script).toContain("queue status --root \"$QUEUE_ROOT\" --json");
@@ -206,7 +193,9 @@ describe("production deploy scripts", () => {
     expect(workerSection).not.toContain("AGENT_WORKER_POLL_INTERVAL_MS");
     expect(workerSection).toContain("healthcheck:");
     expect(workerSection).toContain(".worker/agent-worker.mjs");
-    expect(workerSection).toContain("agent_index.sqlite");
+    expect(workerSection).toContain("global_spine.sqlite");
+    expect(workerSection).toContain("shard_manifest.json");
+    expect(workerSection).not.toContain("agent_index.sqlite");
     expect(workerSection).toContain(".mcp.json");
     expect(webSection).not.toContain("KRW_ONTOLOGY_RELEASE_ROOT");
     expect(webSection).not.toContain("agent_index.sqlite");
@@ -264,7 +253,7 @@ describe("production deploy scripts", () => {
     expect(preflight).toContain("KRW_ONTOLOGY_MCP_URL");
     expect(preflight).toContain("Plugin .mcp.json MCP URL mismatch");
     expect(preflight).toContain("MCP HTTP health is not ok");
-    expect(preflight).toContain("idx_company_topic_scope");
+    expect(preflight).toContain("global_spine_present");
     expect(preflight).toContain("health_payload");
     expect(preflight).toContain("agent_runs");
 
@@ -441,7 +430,8 @@ describe("production deploy scripts", () => {
     expect(devScript).toContain('"current"');
     expect(devScript).toContain("isProdReleaseRoot");
     expect(devScript).toContain("KRW_DEV_ALLOW_PROD_ONTOLOGY");
-    expect(devScript).toContain("KRW_ONTOLOGY_INDEX_PATH");
+    expect(devScript).toContain("KRW_ONTOLOGY_GLOBAL_SPINE_PATH");
+    expect(devScript).toContain("KRW_ONTOLOGY_SHARD_MANIFEST_PATH");
     expect(devScript).toContain("KRW_DEV_WORKER_NICE");
     expect(devScript).toContain('["-n", String(devWorkerNice), process.execPath, workerOutfile]');
     expect(devScript).toContain('stdio: ["pipe", "inherit", "inherit"]');
@@ -451,6 +441,7 @@ describe("production deploy scripts", () => {
     expect(serverConfigSpread).toBeGreaterThan(-1);
     expect(processEnvSpread).toBeGreaterThan(serverConfigSpread);
     expect(mcpClient).toContain('path.join(root, "manifest.json")');
-    expect(mcpClient).toContain('path.join(root, "indexes", "agent_index.sqlite")');
+    expect(mcpClient).toContain('path.join(root, "indexes", "global_spine.sqlite")');
+    expect(mcpClient).toContain('path.join(root, "indexes", "shard_manifest.json")');
   });
 });

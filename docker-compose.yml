@@ -107,7 +107,8 @@ services:
       - KRW_ONTOLOGY_RELEASE_ROOT=/srv/krw-ontology-data/current
       - KRW_ONTOLOGY_ROOT=/srv/krw-ontology-data/current
       - KRW_ONTOLOGY_MANIFEST_PATH=/srv/krw-ontology-data/current/manifest.json
-      - KRW_ONTOLOGY_INDEX_PATH=/srv/krw-ontology-data/current/indexes/agent_index.sqlite
+      - KRW_ONTOLOGY_GLOBAL_SPINE_PATH=/srv/krw-ontology-data/current/indexes/global_spine.sqlite
+      - KRW_ONTOLOGY_SHARD_MANIFEST_PATH=/srv/krw-ontology-data/current/indexes/shard_manifest.json
       - KRW_ONTOLOGY_PLUGIN_PATH=/app/krw-ontology/plugins/krw-ontology
       - CLAUDE_AGENT_CWD=/app/agent-workspace
       - CLAUDE_CODE_EXECUTABLE=/usr/local/bin/claude-prod
@@ -140,7 +141,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "const fs=require('fs'); for (const p of ['.worker/agent-worker.mjs', process.env.KRW_ONTOLOGY_INDEX_PATH || process.env.KRW_ONTOLOGY_ROOT + '/indexes/agent_index.sqlite', process.env.KRW_ONTOLOGY_PLUGIN_PATH + '/.mcp.json']) fs.accessSync(p, fs.constants.R_OK);",
+          "const fs=require('fs'); for (const p of ['.worker/agent-worker.mjs', process.env.KRW_ONTOLOGY_GLOBAL_SPINE_PATH || process.env.KRW_ONTOLOGY_ROOT + '/indexes/global_spine.sqlite', process.env.KRW_ONTOLOGY_SHARD_MANIFEST_PATH || process.env.KRW_ONTOLOGY_ROOT + '/indexes/shard_manifest.json', process.env.KRW_ONTOLOGY_PLUGIN_PATH + '/.mcp.json']) fs.accessSync(p, fs.constants.R_OK);",
         ]
       interval: 30s
       timeout: 5s

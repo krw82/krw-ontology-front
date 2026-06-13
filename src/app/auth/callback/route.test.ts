@@ -101,6 +101,18 @@ describe("GET /auth/callback", () => {
     );
   });
 
+  it("preserves desktop approval code redirects after OAuth", async () => {
+    const response = await GET(
+      new Request(
+        "http://internal.local/auth/callback?code=ok&next=%2Flogin%3Fdesktop_code%3DABCD-1234",
+      ),
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "http://internal.local/login?desktop_code=ABCD-1234",
+    );
+  });
+
   it("reports OAuth provider errors without trying code exchange", async () => {
     const exchangeCodeForSession = vi.fn();
     vi.mocked(createClient).mockResolvedValue({

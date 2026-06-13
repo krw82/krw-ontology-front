@@ -8,7 +8,11 @@ import type {
 import type { EntitlementStatus } from "@/types/entitlement";
 import { isAdminEntitlementEmail } from "./admin-emails";
 import { buildEntitlementStatus } from "./entitlement-model";
-import { getCurrentBillingPeriod } from "./period";
+import {
+  getCurrentBillingPeriod,
+  getCurrentDailyBillingPeriod,
+  getCurrentMonthlyBillingPeriod,
+} from "./period";
 import { getBillingPlanFromStore } from "./plan-store";
 import { DEFAULT_PLAN_KEY, resolvePlanKey } from "./plans";
 
@@ -28,8 +32,13 @@ export async function getEntitlementStatus(
   const planKey = isAdmin ? "internal" : await loadPlanKey(userId);
   const plan = await getBillingPlanFromStore(planKey);
   const period = getCurrentBillingPeriod(plan.budgetPeriod);
-  const dailyPeriod = getCurrentBillingPeriod("daily");
-  const budget = await loadExecutionBudgetSnapshot(userId, period, dailyPeriod);
+  const monthlyPeriod = getCurrentMonthlyBillingPeriod();
+  const dailyPeriod = getCurrentDailyBillingPeriod();
+  const budget = await loadExecutionBudgetSnapshot(
+    userId,
+    monthlyPeriod,
+    dailyPeriod,
+  );
 
   return buildEntitlementStatus({
     planKey,

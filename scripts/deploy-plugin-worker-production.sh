@@ -51,6 +51,13 @@ require_path() {
   fi
 }
 
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1" >&2
+    exit 1
+  fi
+}
+
 require_path "$ENV_PATH"
 
 set -a
@@ -59,10 +66,18 @@ set -a
 set +a
 
 ONTOLOGY_SOURCE_DIR=${KRW_ONTOLOGY_SOURCE_DIR:-"$HOME/krw-ontology"}
+require_command uv
 require_path "$ONTOLOGY_SOURCE_DIR/pyproject.toml"
 require_path "$ONTOLOGY_SOURCE_DIR/src/krw_ontology"
 PLUGIN_SOURCE_PATH=${KRW_ONTOLOGY_PLUGIN_SOURCE_PATH:-"$ONTOLOGY_SOURCE_DIR/plugins/krw-ontology"}
 require_path "$PLUGIN_SOURCE_PATH/.claude-plugin/plugin.json"
+
+echo "Checking KRW Ontology prod release startup contract..."
+(cd "$ONTOLOGY_SOURCE_DIR" && uv run krw-ontology release verify \
+  --startup-check \
+  --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
+  --env prod \
+  --require-current-symlink)
 
 node "$SCRIPT_DIR/materialize-ontology-plugin.mjs" \
   --env prod \

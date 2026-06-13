@@ -41,11 +41,11 @@ while [ "$#" -gt 0 ]; do
       DATA_ARGS="$DATA_ARGS --dry-run"
       ;;
     --replace-remote-data)
-      echo "--replace-remote-data is legacy-only; use legacy:data-gcp for VM data uploads." >&2
+      echo "--replace-remote-data was removed. Full ontology SQLite data stays on the Mac worker v3 release root." >&2
       exit 1
       ;;
     --skip-prune)
-      echo "--skip-prune is legacy-only; use legacy:data-gcp for VM data uploads." >&2
+      echo "--skip-prune was removed with the GCP ontology data upload path." >&2
       exit 1
       ;;
     --release-id)

@@ -3946,6 +3946,504 @@ export const COMPANY_RESEARCH_PROFILES = {
     ],
     questionChains: {},
   },
+  AMT: {
+    ticker: "AMT",
+    companyName: "American Tower Corporation",
+    companyNameKo: "아메리칸 타워",
+    sectorKo: "통신 인프라 REIT",
+    signature: "communications real estate에서 tower leasing, colocation, tenant billings를 만들고 CoreSite data centers와 AFFO 전환을 함께 봐야 하는 글로벌 통신 인프라 REIT.",
+    description: "아메리칸 타워는 미국·캐나다, 유럽, 라틴아메리카, Africa & APAC의 통신 타워와 CoreSite data centers를 운영합니다. 공시 해석에서는 tower leasing의 tenant billings, colocation, amendment, straight-line revenue 조정이 organic tenant billings growth로 이어지는지 확인해야 합니다. DISH 같은 tenant churn과 특정 고객 분쟁은 임대수익 안정성을 흔들 수 있고, data centers는 전력·냉각·interconnection 수요와 capital expenditure가 AFFO 전환 속도를 좌우합니다. REIT 특성상 금리, 부채 만기, 환율, 배당 여력도 사업 성장만큼 중요합니다.",
+    researchFocus: [
+      "tower leasing의 tenant billings, colocation, amendment, tenant churn 변화",
+      "CoreSite data centers의 rental, power, interconnection 수익과 전력·냉각 제약",
+      "지역별 U.S. & Canada, Europe, Latin America, Africa & APAC site 수익성 차이",
+      "AFFO, capital expenditure, 부채비용, 배당 여력의 연결 구조"
+    ],
+    riskVariables: [
+      "DISH 등 대형 tenant churn과 임대료 분쟁에 따른 organic growth 둔화",
+      "data centers 전력 확보, 냉각, 허가, utility 계약 지연",
+      "금리 상승, refinancing, 환율 변동이 AFFO와 배당 여력에 미치는 압박",
+      "통신사 network spending 둔화와 tower colocation 수요 약화"
+    ],
+    suggestedPrompts: [
+      "아메리칸 타워의 tower leasing에서 tenant billings, colocation, tenant churn이 AFFO에 어떻게 연결되는지 정리해줘.",
+      "CoreSite data centers가 아메리칸 타워의 기존 통신 타워 사업과 다른 수익·비용 구조를 갖는지 설명해줘.",
+      "DISH 같은 대형 tenant 이탈, 금리, 환율이 아메리칸 타워의 배당 여력과 현금흐름에 미치는 영향을 분석해줘.",
+    ],
+    questionChains: {},
+  },
+  CSX: {
+    ticker: "CSX",
+    companyName: "CSX Corporation",
+    companyNameKo: "CSX",
+    sectorKo: "철도 운송",
+    signature: "미국 동부 철도망에서 merchandise, intermodal, coal, trucking 물동량을 운송하며, fuel surcharge와 operating ratio, train velocity·dwell이 수익성과 서비스 품질을 함께 보여주는 화물철도 기업.",
+    description: "CSX는 동부 미국 철도 네트워크와 intermodal 터미널을 기반으로 산업재, 농산물, 자동차, 화학, 석탄, 컨테이너 화물을 운송합니다. 공시 해석에서는 merchandise, intermodal, coal의 물동량과 운임 mix를 나눠 보고, fuel surcharge가 연료비 변동을 얼마나 상쇄하는지 확인해야 합니다. operating ratio, train velocity, terminal dwell, on-time performance는 네트워크 효율과 고객 서비스 수준을 동시에 보여주는 핵심 지표입니다. 노무 계약, 안전 규제, hazardous materials, 석탄 수요와 다른 운송모드 경쟁은 마진과 물동량을 흔드는 주요 변수입니다.",
+    researchFocus: [
+      "merchandise, intermodal, coal, trucking의 물동량·운임 mix와 매출 기여",
+      "fuel surcharge와 locomotive fuel 비용이 operating income에 반영되는 방식",
+      "operating ratio, train velocity, terminal dwell, trip plan compliance의 서비스 품질 신호",
+      "동부 네트워크, intermodal 터미널, coal export·domestic 수요가 자산 활용도에 미치는 영향"
+    ],
+    riskVariables: [
+      "연료 가격 변동과 fuel surcharge 회수 시차",
+      "coal 수요 약화, natural gas 가격, export coal 시장 변동",
+      "노무 계약, 안전 규제, hazardous materials 관련 비용 증가",
+      "truck 경쟁, 경기 둔화, 기상 재해로 인한 물동량·네트워크 생산성 저하"
+    ],
+    suggestedPrompts: [
+      "CSX의 merchandise, intermodal, coal 물동량과 운임 mix가 매출과 operating ratio에 어떻게 연결되는지 정리해줘.",
+      "fuel surcharge와 연료비 변동이 CSX의 영업이익과 현금흐름에 미치는 영향을 공시 기준으로 설명해줘.",
+      "train velocity, terminal dwell, on-time performance가 CSX의 서비스 품질과 마진에 어떤 신호를 주는지 분석해줘.",
+    ],
+    questionChains: {},
+  },
+  CI: {
+    ticker: "CI",
+    companyName: "The Cigna Group",
+    companyNameKo: "시그나 그룹",
+    sectorKo: "헬스케어·보험",
+    signature: "Evernorth Health Services의 pharmacy benefit services와 Cigna Healthcare의 보험 사업을 나눠 보며, claims mix, rebate 구조, medical care ratio가 수익성을 좌우하는 헬스케어 기업.",
+    description: "시그나 그룹은 Evernorth Health Services와 Cigna Healthcare를 통해 약제 급여 관리, specialty care, 의료보험, 국제 건강보험 사업을 운영합니다. 공시 해석에서는 Evernorth의 pharmacy claim volume, specialty drug mix, rebate와 제조사 협상 구조가 조정 매출과 마진에 어떻게 반영되는지 봐야 합니다. Cigna Healthcare는 premium rate, 회원 수, medical cost trend, utilization, medical care ratio가 핵심이고, Medicare Advantage 등 일부 사업 매각 이후에는 과거 비교보다 남은 사업의 margin 흐름을 더 중요하게 봐야 합니다.",
+    researchFocus: [
+      "Evernorth Pharmacy Benefit Services의 claim volume, specialty drug mix, rebate 구조",
+      "Specialty and Care Services의 고객 확장, 약제 유통, care management 수익",
+      "Cigna Healthcare의 premium rate, 회원 수, medical care ratio, utilization 변화",
+      "Medicare Advantage·PDP 매각 이후 남은 사업 믹스와 현금흐름 비교 가능성"
+    ],
+    riskVariables: [
+      "고가 specialty drug 비중 증가와 제조사 약가 상승에 따른 pharmacy margin 압박",
+      "rebate-free 모델 전환과 PBM 규제 강화로 인한 계약 구조 변화",
+      "medical cost trend, utilization, unit cost 상승에 따른 medical care ratio 악화",
+      "사업 매각 이후 비교 기준 왜곡, 보험부채·제조사 미수금 타이밍에 따른 현금흐름 변동"
+    ],
+    suggestedPrompts: [
+      "시그나의 Evernorth에서 pharmacy claim volume, specialty drug mix, rebate 구조가 마진에 어떻게 연결되는지 정리해줘.",
+      "Cigna Healthcare의 premium rate, utilization, medical care ratio가 보험 사업 수익성에 미치는 영향을 설명해줘.",
+      "Medicare Advantage 등 매각 이후 시그나의 남은 성장 축과 비교 기준 변화가 어떤 의미를 갖는지 분석해줘.",
+    ],
+    questionChains: {},
+  },
+  DELL: {
+    ticker: "DELL",
+    companyName: "Dell Technologies Inc.",
+    companyNameKo: "델 테크놀로지스",
+    sectorKo: "서버·PC·스토리지",
+    signature: "Infrastructure Solutions Group의 AI servers와 storage, Client Solutions Group의 commercial PC 수요를 함께 보며, AI mix가 gross margin·재고·운전자본을 흔드는 하드웨어 플랫폼 기업.",
+    description: "델 테크놀로지스는 Infrastructure Solutions Group(ISG)과 Client Solutions Group(CSG)을 통해 서버, storage, networking, commercial PC, consumer PC, 서비스 매출을 만듭니다. 공시 해석에서는 AI-optimized servers와 traditional servers의 성장 속도, storage 수요, CSG commercial refresh가 매출을 얼마나 지탱하는지 나눠 봐야 합니다. AI server mix 확대는 매출 성장을 키우지만 부품 조달, 메모리 비용, 재고와 매출채권 증가, gross margin 희석을 동반할 수 있습니다. deferred revenue, remaining performance obligations, channel inventory는 향후 매출 인식과 현금흐름 가시성을 판단하는 핵심 지표입니다.",
+    researchFocus: [
+      "ISG의 AI-optimized servers, traditional servers and networking, storage 매출·마진 구조",
+      "CSG의 commercial PC, consumer PC, services 수요와 PC refresh 사이클",
+      "AI server mix가 gross margin, 부품 조달, inventory, accounts receivable에 미치는 영향",
+      "deferred revenue, remaining performance obligations, channel inventory의 매출 인식 신호"
+    ],
+    riskVariables: [
+      "AI server 수요의 고객별 주문 타이밍 변동과 backlog 전환 불확실성",
+      "메모리·GPU·부품 비용 상승과 supply constraint에 따른 gross margin 압박",
+      "재고와 매출채권 증가로 인한 working capital 부담",
+      "PC refresh 둔화, 가격 경쟁, 서비스 재판매 축소에 따른 CSG 수익성 약화"
+    ],
+    suggestedPrompts: [
+      "델의 ISG에서 AI-optimized servers, traditional servers, storage가 매출과 마진에 어떻게 다르게 기여하는지 정리해줘.",
+      "AI server mix 확대가 델의 gross margin, 재고, 매출채권, 현금흐름에 미치는 영향을 공시 기준으로 설명해줘.",
+      "CSG commercial PC 수요와 deferred revenue, RPO가 델의 향후 매출 가시성에 주는 신호를 분석해줘.",
+    ],
+    questionChains: {},
+  },
+  EMR: {
+    ticker: "EMR",
+    companyName: "Emerson Electric Co.",
+    companyNameKo: "에머슨 일렉트릭",
+    sectorKo: "산업 자동화",
+    signature: "Software & Systems, Intelligent Devices, Safety & Productivity를 통해 공정·하이브리드·이산 제조 자동화를 제공하며, AspenTech와 backlog 전환이 마진과 현금흐름을 좌우하는 자동화 기업.",
+    description: "에머슨 일렉트릭은 DeltaV, Ovation, AspenTech, Test & Measurement, Final Control, Measurement & Analytical, Safety & Productivity 제품군을 통해 process, hybrid, discrete automation 고객을 지원합니다. 공시 해석에서는 Software & Systems의 소프트웨어 갱신과 Test & Measurement 수요, Intelligent Devices의 밸브·계측·분석 장비 수요, Safety & Productivity의 산업 현장 생산성 솔루션을 나눠 봐야 합니다. AspenTech 통합은 소프트웨어와 자산 최적화 비중을 높이는 축이지만 무형자산 상각, 인수 비용, 갱신 타이밍 변동도 함께 만듭니다. backlog 전환 속도와 지역별 주문 흐름은 단기 매출 가시성의 핵심 신호입니다.",
+    researchFocus: [
+      "Software & Systems의 DeltaV, Ovation, AspenTech, Test & Measurement 수요",
+      "Intelligent Devices의 Final Control, Measurement & Analytical, discrete automation 장비 흐름",
+      "AspenTech 통합 이후 소프트웨어 mix, recurring revenue, 무형자산 상각 영향",
+      "backlog 전환, 가격 조정, 관세·환율·원재료 비용이 margin에 반영되는 방식"
+    ],
+    riskVariables: [
+      "소프트웨어 갱신 타이밍 지연과 대형 자동화 프로젝트 발주 둔화",
+      "관세, 원자재, 전자부품 비용 상승을 가격 조정으로 상쇄하지 못할 위험",
+      "AspenTech 통합 비용, 무형자산 상각, 포트폴리오 재편에 따른 이익 변동",
+      "에너지·화학·산업 고객의 설비투자 사이클 둔화와 지역별 수요 편차"
+    ],
+    suggestedPrompts: [
+      "에머슨의 Software & Systems와 Intelligent Devices가 매출·마진에서 어떻게 다른지 공시 기준으로 정리해줘.",
+      "AspenTech 통합이 에머슨의 소프트웨어 mix, recurring revenue, 무형자산 상각 부담에 어떤 변화를 주는지 설명해줘.",
+      "backlog 전환, 관세, 원자재 비용, 자동화 프로젝트 발주가 에머슨의 현금흐름에 미치는 영향을 분석해줘.",
+    ],
+    questionChains: {},
+  },
+  APO: {
+    ticker: "APO",
+    companyName: "Apollo Global Management, Inc.",
+    companyNameKo: "아폴로 글로벌 매니지먼트",
+    sectorKo: "대체자산 운용",
+    signature: "Asset Management와 Athene 중심 Retirement Services를 결합해 AUM, FRE, spread-related earnings, origination이 함께 움직이는 대체자산 운용사.",
+    description: "아폴로는 private credit, equity, real assets, insurance-linked retirement assets를 운용하고 Athene·Athora 등 Retirement Services와 연결된 자산 조달·투자 구조를 갖고 있습니다. 공시 해석에서는 AUM과 Fee-Generating AUM 증가가 management fees와 FRE로 얼마나 전환되는지, Athene의 spread-related earnings가 net spread와 투자 포트폴리오 수익률에 얼마나 민감한지 확인해야 합니다. origination, deployment, realizations, carried interest는 시장 환경과 거래 회전 속도에 따라 이익의 질을 크게 바꿉니다.",
+    researchFocus: [
+      "AUM, Fee-Generating AUM, management fees, FRE의 성장 연결",
+      "Athene·Athora 기반 Retirement Services의 net spread와 spread-related earnings",
+      "origination, asset-backed finance, private credit deployment가 수수료와 보험자산에 미치는 영향",
+      "realizations, carried interest, 투자 성과가 변동 이익과 배당 여력에 주는 신호"
+    ],
+    riskVariables: [
+      "금리와 credit spread 변화로 net spread와 spread-related earnings가 압박될 위험",
+      "시장 침체로 deployment, realizations, carried interest 인식이 지연될 가능성",
+      "보험 계리 가정, 대체투자 평가, 유동성 수요가 Retirement Services 이익을 흔들 위험",
+      "대형 M&A·보험 플랫폼 통합과 규제 자본 요구가 fee mix와 자본배분에 주는 부담"
+    ],
+    suggestedPrompts: [
+      "아폴로의 AUM과 Fee-Generating AUM이 management fees와 FRE로 어떻게 전환되는지 공시 기준으로 정리해줘.",
+      "Athene 중심 Retirement Services에서 net spread와 spread-related earnings가 어떤 변수에 민감한지 설명해줘.",
+      "origination, deployment, realizations, carried interest가 아폴로의 이익 변동성과 배당 여력에 미치는 영향을 분석해줘.",
+    ],
+    questionChains: {},
+  },
+  HWM: {
+    ticker: "HWM",
+    companyName: "Howmet Aerospace Inc.",
+    companyNameKo: "하우메트 에어로스페이스",
+    sectorKo: "항공우주 부품",
+    signature: "Engine Products, Fastening Systems, Engineered Structures, Forged Wheels를 통해 항공 엔진·방산·가스터빈·상용차 휠 수요를 받는 경량 금속 부품 기업.",
+    description: "하우메트 에어로스페이스는 항공 엔진용 investment castings, airfoils, fasteners, titanium structures, forged wheels 같은 고부가 금속 부품을 생산합니다. 공시 해석에서는 Engine Products와 Fastening Systems가 상업 항공·방산 항공·가스터빈 수요에 얼마나 민감한지, Engineered Structures가 titanium·aluminum 가공과 airframe·landing gear 수요에서 어떤 마진을 내는지 봐야 합니다. titanium, aluminum, nickel, cobalt, 에너지 비용을 가격 인상과 inflationary cost pass-through로 얼마나 전가하는지, GE Aerospace·RTX 같은 대형 고객 의존도가 핵심 리스크입니다.",
+    researchFocus: [
+      "Engine Products의 engine spares, airfoils, investment casting, 가스터빈 수요",
+      "Fastening Systems와 Engineered Structures의 항공기·엔진·landing gear 부품 노출",
+      "Forged Wheels의 상용 운송·heavy-duty truck 사이클 민감도",
+      "titanium, aluminum, nickel, cobalt, 에너지 비용과 가격 전가 구조"
+    ],
+    riskVariables: [
+      "GE Aerospace, RTX 등 대형 고객 생산 일정과 항공 엔진 수요 변동",
+      "원자재·에너지·관세 비용을 가격 인상으로 충분히 전가하지 못할 위험",
+      "상업 항공 생산 지연, 방산 프로그램 일정 변경, 공급망 병목",
+      "인수 통합, 제품 라인 재편, 품질·납기 문제로 인한 마진 압박"
+    ],
+    suggestedPrompts: [
+      "하우메트의 Engine Products, Fastening Systems, Engineered Structures, Forged Wheels가 매출·마진에서 어떻게 다른지 정리해줘.",
+      "상업 항공, 방산 항공, 가스터빈 수요가 하우메트의 engine spares와 fasteners에 미치는 영향을 설명해줘.",
+      "titanium, aluminum, nickel, cobalt 비용과 대형 고객 의존도가 하우메트의 마진 방어력에 주는 리스크를 분석해줘.",
+    ],
+    questionChains: {},
+  },
+  KKR: {
+    ticker: "KKR",
+    companyName: "KKR & Co. Inc.",
+    companyNameKo: "KKR",
+    sectorKo: "대체자산 운용",
+    signature: "Private Equity, Real Assets, Credit & Liquid Strategies와 Global Atlantic 보험 플랫폼을 결합해 FPAUM, FRE, carried interest, realizations가 함께 움직이는 대체자산 운용사.",
+    description: "KKR은 자산운용, capital markets, 보험 플랫폼 Global Atlantic을 함께 운영합니다. 공시 해석에서는 AUM보다 Fee Paying AUM(FPAUM)이 management fees와 FRE로 얼마나 전환되는지, Private Equity·Real Assets·Credit 전략별 capital raised와 deployment가 수수료 기반을 얼마나 키우는지 봐야 합니다. carried interest와 realized performance income은 realizations 타이밍에 민감하고, Global Atlantic은 net investment income과 cost of insurance, credit portfolio 성과가 KKR 전체 이익 변동성을 키우거나 완충하는 축입니다.",
+    researchFocus: [
+      "Private Equity, Real Assets, Credit & Liquid Strategies의 AUM·FPAUM·capital raised 흐름",
+      "management fees, transaction fees, FRE, fee-related performance revenues의 연결 구조",
+      "carried interest, carry-eligible AUM, realizations, deployment 속도",
+      "Global Atlantic의 net investment income, cost of insurance, credit portfolio 성과"
+    ],
+    riskVariables: [
+      "시장 침체로 realizations와 carried interest 인식이 지연될 위험",
+      "금리·credit spread 변화로 Global Atlantic 투자수익과 보험 비용이 흔들릴 가능성",
+      "비상장 자산 가치평가, leverage, 유동성 악화가 AUM·FPAUM 성장에 주는 압박",
+      "규제·보험 자본 요구, 핵심 인력 이탈, third-party 운영 리스크"
+    ],
+    suggestedPrompts: [
+      "KKR의 Private Equity, Real Assets, Credit & Liquid Strategies별 AUM과 FPAUM이 FRE로 어떻게 연결되는지 정리해줘.",
+      "carried interest와 realizations 타이밍이 KKR의 실현 이익과 배당 여력에 미치는 영향을 설명해줘.",
+      "Global Atlantic의 net investment income과 cost of insurance가 KKR 전체 수익성에 어떤 변동성을 만드는지 분석해줘.",
+    ],
+    questionChains: {},
+  },
+  JCI: {
+    ticker: "JCI",
+    companyName: "Johnson Controls International plc",
+    companyNameKo: "존슨컨트롤스",
+    sectorKo: "빌딩 솔루션",
+    signature: "Americas, EMEA, APAC에서 HVAC, fire & security, OpenBlue, service revenue를 묶어 건물 자동화·효율화 수요를 수익화하는 빌딩 솔루션 기업.",
+    description: "존슨컨트롤스는 상업용 건물의 HVAC, 제어, fire & security, 디지털 운영 솔루션과 유지보수 서비스를 제공합니다. 공시 해석에서는 Products & Systems 매출과 service revenue가 각각 설치형 프로젝트와 반복 유지보수로 어떻게 나뉘는지, Americas·EMEA·APAC의 orders와 backlog가 매출로 전환되는 속도를 봐야 합니다. OpenBlue와 connected products는 건물 운영 효율과 데이터 기반 서비스를 강화하지만 사이버 보안, 데이터 프라이버시, 장기 서비스 계약 이행 리스크도 함께 키웁니다. R&LC HVAC 매각 이후 포트폴리오 단순화가 마진과 현금흐름에 반영되는지도 중요합니다.",
+    researchFocus: [
+      "Americas, EMEA, APAC별 Products & Systems와 service revenue의 성장·마진 차이",
+      "orders, backlog, RPO가 설치 프로젝트와 서비스 매출로 전환되는 속도",
+      "HVAC, controls, fire & security, OpenBlue connected products의 수익 기여",
+      "R&LC HVAC 매각 이후 포트폴리오 단순화와 구조조정 비용 흐름"
+    ],
+    riskVariables: [
+      "대형 프로젝트 지연·취소와 backlog 전환 속도 둔화",
+      "관세, 부품 조달, 설치 인력 부족으로 인한 project margin 압박",
+      "OpenBlue와 connected products 관련 cyber breach·데이터 프라이버시 리스크",
+      "포트폴리오 매각 정산, 과거 fire·Tyco 법적 이슈, 구조조정 실행 비용"
+    ],
+    suggestedPrompts: [
+      "존슨컨트롤스의 Products & Systems와 service revenue가 Americas, EMEA, APAC별로 어떻게 다른지 정리해줘.",
+      "orders, backlog, RPO가 존슨컨트롤스의 향후 매출과 현금흐름 가시성에 주는 의미를 설명해줘.",
+      "OpenBlue, HVAC, fire & security 사업과 R&LC HVAC 매각 이후 포트폴리오 변화가 마진에 미치는 영향을 분석해줘.",
+    ],
+    questionChains: {},
+  },
+  MCO: {
+    ticker: "MCO",
+    companyName: "Moody's Corporation",
+    companyNameKo: "무디스",
+    sectorKo: "신용평가·금융 데이터",
+    signature: "Moody's Investors Service의 ratings issuance와 Moody's Analytics의 recurring revenue·ARR·KYC·data analytics가 함께 실적을 만드는 금융 정보 기업.",
+    description: "무디스는 Moody's Investors Service(MIS)와 Moody's Analytics(MA)를 통해 신용평가, 리서치, 데이터, 리스크 분석, KYC 솔루션을 제공합니다. 공시 해석에서는 MIS의 Corporate Finance, Structured Finance, Financial Institutions, Public Project & Infrastructure 발행 수요가 transaction revenue와 마진을 얼마나 흔드는지 봐야 합니다. MA는 Decision Solutions, Research & Insights, Data & Information의 recurring revenue와 ARR이 핵심이고, 클라우드 구독과 데이터 솔루션 확장이 수익 방어력을 높입니다. 신용평가 규제, 소송, 모델·데이터 품질, AI 제품 신뢰성은 평판과 비용 구조를 동시에 건드리는 리스크입니다.",
+    researchFocus: [
+      "MIS의 ratings issuance, transaction revenue, CFG·SFG·FIG·PPIF 발행시장 민감도",
+      "MA의 recurring revenue, ARR, deferred revenue, Decision Solutions·KYC 수요",
+      "Research & Insights, Data & Information, cloud subscription 전환이 마진에 미치는 영향",
+      "신용평가 규제, litigation, GenAI·데이터 품질, cyber risk가 비용 구조에 주는 부담"
+    ],
+    riskVariables: [
+      "금리·credit spread·발행시장 위축으로 MIS transaction revenue가 급감할 위험",
+      "신용평가 규제, 조사, 소송으로 인한 법률비용과 평판 훼손",
+      "MA 구독 갱신 둔화, KYC·data analytics 경쟁 심화, 고객 예산 축소",
+      "GenAI 제품 오류, 데이터 품질 문제, cyber breach로 인한 신뢰도 저하"
+    ],
+    suggestedPrompts: [
+      "무디스의 MIS ratings issuance와 MA recurring revenue가 매출 안정성에서 어떻게 다른지 공시 기준으로 비교해줘.",
+      "MA의 ARR, Decision Solutions, KYC, data analytics가 무디스의 반복매출과 마진에 어떤 의미를 갖는지 설명해줘.",
+      "신용평가 규제, 소송, GenAI·데이터 품질 리스크가 무디스의 비용 구조와 평판에 미치는 영향을 분석해줘.",
+    ],
+    questionChains: {},
+  },
+  MDT: {
+    ticker: "MDT",
+    companyName: "Medtronic plc",
+    companyNameKo: "메드트로닉",
+    sectorKo: "의료기기",
+    signature: "Cardiovascular, Neuroscience, Medical Surgical, Diabetes 포트폴리오에서 CoreValve·PulseSelect·Hugo·MiniMed 채택과 규제·보상 환경을 함께 봐야 하는 글로벌 의료기기 기업.",
+    description: "메드트로닉은 심혈관, 신경과학, 수술·의료기기, 당뇨 관리 제품을 전 세계 병원과 환자에게 공급합니다. 공시 해석에서는 Cardiovascular의 CoreValve, Micra, PulseSelect와 Neuroscience의 spine·neurovascular 제품, Medical Surgical의 Hugo RAS와 surgical technologies, Diabetes의 MiniMed 780G·Simplera·Guardian 채택 속도를 나눠 봐야 합니다. 관세, 환율, 공급망, R&D·SG&A 상용화 비용은 제품 성장과 별도로 margin을 흔들 수 있고, Diabetes 분리 추진은 비용 구조와 사업 포커스를 바꾸는 이벤트입니다.",
+    researchFocus: [
+      "Cardiovascular의 CoreValve, Micra, PulseSelect, cardiac rhythm 제품 채택",
+      "Neuroscience의 spine, neuromodulation, ENT, neurovascular 수요",
+      "Medical Surgical의 Hugo RAS, stapling, surgical technologies 수익성",
+      "Diabetes의 MiniMed, Simplera, Guardian과 분리 추진에 따른 비용·전략 변화"
+    ],
+    riskVariables: [
+      "규제 승인 지연, 보험 보상 변화, 병원 구매 예산 압박",
+      "관세, 환율, 공급망 비용이 매출총이익률을 낮출 위험",
+      "Diabetes 분리 과정의 구조조정 비용과 운영 집중도 저하",
+      "신제품 상용화 R&D·SG&A 부담과 제품 리콜·품질 리스크"
+    ],
+    suggestedPrompts: [
+      "메드트로닉의 Cardiovascular, Neuroscience, Medical Surgical, Diabetes가 매출과 마진에서 어떻게 다른지 정리해줘.",
+      "CoreValve, PulseSelect, Hugo RAS, MiniMed 제품군이 메드트로닉의 성장 동력으로 어떻게 작동하는지 설명해줘.",
+      "관세, 환율, 보험 보상, Diabetes 분리 추진이 메드트로닉의 현금흐름과 비용 구조에 미치는 영향을 분석해줘.",
+    ],
+    questionChains: {},
+  },
+  MMM: {
+    ticker: "MMM",
+    companyName: "3M Company",
+    companyNameKo: "3M",
+    sectorKo: "산업·소비재 제조",
+    signature: "Safety and Industrial, Transportation and Electronics, Consumer 사업의 기초 수익성과 Solventum spin-off 이후 PFAS·Combat Arms Earplugs 소송성 항목을 함께 봐야 하는 산업재 기업.",
+    description: "3M은 Safety and Industrial, Transportation and Electronics, Consumer 제품군을 통해 산업용 접착제·연마재, 전기·전자 소재, 자동차·항공·반도체 소재, 가정·소비재 제품을 공급합니다. 공시 해석에서는 electrical markets, industrial adhesives, abrasives, data center, semiconductor, aerospace 수요가 세그먼트 마진을 어떻게 움직이는지 봐야 합니다. Solventum spin-off 이후 헬스케어가 빠진 구조에서 PFAS, Combat Arms Earplugs, Aearo respirator mask/asbestos, transformation cost 같은 특수 항목이 GAAP 이익과 현금흐름을 계속 흔드는지가 핵심입니다.",
+    researchFocus: [
+      "Safety and Industrial의 electrical markets, adhesives, abrasives, industrial specialties 수요",
+      "Transportation and Electronics의 semiconductor, data center, aerospace, automotive 노출",
+      "Consumer의 home improvement, packaging, home and auto care 수요 변화",
+      "Solventum spin-off 이후 PFAS, Combat Arms Earplugs, Aearo 관련 충당금과 현금지출"
+    ],
+    riskVariables: [
+      "PFAS 소송·규제와 환경 정화 비용의 장기 현금흐름 부담",
+      "Combat Arms Earplugs와 Aearo respirator/asbestos 관련 합의·청구 변동",
+      "Consumer 수요 둔화와 home improvement·packaging 약세",
+      "관세, restructuring, transformation cost가 세그먼트 마진을 압박할 위험"
+    ],
+    suggestedPrompts: [
+      "3M의 Safety and Industrial, Transportation and Electronics, Consumer 세그먼트가 매출·마진에서 어떻게 다른지 정리해줘.",
+      "PFAS, Combat Arms Earplugs, Aearo 관련 항목이 3M의 현금흐름과 이익 품질에 미치는 영향을 설명해줘.",
+      "Solventum spin-off 이후 3M의 남은 사업 포트폴리오와 transformation cost가 투자 판단에 주는 의미를 분석해줘.",
+    ],
+    questionChains: {},
+  },
+  MPWR: {
+    ticker: "MPWR",
+    companyName: "Monolithic Power Systems, Inc.",
+    companyNameKo: "모놀리식 파워 시스템즈",
+    sectorKo: "전력관리 반도체",
+    signature: "power management IC, DC-DC converters, power modules를 enterprise data, automotive, industrial 고객에 공급하며, AI 서버 수요와 재고·파운드리·OSAT 운영이 마진을 좌우하는 fabless 반도체 기업.",
+    description: "모놀리식 파워 시스템즈는 전력관리 IC, DC-DC·AC-DC converter, power module, wafer die를 설계하고 외부 foundry와 OSAT 파트너를 통해 생산합니다. 공시 해석에서는 enterprise data의 AI 서버 전력 수요, storage and computing, automotive, industrial, communications, consumer 최종시장별 매출 흐름을 나눠 봐야 합니다. distributor와 value-added reseller 채널 비중이 높아 주문 재조정과 stock rotation이 매출 가시성을 흔들 수 있고, inventory와 purchase commitments는 현금흐름의 핵심 변수입니다.",
+    researchFocus: [
+      "enterprise data와 AI 서버용 power management IC·module 수요",
+      "storage and computing, automotive, industrial, communications, consumer 최종시장 mix",
+      "foundry, OSAT, wafer, assembly/test 비용이 gross margin에 미치는 영향",
+      "distributor, VAS, stock rotation, inventory, purchase commitments가 운전자본에 주는 신호"
+    ],
+    riskVariables: [
+      "AI 서버 주문 타이밍 변동과 고객·채널 재고 조정",
+      "wafer capacity, foundry, OSAT 병목과 원재료·관세 비용 상승",
+      "distributor 의존도와 아시아 매출 편중에 따른 지역·채널 리스크",
+      "inventory 증가, stock rotation, 구매 의무 확대에 따른 현금흐름 압박"
+    ],
+    suggestedPrompts: [
+      "모놀리식 파워의 enterprise data와 AI 서버용 power management 수요가 매출·마진에 어떻게 연결되는지 정리해줘.",
+      "foundry, OSAT, wafer, assembly/test 비용이 MPWR의 gross margin과 공급 안정성에 미치는 영향을 설명해줘.",
+      "distributor 채널, stock rotation, inventory, purchase commitments가 MPWR의 현금흐름에 주는 리스크를 분석해줘.",
+    ],
+    questionChains: {},
+  },
+  MNST: {
+    ticker: "MNST",
+    companyName: "Monster Beverage Corporation",
+    companyNameKo: "몬스터 베버리지",
+    sectorKo: "에너지 음료",
+    signature: "Monster Energy Drinks와 Strategic Brands concentrate, Alcohol Brands를 Coca-Cola bottling system과 병행 유통하며, case sales·promotional allowances·알루미늄 캔 비용이 마진을 좌우하는 에너지 음료 기업.",
+    description: "몬스터 베버리지는 Monster Energy Drinks, Strategic Brands, Alcohol Brands를 운영합니다. Monster Energy는 완제품 에너지음료 출하와 case sales가 핵심이고, Strategic Brands는 concentrate와 beverage base 판매 구조라 매출 인식과 마진이 다르게 움직입니다. Coca-Cola bottling/distribution system은 글로벌 확장에 중요한 채널이지만 특정 bottler·distributor 의존도와 판촉비 부담도 키웁니다. 공시 해석에서는 promotional allowances, slotting fees, rebates, advertising support가 net sales와 gross margin을 얼마나 깎는지, 알루미늄 캔·원재료·운송비가 가격 인상으로 상쇄되는지 봐야 합니다.",
+    researchFocus: [
+      "Monster Energy Drinks의 case sales, pricing, flavor·brand 확장 효과",
+      "Strategic Brands의 concentrate, beverage base, Coca-Cola 유통망 매출 구조",
+      "Alcohol Brands의 craft beer, FMB, hard seltzer 수요와 에너지음료 대비 수익성 차이",
+      "promotional allowances, rebates, slotting fees, 알루미늄 캔·운송비가 gross margin에 미치는 영향"
+    ],
+    riskVariables: [
+      "Coca-Cola bottling system과 대형 distributor 의존도",
+      "알루미늄 캔, 원재료, 연료, 해상·육상 운송비 상승",
+      "promotional allowances 증가와 판촉 경쟁 심화에 따른 net sales 압박",
+      "caffeine·성분 규제, alcohol 제품 규제, 소비자 취향 변화"
+    ],
+    suggestedPrompts: [
+      "몬스터 베버리지의 Monster Energy Drinks와 Strategic Brands가 매출 인식과 마진에서 어떻게 다른지 정리해줘.",
+      "Coca-Cola bottling system과 대형 distributor 의존도가 몬스터의 성장성과 리스크에 어떤 의미를 갖는지 설명해줘.",
+      "promotional allowances, 알루미늄 캔 비용, 운송비가 몬스터 베버리지의 gross margin에 미치는 영향을 분석해줘.",
+    ],
+    questionChains: {},
+  },
+  NOC: {
+    ticker: "NOC",
+    companyName: "Northrop Grumman Corporation",
+    companyNameKo: "노스롭 그라만",
+    sectorKo: "항공우주·방산",
+    signature: "Aeronautics Systems, Defense Systems, Mission Systems, Space Systems에서 B-21, Sentinel, IBCS, SDA, Next-Gen OPIR 같은 장기 방산 프로그램과 fixed-price 계약 리스크를 함께 봐야 하는 방산 기업.",
+    description: "노스롭 그라만은 stealth aircraft, missile defense, C4ISR, radar, cyber, space systems를 미국 정부와 동맹국에 공급합니다. 공시 해석에서는 Aeronautics Systems의 B-21 Raider와 F-35, Defense Systems의 Sentinel·IBCS, Mission Systems의 radar·전자전·C4ISR, Space Systems의 SDA·Next-Gen OPIR·GEM 63XL 프로그램을 나눠 봐야 합니다. backlog와 net awards는 장기 매출 가시성을 보여주지만, fixed-price contracts와 EAC 조정은 비용 초과가 발생할 때 segment margin을 즉시 흔드는 핵심 리스크입니다.",
+    researchFocus: [
+      "Aeronautics Systems의 B-21 Raider, F-35, 무인·유인 항공 프로그램",
+      "Defense Systems의 Sentinel, IBCS, missile defense, ammunition 프로그램",
+      "Mission Systems의 radar, sensors, C4ISR, electronic warfare 수요",
+      "Space Systems의 SDA, Next-Gen OPIR, launch vehicle components와 fixed-price EAC 조정"
+    ],
+    riskVariables: [
+      "B-21과 Sentinel 같은 대형 개발 프로그램의 비용 추정·일정 변경",
+      "fixed-price 계약 비용 초과와 unfavorable EAC 조정에 따른 margin 압박",
+      "미국 정부 예산, continuing resolution, 조달 일정 지연",
+      "classified programs, 공급망, 엔지니어링 인력, 품질 이슈로 인한 현금흐름 변동"
+    ],
+    suggestedPrompts: [
+      "노스롭 그라만의 Aeronautics, Defense, Mission, Space Systems를 주요 프로그램과 margin 리스크 기준으로 비교해줘.",
+      "B-21 Raider와 Sentinel 프로그램에서 fixed-price 계약과 EAC 조정이 이익에 미치는 영향을 설명해줘.",
+      "backlog와 net awards가 노스롭 그라만의 장기 매출 가시성을 보여주는 방식과 한계를 분석해줘.",
+    ],
+    questionChains: {},
+  },
+  NSC: {
+    ticker: "NSC",
+    companyName: "Norfolk Southern Corporation",
+    companyNameKo: "노퍽 서던",
+    sectorKo: "철도 운송",
+    signature: "동부 미국 철도망에서 merchandise, intermodal, coal 물동량을 운송하며, railway operating ratio, train speed, terminal dwell, fuel surcharge가 수익성과 서비스 품질을 보여주는 화물철도 기업.",
+    description: "노퍽 서던은 Eastern U.S. network를 통해 산업재, 농산물, 자동차, 화학, intermodal 컨테이너, 석탄을 운송합니다. 공시 해석에서는 merchandise, intermodal, coal의 volume과 revenue per unit을 나눠 보고, fuel surcharge가 연료비 변동을 얼마나 흡수하는지 확인해야 합니다. railway operating ratio, train speed, terminal dwell은 비용 통제와 서비스 품질을 동시에 보여주는 핵심 지표입니다. Eastern Ohio Incident 관련 비용·보험 회수, STB 규제, 노무 계약, hazardous materials 사고 리스크는 영업비용과 free cash flow를 흔드는 변수입니다.",
+    researchFocus: [
+      "merchandise, intermodal, coal의 volume, revenue per unit, fuel surcharge 기여",
+      "railway operating ratio, train speed, terminal dwell, service reliability 변화",
+      "Eastern U.S. network의 traffic mix와 truck·barge 등 다른 운송모드 경쟁",
+      "Eastern Ohio Incident 비용·보험 회수, STB 규제, 노무 계약이 현금흐름에 미치는 영향"
+    ],
+    riskVariables: [
+      "연료비 상승과 fuel surcharge 회수 시차에 따른 operating ratio 압박",
+      "Eastern Ohio Incident 후속 비용, 보험 회수, litigation 관련 변동성",
+      "STB 규제, 노무 계약 재협상, hazardous materials 안전 비용 증가",
+      "기상 재해, mainline 사고, truck 경쟁으로 인한 train speed·dwell 악화"
+    ],
+    suggestedPrompts: [
+      "노퍽 서던의 merchandise, intermodal, coal 물동량과 revenue per unit이 operating ratio에 어떻게 연결되는지 정리해줘.",
+      "fuel surcharge와 연료비 변동이 노퍽 서던의 영업이익과 free cash flow에 미치는 영향을 설명해줘.",
+      "Eastern Ohio Incident, STB 규제, train speed·terminal dwell 변화가 노퍽 서던의 운영 안정성에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  NXPI: {
+    ticker: "NXPI",
+    companyName: "NXP Semiconductors N.V.",
+    companyNameKo: "엔엑스피",
+    sectorKo: "반도체",
+    signature: "엔엑스피는 Automotive, Industrial & IoT, Mobile, Communication Infrastructure & Other 네 가지 최종시장 축을 중심으로 포트폴리오를 만들고, communication security와 연결성(5G, secure edge) 수요가 성장의 핵심이다.",
+    description: "NXP는 microcontrollers(S32x, MCX), application processors(i.MX), communication processors, connectivity chipsets, analog and interface, RF power amplifier, security controller, 센서를 묶어 차량·산업·모바일·통신 인프라 수요를 동시에 잡는 반도체 기업입니다. 공시에서 Automotive, Industrial & IoT, Mobile, Communication Infrastructure & Other로 나눈 매출과 제품군을 함께 보면, 어느 시장에서 어떤 제품이 margin을 견인했는지가 드러납니다. 마진은 공급원가 효율과 제품 믹스 변화로 개선되는 반면, R&D와 인력 보상 성격의 비용 증가가 순이익 변동성 요인으로 작동합니다. 제조는 자체 시설, 협력 JV, 제3자 파운드리와 조립 파트너의 다층 조달 구조라 납기·원가·품질 영향도가 분기별로 달라집니다.",
+    researchFocus: [
+      "최종시장별 성장 동인을 매출 구성(프로세서·혼합신호·RF 등)과 연결해 분해",
+      "Secure connected edge identification, 5G radio power, wireless connectivity(NFC/UWB/BLE/5G) 수요와 제품군 매칭",
+      "S32x/MCX/i.MX 라인업이 차량·산업·엣지 환경에서 수익성에 미치는 영향",
+      "Foundry/JV/assembly 협력망이 제조 원가·납기 유연성·조달 안정성에 미치는 영향",
+      "인수 통합(예: TTTech Auto, Aviva Links, Kinara) 이후 비용구조 변화와 무형자산·R&D 비용 반영 방식"
+    ],
+    riskVariables: [
+      "반도체 경기 변동: 수요 변동성과 가격 압박이 판매량·마진을 동시에 흔듦",
+      "무역 정책과 수출통제: 관세, 규제 강화가 공급망 분절·조달 차질로 전이",
+      "제3자 생산망 리스크: 파운드리·조립 협력사 병목, 수율·납기 이슈",
+      "인력·통합 리스크: 핵심 엔지니어 확보와 인수조직 통합이 개발 일정·원가에 영향",
+      "보안·지재권 리스크: 사이버 보안, IP 분쟁, 고객 인증·규제 이슈"
+    ],
+    suggestedPrompts: [
+      "NXP의 최종시장별 실적을 제품군 관점으로 나눠 보면 어떤 축의 성장이 더 강한지 분석해줘.",
+      "공급망(자체·JV·제3자 조달) 구조에서 원가 효율과 납기 지연 리스크의 거래 패턴을 정리해줘.",
+      "인수 후 통합 비용과 신규 포트폴리오가 R&D, margin, 영업비용 구조에 어떤 방식으로 반영되는지 보여줘."
+    ],
+    questionChains: {},
+  },
+  SHW: {
+    ticker: "SHW",
+    companyName: "The Sherwin-Williams Company",
+    companyNameKo: "쉐윈-윌리엄스",
+    sectorKo: "도료 및 코팅",
+    signature: "Paint Stores Group, Consumer Brands Group, Performance Coatings Group 3개 축으로 매출이 나뉘며, 각 축의 수요 특성이 가격 인상 전략, 원재료 비용 전가, 산업 수요 회복 속도와 다르게 맞물린다.",
+    description: "쉐윈-윌리엄스는 북미를 중심으로 유럽·라틴아메리카·아시아로 뻗은 글로벌 도료·코팅 기업으로, Paint Stores Group, Consumer Brands Group, Performance Coatings Group 구조를 갖추고 있습니다. 실적 해석은 3개 축의 net sales와 margin 변화를 함께 봐야 하는데, 상권 기반 매장, 라틴아메리카 가정·전문 채널, 산업용 코팅 축이 서로 다른 동학으로 움직이기 때문입니다. 기본적으로 같은 분기에도 화학 원료 가격, 환율, 채널별 판촉 방식이 margin에 다르게 반영되므로 채널별 세그먼트 분해가 필수입니다. 최근 분기 자료는 Paint Stores의 same-store sales 개선, Consumer Brands의 Suvinil 편입효과, Performance Coatings의 건설·코팅 수요 분화로 가시화되는 흐름을 보여줍니다.",
+    researchFocus: [
+      "Paint Stores Group, Consumer Brands Group, Performance Coatings Group의 net sales·gross profit·IBT를 축별로 비교",
+      "Paint Stores의 stores open more than twelve months와 same-store sales가 수익성에 반영되는 경로",
+      "Consumer Brands의 Suvinil 편입 및 라틴아메리카 채널 믹스 변화가 마진에 미치는 영향",
+      "Performance Coatings 내 Automotive Refinish, industrial, packaging, coil 수요 분리와 화학원재료·환율 민감도",
+      "resins and latex, 안료, 용제, 용기 조달 구조가 COGS와 가격 인상 여력에 미치는 영향"
+    ],
+    riskVariables: [
+      "소비 둔화와 DIY/주거 보수 수요 변동으로 소매 채널 회복이 지연될 가능성",
+      "원재료와 에너지 비용 상승, 관세·무역·기상 충격이 COGS에 즉시 반영되는 구조",
+      "숙련 인력 부족이 생산성과 납기 안정성을 제약할 수 있는 운영 리스크",
+      "원자재 수급 집중 구간과 공급망 불안정이 납기와 가격 경쟁력 동시 악화"
+    ],
+    suggestedPrompts: [
+      "Paint Stores Group의 same-store sales가 마진과 어떻게 연결되는지 채널별로 설명해줘.",
+      "Suvinil 인수 이후 Consumer Brands의 매출·gross margin 개선이 어디에서 발생했는지 공시 근거로 보여줘.",
+      "Performance Coatings의 자동차·산업·코일 수요 성장에 원재료 조정이 어떻게 반영됐는지 정리해줘."
+    ],
+    questionChains: {},
+  },
+  SLB: {
+    ticker: "SLB",
+    companyName: "Schlumberger Limited",
+    companyNameKo: "슐럼버저",
+    sectorKo: "석유·가스 서비스",
+    signature: "지질해석, 시추, 완료, 생산최적화 기술을 묶어 상업화하고, 고객의 신규 투자 capex와 운영 효율 회복 속도에 따라 실적이 크게 반응하는 업스트림 핵심 서비스 기업이다.",
+    description: "슐럼버저는 석유·천연가스 E&P 생산성을 높이기 위해 reservoir characterization, 지구물리, 시추·완성 서비스, 압력/재료 관리, 디지털 분석 플랫폼을 결합합니다. 공시 해석에서는 프로젝트 단위로 인식되는 계약 매출, service revenue, backlog, 유정당 단가, 장비 가용성 지표를 같이 봐야 합니다. 단기적으로는 유가 자체보다 상류사 capex 집행 속도, 탐사·개발 계획, 장기 계약(EPC/long-term services) 비중이 성장성 핵심입니다. 동시에 대형 프로젝트의 현장 준수 비용, 안전 규제, 환경·인력 이슈가 margin 변동을 결정합니다.",
+    researchFocus: [
+      "유정별 서비스 포트폴리오(지질해석·시추·완성·생산 솔루션)의 매출 기여와 단가 추적",
+      "상류사 capex 사이클과 contract mix가 서비스 수요와 backlog 전개에 미치는 관계",
+      "디지털 분석과 자동화 도구가 현장 운영 효율·비용 구조·예측 정확도에 주는 영향",
+      "지역별 프로젝트 배분(미국 셰일, 브라질, 중동, 북해 등)과 규제·안전 이슈의 수익성 반영",
+      "장비 운용, 수리, 인력 라인업이 service margin과 프로젝트 일정 준수에 미치는 영향"
+    ],
+    riskVariables: [
+      "상류사 capex 삭감이나 탐사 지연이 실적을 즉시 둔화시킬 수 있음",
+      "안전 규제 강화와 허가 절차 지연이 프로젝트 승인·가동률을 제한할 수 있음",
+      "복잡한 지질 조건 및 장비 고장으로 completion/downtime이 늘어날 수 있음",
+      "원자재 가격, 환율, 연료비 변동이 프로젝트 원가와 계약 단가에 전달되는 타이밍 리스크"
+    ],
+    suggestedPrompts: [
+      "슐럼버저의 backlog와 신계약 수주가 지역별 실적 가시성에 어떤 방식으로 연결되는지 설명해줘.",
+      "시추·완성·생산서비스의 매출 mix가 capex 환경 변화에 따라 어떻게 재배치되는지 추적해줘.",
+      "디지털/소프트웨어 기반 서비스가 margin 개선에 기여하는 부분과 오히려 비용이 늘어나는 포인트를 구분해줘."
+    ],
+    questionChains: {},
+  },
 } satisfies Record<string, CompanyResearchProfile>;
 export const APPLE_RESEARCH_PROFILE = COMPANY_RESEARCH_PROFILES.AAPL;
 export { APPLE_QUESTION_CHAINS };

@@ -30,6 +30,8 @@ describe("analytics page context", () => {
     expect(tickerFromPathOrSearch("/companies/aapl")).toBe("AAPL");
     expect(tickerFromPathOrSearch("/chat/new", "?ticker=msft")).toBe("MSFT");
     expect(tickerFromPathOrSearch("/chat/new", "?ticker=bad ticker")).toBeNull();
+    expect(tickerFromPathOrSearch("/companies/UNKNOWN")).toBeNull();
+    expect(tickerFromPathOrSearch("/chat/new", "?ticker=unknown")).toBeNull();
   });
 
   it("builds standard page analytics properties", () => {

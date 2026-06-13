@@ -264,6 +264,25 @@
     "ontology_ticker": "ADP"
   },
   {
+    "ticker": "AEP",
+    "company_name": "AEP",
+    "legal_name": "AEP",
+    "sector": "electric_utility",
+    "industry": "electric_utility",
+    "keywords": [
+      "electric_utility",
+      "Primary activities",
+      "Transmission Operations",
+      "Electricity Sales",
+      "Debt Financing",
+      "Fuel Procurement",
+      "Power Generation. Key external",
+      "factors",
+      "regulatory"
+    ],
+    "ontology_ticker": "AEP"
+  },
+  {
     "ticker": "AMAT",
     "company_name": "Applied Materials, Inc.",
     "legal_name": "Applied Materials, Inc.",
@@ -379,6 +398,45 @@
     "ontology_ticker": "AMGN"
   },
   {
+    "ticker": "AMT",
+    "company_name": "American Tower Corporation",
+    "legal_name": "American Tower Corporation",
+    "sector": "telecommunications_infrastructure",
+    "industry": "통신 인프라 REIT",
+    "aliases": [
+      "American Tower Corporation",
+      "아메리칸 타워",
+      "American Tower"
+    ],
+    "keywords": [
+      "telecommunications_infrastructure",
+      "통신 인프라 REIT",
+      "tower leasing",
+      "tenant billings",
+      "colocation",
+      "amendment",
+      "tenant churn",
+      "tower leasing의 tenant billings",
+      "tenant churn 변화",
+      "CoreSite data centers",
+      "rental",
+      "power",
+      "interconnection",
+      "CoreSite data centers의 rental",
+      "interconnection 수익과 전력·냉각",
+      "U.S",
+      "APAC",
+      "Canada",
+      "Europe",
+      "Latin America",
+      "Africa",
+      "APAC site",
+      "지역별 U.S",
+      "AFFO"
+    ],
+    "ontology_ticker": "AMT"
+  },
+  {
     "ticker": "AMZN",
     "company_name": "Amazon.com, Inc.",
     "legal_name": "Amazon.com, Inc.",
@@ -452,6 +510,25 @@
     "ontology_ticker": "ANET"
   },
   {
+    "ticker": "AON",
+    "company_name": "AON",
+    "legal_name": "AON",
+    "sector": "professional_services",
+    "industry": "professional_services",
+    "keywords": [
+      "professional_services",
+      "Primary activities",
+      "Insurance Brokerage",
+      "Acquisitions",
+      "Business Integration",
+      "Health Solutions",
+      "Acquisition. Key external factors",
+      "foreign",
+      "exchange"
+    ],
+    "ontology_ticker": "AON"
+  },
+  {
     "ticker": "APH",
     "company_name": "Amphenol",
     "legal_name": "Amphenol",
@@ -487,6 +564,45 @@
       "gross margin"
     ],
     "ontology_ticker": "APH"
+  },
+  {
+    "ticker": "APO",
+    "company_name": "Apollo Global Management, Inc.",
+    "legal_name": "Apollo Global Management, Inc.",
+    "sector": "asset_management",
+    "industry": "대체자산 운용",
+    "aliases": [
+      "Apollo Global Management, Inc.",
+      "아폴로 글로벌 매니지먼트",
+      "Apollo Global Management"
+    ],
+    "keywords": [
+      "asset_management",
+      "대체자산 운용",
+      "AUM",
+      "FRE",
+      "Fee-Generating AUM",
+      "management fees",
+      "FRE의 성장 연결",
+      "Athene",
+      "Athora",
+      "Retirement Services",
+      "net spread",
+      "spread-related earnings",
+      "Athene·Athora 기반 Retirement",
+      "Services의 net spread와 spread-related",
+      "earnings",
+      "origination",
+      "asset-backed finance",
+      "private credit deployment",
+      "private credit deployment가 수수료와",
+      "보험자산에 미치는 영향",
+      "realizations",
+      "carried interest",
+      "투자 성과가 변동 이익과",
+      "배당 여력에 주는 신호"
+    ],
+    "ontology_ticker": "APO"
   },
   {
     "ticker": "AVGO",
@@ -568,6 +684,7 @@
     "ticker": "BA",
     "company_name": "The Boeing Company",
     "legal_name": "The Boeing Company",
+    "sector": "aerospace_defense",
     "industry": "항공우주·국방",
     "aliases": [
       "The Boeing Company",
@@ -575,6 +692,7 @@
       "The Boeing"
     ],
     "keywords": [
+      "aerospace_defense",
       "항공우주·국방",
       "MAX",
       "Commercial Airplanes",
@@ -644,6 +762,7 @@
     "ticker": "BK",
     "company_name": "The Bank of New York Mellon Corporation",
     "legal_name": "The Bank of New York Mellon Corporation",
+    "sector": "financial_services",
     "industry": "수탁은행·자산관리",
     "aliases": [
       "The Bank of New York Mellon Corporation",
@@ -651,6 +770,7 @@
       "The Bank of New York Mellon"
     ],
     "keywords": [
+      "financial_services",
       "수탁은행·자산관리",
       "AUC",
       "Securities Services",
@@ -673,8 +793,7 @@
       "금리·deposit beta 변화에",
       "따른 net interest income",
       "민감도",
-      "시장 하락이 AUC",
-      "AUM 기반 fee revenue에"
+      "시장 하락이 AUC"
     ],
     "ontology_ticker": "BK"
   },
@@ -1025,6 +1144,63 @@
     "ontology_ticker": "CEG"
   },
   {
+    "ticker": "CI",
+    "company_name": "The Cigna Group",
+    "legal_name": "The Cigna Group",
+    "sector": "healthcare_insurance",
+    "industry": "헬스케어·보험",
+    "aliases": [
+      "The Cigna Group",
+      "시그나 그룹"
+    ],
+    "keywords": [
+      "healthcare_insurance",
+      "헬스케어·보험",
+      "Evernorth Pharmacy Benefit Services",
+      "claim volume",
+      "specialty drug mix",
+      "rebate",
+      "Evernorth Pharmacy Benefit Services의",
+      "rebate 구조",
+      "Specialty and Care Services",
+      "care management",
+      "Specialty and Care Services의",
+      "고객 확장",
+      "약제 유통",
+      "care management 수익",
+      "Cigna Healthcare",
+      "premium rate",
+      "medical care ratio",
+      "utilization",
+      "Cigna Healthcare의 premium rate",
+      "utilization 변화",
+      "PDP",
+      "Medicare Advantage",
+      "Medicare Advantage·PDP 매각",
+      "이후 남은 사업 믹스와"
+    ],
+    "ontology_ticker": "CI"
+  },
+  {
+    "ticker": "CL",
+    "company_name": "CL",
+    "legal_name": "CL",
+    "sector": "consumer_products",
+    "industry": "consumer_products",
+    "keywords": [
+      "consumer_products",
+      "Primary activities",
+      "Advertising Investment",
+      "Funding The Growth Initiatives",
+      "Pet Nutrition",
+      "Capital Allocation",
+      "Capital projects. Key external",
+      "factors",
+      "inflation"
+    ],
+    "ontology_ticker": "CL"
+  },
+  {
     "ticker": "CMCSA",
     "company_name": "Comcast Corporation",
     "legal_name": "Comcast Corporation",
@@ -1332,6 +1508,62 @@
     "ontology_ticker": "CSCO"
   },
   {
+    "ticker": "CSX",
+    "company_name": "CSX Corporation",
+    "legal_name": "CSX Corporation",
+    "sector": "transportation_railroad",
+    "industry": "철도 운송",
+    "aliases": [
+      "CSX Corporation"
+    ],
+    "keywords": [
+      "transportation_railroad",
+      "철도 운송",
+      "merchandise",
+      "intermodal",
+      "coal",
+      "trucking",
+      "mix",
+      "trucking의 물동량·운임 mix와",
+      "매출 기여",
+      "fuel surcharge",
+      "locomotive fuel",
+      "operating income",
+      "fuel surcharge와 locomotive fuel",
+      "비용이 operating income에 반영되는",
+      "operating ratio",
+      "train velocity",
+      "terminal dwell",
+      "trip plan compliance",
+      "trip plan compliance의 서비스",
+      "품질 신호",
+      "coal export",
+      "domestic",
+      "동부 네트워크",
+      "intermodal 터미널"
+    ],
+    "ontology_ticker": "CSX"
+  },
+  {
+    "ticker": "CTAS",
+    "company_name": "CTAS",
+    "legal_name": "CTAS",
+    "sector": "business_services",
+    "industry": "business_services",
+    "keywords": [
+      "business_services",
+      "Primary activities",
+      "Uniform Rental Facility Services",
+      "First Aid Safety Services",
+      "Acquisitions",
+      "Acquisition Integration",
+      "Uniform Rental And Facility",
+      "Services. Key external factors",
+      "interest"
+    ],
+    "ontology_ticker": "CTAS"
+  },
+  {
     "ticker": "CVS",
     "company_name": "CVS Health",
     "legal_name": "CVS Health",
@@ -1409,6 +1641,25 @@
     "ontology_ticker": "CVX"
   },
   {
+    "ticker": "DASH",
+    "company_name": "DASH",
+    "legal_name": "DASH",
+    "sector": "food_delivery",
+    "industry": "food_delivery",
+    "keywords": [
+      "food_delivery",
+      "Primary activities",
+      "Marketplace Operations",
+      "Membership Programs",
+      "Dasher Compensation",
+      "Merchant Acquisition",
+      "Consumer Acquisition. Key external",
+      "factors",
+      "geopolitical"
+    ],
+    "ontology_ticker": "DASH"
+  },
+  {
     "ticker": "DE",
     "company_name": "Deere & Company",
     "legal_name": "Deere & Company",
@@ -1443,6 +1694,45 @@
       "타이밍 충돌"
     ],
     "ontology_ticker": "DE"
+  },
+  {
+    "ticker": "DELL",
+    "company_name": "Dell Technologies Inc.",
+    "legal_name": "Dell Technologies Inc.",
+    "sector": "technology",
+    "industry": "서버·PC·스토리지",
+    "aliases": [
+      "Dell Technologies Inc.",
+      "델 테크놀로지스",
+      "Dell Technologies"
+    ],
+    "keywords": [
+      "technology",
+      "서버·PC·스토리지",
+      "ISG",
+      "AI-",
+      "AI-optimized servers",
+      "traditional servers and networking",
+      "storage",
+      "ISG의 AI-optimized servers",
+      "storage 매출·마진 구조",
+      "CSG",
+      "PC",
+      "commercial PC",
+      "consumer PC",
+      "services",
+      "PC refresh",
+      "CSG의 commercial PC",
+      "services 수요와 PC refresh",
+      "AI",
+      "AI server mix",
+      "gross margin",
+      "inventory",
+      "accounts receivable",
+      "AI server mix가 gross",
+      "margin"
+    ],
+    "ontology_ticker": "DELL"
   },
   {
     "ticker": "DHR",
@@ -1558,15 +1848,94 @@
     "ontology_ticker": "DUK"
   },
   {
+    "ticker": "ECL",
+    "company_name": "ECL",
+    "legal_name": "ECL",
+    "sector": "industrial_services",
+    "industry": "industrial_services",
+    "keywords": [
+      "industrial_services",
+      "Primary activities",
+      "Cleaning And Sanitizing Products",
+      "International Operations",
+      "Warewashing Products",
+      "Manufacturing Operations",
+      "Raw Material Procurement. Key",
+      "external factors",
+      "geopolitical"
+    ],
+    "ontology_ticker": "ECL"
+  },
+  {
+    "ticker": "EMR",
+    "company_name": "Emerson Electric Co.",
+    "legal_name": "Emerson Electric Co.",
+    "sector": "industrial_automation",
+    "industry": "산업 자동화",
+    "aliases": [
+      "Emerson Electric Co.",
+      "에머슨 일렉트릭",
+      "Emerson Electric"
+    ],
+    "keywords": [
+      "industrial_automation",
+      "산업 자동화",
+      "Software",
+      "Systems",
+      "DeltaV",
+      "Ovation",
+      "AspenTech",
+      "Test",
+      "Measurement",
+      "Systems의 DeltaV",
+      "Intelligent Devices",
+      "Final Control",
+      "Analytical",
+      "discrete automation",
+      "Intelligent Devices의 Final Control",
+      "discrete automation 장비 흐름",
+      "mix",
+      "recurring revenue",
+      "AspenTech 통합 이후 소프트웨어",
+      "무형자산 상각 영향",
+      "backlog",
+      "backlog 전환",
+      "가격 조정",
+      "관세·환율·원재료 비용이"
+    ],
+    "ontology_ticker": "EMR"
+  },
+  {
+    "ticker": "EOG",
+    "company_name": "EOG",
+    "legal_name": "EOG",
+    "sector": "energy_integrated_oil_gas",
+    "industry": "energy_integrated_oil_gas",
+    "keywords": [
+      "energy_integrated_oil_gas",
+      "Primary activities",
+      "Exploration And Production",
+      "Natural Gas Sales",
+      "Share Repurchases",
+      "Drilling Operations",
+      "Crude Oil Production. Key",
+      "external factors",
+      "crude"
+    ],
+    "ontology_ticker": "EOG"
+  },
+  {
     "ticker": "EQIX",
     "company_name": "Equinix",
     "legal_name": "Equinix",
+    "sector": "data_centers",
     "industry": "데이터센터·클라우드 인프라",
     "aliases": [
       "Equinix",
       "이퀴닉스"
     ],
     "keywords": [
+      "data_centers",
       "데이터센터·클라우드 인프라",
       "IBX",
       "IBX colocation",
@@ -1589,8 +1958,7 @@
       "high-density AI 수요에 따른",
       "capex 부담 확대",
       "SLA",
-      "IBX 장애·SLA 위반",
-      "사이버 사고 리스크"
+      "IBX 장애·SLA 위반"
     ],
     "ontology_ticker": "EQIX"
   },
@@ -1905,6 +2273,25 @@
     "ontology_ticker": "GLW"
   },
   {
+    "ticker": "GM",
+    "company_name": "GM",
+    "legal_name": "GM",
+    "sector": "automotive",
+    "industry": "automotive",
+    "keywords": [
+      "automotive",
+      "Primary activities",
+      "Autonomous Vehicle Development",
+      "Wholesale Vehicle Sales",
+      "Vehicle Sales",
+      "Fleet Sales",
+      "Electric Vehicle Development. Key",
+      "external factors",
+      "geopolitical"
+    ],
+    "ontology_ticker": "GM"
+  },
+  {
     "ticker": "GOOG",
     "company_name": "Alphabet Inc.",
     "legal_name": "Alphabet Inc.",
@@ -2054,6 +2441,25 @@
     "ontology_ticker": "HCA"
   },
   {
+    "ticker": "HLT",
+    "company_name": "HLT",
+    "legal_name": "HLT",
+    "sector": "hospitality",
+    "industry": "hospitality",
+    "keywords": [
+      "hospitality",
+      "Primary activities",
+      "Franchise Operations",
+      "Hotel Development",
+      "Hotel Management",
+      "Hotel Operations",
+      "Purchasing Operations. Key external",
+      "factors",
+      "regulatory"
+    ],
+    "ontology_ticker": "HLT"
+  },
+  {
     "ticker": "HON",
     "company_name": "Honeywell International Inc.",
     "legal_name": "Honeywell International Inc.",
@@ -2091,6 +2497,45 @@
       "흡수력에 미치는 영향"
     ],
     "ontology_ticker": "HON"
+  },
+  {
+    "ticker": "HWM",
+    "company_name": "Howmet Aerospace Inc.",
+    "legal_name": "Howmet Aerospace Inc.",
+    "sector": "aerospace_industrial",
+    "industry": "항공우주 부품",
+    "aliases": [
+      "Howmet Aerospace Inc.",
+      "하우메트 에어로스페이스",
+      "Howmet Aerospace"
+    ],
+    "keywords": [
+      "aerospace_industrial",
+      "항공우주 부품",
+      "Engine Products",
+      "engine spares",
+      "airfoils",
+      "investment casting",
+      "Engine Products의 engine spares",
+      "가스터빈 수요",
+      "Fastening Systems",
+      "Engineered Structures",
+      "landing gear",
+      "Fastening Systems와 Engineered Structures의",
+      "항공기·엔진·landing gear",
+      "부품 노출",
+      "Forged Wheels",
+      "heavy-duty truck",
+      "Forged Wheels의 상용 운송",
+      "heavy-duty truck 사이클 민감도",
+      "titanium",
+      "aluminum",
+      "nickel",
+      "cobalt",
+      "에너지 비용과 가격 전가",
+      "GE"
+    ],
+    "ontology_ticker": "HWM"
   },
   {
     "ticker": "IBM",
@@ -2282,6 +2727,64 @@
     "ontology_ticker": "ISRG"
   },
   {
+    "ticker": "ITW",
+    "company_name": "ITW",
+    "legal_name": "ITW",
+    "sector": "industrial_manufacturing",
+    "industry": "industrial_manufacturing",
+    "keywords": [
+      "industrial_manufacturing",
+      "Primary activities",
+      "Product Line Simplification",
+      "Share Repurchases",
+      "Acquisitions",
+      "Divestitures",
+      "Share Repurchase. Key external",
+      "factors",
+      "foreign"
+    ],
+    "ontology_ticker": "ITW"
+  },
+  {
+    "ticker": "JCI",
+    "company_name": "Johnson Controls International plc",
+    "legal_name": "Johnson Controls International plc",
+    "sector": "industrial_manufacturing",
+    "industry": "빌딩 솔루션",
+    "aliases": [
+      "Johnson Controls International plc",
+      "존슨컨트롤스",
+      "Johnson Controls International"
+    ],
+    "keywords": [
+      "industrial_manufacturing",
+      "빌딩 솔루션",
+      "EMEA",
+      "APAC",
+      "Americas",
+      "Products",
+      "Systems",
+      "service revenue",
+      "APAC별 Products",
+      "Systems와 service revenue의 성장",
+      "RPO",
+      "orders",
+      "backlog",
+      "RPO가 설치 프로젝트와 서비스",
+      "매출로 전환되는 속도",
+      "HVAC",
+      "controls",
+      "fire",
+      "security",
+      "OpenBlue connected products",
+      "OpenBlue connected products의 수익",
+      "R&LC",
+      "R&LC HVAC",
+      "R&LC HVAC 매각 이후"
+    ],
+    "ontology_ticker": "JCI"
+  },
+  {
     "ticker": "JNJ",
     "company_name": "Johnson & Johnson",
     "legal_name": "Johnson & Johnson",
@@ -2359,6 +2862,44 @@
     "ontology_ticker": "JPM"
   },
   {
+    "ticker": "KKR",
+    "company_name": "KKR & Co. Inc.",
+    "legal_name": "KKR & Co. Inc.",
+    "sector": "asset_management",
+    "industry": "대체자산 운용",
+    "aliases": [
+      "KKR & Co. Inc.",
+      "KKR &"
+    ],
+    "keywords": [
+      "asset_management",
+      "대체자산 운용",
+      "AUM",
+      "FPAUM",
+      "Private Equity",
+      "Real Assets",
+      "Credit",
+      "Liquid Strategies",
+      "capital raised",
+      "Liquid Strategies의 AUM·FPAUM",
+      "FRE",
+      "management fees",
+      "transaction fees",
+      "fee-related performance revenues",
+      "fee-related performance revenues의 연결",
+      "carried interest",
+      "carry-eligible AUM",
+      "realizations",
+      "deployment",
+      "deployment 속도",
+      "Global Atlantic",
+      "net investment income",
+      "cost of insurance",
+      "credit portfolio"
+    ],
+    "ontology_ticker": "KKR"
+  },
+  {
     "ticker": "KLAC",
     "company_name": "KLA Corporation",
     "legal_name": "KLA Corporation",
@@ -2396,6 +2937,25 @@
       "BIS"
     ],
     "ontology_ticker": "KLAC"
+  },
+  {
+    "ticker": "KMI",
+    "company_name": "KMI",
+    "legal_name": "KMI",
+    "sector": "energy_midstream",
+    "industry": "energy_midstream",
+    "keywords": [
+      "energy_midstream",
+      "Primary activities",
+      "Liquefaction project development",
+      "Terminals Operations",
+      "Pipeline Operations",
+      "Energy Commodity Hedging",
+      "Capital projects. Key external",
+      "factors",
+      "natural"
+    ],
+    "ontology_ticker": "KMI"
   },
   {
     "ticker": "KO",
@@ -2673,12 +3233,14 @@
     "ticker": "MAR",
     "company_name": "Marriott International",
     "legal_name": "Marriott International",
+    "sector": "hospitality",
     "industry": "호텔·여행",
     "aliases": [
       "Marriott International",
       "메리어트 인터내셔널"
     ],
     "keywords": [
+      "hospitality",
       "호텔·여행",
       "Franchise fees",
       "Base management fees",
@@ -2701,8 +3263,7 @@
       "Owned",
       "leased",
       "and other",
-      "fee",
-      "and other 호텔의 비용"
+      "fee"
     ],
     "ontology_ticker": "MAR"
   },
@@ -2785,21 +3346,80 @@
     "ontology_ticker": "MCK"
   },
   {
+    "ticker": "MCO",
+    "company_name": "Moody's Corporation",
+    "legal_name": "Moody's Corporation",
+    "sector": "financial_services",
+    "industry": "신용평가·금융 데이터",
+    "aliases": [
+      "Moody's Corporation",
+      "무디스",
+      "Moody's"
+    ],
+    "keywords": [
+      "financial_services",
+      "신용평가·금융 데이터",
+      "MIS",
+      "CFG",
+      "SFG",
+      "FIG",
+      "PPIF",
+      "ratings issuance",
+      "transaction revenue",
+      "MIS의 ratings issuance",
+      "MA",
+      "ARR",
+      "KYC",
+      "recurring revenue",
+      "deferred revenue",
+      "Decision Solutions",
+      "MA의 recurring revenue",
+      "Decision Solutions·KYC 수요",
+      "Research",
+      "Insights",
+      "Data",
+      "Information",
+      "cloud subscription",
+      "cloud subscription 전환이 마진에"
+    ],
+    "ontology_ticker": "MCO"
+  },
+  {
     "ticker": "MDT",
-    "company_name": "MDT",
-    "legal_name": "MDT",
+    "company_name": "Medtronic plc",
+    "legal_name": "Medtronic plc",
     "sector": "medical_devices",
-    "industry": "medical_devices",
+    "industry": "의료기기",
+    "aliases": [
+      "Medtronic plc",
+      "메드트로닉",
+      "Medtronic"
+    ],
     "keywords": [
       "medical_devices",
-      "Primary activities",
-      "Spinal Cord Stimulation",
-      "Product Development",
-      "Research And Development",
-      "Acquisitions",
-      "Share Repurchases. Key external",
-      "factors",
-      "foreign"
+      "의료기기",
+      "Cardiovascular",
+      "CoreValve",
+      "Micra",
+      "PulseSelect",
+      "cardiac rhythm",
+      "Cardiovascular의 CoreValve",
+      "cardiac rhythm 제품 채택",
+      "ENT",
+      "Neuroscience",
+      "spine",
+      "neuromodulation",
+      "neurovascular",
+      "Neuroscience의 spine",
+      "neurovascular 수요",
+      "RAS",
+      "Medical Surgical",
+      "Hugo RAS",
+      "stapling",
+      "surgical technologies",
+      "Medical Surgical의 Hugo RAS",
+      "surgical technologies 수익성",
+      "Diabetes"
     ],
     "ontology_ticker": "MDT"
   },
@@ -2843,6 +3463,83 @@
     "ontology_ticker": "META"
   },
   {
+    "ticker": "MMM",
+    "company_name": "3M Company",
+    "legal_name": "3M Company",
+    "sector": "manufacturing",
+    "industry": "산업·소비재 제조",
+    "aliases": [
+      "3M Company",
+      "3M"
+    ],
+    "keywords": [
+      "manufacturing",
+      "산업·소비재 제조",
+      "Safety and Industrial",
+      "electrical markets",
+      "adhesives",
+      "abrasives",
+      "industrial specialties",
+      "Safety and Industrial의 electrical",
+      "markets",
+      "industrial specialties 수요",
+      "Transportation and Electronics",
+      "semiconductor",
+      "data center",
+      "aerospace",
+      "automotive",
+      "Transportation and Electronics의 semiconductor",
+      "automotive 노출",
+      "Consumer",
+      "home improvement",
+      "packaging",
+      "home and auto care",
+      "Consumer의 home improvement",
+      "수요 변화",
+      "PFAS"
+    ],
+    "ontology_ticker": "MMM"
+  },
+  {
+    "ticker": "MNST",
+    "company_name": "Monster Beverage Corporation",
+    "legal_name": "Monster Beverage Corporation",
+    "sector": "beverages",
+    "industry": "에너지 음료",
+    "aliases": [
+      "Monster Beverage Corporation",
+      "몬스터 베버리지",
+      "Monster Beverage"
+    ],
+    "keywords": [
+      "beverages",
+      "에너지 음료",
+      "Monster Energy Drinks",
+      "case sales",
+      "pricing",
+      "flavor",
+      "brand",
+      "Monster Energy Drinks의 case",
+      "sales",
+      "flavor·brand 확장 효과",
+      "Strategic Brands",
+      "concentrate",
+      "beverage base",
+      "Coca-Cola",
+      "Strategic Brands의 concentrate",
+      "Coca-Cola 유통망 매출 구조",
+      "FMB",
+      "Alcohol Brands",
+      "craft beer",
+      "hard seltzer",
+      "Alcohol Brands의 craft beer",
+      "hard seltzer 수요와 에너지음료",
+      "대비 수익성 차이",
+      "promotional allowances"
+    ],
+    "ontology_ticker": "MNST"
+  },
+  {
     "ticker": "MO",
     "company_name": "Altria Group, Inc.",
     "legal_name": "Altria Group, Inc.",
@@ -2880,6 +3577,64 @@
       "과세 체계 변경"
     ],
     "ontology_ticker": "MO"
+  },
+  {
+    "ticker": "MPC",
+    "company_name": "MPC",
+    "legal_name": "MPC",
+    "sector": "energy_refining",
+    "industry": "energy_refining",
+    "keywords": [
+      "energy_refining",
+      "Primary activities",
+      "Refining Operations",
+      "Renewable Diesel Production",
+      "Product or service sales",
+      "Midstream Operations",
+      "Crude Oil Procurement. Key",
+      "external factors",
+      "crude"
+    ],
+    "ontology_ticker": "MPC"
+  },
+  {
+    "ticker": "MPWR",
+    "company_name": "Monolithic Power Systems, Inc.",
+    "legal_name": "Monolithic Power Systems, Inc.",
+    "sector": "generic",
+    "industry": "전력관리 반도체",
+    "aliases": [
+      "Monolithic Power Systems, Inc.",
+      "모놀리식 파워 시스템즈",
+      "Monolithic Power Systems"
+    ],
+    "keywords": [
+      "generic",
+      "전력관리 반도체",
+      "AI",
+      "IC",
+      "enterprise data",
+      "power management IC",
+      "module",
+      "enterprise data와 AI 서버용",
+      "power management IC·module",
+      "storage and computing",
+      "automotive",
+      "industrial",
+      "communications",
+      "consumer",
+      "mix",
+      "consumer 최종시장 mix",
+      "OSAT",
+      "foundry",
+      "wafer",
+      "assembly",
+      "test",
+      "gross margin",
+      "test 비용이 gross margin에",
+      "미치는 영향"
+    ],
+    "ontology_ticker": "MPWR"
   },
   {
     "ticker": "MRK",
@@ -3154,6 +3909,45 @@
     "ontology_ticker": "NFLX"
   },
   {
+    "ticker": "NOC",
+    "company_name": "Northrop Grumman Corporation",
+    "legal_name": "Northrop Grumman Corporation",
+    "sector": "aerospace_defense",
+    "industry": "항공우주·방산",
+    "aliases": [
+      "Northrop Grumman Corporation",
+      "노스롭 그라만",
+      "Northrop Grumman"
+    ],
+    "keywords": [
+      "aerospace_defense",
+      "항공우주·방산",
+      "B-21",
+      "F-35",
+      "Aeronautics Systems",
+      "B-21 Raider",
+      "Aeronautics Systems의 B-21 Raider",
+      "무인·유인 항공 프로그램",
+      "IBCS",
+      "Defense Systems",
+      "Sentinel",
+      "missile defense",
+      "ammunition",
+      "Defense Systems의 Sentinel",
+      "ammunition 프로그램",
+      "C4ISR",
+      "Mission Systems",
+      "radar",
+      "sensors",
+      "electronic warfare",
+      "Mission Systems의 radar",
+      "electronic warfare 수요",
+      "SDA",
+      "OPIR"
+    ],
+    "ontology_ticker": "NOC"
+  },
+  {
     "ticker": "NOW",
     "company_name": "ServiceNow",
     "legal_name": "ServiceNow",
@@ -3190,6 +3984,45 @@
       "ITOM 신뢰도에 미치는 영향"
     ],
     "ontology_ticker": "NOW"
+  },
+  {
+    "ticker": "NSC",
+    "company_name": "Norfolk Southern Corporation",
+    "legal_name": "Norfolk Southern Corporation",
+    "sector": "railroad",
+    "industry": "철도 운송",
+    "aliases": [
+      "Norfolk Southern Corporation",
+      "노퍽 서던",
+      "Norfolk Southern"
+    ],
+    "keywords": [
+      "railroad",
+      "철도 운송",
+      "merchandise",
+      "intermodal",
+      "coal",
+      "volume",
+      "revenue per unit",
+      "fuel surcharge",
+      "coal의 volume",
+      "fuel surcharge 기여",
+      "railway operating ratio",
+      "train speed",
+      "terminal dwell",
+      "service reliability",
+      "service reliability 변화",
+      "U.S",
+      "Eastern U.S. network",
+      "traffic mix",
+      "truck",
+      "barge",
+      "Eastern U.S. network의 traffic",
+      "mix와 truck·barge",
+      "다른 운송모드 경쟁",
+      "STB"
+    ],
+    "ontology_ticker": "NSC"
   },
   {
     "ticker": "NVDA",
@@ -3231,6 +4064,45 @@
     "ontology_ticker": "NVDA"
   },
   {
+    "ticker": "NXPI",
+    "company_name": "NXP Semiconductors N.V.",
+    "legal_name": "NXP Semiconductors N.V.",
+    "sector": "semiconductors",
+    "industry": "반도체",
+    "aliases": [
+      "NXP Semiconductors N.V.",
+      "엔엑스피",
+      "NXP Semiconductors N V"
+    ],
+    "keywords": [
+      "semiconductors",
+      "반도체",
+      "RF",
+      "최종시장별 성장 동인을 매출",
+      "프로세서·혼합신호·RF",
+      "연결해 분해",
+      "NFC",
+      "UWB",
+      "BLE",
+      "Secure connected edge identification",
+      "radio power",
+      "wireless connectivity",
+      "5G radio power",
+      "수요와 제품군 매칭",
+      "MCX",
+      "MX",
+      "S32x",
+      "i.MX",
+      "i.MX 라인업이 차량·산업",
+      "엣지 환경에서 수익성에 미치는",
+      "JV",
+      "Foundry",
+      "assembly",
+      "assembly 협력망이 제조 원가"
+    ],
+    "ontology_ticker": "NXPI"
+  },
+  {
     "ticker": "ORCL",
     "company_name": "Oracle Corporation",
     "legal_name": "Oracle Corporation",
@@ -3268,6 +4140,21 @@
       "license support"
     ],
     "ontology_ticker": "ORCL"
+  },
+  {
+    "ticker": "ORLY",
+    "company_name": "ORLY",
+    "legal_name": "ORLY",
+    "sector": "generic",
+    "industry": "generic",
+    "keywords": [
+      "generic",
+      "Primary activities",
+      "no extracted primary activities",
+      "Key external factors",
+      "no extracted external factors"
+    ],
+    "ontology_ticker": "ORLY"
   },
   {
     "ticker": "PEP",
@@ -3620,6 +4507,25 @@
     "ontology_ticker": "PNC"
   },
   {
+    "ticker": "PSX",
+    "company_name": "PSX",
+    "legal_name": "PSX",
+    "sector": "energy_refining",
+    "industry": "energy_refining",
+    "keywords": [
+      "energy_refining",
+      "Primary activities",
+      "Feedstock Procurement",
+      "Midstream Operations",
+      "Refining Operations",
+      "Capital projects",
+      "Business Transformation. Key external",
+      "factors",
+      "crude"
+    ],
+    "ontology_ticker": "PSX"
+  },
+  {
     "ticker": "PWR",
     "company_name": "Quanta Services, Inc.",
     "legal_name": "Quanta Services, Inc.",
@@ -3695,6 +4601,31 @@
       "고객 자체 SoC"
     ],
     "ontology_ticker": "QCOM"
+  },
+  {
+    "ticker": "RCL",
+    "company_name": "RCL",
+    "legal_name": "RCL",
+    "sector": "cruise",
+    "industry": "cruise",
+    "keywords": [
+      "cruise",
+      "Primary activities",
+      "Ship Procurement",
+      "Cruise Operations",
+      "Debt Management",
+      "Ship Construction",
+      "Fuel Procurement. Key external",
+      "factors",
+      "foreign"
+    ],
+    "ontology_ticker": "RCL"
+  },
+  {
+    "ticker": "ROST",
+    "company_name": "ROST",
+    "legal_name": "ROST",
+    "ontology_ticker": "ROST"
   },
   {
     "ticker": "RTX",
@@ -3811,6 +4742,84 @@
       "market volatility"
     ],
     "ontology_ticker": "SCHW"
+  },
+  {
+    "ticker": "SHW",
+    "company_name": "The Sherwin-Williams Company",
+    "legal_name": "The Sherwin-Williams Company",
+    "sector": "manufacturing",
+    "industry": "도료 및 코팅",
+    "aliases": [
+      "The Sherwin-Williams Company",
+      "쉐윈-윌리엄스",
+      "The Sherwin-Williams"
+    ],
+    "keywords": [
+      "manufacturing",
+      "도료 및 코팅",
+      "IBT",
+      "Paint Stores Group",
+      "Consumer Brands Group",
+      "Performance Coatings Group",
+      "net sales",
+      "gross profit",
+      "Performance Coatings Group의 net",
+      "sales·gross profit·IBT를",
+      "Paint Stores",
+      "stores open more than",
+      "twelve months",
+      "same-store sales",
+      "Paint Stores의 stores open",
+      "more than twelve months와",
+      "same-store sales가 수익성에 반영되는",
+      "Consumer Brands",
+      "Suvinil",
+      "Consumer Brands의 Suvinil 편입",
+      "라틴아메리카 채널 믹스 변화가",
+      "마진에 미치는 영향",
+      "Performance Coatings",
+      "Automotive Refinish"
+    ],
+    "ontology_ticker": "SHW"
+  },
+  {
+    "ticker": "SLB",
+    "company_name": "Schlumberger Limited",
+    "legal_name": "Schlumberger Limited",
+    "sector": "energy_services",
+    "industry": "석유·가스 서비스",
+    "aliases": [
+      "Schlumberger Limited",
+      "슐럼버저",
+      "Schlumberger"
+    ],
+    "keywords": [
+      "energy_services",
+      "석유·가스 서비스",
+      "유정별 서비스 포트폴리오",
+      "지질해석·시추·완성·생산",
+      "솔루션",
+      "매출 기여와 단가 추적",
+      "capex",
+      "contract mix",
+      "backlog",
+      "상류사 capex 사이클과 contract",
+      "mix가 서비스 수요와 backlog",
+      "전개에 미치는 관계",
+      "디지털 분석과 자동화 도구가",
+      "현장 운영 효율·비용",
+      "구조·예측 정확도에 주는",
+      "지역별 프로젝트 배분",
+      "미국 셰일",
+      "브라질",
+      "규제·안전 이슈의 수익성",
+      "service margin",
+      "장비 운용",
+      "인력 라인업이 service margin과",
+      "프로젝트 일정 준수에 미치는",
+      "상류사 capex 삭감이나 탐사"
+    ],
+    "ontology_ticker": "SLB"
   },
   {
     "ticker": "SNPS",
@@ -4048,12 +5057,14 @@
     "ticker": "TJX",
     "company_name": "The TJX Companies, Inc.",
     "legal_name": "The TJX Companies, Inc.",
+    "sector": "retail",
     "industry": "오프프라이스 소매",
     "aliases": [
       "The TJX Companies, Inc.",
       "The TJX Companies"
     ],
     "keywords": [
+      "retail",
       "오프프라이스 소매",
       "TJX",
       "Marmaxx",
@@ -4076,8 +5087,7 @@
       "off-price buying 조직이 브랜드",
       "opportunistic inventory를 확보하는 방식",
       "selling square footage",
-      "e-commerce",
-      "e-commerce 보조 역할"
+      "e-commerce"
     ],
     "ontology_ticker": "TJX"
   },
@@ -4470,6 +5480,25 @@
     "ontology_ticker": "V"
   },
   {
+    "ticker": "VLO",
+    "company_name": "VLO",
+    "legal_name": "VLO",
+    "sector": "energy_refining",
+    "industry": "energy_refining",
+    "keywords": [
+      "energy_refining",
+      "Primary activities",
+      "Ethanol Production",
+      "Refining Operations",
+      "Renewable Fuel Production",
+      "Renewable Diesel Production",
+      "Refinery Operations. Key external",
+      "factors",
+      "crude"
+    ],
+    "ontology_ticker": "VLO"
+  },
+  {
     "ticker": "VRTX",
     "company_name": "Vertex Pharmaceuticals Incorporated",
     "legal_name": "Vertex Pharmaceuticals Incorporated",
@@ -4545,6 +5574,25 @@
       "Fios"
     ],
     "ontology_ticker": "VZ"
+  },
+  {
+    "ticker": "WBD",
+    "company_name": "WBD",
+    "legal_name": "WBD",
+    "sector": "media_entertainment",
+    "industry": "media_entertainment",
+    "keywords": [
+      "media_entertainment",
+      "Primary activities",
+      "Linear Networks",
+      "Content Distribution",
+      "Streaming Services",
+      "Content Production",
+      "Content Licensing. Key external",
+      "factors",
+      "geopolitical"
+    ],
+    "ontology_ticker": "WBD"
   },
   {
     "ticker": "WDC",

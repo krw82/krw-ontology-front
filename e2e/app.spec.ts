@@ -438,4 +438,18 @@ test.describe("protected API under dev auth bypass", () => {
     expect(body.count).toBe(1);
     expect(body.companies?.[0]?.ticker).toBe("AMZN");
   });
+
+  test("does not let Web auth bypass cross the Desktop API boundary", async ({
+    request,
+  }) => {
+    const response = await request.get("/api/desktop/ontology/health");
+
+    expect(response.status()).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: {
+        code: "authentication_error",
+      },
+    });
+  });
 });

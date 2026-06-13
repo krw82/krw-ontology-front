@@ -110,12 +110,26 @@ if (!release) {
 }
 
 const rows = await readCompanies(release.release_id);
-const coverage = rows
-  .filter((row) => row.document_count > 0)
+const placeholderRows = rows.filter(isPlaceholderCompanyRow);
+const companyRows = rows.filter((row) => !isPlaceholderCompanyRow(row));
+const zeroDocumentRows = companyRows.filter((row) => documentCount(row) <= 0);
+if (minCompanies === null && zeroDocumentRows.length > 0) {
+  throw new Error(
+    [
+      "Stock-news coverage has non-placeholder companies without documents:",
+      zeroDocumentRows.map((row) => normalizeTicker(row.ticker)).join(", "),
+    ].join(" "),
+  );
+}
+
+const coverage = companyRows
+  .filter((row) => documentCount(row) > 0)
   .map((row) => companyToCoverage(row, landingProfiles.get(row.ticker)))
   .sort((a, b) => a.ticker.localeCompare(b.ticker));
 
-const expectedMinimum = minCompanies ?? release.company_count ?? 1;
+const expectedMinimum =
+  minCompanies ??
+  Math.max(1, Number(release.company_count ?? rows.length) - placeholderRows.length);
 if (coverage.length < expectedMinimum) {
   throw new Error(
     `Stock-news coverage too small: expected at least ${expectedMinimum}, got ${coverage.length}`,
@@ -132,8 +146,9 @@ console.log(
     `env=${ontologyEnv}`,
     `release_id=${release.release_id}`,
     `companies=${coverage.length}`,
+    placeholderRows.length ? `ignored_placeholders=${placeholderRows.length}` : "",
     `out=${resolvedOutPath}`,
-  ].join(" "),
+  ].filter(Boolean).join(" "),
 );
 
 async function readActiveRelease() {
@@ -362,6 +377,17 @@ function normalizeTicker(value) {
   return String(value || "")
     .trim()
     .toUpperCase();
+}
+
+function documentCount(row) {
+  const value = Number(row?.document_count ?? 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function isPlaceholderCompanyRow(row) {
+  const ticker = normalizeTicker(row?.ticker);
+  const name = normalizeTicker(row?.name);
+  return !ticker || ticker === "UNKNOWN" || ticker === "N/A" || name === "UNKNOWN";
 }
 
 function stringValue(value) {

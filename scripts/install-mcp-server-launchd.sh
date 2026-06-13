@@ -65,6 +65,22 @@ set -a
 . "$ENV_PATH"
 set +a
 
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1" >&2
+    exit 1
+  fi
+}
+
+require_env() {
+  key=$1
+  eval "value=\${$key:-}"
+  if [ -z "$value" ]; then
+    echo "Missing required env value: $key" >&2
+    exit 1
+  fi
+}
+
 MCP_SERVER_NICE=${MCP_SERVER_NICE:-${MAC_WORKER_NICE:--5}}
 MCP_LOG_DIR=${MCP_LOG_DIR:-"$HOME/Library/Logs/krw-ontology"}
 MCP_SERVER_MAXFILES=${MCP_SERVER_MAXFILES:-4096}
@@ -186,6 +202,37 @@ if [ "$LOAD" != "1" ]; then
   exit 0
 fi
 
+require_command uv
+require_env KRW_ONTOLOGY_SOURCE_DIR
+require_env KRW_ONTOLOGY_RELEASE_ROOT
+if [ "${KRW_ONTOLOGY_ENV:-}" != "prod" ]; then
+  echo "MCP launchd load requires KRW_ONTOLOGY_ENV=prod, got: ${KRW_ONTOLOGY_ENV:-unset}" >&2
+  exit 1
+fi
+if [ ! -f "$KRW_ONTOLOGY_SOURCE_DIR/pyproject.toml" ]; then
+  echo "Missing KRW ontology source: $KRW_ONTOLOGY_SOURCE_DIR" >&2
+  exit 1
+fi
+
+PREFLIGHT_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/krw-mcp-prod-preflight.XXXXXX")
+if ! uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology release verify \
+  --startup-check \
+  --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
+  --env prod \
+  --require-current-symlink >"$PREFLIGHT_OUTPUT" 2>&1; then
+  cat "$PREFLIGHT_OUTPUT" >&2
+  rm -f "$PREFLIGHT_OUTPUT"
+  echo "Refusing to restart MCP: target prod/current is not a valid v3 startup release." >&2
+  exit 1
+fi
+TARGET_RELEASE_ID=$(awk -F': ' '/^release_id:/{print $2; exit}' "$PREFLIGHT_OUTPUT")
+cat "$PREFLIGHT_OUTPUT"
+rm -f "$PREFLIGHT_OUTPUT"
+if [ -z "$TARGET_RELEASE_ID" ] || [ "$TARGET_RELEASE_ID" = "<missing>" ]; then
+  echo "Refusing to restart MCP: target release_id is missing." >&2
+  exit 1
+fi
+
 launchctl bootout "$DOMAIN" "$PLIST" >/dev/null 2>&1 || true
 if ! wait_for_mcp_port_release 10; then
   stop_lingering_mcp_listeners
@@ -197,7 +244,9 @@ launchctl kickstart -k "$DOMAIN/com.krwontology.mcp-server"
 VERIFY_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/krw-mcp-prod-verify.XXXXXX")
 verified=0
 for _ in $(seq 1 30); do
-  if "$SCRIPT_DIR/verify-mcp-server-production.sh" --env-file "$ENV_PATH" >"$VERIFY_OUTPUT" 2>&1; then
+  if "$SCRIPT_DIR/verify-mcp-server-production.sh" \
+    --env-file "$ENV_PATH" \
+    --release-id "$TARGET_RELEASE_ID" >"$VERIFY_OUTPUT" 2>&1; then
     verified=1
     break
   fi

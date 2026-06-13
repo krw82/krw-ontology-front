@@ -67,7 +67,7 @@ function mockMcpOk() {
       object_count: 30,
       tool_count: 12,
       root: "/srv/private-ontology-root",
-      index_path: "/srv/private-ontology-root/indexes/agent_index.sqlite",
+      index_path: "/srv/private-ontology-root/indexes/global_spine.sqlite",
       manifest_path: "/srv/private-ontology-root/manifest.json",
       manifest_valid: true,
       agent_index_schema_version: "agent_index_v1",
@@ -95,7 +95,7 @@ function mockMcpOk() {
       toolCount: 12,
       tools: ["krw_ontology_query"],
       root: "/srv/private-ontology-root",
-      indexPath: "/srv/private-ontology-root/indexes/agent_index.sqlite",
+      indexPath: "/srv/private-ontology-root/indexes/global_spine.sqlite",
       pluginPath: "/app/krw-ontology/plugins/krw-ontology",
       releaseMetadata: {
         env: "dev",

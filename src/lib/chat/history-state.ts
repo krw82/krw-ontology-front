@@ -1,5 +1,6 @@
 import type { AgentRunSummary, Message, RunStatus, Session } from "@/types/api-contracts";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
+import { normalizeTicker, normalizeTickers } from "@/lib/ontology/ticker";
 
 export interface LoadedChatState {
   messages: Message[];
@@ -27,6 +28,15 @@ export function buildNewChatHref(
   options: { locale?: Locale } = {},
 ): string {
   const nextParams = new URLSearchParams(params);
+  const ticker = nextParams.get("ticker");
+  if (ticker) {
+    const normalizedTicker = normalizeTicker(ticker);
+    if (normalizedTicker) {
+      nextParams.set("ticker", normalizedTicker);
+    } else {
+      nextParams.delete("ticker");
+    }
+  }
   appendLocaleParam(nextParams, options.locale);
   const query = nextParams.toString();
   return `/chat/new${query ? `?${query}` : ""}`;
@@ -48,13 +58,7 @@ export function getSessionTickers(
       ? [fallbackTicker]
       : [];
 
-  return Array.from(
-    new Set(
-      tickers
-        .map((ticker) => ticker.trim().toUpperCase())
-        .filter(Boolean),
-    ),
-  );
+  return normalizeTickers(tickers);
 }
 
 export function deriveLoadedChatState(

@@ -34,7 +34,7 @@ const releaseRow: OntologyCatalogReleaseRow = {
   object_count: 100,
   manifest_json: { release_id: "20260528_150000" },
   summary_json: { company_count: 2 },
-  source_json: { index_path: "indexes/agent_index.sqlite" },
+  source_json: { global_spine_path: "indexes/global_spine.sqlite" },
   catalog_json: {},
   created_at: "2026-05-28T15:01:00.000Z",
   updated_at: "2026-05-28T15:01:00.000Z",
@@ -249,6 +249,26 @@ describe("ontology catalog", () => {
       description: "Indexed ontology coverage for XOM.",
       document_count: 1,
     });
+  });
+
+  it("does not expose placeholder ticker rows from the index", async () => {
+    companyRows.push({
+      ...companyRows[0],
+      ticker: "UNKNOWN",
+      name: "Unknown company",
+    });
+
+    try {
+      const companies = await listIndexedCompanies();
+
+      expect(companies.map((company) => company.ticker)).toEqual([
+        "AAPL",
+        "XOM",
+      ]);
+      await expect(getIndexedCompany("UNKNOWN")).resolves.toBeNull();
+    } finally {
+      companyRows.pop();
+    }
   });
 
   it("batch loads tickers once and preserves requested ticker order", async () => {

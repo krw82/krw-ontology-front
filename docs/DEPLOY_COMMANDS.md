@@ -32,7 +32,9 @@ runtime
 release
   immutable ontology release directory
   manifest.json
-  indexes/agent_index.sqlite
+  indexes/global_spine.sqlite
+  indexes/shard_manifest.json
+  indexes/companies/<TICKER>.sqlite
   Supabase web catalog publish
 ```
 
@@ -116,9 +118,9 @@ optional prod/current promote
 -> verify worker heartbeat release_id
 ```
 
-이 명령은 full SQLite index를 GCP로 올리지 않는다. full index는 Mac의
-`~/krw-ontology-data/releases/prod/current/indexes/agent_index.sqlite`에
-남고, GCP web/API는 Supabase catalog만 본다.
+이 명령은 v3 SQLite indexes를 GCP로 올리지 않는다. global spine과 company
+shards는 Mac의 `~/krw-ontology-data/releases/prod/current/indexes/`에 남고,
+GCP web/API는 Supabase catalog만 본다.
 
 ### Full production deploy
 
@@ -164,16 +166,16 @@ release를 만드는 작업은 `krw-ontology-front`가 아니라
 cd ~/krw-ontology
 ```
 
-1. 새 dev release 작업 공간 준비
+1. 실행 전 build plan 확인
 
 ```bash
-uv run krw-ontology release prepare-dev <release_id>
+uv run krw-ontology release plan
 ```
 
-이 명령은 새 dev release workspace를 만들고 queue publish target을 그쪽으로
-돌린다.
+이 명령은 source와 cache를 읽어 dirty/cached ticker와 v3 build DAG를 보여주지만
+release output은 쓰지 않는다.
 
-2. Queue 작업 실행
+2. 필요한 source/queue 작업 실행
 
 ```bash
 uv run krw-ontology queue add AAPL NVDA TSLA
@@ -183,16 +185,19 @@ uv run krw-ontology queue status
 uv run krw-ontology queue watch
 ```
 
-queue는 기본적으로 `agent_index.sqlite`를 자동 rebuild하지 않는다.
+queue에서 v3 index refresh를 하지 않으려면 `--no-refresh-index`를 명시한다.
 
-3. Dev release finalize
+3. 새 immutable dev v3 release 생성
 
 ```bash
-uv run krw-ontology release finalize-dev <release_id>
+uv run krw-ontology release force
+uv run krw-ontology release watch
+uv run krw-ontology quality check
 ```
 
-이 명령은 agent index rebuild, manifest 작성, release verify,
-`dev/current` promote, publish-root config 정리를 수행한다.
+`release force`는 company shard와 spine fragment cache를 재사용할 수 있으며,
+global spine merge, manifest v3 작성, deep verification, `dev/current` atomic
+promote를 수행한다.
 
 4. Prod release materialize
 
@@ -200,7 +205,7 @@ uv run krw-ontology release finalize-dev <release_id>
 uv run krw-ontology release materialize-prod <release_id>
 ```
 
-검증된 dev release를 prod release space로 복사한다. 이 단계는 아직
+검증된 dev v3 release를 prod release space로 복사한다. 이 단계는 아직
 `prod/current`를 바꾸지 않는다.
 
 5. Prod publish
@@ -294,21 +299,19 @@ dev:catalog             -> dev:release:publish
 deploy:runtime:dev      -> dev:runtime
 ```
 
-## Legacy Commands
+## Legacy GCP Plugin Command
 
-정상 운영에서는 Mac worker가 production agent execution을 담당한다. 아래는
-예전 GCP MCP/data sync용이다.
+정상 운영에서는 Mac worker가 production agent execution을 담당한다. 아래 명령은
+예전 GCP MCP/plugin 배포용이다. GCP ontology data upload 경로는 삭제되었다.
 
 ```bash
 npm run legacy:gcp-mcp
-npm run legacy:data-gcp
 ```
 
-호환용 이름도 남아 있다.
+GCP plugin 호환용 이름:
 
 ```bash
 npm run deploy:legacy:gcp-mcp
-npm run deploy:legacy:data-gcp
 npm run deploy:plugin:gcp
 ```
 

@@ -33,7 +33,8 @@ KRW_ONTOLOGY_SOURCE_DIR=${KRW_ONTOLOGY_SOURCE_DIR:-"$HOME/krw-ontology"}
 KRW_ONTOLOGY_RELEASE_ROOT=${KRW_ONTOLOGY_RELEASE_ROOT:-"$HOME/krw-ontology-data/releases/dev/current"}
 KRW_ONTOLOGY_ROOT=${KRW_ONTOLOGY_ROOT:-"$KRW_ONTOLOGY_RELEASE_ROOT"}
 KRW_ONTOLOGY_MANIFEST_PATH=${KRW_ONTOLOGY_MANIFEST_PATH:-"$KRW_ONTOLOGY_RELEASE_ROOT/manifest.json"}
-KRW_ONTOLOGY_INDEX_PATH=${KRW_ONTOLOGY_INDEX_PATH:-"$KRW_ONTOLOGY_RELEASE_ROOT/indexes/agent_index.sqlite"}
+KRW_ONTOLOGY_GLOBAL_SPINE_PATH=${KRW_ONTOLOGY_GLOBAL_SPINE_PATH:-"$KRW_ONTOLOGY_RELEASE_ROOT/indexes/global_spine.sqlite"}
+KRW_ONTOLOGY_SHARD_MANIFEST_PATH=${KRW_ONTOLOGY_SHARD_MANIFEST_PATH:-"$KRW_ONTOLOGY_RELEASE_ROOT/indexes/shard_manifest.json"}
 KRW_ONTOLOGY_MCP_HOST=${KRW_ONTOLOGY_MCP_HOST:-127.0.0.1}
 KRW_ONTOLOGY_MCP_PORT=${KRW_ONTOLOGY_MCP_PORT:-8766}
 KRW_ONTOLOGY_MCP_PATH=${KRW_ONTOLOGY_MCP_PATH:-/mcp}
@@ -48,7 +49,8 @@ export KRW_ONTOLOGY_SOURCE_DIR
 export KRW_ONTOLOGY_RELEASE_ROOT
 export KRW_ONTOLOGY_ROOT
 export KRW_ONTOLOGY_MANIFEST_PATH
-export KRW_ONTOLOGY_INDEX_PATH
+export KRW_ONTOLOGY_GLOBAL_SPINE_PATH
+export KRW_ONTOLOGY_SHARD_MANIFEST_PATH
 export KRW_MCP_STORE_MODE
 export KRW_MCP_STORE_POOL_MAX
 
@@ -56,11 +58,14 @@ if [ ! -f "$KRW_ONTOLOGY_SOURCE_DIR/pyproject.toml" ]; then
   echo "Missing KRW ontology source: $KRW_ONTOLOGY_SOURCE_DIR" >&2
   exit 1
 fi
-if [ ! -e "$KRW_ONTOLOGY_INDEX_PATH" ]; then
-  echo "Missing dev ontology index: $KRW_ONTOLOGY_INDEX_PATH" >&2
-  exit 1
-fi
 mkdir -p "$MCP_LOG_DIR"
+
+echo "Checking KRW Ontology dev v3 startup contract..."
+uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology release verify \
+  --startup-check \
+  --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
+  --env dev >/dev/null
+echo "OK KRW Ontology dev v3 startup contract"
 
 echo "Starting KRW Ontology dev MCP HTTP server..."
 echo "Source: $KRW_ONTOLOGY_SOURCE_DIR"
@@ -73,7 +78,6 @@ exec uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology-mcp \
   --host "$KRW_ONTOLOGY_MCP_HOST" \
   --port "$KRW_ONTOLOGY_MCP_PORT" \
   --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
-  --index-path "$KRW_ONTOLOGY_INDEX_PATH" \
   --mcp-path "$KRW_ONTOLOGY_MCP_PATH" \
   --store-mode "$KRW_MCP_STORE_MODE" \
   --log-file "$MCP_SERVER_LOG_FILE" \

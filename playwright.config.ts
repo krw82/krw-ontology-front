@@ -21,7 +21,7 @@ export default defineConfig({
   webServer: useExternalServer
     ? undefined
     : {
-        command: `rm -rf .next-e2e && DEV_AUTH_BYPASS=1 NEXT_DIST_DIR=.next-e2e npm run dev:web -- --hostname 127.0.0.1 --port ${port} --webpack`,
+        command: `rm -rf .next-e2e && DEV_AUTH_BYPASS=1 KRW_E2E_STATIC_CATALOG=1 NEXT_DIST_DIR=.next-e2e npm run dev:web -- --hostname 127.0.0.1 --port ${port} --webpack`,
         url: `${baseURL}/api/healthz`,
         reuseExistingServer,
         timeout: 120_000,

@@ -27,6 +27,12 @@ budget stop
 tool budget
 composer fallback
 fallback
+Now let me
+Let me verify
+I will query
+I'll check
+verified by trace
+verified from trace
 ```
 
 ## Forbidden internal terms

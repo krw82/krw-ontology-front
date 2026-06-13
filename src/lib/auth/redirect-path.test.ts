@@ -26,6 +26,20 @@ describe("normalizeInternalNextPath", () => {
     ).toBe("/companies");
   });
 
+  it("preserves desktop approval codes on login paths", () => {
+    expect(normalizeInternalNextPath("/login?desktop_code=ABCD-1234")).toBe(
+      "/login?desktop_code=ABCD-1234",
+    );
+  });
+
+  it("unwraps OAuth callbacks to desktop approval login paths", () => {
+    expect(
+      normalizeInternalNextPath(
+        "/auth/callback?next=%2Flogin%3Fdesktop_code%3DABCD-1234",
+      ),
+    ).toBe("/login?desktop_code=ABCD-1234");
+  });
+
   it("rejects absolute and protocol-relative URLs", () => {
     expect(normalizeInternalNextPath("https://evil.example")).toBe("/companies");
     expect(normalizeInternalNextPath("//evil.example")).toBe("/companies");

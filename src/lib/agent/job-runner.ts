@@ -22,7 +22,10 @@ import { getBillingPlanFromStore } from "@/lib/billing/plan-store";
 import { heartbeatAgentRun } from "@/lib/agent/job-queue";
 import { closeOpenToolCallsForRun } from "@/lib/agent/tool-call-cleanup";
 import { markAgentRunTerminal } from "@/lib/agent/run-lifecycle";
-import { getCurrentBillingPeriod } from "@/lib/billing/period";
+import {
+  getCurrentDailyBillingPeriod,
+  getCurrentMonthlyBillingPeriod,
+} from "@/lib/billing/period";
 import { getOntologyEnv, readIntEnv } from "@/lib/env";
 import { isAdminEntitlementEmail } from "@/lib/billing/admin-emails";
 import {
@@ -113,6 +116,10 @@ class AgentRunHardTimeoutError extends Error {
     super(`Agent run exceeded hard timeout (${timeoutMs}ms)`);
     this.name = "AgentRunHardTimeoutError";
   }
+}
+
+function isHardTimeoutAbort(signal: AbortSignal) {
+  return signal.reason instanceof AgentRunHardTimeoutError;
 }
 
 class AgentJobLoadError extends Error {
@@ -428,8 +435,9 @@ function runWithHardTimeout<T>(
 
   const timeoutPromise = new Promise<T>((_resolve, reject) => {
     timeout = setTimeout(() => {
-      abortController.abort();
-      reject(new AgentRunHardTimeoutError(timeoutMs));
+      const timeoutError = new AgentRunHardTimeoutError(timeoutMs);
+      reject(timeoutError);
+      abortController.abort(timeoutError);
     }, timeoutMs);
     (timeout as { unref?: () => void }).unref?.();
   });
@@ -830,18 +838,37 @@ async function handleServerPipelineNewsDiscoveryJob(params: {
   sendEvent: (event: Parameters<typeof appendAgentRunEvent>[2], payload: unknown) => Promise<void>;
 }) {
   const { admin, job, runStartedAt, mcpHealth, abortSignal, sendEvent } = params;
+  let terminalHandled = false;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  const cancelIfRequested = async () => {
+    if (!abortSignal.aborted) return false;
+    if (isHardTimeoutAbort(abortSignal)) return true;
+    terminalHandled = true;
+    await handleServerPipelineCancelledJob({
+      admin,
+      job,
+      inputTokens,
+      outputTokens,
+      sendEvent,
+    });
+    return true;
+  };
 
   try {
     await sendEvent("activity_update", {
       stage: "researching",
       label: "시장 뉴스 후보를 찾는 중",
     });
+    if (await cancelIfRequested()) return;
 
     const { discovery, composition } = await discoverNewsCards({
       question: job.userMessage.content,
       session: toResolvedSession(job.session),
     });
-    if (abortSignal.aborted) return;
+    inputTokens = composition.usage?.input_tokens ?? 0;
+    outputTokens = composition.usage?.output_tokens ?? 0;
+    if (await cancelIfRequested()) return;
     const artifact = buildNewsEventSelectionArtifactFromDiscoveryResult({
       result: {
         cards: composition.cards,
@@ -869,6 +896,7 @@ async function handleServerPipelineNewsDiscoveryJob(params: {
       },
       originalQuestion: job.userMessage.content,
     });
+    if (await cancelIfRequested()) return;
     const chatArtifacts = artifact
       ? await persistBuiltNewsDiscoveryArtifact({
           admin,
@@ -878,9 +906,7 @@ async function handleServerPipelineNewsDiscoveryJob(params: {
           runId: job.run.id,
         })
       : [];
-    if (abortSignal.aborted) return;
-    const inputTokens = composition.usage?.input_tokens ?? 0;
-    const outputTokens = composition.usage?.output_tokens ?? 0;
+    if (await cancelIfRequested()) return;
     const estimatedCost =
       composition.usage?.estimated_cost_usd ??
       estimateCost(inputTokens, outputTokens);
@@ -945,7 +971,18 @@ async function handleServerPipelineNewsDiscoveryJob(params: {
       execution_budget: await loadExecutionBudgetStatus(job.session.user_id),
     });
   } catch (error) {
-    if (abortSignal.aborted) return;
+    if (abortSignal.aborted) {
+      if (!isHardTimeoutAbort(abortSignal) && !terminalHandled) {
+        await handleServerPipelineCancelledJob({
+          admin,
+          job,
+          inputTokens,
+          outputTokens,
+          sendEvent,
+        });
+      }
+      return;
+    }
     const rawErrorMessage =
       error instanceof Error ? error.message : "News discovery pipeline failed";
     const publicMessage = "뉴스 후보를 찾는 중 오류가 발생했습니다.";
@@ -977,6 +1014,29 @@ async function handleServerPipelineNewsDiscoveryJob(params: {
       error_message: publicMessage,
     });
   }
+}
+
+async function handleServerPipelineCancelledJob(params: {
+  admin: SupabaseAdmin;
+  job: AgentJob;
+  inputTokens: number;
+  outputTokens: number;
+  sendEvent: (event: Parameters<typeof appendAgentRunEvent>[2], payload: unknown) => Promise<void>;
+}) {
+  const { admin, job, inputTokens, outputTokens, sendEvent } = params;
+
+  await handleCancelledJob({
+    admin,
+    job,
+    result: {
+      acc: {
+        ...emptyAccumulatedRun(),
+        inputTokens,
+        outputTokens,
+      },
+    },
+    sendEvent,
+  });
 }
 
 async function prepareSelectedNewsEventContext(params: {
@@ -1411,8 +1471,8 @@ async function loadExecutionBudgetStatus(userId: string) {
   const admin = getSupabaseAdmin();
   const planKey = await loadPlanKey(admin, userId);
   const plan = await getBillingPlanFromStore(planKey);
-  const monthlyPeriod = getCurrentBillingPeriod(plan.budgetPeriod);
-  const dailyPeriod = getCurrentBillingPeriod("daily");
+  const monthlyPeriod = getCurrentMonthlyBillingPeriod();
+  const dailyPeriod = getCurrentDailyBillingPeriod();
   const [monthly, daily] = await Promise.all([
     loadBudgetBalance(admin, userId, "monthly", monthlyPeriod.start, monthlyPeriod.end),
     loadBudgetBalance(admin, userId, "daily", dailyPeriod.start, dailyPeriod.end),

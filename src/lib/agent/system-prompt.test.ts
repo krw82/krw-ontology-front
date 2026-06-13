@@ -20,6 +20,15 @@ describe("buildSystemPrompt", () => {
     expect(prompt).not.toContain("Match the user's latest message language");
   });
 
+  it("forbids user-visible progress narration and internal source labels", () => {
+    const prompt = buildSystemPrompt();
+
+    expect(prompt).toContain("Let me verify");
+    expect(prompt).toContain("Now let me");
+    expect(prompt).toContain("verified by trace");
+    expect(prompt).toContain("query_context");
+  });
+
   it("builds a Markdown-only research skill prompt outside the system prompt", () => {
     const researchPrompt = buildResearchPassPrompt("아마존 알려줘");
 

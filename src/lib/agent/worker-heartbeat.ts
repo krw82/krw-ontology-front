@@ -266,11 +266,11 @@ function fallbackMcpHealth(error: unknown): McpHealthResult {
       process.env.KRW_ONTOLOGY_ROOT ??
       null,
     indexPath:
-      process.env.KRW_ONTOLOGY_INDEX_PATH ??
+      process.env.KRW_ONTOLOGY_GLOBAL_SPINE_PATH ??
       (process.env.KRW_ONTOLOGY_RELEASE_ROOT
-        ? `${process.env.KRW_ONTOLOGY_RELEASE_ROOT}/indexes/agent_index.sqlite`
+        ? `${process.env.KRW_ONTOLOGY_RELEASE_ROOT}/indexes/global_spine.sqlite`
         : process.env.KRW_ONTOLOGY_ROOT
-          ? `${process.env.KRW_ONTOLOGY_ROOT}/indexes/agent_index.sqlite`
+          ? `${process.env.KRW_ONTOLOGY_ROOT}/indexes/global_spine.sqlite`
           : null),
     pluginPath: process.env.KRW_ONTOLOGY_PLUGIN_PATH ?? "",
     releaseMetadata: null,

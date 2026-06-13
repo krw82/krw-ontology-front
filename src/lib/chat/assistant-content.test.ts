@@ -52,4 +52,22 @@ describe("sanitizeAssistantContent", () => {
       ),
     ).toBe("");
   });
+
+  it("strips cramped leading English progress narration before the answer", () => {
+    expect(
+      sanitizeAssistantContent(
+        "Now let me verify the key MD&A quotes from the CY2025 10-K and get the CY2026Q1 10-Q segment details.Based on Micron's latest filing, the answer is cautious.",
+      ),
+    ).toBe("Based on Micron's latest filing, the answer is cautious.");
+  });
+
+  it("removes internal trace verification labels from user-facing source text", () => {
+    expect(
+      sanitizeAssistantContent(
+        "Based on the filing, margins improved. *(Source: CY2025 10-K, Item 7 MD&A, verified by trace)*",
+      ),
+    ).toBe(
+      "Based on the filing, margins improved. *(Source: CY2025 10-K, Item 7 MD&A)*",
+    );
+  });
 });

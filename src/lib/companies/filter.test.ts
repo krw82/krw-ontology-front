@@ -55,4 +55,18 @@ describe("filterAndSortCompanies", () => {
       "CVX",
     ]);
   });
+
+  it("hides placeholder tickers from company results", () => {
+    const unknownCompany = {
+      ...companies[0],
+      ticker: "UNKNOWN",
+      name: "Unknown company",
+    };
+
+    expect(
+      filterAndSortCompanies([...companies, unknownCompany], "", "ticker").map(
+        (company) => company.ticker,
+      ),
+    ).toEqual(["AMZN", "CVX", "MSFT"]);
+  });
 });

@@ -236,7 +236,12 @@ if not agent_cwd.exists() or not os.access(agent_cwd, os.W_OK | os.X_OK):
     raise SystemExit(f"CLAUDE_AGENT_CWD is not writable: {agent_cwd}")
 if not command.exists() or not os.access(command, os.X_OK):
     raise SystemExit(f"MCP stdio command is not executable: {command}")
-for key in ("KRW_ONTOLOGY_RELEASE_ROOT", "KRW_ONTOLOGY_ROOT", "KRW_ONTOLOGY_INDEX_PATH"):
+for key in (
+    "KRW_ONTOLOGY_RELEASE_ROOT",
+    "KRW_ONTOLOGY_ROOT",
+    "KRW_ONTOLOGY_GLOBAL_SPINE_PATH",
+    "KRW_ONTOLOGY_SHARD_MANIFEST_PATH",
+):
     if os.environ.get(key) or server_env.get(key):
         raise SystemExit(f"GCP web must not be configured with local ontology data: {key}")
 
@@ -280,7 +285,8 @@ if [ "$VALIDATE_AGENT_WORKER" = "1" ]; then
 const fs = require("fs");
 const required = [
   ".worker/agent-worker.mjs",
-  `${process.env.KRW_ONTOLOGY_ROOT}/indexes/agent_index.sqlite`,
+  `${process.env.KRW_ONTOLOGY_ROOT}/indexes/global_spine.sqlite`,
+  `${process.env.KRW_ONTOLOGY_ROOT}/indexes/shard_manifest.json`,
   `${process.env.KRW_ONTOLOGY_PLUGIN_PATH}/.mcp.json`,
 ];
 for (const path of required) {

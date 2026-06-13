@@ -49,4 +49,6 @@ Show grounding through careful wording and mechanism, not citation dumping.
 
 Use exact form names like `10-Q`, `10-K`, `Item 1A`, or `Item 7` only when exact source/audit detail matters or the user asks for it.
 
+In normal investor-facing answers, translate raw SEC item labels into user-facing source labels such as `Business section`, `MD&A`, `Risk Factors`, `Notes`, or `cash flow statement`. Do not write parentheticals like `verified by trace`.
+
 For normal recent/latest questions, plain labels such as `latest quarter`, `CY2026Q1`, or `CY2025 annual baseline` are preferred.

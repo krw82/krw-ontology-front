@@ -11,6 +11,9 @@ import {
   sanitizeAssistantPreviewContent,
 } from "@/lib/chat/assistant-content";
 import { parseChatAttachmentContent } from "@/lib/chat/attachments";
+import { normalizeTickers } from "@/lib/ontology/ticker";
+import type { Locale } from "@/i18n/config";
+import { inferShareLocale } from "./share-locale";
 
 const SHARE_TOKEN_BYTES = 18;
 const MAX_SHARE_TITLE_LENGTH = 90;
@@ -26,6 +29,7 @@ export interface PublicMessageShare {
   answer_created_at: string;
   tickers: string[] | null;
   created_at: string;
+  locale: Locale;
 }
 
 export interface PublicShareStarter {
@@ -79,11 +83,17 @@ export async function findPublicMessageShare(
 
   const answerContent = sanitizeAssistantContent(data.answer_content);
   const titleFallback = sanitizeAssistantPreviewContent(data.title);
+  const questionContent = normalizeShareQuestion(data.question_content);
   return {
     ...data,
     title: buildShareTitle(answerContent, titleFallback || undefined),
-    question_content: normalizeShareQuestion(data.question_content),
+    question_content: questionContent,
     answer_content: answerContent,
+    tickers: normalizeShareTickers(data.tickers),
+    locale: inferShareLocale({
+      questionContent,
+      answerContent,
+    }),
   };
 }
 
@@ -136,7 +146,7 @@ export async function createMessageShare(params: {
     question_created_at: questionSnapshot.questionCreatedAt,
     answer_content: answerContent,
     answer_created_at: params.message.created_at,
-    tickers: params.session.default_tickers ?? null,
+    tickers: normalizeShareTickers(params.session.default_tickers),
     snapshot_version: SHARE_SNAPSHOT_VERSION,
   };
 
@@ -152,6 +162,13 @@ export async function createMessageShare(params: {
   if (existing) return existing;
 
   throw new Error(error?.message || "Failed to create message share");
+}
+
+function normalizeShareTickers(
+  tickers: readonly string[] | null | undefined,
+): string[] | null {
+  const normalized = normalizeTickers(tickers ?? []);
+  return normalized.length > 0 ? normalized : null;
 }
 
 export async function ensureMessageShareQuestionSnapshot(params: {

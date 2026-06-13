@@ -15,6 +15,9 @@ describe("ResearchMarkdown URL sanitization", () => {
     );
     expect(getSafeMarkdownHref("#risk-factors")).toBe("#risk-factors");
     expect(getSafeMarkdownHref("/companies/NVDA")).toBe("/companies/NVDA");
+    expect(
+      getSafeMarkdownHref("https://krwontology.com/ko/companies/NVDA"),
+    ).toBe("https://krwontology.com/ko/companies/NVDA");
   });
 
   it("rejects unsafe link and image schemes", () => {
@@ -23,6 +26,14 @@ describe("ResearchMarkdown URL sanitization", () => {
     expect(getSafeMarkdownHref("//evil.example/path")).toBeUndefined();
     expect(getSafeMarkdownImageSrc("data:image/svg+xml,<svg />")).toBeUndefined();
     expect(getSafeMarkdownImageSrc("javascript:alert(1)")).toBeUndefined();
+  });
+
+  it("rejects placeholder company links", () => {
+    expect(getSafeMarkdownHref("/companies/UNKNOWN")).toBeUndefined();
+    expect(getSafeMarkdownHref("/ko/companies/unknown")).toBeUndefined();
+    expect(
+      getSafeMarkdownHref("https://krwontology.com/ko/companies/UNKNOWN"),
+    ).toBeUndefined();
   });
 
   it("allows only http and https image URLs", () => {
