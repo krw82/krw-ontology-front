@@ -399,6 +399,105 @@ body {
   animation: home-evidence-rail-glow 900ms var(--ease-out-expo) both;
 }
 
+@keyframes notebook-refresh-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes notebook-refresh-scan {
+  0% {
+    opacity: 0;
+    transform: translateY(-120%) scaleY(0.7);
+  }
+  16% {
+    opacity: 1;
+  }
+  72% {
+    opacity: 0.42;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(520%) scaleY(1);
+  }
+}
+
+@keyframes notebook-refresh-line-flow {
+  0%,
+  100% {
+    opacity: 0.48;
+    transform: scaleX(0.86);
+  }
+  45% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes notebook-refresh-icon-pulse {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.72;
+  }
+  50% {
+    transform: translateY(-1px) rotate(-4deg);
+    opacity: 1;
+  }
+}
+
+.notebook-refresh-panel {
+  position: relative;
+  animation: notebook-refresh-panel-in 340ms var(--ease-out-expo) both;
+}
+
+.notebook-refresh-scan {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 24%;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(0, 82, 255, 0.08),
+    rgba(0, 82, 255, 0.18),
+    transparent
+  );
+  animation: notebook-refresh-scan 1600ms var(--ease-out-expo) infinite;
+}
+
+.notebook-refresh-line {
+  display: block;
+  height: 8px;
+  border-radius: 9999px;
+  transform-origin: left;
+  background: linear-gradient(
+    90deg,
+    var(--color-hairline-soft),
+    rgba(0, 82, 255, 0.22),
+    var(--color-hairline-soft)
+  );
+  animation: notebook-refresh-line-flow 1200ms var(--ease-out-expo) infinite;
+}
+
+.notebook-refresh-line:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.notebook-refresh-line:nth-child(3) {
+  animation-delay: 240ms;
+}
+
+.notebook-refresh-icon {
+  animation: notebook-refresh-icon-pulse 900ms var(--ease-out-expo) infinite;
+}
+
 /* Reduced motion: disable all animations for accessibility */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -418,7 +517,15 @@ body {
 
   .question-chain-stage-desktop::before,
   .question-chain-entry::after,
-  .home-trace-scan {
+  .home-trace-scan,
+  .notebook-refresh-scan {
     display: none !important;
+  }
+
+  .notebook-refresh-panel,
+  .notebook-refresh-line,
+  .notebook-refresh-icon {
+    opacity: 1 !important;
+    transform: none !important;
   }
 }

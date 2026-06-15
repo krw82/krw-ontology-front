@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import TopNav from "@/components/TopNav";
+import CompanyWatchlistActions from "@/components/CompanyWatchlistActions";
 import MarketingCtaLink from "@/components/MarketingCtaLink";
 import SuggestedPromptActions from "@/components/SuggestedPromptActions";
 import {
@@ -16,6 +17,8 @@ import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { normalizeTicker } from "@/lib/ontology/ticker";
 import { absoluteUrl, SITE_NAME } from "@/lib/marketing/site";
 import { getCspNonce } from "@/lib/security/csp-nonce";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import type { UserCompanyMarkRow } from "@/types/database";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -91,6 +94,18 @@ export default async function CompanyLandingPage({
 
   if (!company) notFound();
 
+  let savedMark: Pick<UserCompanyMarkRow, "is_watchlisted" | "is_holding"> | null =
+    null;
+  if (user) {
+    const { data } = await getSupabaseAdmin()
+      .from("user_company_marks")
+      .select("is_watchlisted, is_holding")
+      .eq("user_id", user.id)
+      .eq("ticker", company.ticker)
+      .maybeSingle<Pick<UserCompanyMarkRow, "is_watchlisted" | "is_holding">>();
+    savedMark = data ?? null;
+  }
+
   const metadata = user?.user_metadata;
   const initialUserProfile = user?.email
     ? {
@@ -123,7 +138,12 @@ export default async function CompanyLandingPage({
           breadcrumbCompanies: "회사 목록",
           heroHeading: `${companyTitleName} 공시 기반 리서치`,
           startCta: `${displayCompany.ticker} 무료 분석 시작`,
-          watchlistCta: "내 종목장에 저장",
+          watchlistInterestCta: "관심",
+          watchlistHoldingCta: "보유",
+          watchlistInterestSaved: "관심 저장됨",
+          watchlistHoldingSaved: "보유 저장됨",
+          watchlistSaving: "저장 중",
+          watchlistError: "종목 상태를 저장하지 못했습니다.",
           scopeEyebrow: "분석 범위",
           scopeHeading: `${companyTitleName} 리서치 초점`,
           businessActivity: "사업 활동",
@@ -136,7 +156,12 @@ export default async function CompanyLandingPage({
           breadcrumbCompanies: "Companies",
           heroHeading: `${displayCompany.name} filing-grounded research`,
           startCta: `Start ${displayCompany.ticker} analysis`,
-          watchlistCta: "Save to my research",
+          watchlistInterestCta: "Watch",
+          watchlistHoldingCta: "Holding",
+          watchlistInterestSaved: "Watch saved",
+          watchlistHoldingSaved: "Holding saved",
+          watchlistSaving: "Saving",
+          watchlistError: "Could not save this company.",
           scopeEyebrow: "Analysis scope",
           scopeHeading: `${displayCompany.name} research focus`,
           businessActivity: "Business activity",
@@ -162,9 +187,7 @@ export default async function CompanyLandingPage({
     },
   };
   const watchlistPath = `/watchlist/${displayCompany.ticker}`;
-  const watchlistHref = user
-    ? watchlistPath
-    : `/login?next=${encodeURIComponent(watchlistPath)}`;
+  const watchlistLoginHref = `/login?next=${encodeURIComponent(watchlistPath)}`;
 
   return (
     <div className="min-h-[100dvh] bg-canvas text-ink">
@@ -219,18 +242,31 @@ export default async function CompanyLandingPage({
               >
                 {pageCopy.startCta}
               </MarketingCtaLink>
-              <Link
-                href={watchlistHref}
-                className="inline-flex min-h-12 items-center justify-center gap-1 rounded-[8px] border border-hairline bg-canvas px-5 py-3 text-[15px] font-extrabold leading-5 text-ink transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-              >
-                <span
-                  aria-hidden="true"
-                  className="material-symbols-outlined text-[18px]"
-                >
-                  bookmark
-                </span>
-                {pageCopy.watchlistCta}
-              </Link>
+              <CompanyWatchlistActions
+                ticker={displayCompany.ticker}
+                isAuthenticated={Boolean(user)}
+                loginHref={watchlistLoginHref}
+                destinationHref={watchlistPath}
+                initialSavedAction={
+                  savedMark?.is_holding
+                    ? "holding"
+                    : savedMark?.is_watchlisted
+                      ? "watchlist"
+                      : null
+                }
+                labels={{
+                  watchlist: pageCopy.watchlistInterestCta,
+                  holding: pageCopy.watchlistHoldingCta,
+                  savedWatchlist: pageCopy.watchlistInterestSaved,
+                  savedHolding: pageCopy.watchlistHoldingSaved,
+                  saving: pageCopy.watchlistSaving,
+                  error: pageCopy.watchlistError,
+                }}
+                analyticsProperties={{
+                  company_name: displayCompany.name,
+                  source_surface: "company_hero",
+                }}
+              />
             </div>
             <SuggestedPromptActions
               prompts={prompts}

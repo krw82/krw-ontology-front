@@ -44,8 +44,6 @@ interface ChatMessageProps {
   messageId?: string;
   createdAt?: string;
   status?: MessageStatus;
-  researchNoteTicker?: string;
-  researchNoteSessionId?: string | null;
 }
 
 const statusTransition = {
@@ -200,217 +198,16 @@ class ShareCreationError extends Error {
 }
 
 type ShareState = "idle" | "sharing" | "shared" | "failed" | "auth_required";
-type WorkspaceSaveKind = "note" | "card" | "thesis";
-type WorkspaceSaveState =
-  | "idle"
-  | "saving"
-  | "saved"
-  | "failed"
-  | "auth_required";
-
-const WORKSPACE_SAVE_ACTIONS: Array<{
-  kind: WorkspaceSaveKind;
-  idleIcon: string;
-  idleLabel: string;
-  savedLabel: string;
-  failedLabel: string;
-  savingLabel: string;
-  visibleSavedStatus: string;
-  visibleFailedStatus: string;
-}> = [
-  {
-    kind: "note",
-    idleIcon: "edit_note",
-    idleLabel: "리서치 노트로 저장",
-    savedLabel: "리서치 노트 저장 완료",
-    failedLabel: "리서치 노트 저장 실패",
-    savingLabel: "리서치 노트 저장 중",
-    visibleSavedStatus: "노트 저장 완료",
-    visibleFailedStatus: "노트 저장 실패",
-  },
-  {
-    kind: "card",
-    idleIcon: "assignment",
-    idleLabel: "종목 카드로 저장",
-    savedLabel: "종목 카드 저장 완료",
-    failedLabel: "종목 카드 저장 실패",
-    savingLabel: "종목 카드 저장 중",
-    visibleSavedStatus: "카드 저장 완료",
-    visibleFailedStatus: "카드 저장 실패",
-  },
-  {
-    kind: "thesis",
-    idleIcon: "fact_check",
-    idleLabel: "Thesis로 저장",
-    savedLabel: "Thesis 저장 완료",
-    failedLabel: "Thesis 저장 실패",
-    savingLabel: "Thesis 저장 중",
-    visibleSavedStatus: "Thesis 저장 완료",
-    visibleFailedStatus: "Thesis 저장 실패",
-  },
-];
-
-const INITIAL_WORKSPACE_SAVE_STATES: Record<
-  WorkspaceSaveKind,
-  WorkspaceSaveState
-> = {
-  note: "idle",
-  card: "idle",
-  thesis: "idle",
-};
-
-async function saveAssistantMessageAsResearchNote({
-  ticker,
-  sessionId,
-  messageId,
-  content,
-}: {
-  ticker: string;
-  sessionId?: string | null;
-  messageId: string;
-  content: string;
-}) {
-  const response = await fetch(
-    `/api/watchlist/${encodeURIComponent(ticker)}/notes`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        title: `${ticker} 채팅 요약`,
-        body: content,
-        note_type: "chat_summary",
-        tags: ["chat"],
-        source_chat_session_id: sessionId || undefined,
-        source_message_id: messageId,
-      }),
-    },
-  );
-  const data = (await response.json().catch(() => null)) as {
-    error?: { message?: string };
-  } | null;
-
-  if (!response.ok) {
-    const error = new Error(data?.error?.message || "리서치 노트로 저장하지 못했습니다.");
-    if (response.status === 401) error.name = "AuthRequiredError";
-    throw error;
-  }
-}
-
-async function saveAssistantMessageAsCompanyCard({
-  ticker,
-  sessionId,
-  messageId,
-  content,
-}: {
-  ticker: string;
-  sessionId?: string | null;
-  messageId: string;
-  content: string;
-}) {
-  const response = await fetch(
-    `/api/watchlist/${encodeURIComponent(ticker)}/card`,
-    {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        title: `${ticker} 종목 카드`,
-        summary: compactTextPreview(content, 1200),
-        content_md: content,
-        source_chat_session_id: sessionId || undefined,
-        source_message_id: messageId,
-      }),
-    },
-  );
-  await assertWorkspaceSaveResponse(response, "종목 카드로 저장하지 못했습니다.");
-}
-
-async function saveAssistantMessageAsThesis({
-  ticker,
-  sessionId,
-  messageId,
-  content,
-}: {
-  ticker: string;
-  sessionId?: string | null;
-  messageId: string;
-  content: string;
-}) {
-  const response = await fetch(
-    `/api/watchlist/${encodeURIComponent(ticker)}/theses`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        title: `${ticker} 채팅 기반 Thesis`,
-        thesis_text: content,
-        status: "needs_review",
-        tags: ["chat"],
-        source_chat_session_id: sessionId || undefined,
-        source_message_id: messageId,
-      }),
-    },
-  );
-  await assertWorkspaceSaveResponse(response, "Thesis로 저장하지 못했습니다.");
-}
-
-async function assertWorkspaceSaveResponse(
-  response: Response,
-  fallbackMessage: string,
-) {
-  const data = (await response.json().catch(() => null)) as {
-    error?: { message?: string };
-  } | null;
-
-  if (!response.ok) {
-    const error = new Error(data?.error?.message || fallbackMessage);
-    if (response.status === 401) error.name = "AuthRequiredError";
-    throw error;
-  }
-}
-
-function compactTextPreview(content: string, maxLength: number): string {
-  return content
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/[#>*_`[\]()]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, maxLength);
-}
 
 function MessageActions({
   messageId,
   createdAt,
-  assistantContent,
-  researchNoteTicker,
-  researchNoteSessionId,
 }: {
   messageId: string;
   createdAt: string;
-  assistantContent: string;
-  researchNoteTicker?: string;
-  researchNoteSessionId?: string | null;
 }) {
   const [shareState, setShareState] = useState<ShareState>("idle");
-  const [saveStates, setSaveStates] = useState<
-    Record<WorkspaceSaveKind, WorkspaceSaveState>
-  >(() => ({ ...INITIAL_WORKSPACE_SAVE_STATES }));
   const formattedTime = useMemo(() => formatMessageTime(createdAt), [createdAt]);
-
-  const setSaveState = useCallback(
-    (kind: WorkspaceSaveKind, state: WorkspaceSaveState) => {
-      setSaveStates((current) => ({ ...current, [kind]: state }));
-    },
-    [],
-  );
 
   useEffect(() => {
     if (
@@ -423,27 +220,6 @@ function MessageActions({
     const timeoutId = window.setTimeout(() => setShareState("idle"), 1800);
     return () => window.clearTimeout(timeoutId);
   }, [shareState]);
-
-  useEffect(() => {
-    const hasTerminalState = WORKSPACE_SAVE_ACTIONS.some(({ kind }) =>
-      ["saved", "failed", "auth_required"].includes(saveStates[kind]),
-    );
-    if (!hasTerminalState) {
-      return;
-    }
-    const timeoutId = window.setTimeout(() => {
-      setSaveStates((current) => {
-        const next = { ...current };
-        for (const { kind } of WORKSPACE_SAVE_ACTIONS) {
-          if (["saved", "failed", "auth_required"].includes(next[kind])) {
-            next[kind] = "idle";
-          }
-        }
-        return next;
-      });
-    }, 1800);
-    return () => window.clearTimeout(timeoutId);
-  }, [saveStates]);
 
   const handleShare = useCallback(async () => {
     if (shareState === "sharing") return;
@@ -482,52 +258,6 @@ function MessageActions({
     }
   }, [messageId, shareState]);
 
-  const handleSaveWorkspaceAsset = useCallback(async (kind: WorkspaceSaveKind) => {
-    if (!researchNoteTicker || !assistantContent.trim()) return;
-    if (saveStates[kind] === "saving") return;
-
-    setSaveState(kind, "saving");
-    try {
-      if (kind === "note") {
-        await saveAssistantMessageAsResearchNote({
-          ticker: researchNoteTicker,
-          sessionId: researchNoteSessionId,
-          messageId,
-          content: assistantContent,
-        });
-      } else if (kind === "card") {
-        await saveAssistantMessageAsCompanyCard({
-          ticker: researchNoteTicker,
-          sessionId: researchNoteSessionId,
-          messageId,
-          content: assistantContent,
-        });
-      } else {
-        await saveAssistantMessageAsThesis({
-          ticker: researchNoteTicker,
-          sessionId: researchNoteSessionId,
-          messageId,
-          content: assistantContent,
-        });
-      }
-      setSaveState(kind, "saved");
-    } catch (error) {
-      setSaveState(
-        kind,
-        error instanceof Error && error.name === "AuthRequiredError"
-          ? "auth_required"
-          : "failed",
-      );
-    }
-  }, [
-    assistantContent,
-    messageId,
-    researchNoteSessionId,
-    researchNoteTicker,
-    saveStates,
-    setSaveState,
-  ]);
-
   if (!formattedTime) return null;
 
   const iconName =
@@ -558,72 +288,9 @@ function MessageActions({
         : shareState === "auth_required"
           ? "로그인이 필요합니다"
           : "";
-  const canSaveResearchNote = Boolean(
-    researchNoteTicker && assistantContent.trim(),
-  );
-  const activeSaveAction = WORKSPACE_SAVE_ACTIONS.find(
-    ({ kind }) => saveStates[kind] !== "idle",
-  );
-  const visibleSaveStatus =
-    activeSaveAction && saveStates[activeSaveAction.kind] === "saved"
-      ? activeSaveAction.visibleSavedStatus
-      : activeSaveAction && saveStates[activeSaveAction.kind] === "failed"
-        ? activeSaveAction.visibleFailedStatus
-        : activeSaveAction &&
-            saveStates[activeSaveAction.kind] === "auth_required"
-          ? "로그인이 필요합니다"
-          : "";
 
   return (
     <div className="mt-sm flex items-center gap-xs text-[13px] leading-none text-muted">
-      {canSaveResearchNote && (
-        <>
-          {WORKSPACE_SAVE_ACTIONS.map((action) => {
-            const state = saveStates[action.kind];
-            const actionIcon =
-              state === "saved"
-                ? "check"
-                : state === "failed"
-                  ? "error"
-                  : state === "auth_required"
-                    ? "lock"
-                    : state === "saving"
-                      ? "progress_activity"
-                      : action.idleIcon;
-            const actionLabel =
-              state === "saved"
-                ? action.savedLabel
-                : state === "failed"
-                  ? action.failedLabel
-                  : state === "auth_required"
-                    ? "로그인이 필요합니다"
-                    : state === "saving"
-                      ? action.savingLabel
-                      : action.idleLabel;
-
-            return (
-              <button
-                key={action.kind}
-                type="button"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-70"
-                aria-label={actionLabel}
-                disabled={state === "saving"}
-                onClick={() => handleSaveWorkspaceAsset(action.kind)}
-              >
-                <span
-                  aria-hidden="true"
-                  className={[
-                    "material-symbols-outlined text-[18px]",
-                    state === "saving" ? "animate-spin" : "",
-                  ].join(" ")}
-                >
-                  {actionIcon}
-                </span>
-              </button>
-            );
-          })}
-        </>
-      )}
       <button
         type="button"
         className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-70"
@@ -646,18 +313,13 @@ function MessageActions({
         aria-live="polite"
         className={[
           "min-w-0 text-[12px] leading-none transition-opacity",
-          visibleSaveStatus || visibleShareStatus ? "opacity-100" : "opacity-0",
-          shareState === "failed" ||
-          shareState === "auth_required" ||
-          (activeSaveAction &&
-            ["failed", "auth_required"].includes(
-              saveStates[activeSaveAction.kind],
-            ))
+          visibleShareStatus ? "opacity-100" : "opacity-0",
+          shareState === "failed" || shareState === "auth_required"
             ? "text-error"
             : "text-muted",
         ].join(" ")}
       >
-        {visibleSaveStatus || visibleShareStatus || " "}
+        {visibleShareStatus || " "}
       </span>
     </div>
   );
@@ -748,8 +410,6 @@ export default function ChatMessage({
   messageId,
   createdAt,
   status,
-  researchNoteTicker,
-  researchNoteSessionId,
 }: ChatMessageProps) {
   if (role === "user") {
     const { visibleText, attachments } = parseChatAttachmentContent(content);
@@ -854,9 +514,6 @@ export default function ChatMessage({
             <MessageActions
               messageId={messageId}
               createdAt={createdAt}
-              assistantContent={assistantContent}
-              researchNoteTicker={researchNoteTicker}
-              researchNoteSessionId={researchNoteSessionId}
             />
           ) : null}
         </div>

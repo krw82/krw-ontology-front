@@ -84,8 +84,17 @@ export default async function CompaniesPage({ params }: CompaniesPageProps) {
         brandAriaLabel={locale === "ko" ? "홈으로 이동" : "Go home"}
         showSidebarTrigger
         showLocaleSwitcher
+        accountIconHref="/watchlist"
+        accountIconAriaLabel={
+          locale === "ko"
+            ? "리서치 노트북으로 이동"
+            : "Go to research notebook"
+        }
       />
-      <CompaniesBrowser initialCompanies={displayCompanies} locale={locale} />
+      <CompaniesBrowser
+        initialCompanies={displayCompanies}
+        locale={locale}
+      />
     </div>
   );
 }

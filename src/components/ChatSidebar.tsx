@@ -17,13 +17,14 @@ import {
 import { OPEN_CHAT_SIDEBAR_EVENT } from "@/lib/chat/sidebar-events";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
-import { getPathLocale } from "@/i18n/routing";
+import { getPathLocale, localizedPath } from "@/i18n/routing";
 import type { SessionSummary } from "@/types/api-contracts";
 import { normalizeTickers } from "@/lib/ontology/ticker";
 
 interface ChatSidebarProps {
   activeSessionId: string | null;
   refreshSignal?: string | number;
+  showDesktopSidebar?: boolean;
 }
 
 function subscribePortalTarget() {
@@ -38,6 +39,11 @@ const sidebarCopy = {
   ko: {
     closeHistory: "채팅 기록 닫기",
     history: "채팅 기록",
+    researchNotebook: "리서치 노트북",
+    openResearchNotebook: "내 리서치 노트북 열기",
+    companySearch: "회사 찾기",
+    openCompanySearch: "회사 찾기 열기",
+    recentChats: "최근 채팅 목록",
     newChat: "새 채팅",
     nameSaved: "채팅 이름을 저장했습니다.",
     deleted: "채팅을 삭제했습니다.",
@@ -62,6 +68,11 @@ const sidebarCopy = {
   en: {
     closeHistory: "Close chat history",
     history: "Chat history",
+    researchNotebook: "Research notebook",
+    openResearchNotebook: "Open my research notebook",
+    companySearch: "Find companies",
+    openCompanySearch: "Open company search",
+    recentChats: "Recent chats",
     newChat: "New chat",
     nameSaved: "Chat name saved.",
     deleted: "Chat deleted.",
@@ -138,6 +149,7 @@ function formatRelativeDate(value: string, locale: Locale): string {
 export default function ChatSidebar({
   activeSessionId,
   refreshSignal,
+  showDesktopSidebar = true,
 }: ChatSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -243,9 +255,7 @@ export default function ChatSidebar({
               variants={sidebarPanel}
             >
               <div className="flex h-[64px] items-center justify-between border-b border-hairline px-md">
-                <p className="text-[15px] font-extrabold text-ink">
-                  {copy.history}
-                </p>
+                <span aria-hidden="true" />
                 <button
                   type="button"
                   className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-surface hover:text-ink"
@@ -256,6 +266,41 @@ export default function ChatSidebar({
                     close
                   </span>
                 </button>
+              </div>
+              <div className="border-b border-hairline px-sm py-xs">
+                <Link
+                  href="/watchlist"
+                  className="group flex h-12 items-center gap-sm rounded-[8px] px-xs text-[15px] font-extrabold leading-5 text-ink transition-colors hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  aria-label={copy.openResearchNotebook}
+                  onClick={closeMobileSidebar}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="material-symbols-outlined text-[22px] text-muted transition-colors group-hover:text-primary"
+                  >
+                    article
+                  </span>
+                  <span className="truncate">{copy.researchNotebook}</span>
+                </Link>
+                <Link
+                  href={localizedPath(locale, "/companies")}
+                  className="group flex h-12 items-center gap-sm rounded-[8px] px-xs text-[15px] font-extrabold leading-5 text-ink transition-colors hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  aria-label={copy.openCompanySearch}
+                  onClick={closeMobileSidebar}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="material-symbols-outlined text-[22px] text-muted transition-colors group-hover:text-primary"
+                  >
+                    search
+                  </span>
+                  <span className="truncate">{copy.companySearch}</span>
+                </Link>
+              </div>
+              <div className="border-b border-hairline px-md py-xs">
+                <p className="text-[12px] font-bold leading-4 text-muted">
+                  {copy.recentChats}
+                </p>
               </div>
               <SidebarContent
                 activeSessionId={activeSessionId}
@@ -279,23 +324,25 @@ export default function ChatSidebar({
         )}
       </AnimatePresence>
 
-      <aside className="hidden w-[280px] shrink-0 flex-col border-r border-hairline bg-surface/80 md:sticky md:top-0 md:flex md:h-[100dvh] md:max-h-[100dvh]">
-        <SidebarContent
-          activeSessionId={activeSessionId}
-          locale={locale}
-          copy={copy}
-          loading={loading}
-          sessions={sessions}
-          mutatingSessionId={mutatingSessionId}
-          mutationError={mutationError}
-          renameSession={renameSession}
-          deleteSession={deleteSession}
-          pendingNavigationSessionId={null}
-          onDeleteActiveSession={() =>
-            router.replace(buildNewChatHref(undefined, { locale }))
-          }
-        />
-      </aside>
+      {showDesktopSidebar && (
+        <aside className="hidden w-[280px] shrink-0 flex-col border-r border-hairline bg-surface/80 md:sticky md:top-0 md:flex md:h-[100dvh] md:max-h-[100dvh]">
+          <SidebarContent
+            activeSessionId={activeSessionId}
+            locale={locale}
+            copy={copy}
+            loading={loading}
+            sessions={sessions}
+            mutatingSessionId={mutatingSessionId}
+            mutationError={mutationError}
+            renameSession={renameSession}
+            deleteSession={deleteSession}
+            pendingNavigationSessionId={null}
+            onDeleteActiveSession={() =>
+              router.replace(buildNewChatHref(undefined, { locale }))
+            }
+          />
+        </aside>
+      )}
     </>
   );
 }

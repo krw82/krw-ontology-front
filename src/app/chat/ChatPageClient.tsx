@@ -28,6 +28,7 @@ import { normalizeTicker } from "@/lib/ontology/ticker";
 import type {
   CreateSessionRequest,
   CreateSessionResponse,
+  UserCompanyMark,
 } from "@/types/api-contracts";
 
 const DRAFT_MESSAGE_STORAGE_PREFIX = "krw:chat-draft-message:";
@@ -416,8 +417,6 @@ function ChatContent() {
   // ---------------------------------------------------------------------------
 
   const contextTickers = getSessionTickers(chat.session, activeTicker);
-  const researchNoteTicker =
-    contextTickers.length === 1 ? contextTickers[0] : undefined;
   const contextTickersKey = contextTickers.join(",");
   const contextCompanies = contextTickers.map((contextTicker) => {
     const normalizedTicker = contextTicker.trim().toUpperCase();
@@ -448,6 +447,7 @@ function ChatContent() {
         .filter((sector): sector is string => Boolean(sector)),
     ),
   ).join(" / ");
+  const headerActionTicker = contextTickers[0] ?? null;
   const suggestedPrompts = getSuggestedPromptDisplaysForTickers(
     responseLocale,
     contextTickers,
@@ -834,6 +834,11 @@ function ChatContent() {
         showSidebarTrigger
         mobileOverlay
         mobileCollapsed={mobileHeaderHidden}
+        actionSlot={
+          headerActionTicker ? (
+            <ChatWatchlistHeaderActions ticker={headerActionTicker} />
+          ) : null
+        }
       />
 
       {/* Main Workspace */}
@@ -928,12 +933,6 @@ function ChatContent() {
                       messageId={msg.role === "assistant" ? msg.id : undefined}
                       createdAt={
                         msg.role === "assistant" ? msg.created_at : undefined
-                      }
-                      researchNoteTicker={
-                        msg.role === "assistant" ? researchNoteTicker : undefined
-                      }
-                      researchNoteSessionId={
-                        msg.role === "assistant" ? sessionId : undefined
                       }
                       citations={
                         isLatestAssistantMessage ? chat.citations : undefined
@@ -1239,6 +1238,120 @@ function ChatContent() {
         </div>
       </main>
     </div>
+  );
+}
+
+function ChatWatchlistHeaderActions({ ticker }: { ticker: string }) {
+  const normalizedTicker = normalizeTicker(ticker);
+  const [mark, setMark] = useState<UserCompanyMark | null>(null);
+  const [pendingAction, setPendingAction] = useState<"watchlist" | "holding" | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!normalizedTicker) return;
+
+    let stale = false;
+    const tickerForRequest = normalizedTicker;
+    async function loadMark() {
+      try {
+        const response = await fetch(
+          `/api/watchlist/${encodeURIComponent(tickerForRequest)}`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) return;
+        const payload = (await response.json()) as {
+          company?: { mark?: UserCompanyMark };
+        };
+        if (!stale) setMark(payload.company?.mark ?? null);
+      } catch {
+        if (!stale) setMark(null);
+      }
+    }
+
+    void loadMark();
+    return () => {
+      stale = true;
+    };
+  }, [normalizedTicker]);
+
+  if (!normalizedTicker) return null;
+
+  async function saveMark(action: "watchlist" | "holding") {
+    if (!normalizedTicker || pendingAction) return;
+
+    setPendingAction(action);
+    try {
+      const response = await fetch(
+        `/api/watchlist/${encodeURIComponent(normalizedTicker)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            action === "holding"
+              ? { is_watchlisted: true, is_holding: true }
+              : { is_watchlisted: true },
+          ),
+        },
+      );
+      if (!response.ok) throw new Error("Failed to save watchlist mark");
+      const payload = (await response.json()) as { mark?: UserCompanyMark };
+      if (payload.mark) setMark(payload.mark);
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <ChatHeaderMarkButton
+        active={Boolean(mark?.is_watchlisted)}
+        disabled={pendingAction !== null}
+        icon="bookmark"
+        label={pendingAction === "watchlist" ? "저장" : "관심"}
+        onClick={() => void saveMark("watchlist")}
+      />
+      <ChatHeaderMarkButton
+        active={Boolean(mark?.is_holding)}
+        disabled={pendingAction !== null}
+        icon="inventory_2"
+        label={pendingAction === "holding" ? "저장" : "보유"}
+        onClick={() => void saveMark("holding")}
+      />
+    </div>
+  );
+}
+
+function ChatHeaderMarkButton({
+  active,
+  disabled,
+  icon,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  disabled: boolean;
+  icon: string;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={[
+        "inline-flex h-9 items-center justify-center gap-1 rounded-[8px] border px-2 text-[12px] font-extrabold leading-4 transition-colors disabled:cursor-not-allowed disabled:opacity-55 sm:h-10 sm:px-3 sm:text-[13px]",
+        active
+          ? "border-primary bg-primary-fixed text-on-primary-fixed"
+          : "border-hairline bg-canvas text-ink hover:border-primary hover:text-primary",
+      ].join(" ")}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span aria-hidden="true" className="material-symbols-outlined text-[17px]">
+        {icon}
+      </span>
+      <span>{label}</span>
+    </button>
   );
 }
 

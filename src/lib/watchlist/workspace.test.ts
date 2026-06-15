@@ -83,6 +83,7 @@ function createAdmin() {
         source_chat_session_id: null,
         source_message_id: null,
         answered_at: null,
+        visible_after_at: "2026-06-11T00:00:00.000Z",
         created_at: "2026-06-11T00:00:00.000Z",
         updated_at: "2026-06-12T00:00:00.000Z",
       },
@@ -96,6 +97,21 @@ function createAdmin() {
         source_chat_session_id: null,
         source_message_id: null,
         answered_at: "2026-06-12T00:00:00.000Z",
+        visible_after_at: "2026-06-10T00:00:00.000Z",
+        created_at: "2026-06-10T00:00:00.000Z",
+        updated_at: "2026-06-12T12:00:00.000Z",
+      },
+      {
+        id: "10000000-0000-4000-8000-000000000004",
+        user_id: "user-1",
+        ticker: "AAPL",
+        question: "미래에 보여야 하는 자동 질문",
+        status: "open",
+        source: "saved_from_chat",
+        source_chat_session_id: null,
+        source_message_id: null,
+        answered_at: null,
+        visible_after_at: "2099-06-10T00:00:00.000Z",
         created_at: "2026-06-10T00:00:00.000Z",
         updated_at: "2026-06-12T12:00:00.000Z",
       },
@@ -109,6 +125,7 @@ function createAdmin() {
         source_chat_session_id: null,
         source_message_id: null,
         answered_at: null,
+        visible_after_at: "2026-06-09T00:00:00.000Z",
         created_at: "2026-06-09T00:00:00.000Z",
         updated_at: "2026-06-09T00:00:00.000Z",
       },
@@ -143,6 +160,22 @@ function createAdmin() {
         source_message_id: null,
         created_at: "2026-06-12T09:00:00.000Z",
         updated_at: "2026-06-12T09:00:00.000Z",
+      },
+    ],
+    user_company_notebooks: [
+      {
+        id: "31000000-0000-4000-8000-000000000001",
+        user_id: "user-1",
+        ticker: "AAPL",
+        title: "AAPL 리서치 노트북",
+        content_md: "# AAPL 리서치 노트북\n\n서비스 매출을 계속 본다.",
+        previous_content_md: null,
+        basis_release_id: null,
+        basis_period: "CY2026Q1",
+        last_source_chat_session_id: null,
+        last_source_message_id: null,
+        created_at: "2026-06-12T14:00:00.000Z",
+        updated_at: "2026-06-12T14:00:00.000Z",
       },
     ],
     user_company_theses: [
@@ -212,8 +245,27 @@ function createAdmin() {
     ],
   };
 
-  function rowsFor(table: keyof typeof tableData, selected: string | null) {
-    const rows = tableData[table] as Array<Record<string, unknown>>;
+  function rowsFor(
+    table: keyof typeof tableData,
+    selected: string | null,
+    visibleAfterCutoff: string | null,
+  ) {
+    let rows = tableData[table] as Array<Record<string, unknown>>;
+    if (visibleAfterCutoff) {
+      rows = rows.filter((row) => {
+        const visibleAfterAt = row.visible_after_at;
+        return (
+          typeof visibleAfterAt !== "string" ||
+          visibleAfterAt <= visibleAfterCutoff
+        );
+      });
+    }
+    if (
+      table === "user_company_questions" &&
+      selected === "ticker,id,question,visible_after_at,created_at,updated_at"
+    ) {
+      return rows.filter((row) => row.status === "open");
+    }
     if (table === "user_company_questions" && selected === "ticker") {
       return rows
         .filter((row) => row.status === "open")
@@ -235,6 +287,7 @@ function createAdmin() {
     from(table: keyof typeof tableData) {
       let selected: string | null = null;
       let updatePayload: unknown = null;
+      let visibleAfterCutoff: string | null = null;
 
       const query = {
         select(value: string) {
@@ -242,6 +295,10 @@ function createAdmin() {
           return query;
         },
         eq() {
+          return query;
+        },
+        lte(column: string, value: string) {
+          if (column === "visible_after_at") visibleAfterCutoff = value;
           return query;
         },
         or() {
@@ -272,12 +329,12 @@ function createAdmin() {
         },
         returns() {
           return Promise.resolve({
-            data: rowsFor(table, selected),
+            data: rowsFor(table, selected, visibleAfterCutoff),
             error: null,
           });
         },
         maybeSingle() {
-          const rows = rowsFor(table, selected);
+          const rows = rowsFor(table, selected, visibleAfterCutoff);
           return Promise.resolve({ data: rows[0] ?? null, error: null });
         },
         then(resolve: (value: { data: null; error: null }) => void) {
@@ -306,6 +363,9 @@ function createEmptyDetailAdmin() {
           return query;
         },
         eq() {
+          return query;
+        },
+        lte() {
           return query;
         },
         is() {
@@ -372,16 +432,43 @@ describe("watchlist workspace helpers", () => {
       notes: 1,
       recent_activity: 2,
     });
+    expect(overview.research_inbox).toEqual([
+      expect.objectContaining({
+        ticker: "MSFT",
+        reason: "empty_notebook",
+        status: "empty",
+      }),
+      expect.objectContaining({
+        ticker: "AAPL",
+        reason: "open_questions",
+        status: "has_open_questions",
+        open_question_count: 1,
+        current_question_id: "10000000-0000-4000-8000-000000000001",
+        current_question: "서비스 매출 성장률은 유지되는가?",
+        dismiss_question_id: "10000000-0000-4000-8000-000000000001",
+        action_label: "이 질문으로 리서치",
+        secondary_action_label: null,
+      }),
+    ]);
     expect(overview.companies[0]).toMatchObject({
       ticker: "AAPL",
       name: "Apple Inc.",
       open_question_count: 1,
       note_count: 1,
       recent_chat_count: 2,
+      notebook_preview: "서비스 매출을 계속 본다.",
+      research_status: "has_open_questions",
+      research_status_reason: "open_questions",
       mark: {
         is_holding: true,
         interest_reason: "서비스 매출과 자사주를 확인 중",
       },
+    });
+    expect(overview.companies[1]).toMatchObject({
+      ticker: "MSFT",
+      notebook_preview: "아직 작성된 리서치 노트가 없습니다.",
+      research_status: "empty",
+      research_status_reason: "empty_notebook",
     });
   });
 
@@ -402,6 +489,10 @@ describe("watchlist workspace helpers", () => {
         title: "AAPL 종목 카드",
         basis_period: "CY2026Q1",
       },
+      notebook: {
+        title: "AAPL 리서치 노트북",
+        basis_period: "CY2026Q1",
+      },
       theses: [{ title: "서비스 매출 방어력" }],
       thesis_checks: [{ result_status: "mixed" }],
       notes: [{ title: "서비스 매출 점검" }],
@@ -413,7 +504,7 @@ describe("watchlist workspace helpers", () => {
     );
     expect(fake.updates).toContainEqual({
       table: "user_company_marks",
-      payload: { last_activity_at: "2026-06-12T13:00:00.000Z" },
+      payload: { last_activity_at: "2026-06-12T14:00:00.000Z" },
     });
   });
 
@@ -428,6 +519,10 @@ describe("watchlist workspace helpers", () => {
       is_watchlisted: false,
       is_holding: false,
       last_activity_at: null,
+    });
+    expect(detail?.company).toMatchObject({
+      research_status: "empty",
+      research_status_reason: "empty_notebook",
     });
     expect(fake.updates).toEqual([]);
   });

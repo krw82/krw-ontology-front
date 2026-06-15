@@ -1,61 +1,40 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
-import type { FormEvent } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type {
+  ResearchInboxItem,
   WatchlistCompanySummary,
   WatchlistOverviewResponse,
 } from "@/types/api-contracts";
-
-type FilterKey = "all" | "watchlisted" | "holding" | "questions" | "notes";
 
 interface WatchlistHomeClientProps {
   overview: WatchlistOverviewResponse;
   loadError?: string | null;
 }
 
-const FILTERS: Array<{ key: FilterKey; label: string; icon: string }> = [
-  { key: "all", label: "전체", icon: "apps" },
-  { key: "watchlisted", label: "관심", icon: "bookmark" },
-  { key: "holding", label: "보유", icon: "inventory_2" },
-  { key: "questions", label: "열린 질문", icon: "help" },
-  { key: "notes", label: "최근 노트", icon: "edit_note" },
-];
-
 export default function WatchlistHomeClient({
   overview,
   loadError = null,
 }: WatchlistHomeClientProps) {
-  const router = useRouter();
-  const tickerInputRef = useRef<HTMLInputElement | null>(null);
-  const [companies, setCompanies] = useState(overview.companies);
+  const [overviewState, setOverviewState] = useState(overview);
+  const [dismissingQuestionId, setDismissingQuestionId] = useState<string | null>(
+    null,
+  );
+  const companies = overviewState.companies;
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<FilterKey>("all");
-  const [ticker, setTicker] = useState("");
-  const [interestReason, setInterestReason] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
 
-  const stats = useMemo(() => buildStats(companies), [companies]);
+  const researchInbox = overviewState.research_inbox;
   const filteredCompanies = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return companies.filter((company) => {
-      const matchesFilter =
-        filter === "all" ||
-        (filter === "holding" && company.mark.is_holding) ||
-        (filter === "watchlisted" && company.mark.is_watchlisted) ||
-        (filter === "questions" && company.open_question_count > 0) ||
-        (filter === "notes" && company.note_count > 0);
-      if (!matchesFilter) return false;
       if (!normalizedQuery) return true;
       const haystack = [
         company.ticker,
         company.name,
         company.companyNameKo,
         company.sector,
-        company.description,
+        company.notebook_preview,
         company.mark.interest_reason,
         company.mark.tags.join(" "),
       ]
@@ -64,44 +43,68 @@ export default function WatchlistHomeClient({
         .toLowerCase();
       return haystack.includes(normalizedQuery);
     });
-  }, [companies, filter, query]);
+  }, [companies, query]);
+  const companySections = useMemo(() => {
+    const holdingCompanies = filteredCompanies.filter(
+      (company) => company.mark.is_holding,
+    );
+    const interestCompanies = filteredCompanies.filter(
+      (company) => !company.mark.is_holding,
+    );
 
-  const handleAddCompany = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError(null);
-    const nextTicker = ticker.trim().toUpperCase();
-    if (!nextTicker) {
-      setError("티커를 입력해주세요.");
-      return;
+    return [
+      {
+        key: "holding",
+        title: "보유 중",
+        emptyMessage: "보유로 표시한 리서치 노트북이 없습니다.",
+        companies: holdingCompanies,
+      },
+      {
+        key: "interest",
+        title: "관심 중",
+        emptyMessage: "관심으로 남은 리서치 노트북이 없습니다.",
+        companies: interestCompanies,
+      },
+    ];
+  }, [filteredCompanies]);
+  const showEmptySections = query.trim().length === 0;
+
+  async function handleDismissInboxQuestion(item: ResearchInboxItem) {
+    if (!item.dismiss_question_id || dismissingQuestionId) return;
+
+    setDismissingQuestionId(item.dismiss_question_id);
+    try {
+      const response = await fetch(
+        `/api/watchlist/${encodeURIComponent(item.ticker)}/questions/${encodeURIComponent(
+          item.dismiss_question_id,
+        )}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "dismissed" }),
+        },
+      );
+      if (!response.ok) throw new Error("Failed to dismiss question");
+
+      const overviewResponse = await fetch("/api/watchlist", {
+        cache: "no-store",
+      });
+      if (!overviewResponse.ok) throw new Error("Failed to refresh watchlist");
+
+      setOverviewState((await overviewResponse.json()) as WatchlistOverviewResponse);
+    } catch {
+      setOverviewState((current) => ({
+        ...current,
+        research_inbox: current.research_inbox.filter(
+          (existing) =>
+            existing.ticker !== item.ticker ||
+            existing.dismiss_question_id !== item.dismiss_question_id,
+        ),
+      }));
+    } finally {
+      setDismissingQuestionId(null);
     }
-
-    startTransition(async () => {
-      const response = await fetch("/api/watchlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ticker: nextTicker,
-          is_watchlisted: true,
-          interest_reason: interestReason,
-        }),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        setError(
-          payload?.error?.message ?? "종목을 내 종목장에 추가하지 못했습니다.",
-        );
-        return;
-      }
-      const savedTicker = payload?.mark?.ticker ?? nextTicker;
-      setCompanies((current) => {
-        if (current.some((company) => company.ticker === savedTicker)) {
-          return current;
-        }
-        return current;
-      });
-      router.push(`/watchlist/${encodeURIComponent(savedTicker)}`);
-    });
-  };
+  }
 
   return (
     <main
@@ -113,102 +116,19 @@ export default function WatchlistHomeClient({
           <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-primary">
             Personal Research
           </p>
-          <div className="mt-3 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
+          <div className="mt-3">
             <div className="min-w-0">
               <h1 className="text-balance text-[32px] font-black leading-[1.08] tracking-normal text-ink sm:text-[44px]">
-                내 종목장
+                리서치 노트북
               </h1>
               <p className="mt-4 max-w-2xl text-[16px] leading-7 text-body sm:text-[18px]">
                 관심종목과 보유종목을 공시 근거로 계속 점검합니다.
                 매수·매도 추천이 아니라, 내가 왜 이 종목을 보는지와
                 무엇을 확인해야 하는지 정리하는 공간입니다.
               </p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="inline-flex h-11 items-center gap-1 rounded-[8px] bg-surface-dark px-sm text-[14px] font-extrabold text-on-dark transition-colors hover:bg-primary-active"
-                  onClick={() => tickerInputRef.current?.focus()}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="material-symbols-outlined text-[18px]"
-                  >
-                    add
-                  </span>
-                  회사 추가
-                </button>
-                <Link
-                  href="/chat/new"
-                  className="inline-flex h-11 items-center gap-1 rounded-[8px] border border-hairline bg-canvas px-sm text-[14px] font-extrabold text-ink transition-colors hover:border-primary hover:text-primary"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="material-symbols-outlined text-[18px]"
-                  >
-                    chat_bubble
-                  </span>
-                  공시 기준으로 질문하기
-                </Link>
-              </div>
             </div>
-            <form
-              className="grid gap-2 border border-hairline bg-surface-soft p-sm"
-              onSubmit={handleAddCompany}
-            >
-              <label
-                htmlFor="watchlist-ticker"
-                className="text-[12px] font-extrabold leading-4 text-muted"
-              >
-                종목 추가
-              </label>
-              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_112px]">
-                <input
-                  id="watchlist-ticker"
-                  ref={tickerInputRef}
-                  className="h-11 min-w-0 rounded-[8px] border border-hairline bg-canvas px-sm font-mono text-[15px] font-bold uppercase text-ink placeholder:normal-case placeholder:text-muted focus:border-primary focus:outline-none"
-                  placeholder="AAPL"
-                  value={ticker}
-                  onChange={(event) => setTicker(event.target.value)}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <button
-                  type="submit"
-                  className="inline-flex h-11 items-center justify-center gap-1 rounded-[8px] bg-surface-dark px-sm text-[14px] font-extrabold text-on-dark transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:opacity-55"
-                  disabled={isPending}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="material-symbols-outlined text-[18px]"
-                  >
-                    add
-                  </span>
-                  추가
-                </button>
-              </div>
-              <textarea
-                className="min-h-16 resize-y rounded-[8px] border border-hairline bg-canvas px-sm py-xs text-[13px] font-semibold leading-5 text-ink placeholder:text-muted focus:border-primary focus:outline-none"
-                placeholder="관심 이유"
-                value={interestReason}
-                onChange={(event) => setInterestReason(event.target.value)}
-                maxLength={1200}
-              />
-              {error && (
-                <p className="text-[12px] font-bold leading-4 text-error">
-                  {error}
-                </p>
-              )}
-            </form>
           </div>
         </header>
-
-        <section className="grid border-b border-hairline md:grid-cols-5">
-          <Metric label="관심종목" value={stats.watchlisted} />
-          <Metric label="보유종목" value={stats.holding} />
-          <Metric label="열린 질문" value={stats.open_questions} />
-          <Metric label="리서치 노트" value={stats.notes} />
-          <Metric label="최근 점검" value={stats.recent_activity} />
-        </section>
 
         {loadError && (
           <div className="mt-4 border border-error-container bg-error-container/40 px-sm py-xs text-[13px] font-bold leading-5 text-error">
@@ -216,8 +136,14 @@ export default function WatchlistHomeClient({
           </div>
         )}
 
+        <ResearchInboxPanel
+          dismissingQuestionId={dismissingQuestionId}
+          inbox={researchInbox}
+          onDismissQuestion={handleDismissInboxQuestion}
+        />
+
         <section className="mt-6">
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+          <div className="grid gap-3">
             <div className="relative">
               <span
                 aria-hidden="true"
@@ -227,34 +153,10 @@ export default function WatchlistHomeClient({
               </span>
               <input
                 className="h-11 w-full rounded-[8px] border border-hairline bg-surface pl-10 pr-sm text-[14px] font-semibold leading-5 text-ink placeholder:text-muted focus:border-primary focus:bg-canvas focus:outline-none"
-                placeholder="티커, 회사명, 태그 검색"
+                placeholder="티커, 회사명, 노트 검색"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {FILTERS.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  className={[
-                    "inline-flex h-10 items-center gap-1 rounded-[8px] border px-sm text-[13px] font-extrabold leading-4 transition-colors",
-                    filter === item.key
-                      ? "border-primary bg-primary-fixed text-on-primary-fixed"
-                      : "border-hairline bg-canvas text-muted hover:border-primary hover:text-primary",
-                  ].join(" ")}
-                  aria-pressed={filter === item.key}
-                  onClick={() => setFilter(item.key)}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="material-symbols-outlined text-[17px]"
-                  >
-                    {item.icon}
-                  </span>
-                  {item.label}
-                </button>
-              ))}
             </div>
           </div>
 
@@ -265,20 +167,19 @@ export default function WatchlistHomeClient({
               조건에 맞는 종목이 없습니다.
             </div>
           ) : (
-            <div className="mt-4 overflow-hidden rounded-[8px] border border-hairline bg-canvas">
-              <div className="hidden grid-cols-[116px_minmax(220px,1fr)_128px_116px_116px_120px] border-b border-hairline bg-surface px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted xl:grid">
-                <span>ticker</span>
-                <span>research state</span>
-                <span>status</span>
-                <span>questions</span>
-                <span>notes</span>
-                <span>activity</span>
-              </div>
-              <div className="divide-y divide-hairline">
-                {filteredCompanies.map((company) => (
-                  <CompanyRow key={company.ticker} company={company} />
+            <div className="mt-6 grid gap-7">
+              {companySections
+                .filter(
+                  (section) => section.companies.length > 0 || showEmptySections,
+                )
+                .map((section) => (
+                  <CompanySection
+                    key={section.key}
+                    title={section.title}
+                    emptyMessage={section.emptyMessage}
+                    companies={section.companies}
+                  />
                 ))}
-              </div>
             </div>
           )}
         </section>
@@ -287,36 +188,53 @@ export default function WatchlistHomeClient({
   );
 }
 
-function buildStats(companies: WatchlistCompanySummary[]) {
-  return {
-    total: companies.length,
-    watchlisted: companies.filter((company) => company.mark.is_watchlisted).length,
-    holding: companies.filter((company) => company.mark.is_holding).length,
-    open_questions: companies.reduce(
-      (sum, company) => sum + company.open_question_count,
-      0,
-    ),
-    notes: companies.reduce((sum, company) => sum + company.note_count, 0),
-    recent_activity: companies.filter((company) => company.latest_activity_at).length,
-  };
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
+function CompanySection({
+  title,
+  emptyMessage,
+  companies,
+}: {
+  title: string;
+  emptyMessage: string;
+  companies: WatchlistCompanySummary[];
+}) {
   return (
-    <div className="border-hairline py-5 md:border-r md:px-5 md:last:border-r-0">
-      <p className="text-[12px] font-extrabold leading-4 text-muted">{label}</p>
-      <p className="mt-2 font-mono text-[28px] font-black leading-8 text-ink">
-        {value.toLocaleString()}
-      </p>
-    </div>
+    <section>
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+        <h2 className="text-[20px] font-black leading-7 text-ink">{title}</h2>
+        <span className="font-mono text-[13px] font-black leading-5 text-muted">
+          {companies.length.toLocaleString()}개
+        </span>
+      </div>
+
+      {companies.length === 0 ? (
+        <div className="border border-hairline bg-surface-soft px-sm py-sm text-[13px] font-bold leading-5 text-muted">
+          {emptyMessage}
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-[8px] border border-hairline bg-canvas">
+          <div className="hidden grid-cols-[116px_minmax(220px,1fr)_120px] border-b border-hairline bg-surface px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted xl:grid">
+            <span>ticker</span>
+            <span>research state</span>
+            <span>activity</span>
+          </div>
+          <div className="divide-y divide-hairline">
+            {companies.map((company) => (
+              <CompanyRow key={company.ticker} company={company} />
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
 function CompanyRow({ company }: { company: WatchlistCompanySummary }) {
+  const companyName = visibleCompanyName(company);
+
   return (
     <Link
       href={`/watchlist/${encodeURIComponent(company.ticker)}`}
-      className="grid gap-3 px-4 py-4 transition-colors hover:bg-surface-soft xl:grid-cols-[116px_minmax(220px,1fr)_128px_116px_116px_120px] xl:items-center"
+      className="grid gap-3 px-4 py-4 transition-colors hover:bg-surface-soft xl:grid-cols-[116px_minmax(220px,1fr)_120px] xl:items-center"
     >
       <div className="flex items-center gap-2">
         <span className="font-mono text-[18px] font-black leading-6 text-ink">
@@ -330,16 +248,15 @@ function CompanyRow({ company }: { company: WatchlistCompanySummary }) {
         </span>
       </div>
       <div className="min-w-0">
-        <p className="truncate text-[15px] font-black leading-5 text-ink">
-          {company.companyNameKo ?? company.name}
-        </p>
+        {companyName && (
+          <p className="truncate text-[15px] font-black leading-5 text-ink">
+            {companyName}
+          </p>
+        )}
         <p className="mt-1 line-clamp-2 text-[13px] font-medium leading-5 text-muted">
-          {company.mark.interest_reason || company.description}
+          {company.notebook_preview}
         </p>
       </div>
-      <StatusChips company={company} />
-      <MobileMetric label="질문" value={company.open_question_count} />
-      <MobileMetric label="노트" value={company.note_count} />
       <div className="text-[12px] font-bold leading-5 text-muted">
         {formatDate(company.latest_activity_at)}
       </div>
@@ -347,37 +264,155 @@ function CompanyRow({ company }: { company: WatchlistCompanySummary }) {
   );
 }
 
-function StatusChips({ company }: { company: WatchlistCompanySummary }) {
-  const chips = [
-    company.mark.is_holding ? "보유" : null,
-    company.mark.is_watchlisted ? "관심" : null,
-  ].filter(Boolean);
+function visibleCompanyName(company: WatchlistCompanySummary): string | null {
+  const name = (company.companyNameKo ?? company.name).trim();
+  if (!name) return null;
+  if (name.toUpperCase() === company.ticker.trim().toUpperCase()) return null;
+  return name;
+}
 
-  if (chips.length === 0) {
-    return <span className="text-[12px] font-bold text-muted">미지정</span>;
+function ResearchInboxPanel({
+  dismissingQuestionId,
+  inbox,
+  onDismissQuestion,
+}: {
+  dismissingQuestionId: string | null;
+  inbox: ResearchInboxItem[];
+  onDismissQuestion: (item: ResearchInboxItem) => void;
+}) {
+  const collapsedLimit = 3;
+  const [isExpanded, setIsExpanded] = useState(false);
+  const shouldCollapse = inbox.length > collapsedLimit;
+  const visibleItems =
+    shouldCollapse && !isExpanded ? inbox.slice(0, collapsedLimit) : inbox;
+  const hiddenCount = Math.max(0, inbox.length - visibleItems.length);
+
+  if (inbox.length === 0) {
+    return (
+      <section className="mt-6 flex flex-wrap items-center justify-between gap-2 border border-hairline bg-canvas px-sm py-xs">
+        <p className="font-mono text-[12px] font-bold uppercase tracking-[0.14em] text-primary">
+          Research Inbox
+        </p>
+        <p className="text-[14px] font-black leading-5 text-ink">
+          오늘 처리할 리서치 없음
+        </p>
+      </section>
+    );
   }
 
   return (
-    <div className="flex flex-wrap gap-1">
-      {chips.map((chip) => (
-        <span
-          key={chip}
-          className="rounded-[8px] border border-hairline bg-surface px-2 py-1 text-[12px] font-extrabold leading-4 text-ink"
-        >
-          {chip}
-        </span>
-      ))}
-    </div>
+    <section className="mt-6 border border-hairline bg-canvas">
+      <div className="border-b border-hairline px-sm py-sm md:px-md">
+        <div>
+          <p className="font-mono text-[12px] font-bold uppercase tracking-[0.14em] text-primary">
+            Research Inbox
+          </p>
+          <h2 className="mt-1 text-[22px] font-black leading-7 text-ink">
+            오늘 처리할 리서치 {inbox.length.toLocaleString()}개
+          </h2>
+        </div>
+      </div>
+
+      <div className="divide-y divide-hairline">
+        {visibleItems.map((item) => (
+          <ResearchInboxRow
+            key={`${item.ticker}:${item.reason}:${item.current_question_id ?? "none"}`}
+            dismissingQuestionId={dismissingQuestionId}
+            item={item}
+            onDismissQuestion={onDismissQuestion}
+          />
+        ))}
+        {hiddenCount > 0 && (
+          <button
+            className="flex h-11 w-full items-center justify-center gap-1 px-sm text-[13px] font-extrabold leading-5 text-muted transition-colors hover:bg-surface-soft hover:text-primary md:px-md"
+            type="button"
+            onClick={() => setIsExpanded(true)}
+          >
+            {hiddenCount.toLocaleString()}개 더보기
+            <span
+              aria-hidden="true"
+              className="material-symbols-outlined text-[18px]"
+            >
+              expand_more
+            </span>
+          </button>
+        )}
+        {shouldCollapse && isExpanded && (
+          <button
+            className="flex h-11 w-full items-center justify-center gap-1 px-sm text-[13px] font-extrabold leading-5 text-muted transition-colors hover:bg-surface-soft hover:text-primary md:px-md"
+            type="button"
+            onClick={() => setIsExpanded(false)}
+          >
+            접기
+            <span
+              aria-hidden="true"
+              className="material-symbols-outlined text-[18px]"
+            >
+              expand_less
+            </span>
+          </button>
+        )}
+      </div>
+    </section>
   );
 }
 
-function MobileMetric({ label, value }: { label: string; value: number }) {
+function ResearchInboxRow({
+  dismissingQuestionId,
+  item,
+  onDismissQuestion,
+}: {
+  dismissingQuestionId: string | null;
+  item: ResearchInboxItem;
+  onDismissQuestion: (item: ResearchInboxItem) => void;
+}) {
+  const isDismissing =
+    Boolean(item.dismiss_question_id) &&
+    dismissingQuestionId === item.dismiss_question_id;
+
   return (
-    <div className="flex items-baseline justify-between gap-2 xl:block">
-      <span className="text-[12px] font-bold text-muted xl:hidden">{label}</span>
-      <span className="font-mono text-[14px] font-black text-ink">
-        {value.toLocaleString()}
-      </span>
+    <div className="grid gap-3 px-sm py-sm md:grid-cols-[116px_minmax(0,1fr)_auto] md:items-center md:px-md">
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-[18px] font-black leading-6 text-ink">
+          {item.ticker}
+        </span>
+      </div>
+      <div className="min-w-0">
+        <p className="text-[15px] font-black leading-5 text-ink">
+          {item.title}
+        </p>
+        {item.description && (
+          <p className="mt-1 line-clamp-2 text-[13px] font-semibold leading-5 text-muted">
+            {item.description}
+          </p>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2 md:justify-end">
+        <Link
+          href={item.action_href}
+          className="inline-flex h-10 items-center justify-center rounded-[8px] bg-surface-dark px-sm text-[13px] font-extrabold text-on-dark transition-colors hover:bg-primary-active"
+        >
+          {item.action_label}
+        </Link>
+        {item.secondary_action_href && item.secondary_action_label && (
+          <Link
+            href={item.secondary_action_href}
+            className="inline-flex h-10 items-center justify-center rounded-[8px] border border-hairline bg-canvas px-sm text-[13px] font-extrabold text-ink transition-colors hover:border-primary hover:text-primary"
+          >
+            {item.secondary_action_label}
+          </Link>
+        )}
+        {item.dismiss_question_id && (
+          <button
+            className="inline-flex h-10 items-center justify-center rounded-[8px] border border-hairline bg-canvas px-sm text-[13px] font-extrabold text-ink transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isDismissing}
+            type="button"
+            onClick={() => onDismissQuestion(item)}
+          >
+            {isDismissing ? "닫는 중" : "닫기"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -389,32 +424,9 @@ function EmptyWatchlist() {
         아직 저장한 종목이 없습니다.
       </p>
       <p className="mt-3 max-w-2xl text-[14px] font-semibold leading-6 text-body">
-        관심 있는 회사를 저장하면 공시 근거로 투자 가설과 확인 질문을 계속
-        정리할 수 있습니다.
+        관심 있는 회사를 저장하면 종목별 Markdown 노트북에 리서치 기록을
+        계속 정리할 수 있습니다.
       </p>
-      <div className="mt-5 border-y border-hairline py-4">
-        <p className="text-[12px] font-extrabold leading-4 text-muted">
-          예시: AAPL을 저장하면
-        </p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {[
-            "내가 왜 보는지 기록",
-            "서비스 매출과 중국 수요를 열린 질문으로 관리",
-            "공시 기준으로 thesis 점검",
-            "채팅 답변을 리서치 노트로 저장",
-          ].map((item) => (
-            <div key={item} className="flex gap-2">
-              <span
-                aria-hidden="true"
-                className="material-symbols-outlined mt-[2px] text-[17px] text-primary"
-              >
-                check
-              </span>
-              <p className="text-[13px] font-bold leading-5 text-ink">{item}</p>
-            </div>
-          ))}
-        </div>
-      </div>
       <div className="mt-4 flex flex-wrap gap-2">
         <Link
           href="/ko/companies"

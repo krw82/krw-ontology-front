@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const QUESTION_SELECT =
-  "id, user_id, ticker, question, status, source, source_chat_session_id, source_message_id, answered_at, created_at, updated_at";
+  "id, user_id, ticker, question, status, source, source_chat_session_id, source_message_id, answered_at, visible_after_at, created_at, updated_at";
 const VALID_STATUSES = new Set(["open", "answered", "dismissed"]);
 
 export async function PATCH(

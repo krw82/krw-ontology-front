@@ -273,6 +273,7 @@ export interface UserCompanyQuestionRow extends Record<string, unknown> {
   source_chat_session_id: string | null;
   source_message_id: string | null;
   answered_at: string | null;
+  visible_after_at: string;
   created_at: string;
   updated_at: string;
 }
@@ -289,6 +290,40 @@ export interface UserCompanyCardRow extends Record<string, unknown> {
   basis_document_type: string | null;
   source_chat_session_id: string | null;
   source_message_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserCompanyNotebookRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  ticker: string;
+  title: string;
+  content_md: string;
+  previous_content_md: string | null;
+  basis_release_id: string | null;
+  basis_period: string | null;
+  last_source_chat_session_id: string | null;
+  last_source_message_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserCompanyNotebookRefreshJobRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  ticker: string;
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+  notebook_id: string | null;
+  recent_conversation_count: number;
+  saved_question_count: number;
+  last_source_chat_session_id: string | null;
+  last_source_message_id: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  requested_at: string;
+  started_at: string | null;
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -960,6 +995,7 @@ export interface Database {
           | "source_chat_session_id"
           | "source_message_id"
           | "answered_at"
+          | "visible_after_at"
           | "created_at"
           | "updated_at"
         > & {
@@ -969,6 +1005,7 @@ export interface Database {
           source_chat_session_id?: string | null;
           source_message_id?: string | null;
           answered_at?: string | null;
+          visible_after_at?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -1010,6 +1047,84 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Omit<UserCompanyCardRow, "id" | "user_id" | "ticker" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_company_notebooks: {
+        Row: UserCompanyNotebookRow;
+        Insert: Omit<
+          UserCompanyNotebookRow,
+          | "id"
+          | "title"
+          | "content_md"
+          | "previous_content_md"
+          | "basis_release_id"
+          | "basis_period"
+          | "last_source_chat_session_id"
+          | "last_source_message_id"
+          | "created_at"
+          | "updated_at"
+        > & {
+          id?: string;
+          title?: string;
+          content_md?: string;
+          previous_content_md?: string | null;
+          basis_release_id?: string | null;
+          basis_period?: string | null;
+          last_source_chat_session_id?: string | null;
+          last_source_message_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<UserCompanyNotebookRow, "id" | "user_id" | "ticker" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_company_notebook_refresh_jobs: {
+        Row: UserCompanyNotebookRefreshJobRow;
+        Insert: Omit<
+          UserCompanyNotebookRefreshJobRow,
+          | "id"
+          | "status"
+          | "notebook_id"
+          | "recent_conversation_count"
+          | "saved_question_count"
+          | "last_source_chat_session_id"
+          | "last_source_message_id"
+          | "error_code"
+          | "error_message"
+          | "requested_at"
+          | "started_at"
+          | "completed_at"
+          | "created_at"
+          | "updated_at"
+        > & {
+          id?: string;
+          status?: UserCompanyNotebookRefreshJobRow["status"];
+          notebook_id?: string | null;
+          recent_conversation_count?: number;
+          saved_question_count?: number;
+          last_source_chat_session_id?: string | null;
+          last_source_message_id?: string | null;
+          error_code?: string | null;
+          error_message?: string | null;
+          requested_at?: string;
+          started_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<UserCompanyNotebookRefreshJobRow, "id" | "user_id" | "ticker" | "created_at">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];

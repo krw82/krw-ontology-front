@@ -121,12 +121,22 @@ const checks = [
   {
     table: "user_company_questions",
     select:
-      "id,user_id,ticker,question,status,source,source_chat_session_id,source_message_id,answered_at,created_at,updated_at",
+      "id,user_id,ticker,question,status,source,source_chat_session_id,source_message_id,answered_at,visible_after_at,created_at,updated_at",
   },
   {
     table: "user_company_cards",
     select:
       "id,user_id,ticker,title,summary,content_md,basis_release_id,basis_period,basis_document_type,source_chat_session_id,source_message_id,created_at,updated_at",
+  },
+  {
+    table: "user_company_notebooks",
+    select:
+      "id,user_id,ticker,title,content_md,previous_content_md,basis_release_id,basis_period,last_source_chat_session_id,last_source_message_id,created_at,updated_at",
+  },
+  {
+    table: "user_company_notebook_refresh_jobs",
+    select:
+      "id,user_id,ticker,status,notebook_id,recent_conversation_count,saved_question_count,last_source_chat_session_id,last_source_message_id,error_code,error_message,requested_at,started_at,completed_at,created_at,updated_at",
   },
   {
     table: "user_company_theses",

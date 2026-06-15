@@ -30,7 +30,7 @@ export async function GET() {
   try {
     return Response.json(await listWatchlistOverview(user.id));
   } catch {
-    return errorResponse(500, "internal_error", "내 종목장을 불러오지 못했습니다.");
+    return errorResponse(500, "internal_error", "리서치 노트북을 불러오지 못했습니다.");
   }
 }
 

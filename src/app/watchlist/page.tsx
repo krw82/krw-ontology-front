@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import ChatSidebar from "@/components/ChatSidebar";
 import TopNav from "@/components/TopNav";
 import WatchlistHomeClient from "@/components/watchlist/WatchlistHomeClient";
 import { getAuthUser } from "@/lib/auth";
@@ -14,12 +15,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "내 종목장 | KRW Ontology",
+  title: "리서치 노트북 | KRW Ontology",
   description: "보유 종목과 관심 종목의 리서치 이유, 질문, 노트를 관리합니다.",
 };
 
 const EMPTY_OVERVIEW: WatchlistOverviewResponse = {
   companies: [],
+  research_inbox: [],
   stats: {
     total: 0,
     watchlisted: 0,
@@ -42,7 +44,7 @@ async function loadWatchlistPageData(userId: string): Promise<{
   } catch {
     return {
       overview: EMPTY_OVERVIEW,
-      loadError: "내 종목장 데이터를 불러오지 못했습니다.",
+      loadError: "리서치 노트북 데이터를 불러오지 못했습니다.",
     };
   }
 }
@@ -61,7 +63,13 @@ export default async function WatchlistPage() {
         initialUserProfile={topNavProfileFromUser(user)}
         preserveInitialUserProfile={shouldPreserveInitialProfile(user)}
         brandHref="/watchlist"
-        brandAriaLabel="내 종목장으로 이동"
+        brandAriaLabel="리서치 노트북으로 이동"
+        showSidebarTrigger
+      />
+      <ChatSidebar
+        activeSessionId={null}
+        refreshSignal="/watchlist"
+        showDesktopSidebar={false}
       />
       <WatchlistHomeClient overview={overview} loadError={loadError} />
     </div>

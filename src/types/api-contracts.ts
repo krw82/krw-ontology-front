@@ -253,6 +253,7 @@ export interface UserCompanyQuestion {
   source_chat_session_id: string | null;
   source_message_id: string | null;
   answered_at: string | null;
+  visible_after_at: string;
   created_at: string;
   updated_at: string;
 }
@@ -269,6 +270,47 @@ export interface UserCompanyCard {
   basis_document_type: string | null;
   source_chat_session_id: string | null;
   source_message_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserCompanyNotebook {
+  id: string | null;
+  user_id: string;
+  ticker: string;
+  title: string;
+  content_md: string;
+  previous_content_md: string | null;
+  basis_release_id: string | null;
+  basis_period: string | null;
+  last_source_chat_session_id: string | null;
+  last_source_message_id: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export type UserCompanyNotebookRefreshJobStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancelled";
+
+export interface UserCompanyNotebookRefreshJob {
+  id: string;
+  user_id: string;
+  ticker: string;
+  status: UserCompanyNotebookRefreshJobStatus;
+  notebook_id: string | null;
+  recent_conversation_count: number;
+  saved_question_count: number;
+  last_source_chat_session_id: string | null;
+  last_source_message_id: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  requested_at: string;
+  started_at: string | null;
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -320,6 +362,37 @@ export interface UserResearchNote {
   updated_at: string;
 }
 
+export type ResearchStatus =
+  | "ready"
+  | "empty"
+  | "has_open_questions"
+  | "stale";
+
+export type ResearchInboxReason =
+  | "empty_notebook"
+  | "open_questions"
+  | "stale_notebook";
+
+export interface ResearchInboxItem {
+  ticker: string;
+  company_name: string;
+  status: ResearchStatus;
+  status_label: string;
+  reason: ResearchInboxReason;
+  title: string;
+  description: string;
+  current_question_id: string | null;
+  current_question: string | null;
+  dismiss_question_id: string | null;
+  action_label: string;
+  action_href: string;
+  secondary_action_label: string | null;
+  secondary_action_href: string | null;
+  priority: number;
+  age_days: number | null;
+  open_question_count: number;
+}
+
 export interface WatchlistCompanySummary {
   ticker: string;
   name: string;
@@ -330,15 +403,22 @@ export interface WatchlistCompanySummary {
   coverage: string;
   document_count: number;
   document_types: string[];
+  notebook_preview: string;
   mark: UserCompanyMark;
   open_question_count: number;
   note_count: number;
   recent_chat_count: number;
   latest_activity_at: string | null;
+  research_status: ResearchStatus;
+  research_status_label: string;
+  research_status_reason: ResearchInboxReason | null;
+  notebook_updated_at: string | null;
+  notebook_age_days: number | null;
 }
 
 export interface WatchlistOverviewResponse {
   companies: WatchlistCompanySummary[];
+  research_inbox: ResearchInboxItem[];
   stats: {
     total: number;
     watchlisted: number;
@@ -351,6 +431,7 @@ export interface WatchlistOverviewResponse {
 
 export interface WatchlistCompanyDetailResponse {
   company: WatchlistCompanySummary;
+  notebook: UserCompanyNotebook;
   questions: UserCompanyQuestion[];
   card: UserCompanyCard | null;
   theses: UserCompanyThesis[];

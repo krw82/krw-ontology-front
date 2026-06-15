@@ -14,6 +14,8 @@ import { dispatchOpenChatSidebar } from "@/lib/chat/sidebar-events";
 import { createClient } from "@/lib/supabase/client";
 import { popoverMenu } from "@/lib/animation";
 import { useEntitlement } from "@/hooks/useEntitlement";
+import type { WatchlistOverviewResponse } from "@/types/api-contracts";
+import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 
 export interface TopNavUserProfile {
@@ -32,6 +34,9 @@ interface TopNavProps {
   mobileOverlay?: boolean;
   preserveInitialUserProfile?: boolean;
   showLocaleSwitcher?: boolean;
+  accountIconHref?: string;
+  accountIconAriaLabel?: string;
+  actionSlot?: ReactNode;
 }
 
 function profileFromUser(user: User | null | undefined): TopNavUserProfile | null {
@@ -97,6 +102,9 @@ export default function TopNav({
   mobileOverlay = false,
   preserveInitialUserProfile = false,
   showLocaleSwitcher = false,
+  accountIconHref,
+  accountIconAriaLabel,
+  actionSlot,
 }: TopNavProps = {}) {
   const router = useRouter();
   const pathname = usePathname();
@@ -110,9 +118,18 @@ export default function TopNav({
   );
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [clientReady, setClientReady] = useState(false);
+  const [researchInboxIndicator, setResearchInboxIndicator] = useState<{
+    userKey: string | null;
+    hasItems: boolean;
+  }>({ userKey: null, hasItems: false });
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const shouldLoadAccount = !hideAccountMenu;
   const { entitlement } = useEntitlement(shouldLoadAccount && Boolean(userProfile));
+  const userProfileKey = userProfile?.email ?? null;
+  const hasResearchInboxItems =
+    Boolean(accountIconHref && userProfileKey) &&
+    researchInboxIndicator.userKey === userProfileKey &&
+    researchInboxIndicator.hasItems;
 
   // M-07: useMemo to cache Supabase client
   const supabase = useMemo(
@@ -131,13 +148,8 @@ export default function TopNav({
     },
     {
       href: "/watchlist",
-      label: currentLocale === "ko" ? "내 종목장" : "My Research",
+      label: currentLocale === "ko" ? "리서치 노트북" : "Research Notebook",
       active: pathname.startsWith("/watchlist"),
-    },
-    {
-      href: currentLocale === "ko" ? "/chat/new" : "/chat/new?locale=en",
-      label: currentLocale === "ko" ? "채팅" : "Chat",
-      active: pathname.startsWith("/chat"),
     },
   ];
 
@@ -210,6 +222,40 @@ export default function TopNav({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [accountMenuOpen]);
+
+  useEffect(() => {
+    if (!accountIconHref || !userProfileKey) return;
+
+    let stale = false;
+    const userKey = userProfileKey;
+    async function loadResearchInboxState() {
+      try {
+        const response = await fetch("/api/watchlist", { cache: "no-store" });
+        if (!response.ok) {
+          if (!stale) {
+            setResearchInboxIndicator({ userKey, hasItems: false });
+          }
+          return;
+        }
+        const overview = (await response.json()) as WatchlistOverviewResponse;
+        if (!stale) {
+          setResearchInboxIndicator({
+            userKey,
+            hasItems: overview.research_inbox.length > 0,
+          });
+        }
+      } catch {
+        if (!stale) {
+          setResearchInboxIndicator({ userKey, hasItems: false });
+        }
+      }
+    }
+
+    void loadResearchInboxState();
+    return () => {
+      stale = true;
+    };
+  }, [accountIconHref, userProfileKey]);
 
   const handleSignOut = useCallback(async () => {
     if (!supabase) {
@@ -284,12 +330,37 @@ export default function TopNav({
         </div>
 
         <div className="flex shrink-0 items-center justify-end gap-xs sm:gap-md">
+          {actionSlot}
           {showLocaleSwitcher && <LocaleSwitcher compact />}
           {hideAccountMenu ? null : !authChecked ? (
             <div
               aria-hidden="true"
               className="h-9 w-0 sm:h-10"
             />
+          ) : userProfile && accountIconHref ? (
+            <Link
+              href={accountIconHref}
+              className="relative flex h-9 w-9 items-center justify-center rounded-[8px] border border-hairline bg-surface-dark text-[13px] font-semibold text-on-dark shadow-sm transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas sm:h-10 sm:w-10"
+              aria-label={
+                accountIconAriaLabel ??
+                (currentLocale === "ko"
+                  ? "리서치 노트북으로 이동"
+                  : "Go to research notebook")
+              }
+            >
+              <span className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[7px]">
+                <UserAvatar
+                  profile={userProfile}
+                  onAvatarError={handleAvatarError}
+                />
+              </span>
+              {hasResearchInboxItems && (
+                <span
+                  aria-hidden="true"
+                  className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-canvas bg-error shadow-[0_0_0_1px_rgba(0,0,0,0.06)]"
+                />
+              )}
+            </Link>
           ) : userProfile ? (
             <div ref={accountMenuRef} className="relative">
               <button
