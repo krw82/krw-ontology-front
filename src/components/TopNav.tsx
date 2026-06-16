@@ -14,7 +14,6 @@ import { dispatchOpenChatSidebar } from "@/lib/chat/sidebar-events";
 import { createClient } from "@/lib/supabase/client";
 import { popoverMenu } from "@/lib/animation";
 import { useEntitlement } from "@/hooks/useEntitlement";
-import type { WatchlistOverviewResponse } from "@/types/api-contracts";
 import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 
@@ -118,18 +117,9 @@ export default function TopNav({
   );
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [clientReady, setClientReady] = useState(false);
-  const [researchInboxIndicator, setResearchInboxIndicator] = useState<{
-    userKey: string | null;
-    hasItems: boolean;
-  }>({ userKey: null, hasItems: false });
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const shouldLoadAccount = !hideAccountMenu;
   const { entitlement } = useEntitlement(shouldLoadAccount && Boolean(userProfile));
-  const userProfileKey = userProfile?.email ?? null;
-  const hasResearchInboxItems =
-    Boolean(accountIconHref && userProfileKey) &&
-    researchInboxIndicator.userKey === userProfileKey &&
-    researchInboxIndicator.hasItems;
 
   // M-07: useMemo to cache Supabase client
   const supabase = useMemo(
@@ -222,40 +212,6 @@ export default function TopNav({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [accountMenuOpen]);
-
-  useEffect(() => {
-    if (!accountIconHref || !userProfileKey) return;
-
-    let stale = false;
-    const userKey = userProfileKey;
-    async function loadResearchInboxState() {
-      try {
-        const response = await fetch("/api/watchlist", { cache: "no-store" });
-        if (!response.ok) {
-          if (!stale) {
-            setResearchInboxIndicator({ userKey, hasItems: false });
-          }
-          return;
-        }
-        const overview = (await response.json()) as WatchlistOverviewResponse;
-        if (!stale) {
-          setResearchInboxIndicator({
-            userKey,
-            hasItems: overview.research_inbox.length > 0,
-          });
-        }
-      } catch {
-        if (!stale) {
-          setResearchInboxIndicator({ userKey, hasItems: false });
-        }
-      }
-    }
-
-    void loadResearchInboxState();
-    return () => {
-      stale = true;
-    };
-  }, [accountIconHref, userProfileKey]);
 
   const handleSignOut = useCallback(async () => {
     if (!supabase) {
@@ -354,12 +310,6 @@ export default function TopNav({
                   onAvatarError={handleAvatarError}
                 />
               </span>
-              {hasResearchInboxItems && (
-                <span
-                  aria-hidden="true"
-                  className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-canvas bg-error shadow-[0_0_0_1px_rgba(0,0,0,0.06)]"
-                />
-              )}
             </Link>
           ) : userProfile ? (
             <div ref={accountMenuRef} className="relative">

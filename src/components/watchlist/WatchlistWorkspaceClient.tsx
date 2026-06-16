@@ -29,7 +29,7 @@ export default function WatchlistWorkspaceClient({
   const [company, setCompany] = useState(detail.company);
   const [notebook, setNotebook] = useState<UserCompanyNotebook>(detail.notebook);
   const [draft, setDraft] = useState(detail.notebook.content_md);
-  const [isEditing, setIsEditing] = useState(detail.notebook.id === null);
+  const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshingNotebook, setIsRefreshingNotebook] = useState(false);
   const [refreshJobId, setRefreshJobId] = useState<string | null>(null);

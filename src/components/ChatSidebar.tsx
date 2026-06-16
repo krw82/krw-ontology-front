@@ -18,7 +18,10 @@ import { OPEN_CHAT_SIDEBAR_EVENT } from "@/lib/chat/sidebar-events";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
 import { getPathLocale, localizedPath } from "@/i18n/routing";
-import type { SessionSummary } from "@/types/api-contracts";
+import type {
+  SessionSummary,
+  WatchlistOverviewResponse,
+} from "@/types/api-contracts";
 import { normalizeTickers } from "@/lib/ontology/ticker";
 
 interface ChatSidebarProps {
@@ -166,6 +169,8 @@ export default function ChatSidebar({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pendingNavigationSessionId, setPendingNavigationSessionId] =
     useState<string | null>(null);
+  const [hasResearchInboxItems, setHasResearchInboxItems] = useState(false);
+  const reducedMotion = useReducedMotion();
   const queryLocale = searchParams.get("locale");
   const locale =
     getPathLocale(pathname) ??
@@ -203,6 +208,32 @@ export default function ChatSidebar({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [closeMobileSidebar, mobileOpen]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    let stale = false;
+    async function loadResearchInboxState() {
+      try {
+        const response = await fetch("/api/watchlist", { cache: "no-store" });
+        if (!response.ok) {
+          if (!stale) setHasResearchInboxItems(false);
+          return;
+        }
+        const overview = (await response.json()) as WatchlistOverviewResponse;
+        if (!stale) {
+          setHasResearchInboxItems(overview.research_inbox.length > 0);
+        }
+      } catch {
+        if (!stale) setHasResearchInboxItems(false);
+      }
+    }
+
+    void loadResearchInboxState();
+    return () => {
+      stale = true;
+    };
+  }, [mobileOpen]);
 
   useEffect(() => {
     if (!pendingNavigationSessionId) return;
@@ -280,7 +311,29 @@ export default function ChatSidebar({
                   >
                     article
                   </span>
-                  <span className="truncate">{copy.researchNotebook}</span>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate">{copy.researchNotebook}</span>
+                    {hasResearchInboxItems ? (
+                      <span
+                        aria-hidden="true"
+                        className="relative h-2.5 w-2.5 shrink-0"
+                      >
+                        <span className="absolute inset-[1px] rounded-full bg-primary-container" />
+                        {!reducedMotion && (
+                          <motion.span
+                            aria-hidden="true"
+                            className="absolute inset-0 rounded-full border border-primary-container"
+                            animate={{ opacity: [0.48, 0], scale: [1, 2.2] }}
+                            transition={{
+                              duration: 1.2,
+                              repeat: Infinity,
+                              ease: "easeOut",
+                            }}
+                          />
+                        )}
+                      </span>
+                    ) : null}
+                  </span>
                 </Link>
                 <Link
                   href={localizedPath(locale, "/companies")}
