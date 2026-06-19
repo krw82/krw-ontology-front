@@ -11,6 +11,8 @@ import nextEnv from "@next/env";
 
 const workerEntry = "src/worker/agent-worker.ts";
 const workerOutfile = ".worker/agent-worker.mjs";
+const documentWorkerEntry = "src/worker/document-worker.ts";
+const documentWorkerOutfile = ".worker/document-worker.mjs";
 const serverOnlyShim = resolve("src/worker/server-only-shim.ts");
 
 const { loadEnvConfig } = nextEnv;
@@ -19,6 +21,9 @@ loadEnvConfig(process.cwd(), true);
 function configureDevOntologyEnv() {
   const allowProdOntology = process.env.KRW_DEV_ALLOW_PROD_ONTOLOGY === "1";
   const frontDir = process.cwd();
+  process.env.DOCUMENT_STORAGE_ROOT =
+    process.env.DOCUMENT_STORAGE_ROOT ||
+    join(frontDir, ".tmp", "document-attachments");
   const defaultReleaseRoot = join(
     homedir(),
     "krw-ontology-data",
@@ -117,12 +122,15 @@ function healthUrlFromMcpUrl(mcpUrl) {
 configureDevOntologyEnv();
 
 let worker = null;
+let documentWorker = null;
 let nextDev = null;
 let devMcp = null;
 let stockNewsMcp = null;
 let shuttingDown = false;
 let workerStartQueued = false;
 let workerRestarting = false;
+let documentWorkerStartQueued = false;
+let documentWorkerRestarting = false;
 let expectedStockNewsCoverageCount = null;
 
 materializeDevPlugin();
@@ -282,6 +290,33 @@ async function restartWorker() {
   } finally {
     workerRestarting = false;
     workerStartQueued = false;
+  }
+}
+
+async function restartDocumentWorker() {
+  if (shuttingDown) return;
+  if (documentWorkerStartQueued) return;
+  documentWorkerStartQueued = true;
+
+  try {
+    documentWorkerRestarting = true;
+    await stopChild(documentWorker);
+    documentWorkerRestarting = false;
+    if (shuttingDown) return;
+    documentWorker = spawnLabeled(
+      "document-worker",
+      "nice",
+      ["-n", String(devWorkerNice), process.execPath, documentWorkerOutfile],
+      (code) => {
+        if (documentWorkerRestarting) return;
+        void shutdown("document-worker-exit").finally(() =>
+          process.exit(code ?? 1),
+        );
+      },
+    );
+  } finally {
+    documentWorkerRestarting = false;
+    documentWorkerStartQueued = false;
   }
 }
 
@@ -498,6 +533,25 @@ const workerRestartPlugin = {
   },
 };
 
+const documentWorkerRestartPlugin = {
+  name: "document-worker-restart",
+  setup(build) {
+    build.onResolve({ filter: /^server-only$/ }, () => ({
+      path: serverOnlyShim,
+    }));
+
+    build.onEnd((result) => {
+      if (result.errors.length > 0) {
+        console.error(
+          "[dev:document-worker] build failed; keeping previous document worker",
+        );
+        return;
+      }
+      void restartDocumentWorker();
+    });
+  },
+};
+
 const workerContext = await context({
   entryPoints: [workerEntry],
   bundle: true,
@@ -509,6 +563,17 @@ const workerContext = await context({
   plugins: [workerRestartPlugin],
 });
 
+const documentWorkerContext = await context({
+  entryPoints: [documentWorkerEntry],
+  bundle: true,
+  platform: "node",
+  target: "node20",
+  format: "esm",
+  packages: "external",
+  outfile: documentWorkerOutfile,
+  plugins: [documentWorkerRestartPlugin],
+});
+
 async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
@@ -516,7 +581,9 @@ async function shutdown(signal) {
 
   await Promise.allSettled([
     workerContext.dispose(),
+    documentWorkerContext.dispose(),
     stopChild(worker),
+    stopChild(documentWorker),
     stopChild(devMcp),
     stopChild(stockNewsMcp),
     stopChild(nextDev),
@@ -536,6 +603,7 @@ nextDev = spawnLabeled("web", "npm", ["run", "dev:web"], (code) => {
   void shutdown("web-exit").finally(() => process.exit(code ?? 1));
 });
 await workerContext.watch();
+await documentWorkerContext.watch();
 await new Promise(() => {
   // Keep the wrapper alive; child exit handlers and signal handlers own shutdown.
 });

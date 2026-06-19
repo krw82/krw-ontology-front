@@ -153,8 +153,9 @@ function buildOntologySourceBrief(
     `Selected market-news event for filing-grounded research: ${bridgeEvent}`,
     event.ticker ? `Ticker: ${event.ticker}` : "",
     event.company_name ? `Company: ${event.company_name}` : "",
-    axes.length > 0 ? `Ontology axes to verify: ${axes.join(", ")}` : "",
-    "Use the following news reader text as market narrative context, not as confirmed company disclosure:",
+    axes.length > 0 ? `Ontology axes to anchor: ${axes.join(", ")}` : "",
+    "Use the following news reader text as a market hypothesis for investment interpretation:",
+    "First consider what would matter for the company if the narrative is directionally true, then anchor it against filing evidence:",
     originalTextForOntology.slice(0, MAX_SOURCE_TEXT_CHARS * MAX_SOURCE_COUNT),
   ]
     .filter(Boolean)

@@ -621,10 +621,10 @@ describe("agent runner research budget recovery", () => {
     );
     expect(call.prompt).toContain("웹앱 뉴스 research 실행");
     expect(call.prompt).toContain(
-      "/krw-ontology:krw-ontology-research",
+      "/krw-ontology:krw-ontology-news-research",
     );
     expect(call.prompt).not.toContain(
-      "/krw-ontology:krw-ontology-news-research",
+      "/krw-ontology:krw-ontology-research 선택한 이벤트를 공시 기준으로 분석해줘",
     );
     expect(call.prompt).toContain("<selected_news_event_context>");
   });

@@ -59,7 +59,13 @@ export function pageTypeFromPath(
   if (pathname === "/login") return "login";
   if (pathname.startsWith("/share/")) return "shared_answer";
   if (pathname.startsWith("/settings")) return "settings";
-  if (pathname === "/privacy" || pathname === "/terms") return "legal";
+  if (
+    pathname === "/privacy" ||
+    pathname === "/terms" ||
+    pathname === "/refund"
+  ) {
+    return "legal";
+  }
   return "other";
 }
 
@@ -72,7 +78,8 @@ export function isPublicMarketingPath(pathname: string): boolean {
     pathname.startsWith("/questions/") ||
     pathname === "/pricing" ||
     pathname === "/privacy" ||
-    pathname === "/terms"
+    pathname === "/terms" ||
+    pathname === "/refund"
   );
 }
 

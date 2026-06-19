@@ -76,6 +76,7 @@ import {
 } from "@/lib/chat-artifacts/news-event-selection";
 import { discoverNewsCards } from "@/lib/news-discovery/discovery";
 import { buildSelectedNewsSourcePack } from "@/lib/news-discovery/source-pack";
+import { appendDocumentContextToUserMessage } from "@/lib/document-ingestion/prompt-context";
 import type { ResolvedSession } from "@/lib/api/chat/resolve-session";
 
 const HEARTBEAT_INTERVAL_MS = readIntEnv("LEASE_HEARTBEAT_INTERVAL_MS", 60_000, {
@@ -302,6 +303,11 @@ export async function runAgentJob(runId: string, workerId: string) {
       job,
       sendEvent,
     });
+    const userMessageWithDocumentContext =
+      await appendDocumentContextToUserMessage(admin, {
+        messageId: job.userMessage.id,
+        userMessage: job.userMessage.content,
+      });
 
     const persistRunRecords = createRunRecordPersister(
       admin,
@@ -314,7 +320,7 @@ export async function runAgentJob(runId: string, workerId: string) {
       runAgent(
         {
           sessionId: job.session.id,
-          userMessage: job.userMessage.content,
+          userMessage: userMessageWithDocumentContext,
           scopeType: job.session.scope_type,
           defaultTickers: job.session.default_tickers ?? [],
           defaultDocumentTypes:

@@ -31,6 +31,11 @@ vi.mock("@/lib/agent/run-events", () => ({
 vi.mock("@/lib/concurrency/execution-budget", () => ({
   releaseExecutionBudget: vi.fn(),
 }));
+vi.mock("@/lib/news-discovery/user-url-context", () => ({
+  buildUserUrlNewsEventContext: vi.fn(),
+  buildUserUrlsNewsEventContext: vi.fn(),
+  UserUrlContextError: class UserUrlContextError extends Error {},
+}));
 vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: vi.fn(),
 }));
@@ -53,6 +58,10 @@ import {
 } from "@/lib/ontology/catalog";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import {
+  buildUserUrlNewsEventContext,
+  buildUserUrlsNewsEventContext,
+} from "@/lib/news-discovery/user-url-context";
 import { POST } from "./route";
 
 const readyMcpHealth = {
@@ -241,6 +250,25 @@ describe("POST /api/chat/run worker admission", () => {
       assistantMessageId: "assistant-message-1",
       queuedAt: "2026-05-27T00:00:00.000Z",
     });
+    vi.mocked(buildUserUrlNewsEventContext).mockResolvedValue({
+      version: "user-url-event/v1",
+      ticker: "AAPL",
+      source_url: "https://example.com/news",
+      source_pack: {
+        version: "user-url-source-pack/v1",
+        original_text_for_ontology: "raw page text",
+      },
+    });
+    vi.mocked(buildUserUrlsNewsEventContext).mockResolvedValue({
+      version: "user-url-event/v1",
+      source_kind: "user_provided_urls",
+      ticker: "AAPL",
+      source_urls: ["https://example.com/news", "https://example.com/filing"],
+      source_pack: {
+        version: "user-url-source-pack/v1",
+        original_text_for_ontology: "raw page text bundle",
+      },
+    });
   });
 
   it("rejects before budget reservation when no ready worker heartbeat exists", async () => {
@@ -404,6 +432,136 @@ describe("POST /api/chat/run worker admission", () => {
         sessionId: "11111111-1111-4111-8111-111111111111",
         runId: "run-1",
         requestId: "550e8400-e29b-41d4-a716-446655440001",
+      }),
+    );
+  });
+
+  it("queues explicit user URL checks as selected news research", async () => {
+    vi.mocked(getReadyAgentWorker).mockResolvedValue({
+      ok: true,
+      worker: { worker_id: "mac-worker-jwc-1" } as never,
+      mcpHealth: readyMcpHealth,
+    });
+    vi.mocked(validateRequest).mockResolvedValue({
+      ok: true,
+      data: {
+        userId: "user-1",
+        userEmail: "user@example.test",
+        body: {
+          content: "이 URL이 AAPL에 어떤 의미인지 봐줘",
+          request_id: "550e8400-e29b-41d4-a716-446655440001",
+          session_id: "11111111-1111-4111-8111-111111111111",
+          research_mode: "fast",
+          analysis_mode: "company",
+          run_kind: "company_research",
+          user_url: "https://example.com/news",
+        },
+      },
+    });
+    vi.mocked(resolveSession).mockResolvedValue({
+      ok: true,
+      session: {
+        id: "11111111-1111-4111-8111-111111111111",
+        userId: "user-1",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+      },
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(buildUserUrlNewsEventContext).toHaveBeenCalledWith({
+      url: "https://example.com/news",
+      ticker: "AAPL",
+      userQuestion: "이 URL이 AAPL에 어떤 의미인지 봐줘",
+    });
+    expect(enqueueAgentRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        analysisMode: "news",
+        runKind: "news_research",
+        executorType: "claude_agent",
+        selectedNewsEventContext: expect.objectContaining({
+          version: "user-url-event/v1",
+          source_pack: expect.objectContaining({
+            original_text_for_ontology: "raw page text",
+          }),
+        }),
+      }),
+    );
+    expect(recordAnalyticsEventFromRequest).toHaveBeenCalledWith(
+      expect.any(NextRequest),
+      expect.objectContaining({
+        properties: expect.objectContaining({
+          analysis_mode: "news",
+          run_kind: "news_research",
+          has_user_url: true,
+          user_url_count: 1,
+        }),
+      }),
+    );
+  });
+
+  it("queues multiple explicit user URL checks as one selected news research context", async () => {
+    vi.mocked(getReadyAgentWorker).mockResolvedValue({
+      ok: true,
+      worker: { worker_id: "mac-worker-jwc-1" } as never,
+      mcpHealth: readyMcpHealth,
+    });
+    vi.mocked(validateRequest).mockResolvedValue({
+      ok: true,
+      data: {
+        userId: "user-1",
+        userEmail: "user@example.test",
+        body: {
+          content: "이 URL들이 AAPL에 어떤 의미인지 봐줘",
+          request_id: "550e8400-e29b-41d4-a716-446655440001",
+          session_id: "11111111-1111-4111-8111-111111111111",
+          research_mode: "fast",
+          analysis_mode: "company",
+          run_kind: "company_research",
+          user_url: "https://example.com/news",
+          user_urls: ["https://example.com/news", "https://example.com/filing"],
+        },
+      },
+    });
+    vi.mocked(resolveSession).mockResolvedValue({
+      ok: true,
+      session: {
+        id: "11111111-1111-4111-8111-111111111111",
+        userId: "user-1",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+      },
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(buildUserUrlNewsEventContext).not.toHaveBeenCalled();
+    expect(buildUserUrlsNewsEventContext).toHaveBeenCalledWith({
+      urls: ["https://example.com/news", "https://example.com/filing"],
+      ticker: "AAPL",
+      userQuestion: "이 URL들이 AAPL에 어떤 의미인지 봐줘",
+    });
+    expect(enqueueAgentRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        analysisMode: "news",
+        runKind: "news_research",
+        selectedNewsEventContext: expect.objectContaining({
+          source_kind: "user_provided_urls",
+        }),
+      }),
+    );
+    expect(recordAnalyticsEventFromRequest).toHaveBeenCalledWith(
+      expect.any(NextRequest),
+      expect.objectContaining({
+        properties: expect.objectContaining({
+          has_user_url: true,
+          user_url_count: 2,
+        }),
       }),
     );
   });

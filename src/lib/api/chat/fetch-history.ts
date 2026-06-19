@@ -4,6 +4,7 @@ import type { ErrorCode } from "@/types/api-contracts";
 
 export interface HistoryResult {
   userMessageId: string;
+  userMessageCreated?: boolean;
   history: Array<{ role: string; content: string }>;
 }
 
@@ -80,6 +81,7 @@ export async function fetchHistory(
     ok: true,
     result: {
       userMessageId: userMessageResult.id,
+      userMessageCreated: userMessageResult.created,
       history,
     },
   };

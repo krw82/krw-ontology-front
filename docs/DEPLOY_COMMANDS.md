@@ -2,6 +2,11 @@
 
 이 문서는 운영자가 외워야 하는 명령어 UX를 기준으로 정리한다.
 
+이 문서는 서버/Web 운영 명령어 기준이다. 장기 제품 구조의 macOS Desktop 앱은
+별도 배포 단위이며, Desktop이 Web app의 agent run을 claim해서 실행하는 구조를
+목표로 하지 않는다. Desktop/Web 제품 경계는
+[`docs/DESKTOP_WEB_BOUNDARY.md`](./DESKTOP_WEB_BOUNDARY.md)를 기준으로 한다.
+
 핵심 원칙은 세 가지다.
 
 ```text

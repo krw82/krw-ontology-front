@@ -57,7 +57,7 @@ const auth = {
   userId: "user-1",
   userEmail: "user@example.test",
   deviceId: "device-1",
-  authMethod: "supabase_bearer" as const,
+  authMethod: "desktop_access_token" as const,
 };
 
 describe("Desktop ontology service", () => {

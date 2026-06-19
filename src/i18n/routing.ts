@@ -12,6 +12,7 @@ export const PUBLIC_LOCALIZED_PATH_PREFIXES = [
   "/pricing",
   "/privacy",
   "/terms",
+  "/refund",
 ] as const;
 
 export function localizedPath(locale: Locale, pathname = "/"): string {

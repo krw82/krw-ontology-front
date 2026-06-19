@@ -1,7 +1,6 @@
 import "server-only";
 
 import { getEntitlementStatus } from "@/lib/billing/entitlement";
-import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { EntitlementStatus } from "@/types/entitlement";
 import { authenticateDesktopAccessToken } from "./device-auth";
 import type { DesktopErrorCode } from "./ontology-contracts";
@@ -10,7 +9,7 @@ export interface DesktopAuthContext {
   userId: string;
   userEmail: string | null;
   deviceId: string | null;
-  authMethod: "desktop_access_token" | "supabase_bearer" | "dev_token";
+  authMethod: "desktop_access_token" | "dev_token";
 }
 
 export class DesktopAuthError extends Error {
@@ -61,20 +60,10 @@ export async function authenticateDesktopRequest(
   const desktopAuth = await authenticateDesktopAccessToken(token);
   if (desktopAuth) return desktopAuth;
 
-  const { data, error } = await getSupabaseAdmin().auth.getUser(token);
-  if (error || !data.user) {
-    throw new DesktopAuthError("Invalid desktop bearer token", {
-      publicMessage: "로그인이 만료되었습니다. 다시 로그인해주세요.",
-      status: 401,
-    });
-  }
-
-  return {
-    userId: data.user.id,
-    userEmail: data.user.email ?? null,
-    deviceId: request.headers.get("x-krw-device-id"),
-    authMethod: "supabase_bearer",
-  };
+  throw new DesktopAuthError("Invalid desktop bearer token", {
+    publicMessage: "KRW Desktop 로그인이 만료되었습니다. 다시 로그인해주세요.",
+    status: 401,
+  });
 }
 
 export async function requireDesktopEntitlement(

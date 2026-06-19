@@ -6,7 +6,10 @@ import { Suspense } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import TopNav from "@/components/TopNav";
 import ChatMessage from "@/components/ChatMessage";
-import Composer, { type ComposerSendResult } from "@/components/Composer";
+import Composer, {
+  type ComposerSendOptions,
+  type ComposerSendResult,
+} from "@/components/Composer";
 import QueueRemotionAnimation from "@/components/QueueRemotionAnimation";
 import SuggestedPromptActions from "@/components/SuggestedPromptActions";
 import RunStatusDock from "@/components/RunStatusDock";
@@ -14,7 +17,6 @@ import { useChat } from "@/hooks/useChat";
 import { useChatMobileDock } from "@/hooks/useChatMobileDock";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { useResearchModePreference } from "@/hooks/useResearchModePreference";
-import { useAnalysisModePreference } from "@/hooks/useAnalysisModePreference";
 import {
   getSessionTickers,
   buildChatSessionHref,
@@ -36,6 +38,9 @@ const DRAFT_MESSAGE_STORAGE_PREFIX = "krw:chat-draft-message:";
 type DraftMessagePayload = {
   content: string;
   requestId: string;
+  userUrl?: string;
+  userUrls?: string[];
+  attachmentIds?: string[];
 };
 
 function draftMessageStorageKey(draftMessageId: string): string {
@@ -68,8 +73,25 @@ function readDraftMessage(draftMessageId: string): DraftMessagePayload | null {
     const payload = JSON.parse(rawPayload) as Partial<DraftMessagePayload>;
     const content = payload.content?.trim();
     const requestId = payload.requestId?.trim();
+    const userUrls = Array.isArray(payload.userUrls)
+      ? payload.userUrls
+          .map((url) => (typeof url === "string" ? url.trim() : ""))
+          .filter(Boolean)
+      : [];
+    const userUrl = payload.userUrl?.trim() || userUrls[0];
+    const attachmentIds = Array.isArray(payload.attachmentIds)
+      ? payload.attachmentIds
+          .map((id) => (typeof id === "string" ? id.trim() : ""))
+          .filter(Boolean)
+      : [];
     if (!content || !requestId) return null;
-    return { content, requestId };
+    return {
+      content,
+      requestId,
+      ...(userUrl ? { userUrl } : {}),
+      ...(userUrls.length > 0 ? { userUrls } : {}),
+      ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
+    };
   } catch {
     const content = rawPayload.trim();
     return content ? { content, requestId: createClientId() } : null;
@@ -144,7 +166,6 @@ function ChatContent() {
   const prevMessagesCountRef = useRef(0);
   const { entitlement, refresh: refreshEntitlement } = useEntitlement();
   const [researchMode, setResearchMode] = useResearchModePreference(sessionId);
-  const [analysisMode, setAnalysisMode] = useAnalysisModePreference(sessionId);
   const [composerDraftResetKey, setComposerDraftResetKey] = useState(0);
 
   const isDraftRoute = pathname === "/chat/new";
@@ -237,7 +258,6 @@ function ChatContent() {
     scopeType: activeTicker ? "company" : "global",
     defaultTickers: activeTicker ? [activeTicker] : [],
     researchMode,
-    analysisMode,
     responseLocale,
     onSessionCreated: handleSessionCreated,
   });
@@ -312,6 +332,9 @@ function ChatContent() {
       startedDraftMessageIdsRef.current.add(draftMessageId);
       void sendMessage(draftMessage.content, {
         requestId: draftMessage.requestId,
+        userUrl: draftMessage.userUrl,
+        userUrls: draftMessage.userUrls,
+        attachmentIds: draftMessage.attachmentIds,
       }).finally(() => {
         if (cancelledRef.current) return;
         removeDraftMessage(draftMessageId);
@@ -684,7 +707,10 @@ function ChatContent() {
   // ---------------------------------------------------------------------------
 
   const handleSend = useCallback(
-    async (content: string): Promise<ComposerSendResult> => {
+    async (
+      content: string,
+      options?: ComposerSendOptions,
+    ): Promise<ComposerSendResult> => {
       const trimmed = content.trim();
       if (!trimmed) {
         return {
@@ -716,6 +742,9 @@ function ChatContent() {
           !storeDraftMessage(nextDraftMessageId, {
             content: trimmed,
             requestId: nextRequestId,
+            userUrl: options?.userUrl,
+            userUrls: options?.userUrls,
+            attachmentIds: options?.attachmentIds,
           })
         ) {
           setSessionError("새 채팅 메시지를 준비하지 못했습니다.");
@@ -746,7 +775,11 @@ function ChatContent() {
 
       clearComposerPrefillParams();
       try {
-        const result = await sendMessage(trimmed);
+        const result = await sendMessage(trimmed, {
+          userUrl: options?.userUrl,
+          userUrls: options?.userUrls,
+          attachmentIds: options?.attachmentIds,
+        });
         if (result.ok) return { ok: true };
         return { ok: false, message: result.message };
       } catch (error) {
@@ -1172,8 +1205,7 @@ function ChatContent() {
               runStartedAt={chat.runStartedAt}
               researchMode={researchMode}
               onResearchModeChange={setResearchMode}
-              analysisMode={analysisMode}
-              onAnalysisModeChange={setAnalysisMode}
+              urlModeAvailable={contextTickers.length > 0}
               focusRequestKey={composerFocusRequestKey}
               onFocusChange={handleComposerFocusChange}
             />

@@ -1,24 +1,35 @@
 # KRW Ontology Front
 
-KRW Ontology의 웹 채팅/기업 브라우저 프론트엔드입니다. GCP web/API는
-Supabase queue/catalog를 다루고, 실제 agent execution과 full SQLite
-ontology index 접근은 Mac runtime이 담당합니다.
+KRW Ontology의 웹 제품과 서버 API입니다. 장기 제품 구조에서는 Web app과
+Desktop app을 분리하고, 이 저장소는 인증, 과금, catalog, ontology search
+API, chat/session/artifact 저장 같은 서버 쪽 control/data plane을 담당합니다.
+
+Desktop app은 별도 macOS 앱/로컬 런타임으로 배포합니다. Desktop API는
+server-issued desktop device token만 받으며, 일반 Web session/Supabase bearer
+token을 Desktop API 인증으로 사용하지 않습니다.
 
 ## Architecture
 
 ```text
-Browser
-  -> Next.js /api/chat/run
-  -> Supabase queue/catalog
-  -> Mac agent workers
-  -> local Claude plugin path
-  -> prod/dev MCP HTTP sidecar
-  -> ~/krw-ontology-data/releases/<env>/current
+Web product
+  Browser
+    -> Next.js web/API
+    -> server-side auth, billing, chat/session/artifact storage
+    -> server-side ontology/news/indicator services
+
+Desktop product
+  KRW Desktop for macOS
+    -> local agent/LLM/MCP proxy runtime
+    -> /api/desktop/* with desktop device tokens
+    -> server-side ontology search API
 ```
 
-GCP web/API는 full ontology SQLite index를 직접 읽지 않습니다. Web이 보는
-데이터는 Supabase의 compact web catalog이고, full index는 Mac MCP/runtime만
-읽습니다.
+온톨로지 데이터, 인덱스, release metadata, 뉴스 후보 cache, 지표 store는
+서버가 관리합니다. 사용자 PC는 full ontology SQLite/index를 내려받지 않고,
+agent/LLM 실행과 thin MCP proxy만 담당합니다.
+
+새 Desktop/Web 경계의 상세 설계는
+[docs/DESKTOP_WEB_BOUNDARY.md](docs/DESKTOP_WEB_BOUNDARY.md)를 기준으로 합니다.
 
 ## Local Development
 

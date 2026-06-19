@@ -9,6 +9,7 @@ import {
   isUuid,
   normalizeStringList,
 } from "@/lib/api/validation";
+import { MAX_DOCUMENT_ATTACHMENT_COUNT } from "@/lib/document-ingestion/config";
 import { normalizeResearchMode } from "@/lib/research-mode";
 import { normalizeAnalysisMode } from "@/lib/analysis-mode";
 import { defaultRunKindForAnalysisMode, normalizeRunKind } from "@/lib/run-kind";
@@ -61,6 +62,9 @@ export async function validateRequest(
     research_mode,
     analysis_mode,
     run_kind,
+    user_url,
+    user_urls,
+    attachment_ids,
     session_id,
     scope_type,
     default_tickers,
@@ -150,6 +154,42 @@ export async function validateRequest(
     };
   }
 
+  if (user_url !== undefined && typeof user_url !== "string") {
+    return {
+      ok: false,
+      response: errorResponse(
+        400,
+        "validation_error",
+        "user_url must be a string",
+        normalizedRequestId,
+      ),
+    };
+  }
+
+  if (!isOptionalStringArray(user_urls)) {
+    return {
+      ok: false,
+      response: errorResponse(
+        400,
+        "validation_error",
+        "user_urls must be an array of strings",
+        normalizedRequestId,
+      ),
+    };
+  }
+
+  if (!isOptionalStringArray(attachment_ids)) {
+    return {
+      ok: false,
+      response: errorResponse(
+        400,
+        "validation_error",
+        "attachment_ids must be an array of strings",
+        normalizedRequestId,
+      ),
+    };
+  }
+
   if (!isOptionalStringArray(default_tickers)) {
     return {
       ok: false,
@@ -176,6 +216,55 @@ export async function validateRequest(
 
   const normalizedDefaultTickers = normalizeStringList(default_tickers);
   const normalizedDefaultDocumentTypes = normalizeStringList(default_document_types);
+  const normalizedAttachmentIds = normalizeStringList(attachment_ids);
+  const normalizedUserUrls = normalizeStringList([
+    ...(typeof user_url === "string" ? [user_url] : []),
+    ...(Array.isArray(user_urls) ? user_urls : []),
+  ]);
+  if (normalizedAttachmentIds.length > MAX_DOCUMENT_ATTACHMENT_COUNT) {
+    return {
+      ok: false,
+      response: errorResponse(
+        400,
+        "validation_error",
+        `attachment_ids can include up to ${MAX_DOCUMENT_ATTACHMENT_COUNT} documents`,
+        normalizedRequestId,
+      ),
+    };
+  }
+  if (normalizedAttachmentIds.some((attachmentId) => !isUuid(attachmentId))) {
+    return {
+      ok: false,
+      response: errorResponse(
+        400,
+        "validation_error",
+        "attachment_ids must be valid UUIDs",
+        normalizedRequestId,
+      ),
+    };
+  }
+  if (normalizedUserUrls.length > 3) {
+    return {
+      ok: false,
+      response: errorResponse(
+        400,
+        "validation_error",
+        "user_urls can include up to 3 URLs",
+        normalizedRequestId,
+      ),
+    };
+  }
+  if (normalizedUserUrls.some((url) => url.length > 2_048)) {
+    return {
+      ok: false,
+      response: errorResponse(
+        400,
+        "validation_error",
+        "user_url is too long",
+        normalizedRequestId,
+      ),
+    };
+  }
   const attachmentValidation = validateChatAttachments(content);
   if (!attachmentValidation.ok) {
     return {
@@ -195,6 +284,12 @@ export async function validateRequest(
     research_mode: normalizedResearchMode,
     analysis_mode: normalizedAnalysisMode,
     run_kind: normalizedRunKind,
+    ...(normalizedUserUrls[0]
+      ? { user_url: normalizedUserUrls[0], user_urls: normalizedUserUrls }
+      : {}),
+    ...(normalizedAttachmentIds.length > 0
+      ? { attachment_ids: normalizedAttachmentIds }
+      : {}),
     ...(session_id ? { session_id } : {}),
     ...(scope_type ? { scope_type } : {}),
     ...(default_tickers ? { default_tickers: normalizedDefaultTickers } : {}),

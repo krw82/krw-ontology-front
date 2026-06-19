@@ -377,6 +377,9 @@ function LoginContent() {
           <Link href="/terms" className="transition-colors hover:text-ink">
             서비스 약관
           </Link>
+          <Link href="/refund" className="transition-colors hover:text-ink">
+            환불정책
+          </Link>
         </div>
       </footer>
     </div>

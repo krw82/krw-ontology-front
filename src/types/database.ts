@@ -35,6 +35,47 @@ export interface MessageRow extends Record<string, unknown> {
   updated_at: string;
 }
 
+export interface ChatAttachmentRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  session_id: string | null;
+  message_id: string | null;
+  ticker: string | null;
+  file_name: string;
+  mime_type: string;
+  file_size: number;
+  storage_kind: "local_fs";
+  original_path: string | null;
+  extracted_md: string | null;
+  extracted_char_count: number | null;
+  extraction_status:
+    | "queued"
+    | "processing"
+    | "completed"
+    | "failed"
+    | "expired";
+  extraction_error: string | null;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DocumentIngestionJobRow extends Record<string, unknown> {
+  id: string;
+  attachment_id: string;
+  status: "queued" | "running" | "completed" | "failed";
+  worker_id: string | null;
+  attempts: number;
+  max_attempts: number;
+  queued_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  lease_expires_at: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AgentRunRow extends Record<string, unknown> {
   id: string;
   session_id: string;
@@ -721,6 +762,74 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Omit<MessageRow, "id" | "created_at" | "updated_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      chat_attachments: {
+        Row: ChatAttachmentRow;
+        Insert: Omit<
+          ChatAttachmentRow,
+          | "id"
+          | "created_at"
+          | "updated_at"
+          | "extracted_md"
+          | "extracted_char_count"
+          | "extraction_error"
+        > & {
+          id?: string;
+          session_id?: string | null;
+          message_id?: string | null;
+          ticker?: string | null;
+          extracted_md?: string | null;
+          extracted_char_count?: number | null;
+          extraction_error?: string | null;
+          expires_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<ChatAttachmentRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      document_ingestion_jobs: {
+        Row: DocumentIngestionJobRow;
+        Insert: Omit<
+          DocumentIngestionJobRow,
+          | "id"
+          | "status"
+          | "worker_id"
+          | "attempts"
+          | "queued_at"
+          | "started_at"
+          | "completed_at"
+          | "lease_expires_at"
+          | "error_message"
+          | "created_at"
+          | "updated_at"
+        > & {
+          id?: string;
+          status?: DocumentIngestionJobRow["status"];
+          worker_id?: string | null;
+          attempts?: number;
+          queued_at?: string;
+          started_at?: string | null;
+          completed_at?: string | null;
+          lease_expires_at?: string | null;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<DocumentIngestionJobRow, "id" | "created_at">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];
@@ -1647,6 +1756,14 @@ export interface Database {
           p_worker_id: string;
           p_worker_env: "dev" | "staging" | "prod";
           p_ontology_env: "dev" | "staging" | "prod";
+          p_lease_seconds: number;
+          p_global_limit: number;
+        };
+        Returns: Array<{ id: string }>;
+      };
+      claim_document_ingestion_job: {
+        Args: {
+          p_worker_id: string;
           p_lease_seconds: number;
           p_global_limit: number;
         };

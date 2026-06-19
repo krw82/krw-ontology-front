@@ -26,7 +26,7 @@ describe("GET /api/desktop/entitlement", () => {
       userId: "user-1",
       userEmail: "user@example.test",
       deviceId: "device-1",
-      authMethod: "supabase_bearer",
+      authMethod: "desktop_access_token",
     });
     vi.mocked(requireDesktopEntitlement).mockResolvedValue({
       usage: {

@@ -79,7 +79,7 @@ describe("POST /api/desktop/ontology/tool-call", () => {
       userId: "user-1",
       userEmail: "user@example.test",
       deviceId: "device-1",
-      authMethod: "supabase_bearer",
+      authMethod: "desktop_access_token",
     });
     vi.mocked(requireDesktopEntitlement).mockResolvedValue({} as never);
     vi.mocked(checkDesktopOntologyRateLimit).mockResolvedValue({

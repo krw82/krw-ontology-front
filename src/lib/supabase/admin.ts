@@ -11,8 +11,10 @@ let _admin: SupabaseClient<Database> | null = null;
 
 export function getSupabaseAdmin(): SupabaseClient<Database> {
   if (!_admin) {
+    const supabaseUrl =
+      process.env.SUPABASE_URL || requireEnv("NEXT_PUBLIC_SUPABASE_URL");
     _admin = createClient<Database, "public">(
-      requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
+      supabaseUrl,
       requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
       {
         auth: { persistSession: false, autoRefreshToken: false },

@@ -117,6 +117,7 @@ describe("fetchHistory", () => {
     if (!result.ok) return;
     expect(result.result).toEqual({
       userMessageId: "user-message-1",
+      userMessageCreated: true,
       history: [
         { role: "user", content: "older" },
         { role: "assistant", content: "latest" },

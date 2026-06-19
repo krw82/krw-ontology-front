@@ -51,6 +51,9 @@ interface UseChatOptions {
 interface SendMessageOptions {
   sessionId?: string;
   requestId?: string;
+  userUrl?: string;
+  userUrls?: string[];
+  attachmentIds?: string[];
 }
 
 interface SendNewsEventSelectionOptions {
@@ -1176,6 +1179,13 @@ export function useChat({
       const abortController = new AbortController();
       abortRef.current = abortController;
 
+      const normalizedUserUrls =
+        options.userUrls?.map((url) => url.trim()).filter(Boolean) ??
+        (options.userUrl ? [options.userUrl] : []);
+      const primaryUserUrl = normalizedUserUrls[0] ?? options.userUrl;
+      const attachmentIds =
+        options.attachmentIds?.map((id) => id.trim()).filter(Boolean) ?? [];
+
       let response: Response;
       try {
         response = await fetch("/api/chat/run", {
@@ -1194,6 +1204,11 @@ export function useChat({
             scope_type: scopeType,
             default_tickers: defaultTickers,
             default_document_types: defaultDocumentTypes,
+            ...(primaryUserUrl ? { user_url: primaryUserUrl } : {}),
+            ...(normalizedUserUrls.length > 0
+              ? { user_urls: normalizedUserUrls }
+              : {}),
+            ...(attachmentIds.length > 0 ? { attachment_ids: attachmentIds } : {}),
           }),
           signal: abortController.signal,
         });

@@ -63,8 +63,10 @@ services:
       - LEASE_TIMEOUT_MINUTES=${LEASE_TIMEOUT_MINUTES:-10}
       - MCP_HEALTH_TIMEOUT_MS=${MCP_HEALTH_TIMEOUT_MS:-30000}
       - MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-INFO}
+      - DOCUMENT_STORAGE_ROOT=/srv/krw-document-inbox
     volumes:
       - ${CLAUDE_PROD_CONFIG_DIR:-/srv/claude-prod}:/home/nextjs/.claude-prod
+      - document_inbox:/srv/krw-document-inbox
     networks:
       - app-network
     restart: unless-stopped
@@ -148,6 +150,38 @@ services:
       retries: 3
       start_period: 15s
 
+  document-worker:
+    image: krw-ontology-front-web:local
+    command: ["node", ".worker/document-worker.mjs"]
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - DOCUMENT_WORKER_ID=${DOCUMENT_WORKER_ID:-gcp-document-worker}
+      - DOCUMENT_STORAGE_ROOT=/srv/krw-document-inbox
+      - DOCUMENT_INGESTION_CONCURRENT_LIMIT=${DOCUMENT_INGESTION_CONCURRENT_LIMIT:-2}
+      - DOCUMENT_WORKER_RECONCILE_INTERVAL_MS=${DOCUMENT_WORKER_RECONCILE_INTERVAL_MS:-5000}
+      - MAX_DOCUMENT_ATTACHMENT_MB=${MAX_DOCUMENT_ATTACHMENT_MB:-20}
+      - MAX_EXTRACTED_MARKDOWN_CHARS=${MAX_EXTRACTED_MARKDOWN_CHARS:-200000}
+      - MARKITDOWN_COMMAND=${MARKITDOWN_COMMAND:-markitdown}
+      - MARKITDOWN_TIMEOUT_MS=${MARKITDOWN_TIMEOUT_MS:-120000}
+    volumes:
+      - document_inbox:/srv/krw-document-inbox
+    networks:
+      - app-network
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('fs').accessSync('.worker/document-worker.mjs')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
 networks:
   app-network:
     driver: bridge
@@ -155,3 +189,4 @@ networks:
 volumes:
   caddy_data:
   caddy_config:
+  document_inbox:

@@ -370,6 +370,40 @@ function ResearchInboxRow({
     Boolean(item.dismiss_question_id) &&
     dismissingQuestionId === item.dismiss_question_id;
 
+  if (item.reason !== "open_questions") {
+    return (
+      <Link
+        href={item.action_href}
+        className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-sm py-sm transition-colors hover:bg-surface-soft md:grid-cols-[116px_minmax(0,1fr)_auto] md:px-md"
+        aria-label={`${item.ticker} 리서치 노트북 열기`}
+      >
+        <div className="min-w-0 md:contents">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[18px] font-black leading-6 text-ink">
+              {item.ticker}
+            </span>
+          </div>
+          <div className="mt-3 min-w-0 md:mt-0">
+            <p className="text-[15px] font-black leading-5 text-ink">
+              {item.title}
+            </p>
+            {item.description && (
+              <p className="mt-1 line-clamp-2 text-[13px] font-semibold leading-5 text-muted">
+                {item.description}
+              </p>
+            )}
+          </div>
+        </div>
+        <span
+          aria-hidden="true"
+          className="material-symbols-outlined justify-self-end text-[28px] text-muted transition-colors group-hover:text-primary"
+        >
+          arrow_forward
+        </span>
+      </Link>
+    );
+  }
+
   return (
     <div className="grid gap-3 px-sm py-sm md:grid-cols-[116px_minmax(0,1fr)_auto] md:items-center md:px-md">
       <div className="flex items-center gap-2">

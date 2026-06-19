@@ -24,6 +24,12 @@ import { getClaudeAgentModel } from "@/lib/agent/model";
 import { streamAgentRunEventsResponse } from "@/lib/agent/run-events";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
 import { parseChatAttachmentContent } from "@/lib/chat/attachments";
+import {
+  buildUserUrlNewsEventContext,
+  buildUserUrlsNewsEventContext,
+  UserUrlContextError,
+} from "@/lib/news-discovery/user-url-context";
+import { attachCompletedDocumentsToMessage } from "@/lib/document-ingestion/prompt-context";
 import type { ChatRunRequest, ErrorCode } from "@/types/api-contracts";
 
 // --- Agent worker readiness cache ---
@@ -109,9 +115,6 @@ export async function POST(request: NextRequest) {
   });
   if (!rateLimitResult.ok) return rateLimitResult.response;
 
-  const isServerPipelineNewsDiscovery =
-    body.analysis_mode === "news" && body.run_kind === "news_discovery";
-
   // 4. Check catalog/worker readiness before reserving execution budget. The
   // web route only queues durable work; MCP calls run inside the Mac worker.
   let mcpHealth: McpHealthResult;
@@ -164,6 +167,53 @@ export async function POST(request: NextRequest) {
   });
   if (!sessionRateLimitResult.ok) return sessionRateLimitResult.response;
 
+  let effectiveAnalysisMode = body.analysis_mode;
+  let effectiveRunKind = body.run_kind;
+  let selectedNewsEventContext: Record<string, unknown> | null = null;
+  const userUrls = body.user_urls?.length
+    ? body.user_urls
+    : body.user_url
+      ? [body.user_url]
+      : [];
+
+  if (userUrls.length > 0) {
+    const ticker = session.defaultTickers[0];
+    if (!ticker) {
+      return errorResponse(
+        400,
+        "validation_error",
+        "URL 점검은 종목 기준 채팅에서만 사용할 수 있습니다.",
+        request_id,
+      );
+    }
+
+    try {
+      selectedNewsEventContext =
+        userUrls.length === 1
+          ? await buildUserUrlNewsEventContext({
+              url: userUrls[0],
+              ticker,
+              userQuestion: content,
+            })
+          : await buildUserUrlsNewsEventContext({
+              urls: userUrls,
+              ticker,
+              userQuestion: content,
+            });
+      effectiveAnalysisMode = "news";
+      effectiveRunKind = "news_research";
+    } catch (error) {
+      const message =
+        error instanceof UserUrlContextError
+          ? error.message
+          : "URL을 읽지 못했습니다.";
+      return errorResponse(400, "validation_error", message, request_id);
+    }
+  }
+
+  const isEffectiveServerPipelineNewsDiscovery =
+    effectiveAnalysisMode === "news" && effectiveRunKind === "news_discovery";
+
   // 6. Open an execution-budget record before creating durable chat work.
   const budgetResult = await reserveBudgetStep(
     userId,
@@ -178,6 +228,39 @@ export async function POST(request: NextRequest) {
   if (!historyResult.ok) {
     await releaseExecutionBudget(userId, request_id, null, "history_fetch_failed");
     return historyResult.response;
+  }
+
+  const documentAttachmentIds = body.attachment_ids ?? [];
+  if (documentAttachmentIds.length > 0) {
+    const attachmentResult = await attachCompletedDocumentsToMessage(
+      getSupabaseAdmin(),
+      {
+        userId,
+        sessionId: session.id,
+        messageId: historyResult.result.userMessageId,
+        attachmentIds: documentAttachmentIds,
+      },
+    );
+    if (!attachmentResult.ok) {
+      await releaseExecutionBudget(
+        userId,
+        request_id,
+        null,
+        "document_attachment_validation_failed",
+      );
+      if (historyResult.result.userMessageCreated) {
+        await getSupabaseAdmin()
+          .from("messages")
+          .delete()
+          .eq("id", historyResult.result.userMessageId);
+      }
+      return errorResponse(
+        400,
+        "validation_error",
+        attachmentResult.message,
+        request_id,
+      );
+    }
   }
 
   // 8. A duplicate can arrive while the first request is between session/message
@@ -203,8 +286,12 @@ export async function POST(request: NextRequest) {
       tickers: session.defaultTickers,
       question_length: content.length,
       attachment_count: countAttachedFiles(content),
+      document_attachment_count: documentAttachmentIds.length,
       research_mode: body.research_mode,
-      analysis_mode: body.analysis_mode,
+      analysis_mode: effectiveAnalysisMode,
+      run_kind: effectiveRunKind,
+      has_user_url: userUrls.length > 0,
+      user_url_count: userUrls.length,
       response_locale: responseLocale,
       question_source: session.scopeType === "company" ? "company_context" : "custom",
       source_surface: session.scopeType === "company" ? "ticker_chat" : "chat",
@@ -221,12 +308,13 @@ export async function POST(request: NextRequest) {
     model,
     mcpHealth,
     researchMode: body.research_mode,
-    analysisMode: body.analysis_mode,
-    runKind: body.run_kind,
+    analysisMode: effectiveAnalysisMode,
+    runKind: effectiveRunKind,
     responseLocale,
-    executorType: isServerPipelineNewsDiscovery
+    executorType: isEffectiveServerPipelineNewsDiscovery
       ? "server_pipeline"
       : "claude_agent",
+    selectedNewsEventContext,
   });
 
   if (!enqueueResult.ok) {

@@ -13,6 +13,7 @@ describe("analytics page context", () => {
     expect(pageTypeFromPath("/companies/AAPL")).toBe("company_detail");
     expect(pageTypeFromPath("/questions")).toBe("questions_index");
     expect(pageTypeFromPath("/questions/margin")).toBe("question_detail");
+    expect(pageTypeFromPath("/refund")).toBe("legal");
     expect(pageTypeFromPath("/chat/new", "?ticker=AAPL")).toBe("chat_new");
     expect(pageTypeFromPath("/chat", "?sessionId=session-1")).toBe(
       "chat_session",
@@ -22,6 +23,7 @@ describe("analytics page context", () => {
   it("marks public SEO routes without exposing authenticated app pages", () => {
     expect(isPublicMarketingPath("/companies/AAPL")).toBe(true);
     expect(isPublicMarketingPath("/pricing")).toBe(true);
+    expect(isPublicMarketingPath("/refund")).toBe(true);
     expect(isPublicMarketingPath("/chat/new")).toBe(false);
     expect(isPublicMarketingPath("/settings")).toBe(false);
   });

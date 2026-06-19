@@ -54,7 +54,7 @@ describe("buildSystemPrompt", () => {
     );
   });
 
-  it("uses the normal KRW ontology research skill after a news event is selected", () => {
+  it("uses the KRW ontology news research skill after a news event is selected", () => {
     const researchPrompt = buildResearchPassPrompt(
       "선택한 뉴스 이벤트를 공시 기준으로 분석해줘",
       "news",
@@ -62,11 +62,11 @@ describe("buildSystemPrompt", () => {
     );
 
     expect(researchPrompt).toContain(
-      "/krw-ontology:krw-ontology-research 선택한 뉴스 이벤트를 공시 기준으로 분석해줘",
+      "/krw-ontology:krw-ontology-news-research 선택한 뉴스 이벤트를 공시 기준으로 분석해줘",
     );
     expect(researchPrompt).toContain("웹앱 뉴스 research 실행");
     expect(researchPrompt).not.toContain(
-      "/krw-ontology:krw-ontology-news-research",
+      "/krw-ontology:krw-ontology-research 선택한 뉴스 이벤트를 공시 기준으로 분석해줘",
     );
   });
 

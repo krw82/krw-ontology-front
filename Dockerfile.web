@@ -47,7 +47,7 @@ COPY --from=krw-ontology-src pyproject.toml /tmp/krw-ontology/pyproject.toml
 COPY --from=krw-ontology-src src /tmp/krw-ontology/src
 COPY --from=krw-ontology-src ontology /tmp/krw-ontology/ontology
 RUN python3 -m venv /opt/krw-ontology-venv \
-    && /opt/krw-ontology-venv/bin/pip install --no-cache-dir /tmp/krw-ontology \
+    && /opt/krw-ontology-venv/bin/pip install --no-cache-dir /tmp/krw-ontology 'markitdown[pdf]' \
     && rm -rf /tmp/krw-ontology
 
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
@@ -83,8 +83,8 @@ cat > ./krw-ontology/plugins/krw-ontology/.mcp.json <<'JSON'
 }
 JSON
 chown nextjs:nodejs ./krw-ontology/plugins/krw-ontology/.mcp.json
-mkdir -p .next/cache /app/agent-workspace /home/nextjs/.claude-prod
-chown -R nextjs:nodejs .next /app/agent-workspace /home/nextjs/.claude-prod
+mkdir -p .next/cache /app/agent-workspace /home/nextjs/.claude-prod /srv/krw-document-inbox
+chown -R nextjs:nodejs .next /app/agent-workspace /home/nextjs/.claude-prod /srv/krw-document-inbox
 EOF
 
 USER nextjs

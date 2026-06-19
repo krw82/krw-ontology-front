@@ -36,6 +36,8 @@ describe("sitemap", () => {
     expect(paths).toContain("/en");
     expect(paths).toContain("/ko/companies");
     expect(paths).toContain("/en/companies");
+    expect(paths).toContain("/ko/refund");
+    expect(paths).toContain("/en/refund");
     expect(paths).not.toContain("/ko/questions");
     expect(paths).not.toContain("/en/questions");
     expect(paths.some((path) => path.includes("/questions/"))).toBe(false);

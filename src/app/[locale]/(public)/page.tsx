@@ -55,6 +55,7 @@ const homeCopy = {
     footer: "© 2026 KRW Ontology Research. 근거 기반 기업 분석.",
     privacy: "개인정보처리방침",
     terms: "서비스 약관",
+    refund: "환불정책",
     offerDescription: "무료 베타 플랜",
     browseAria: "공개 페이지 둘러보기",
   },
@@ -81,6 +82,7 @@ const homeCopy = {
     footer: "© 2026 KRW Ontology Research. Evidence-first company analysis.",
     privacy: "Privacy Policy",
     terms: "Terms of Service",
+    refund: "Refund Policy",
     offerDescription: "Free beta plan",
     browseAria: "Browse public pages",
   },
@@ -101,6 +103,7 @@ const homeCopy = {
   footer: string;
   privacy: string;
   terms: string;
+  refund: string;
   offerDescription: string;
   browseAria: string;
 }>;
@@ -401,11 +404,23 @@ export default async function Home({ params }: HomePageProps) {
             {copy.footer}
           </span>
           <span className="hidden h-1 w-1 rounded-full bg-outline-variant sm:block" />
-          <Link href={localizedPath(locale, "/privacy")} className="transition-colors hover:text-ink">
+          <Link
+            href={localizedPath(locale, "/privacy")}
+            className="transition-colors hover:text-ink"
+          >
             {copy.privacy}
           </Link>
-          <Link href={localizedPath(locale, "/terms")} className="transition-colors hover:text-ink">
+          <Link
+            href={localizedPath(locale, "/terms")}
+            className="transition-colors hover:text-ink"
+          >
             {copy.terms}
+          </Link>
+          <Link
+            href={localizedPath(locale, "/refund")}
+            className="transition-colors hover:text-ink"
+          >
+            {copy.refund}
           </Link>
         </div>
       </footer>

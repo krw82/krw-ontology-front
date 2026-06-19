@@ -41,6 +41,16 @@ services:
       - ~/krw-ontology-data:/srv/krw-ontology-data/current:ro
       - ~/.claude-krw:/home/nextjs/.claude-prod
 
+  document-worker:
+    cpus: "0.3"
+    mem_limit: 900m
+    memswap_limit: 900m
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=http://host.docker.internal:54321
+      - SUPABASE_URL=http://host.docker.internal:54321
+      - DOCUMENT_INGESTION_CONCURRENT_LIMIT=1
+      - MAX_DOCUMENT_ATTACHMENT_MB=20
+
   reverse-proxy:
     cpus: "0.2"
     mem_limit: 256m

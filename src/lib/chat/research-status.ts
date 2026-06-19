@@ -110,15 +110,13 @@ export function getResearchActivityLabel(
 export function getQueueStatusLabel(queue?: QueueStatus | null): string {
   if (!queue) return "앞 작업이 끝나면 자동으로 시작됩니다";
 
-  const running = Math.min(queue.running_count, queue.concurrency_limit);
-  const limit = queue.concurrency_limit;
   const ahead = queue.queued_ahead;
 
   if (ahead <= 0) {
-    return `현재 ${running}/${limit}개 분석 중 · 다음 순서`;
+    return "다음 순서";
   }
 
-  return `현재 ${running}/${limit}개 분석 중 · 앞에 ${ahead}개 대기`;
+  return `앞에 ${ahead}개 대기`;
 }
 
 export function getActiveResearchLabel(

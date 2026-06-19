@@ -535,7 +535,7 @@ describe("agent job runner", () => {
       ],
       original_text_for_ontology: "Original market news text",
       ontology_search_brief_en:
-        "Use the article text to verify Apple market narrative against filings.",
+        "Use the article text as a market hypothesis for Apple and anchor it against filings.",
       source_read_status: "read",
       claims_ko: ["시장 뉴스 이후 애플 주가 상승"],
     });
@@ -566,7 +566,7 @@ describe("agent job runner", () => {
           source_pack: expect.objectContaining({
             original_text_for_ontology: "Original market news text",
             ontology_search_brief_en:
-              "Use the article text to verify Apple market narrative against filings.",
+              "Use the article text as a market hypothesis for Apple and anchor it against filings.",
           }),
         }),
       }),

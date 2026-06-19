@@ -1,0 +1,52 @@
+import { readIntEnv } from "@/lib/env";
+
+export const MAX_DOCUMENT_ATTACHMENT_COUNT = readIntEnv(
+  "MAX_DOCUMENT_ATTACHMENT_COUNT",
+  3,
+  { min: 1 },
+);
+
+export const MAX_ACTIVE_DOCUMENT_ATTACHMENTS_PER_USER = readIntEnv(
+  "MAX_ACTIVE_DOCUMENT_ATTACHMENTS_PER_USER",
+  20,
+  { min: 1 },
+);
+
+export const MAX_DOCUMENT_ATTACHMENT_BYTES =
+  readIntEnv("MAX_DOCUMENT_ATTACHMENT_MB", 20, { min: 1 }) * 1024 * 1024;
+
+export const MAX_EXTRACTED_MARKDOWN_CHARS = readIntEnv(
+  "MAX_EXTRACTED_MARKDOWN_CHARS",
+  200_000,
+  { min: 10_000 },
+);
+
+export const MAX_DOCUMENT_PROMPT_CHARS = readIntEnv(
+  "MAX_DOCUMENT_PROMPT_CHARS",
+  80_000,
+  { min: 10_000 },
+);
+
+export const DOCUMENT_INGESTION_LEASE_SECONDS = readIntEnv(
+  "DOCUMENT_INGESTION_LEASE_SECONDS",
+  300,
+  { min: 30 },
+);
+
+export const DOCUMENT_INGESTION_CONCURRENT_LIMIT = readIntEnv(
+  "DOCUMENT_INGESTION_CONCURRENT_LIMIT",
+  2,
+  { min: 1 },
+);
+
+export const DOCUMENT_WORKER_RECONCILE_INTERVAL_MS = readIntEnv(
+  "DOCUMENT_WORKER_RECONCILE_INTERVAL_MS",
+  5_000,
+  { min: 1_000 },
+);
+
+export const DOCUMENT_WORKER_IDLE_LOG_INTERVAL_MS = readIntEnv(
+  "DOCUMENT_WORKER_IDLE_LOG_INTERVAL_MS",
+  60_000,
+  { min: 5_000 },
+);

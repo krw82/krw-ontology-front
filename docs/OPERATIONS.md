@@ -1,5 +1,10 @@
 # Operations
 
+이 문서는 서버/Web 운영 절차를 다룬다. macOS Desktop 앱은 별도 제품/배포
+단위이며, Web app이 Desktop 설치 여부에 의존하지 않는 것을 목표 경계로 둔다.
+Desktop/Web 분리 설계는
+[`docs/DESKTOP_WEB_BOUNDARY.md`](./DESKTOP_WEB_BOUNDARY.md)를 기준으로 한다.
+
 ## Current Production Boundary
 
 KRW Ontology Front is operated with GCP web/API as the control-plane entry point

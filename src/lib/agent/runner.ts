@@ -785,7 +785,7 @@ function buildSelectedNewsEventContextPrompt(
   selectedNewsEventContext: Record<string, unknown> | null | undefined,
 ): string {
   if (runKind !== "news_research" || !selectedNewsEventContext) return "";
-  return `Use this selected market-news context as the input brief for KRW Ontology filing research. Treat it as market narrative, not confirmed company fact. Start KRW ontology retrieval from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology when present; otherwise use ontology_bridge_brief_en.
+  return `Use this selected market narrative as the input brief for KRW Ontology filing research. Treat it as an investment hypothesis, not confirmed company fact. If it came from a user-provided URL, first ask what would matter if the narrative is directionally true, then anchor the interpretation against filing evidence. Start KRW ontology retrieval from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology when present; otherwise use ontology_bridge_brief_en.
 
 <selected_news_event_context>
 ${JSON.stringify(selectedNewsEventContext)}

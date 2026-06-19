@@ -289,6 +289,92 @@ describe("validateRequest", () => {
     expect(result.data.body.run_kind).toBe("news_research");
   });
 
+  it("accepts an explicit user URL for chat URL mode", async () => {
+    const result = await validateRequest(
+      makeRequest({
+        content: "이 URL을 공시 기준으로 봐줘",
+        request_id: REQUEST_ID,
+        user_url: " https://example.com/news?id=1#section ",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.body.user_url).toBe("https://example.com/news?id=1#section");
+    expect(result.data.body.user_urls).toEqual(["https://example.com/news?id=1#section"]);
+  });
+
+  it("accepts explicit user URLs for chat URL mode", async () => {
+    const result = await validateRequest(
+      makeRequest({
+        content: "이 URL들을 공시 기준으로 봐줘",
+        request_id: REQUEST_ID,
+        user_urls: [
+          " https://example.com/news ",
+          "https://example.com/news",
+          "https://example.com/filing",
+        ],
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.body.user_url).toBe("https://example.com/news");
+    expect(result.data.body.user_urls).toEqual([
+      "https://example.com/news",
+      "https://example.com/filing",
+    ]);
+  });
+
+  it("rejects non-string user URLs", async () => {
+    const result = await validateRequest(
+      makeRequest({
+        content: "hello",
+        request_id: REQUEST_ID,
+        user_url: { href: "https://example.com" },
+      }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.response.status).toBe(400);
+    expect(await json(result.response)).toMatchObject({
+      error: {
+        code: "validation_error",
+        message: "user_url must be a string",
+      },
+      request_id: REQUEST_ID,
+    });
+    expect(getAuthUser).not.toHaveBeenCalled();
+  });
+
+  it("rejects too many user URLs", async () => {
+    const result = await validateRequest(
+      makeRequest({
+        content: "hello",
+        request_id: REQUEST_ID,
+        user_urls: [
+          "https://example.com/1",
+          "https://example.com/2",
+          "https://example.com/3",
+          "https://example.com/4",
+        ],
+      }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.response.status).toBe(400);
+    expect(await json(result.response)).toMatchObject({
+      error: {
+        code: "validation_error",
+        message: "user_urls can include up to 3 URLs",
+      },
+      request_id: REQUEST_ID,
+    });
+    expect(getAuthUser).not.toHaveBeenCalled();
+  });
+
   it("accepts valid markdown attachments after server-side validation", async () => {
     const result = await validateRequest(
       makeRequest({

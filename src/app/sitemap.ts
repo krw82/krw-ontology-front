@@ -109,6 +109,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "yearly",
       priority: 0.2,
     }),
+    ...localizedEntries({
+      path: "/refund",
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.2,
+    }),
     ...companies.flatMap((company) =>
       localizedEntries({
         path: `/companies/${encodeURIComponent(company.ticker)}`,

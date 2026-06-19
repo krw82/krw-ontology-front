@@ -122,36 +122,27 @@ describe("Desktop auth", () => {
     expect(getSupabaseAdmin).not.toHaveBeenCalled();
   });
 
-  it("verifies normal desktop bearer tokens through Supabase auth", async () => {
-    vi.mocked(getSupabaseAdmin).mockReturnValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: {
-            user: {
-              id: "user-1",
-              email: "user@example.test",
-            },
-          },
-          error: null,
+  it("rejects ordinary web bearer tokens without Supabase auth fallback", async () => {
+    await expect(
+      authenticateDesktopRequest(
+        request({
+          authorization: "Bearer web-access-token",
         }),
-      },
-    } as unknown as ReturnType<typeof getSupabaseAdmin>);
-
-    const auth = await authenticateDesktopRequest(
-      request({
-        authorization: "Bearer access-token",
-      }),
-    );
-
-    expect(auth).toMatchObject({
-      userId: "user-1",
-      userEmail: "user@example.test",
-      authMethod: "supabase_bearer",
+      ),
+    ).rejects.toMatchObject({
+      name: "DesktopAuthError",
+      code: "authentication_error",
+      status: 401,
+      publicMessage: "KRW Desktop 로그인이 만료되었습니다. 다시 로그인해주세요.",
     });
-    expect(getSupabaseAdmin().auth.getUser).toHaveBeenCalledWith("access-token");
+
+    expect(authenticateDesktopAccessToken).toHaveBeenCalledWith(
+      "web-access-token",
+    );
+    expect(getSupabaseAdmin).not.toHaveBeenCalled();
   });
 
-  it("accepts server-issued desktop access tokens before Supabase fallback", async () => {
+  it("accepts server-issued desktop access tokens", async () => {
     vi.mocked(authenticateDesktopAccessToken).mockResolvedValue({
       userId: "desktop-user",
       userEmail: null,
@@ -170,6 +161,9 @@ describe("Desktop auth", () => {
       deviceId: "device-1",
       authMethod: "desktop_access_token",
     });
+    expect(authenticateDesktopAccessToken).toHaveBeenCalledWith(
+      "desktop-token",
+    );
     expect(getSupabaseAdmin).not.toHaveBeenCalled();
   });
 
@@ -181,7 +175,7 @@ describe("Desktop auth", () => {
         userId: "user-1",
         userEmail: "user@example.test",
         deviceId: "device-1",
-        authMethod: "supabase_bearer",
+        authMethod: "desktop_access_token",
       }),
     ).rejects.toBeInstanceOf(DesktopAuthError);
   });

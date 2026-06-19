@@ -1264,6 +1264,9 @@ export interface ChatRunRequest {
   research_mode?: "fast" | "standard" | "deep";
   analysis_mode?: AnalysisMode;
   run_kind?: RunKind;
+  user_url?: string;
+  user_urls?: string[];
+  attachment_ids?: string[];
   scope_type?: SessionScopeType;
   default_tickers?: string[];
   default_document_types?: string[];

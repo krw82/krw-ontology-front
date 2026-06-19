@@ -22,7 +22,7 @@ describe("GET /api/desktop/account", () => {
       userId: "user-1",
       userEmail: "user@example.test",
       deviceId: "device-1",
-      authMethod: "supabase_bearer",
+      authMethod: "desktop_access_token",
     });
   });
 
@@ -43,7 +43,7 @@ describe("GET /api/desktop/account", () => {
       },
       device: {
         id: "device-1",
-        auth_method: "supabase_bearer",
+        auth_method: "desktop_access_token",
       },
     });
   });
