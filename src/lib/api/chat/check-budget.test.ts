@@ -72,7 +72,7 @@ describe("reserveBudgetStep", () => {
     expect(await json(result.response)).toEqual({
       error: {
         code: "internal_error",
-        message: "분석 크레딧 정보를 확인하지 못했습니다.",
+        message: "사용량 정보를 확인하지 못했습니다.",
       },
       request_id: "req-1",
     });
@@ -100,7 +100,7 @@ describe("reserveBudgetStep", () => {
     expect(await json(result.response)).toMatchObject({
       error: {
         code: "cost_cap_exceeded",
-        message: "사용할 수 있는 분석 크레딧을 모두 사용했습니다.",
+        message: "주간 분석 한도에 도달했습니다.",
       },
     });
   });

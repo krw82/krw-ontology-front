@@ -36,10 +36,28 @@ export function getConfiguredRedirectOrigin(
   fallbackOrigin: string,
   env: OriginEnv = process.env,
 ): string {
+  const configuredOrigin = getConfiguredRedirectOriginOrNull(env);
+  if (configuredOrigin) return configuredOrigin;
+  return fallbackOrigin;
+}
+
+export function getConfiguredBillingRedirectOrigin(
+  fallbackOrigin: string,
+  env: OriginEnv = process.env,
+): string | null {
+  const configuredOrigin = getConfiguredRedirectOriginOrNull(env);
+  if (configuredOrigin) return configuredOrigin;
+  if (env.NODE_ENV !== "production") {
+    return normalizeRedirectOrigin(fallbackOrigin);
+  }
+  return null;
+}
+
+function getConfiguredRedirectOriginOrNull(env: OriginEnv): string | null {
   for (const key of REDIRECT_ORIGIN_ENV_KEYS) {
     const configuredOrigin = normalizeRedirectOrigin(env[key]);
     if (configuredOrigin) return configuredOrigin;
   }
 
-  return fallbackOrigin;
+  return null;
 }

@@ -19,7 +19,7 @@ function errorResponse(
 
 /**
  * Opens an idempotent execution-budget record before an agent run can start.
- * Credits are charged after completion and capped at the remaining balance.
+ * Usage is charged after completion and capped at the remaining balance.
  */
 export async function reserveBudgetStep(
   userId: string,
@@ -44,7 +44,7 @@ export async function reserveBudgetStep(
         response: errorResponse(
           500,
           "internal_error",
-          "분석 크레딧 정보를 확인하지 못했습니다.",
+          "사용량 정보를 확인하지 못했습니다.",
           requestId,
         ),
       };
@@ -55,7 +55,7 @@ export async function reserveBudgetStep(
       response: errorResponse(
         429,
         "cost_cap_exceeded",
-        "사용할 수 있는 분석 크레딧을 모두 사용했습니다.",
+        "주간 분석 한도에 도달했습니다.",
         requestId,
       ),
     };

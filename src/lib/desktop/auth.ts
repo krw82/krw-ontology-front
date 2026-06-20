@@ -49,6 +49,12 @@ export async function authenticateDesktopRequest(
 
   const devToken = process.env.KRW_DESKTOP_DEV_TOKEN;
   if (devToken && token === devToken) {
+    if (!isDesktopDevTokenAllowed(request)) {
+      throw new DesktopAuthError("Desktop dev token is disabled for this request", {
+        publicMessage: "KRW Desktop 로그인이 필요합니다.",
+        status: 401,
+      });
+    }
     return {
       userId: process.env.KRW_DESKTOP_DEV_USER_ID ?? "desktop-dev-user",
       userEmail: process.env.KRW_DESKTOP_DEV_USER_EMAIL ?? "desktop-dev@example.test",
@@ -77,7 +83,7 @@ export async function requireDesktopEntitlement(
   if (!entitlement.usage.can_run || evidenceResearch?.enabled === false) {
     throw new DesktopAuthError("Desktop entitlement required", {
       code: "entitlement_required",
-      publicMessage: "KRW Desktop 사용 권한 또는 분석 크레딧이 부족합니다.",
+      publicMessage: "KRW Desktop 사용 권한 또는 사용량이 부족합니다.",
       status: 403,
     });
   }
@@ -89,4 +95,48 @@ function bearerToken(value: string | null): string | null {
   if (!value) return null;
   const match = value.match(/^Bearer\s+(.+)$/i);
   return match?.[1]?.trim() || null;
+}
+
+function isDesktopDevTokenAllowed(request: Request): boolean {
+  if (!isLocalRequest(request)) return false;
+  if (process.env.NODE_ENV !== "production") return true;
+  return isTruthyEnv(process.env.KRW_DESKTOP_DEV_TOKEN_ENABLED);
+}
+
+function isLocalRequest(request: Request): boolean {
+  const hostHeader = request.headers.get("host");
+  const candidates = [hostnameFromUrl(request.url), hostnameFromHost(hostHeader)];
+  return candidates.some((hostname) => {
+    if (!hostname) return false;
+    const normalized = hostname.toLowerCase();
+    return (
+      normalized === "localhost" ||
+      normalized === "127.0.0.1" ||
+      normalized === "::1" ||
+      normalized.endsWith(".localhost")
+    );
+  });
+}
+
+function hostnameFromUrl(value: string): string | null {
+  try {
+    return new URL(value).hostname.replace(/^\[|\]$/g, "");
+  } catch {
+    return null;
+  }
+}
+
+function hostnameFromHost(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("[")) {
+    const end = trimmed.indexOf("]");
+    return end > 0 ? trimmed.slice(1, end) : null;
+  }
+  return trimmed.split(":")[0] || null;
+}
+
+function isTruthyEnv(value: string | undefined): boolean {
+  return ["1", "true", "yes", "on"].includes(value?.trim().toLowerCase() ?? "");
 }

@@ -116,6 +116,21 @@ function createAdmin({
   const deleted: Array<{ table: string; key: string; value: unknown }> = [];
   const runLookups = [...existingRuns];
   const admin = {
+    rpc(name: string) {
+      if (name === "reserve_analysis_credits") {
+        return Promise.resolve({
+          data: [
+            {
+              allowed: true,
+              reason: null,
+              reservation_id: "credit-reservation-1",
+            },
+          ],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: null, error: null });
+    },
     from(table: string) {
       const filters: Record<string, unknown> = {};
       return {

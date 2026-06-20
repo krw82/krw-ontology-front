@@ -49,6 +49,20 @@ set -a
 . "$ENV_PATH"
 set +a
 
+truthy_env() {
+  case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+falsey_env() {
+  case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
+    0|false|no|off) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 STOCK_NEWS_MCP_ROOT=${STOCK_NEWS_MCP_ROOT:-"$HOME/mcp-servers/stock-news-mcp"}
 STOCK_NEWS_MCP_HOST=${STOCK_NEWS_MCP_HOST:-127.0.0.1}
 STOCK_NEWS_MCP_PORT=${STOCK_NEWS_MCP_PORT:-8775}
@@ -56,9 +70,17 @@ STOCK_NEWS_MCP_PATH=${STOCK_NEWS_MCP_PATH:-/mcp}
 MCP_LOG_DIR=${MCP_LOG_DIR:-"$HOME/Library/Logs/krw-ontology"}
 DEFAULT_STOCK_NEWS_COVERAGE_PATH="${KRW_ONTOLOGY_PLUGIN_PATH:-}/stock-news/coverage_companies.json"
 
+if truthy_env "${STOCK_NEWS_FORCE_DISABLED:-}" || falsey_env "${STOCK_NEWS_ENABLED:-}"; then
+  echo "Stock News MCP disabled by environment."
+  exit 0
+fi
 if [ -z "${FINNHUB_API_KEY:-}" ]; then
-  echo "Missing FINNHUB_API_KEY in $ENV_PATH" >&2
-  exit 1
+  if truthy_env "${STOCK_NEWS_ENABLED:-}"; then
+    echo "STOCK_NEWS_ENABLED=1 but FINNHUB_API_KEY is missing in $ENV_PATH" >&2
+    exit 1
+  fi
+  echo "Stock News MCP disabled: FINNHUB_API_KEY is not set in $ENV_PATH."
+  exit 0
 fi
 if [ ! -f "$STOCK_NEWS_MCP_ROOT/package.json" ]; then
   echo "Missing stock-news-mcp package: $STOCK_NEWS_MCP_ROOT" >&2

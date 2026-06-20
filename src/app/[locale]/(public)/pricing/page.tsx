@@ -6,10 +6,6 @@ import PublicTopNav from "@/components/PublicTopNav";
 import { isLocale, type Locale } from "@/i18n/config";
 import { localizedPageMetadata } from "@/i18n/metadata";
 import { localizedPath } from "@/i18n/routing";
-import {
-  getBillingPlanAnalysisCredits,
-  getBillingPlanLimitLabel,
-} from "@/lib/billing/plans";
 import { listPublicBillingPlansFromStore } from "@/lib/billing/plan-store";
 
 type PricingPageProps = {
@@ -18,71 +14,74 @@ type PricingPageProps = {
 
 const pricingCopy = {
   ko: {
-    title: "가격과 무료 베타 플랜",
+    title: "가격과 사용량 기반 플랜",
     description:
-      "KRW Ontology의 무료 베타, Pro, Power 플랜의 분석 크레딧과 사용 범위를 확인하세요.",
-    eyebrow: "무료 베타",
-    heading: "먼저 무료로 근거 기반 분석을 확인하세요.",
+      "KRW Ontology의 Free, Standard, Pro 사용량 기반 플랜을 확인하세요.",
+    eyebrow: "가격",
+    heading: "필요한 만큼 리서치하세요.",
     intro:
-      "현재는 결제 없이 무료 베타로 운영합니다. 내부 플랜과 사용량 모델은 아래 기준으로 동작하며, 유료 결제는 정식 오픈 전에 별도로 안내합니다.",
+      "결제는 월 단위로 받고, 주간 분석량은 구독 시작 시각 기준 7일마다 다시 충전됩니다. 사용량은 질문 수가 아니라 분석 범위와 답변 생성량에 따라 달라집니다.",
     primaryCta: "무료로 첫 분석 시작",
-    cardCta: "무료 베타로 시작",
+    cardCta: "분석 시작",
     recommended: "추천",
     principlesHeading: "플랜을 나누는 기준",
     principles: [
       {
-        title: "가치 기준은 분석 크레딧",
-        body: "질문마다 공시 검색 범위와 답변 생성량이 다르므로, 실제 제한은 단순 질문 수가 아니라 분석 크레딧을 기준으로 둡니다.",
+        title: "사용량 기반 플랜",
+        body: "기능은 모든 플랜에서 열어두고, 분석 범위와 답변 생성량에 따라 이번 주 사용량에 반영합니다.",
       },
       {
         title: "먼저 가치를 확인",
-        body: "결제보다 첫 답변 성공, 근거 확인, 재질문 경험을 먼저 완성하는 무료 베타 흐름을 유지합니다.",
+        body: "Free 플랜으로 첫 답변 성공, 근거 확인, 재질문 경험을 먼저 확인한 뒤 필요한 만큼 플랜을 올릴 수 있습니다.",
       },
       {
         title: "무리한 차단 없음",
-        body: "80%에서는 부드럽게 알리고, 크레딧이 남아 있으면 마지막 분석까지 실행합니다. 한도를 넘는 비용은 남은 크레딧까지만 차감합니다.",
+        body: "사용량이 남아 있으면 기능을 막지 않습니다. 한도에 도달하면 다음 충전 시각과 업그레이드 선택지만 안내합니다.",
       },
     ],
   },
   en: {
-    title: "Pricing and free beta plans",
+    title: "Usage-based pricing",
     description:
-      "Review KRW Ontology free beta, Pro, and Power plan analysis credits and usage limits.",
-    eyebrow: "Free beta",
-    heading: "Start by testing evidence-first analysis for free.",
+      "Review KRW Ontology Free, Standard, and Pro usage-based plans.",
+    eyebrow: "Pricing",
+    heading: "Choose the research capacity that fits your workflow.",
     intro:
-      "KRW Ontology is currently running as a free beta. The plan and usage model below shows how analysis credits work before paid plans are opened.",
+      "Billing is monthly, while weekly usage capacity refills every seven days from your subscription anchor. Usage depends on research scope and answer length, not a fixed question count.",
     primaryCta: "Start your first analysis",
-    cardCta: "Start free beta",
+    cardCta: "Start analysis",
     recommended: "Recommended",
     principlesHeading: "How plans are separated",
     principles: [
       {
-        title: "Value is measured in analysis credits",
-        body: "Each question can require a different filing search scope and answer size, so limits are based on analysis credits rather than raw question count.",
+        title: "Usage-based plans",
+        body: "Features stay open across plans. Usage reflects research scope and answer size.",
       },
       {
         title: "Prove value before payment",
-        body: "The free beta keeps the focus on a successful first answer, visible evidence, and follow-up questions before charging users.",
+        body: "The Free plan keeps the focus on a successful first answer, visible evidence, and follow-up questions before upgrading.",
       },
       {
         title: "No abrupt blocking",
-        body: "At 80% usage KRW Ontology warns gently, and if credits remain the final analysis can still run. Over-limit cost is capped by remaining credits.",
+        body: "If usage remains, features stay usable. When the weekly limit is reached, the product shows the next refill time and upgrade options.",
       },
     ],
   },
-} satisfies Record<Locale, {
-  title: string;
-  description: string;
-  eyebrow: string;
-  heading: string;
-  intro: string;
-  primaryCta: string;
-  cardCta: string;
-  recommended: string;
-  principlesHeading: string;
-  principles: Array<{ title: string; body: string }>;
-}>;
+} satisfies Record<
+  Locale,
+  {
+    title: string;
+    description: string;
+    eyebrow: string;
+    heading: string;
+    intro: string;
+    primaryCta: string;
+    cardCta: string;
+    recommended: string;
+    principlesHeading: string;
+    principles: Array<{ title: string; body: string }>;
+  }
+>;
 
 type PublicBillingPlan = Awaited<
   ReturnType<typeof listPublicBillingPlansFromStore>
@@ -92,28 +91,28 @@ type BillingPlanDisplay = {
   label: string;
   statusLabel: string;
   description: string;
-  limitLabel: string;
+  usageLabel: string;
 };
 
 const englishPlanCopy: Record<string, BillingPlanDisplay> = {
   free: {
     label: "Free",
-    statusLabel: "Free beta",
+    statusLabel: "Free",
     description: "For individual testing and lightweight company research.",
-    limitLabel: "analysis credits/month",
+    usageLabel: "Basic weekly usage",
   },
   pro: {
-    label: "Pro individual analysis",
-    statusLabel: "Free beta",
-    description: "For users who regularly perform company research.",
-    limitLabel: "analysis credits/month",
-  },
-  power: {
-    label: "Power high-frequency analysis",
-    statusLabel: "Free beta",
+    label: "Pro",
+    statusLabel: "Advanced analysis",
     description:
-      "For repeated high-usage research across multiple companies and topics.",
-    limitLabel: "analysis credits/month",
+      "For higher-volume comparison and repeated research workflows.",
+    usageLabel: "5x Standard usage",
+  },
+  standard: {
+    label: "Standard",
+    statusLabel: "Individual analysis",
+    description: "For users who regularly perform company research.",
+    usageLabel: "Individual research",
   },
 };
 
@@ -123,13 +122,39 @@ function fallbackEnglishPlanLabel(key: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function getPlanDisplay(plan: PublicBillingPlan, locale: Locale): BillingPlanDisplay {
+function getPlanDisplay(
+  plan: PublicBillingPlan,
+  locale: Locale,
+): BillingPlanDisplay {
   if (locale === "ko") {
+    const koPlanCopy: Record<
+      string,
+      Pick<BillingPlanDisplay, "description" | "usageLabel">
+    > = {
+      free: {
+        description: "첫 리서치 흐름을 확인하는 체험용 플랜입니다.",
+        usageLabel: "체험 사용량",
+      },
+      standard: {
+        description: "보통의 개인 투자자에게 맞습니다.",
+        usageLabel: "기본 사용량",
+      },
+      pro: {
+        description:
+          "여러 기업을 자주 비교하고 반복적으로 리서치하는 사용자에게 맞습니다.",
+        usageLabel: "넉넉한 주간 사용량",
+      },
+    };
+    const copy = koPlanCopy[plan.key] ?? {
+      description: "사용량 기반으로 리서치를 이어갈 수 있는 플랜입니다.",
+      usageLabel: "사용량 기반",
+    };
+
     return {
       label: plan.label,
       statusLabel: plan.statusLabel,
-      description: plan.description,
-      limitLabel: getBillingPlanLimitLabel(plan),
+      description: copy.description,
+      usageLabel: copy.usageLabel,
     };
   }
 
@@ -137,8 +162,8 @@ function getPlanDisplay(plan: PublicBillingPlan, locale: Locale): BillingPlanDis
     englishPlanCopy[plan.key] ?? {
       label: fallbackEnglishPlanLabel(plan.key),
       statusLabel: "Beta",
-      description: "Analysis credits for company research.",
-      limitLabel: "analysis credits/month",
+      description: "Usage-based access for company research.",
+      usageLabel: "Usage-based",
     }
   );
 }
@@ -197,7 +222,7 @@ export default async function PricingPage({ params }: PricingPageProps) {
 
           <section className="grid gap-4 py-8 md:grid-cols-3">
             {plans.map((plan) => {
-              const recommended = plan.key === "pro";
+              const recommended = plan.key === "standard";
               const planDisplay = getPlanDisplay(plan, locale);
 
               return (
@@ -225,10 +250,16 @@ export default async function PricingPage({ params }: PricingPageProps) {
                     )}
                   </div>
                   <p className="mt-5 text-[32px] font-black leading-[1.05] text-ink">
-                    {getBillingPlanAnalysisCredits(plan).toLocaleString()}{" "}
-                    <span className="ml-1 align-baseline text-[13px] font-bold leading-5 text-muted">
-                      {planDisplay.limitLabel}
-                    </span>
+                    {plan.monthlyPriceKrw === 0
+                      ? locale === "ko"
+                        ? "무료"
+                        : "Free"
+                      : locale === "ko"
+                        ? `월 ${plan.monthlyPriceKrw.toLocaleString()}원`
+                        : `KRW ${plan.monthlyPriceKrw.toLocaleString()}/mo`}
+                  </p>
+                  <p className="mt-3 text-[22px] font-black leading-[1.05] text-ink">
+                    {planDisplay.usageLabel}
                   </p>
                   <p className="mt-4 text-[14px] font-medium leading-6 text-body">
                     {planDisplay.description}

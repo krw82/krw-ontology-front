@@ -359,23 +359,39 @@ export default function WatchlistWorkspaceClient({
                     </>
                   ) : (
                     <>
-                      <button
-                        type="button"
-                        className="inline-flex h-10 items-center gap-1 rounded-[8px] border border-hairline bg-canvas px-2.5 text-[13px] font-extrabold text-ink transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-65 sm:px-sm"
-                        disabled={isBusy || recentSessions.length === 0}
-                        onClick={handleRefreshNotebook}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={[
-                            "material-symbols-outlined text-[17px]",
-                            isRefreshingNotebook ? "notebook-refresh-icon" : "",
-                          ].join(" ")}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          className="inline-flex h-10 items-center gap-1 rounded-[8px] border border-hairline bg-canvas px-2.5 text-[13px] font-extrabold text-ink transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-65 sm:px-sm"
+                          disabled={isBusy || recentSessions.length === 0}
+                          onClick={handleRefreshNotebook}
                         >
-                          auto_fix_high
-                        </span>
-                        {isRefreshingNotebook ? "정리 중" : "노트북 다시정리"}
-                      </button>
+                          <span
+                            aria-hidden="true"
+                            className={[
+                              "material-symbols-outlined text-[17px]",
+                              isRefreshingNotebook ? "notebook-refresh-icon" : "",
+                            ].join(" ")}
+                          >
+                            auto_fix_high
+                          </span>
+                          {isRefreshingNotebook ? "정리 중" : "노트북 다시정리"}
+                        </button>
+                        {!isRefreshingNotebook ? (
+                          <div
+                            className="absolute right-0 top-[calc(100%+8px)] z-30 w-[min(248px,calc(100vw-32px))] rounded-[8px] border border-primary/25 bg-canvas px-3 py-2 text-left shadow-[0_12px_28px_rgba(15,23,42,0.16)]"
+                            role="status"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="absolute right-9 top-[-5px] h-2.5 w-2.5 rotate-45 border-l border-t border-primary/25 bg-canvas"
+                            />
+                            <p className="text-[12px] font-extrabold leading-5 text-ink">
+                              최근 리서치한 내역을 보고 AI가 정리해줘요.
+                            </p>
+                          </div>
+                        ) : null}
+                      </div>
                       <button
                         type="button"
                         className="inline-flex h-10 items-center gap-1 rounded-[8px] bg-surface-dark px-3 text-[13px] font-extrabold text-on-dark transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:opacity-55 sm:px-sm"

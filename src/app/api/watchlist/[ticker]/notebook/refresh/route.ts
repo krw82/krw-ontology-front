@@ -1,6 +1,15 @@
+import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
+import { reserveBudgetStep } from "@/lib/api/chat";
 import { isUuid } from "@/lib/api/validation";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
+import { shouldBlockAnalysisCreditReservation } from "@/lib/billing/credit-policy";
+import { reserveAnalysisCreditsShadow } from "@/lib/concurrency/analysis-credits";
+import {
+  estimateCost,
+  releaseExecutionBudget,
+  settleExecutionBudget,
+} from "@/lib/concurrency/execution-budget";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { errorResponse, requireIndexedTicker } from "@/lib/watchlist/api";
 import {
@@ -9,6 +18,7 @@ import {
   listRecentTickerNotebookConversations,
   saveExtractedNotebookQuestions,
   type NotebookConversationInput,
+  type NotebookAgentUsage,
 } from "@/lib/watchlist/notebook-refresh";
 import {
   defaultCompanyNotebook,
@@ -29,9 +39,11 @@ const REFRESH_JOB_SELECT =
   "id, user_id, ticker, status, notebook_id, recent_conversation_count, saved_question_count, last_source_chat_session_id, last_source_message_id, error_code, error_message, requested_at, started_at, completed_at, created_at, updated_at";
 const ACTIVE_REFRESH_STATUSES = ["queued", "running"] as const;
 const STALE_REFRESH_JOB_MS = 30 * 60 * 1000;
+const NOTEBOOK_REFRESH_RESEARCH_MODE = "standard";
 
 interface NotebookRefreshJobContext {
   userId: string;
+  creditRequestId: string;
   ticker: string;
   companyName: string;
   latestPeriod: string | null;
@@ -120,6 +132,42 @@ export async function POST(
     );
   }
 
+  const creditRequestId = randomUUID();
+  const budgetResult = await reserveBudgetStep(
+    user.id,
+    creditRequestId,
+    user.email ?? null,
+    NOTEBOOK_REFRESH_RESEARCH_MODE,
+  );
+  if (!budgetResult.ok) return budgetResult.response;
+
+  const creditReservation = await reserveAnalysisCreditsShadow(
+    user.id,
+    creditRequestId,
+    {
+      runKind: "company_research",
+      researchMode: NOTEBOOK_REFRESH_RESEARCH_MODE,
+    },
+  );
+  if (
+    !budgetResult.budget.entitlement?.usage.unlimited &&
+    shouldBlockAnalysisCreditReservation(creditReservation)
+  ) {
+    await releaseExecutionBudget(
+      user.id,
+      creditRequestId,
+      null,
+      "notebook_credit_reserve_blocked",
+    );
+    return errorResponse(
+      creditReservation.ok ? 429 : 500,
+      creditReservation.ok ? "cost_cap_exceeded" : "internal_error",
+      creditReservation.ok
+        ? "이번 주 분석 한도에 도달해 노트북 정리를 시작할 수 없습니다."
+        : "사용량 정보를 확인하지 못했습니다.",
+    );
+  }
+
   const latestSource = recentConversations[0] ?? null;
   const { data: job, error } = await getSupabaseAdmin()
     .from("user_company_notebook_refresh_jobs")
@@ -135,6 +183,12 @@ export async function POST(
     .single<UserCompanyNotebookRefreshJobRow>();
 
   if (error || !job) {
+    await releaseExecutionBudget(
+      user.id,
+      creditRequestId,
+      null,
+      "notebook_refresh_job_insert_failed",
+    );
     const existingActiveJob = await getActiveRefreshJob(user.id, tickerResult.ticker);
     if (existingActiveJob) {
       return Response.json(
@@ -148,6 +202,7 @@ export async function POST(
 
   void runNotebookRefreshJob(job.id, {
     userId: user.id,
+    creditRequestId,
     ticker: tickerResult.ticker,
     companyName: tickerResult.company.name ?? tickerResult.ticker,
     latestPeriod: tickerResult.company.latest_period,
@@ -163,6 +218,7 @@ async function runNotebookRefreshJob(
   context: NotebookRefreshJobContext,
 ) {
   const admin = getSupabaseAdmin();
+  const usage = createNotebookUsageAccumulator();
 
   try {
     await admin
@@ -183,6 +239,7 @@ async function runNotebookRefreshJob(
       basisPeriod: context.existing.basis_period ?? context.latestPeriod,
       existingNotebookMd: context.existing.content_md,
       recentConversations: context.recentConversations,
+      onUsage: usage.add,
     });
 
     const latestSource = context.recentConversations[0] ?? null;
@@ -217,6 +274,7 @@ async function runNotebookRefreshJob(
         basisPeriod: context.existing.basis_period ?? context.latestPeriod,
         existingNotebookMd: contentMd,
         recentConversations: context.recentConversations,
+        onUsage: usage.add,
       });
       savedQuestionCount = await saveExtractedNotebookQuestions({
         userId: context.userId,
@@ -243,6 +301,11 @@ async function runNotebookRefreshJob(
       .eq("id", jobId)
       .eq("user_id", context.userId)
       .eq("ticker", context.ticker);
+
+    await settleNotebookRefreshCredits(context, usage.snapshot(), "completed", {
+      saved_question_count: savedQuestionCount,
+      recent_conversation_count: context.recentConversations.length,
+    });
   } catch (err) {
     console.warn("[watchlist-notebook-refresh] job failed", {
       ticker: context.ticker,
@@ -261,7 +324,68 @@ async function runNotebookRefreshJob(
       .eq("id", jobId)
       .eq("user_id", context.userId)
       .eq("ticker", context.ticker);
+
+    await settleNotebookRefreshCredits(context, usage.snapshot(), "failed", {
+      error_message: err instanceof Error ? err.message : String(err),
+      recent_conversation_count: context.recentConversations.length,
+    });
   }
+}
+
+function createNotebookUsageAccumulator() {
+  const total: NotebookAgentUsage = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheHitInputTokens: 0,
+    cacheMissInputTokens: 0,
+  };
+
+  return {
+    add: (usage: NotebookAgentUsage) => {
+      total.inputTokens += usage.inputTokens;
+      total.outputTokens += usage.outputTokens;
+      total.cacheHitInputTokens += usage.cacheHitInputTokens;
+      total.cacheMissInputTokens += usage.cacheMissInputTokens;
+    },
+    snapshot: () => ({ ...total }),
+  };
+}
+
+async function settleNotebookRefreshCredits(
+  context: NotebookRefreshJobContext,
+  usage: NotebookAgentUsage,
+  terminalStatus: string,
+  metadata: Record<string, unknown>,
+) {
+  const estimatedCost = estimateCost(usage.inputTokens, usage.outputTokens);
+  const budgetMetadata = {
+    executor_type: "notebook_refresh",
+    ticker: context.ticker,
+    input_tokens: usage.inputTokens,
+    output_tokens: usage.outputTokens,
+    prompt_cache_hit_tokens: usage.cacheHitInputTokens,
+    prompt_cache_miss_tokens: usage.cacheMissInputTokens,
+    ...metadata,
+  };
+
+  if (usage.inputTokens > 0 || usage.outputTokens > 0) {
+    await settleExecutionBudget(
+      context.userId,
+      context.creditRequestId,
+      null,
+      estimatedCost,
+      terminalStatus,
+      budgetMetadata,
+    );
+    return;
+  }
+
+  await releaseExecutionBudget(
+    context.userId,
+    context.creditRequestId,
+    null,
+    `notebook_refresh_${terminalStatus}`,
+  );
 }
 
 async function getRefreshJob(

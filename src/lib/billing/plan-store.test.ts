@@ -14,7 +14,11 @@ const freeRow = {
   label: "Free",
   status_label: "무료",
   description: "DB Free",
-  budget_period: "monthly",
+  budget_period: "weekly",
+  monthly_price_krw: 0,
+  weekly_analysis_credits_raw: 21000,
+  plan_version: "free-db",
+  credit_policy_version: "credit-v1",
   monthly_analysis_credits: 21000,
   daily_analysis_credits: null,
   monthly_budget_usd: 21,
@@ -55,11 +59,14 @@ describe("billing plan store", () => {
   });
 
   it("loads public plans from the database in display order", async () => {
-    const powerRow = {
+    const proRow = {
       ...freeRow,
-      key: "power",
-      label: "Power",
-      status_label: "고빈도 분석",
+      key: "pro",
+      label: "Pro",
+      status_label: "고급 분석",
+      monthly_price_krw: 29000,
+      weekly_analysis_credits_raw: 600000,
+      plan_version: "pro-db",
       monthly_analysis_credits: 600000,
       monthly_budget_usd: 600,
       sort_order: 30,
@@ -70,7 +77,7 @@ describe("billing plan store", () => {
           eq: vi.fn(() => ({
             order: vi.fn(() => ({
               returns: vi.fn().mockResolvedValue({
-                data: [freeRow, powerRow],
+                data: [freeRow, proRow],
                 error: null,
               }),
             })),
@@ -81,8 +88,9 @@ describe("billing plan store", () => {
 
     const plans = await listPublicBillingPlansFromStore();
 
-    expect(plans.map((plan) => plan.key)).toEqual(["free", "power"]);
+    expect(plans.map((plan) => plan.key)).toEqual(["free", "pro"]);
     expect(plans[1]?.monthlyAnalysisCredits).toBe(600000);
+    expect(plans[1]?.monthlyPriceKrw).toBe(29000);
   });
 
   it("falls back to code-defined plans when the table is missing", async () => {
@@ -101,7 +109,7 @@ describe("billing plan store", () => {
 
     const plan = await getBillingPlanFromStore("free");
 
-    expect(plan.monthlyAnalysisCredits).toBe(20000);
-    expect(plan.monthlyBudgetUsd).toBe(20);
+    expect(plan.weeklyAnalysisCreditsRaw).toBe(400000);
+    expect(plan.monthlyPriceKrw).toBe(0);
   });
 });

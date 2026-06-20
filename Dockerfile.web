@@ -54,6 +54,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/.worker ./.worker
+COPY --from=builder --chown=nextjs:nodejs /app/.services ./.services
 COPY --from=prod-deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 # Next standalone file tracing misses the Claude Agent SDK native optional
 # package because the SDK resolves it dynamically at runtime.

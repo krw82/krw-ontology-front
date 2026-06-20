@@ -13,6 +13,11 @@ Environment:
   KRW_ONTOLOGY_SOURCE_DIR  Defaults to $HOME/krw-ontology
   ENV_FILE                 Defaults to <front repo>/.env
   COMPOSE_PROJECT_NAME     Defaults to krw-ontology-front
+  ALLOW_MISSING_TOSS_PAYMENTS
+                           Defaults to 1 temporarily. Set to 0 when Toss
+                           live keys are configured and paid checkout is ready.
+  ALLOW_TOSS_TEST_KEYS     Defaults to 0. Set to 1 only for staging-like
+                           deploys that intentionally use Toss test keys.
 EOF
 }
 
@@ -27,11 +32,16 @@ if [ "${1:-}" = "--dry-run" ]; then
 fi
 
 VALIDATE_AGENT_WORKER=1
+VALIDATE_BILLING_WORKER=1
 if [ "$#" -gt 0 ]; then
   VALIDATE_AGENT_WORKER=0
+  VALIDATE_BILLING_WORKER=0
   for compose_arg in "$@"; do
     if [ "$compose_arg" = "agent-worker" ]; then
       VALIDATE_AGENT_WORKER=1
+    fi
+    if [ "$compose_arg" = "billing-worker" ]; then
+      VALIDATE_BILLING_WORKER=1
     fi
   done
 fi
@@ -41,6 +51,7 @@ FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 ONTOLOGY_SOURCE_DIR=${KRW_ONTOLOGY_SOURCE_DIR:-"$HOME/krw-ontology"}
 ENV_FILE=${ENV_FILE:-"$FRONT_DIR/.env"}
 COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-krw-ontology-front}
+ALLOW_MISSING_TOSS_PAYMENTS=${ALLOW_MISSING_TOSS_PAYMENTS:-1}
 EXPECTED_CLAUDE_CODE_VERSION=${EXPECTED_CLAUDE_CODE_VERSION:-2.1.141}
 EXPECTED_NODE_CLAUDE_AGENT_SDK_VERSION=${EXPECTED_NODE_CLAUDE_AGENT_SDK_VERSION:-0.2.141}
 EXPECTED_PY_CLAUDE_AGENT_SDK_VERSION=${EXPECTED_PY_CLAUDE_AGENT_SDK_VERSION:-0.2.85}
@@ -76,23 +87,71 @@ if [ "$SKILL_COUNT" -lt 1 ]; then
   exit 1
 fi
 
+env_value() {
+  key="$1"
+  awk -F= -v key="$key" '
+    $0 !~ /^[[:space:]]*#/ && $1 == key {
+      sub(/^[^=]*=/, "")
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+      gsub(/^"|"$/, "")
+      gsub(/^'\''|'\''$/, "")
+      print
+    }
+  ' "$ENV_FILE" | tail -n 1
+}
+
 require_env_value() {
   key="$1"
-  value=$(
-    awk -F= -v key="$key" '
-      $0 !~ /^[[:space:]]*#/ && $1 == key {
-        sub(/^[^=]*=/, "")
-        gsub(/^[[:space:]]+|[[:space:]]+$/, "")
-        gsub(/^"|"$/, "")
-        gsub(/^'\''|'\''$/, "")
-        print
-      }
-    ' "$ENV_FILE" | tail -n 1
-  )
+  value=$(env_value "$key")
   if [ -z "$value" ]; then
     echo "Missing required environment value in $ENV_FILE: $key" >&2
     exit 1
   fi
+}
+
+require_env_exact() {
+  key="$1"
+  expected="$2"
+  value=$(env_value "$key")
+  if [ "$value" != "$expected" ]; then
+    echo "Invalid environment value in $ENV_FILE: $key must be $expected, got ${value:-unset}" >&2
+    exit 1
+  fi
+}
+
+require_toss_payments_key() {
+  key="$1"
+  live_prefix="$2"
+  test_prefix="$3"
+  value=$(env_value "$key")
+
+  if [ -z "$value" ]; then
+    echo "Missing required Toss Payments environment value in $ENV_FILE: $key" >&2
+    exit 1
+  fi
+  case "$value" in
+    *"..."*)
+      echo "Placeholder Toss Payments environment value in $ENV_FILE: $key" >&2
+      exit 1
+      ;;
+  esac
+  case "$value" in
+    "$live_prefix"*)
+      ;;
+    "$test_prefix"*)
+      if [ "${ALLOW_TOSS_TEST_KEYS:-0}" = "1" ]; then
+        echo "Warning: $key uses a Toss test key because ALLOW_TOSS_TEST_KEYS=1." >&2
+      else
+        echo "$key must use a Toss live key for production deploys." >&2
+        echo "Set ALLOW_TOSS_TEST_KEYS=1 only for staging-like deploys." >&2
+        exit 1
+      fi
+      ;;
+    *)
+      echo "$key has an unexpected Toss Payments key prefix." >&2
+      exit 1
+      ;;
+  esac
 }
 
 for key in \
@@ -105,10 +164,27 @@ for key in \
   SUPABASE_URL \
   SUPABASE_ANON_KEY \
   SUPABASE_SERVICE_ROLE_KEY \
+  KRW_LLM_JOB_TOKEN_SECRET \
+  DESKTOP_LLM_GATEWAY_BASE_URL \
+  DEEPSEEK_API_KEY \
   INTERNAL_API_KEY
 do
   require_env_value "$key"
 done
+
+require_env_exact ANALYSIS_CREDIT_ENFORCEMENT_MODE enforced
+
+if [ "${ALLOW_MISSING_TOSS_PAYMENTS:-0}" = "1" ]; then
+  echo "Warning: skipping Toss Payments key validation because ALLOW_MISSING_TOSS_PAYMENTS=1." >&2
+  echo "Paid checkout will not be launch-ready until live Toss keys are configured." >&2
+  export BILLING_WORKER_REQUIRE_TOSS_PAYMENTS=0
+else
+  require_toss_payments_key TOSS_PAYMENTS_CLIENT_KEY live_ck_ test_ck_
+  require_toss_payments_key TOSS_PAYMENTS_SECRET_KEY live_sk_ test_sk_
+fi
+if [ "${ALLOW_TOSS_TEST_KEYS:-0}" = "1" ]; then
+  export BILLING_WORKER_ALLOW_TOSS_TEST_KEYS=1
+fi
 
 BUILD_CONTEXT=$(mktemp -d "${TMPDIR:-/tmp}/krw-ontology-front-build.XXXXXX")
 cleanup() {
@@ -300,4 +376,31 @@ console.log(JSON.stringify({
 NODE
 else
   echo "Skipping agent-worker validation; compose target excludes agent-worker."
+fi
+
+if [ "$VALIDATE_BILLING_WORKER" = "1" ]; then
+  for i in $(seq 1 30); do
+    billing_container=$(
+      docker compose \
+        --project-name "$COMPOSE_PROJECT_NAME" \
+        --env-file "$ENV_FILE" \
+        -f "$BUILD_CONTEXT/docker-compose.yml" \
+        ps -q billing-worker
+    )
+    if [ -n "$billing_container" ] && [ "$(docker inspect --format '{{.State.Status}}' "$billing_container")" = "running" ]; then
+      break
+    fi
+    if [ "$i" -eq 30 ]; then
+      echo "billing-worker did not become ready" >&2
+      docker compose \
+        --project-name "$COMPOSE_PROJECT_NAME" \
+        --env-file "$ENV_FILE" \
+        -f "$BUILD_CONTEXT/docker-compose.yml" \
+        ps >&2
+      exit 1
+    fi
+    sleep 2
+  done
+else
+  echo "Skipping billing-worker validation; compose target excludes billing-worker."
 fi

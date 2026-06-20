@@ -17,6 +17,9 @@ export type DesktopOntologyToolName =
 export type DesktopErrorCode =
   | "authentication_error"
   | "entitlement_required"
+  | "provider_unavailable"
+  | "llm_job_token_unavailable"
+  | "invalid_job_token"
   | "ontology_unavailable"
   | "tool_not_allowed"
   | "invalid_tool_arguments"

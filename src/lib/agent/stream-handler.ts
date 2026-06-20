@@ -29,6 +29,8 @@ export interface AccumulatedRun {
   citations: StreamingCitation[];
   inputTokens: number;
   outputTokens: number;
+  cacheHitInputTokens: number;
+  cacheMissInputTokens: number;
 }
 
 export type AccumulatedToolCall = AccumulatedRun["toolCalls"][number];
@@ -44,6 +46,8 @@ export function createAccumulator(): AccumulatedRun {
     citations: [],
     inputTokens: 0,
     outputTokens: 0,
+    cacheHitInputTokens: 0,
+    cacheMissInputTokens: 0,
   };
 }
 
@@ -125,8 +129,12 @@ export function addCitation(acc: AccumulatedRun, citation: StreamingCitation) {
 export function setUsage(
   acc: AccumulatedRun,
   inputTokens: number,
-  outputTokens: number
+  outputTokens: number,
+  cacheHitInputTokens = 0,
+  cacheMissInputTokens = 0,
 ) {
   acc.inputTokens += inputTokens;
   acc.outputTokens += outputTokens;
+  acc.cacheHitInputTokens += cacheHitInputTokens;
+  acc.cacheMissInputTokens += cacheMissInputTokens;
 }

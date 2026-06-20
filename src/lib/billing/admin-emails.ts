@@ -3,6 +3,10 @@ const DEFAULT_ADMIN_EMAILS = [
   "admin2@example.com",
 ];
 
+function getDefaultAdminEmails() {
+  return process.env.NODE_ENV === "production" ? [] : DEFAULT_ADMIN_EMAILS;
+}
+
 export function isAdminEntitlementEmail(email?: string | null): boolean {
   if (!email) return false;
   const normalizedEmail = email.trim().toLowerCase();
@@ -10,7 +14,7 @@ export function isAdminEntitlementEmail(email?: string | null): boolean {
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
-  return new Set([...DEFAULT_ADMIN_EMAILS, ...configuredEmails]).has(
+  return new Set([...getDefaultAdminEmails(), ...configuredEmails]).has(
     normalizedEmail,
   );
 }

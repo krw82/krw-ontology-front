@@ -23,6 +23,12 @@ import { enqueueAgentRun } from "@/lib/agent/job-queue";
 import { getClaudeAgentModel } from "@/lib/agent/model";
 import { streamAgentRunEventsResponse } from "@/lib/agent/run-events";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
+import {
+  attachAnalysisCreditRunShadow,
+  releaseAnalysisCreditsShadow,
+  reserveAnalysisCreditsShadow,
+} from "@/lib/concurrency/analysis-credits";
+import { shouldBlockAnalysisCreditReservation } from "@/lib/billing/credit-policy";
 import { parseChatAttachmentContent } from "@/lib/chat/attachments";
 import {
   buildUserUrlNewsEventContext,
@@ -222,11 +228,46 @@ export async function POST(request: NextRequest) {
     body.research_mode,
   );
   if (!budgetResult.ok) return budgetResult.response;
+  const creditReservation = await reserveAnalysisCreditsShadow(userId, request_id, {
+    runKind: effectiveRunKind,
+    researchMode: body.research_mode,
+  });
+  if (
+    !budgetResult.budget.entitlement?.usage.unlimited &&
+    shouldBlockAnalysisCreditReservation(creditReservation)
+  ) {
+    await releaseExecutionBudget(
+      userId,
+      request_id,
+      null,
+      "analysis_credit_reserve_blocked",
+    );
+    await releaseAnalysisCreditsShadow(
+      userId,
+      request_id,
+      null,
+      "analysis_credit_reserve_blocked",
+    );
+    return errorResponse(
+      creditReservation.ok ? 429 : 500,
+      creditReservation.ok ? "cost_cap_exceeded" : "internal_error",
+      creditReservation.ok
+        ? "이번 주 분석 한도에 도달해 새 분석을 시작할 수 없습니다."
+        : "사용량 정보를 확인하지 못했습니다.",
+      request_id,
+    );
+  }
 
   // 7. Save user message idempotently & fetch history
   const historyResult = await fetchHistory(session.id, content, request_id);
   if (!historyResult.ok) {
     await releaseExecutionBudget(userId, request_id, null, "history_fetch_failed");
+    await releaseAnalysisCreditsShadow(
+      userId,
+      request_id,
+      null,
+      "history_fetch_failed",
+    );
     return historyResult.response;
   }
 
@@ -243,6 +284,12 @@ export async function POST(request: NextRequest) {
     );
     if (!attachmentResult.ok) {
       await releaseExecutionBudget(
+        userId,
+        request_id,
+        null,
+        "document_attachment_validation_failed",
+      );
+      await releaseAnalysisCreditsShadow(
         userId,
         request_id,
         null,
@@ -333,6 +380,12 @@ export async function POST(request: NextRequest) {
       enqueueResult.runId ?? null,
       enqueueResult.reason,
     );
+    await releaseAnalysisCreditsShadow(
+      userId,
+      request_id,
+      enqueueResult.runId ?? null,
+      enqueueResult.reason,
+    );
     await getSupabaseAdmin()
       .from("messages")
       .delete()
@@ -349,6 +402,8 @@ export async function POST(request: NextRequest) {
       request_id,
     );
   }
+
+  await attachAnalysisCreditRunShadow(userId, request_id, enqueueResult.runId);
 
   return withSessionHeader(streamAgentRunEventsResponse({
     userId,

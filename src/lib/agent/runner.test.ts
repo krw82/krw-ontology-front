@@ -179,6 +179,7 @@ async function probeToolPermission(params: {
   researchMode?: ResearchMode;
   analysisMode?: AnalysisMode;
   runKind?: RunKind;
+  selectedNewsEventContext?: Record<string, unknown> | null;
 }): Promise<{
   permission: Awaited<ReturnType<typeof canUseTool>>;
   result: Awaited<ReturnType<typeof runAgent>>;
@@ -225,6 +226,7 @@ async function probeToolPermission(params: {
       researchMode: params.researchMode ?? "deep",
       analysisMode: params.analysisMode ?? "company",
       runKind: params.runKind,
+      selectedNewsEventContext: params.selectedNewsEventContext,
     },
     {
       write: vi.fn().mockResolvedValue(undefined),
@@ -637,6 +639,54 @@ describe("agent runner research budget recovery", () => {
     });
 
     expect(permission).toEqual({ behavior: "allow" });
+  });
+
+  it("binds read_news_sources to selected preferred source URLs", async () => {
+    const selectedUrl =
+      "https://www.reuters.com/markets/technology/broadcom-ai-networking-orders-2026-06-01/";
+    const { permission } = await probeToolPermission({
+      existingTools: [],
+      attemptedTool: "read_news_sources",
+      analysisMode: "news",
+      runKind: "news_research",
+      input: {
+        urls: [
+          "https://malicious.example/internal",
+          selectedUrl,
+        ],
+      },
+      selectedNewsEventContext: {
+        source_pack: {
+          source_urls: [selectedUrl],
+        },
+        source_previews: [{ title: "Reuters", url: selectedUrl }],
+      },
+    });
+
+    expect(permission.behavior).toBe("allow");
+    if (permission.behavior === "allow") {
+      expect(permission.updatedInput).toEqual({ urls: [selectedUrl] });
+    }
+  });
+
+  it("denies read_news_sources when the selected event has no eligible source URL", async () => {
+    const { permission } = await probeToolPermission({
+      existingTools: [],
+      attemptedTool: "read_news_sources",
+      analysisMode: "news",
+      runKind: "news_research",
+      input: {
+        urls: ["https://www.reuters.com/markets/technology/broadcom-ai/"],
+      },
+      selectedNewsEventContext: {
+        source_previews: [{ title: "user URL", url: "https://example.test/a" }],
+      },
+    });
+
+    expect(permission.behavior).toBe("deny");
+    if (permission.behavior === "deny") {
+      expect(permission.message).toContain("selected preferred market-news URLs");
+    }
   });
 
   it("limits Stock News MCP calls separately from ontology calls", async () => {

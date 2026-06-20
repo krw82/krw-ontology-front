@@ -13,7 +13,7 @@ import {
 } from "./plans";
 
 const BILLING_PLAN_SELECT =
-  "key, label, status_label, description, budget_period, monthly_analysis_credits, daily_analysis_credits, monthly_budget_usd, daily_budget_usd, per_run_analysis_credits, per_run_reserve_usd, unlimited, sort_order, is_public, created_at, updated_at";
+  "key, label, status_label, description, budget_period, monthly_analysis_credits, daily_analysis_credits, monthly_budget_usd, daily_budget_usd, per_run_analysis_credits, per_run_reserve_usd, unlimited, sort_order, is_public, monthly_price_krw, weekly_analysis_credits_raw, plan_version, credit_policy_version, created_at, updated_at";
 
 function isMissingRelationError(error: { code?: string; message?: string }) {
   return (
@@ -33,6 +33,13 @@ function rowToBillingPlan(row: BillingPlanRow): BillingPlan {
     label: row.label,
     statusLabel: row.status_label,
     description: row.description,
+    planVersion: row.plan_version ?? fallback.planVersion,
+    monthlyPriceKrw: Number(row.monthly_price_krw ?? fallback.monthlyPriceKrw),
+    weeklyAnalysisCreditsRaw: unlimited
+      ? Number.MAX_SAFE_INTEGER
+      : Number(row.weekly_analysis_credits_raw ?? fallback.weeklyAnalysisCreditsRaw),
+    creditPolicyVersion:
+      row.credit_policy_version ?? fallback.creditPolicyVersion,
     budgetPeriod: row.budget_period as EntitlementUsagePeriod,
     monthlyAnalysisCredits: unlimited
       ? Number.MAX_SAFE_INTEGER

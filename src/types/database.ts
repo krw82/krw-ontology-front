@@ -171,6 +171,7 @@ export interface DesktopDeviceRow extends Record<string, unknown> {
   id: string;
   user_id: string;
   device_name: string;
+  installation_id: string | null;
   platform: string | null;
   arch: string | null;
   app_version: string | null;
@@ -188,6 +189,7 @@ export interface DesktopDeviceLoginCodeRow extends Record<string, unknown> {
   user_code_hash: string;
   user_code_display: string;
   device_name: string;
+  installation_id: string | null;
   platform: string | null;
   arch: string | null;
   app_version: string | null;
@@ -195,6 +197,31 @@ export interface DesktopDeviceLoginCodeRow extends Record<string, unknown> {
   status: "pending" | "approved" | "denied" | "expired" | "complete";
   user_id: string | null;
   device_id: string | null;
+  expires_at: string;
+  approved_at: string | null;
+  consumed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DesktopAuthorizationRequestRow
+  extends Record<string, unknown> {
+  id: string;
+  client_id: string;
+  redirect_uri: string;
+  state: string;
+  code_challenge: string;
+  code_challenge_method: "S256";
+  installation_id: string;
+  device_name: string;
+  platform: string | null;
+  arch: string | null;
+  app_version: string | null;
+  protocol_version: string;
+  status: "pending" | "approved" | "denied" | "consumed" | "expired";
+  user_id: string | null;
+  device_id: string | null;
+  authorization_code_hash: string | null;
   expires_at: string;
   approved_at: string | null;
   consumed_at: string | null;
@@ -246,6 +273,40 @@ export interface DesktopOntologyToolCallRow extends Record<string, unknown> {
   error_code: string | null;
   created_at: string;
   completed_at: string | null;
+}
+
+export interface DesktopLlmJobRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  device_id: string | null;
+  local_session_id: string | null;
+  local_run_id: string;
+  runtime: "claude-sdk";
+  token_jti: string;
+  token_hash: string;
+  status: "active" | "completed" | "failed" | "expired" | "revoked";
+  provider: "deepseek";
+  model_profile: string;
+  sdk_model: string;
+  upstream_model: string;
+  gateway_base_url: string;
+  max_budget_usd: number | null;
+  max_request_count: number;
+  request_count: number;
+  max_input_tokens: number | null;
+  max_output_tokens: number | null;
+  expires_at: string;
+  last_used_at: string | null;
+  finalized_at: string | null;
+  usage_input_tokens: number;
+  usage_output_tokens: number;
+  usage_cache_read_input_tokens: number;
+  usage_cache_creation_input_tokens: number;
+  actual_provider_cost_usd: number | null;
+  error_code: string | null;
+  metadata: Json;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface OntologyCatalogReleaseRow extends Record<string, unknown> {
@@ -482,22 +543,41 @@ export interface UsageDailyRow extends Record<string, unknown> {
 
 export interface UserEntitlementRow extends Record<string, unknown> {
   user_id: string;
-  plan_key: "free" | "pro" | "power" | "beta" | "internal";
-  status: "active" | "paused" | "cancelled";
+  plan_key: "free" | "standard" | "pro" | "power" | "beta" | "internal";
+  status:
+    | "active"
+    | "paused"
+    | "past_due"
+    | "grace"
+    | "cancelled"
+    | "expired";
   current_period_start: string;
   current_period_end: string;
+  billing_period_start?: string | null;
+  billing_period_end?: string | null;
+  credit_anchor_at?: string | null;
+  plan_version_id?: string | null;
+  cancel_at_period_end?: boolean;
+  plan_change_pending?: Json;
+  grace_until?: string | null;
   provider_customer_id: string | null;
   provider_subscription_id: string | null;
+  provider_price_id?: string | null;
+  entitlement_updated_at?: string;
   created_at: string;
   updated_at: string;
 }
 
 export interface BillingPlanRow extends Record<string, unknown> {
-  key: "free" | "pro" | "power" | "beta" | "internal";
+  key: "free" | "standard" | "pro" | "power" | "beta" | "internal";
   label: string;
   status_label: string;
   description: string;
-  budget_period: "daily" | "monthly";
+  budget_period: "daily" | "weekly" | "monthly";
+  monthly_price_krw?: number | null;
+  weekly_analysis_credits_raw?: number | null;
+  plan_version?: string | null;
+  credit_policy_version?: string | null;
   monthly_analysis_credits: number | null;
   daily_analysis_credits: number | null;
   monthly_budget_usd: number | null;
@@ -576,6 +656,205 @@ export interface UsageLedgerRow extends Record<string, unknown> {
   period_end: string;
   entry_type: "reservation" | "settlement" | "release" | "adjustment" | "expiry";
   amount_usd: number;
+  metadata: Json;
+  created_at: string;
+}
+
+export interface CreditPolicyRow extends Record<string, unknown> {
+  version: string;
+  input_token_weight: number;
+  output_token_weight: number;
+  display_scale: number;
+  created_at: string;
+}
+
+export interface ProviderPricingPolicyRow extends Record<string, unknown> {
+  version: string;
+  provider: string;
+  provider_model: string;
+  provider_model_version: string;
+  input_cache_hit_cost_per_million: number;
+  input_cache_miss_cost_per_million: number;
+  output_cost_per_million: number;
+  source_url: string | null;
+  verified_at: string | null;
+  effective_from: string;
+  effective_to: string | null;
+  created_at: string;
+}
+
+export interface BillingPlanVersionRow extends Record<string, unknown> {
+  id: string;
+  plan_key: "free" | "standard" | "pro" | "beta" | "internal";
+  plan_version: string;
+  monthly_price_krw: number;
+  weekly_credit_limit_raw: number | null;
+  credit_policy_version: string;
+  provider_price_id: string | null;
+  effective_from: string;
+  effective_to: string | null;
+  is_current: boolean;
+  created_at: string;
+}
+
+export type BillingTossPlanKey = "standard" | "pro";
+
+export interface BillingTossCustomerRow extends Record<string, unknown> {
+  user_id: string;
+  customer_key: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingTossCheckoutSessionRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  plan_key: BillingTossPlanKey;
+  plan_version_id: string | null;
+  amount_krw: number;
+  currency: "KRW";
+  order_name: string;
+  customer_key: string;
+  status:
+    | "created"
+    | "auth_succeeded"
+    | "paid"
+    | "failed"
+    | "cancelled"
+    | "expired";
+  success_url: string;
+  fail_url: string;
+  auth_key_received_at: string | null;
+  billing_key_idempotency_key: string;
+  failure_code: string | null;
+  failure_message: string | null;
+  provider_response: Json;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingTossSubscriptionRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  plan_key: BillingTossPlanKey;
+  plan_version_id: string | null;
+  status:
+    | "active"
+    | "past_due"
+    | "grace"
+    | "pending_cancel"
+    | "cancelled"
+    | "expired";
+  customer_key: string;
+  billing_key: string;
+  billing_method: "CARD" | "TRANSFER";
+  billing_key_issued_at: string | null;
+  card_snapshot: Json;
+  current_period_start: string;
+  current_period_end: string;
+  next_billing_at: string;
+  renewal_due_at: string;
+  cancel_at_period_end: boolean;
+  cancelled_at: string | null;
+  grace_until: string | null;
+  renewal_attempt_count: number;
+  renewal_lease_owner: string | null;
+  renewal_lease_expires_at: string | null;
+  pending_plan_key: BillingTossPlanKey | null;
+  pending_plan_version_id: string | null;
+  last_payment_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingTossPaymentRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  subscription_id: string | null;
+  checkout_session_id: string | null;
+  plan_key: BillingTossPlanKey;
+  plan_version_id: string | null;
+  payment_kind: "initial" | "renewal" | "upgrade";
+  order_id: string;
+  order_name: string;
+  idempotency_key: string;
+  amount_krw: number;
+  currency: "KRW";
+  billing_period_start: string | null;
+  billing_period_end: string | null;
+  attempt_number: number;
+  status: "pending" | "paid" | "failed" | "cancelled";
+  provider_payment_key: string | null;
+  provider_status: string | null;
+  failure_code: string | null;
+  failure_message: string | null;
+  provider_response: Json;
+  requested_at: string | null;
+  approved_at: string | null;
+  paid_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UsageCreditBalanceRow extends Record<string, unknown> {
+  user_id: string;
+  period_kind: "weekly";
+  period_start: string;
+  period_end: string;
+  plan_key_snapshot: "free" | "standard" | "pro" | "beta" | "internal";
+  plan_version_id: string | null;
+  credit_policy_version: string;
+  credits_limit_raw: number;
+  credits_used_raw: number;
+  credits_reserved_raw: number;
+  credits_released_raw: number;
+  actual_provider_cost_usd: number;
+  run_count: number;
+  updated_at: string;
+}
+
+export interface RunCreditReservationRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  request_id: string;
+  run_id: string | null;
+  credit_period_start: string;
+  credit_period_end: string;
+  reserved_credits_raw: number;
+  settled_credits_raw: number;
+  status: "reserved" | "running" | "settled" | "released" | "expired";
+  terminal_status: string | null;
+  plan_key_snapshot: "free" | "standard" | "pro" | "beta" | "internal";
+  plan_version_id: string | null;
+  credit_policy_version: string;
+  provider: string | null;
+  provider_model: string | null;
+  provider_model_version: string | null;
+  pricing_version: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  prompt_cache_hit_tokens: number;
+  prompt_cache_miss_tokens: number;
+  actual_provider_cost_usd: number;
+  metadata: Json;
+  expires_at: string;
+  created_at: string;
+  settled_at: string | null;
+}
+
+export interface UsageCreditLedgerRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  run_credit_reservation_id: string | null;
+  run_id: string | null;
+  request_id: string;
+  period_kind: "weekly";
+  period_start: string;
+  period_end: string;
+  entry_type: "reservation" | "settlement" | "release" | "adjustment" | "expiry";
+  amount_credits_raw: number;
+  actual_provider_cost_usd: number;
   metadata: Json;
   created_at: string;
 }
@@ -950,6 +1229,41 @@ export interface Database {
           referencedColumns: string[];
         }>;
       };
+      desktop_authorization_requests: {
+        Row: DesktopAuthorizationRequestRow;
+        Insert: Omit<
+          DesktopAuthorizationRequestRow,
+          | "id"
+          | "status"
+          | "user_id"
+          | "device_id"
+          | "authorization_code_hash"
+          | "approved_at"
+          | "consumed_at"
+          | "created_at"
+          | "updated_at"
+        > & {
+          id?: string;
+          status?: DesktopAuthorizationRequestRow["status"];
+          user_id?: string | null;
+          device_id?: string | null;
+          authorization_code_hash?: string | null;
+          approved_at?: string | null;
+          consumed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Omit<DesktopAuthorizationRequestRow, "id" | "created_at">
+        >;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
       desktop_access_tokens: {
         Row: DesktopAccessTokenRow;
         Insert: Omit<
@@ -1027,6 +1341,47 @@ export interface Database {
           completed_at?: string | null;
         };
         Update: Partial<Omit<DesktopOntologyToolCallRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      desktop_llm_jobs: {
+        Row: DesktopLlmJobRow;
+        Insert: Omit<
+          DesktopLlmJobRow,
+          | "status"
+          | "request_count"
+          | "last_used_at"
+          | "finalized_at"
+          | "usage_input_tokens"
+          | "usage_output_tokens"
+          | "usage_cache_read_input_tokens"
+          | "usage_cache_creation_input_tokens"
+          | "actual_provider_cost_usd"
+          | "error_code"
+          | "metadata"
+          | "created_at"
+          | "updated_at"
+        > & {
+          status?: DesktopLlmJobRow["status"];
+          request_count?: number;
+          last_used_at?: string | null;
+          finalized_at?: string | null;
+          usage_input_tokens?: number;
+          usage_output_tokens?: number;
+          usage_cache_read_input_tokens?: number;
+          usage_cache_creation_input_tokens?: number;
+          actual_provider_cost_usd?: number | null;
+          error_code?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<DesktopLlmJobRow, "id" | "created_at">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];
@@ -1528,6 +1883,230 @@ export interface Database {
         Update: Partial<Omit<UsageLedgerRow, "id" | "created_at">>;
         Relationships: [];
       };
+      credit_policies: {
+        Row: CreditPolicyRow;
+        Insert: Omit<CreditPolicyRow, "created_at"> & {
+          created_at?: string;
+        };
+        Update: Partial<Omit<CreditPolicyRow, "version" | "created_at">>;
+        Relationships: [];
+      };
+      provider_pricing_policies: {
+        Row: ProviderPricingPolicyRow;
+        Insert: Omit<
+          ProviderPricingPolicyRow,
+          "created_at" | "source_url" | "verified_at"
+        > & {
+          source_url?: string | null;
+          verified_at?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Omit<ProviderPricingPolicyRow, "version" | "created_at">>;
+        Relationships: [];
+      };
+      billing_plan_versions: {
+        Row: BillingPlanVersionRow;
+        Insert: Omit<BillingPlanVersionRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<BillingPlanVersionRow, "id" | "plan_key" | "created_at">>;
+        Relationships: [];
+      };
+      billing_toss_customers: {
+        Row: BillingTossCustomerRow;
+        Insert: Omit<BillingTossCustomerRow, "created_at" | "updated_at"> & {
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<BillingTossCustomerRow, "user_id" | "created_at">>;
+        Relationships: [];
+      };
+      billing_toss_checkout_sessions: {
+        Row: BillingTossCheckoutSessionRow;
+        Insert: Omit<
+          BillingTossCheckoutSessionRow,
+          | "id"
+          | "currency"
+          | "status"
+          | "auth_key_received_at"
+          | "failure_code"
+          | "failure_message"
+          | "provider_response"
+          | "expires_at"
+          | "created_at"
+          | "updated_at"
+        > & {
+          id?: string;
+          currency?: "KRW";
+          status?: BillingTossCheckoutSessionRow["status"];
+          auth_key_received_at?: string | null;
+          billing_key_idempotency_key?: string;
+          failure_code?: string | null;
+          failure_message?: string | null;
+          provider_response?: Json;
+          expires_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Omit<BillingTossCheckoutSessionRow, "id" | "user_id" | "created_at">
+        >;
+        Relationships: [];
+      };
+      billing_toss_subscriptions: {
+        Row: BillingTossSubscriptionRow;
+        Insert: Omit<
+          BillingTossSubscriptionRow,
+          | "id"
+          | "status"
+          | "billing_method"
+          | "card_snapshot"
+          | "cancel_at_period_end"
+          | "cancelled_at"
+          | "grace_until"
+          | "renewal_due_at"
+          | "renewal_attempt_count"
+          | "renewal_lease_owner"
+          | "renewal_lease_expires_at"
+          | "pending_plan_key"
+          | "pending_plan_version_id"
+          | "last_payment_id"
+          | "created_at"
+          | "updated_at"
+        > & {
+          id?: string;
+          status?: BillingTossSubscriptionRow["status"];
+          billing_method?: BillingTossSubscriptionRow["billing_method"];
+          card_snapshot?: Json;
+          cancel_at_period_end?: boolean;
+          cancelled_at?: string | null;
+          grace_until?: string | null;
+          renewal_due_at?: string;
+          renewal_attempt_count?: number;
+          renewal_lease_owner?: string | null;
+          renewal_lease_expires_at?: string | null;
+          pending_plan_key?: BillingTossPlanKey | null;
+          pending_plan_version_id?: string | null;
+          last_payment_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<BillingTossSubscriptionRow, "id" | "user_id" | "created_at">>;
+        Relationships: [];
+      };
+      billing_toss_payments: {
+        Row: BillingTossPaymentRow;
+        Insert: Omit<
+          BillingTossPaymentRow,
+          | "id"
+          | "currency"
+          | "billing_period_start"
+          | "billing_period_end"
+          | "attempt_number"
+          | "status"
+          | "provider_payment_key"
+          | "provider_status"
+          | "failure_code"
+          | "failure_message"
+          | "provider_response"
+          | "requested_at"
+          | "approved_at"
+          | "paid_at"
+          | "created_at"
+          | "updated_at"
+        > & {
+          id?: string;
+          currency?: "KRW";
+          billing_period_start?: string | null;
+          billing_period_end?: string | null;
+          attempt_number?: number;
+          status?: BillingTossPaymentRow["status"];
+          provider_payment_key?: string | null;
+          provider_status?: string | null;
+          failure_code?: string | null;
+          failure_message?: string | null;
+          provider_response?: Json;
+          requested_at?: string | null;
+          approved_at?: string | null;
+          paid_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<BillingTossPaymentRow, "id" | "user_id" | "created_at">>;
+        Relationships: [];
+      };
+      usage_credit_balances: {
+        Row: UsageCreditBalanceRow;
+        Insert: Omit<
+          UsageCreditBalanceRow,
+          | "credits_used_raw"
+          | "credits_reserved_raw"
+          | "credits_released_raw"
+          | "actual_provider_cost_usd"
+          | "run_count"
+          | "updated_at"
+        > & {
+          credits_used_raw?: number;
+          credits_reserved_raw?: number;
+          credits_released_raw?: number;
+          actual_provider_cost_usd?: number;
+          run_count?: number;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Omit<
+            UsageCreditBalanceRow,
+            "user_id" | "period_kind" | "period_start" | "period_end"
+          >
+        >;
+        Relationships: [];
+      };
+      run_credit_reservations: {
+        Row: RunCreditReservationRow;
+        Insert: Omit<
+          RunCreditReservationRow,
+          | "id"
+          | "run_id"
+          | "settled_credits_raw"
+          | "status"
+          | "terminal_status"
+          | "input_tokens"
+          | "output_tokens"
+          | "prompt_cache_hit_tokens"
+          | "prompt_cache_miss_tokens"
+          | "actual_provider_cost_usd"
+          | "metadata"
+          | "created_at"
+          | "settled_at"
+        > & {
+          id?: string;
+          run_id?: string | null;
+          settled_credits_raw?: number;
+          status?: RunCreditReservationRow["status"];
+          terminal_status?: string | null;
+          input_tokens?: number;
+          output_tokens?: number;
+          prompt_cache_hit_tokens?: number;
+          prompt_cache_miss_tokens?: number;
+          actual_provider_cost_usd?: number;
+          metadata?: Json;
+          created_at?: string;
+          settled_at?: string | null;
+        };
+        Update: Partial<Omit<RunCreditReservationRow, "id" | "user_id" | "request_id" | "created_at">>;
+        Relationships: [];
+      };
+      usage_credit_ledger: {
+        Row: UsageCreditLedgerRow;
+        Insert: Omit<UsageCreditLedgerRow, "id" | "created_at" | "metadata"> & {
+          id?: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: Partial<Omit<UsageCreditLedgerRow, "id" | "created_at">>;
+        Relationships: [];
+      };
       concurrency_leases: {
         Row: ConcurrencyLeaseRow;
         Insert: Omit<ConcurrencyLeaseRow, "id" | "acquired_at"> & {
@@ -1720,6 +2299,152 @@ export interface Database {
           released: boolean;
           reservation_id: string | null;
           released_cost_usd: number;
+        }>;
+      };
+      reserve_analysis_credits: {
+        Args: {
+          p_user_id: string;
+          p_request_id: string;
+          p_reserve_credits_raw: number;
+          p_expires_at: string;
+          p_now?: string;
+        };
+        Returns: Array<{
+          allowed: boolean;
+          reason: string | null;
+          reservation_id: string | null;
+          period_start: string | null;
+          period_end: string | null;
+          credits_used_raw: number;
+          credits_reserved_raw: number;
+          credits_limit_raw: number;
+        }>;
+      };
+      attach_analysis_credit_run: {
+        Args: {
+          p_user_id: string;
+          p_request_id: string;
+          p_run_id: string;
+        };
+        Returns: undefined;
+      };
+      settle_analysis_credits: {
+        Args: {
+          p_user_id: string;
+          p_request_id: string;
+          p_run_id: string | null;
+          p_terminal_status: string;
+          p_settled_credits_raw: number;
+          p_input_tokens: number;
+          p_output_tokens: number;
+          p_prompt_cache_hit_tokens: number;
+          p_prompt_cache_miss_tokens: number;
+          p_provider: string;
+          p_provider_model: string;
+          p_provider_model_version: string;
+          p_pricing_version: string;
+          p_actual_provider_cost_usd: number;
+          p_metadata: Json;
+        };
+        Returns: Array<{
+          settled: boolean;
+          reservation_id: string | null;
+          settled_credits_raw: number;
+        }>;
+      };
+      release_analysis_credits: {
+        Args: {
+          p_user_id: string;
+          p_request_id: string;
+          p_run_id: string | null;
+          p_reason: string;
+        };
+        Returns: Array<{
+          released: boolean;
+          reservation_id: string | null;
+          released_credits_raw: number;
+        }>;
+      };
+      expire_stale_analysis_credit_reservations: {
+        Args: {
+          p_now?: string;
+        };
+        Returns: number;
+      };
+      complete_desktop_device_login: {
+        Args: {
+          p_device_code_hash: string;
+          p_new_access_token_hash: string;
+          p_new_access_expires_at: string;
+          p_new_refresh_token_hash: string;
+          p_new_refresh_expires_at: string;
+          p_now?: string;
+        };
+        Returns: Array<{
+          completed: boolean;
+          user_id: string | null;
+          device_id: string | null;
+          device_name: string | null;
+          device_status: string | null;
+        }>;
+      };
+      exchange_desktop_authorization_code: {
+        Args: {
+          p_authorization_code_hash: string;
+          p_client_id: string;
+          p_redirect_uri: string;
+          p_code_challenge: string;
+          p_new_access_token_hash: string;
+          p_new_access_expires_at: string;
+          p_new_refresh_token_hash: string;
+          p_new_refresh_expires_at: string;
+          p_now?: string;
+        };
+        Returns: Array<{
+          exchanged: boolean;
+          user_id: string | null;
+          device_id: string | null;
+          device_name: string | null;
+          device_status: string | null;
+        }>;
+      };
+      record_desktop_llm_job_usage: {
+        Args: {
+          p_job_id: string;
+          p_input_tokens: number;
+          p_output_tokens: number;
+          p_cache_read_input_tokens: number;
+          p_cache_creation_input_tokens: number;
+          p_upstream_ok: boolean;
+          p_now?: string;
+        };
+        Returns: undefined;
+      };
+      rotate_desktop_refresh_token: {
+        Args: {
+          p_device_id: string;
+          p_current_token_hash: string;
+          p_new_access_token_hash: string;
+          p_new_access_expires_at: string;
+          p_new_refresh_token_hash: string;
+          p_new_refresh_expires_at: string;
+          p_now?: string;
+        };
+        Returns: Array<{
+          rotated: boolean;
+          user_id: string | null;
+          device_id: string | null;
+        }>;
+      };
+      claim_due_toss_subscriptions: {
+        Args: {
+          p_worker_id: string;
+          p_now?: string;
+          p_limit?: number;
+          p_lease_seconds?: number;
+        };
+        Returns: Array<{
+          subscription_id: string;
         }>;
       };
       mark_agent_run_terminal: {

@@ -11,6 +11,7 @@ import {
   estimateCost,
   checkExecutionBudget,
 } from "@/lib/concurrency/execution-budget";
+import { attachAnalysisCreditRunShadow } from "@/lib/concurrency/analysis-credits";
 import { registerRun, cleanupRun } from "@/lib/agent/abort-manager";
 import { getClaudeAgentModel } from "@/lib/agent/model";
 import { runAgent } from "@/lib/agent/runner";
@@ -167,6 +168,7 @@ export function executeRun(params: RunAgentParams): Response {
 
       const runId = leaseResult.runId;
       await attachExecutionBudgetRun(session.userId, requestId, runId);
+      await attachAnalysisCreditRunShadow(session.userId, requestId, runId);
       const { data: runStart } = await admin
         .from("agent_runs")
         .select("started_at")
@@ -983,6 +985,8 @@ async function handleCompletedRun(params: CompletedRunParams) {
   await settleExecutionBudget(userId, requestId, runId, estimatedCost, "completed", {
     input_tokens: acc.inputTokens,
     output_tokens: acc.outputTokens,
+    prompt_cache_hit_tokens: acc.cacheHitInputTokens,
+    prompt_cache_miss_tokens: acc.cacheMissInputTokens,
     tool_call_count: acc.toolCalls.length,
   });
 
@@ -1107,6 +1111,8 @@ async function handleCancelledRun(params: CancelledRunParams) {
   await settleExecutionBudget(userId, requestId, runId, estimatedCost, "cancelled", {
     input_tokens: result.acc.inputTokens,
     output_tokens: result.acc.outputTokens,
+    prompt_cache_hit_tokens: result.acc.cacheHitInputTokens,
+    prompt_cache_miss_tokens: result.acc.cacheMissInputTokens,
     tool_call_count: result.acc.toolCalls.length,
   });
 
@@ -1185,6 +1191,8 @@ async function handleFailedRun(params: FailedRunParams) {
   await settleExecutionBudget(userId, requestId, runId, estimatedCost, errorCode, {
     input_tokens: result.acc.inputTokens,
     output_tokens: result.acc.outputTokens,
+    prompt_cache_hit_tokens: result.acc.cacheHitInputTokens,
+    prompt_cache_miss_tokens: result.acc.cacheMissInputTokens,
     tool_call_count: result.acc.toolCalls.length,
     output_length: result.acc.fullText.length,
   });

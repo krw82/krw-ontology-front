@@ -18,6 +18,11 @@ import {
   getEffectiveDailyBudgetUsd,
   resolvePlanKey,
 } from "@/lib/billing/plans";
+import { estimateCost } from "@/lib/billing/provider-pricing";
+import {
+  releaseAnalysisCreditsShadow,
+  settleAnalysisCreditsShadow,
+} from "@/lib/concurrency/analysis-credits";
 import { getBillingPlanFromStore } from "@/lib/billing/plan-store";
 import { heartbeatAgentRun } from "@/lib/agent/job-queue";
 import { closeOpenToolCallsForRun } from "@/lib/agent/tool-call-cleanup";
@@ -91,12 +96,6 @@ const AGENT_RUN_HARD_TIMEOUT_MS =
   readIntEnv("AGENT_RUN_HARD_TIMEOUT_MINUTES", 6, { min: 1 }) * 60_000;
 const RUN_TIMEOUT_MESSAGE =
   "분석 시간이 초과되었습니다. 다시 시도해주세요.";
-const INPUT_COST_PER_1M = Number.parseFloat(
-  process.env.INPUT_COST_PER_MILLION ?? "3.0",
-);
-const OUTPUT_COST_PER_1M = Number.parseFloat(
-  process.env.OUTPUT_COST_PER_MILLION ?? "15.0",
-);
 
 type SupabaseAdmin = ReturnType<typeof getSupabaseAdmin>;
 type PublicReleaseInput = Omit<
@@ -1215,6 +1214,8 @@ async function handleCompletedJob(params: {
     {
       input_tokens: acc.inputTokens,
       output_tokens: acc.outputTokens,
+      prompt_cache_hit_tokens: acc.cacheHitInputTokens,
+      prompt_cache_miss_tokens: acc.cacheMissInputTokens,
       tool_call_count: acc.toolCalls.length,
     },
   );
@@ -1371,6 +1372,8 @@ async function handleCancelledJob(params: {
     {
       input_tokens: result.acc.inputTokens,
       output_tokens: result.acc.outputTokens,
+      prompt_cache_hit_tokens: result.acc.cacheHitInputTokens,
+      prompt_cache_miss_tokens: result.acc.cacheMissInputTokens,
       tool_call_count: result.acc.toolCalls.length,
     },
   );
@@ -1453,6 +1456,8 @@ async function handleFailedJob(params: {
       {
         input_tokens: result.acc.inputTokens,
         output_tokens: result.acc.outputTokens,
+        prompt_cache_hit_tokens: result.acc.cacheHitInputTokens,
+        prompt_cache_miss_tokens: result.acc.cacheMissInputTokens,
         tool_call_count: result.acc.toolCalls.length,
         output_length: result.acc.fullText.length,
       },
@@ -1553,6 +1558,36 @@ async function settleExecutionBudgetForWorker(
       message: error.message,
     });
   }
+
+  const inputTokens = numberFromMetadata(metadata, "input_tokens");
+  const outputTokens = numberFromMetadata(metadata, "output_tokens");
+  const cacheHitInputTokens = numberFromMetadata(
+    metadata,
+    "prompt_cache_hit_tokens",
+  );
+  const cacheMissInputTokens = numberFromMetadata(
+    metadata,
+    "prompt_cache_miss_tokens",
+  );
+  if (inputTokens > 0 || outputTokens > 0) {
+    await settleAnalysisCreditsShadow(userId, requestId, runId, {
+      terminalStatus,
+      inputTokens,
+      outputTokens,
+      cacheHitInputTokens,
+      cacheMissInputTokens,
+      chargeUserCredits:
+        terminalStatus === "completed" || terminalStatus === "partial_completed",
+      metadata,
+    });
+  } else {
+    await releaseAnalysisCreditsShadow(
+      userId,
+      requestId,
+      runId,
+      terminalStatus,
+    );
+  }
 }
 
 async function releaseExecutionBudgetForWorker(
@@ -1573,16 +1608,17 @@ async function releaseExecutionBudgetForWorker(
       message: error.message,
     });
   }
+  await releaseAnalysisCreditsShadow(userId, requestId, runId, reason);
 }
 
-function estimateCost(inputTokens: number, outputTokens: number): number {
-  const inputCost = Number.isFinite(INPUT_COST_PER_1M)
-    ? INPUT_COST_PER_1M
-    : 3.0;
-  const outputCost = Number.isFinite(OUTPUT_COST_PER_1M)
-    ? OUTPUT_COST_PER_1M
-    : 15.0;
-  return (inputTokens / 1_000_000) * inputCost + (outputTokens / 1_000_000) * outputCost;
+function numberFromMetadata(metadata: Json, key: string): number {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return 0;
+  }
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.floor(value))
+    : 0;
 }
 
 function roundUsd(value: number): number {
@@ -1592,15 +1628,27 @@ function roundUsd(value: number): number {
 async function loadPlanKey(admin: SupabaseAdmin, userId: string) {
   const { data } = await admin
     .from("user_entitlements")
-    .select("plan_key, status")
+    .select("plan_key, status, current_period_end")
     .eq("user_id", userId)
-    .maybeSingle<Pick<UserEntitlementRow, "plan_key" | "status">>();
+    .maybeSingle<
+      Pick<UserEntitlementRow, "plan_key" | "status" | "current_period_end">
+    >();
 
-  if (!data || data.status !== "active") {
+  if (!data || !isCurrentEntitlement(data)) {
     const email = await loadUserEmailForAdminCheck(admin, userId);
     return isAdminEntitlementEmail(email) ? "internal" : resolvePlanKey(null);
   }
   return resolvePlanKey(data.plan_key);
+}
+
+function isCurrentEntitlement(
+  entitlement: Pick<UserEntitlementRow, "status" | "current_period_end">,
+) {
+  if (entitlement.status !== "active" && entitlement.status !== "grace") {
+    return false;
+  }
+  const periodEnd = new Date(entitlement.current_period_end).getTime();
+  return Number.isFinite(periodEnd) && periodEnd > Date.now();
 }
 
 async function loadUserEmailForAdminCheck(
@@ -1672,6 +1720,8 @@ function emptyAccumulatedRun(): AccumulatedRun {
     citations: [],
     inputTokens: 0,
     outputTokens: 0,
+    cacheHitInputTokens: 0,
+    cacheMissInputTokens: 0,
   };
 }
 

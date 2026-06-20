@@ -19,7 +19,9 @@ const eslintConfig = defineConfig([
     // Default ignores of eslint-config-next:
     ".next/**",
     ".worker/**",
+    ".services/**",
     ".next-e2e/**",
+    "_workspace/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

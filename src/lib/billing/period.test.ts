@@ -3,6 +3,7 @@ import {
   getCurrentDailyBillingPeriod,
   getCurrentBillingPeriod,
   getCurrentMonthlyBillingPeriod,
+  getCurrentWeeklyBillingPeriod,
   isDateWithinPeriod,
 } from "./period";
 
@@ -31,10 +32,24 @@ describe("billing period", () => {
     });
   });
 
+  it("uses seven-day periods from the subscription credit anchor", () => {
+    const period = getCurrentWeeklyBillingPeriod(
+      new Date("2026-05-20T12:30:00.000Z"),
+      new Date("2026-06-03T12:29:59.999Z"),
+    );
+
+    expect(period).toEqual({
+      start: "2026-05-27T12:30:00.000Z",
+      end: "2026-06-03T12:30:00.000Z",
+      label: "이번 주",
+    });
+  });
+
   it("selects daily or monthly periods by usage period", () => {
     const now = new Date("2026-05-23T18:00:00.000Z");
 
     expect(getCurrentBillingPeriod("daily", now).label).toBe("오늘");
+    expect(getCurrentBillingPeriod("weekly", now).label).toBe("이번 주");
     expect(getCurrentBillingPeriod("monthly", now).label).toBe("이번 달");
   });
 

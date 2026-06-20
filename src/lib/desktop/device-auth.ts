@@ -6,7 +6,6 @@ import type {
   DesktopAccessTokenRow,
   DesktopDeviceLoginCodeRow,
   DesktopDeviceRow,
-  DesktopRefreshTokenRow,
 } from "@/types/database";
 import { DesktopAuthError, type DesktopAuthContext } from "./auth";
 
@@ -19,6 +18,7 @@ const REFRESH_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
 export interface StartDesktopDeviceLoginInput {
   deviceName: string;
+  installationId?: string | null;
   platform?: string | null;
   arch?: string | null;
   appVersion?: string | null;
@@ -64,6 +64,7 @@ export async function startDesktopDeviceLogin(
       user_code_hash: tokenHash(normalizeUserCode(userCode)),
       user_code_display: userCode,
       device_name: boundedText(input.deviceName, "KRW Desktop"),
+      installation_id: nullableBoundedText(input.installationId),
       platform: nullableBoundedText(input.platform),
       arch: nullableBoundedText(input.arch),
       app_version: nullableBoundedText(input.appVersion),
@@ -71,7 +72,7 @@ export async function startDesktopDeviceLogin(
       expires_at: expiresAt,
     })
     .select(
-      "id, device_code_hash, user_code_hash, user_code_display, device_name, platform, arch, app_version, protocol_version, status, user_id, device_id, expires_at, approved_at, consumed_at, created_at, updated_at",
+      "id, device_code_hash, user_code_hash, user_code_display, device_name, installation_id, platform, arch, app_version, protocol_version, status, user_id, device_id, expires_at, approved_at, consumed_at, created_at, updated_at",
     )
     .single<DesktopDeviceLoginCodeRow>();
 
@@ -129,25 +130,49 @@ export async function pollDesktopDeviceLogin(
     });
   }
 
-  const device = await createDesktopDeviceFromCode(row, row.user_id, now);
-  const tokens = await issueDesktopTokens({
-    userId: row.user_id,
-    deviceId: device.id,
-    now,
-  });
-  await completeLoginCode(row.id, device.id, now);
+  const tokens = createDesktopTokenPair(now);
+  const { data, error } = await getSupabaseAdmin().rpc(
+    "complete_desktop_device_login",
+    {
+      p_device_code_hash: tokenHash(deviceCode),
+      p_new_access_token_hash: tokenHash(tokens.desktop_access_token),
+      p_new_access_expires_at: tokens.expires_at,
+      p_new_refresh_token_hash: tokenHash(tokens.desktop_refresh_token),
+      p_new_refresh_expires_at: tokens.refresh_expires_at,
+      p_now: now.toISOString(),
+    },
+  );
+  if (error) {
+    throw new DesktopAuthError("Failed to complete desktop login", {
+      publicMessage: "Desktop 로그인을 완료하지 못했습니다.",
+      status: 500,
+      retryable: true,
+    });
+  }
+
+  const completion = data?.[0];
+  if (
+    !completion?.completed ||
+    !completion.user_id ||
+    !completion.device_id ||
+    !completion.device_name ||
+    !completion.device_status
+  ) {
+    return { ok: true, status: "complete" };
+  }
+  const userEmail = await loadDesktopUserEmail(completion.user_id);
 
   return {
     ok: true,
     status: "complete",
     account: {
-      user_id: row.user_id,
-      email: null,
+      user_id: completion.user_id,
+      email: userEmail,
     },
     device: {
-      id: device.id,
-      name: device.device_name,
-      status: device.status,
+      id: completion.device_id,
+      name: completion.device_name,
+      status: completion.device_status,
     },
     tokens,
   };
@@ -163,7 +188,7 @@ export async function approveDesktopDeviceLoginCode(input: {
   const { data, error } = await getSupabaseAdmin()
     .from("desktop_device_login_codes")
     .select(
-      "id, device_code_hash, user_code_hash, user_code_display, device_name, platform, arch, app_version, protocol_version, status, user_id, device_id, expires_at, approved_at, consumed_at, created_at, updated_at",
+      "id, device_code_hash, user_code_hash, user_code_display, device_name, installation_id, platform, arch, app_version, protocol_version, status, user_id, device_id, expires_at, approved_at, consumed_at, created_at, updated_at",
     )
     .eq("user_code_hash", tokenHash(normalizedCode))
     .maybeSingle<DesktopDeviceLoginCodeRow>();
@@ -181,7 +206,7 @@ export async function approveDesktopDeviceLoginCode(input: {
     });
   }
 
-  const { error: updateError } = await getSupabaseAdmin()
+  const { data: approved, error: updateError } = await getSupabaseAdmin()
     .from("desktop_device_login_codes")
     .update({
       status: "approved",
@@ -189,13 +214,19 @@ export async function approveDesktopDeviceLoginCode(input: {
       approved_at: now.toISOString(),
       updated_at: now.toISOString(),
     })
-    .eq("id", data.id);
+    .eq("id", data.id)
+    .eq("status", "pending")
+    .is("user_id", null)
+    .select("id")
+    .maybeSingle<Pick<DesktopDeviceLoginCodeRow, "id">>();
 
-  if (updateError) {
+  if (updateError || !approved) {
     throw new DesktopAuthError("Failed to approve desktop login code", {
-      publicMessage: "Desktop 로그인 승인을 저장하지 못했습니다.",
-      status: 500,
-      retryable: true,
+      publicMessage: updateError
+        ? "Desktop 로그인 승인을 저장하지 못했습니다."
+        : "Desktop 로그인 코드가 이미 사용되었습니다.",
+      status: updateError ? 500 : 400,
+      retryable: Boolean(updateError),
     });
   }
 
@@ -208,35 +239,19 @@ export async function refreshDesktopTokens(input: {
   now?: Date;
 }): Promise<DesktopTokenPair> {
   const now = input.now ?? new Date();
-  const refresh = await loadRefreshToken(input.refreshToken);
-  if (
-    !refresh ||
-    refresh.device_id !== input.deviceId ||
-    refresh.status !== "active" ||
-    Date.parse(refresh.expires_at) <= now.getTime()
-  ) {
-    throw new DesktopAuthError("Invalid desktop refresh token", {
-      publicMessage: "Desktop 로그인이 만료되었습니다. 다시 로그인해주세요.",
-      status: 401,
-    });
-  }
-
-  const device = await loadActiveDevice(refresh.device_id, refresh.user_id);
-  if (!device) {
-    throw new DesktopAuthError("Desktop device is revoked", {
-      publicMessage: "이 Desktop 기기의 로그인이 해제되었습니다.",
-      status: 401,
-    });
-  }
-
-  const { error } = await getSupabaseAdmin()
-    .from("desktop_refresh_tokens")
-    .update({
-      status: "rotated",
-      last_used_at: now.toISOString(),
-      rotated_at: now.toISOString(),
-    })
-    .eq("id", refresh.id);
+  const tokens = createDesktopTokenPair(now);
+  const { data, error } = await getSupabaseAdmin().rpc(
+    "rotate_desktop_refresh_token",
+    {
+      p_device_id: input.deviceId,
+      p_current_token_hash: tokenHash(input.refreshToken),
+      p_new_access_token_hash: tokenHash(tokens.desktop_access_token),
+      p_new_access_expires_at: tokens.expires_at,
+      p_new_refresh_token_hash: tokenHash(tokens.desktop_refresh_token),
+      p_new_refresh_expires_at: tokens.refresh_expires_at,
+      p_now: now.toISOString(),
+    },
+  );
 
   if (error) {
     throw new DesktopAuthError("Failed to rotate desktop refresh token", {
@@ -245,12 +260,14 @@ export async function refreshDesktopTokens(input: {
       retryable: true,
     });
   }
+  if (!data?.[0]?.rotated) {
+    throw new DesktopAuthError("Invalid desktop refresh token", {
+      publicMessage: "Desktop 로그인이 만료되었습니다. 다시 로그인해주세요.",
+      status: 401,
+    });
+  }
 
-  return issueDesktopTokens({
-    userId: refresh.user_id,
-    deviceId: refresh.device_id,
-    now,
-  });
+  return tokens;
 }
 
 export async function authenticateDesktopAccessToken(
@@ -298,10 +315,11 @@ export async function authenticateDesktopAccessToken(
       .update({ last_seen_at: now.toISOString(), updated_at: now.toISOString() })
       .eq("id", device.id),
   ]);
+  const userEmail = await loadDesktopUserEmail(data.user_id);
 
   return {
     userId: data.user_id,
-    userEmail: null,
+    userEmail,
     deviceId: device.id,
     authMethod: "desktop_access_token",
   };
@@ -346,7 +364,7 @@ async function loadLoginCodeByDeviceCode(deviceCode: string) {
   const { data, error } = await getSupabaseAdmin()
     .from("desktop_device_login_codes")
     .select(
-      "id, device_code_hash, user_code_hash, user_code_display, device_name, platform, arch, app_version, protocol_version, status, user_id, device_id, expires_at, approved_at, consumed_at, created_at, updated_at",
+      "id, device_code_hash, user_code_hash, user_code_display, device_name, installation_id, platform, arch, app_version, protocol_version, status, user_id, device_id, expires_at, approved_at, consumed_at, created_at, updated_at",
     )
     .eq("device_code_hash", tokenHash(deviceCode))
     .maybeSingle<DesktopDeviceLoginCodeRow>();
@@ -361,111 +379,11 @@ async function loadLoginCodeByDeviceCode(deviceCode: string) {
   return data ?? null;
 }
 
-async function createDesktopDeviceFromCode(
-  code: DesktopDeviceLoginCodeRow,
-  userId: string,
-  now: Date,
-) {
-  const { data, error } = await getSupabaseAdmin()
-    .from("desktop_devices")
-    .insert({
-      user_id: userId,
-      device_name: code.device_name,
-      platform: code.platform,
-      arch: code.arch,
-      app_version: code.app_version,
-      protocol_version: code.protocol_version,
-      status: "active",
-      last_seen_at: now.toISOString(),
-    })
-    .select(
-      "id, user_id, device_name, platform, arch, app_version, protocol_version, status, last_seen_at, revoked_at, created_at, updated_at",
-    )
-    .single<DesktopDeviceRow>();
-
-  if (error || !data) {
-    throw new DesktopAuthError("Failed to create desktop device", {
-      publicMessage: "Desktop 기기를 등록하지 못했습니다.",
-      status: 500,
-      retryable: true,
-    });
-  }
-  return data;
-}
-
-async function issueDesktopTokens(input: {
-  userId: string;
-  deviceId: string;
-  now: Date;
-}): Promise<DesktopTokenPair> {
-  const accessToken = `krw_dt_${randomSecret(TOKEN_BYTES)}`;
-  const refreshToken = `krw_dr_${randomSecret(TOKEN_BYTES)}`;
-  const accessExpiresAt = new Date(
-    input.now.getTime() + ACCESS_TOKEN_TTL_MS,
-  ).toISOString();
-  const refreshExpiresAt = new Date(
-    input.now.getTime() + REFRESH_TOKEN_TTL_MS,
-  ).toISOString();
-
-  const [accessResult, refreshResult] = await Promise.all([
-    getSupabaseAdmin()
-      .from("desktop_access_tokens")
-      .insert({
-        device_id: input.deviceId,
-        user_id: input.userId,
-        token_hash: tokenHash(accessToken),
-        expires_at: accessExpiresAt,
-      }),
-    getSupabaseAdmin()
-      .from("desktop_refresh_tokens")
-      .insert({
-        device_id: input.deviceId,
-        user_id: input.userId,
-        token_hash: tokenHash(refreshToken),
-        expires_at: refreshExpiresAt,
-      }),
-  ]);
-
-  if (accessResult.error || refreshResult.error) {
-    throw new DesktopAuthError("Failed to issue desktop tokens", {
-      publicMessage: "Desktop 토큰을 발급하지 못했습니다.",
-      status: 500,
-      retryable: true,
-    });
-  }
-
-  return {
-    desktop_access_token: accessToken,
-    desktop_refresh_token: refreshToken,
-    expires_at: accessExpiresAt,
-    refresh_expires_at: refreshExpiresAt,
-  };
-}
-
-async function loadRefreshToken(refreshToken: string) {
-  const { data, error } = await getSupabaseAdmin()
-    .from("desktop_refresh_tokens")
-    .select(
-      "id, device_id, user_id, token_hash, status, expires_at, last_used_at, created_at, rotated_at, revoked_at",
-    )
-    .eq("token_hash", tokenHash(refreshToken))
-    .maybeSingle<DesktopRefreshTokenRow>();
-
-  if (error) {
-    throw new DesktopAuthError("Failed to load desktop refresh token", {
-      publicMessage: "Desktop 토큰을 확인하지 못했습니다.",
-      status: 500,
-      retryable: true,
-    });
-  }
-  return data ?? null;
-}
-
 async function loadActiveDevice(deviceId: string, userId: string) {
   const { data, error } = await getSupabaseAdmin()
     .from("desktop_devices")
     .select(
-      "id, user_id, device_name, platform, arch, app_version, protocol_version, status, last_seen_at, revoked_at, created_at, updated_at",
+      "id, user_id, device_name, installation_id, platform, arch, app_version, protocol_version, status, last_seen_at, revoked_at, created_at, updated_at",
     )
     .eq("id", deviceId)
     .eq("user_id", userId)
@@ -492,18 +410,6 @@ async function markLoginCode(
     .eq("id", id);
 }
 
-async function completeLoginCode(id: string, deviceId: string, now: Date) {
-  await getSupabaseAdmin()
-    .from("desktop_device_login_codes")
-    .update({
-      status: "complete",
-      device_id: deviceId,
-      consumed_at: now.toISOString(),
-      updated_at: now.toISOString(),
-    })
-    .eq("id", id);
-}
-
 async function expireAccessToken(id: string, now: Date) {
   await getSupabaseAdmin()
     .from("desktop_access_tokens")
@@ -512,6 +418,30 @@ async function expireAccessToken(id: string, now: Date) {
       revoked_at: now.toISOString(),
     })
     .eq("id", id);
+}
+
+async function loadDesktopUserEmail(userId: string): Promise<string | null> {
+  try {
+    const admin = getSupabaseAdmin();
+    const getUserById = admin.auth?.admin?.getUserById;
+    if (typeof getUserById !== "function") return null;
+    const { data, error } = await getUserById.call(admin.auth.admin, userId);
+    if (error) return null;
+    return data.user?.email ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function createDesktopTokenPair(now: Date): DesktopTokenPair {
+  return {
+    desktop_access_token: `krw_dt_${randomSecret(TOKEN_BYTES)}`,
+    desktop_refresh_token: `krw_dr_${randomSecret(TOKEN_BYTES)}`,
+    expires_at: new Date(now.getTime() + ACCESS_TOKEN_TTL_MS).toISOString(),
+    refresh_expires_at: new Date(
+      now.getTime() + REFRESH_TOKEN_TTL_MS,
+    ).toISOString(),
+  };
 }
 
 function randomSecret(bytes: number) {

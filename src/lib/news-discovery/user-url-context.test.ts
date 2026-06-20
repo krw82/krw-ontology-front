@@ -31,4 +31,12 @@ describe("user URL context safety helpers", () => {
     expect(isPrivateIpAddress("169.254.1.1")).toBe(true);
     expect(isPrivateIpAddress("8.8.8.8")).toBe(false);
   });
+
+  it("classifies IPv4-mapped private IPv6 addresses as private", () => {
+    expect(isPrivateIpAddress("::ffff:10.0.0.1")).toBe(true);
+    expect(isPrivateIpAddress("::ffff:100.64.0.1")).toBe(true);
+    expect(isPrivateIpAddress("::ffff:172.20.0.1")).toBe(true);
+    expect(isPrivateIpAddress("::ffff:192.0.2.10")).toBe(true);
+    expect(isPrivateIpAddress("::ffff:8.8.8.8")).toBe(false);
+  });
 });

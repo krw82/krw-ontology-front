@@ -66,6 +66,20 @@ set -a
 . "$ENV_PATH"
 set +a
 
+truthy_env() {
+  case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+falsey_env() {
+  case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
+    0|false|no|off) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # Keep this service at normal priority unless explicitly configured. A user
 # launchd service cannot raise priority with a negative nice value, and reusing
 # MAC_WORKER_NICE=-5 here makes bootstrap look successful while the process
@@ -74,6 +88,30 @@ STOCK_NEWS_MCP_NICE=${STOCK_NEWS_MCP_NICE:-0}
 MCP_SERVER_MAXFILES=${MCP_SERVER_MAXFILES:-4096}
 MCP_LOG_DIR=${MCP_LOG_DIR:-"$HOME/Library/Logs/krw-ontology"}
 STOCK_NEWS_MCP_PORT=${STOCK_NEWS_MCP_PORT:-8775}
+
+STOCK_NEWS_RUNTIME_ENABLED=1
+if truthy_env "${STOCK_NEWS_FORCE_DISABLED:-}" || falsey_env "${STOCK_NEWS_ENABLED:-}"; then
+  STOCK_NEWS_RUNTIME_ENABLED=0
+elif [ -z "${FINNHUB_API_KEY:-}" ]; then
+  if truthy_env "${STOCK_NEWS_ENABLED:-}"; then
+    echo "STOCK_NEWS_ENABLED=1 but FINNHUB_API_KEY is missing in $ENV_PATH" >&2
+    exit 1
+  fi
+  STOCK_NEWS_RUNTIME_ENABLED=0
+fi
+
+if [ "$STOCK_NEWS_RUNTIME_ENABLED" != "1" ]; then
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "Dry run: would disable Stock News MCP launchd service"
+    exit 0
+  fi
+
+  echo "Stock News MCP disabled; unloading launchd service if present."
+  launchctl bootout "$DOMAIN/com.krwontology.stock-news-mcp" >/dev/null 2>&1 || true
+  launchctl bootout "$DOMAIN" "$PLIST" >/dev/null 2>&1 || true
+  rm -f "$PLIST"
+  exit 0
+fi
 
 case "$STOCK_NEWS_MCP_NICE" in
   -[0-9]*|[0-9]*) ;;

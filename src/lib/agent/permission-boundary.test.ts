@@ -22,10 +22,13 @@ describe("agent permission boundary", () => {
   beforeEach(() => {
     delete process.env.STOCK_NEWS_ENABLED;
     delete process.env.STOCK_NEWS_FORCE_DISABLED;
+    delete process.env.FINNHUB_API_KEY;
     delete process.env.ZAI_API_KEY;
   });
 
-  it("allows Stock News MCP by default at the global MCP boundary", async () => {
+  it("allows Stock News MCP when Finnhub is configured at the global MCP boundary", async () => {
+    process.env.FINNHUB_API_KEY = "test-finnhub-key";
+
     for (const toolName of STOCK_NEWS_SDK_ALLOWED_TOOLS) {
       await expect(canUseTool(toolName)).resolves.toEqual({
         behavior: "allow",
@@ -34,7 +37,16 @@ describe("agent permission boundary", () => {
     }
   });
 
+  it("denies Stock News MCP when Finnhub is missing", async () => {
+    for (const toolName of STOCK_NEWS_SDK_ALLOWED_TOOLS) {
+      await expect(canUseTool(toolName)).resolves.toMatchObject({
+        behavior: "deny",
+      });
+    }
+  });
+
   it("denies Stock News MCP when explicitly disabled", async () => {
+    process.env.FINNHUB_API_KEY = "test-finnhub-key";
     process.env.STOCK_NEWS_FORCE_DISABLED = "1";
 
     for (const toolName of STOCK_NEWS_SDK_ALLOWED_TOOLS) {

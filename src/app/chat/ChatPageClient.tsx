@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -30,10 +31,16 @@ import { normalizeTicker } from "@/lib/ontology/ticker";
 import type {
   CreateSessionRequest,
   CreateSessionResponse,
+  UserCompanyNotebook,
   UserCompanyMark,
 } from "@/types/api-contracts";
+import type { EntitlementStatus } from "@/types/entitlement";
 
 const DRAFT_MESSAGE_STORAGE_PREFIX = "krw:chat-draft-message:";
+const ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV =
+  process.env.NODE_ENV === "development";
+const ALWAYS_SHOW_CREDIT_LIMIT_CARD_IN_DEV =
+  process.env.NODE_ENV === "development";
 
 type DraftMessagePayload = {
   content: string;
@@ -112,6 +119,81 @@ function sanitizeError(message: string): string {
   }
   if (cleaned.length > 200) return cleaned.slice(0, 200) + "...";
   return cleaned;
+}
+
+function isCreditLimitErrorMessage(message: string | null | undefined): boolean {
+  if (!message) return false;
+  return /크레딧|credit|한도|quota/i.test(message);
+}
+
+function formatCreditResetTime(entitlement: EntitlementStatus | null): string {
+  const rawResetTime =
+    entitlement?.usage.resets_at || entitlement?.usage.period_end || "";
+  const resetTime = new Date(rawResetTime);
+  if (Number.isNaN(resetTime.getTime())) return "다음 주간 충전 시점";
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(resetTime);
+}
+
+function CreditLimitErrorCard({
+  entitlement,
+}: {
+  entitlement: EntitlementStatus | null;
+}) {
+  const resetLabel = formatCreditResetTime(entitlement);
+  const billingHref = entitlement?.upgrade.href || "/settings/billing";
+
+  return (
+    <div
+      className="overflow-hidden rounded-[8px] border border-hairline bg-canvas shadow-[0_18px_48px_rgba(10,11,13,0.08)]"
+      role="alert"
+    >
+      <div className="h-1 bg-primary" aria-hidden="true" />
+      <div className="p-base sm:p-lg">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="w-full min-w-0 flex-1 [overflow-wrap:normal]">
+            <p className="font-mono text-[11px] font-black uppercase tracking-[0.16em] text-primary">
+              WEEKLY LIMIT
+            </p>
+            <h3 className="mt-2 text-[20px] font-black leading-7 text-ink sm:text-[22px]">
+              주간 분석 한도를 모두 사용했습니다.
+            </h3>
+            <p className="mt-2 w-full max-w-none break-normal text-[14px] font-semibold leading-6 text-body [overflow-wrap:normal] [word-break:keep-all] sm:max-w-xl sm:text-[15px]">
+              다음 충전 전까지 새 분석은 시작할 수 없습니다. 기존 리서치와
+              노트북은 계속 볼 수 있습니다.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-base grid gap-2 border-t border-hairline pt-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+          <div>
+            <p className="font-mono text-[11px] font-black uppercase tracking-[0.14em] text-muted">
+              다음 충전
+            </p>
+            <p className="mt-1 text-[15px] font-black leading-5 text-ink">
+              {resetLabel}
+            </p>
+          </div>
+          <Link
+            href={billingHref}
+            className="inline-flex h-11 items-center justify-center gap-1 rounded-[8px] bg-surface-dark px-sm text-[14px] font-extrabold text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+          >
+            업그레이드 플랜 보기
+            <span
+              aria-hidden="true"
+              className="material-symbols-outlined text-[18px]"
+            >
+              arrow_forward
+            </span>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 type CompaniesResponse = {
@@ -364,11 +446,23 @@ function ChatContent() {
 
   const isHydratingSession = Boolean(sessionId && chat.isHydratingSession);
   const isBudgetBlocked = entitlement?.usage.can_run === false;
+  const isCreditLimitError = isCreditLimitErrorMessage(chat.error);
+  const shouldPreviewCreditLimitCard =
+    ALWAYS_SHOW_CREDIT_LIMIT_CARD_IN_DEV && !chat.error;
+  const shouldShowCreditLimitCard =
+    isCreditLimitError || shouldPreviewCreditLimitCard;
+  const shouldShowChatError = Boolean(chat.error) || shouldPreviewCreditLimitCard;
   const hasConversationContent =
     chat.messages.length > 0 ||
     Boolean(chat.streamingContent) ||
     isActiveRun ||
     Boolean(chat.error);
+  const hasCompletedAssistantAnswer = chat.messages.some(
+    (message) =>
+      message.role === "assistant" &&
+      message.status === "completed" &&
+      message.content.trim().length > 0,
+  );
   const streamingTransition = {
     duration: 0.14,
     ease: [0.16, 1, 0.3, 1] as const,
@@ -869,7 +963,13 @@ function ChatContent() {
         mobileCollapsed={mobileHeaderHidden}
         actionSlot={
           headerActionTicker ? (
-            <ChatWatchlistHeaderActions ticker={headerActionTicker} />
+            <ChatWatchlistHeaderActions
+              ticker={headerActionTicker}
+              showNotebookOnboarding={
+                ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV ||
+                hasCompletedAssistantAnswer
+              }
+            />
           ) : null
         }
       />
@@ -1044,9 +1144,13 @@ function ChatContent() {
                     />
                   </motion.div>
                 )}
-                {chat.error && (
+                {shouldShowChatError && (
                   <motion.div
-                    key="chat-error"
+                    key={
+                      shouldPreviewCreditLimitCard
+                        ? "credit-limit-preview"
+                        : "chat-error"
+                    }
                     initial={{ opacity: 0, y: streamingTransition.y }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -streamingTransition.y }}
@@ -1057,18 +1161,22 @@ function ChatContent() {
                   >
                     <div className="flex w-full flex-col">
                       <div className="pl-0 sm:pl-[48px]">
-                        <div
-                          className="rounded-[8px] border border-error/20 bg-error-container/10 p-base text-[15px] leading-[1.5] text-error sm:p-lg sm:text-[16px]"
-                          role="alert"
-                        >
-                          <span
-                            aria-hidden="true"
-                            className="material-symbols-outlined mr-xs text-[18px] align-middle"
+                        {shouldShowCreditLimitCard ? (
+                          <CreditLimitErrorCard entitlement={entitlement} />
+                        ) : (
+                          <div
+                            className="rounded-[8px] border border-error/20 bg-error-container/10 p-base text-[15px] leading-[1.5] text-error sm:p-lg sm:text-[16px]"
+                            role="alert"
                           >
-                            error
-                          </span>
-                          {sanitizeError(chat.error)}
-                        </div>
+                            <span
+                              aria-hidden="true"
+                              className="material-symbols-outlined mr-xs text-[18px] align-middle"
+                            >
+                              error
+                            </span>
+                            {sanitizeError(chat.error ?? "")}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </motion.div>
@@ -1141,7 +1249,7 @@ function ChatContent() {
             </div>
           </div>
 
-          {isBudgetBlocked && entitlement && (
+          {isBudgetBlocked && entitlement && !shouldShowCreditLimitCard && (
             <div className="border-t border-hairline bg-canvas px-base py-sm sm:px-lg">
               <div className="mx-auto max-w-4xl rounded-[8px] border border-error/20 bg-error-container/10 px-base py-sm text-[13px] font-semibold leading-5 text-error">
                 <span
@@ -1196,7 +1304,7 @@ function ChatContent() {
                 effectiveSessionError
                   ? "인덱스에 있는 회사만 채팅할 수 있습니다."
                   : isBudgetBlocked
-                  ? "분석 크레딧을 모두 사용했습니다."
+                  ? "주간 분석 한도에 도달했습니다."
                   : "기업에 대해 질문하세요..."
               }
               toolCalls={chat.toolCalls}
@@ -1273,9 +1381,19 @@ function ChatContent() {
   );
 }
 
-function ChatWatchlistHeaderActions({ ticker }: { ticker: string }) {
+function ChatWatchlistHeaderActions({
+  ticker,
+  showNotebookOnboarding,
+}: {
+  ticker: string;
+  showNotebookOnboarding: boolean;
+}) {
   const normalizedTicker = normalizeTicker(ticker);
   const [mark, setMark] = useState<UserCompanyMark | null>(null);
+  const [notebookUsage, setNotebookUsage] = useState<{
+    ticker: string;
+    hasBeenUsed: boolean;
+  } | null>(null);
   const [pendingAction, setPendingAction] = useState<"watchlist" | "holding" | null>(
     null,
   );
@@ -1307,6 +1425,50 @@ function ChatWatchlistHeaderActions({ ticker }: { ticker: string }) {
     };
   }, [normalizedTicker]);
 
+  useEffect(() => {
+    if (
+      !normalizedTicker ||
+      !showNotebookOnboarding ||
+      ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV
+    ) {
+      return;
+    }
+
+    let stale = false;
+    const tickerForRequest = normalizedTicker;
+
+    async function loadNotebookUsage() {
+      try {
+        const response = await fetch(
+          `/api/watchlist/${encodeURIComponent(tickerForRequest)}/notebook`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) return;
+        const payload = (await response.json()) as {
+          notebook?: UserCompanyNotebook;
+        };
+        if (!stale) {
+          setNotebookUsage({
+            ticker: tickerForRequest,
+            hasBeenUsed: Boolean(payload.notebook?.updated_at),
+          });
+        }
+      } catch {
+        if (!stale) {
+          setNotebookUsage({
+            ticker: tickerForRequest,
+            hasBeenUsed: false,
+          });
+        }
+      }
+    }
+
+    void loadNotebookUsage();
+    return () => {
+      stale = true;
+    };
+  }, [normalizedTicker, showNotebookOnboarding]);
+
   if (!normalizedTicker) return null;
 
   async function saveMark(action: "watchlist" | "holding") {
@@ -1334,8 +1496,15 @@ function ChatWatchlistHeaderActions({ ticker }: { ticker: string }) {
     }
   }
 
+  const notebookHasBeenUsed =
+    notebookUsage?.ticker === normalizedTicker ? notebookUsage.hasBeenUsed : null;
+  const shouldShowNotebookHint =
+    showNotebookOnboarding &&
+    (ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV || notebookHasBeenUsed === false);
+  const hasSavedMark = Boolean(mark?.is_watchlisted || mark?.is_holding);
+
   return (
-    <div className="flex items-center gap-1">
+    <div className="relative flex items-center gap-1">
       <ChatHeaderMarkButton
         active={Boolean(mark?.is_watchlisted)}
         disabled={pendingAction !== null}
@@ -1350,6 +1519,22 @@ function ChatWatchlistHeaderActions({ ticker }: { ticker: string }) {
         label={pendingAction === "holding" ? "저장" : "보유"}
         onClick={() => void saveMark("holding")}
       />
+      {shouldShowNotebookHint ? (
+        <div
+          className="absolute right-0 top-[calc(100%+8px)] z-30 inline-flex max-w-[calc(100vw-32px)] items-center rounded-[8px] border border-primary/25 bg-canvas px-3 py-2 text-left shadow-[0_12px_28px_rgba(15,23,42,0.16)]"
+          role="status"
+        >
+          <span
+            aria-hidden="true"
+            className="absolute right-9 top-[-5px] h-2.5 w-2.5 rotate-45 border-l border-t border-primary/25 bg-canvas"
+          />
+          <p className="min-w-0 whitespace-nowrap text-[12px] font-extrabold leading-5 text-ink">
+            {hasSavedMark
+              ? "이 리서치를 노트북에 남기세요"
+              : "저장하고 노트북에서 이어가세요"}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

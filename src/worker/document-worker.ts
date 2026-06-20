@@ -17,16 +17,15 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
       return;
     }
 
-    let timeout: NodeJS.Timeout;
-    const stop = () => {
+    function stop() {
       clearTimeout(timeout);
       resolve();
-    };
-    const finish = () => {
+    }
+    function finish() {
       signal.removeEventListener("abort", stop);
       resolve();
-    };
-    timeout = setTimeout(finish, ms);
+    }
+    const timeout = setTimeout(finish, ms);
     signal.addEventListener("abort", stop, { once: true });
   });
 }

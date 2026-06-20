@@ -75,6 +75,14 @@ export interface GenerateResearchNotebookInput {
   basisPeriod: string | null;
   existingNotebookMd: string;
   recentConversations: NotebookConversationInput[];
+  onUsage?: (usage: NotebookAgentUsage) => void;
+}
+
+export interface NotebookAgentUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheHitInputTokens: number;
+  cacheMissInputTokens: number;
 }
 
 export async function listRecentTickerNotebookConversations(
@@ -187,7 +195,7 @@ export async function generateResearchNotebookMarkdown(
     JSON.stringify(promptPayload, null, 2),
   ].join("\n");
 
-  const markdown = await runNotebookAgent(prompt);
+  const markdown = await runNotebookAgent(prompt, input.onUsage);
 
   return normalizeNotebookMarkdown(markdown, ticker).slice(0, NOTEBOOK_MAX_LENGTH);
 }
@@ -236,7 +244,7 @@ export async function generateResearchNotebookOpenQuestions(
     JSON.stringify(promptPayload, null, 2),
   ].join("\n");
 
-  const result = await runNotebookAgent(prompt);
+  const result = await runNotebookAgent(prompt, input.onUsage);
   return parseQuestionArray(result).slice(0, OPEN_QUESTION_MAX_COUNT);
 }
 
@@ -337,7 +345,10 @@ function buildNotebookTemplate(): string {
   ].join("\n");
 }
 
-async function runNotebookAgent(prompt: string): Promise<string> {
+async function runNotebookAgent(
+  prompt: string,
+  onUsage?: (usage: NotebookAgentUsage) => void,
+): Promise<string> {
   const cwd = await resolveNotebookAgentCwd();
   const pluginPath = getKrwOntologyPluginPath();
   const sdkOptions: Options = {
@@ -391,6 +402,8 @@ async function runNotebookAgent(prompt: string): Promise<string> {
   const sdkQuery = query({ prompt, options: sdkOptions });
   for await (const message of sdkQuery) {
     if (message.type === "result") {
+      const usage = usageFromSdkMessage(message);
+      if (hasUsage(usage)) onUsage?.(usage);
       if (message.subtype === "success") {
         if (!output.trim() && typeof message.result === "string") {
           output = message.result;
@@ -653,4 +666,77 @@ function normalizeQuestionKey(value: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function usageFromSdkMessage(message: SDKMessage): NotebookAgentUsage {
+  if (message.type !== "result") {
+    return emptyNotebookAgentUsage();
+  }
+
+  const recordMessage = message as Record<string, unknown>;
+  const usage = isRecord(recordMessage.usage) ? recordMessage.usage : {};
+  const modelUsage = isRecord(recordMessage.modelUsage)
+    ? recordMessage.modelUsage
+    : {};
+  const inputTokens =
+    numberValue(usage.input_tokens) ??
+    numberValue(usage.inputTokens) ??
+    sumModelUsage(modelUsage, "inputTokens");
+  const outputTokens =
+    numberValue(usage.output_tokens) ??
+    numberValue(usage.outputTokens) ??
+    sumModelUsage(modelUsage, "outputTokens");
+  const cacheHitInputTokens =
+    numberValue(usage.prompt_cache_hit_tokens) ??
+    numberValue(usage.promptCacheHitTokens) ??
+    sumModelUsage(modelUsage, "cacheHitInputTokens");
+  const cacheMissInputTokens =
+    numberValue(usage.prompt_cache_miss_tokens) ??
+    numberValue(usage.promptCacheMissTokens) ??
+    sumModelUsage(modelUsage, "cacheMissInputTokens");
+
+  return {
+    inputTokens: inputTokens ?? 0,
+    outputTokens: outputTokens ?? 0,
+    cacheHitInputTokens: cacheHitInputTokens ?? 0,
+    cacheMissInputTokens: cacheMissInputTokens ?? 0,
+  };
+}
+
+function emptyNotebookAgentUsage(): NotebookAgentUsage {
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheHitInputTokens: 0,
+    cacheMissInputTokens: 0,
+  };
+}
+
+function hasUsage(usage: NotebookAgentUsage): boolean {
+  return (
+    usage.inputTokens > 0 ||
+    usage.outputTokens > 0 ||
+    usage.cacheHitInputTokens > 0 ||
+    usage.cacheMissInputTokens > 0
+  );
+}
+
+function sumModelUsage(
+  modelUsage: Record<string, unknown>,
+  field:
+    | "inputTokens"
+    | "outputTokens"
+    | "cacheHitInputTokens"
+    | "cacheMissInputTokens",
+): number {
+  return Object.values(modelUsage).reduce<number>((sum, value) => {
+    if (!isRecord(value)) return sum;
+    return sum + (numberValue(value[field]) ?? 0);
+  }, 0);
+}
+
+function numberValue(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.floor(value))
+    : null;
 }

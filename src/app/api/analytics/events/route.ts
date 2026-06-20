@@ -1,8 +1,17 @@
 import type { NextRequest } from "next/server";
 import { isAnalyticsEventName } from "@/lib/analytics/events";
 import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
+import {
+  checkDurableRateLimits,
+  readPositiveIntEnv,
+} from "@/lib/api/rate-limit";
+import { getClientIp } from "@/lib/http/client-ip";
 
 export const runtime = "nodejs";
+
+const DEFAULT_ANALYTICS_EVENTS_PER_IP_PER_MINUTE = 60;
+const DEFAULT_ANALYTICS_EVENTS_PER_ANON_PER_MINUTE = 120;
+const MAX_ANONYMOUS_ID_LENGTH = 128;
 
 function errorResponse(status: number, code: string, message: string) {
   return Response.json({ error: { code, message } }, { status });
@@ -28,18 +37,42 @@ export async function POST(request: NextRequest) {
   }
 
   const properties = isRecord(body.properties) ? body.properties : {};
+  const anonymousId = normalizeAnonymousId(body.anonymous_id);
+  const rateLimit = await checkDurableRateLimits([
+    {
+      key: `ip:${getClientIp(request.headers)}`,
+      bucket: "analytics_event:ip:minute",
+      limit: readPositiveIntEnv(
+        "ANALYTICS_EVENTS_PER_IP_PER_MINUTE",
+        DEFAULT_ANALYTICS_EVENTS_PER_IP_PER_MINUTE,
+      ),
+    },
+    ...(anonymousId
+      ? [
+          {
+            key: `anon:${anonymousId}`,
+            bucket: "analytics_event:anon:minute",
+            limit: readPositiveIntEnv(
+              "ANALYTICS_EVENTS_PER_ANONYMOUS_ID_PER_MINUTE",
+              DEFAULT_ANALYTICS_EVENTS_PER_ANON_PER_MINUTE,
+            ),
+          },
+        ]
+      : []),
+  ]);
+  if (!rateLimit.ok) return rateLimitResponse(rateLimit);
 
   const result = await recordAnalyticsEventFromRequest(request, {
     eventName: body.event_name,
     userId: null,
-    anonymousId: typeof body.anonymous_id === "string" ? body.anonymous_id : null,
+    anonymousId,
     properties,
     path: typeof body.path === "string" ? body.path : null,
     referrer: typeof body.referrer === "string" ? body.referrer : null,
     utm: isRecord(body.utm) ? normalizeUtmBody(body.utm) : null,
-    sessionId: typeof body.session_id === "string" ? body.session_id : null,
-    messageId: typeof body.message_id === "string" ? body.message_id : null,
-    runId: typeof body.run_id === "string" ? body.run_id : null,
+    sessionId: null,
+    messageId: null,
+    runId: null,
   });
 
   if (!result.ok) {
@@ -55,8 +88,33 @@ export async function POST(request: NextRequest) {
   return Response.json({ ok: true });
 }
 
+function rateLimitResponse(result: Exclude<Awaited<ReturnType<typeof checkDurableRateLimits>>, { ok: true }>) {
+  const headers =
+    result.retryAfterSeconds === undefined
+      ? undefined
+      : { "Retry-After": String(result.retryAfterSeconds) };
+  return Response.json(
+    {
+      error: {
+        code: result.code,
+        message:
+          result.status === 429
+            ? "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."
+            : "요청 제한 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.",
+      },
+    },
+    { status: result.status, headers },
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeAnonymousId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized ? normalized.slice(0, MAX_ANONYMOUS_ID_LENGTH) : null;
 }
 
 function normalizeUtmBody(value: Record<string, unknown>) {

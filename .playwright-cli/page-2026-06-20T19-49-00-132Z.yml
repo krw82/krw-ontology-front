@@ -1,0 +1,11 @@
+- generic [active] [ref=e1]:
+  - link "메인 콘텐츠로 이동" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - main [ref=e4]:
+    - generic [ref=e5]:
+      - link "KRW Ontology 홈" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e9]: KRW Ontology
+      - heading "Desktop 연결 불가" [level=1] [ref=e10]
+      - paragraph [ref=e11]: Desktop 로그인 요청이 없습니다.
+  - alert [ref=e12]

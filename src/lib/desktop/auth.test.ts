@@ -23,8 +23,11 @@ import type { EntitlementStatus } from "@/types/entitlement";
 
 const ORIGINAL_ENV = { ...process.env };
 
-function request(headers: Record<string, string> = {}) {
-  return new Request("http://localhost/api/desktop/ontology/tool-call", {
+function request(
+  headers: Record<string, string> = {},
+  url = "http://localhost/api/desktop/ontology/tool-call",
+) {
+  return new Request(url, {
     headers,
   });
 }
@@ -92,6 +95,7 @@ describe("Desktop auth", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     process.env = { ...ORIGINAL_ENV };
   });
 
@@ -119,6 +123,28 @@ describe("Desktop auth", () => {
       deviceId: "device-1",
       authMethod: "dev_token",
     });
+    expect(getSupabaseAdmin).not.toHaveBeenCalled();
+  });
+
+  it("does not accept the dev token on production public hosts", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    process.env.KRW_DESKTOP_DEV_TOKEN = "dev-token";
+
+    await expect(
+      authenticateDesktopRequest(
+        request(
+          {
+            authorization: "Bearer dev-token",
+            host: "app.example.com",
+          },
+          "https://app.example.com/api/desktop/ontology/tool-call",
+        ),
+      ),
+    ).rejects.toMatchObject({
+      name: "DesktopAuthError",
+      status: 401,
+    });
+    expect(authenticateDesktopAccessToken).not.toHaveBeenCalled();
     expect(getSupabaseAdmin).not.toHaveBeenCalled();
   });
 

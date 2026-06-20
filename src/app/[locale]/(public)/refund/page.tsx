@@ -21,6 +21,7 @@ const refundCopy = {
     paragraphs: [
       "KRW Ontology는 월 단위로 과금되는 정기구독형 온라인 리서치 및 데이터 분석 서비스입니다.",
       "회원은 언제든지 구독을 해지할 수 있으며, 구독 해지 시 다음 결제일부터 자동결제가 중단됩니다. 이미 결제된 이용기간은 해당 기간 종료일까지 서비스 이용이 가능합니다.",
+      "상위 플랜으로 즉시 변경하는 경우 남은 결제기간에 해당하는 월 구독료 차액만 결제합니다. 하위 플랜 변경은 다음 월 결제일부터 적용됩니다.",
       "결제 후 7일 이내이고 유료 기능 사용 이력이 없는 경우 전액 환불합니다.",
       "다만 유료 리서치 조회, 데이터 검색, 분석 결과 생성, 다운로드, API 사용 등 유료 서비스 이용이 개시된 경우에는 디지털 콘텐츠 및 온라인 서비스 특성상 해당 결제 건의 환불이 제한될 수 있습니다.",
       "중복 결제, 오결제, 시스템 장애, 회사 귀책사유로 정상적인 서비스 이용이 불가능한 경우에는 확인 후 전액 또는 잔여기간 기준으로 환불합니다.",
@@ -37,7 +38,8 @@ const refundCopy = {
     paragraphs: [
       "KRW Ontology is a monthly subscription-based online research and data analysis service.",
       "Members may cancel their subscription at any time. When a subscription is cancelled, automatic billing stops from the next billing date. The service remains available until the end of the already paid billing period.",
-      "A full refund is available if the payment was made within the last 7 days and there is no usage history of paid features.",
+      "Immediate upgrades charge only the prorated monthly price difference for the remaining billing period. Downgrades take effect from the next monthly billing date.",
+      "A full refund is available if the payment was made within the last 7 days and there is no paid feature usage history.",
       "However, once paid service usage has started, including paid research views, data searches, analysis result generation, downloads, or API usage, refunds for that payment may be restricted due to the nature of digital content and online services.",
       "If duplicate billing, incorrect billing, system failures, or causes attributable to the company prevent normal service use, KRW Ontology will review the case and provide a full refund or a refund based on the remaining period.",
       "Refund requests may be submitted through the customer support email or in-service inquiry feature. Approved refunds are processed by cancelling the original payment method.",

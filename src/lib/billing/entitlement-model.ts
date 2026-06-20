@@ -5,6 +5,7 @@ import {
   getBillingPlan,
   type BillingPlan,
 } from "./plans";
+import { rawCreditsToDisplayCredits } from "./credit-policy";
 import type { BillingPeriod } from "./period";
 import type {
   EntitlementAccessStatus,
@@ -21,6 +22,12 @@ export interface EntitlementUsageInput {
   runCount: number;
   period: BillingPeriod;
   status?: EntitlementAccessStatus;
+  creditsUsedRaw?: number;
+  creditsReservedRaw?: number;
+  creditsLimitRaw?: number;
+  creditRunCount?: number;
+  creditPolicyVersion?: string;
+  creditEnforcementMode?: "shadow" | "soft_warning" | "enforced";
 }
 
 function clampUsage(value: number): number {
@@ -43,45 +50,62 @@ function remainingCredits(budgetUsd: number): number {
   return budgetUsdToAnalysisCredits(budgetUsd, "floor");
 }
 
-function featureEnabled(plan: BillingPlan, feature: string): boolean {
-  if (plan.key === "internal") return true;
-  if (feature === "company_compare") {
-    return plan.key === "pro" || plan.key === "power" || plan.key === "beta";
-  }
-  if (feature === "priority_queue") {
-    return plan.key === "power" || plan.key === "beta";
-  }
-  return true;
-}
-
 function upgradeCopy(
   percentUsed: number,
   usageLabel: string,
+  planKey: EntitlementPlanKey,
   status: EntitlementAccessStatus,
 ) {
   if (status === "admin") {
     return {
       enabled: false,
       title: "관리자 계정입니다.",
-      message: "분석 크레딧 한도가 적용되지 않습니다.",
+      message: "주간 분석 한도가 적용되지 않습니다.",
       label: "플랜 확인",
+    };
+  }
+
+  if (planKey === "standard" || planKey === "pro") {
+    if (percentUsed >= 100) {
+      return {
+        enabled: false,
+        title: `${usageLabel} 분석 한도를 모두 사용했습니다.`,
+        message: "다음 충전 후 새 분석을 다시 실행할 수 있습니다.",
+        label: "사용량 확인",
+      };
+    }
+
+    if (percentUsed >= 90) {
+      return {
+        enabled: false,
+        title: `${usageLabel} 분석량이 거의 찼습니다.`,
+        message: "다음 충전 시각을 확인하세요.",
+        label: "사용량 확인",
+      };
+    }
+
+    return {
+      enabled: false,
+      title: "현재 플랜으로 사용할 수 있습니다.",
+      message: "사용량이 안정 범위 안에 있습니다.",
+      label: "사용량 확인",
     };
   }
 
   if (percentUsed >= 100) {
     return {
       enabled: true,
-      title: `${usageLabel} 분석 크레딧을 모두 사용했습니다.`,
-      message: "플랜을 올리면 더 많은 기업 리서치를 계속 실행할 수 있습니다.",
-      label: "플랜 확인",
+      title: `${usageLabel} 무료 사용량을 모두 사용했습니다.`,
+      message: "Standard로 업그레이드하면 더 넉넉한 주간 분석량을 사용할 수 있습니다.",
+      label: "Standard 보기",
     };
   }
 
   if (percentUsed >= 80) {
     return {
       enabled: true,
-      title: `${usageLabel} 분석 크레딧 한도에 가까워졌습니다.`,
-      message: "남은 크레딧을 확인하고 필요한 경우 상위 플랜을 준비하세요.",
+      title: `${usageLabel} 무료 사용량이 거의 찼습니다.`,
+      message: "Standard로 업그레이드하면 더 넉넉한 주간 분석량을 사용할 수 있습니다.",
       label: "플랜 확인",
     };
   }
@@ -104,6 +128,12 @@ export function buildEntitlementStatus({
   runCount,
   period,
   status,
+  creditsUsedRaw,
+  creditsReservedRaw,
+  creditsLimitRaw,
+  creditRunCount,
+  creditPolicyVersion,
+  creditEnforcementMode = "shadow",
 }: EntitlementUsageInput): EntitlementStatus {
   const plan = providedPlan ?? getBillingPlan(planKey);
   const used = roundUsd(budgetUsedUsd);
@@ -120,32 +150,43 @@ export function buildEntitlementStatus({
     ? Number.MAX_SAFE_INTEGER
     : Math.max(0.01, getEffectiveDailyBudgetUsd(plan));
   const effectiveBudgetUsed = used + reserved;
-  const effectiveDailyBudgetUsed = dailyUsed + dailyReserved;
+  const rawLimit = unlimited
+    ? Number.MAX_SAFE_INTEGER
+    : Math.max(0, Math.floor(clampUsage(creditsLimitRaw ?? plan.weeklyAnalysisCreditsRaw)));
+  const rawUsed = unlimited ? 0 : Math.floor(clampUsage(creditsUsedRaw ?? 0));
+  const rawReserved = unlimited
+    ? 0
+    : Math.floor(clampUsage(creditsReservedRaw ?? 0));
+  const rawRemaining = unlimited
+    ? Number.MAX_SAFE_INTEGER
+    : Math.max(0, rawLimit - rawUsed - rawReserved);
   const remaining = unlimited
     ? Number.MAX_SAFE_INTEGER
     : roundUsd(Math.max(0, budgetLimit - effectiveBudgetUsed));
-  const dailyRemaining = unlimited
-    ? Number.MAX_SAFE_INTEGER
-    : roundUsd(Math.max(0, dailyBudgetLimit - effectiveDailyBudgetUsed));
   const percentUsed = unlimited
     ? 0
-    : Math.min(100, Math.round((effectiveBudgetUsed / budgetLimit) * 100));
+    : rawLimit > 0
+      ? Math.min(100, Math.round(((rawUsed + rawReserved) / rawLimit) * 100))
+      : 100;
   const canRun =
     unlimited ||
-    (remainingCredits(remaining) > 0 && remainingCredits(dailyRemaining) > 0);
+    rawRemaining > 0;
   const alertLevel =
     !unlimited && !canRun
       ? "blocked"
-      : !unlimited && percentUsed >= 80
+      : !unlimited && percentUsed >= 90
         ? "warning"
         : "ok";
-  const upgrade = upgradeCopy(percentUsed, period.label, accessStatus);
+  const upgrade = upgradeCopy(percentUsed, period.label, plan.key, accessStatus);
   const analysisCreditLimit = unlimited
     ? Number.MAX_SAFE_INTEGER
-    : plan.monthlyAnalysisCredits;
+    : creditLimit(budgetLimit);
   const dailyAnalysisCreditLimit = unlimited
     ? Number.MAX_SAFE_INTEGER
-    : (plan.dailyAnalysisCredits ?? creditLimit(dailyBudgetLimit));
+    : creditLimit(dailyBudgetLimit);
+  const effectiveRunCount = Math.floor(
+    clampUsage(creditRunCount ?? runCount),
+  );
 
   return {
     status: accessStatus,
@@ -168,12 +209,22 @@ export function buildEntitlementStatus({
       daily_budget_reserved_usd: dailyReserved,
       daily_budget_limit_usd: dailyBudgetLimit,
       per_run_reserve_usd: plan.perRunReserveUsd,
+      credits_used_raw: rawUsed,
+      credits_reserved_raw: rawReserved,
+      credits_limit_raw: rawLimit,
+      credits_remaining_raw: rawRemaining,
+      credits_used_display: rawCreditsToDisplayCredits(rawUsed),
+      credits_reserved_display: rawCreditsToDisplayCredits(rawReserved),
+      credits_limit_display: rawCreditsToDisplayCredits(rawLimit),
+      credits_remaining_display: rawCreditsToDisplayCredits(rawRemaining),
+      credit_policy_version: creditPolicyVersion ?? plan.creditPolicyVersion,
+      credit_enforcement_mode: creditEnforcementMode,
       analysis_credits_used: unlimited
         ? 0
-        : usedCredits(used),
+        : Math.min(usedCredits(used), analysisCreditLimit),
       analysis_credits_reserved: unlimited
         ? 0
-        : usedCredits(reserved),
+        : Math.min(usedCredits(reserved), analysisCreditLimit),
       analysis_credits_limit: analysisCreditLimit,
       remaining_analysis_credits: unlimited
         ? Number.MAX_SAFE_INTEGER
@@ -188,7 +239,7 @@ export function buildEntitlementStatus({
       per_run_analysis_credits: unlimited
         ? 0
         : budgetUsdToAnalysisCredits(plan.perRunReserveUsd, "ceil"),
-      run_count: Math.floor(clampUsage(runCount)),
+      run_count: effectiveRunCount,
       percent_used: percentUsed,
       alert_level: alertLevel,
       can_run: canRun,
@@ -224,13 +275,13 @@ export function buildEntitlementStatus({
         key: "company_compare",
         label: "기업 비교",
         description: "여러 기업을 같은 기준으로 비교하는 분석",
-        enabled: featureEnabled(plan, "company_compare"),
+        enabled: true,
       },
       {
         key: "priority_queue",
         label: "우선 분석 큐",
-        description: "혼잡 시간대에 리서치 작업을 우선 처리",
-        enabled: featureEnabled(plan, "priority_queue"),
+        description: "플랜과 사용량 상태에 따라 작업 처리 순서를 조정",
+        enabled: true,
       },
     ],
     upgrade: {

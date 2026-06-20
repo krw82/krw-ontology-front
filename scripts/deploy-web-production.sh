@@ -139,7 +139,7 @@ ln -s ../krw-ontology "\$REMOTE_FRONT_DIR/krw-ontology"
 
 chmod +x "\$REMOTE_FRONT_DIR/scripts/deploy-vm-compose.sh"
 cd "\$REMOTE_FRONT_DIR"
-KRW_ONTOLOGY_SOURCE_DIR="\$REMOTE_ONTOLOGY_DIR" scripts/deploy-vm-compose.sh web
+KRW_ONTOLOGY_SOURCE_DIR="\$REMOTE_ONTOLOGY_DIR" scripts/deploy-vm-compose.sh reverse-proxy web llm-gateway document-worker billing-worker
 docker compose --project-name krw-ontology-front --env-file .env ps
 EOF
 )

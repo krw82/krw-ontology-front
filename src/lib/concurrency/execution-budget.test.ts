@@ -89,7 +89,7 @@ describe("execution budget", () => {
     expect(getResearchModeReserveCostUsd("deep")).toBe(0.5);
   });
 
-  it("allows runs when any execution budget remains", async () => {
+  it("allows runs when entitlement credits allow the run", async () => {
     vi.mocked(getEntitlementStatus).mockResolvedValue(
       entitlement({
         budget_used_usd: 19.9,
@@ -105,7 +105,7 @@ describe("execution budget", () => {
     expect(result.reason).toBeUndefined();
   });
 
-  it("blocks runs when no execution budget remains", async () => {
+  it("blocks runs when entitlement credits are exhausted", async () => {
     vi.mocked(getEntitlementStatus).mockResolvedValue(
       entitlement({
         budget_used_usd: 20,
@@ -153,11 +153,38 @@ describe("execution budget", () => {
       expect.objectContaining({
         p_user_id: "user-1",
         p_request_id: "req-1",
-        p_monthly_budget_usd: 20,
-        p_daily_budget_usd: 20,
+        p_monthly_budget_usd: 0.182,
+        p_daily_budget_usd: 0.182,
         p_reserve_cost_usd: 0.5,
       }),
     );
+  });
+
+  it("does not let the legacy execution budget block raw-credit runs", async () => {
+    vi.mocked(getEntitlementStatus).mockResolvedValue(entitlement());
+    const rpc = vi.fn().mockResolvedValue({
+      data: [
+        {
+          allowed: false,
+          reason: "monthly_budget_exceeded",
+          reservation_id: null,
+          monthly_used_usd: 20,
+          monthly_reserved_usd: 0,
+          monthly_limit_usd: 20,
+          daily_used_usd: 20,
+          daily_reserved_usd: 0,
+          daily_limit_usd: 20,
+        },
+      ],
+      error: null,
+    });
+    vi.mocked(getSupabaseAdmin).mockReturnValue({ rpc } as never);
+
+    const result = await reserveExecutionBudget("user-1", "req-1", null, "deep");
+
+    expect(result.allowed).toBe(true);
+    expect(result.reason).toBeUndefined();
+    expect(result.reservationId).toBeNull();
   });
 
   it("formats settled execution budget after a run completes", () => {
@@ -181,13 +208,13 @@ describe("execution budget", () => {
       remaining_budget_usd: 19.38,
       daily_budget_used_usd: 0.22,
       daily_budget_reserved_usd: 0,
-      analysis_credits_used: 620,
+      analysis_credits_used: 4428572,
       analysis_credits_reserved: 0,
-      analysis_credits_limit: 20000,
-      remaining_analysis_credits: 19380,
-      daily_analysis_credits_used: 220,
+      analysis_credits_limit: 142857142,
+      remaining_analysis_credits: 138428571,
+      daily_analysis_credits_used: 1571429,
       daily_analysis_credits_reserved: 0,
-      daily_analysis_credits_limit: 20000,
+      daily_analysis_credits_limit: 142857142,
       run_count: 3,
       can_run: true,
     });
@@ -211,7 +238,7 @@ describe("execution budget", () => {
     ).toMatchObject({
       budget_used_usd: 20,
       remaining_budget_usd: 0,
-      analysis_credits_used: 20000,
+      analysis_credits_used: 142857142,
       remaining_analysis_credits: 0,
       percent_used: 100,
       can_run: false,

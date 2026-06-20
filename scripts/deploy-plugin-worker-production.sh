@@ -58,12 +58,40 @@ require_command() {
   fi
 }
 
+truthy_env() {
+  case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+falsey_env() {
+  case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
+    0|false|no|off) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 require_path "$ENV_PATH"
 
 set -a
 # shellcheck disable=SC1090
 . "$ENV_PATH"
 set +a
+
+STOCK_NEWS_RUNTIME_ENABLED=1
+if truthy_env "${STOCK_NEWS_FORCE_DISABLED:-}" || falsey_env "${STOCK_NEWS_ENABLED:-}"; then
+  STOCK_NEWS_RUNTIME_ENABLED=0
+elif [ -z "${FINNHUB_API_KEY:-}" ]; then
+  if truthy_env "${STOCK_NEWS_ENABLED:-}"; then
+    echo "STOCK_NEWS_ENABLED=1 but FINNHUB_API_KEY is missing in $ENV_PATH" >&2
+    exit 1
+  fi
+  STOCK_NEWS_RUNTIME_ENABLED=0
+  STOCK_NEWS_FORCE_DISABLED=1
+  export STOCK_NEWS_FORCE_DISABLED
+  echo "Stock News MCP disabled: FINNHUB_API_KEY is not set."
+fi
 
 ONTOLOGY_SOURCE_DIR=${KRW_ONTOLOGY_SOURCE_DIR:-"$HOME/krw-ontology"}
 require_command uv
@@ -87,15 +115,19 @@ node "$SCRIPT_DIR/materialize-ontology-plugin.mjs" \
   --stock-news-url "${STOCK_NEWS_MCP_URL:-http://127.0.0.1:8775/mcp}" >/dev/null
 
 STOCK_NEWS_COVERAGE_PATH=${STOCK_NEWS_COVERAGE_PATH:-"$KRW_ONTOLOGY_PLUGIN_PATH/stock-news/coverage_companies.json"}
-node "$SCRIPT_DIR/export-stock-news-coverage.mjs" \
-  --env prod \
-  --env-file "$ENV_PATH" \
-  --out "$STOCK_NEWS_COVERAGE_PATH"
-export STOCK_NEWS_COVERAGE_PATH
+if [ "$STOCK_NEWS_RUNTIME_ENABLED" = "1" ]; then
+  node "$SCRIPT_DIR/export-stock-news-coverage.mjs" \
+    --env prod \
+    --env-file "$ENV_PATH" \
+    --out "$STOCK_NEWS_COVERAGE_PATH"
+  export STOCK_NEWS_COVERAGE_PATH
+fi
 
 require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.mcp.json"
 require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.claude-plugin/plugin.json"
-require_path "$STOCK_NEWS_COVERAGE_PATH"
+if [ "$STOCK_NEWS_RUNTIME_ENABLED" = "1" ]; then
+  require_path "$STOCK_NEWS_COVERAGE_PATH"
+fi
 
 SKILL_COUNT=$(
   find "$KRW_ONTOLOGY_PLUGIN_PATH/skills" \
@@ -125,8 +157,12 @@ echo "Ontology source: $ONTOLOGY_SOURCE_DIR"
 echo "Plugin path: $KRW_ONTOLOGY_PLUGIN_PATH"
 echo "Skill files: $SKILL_COUNT"
 echo "MCP URL: ${KRW_ONTOLOGY_MCP_URL:-unset}"
-echo "Stock News MCP URL: ${STOCK_NEWS_MCP_URL:-http://127.0.0.1:8775/mcp}"
-echo "Stock News coverage: $STOCK_NEWS_COVERAGE_PATH"
+if [ "$STOCK_NEWS_RUNTIME_ENABLED" = "1" ]; then
+  echo "Stock News MCP URL: ${STOCK_NEWS_MCP_URL:-http://127.0.0.1:8775/mcp}"
+  echo "Stock News coverage: $STOCK_NEWS_COVERAGE_PATH"
+else
+  echo "Stock News MCP: disabled"
+fi
 
 echo "Checking news translation readiness..."
 (cd "$FRONT_DIR" && node scripts/verify-news-translation.mjs)

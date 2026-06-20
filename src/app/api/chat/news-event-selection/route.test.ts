@@ -108,6 +108,21 @@ function createAdmin(options: { artifactExists?: boolean } = {}) {
   const deletes: unknown[] = [];
 
   const admin = {
+    rpc(name: string) {
+      if (name === "reserve_analysis_credits") {
+        return Promise.resolve({
+          data: [
+            {
+              allowed: true,
+              reason: null,
+              reservation_id: "credit-reservation-1",
+            },
+          ],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: null, error: null });
+    },
     from(table: string) {
       return {
         select() {

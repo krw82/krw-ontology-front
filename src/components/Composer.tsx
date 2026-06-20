@@ -898,7 +898,6 @@ export default function Composer({
         setCommittedUserUrls(committedUrlSnapshot);
         setUserUrlDrafts(urlDraftSnapshot);
         setIsUrlSheetOpen(urlSheetOpenSnapshot);
-        setAttachmentError(result.message);
       }
     } catch {
       setAttachmentError("메시지를 보내지 못했습니다. 다시 시도해주세요.");

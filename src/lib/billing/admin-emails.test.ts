@@ -1,10 +1,11 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { isAdminEntitlementEmail } from "./admin-emails";
 
 describe("isAdminEntitlementEmail", () => {
   const originalAdminEmails = process.env.ADMIN_EMAILS;
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     if (originalAdminEmails === undefined) {
       delete process.env.ADMIN_EMAILS;
     } else {
@@ -23,5 +24,15 @@ describe("isAdminEntitlementEmail", () => {
     expect(isAdminEntitlementEmail("dev@example.com")).toBe(true);
     expect(isAdminEntitlementEmail("ops@example.com")).toBe(true);
     expect(isAdminEntitlementEmail("user@example.com")).toBe(false);
+  });
+
+  it("does not use default development admin emails in production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ADMIN_EMAILS", "");
+
+    expect(isAdminEntitlementEmail("admin1@example.com")).toBe(false);
+
+    vi.stubEnv("ADMIN_EMAILS", "admin1@example.com");
+    expect(isAdminEntitlementEmail("admin1@example.com")).toBe(true);
   });
 });

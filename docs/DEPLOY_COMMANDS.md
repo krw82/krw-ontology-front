@@ -223,6 +223,25 @@ npm run prod:release:publish -- --release-id <release_id>
 이 단계에서만 prod/current, Supabase web catalog, prod MCP, prod workers가
 같은 release로 전환된다.
 
+### Production billing
+
+Toss live keys are secret runtime config and must stay only in the production VM
+env file, not in git:
+
+```text
+TOSS_PAYMENTS_CLIENT_KEY=live_ck_...
+TOSS_PAYMENTS_SECRET_KEY=live_sk_...
+ANALYSIS_CREDIT_ENFORCEMENT_MODE=enforced
+```
+
+After changing the VM env, restart the GCP compose services and run the paid
+billing readiness gate:
+
+```bash
+scripts/restart-production-compose.sh
+npm run billing:prod:readiness
+```
+
 ## MCP And Worker Operations
 
 일상 운영에서는 `prod:deploy:runtime`과 `prod:status`만 외우면 된다. 낮은

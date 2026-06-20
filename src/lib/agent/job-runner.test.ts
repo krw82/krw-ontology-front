@@ -551,6 +551,8 @@ describe("agent job runner", () => {
         citations: [],
         inputTokens: 10,
         outputTokens: 20,
+        cacheHitInputTokens: 0,
+        cacheMissInputTokens: 0,
       },
     });
 

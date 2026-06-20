@@ -8,6 +8,10 @@ import { getBillingPlanFromStore } from "@/lib/billing/plan-store";
 import { readFloatEnv } from "@/lib/env";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
+  releaseAnalysisCreditsShadow,
+  settleAnalysisCreditsShadow,
+} from "@/lib/concurrency/analysis-credits";
+import {
   normalizeResearchMode,
   type ResearchMode,
 } from "@/lib/research-mode";
@@ -130,19 +134,30 @@ export async function reserveExecutionBudget(
   });
 
   if (error) {
+    console.warn("[execution-budget] legacy reserve failed; raw credits remain authoritative", {
+      code: error.code,
+      message: error.message,
+    });
     return {
       ...budget,
-      allowed: false,
-      reason: "internal_error",
+      allowed: true,
+      reason: undefined,
+      reserveCostUsd,
     };
   }
 
   const result = data?.[0];
   if (!result?.allowed) {
+    console.warn("[execution-budget] legacy budget would block; raw credits remain authoritative", {
+      userId,
+      requestId,
+      reason: result?.reason,
+    });
     return {
       ...budget,
-      allowed: false,
-      reason: "cost_cap_exceeded",
+      allowed: true,
+      reason: undefined,
+      reservationId: null,
       budgetUsedUsd: Number(result?.monthly_used_usd ?? budget.budgetUsedUsd),
       budgetReservedUsd: Number(result?.monthly_reserved_usd ?? budget.budgetReservedUsd),
       budgetLimitUsd: Number(result?.monthly_limit_usd ?? budget.budgetLimitUsd),
@@ -207,6 +222,36 @@ export async function settleExecutionBudget(
       message: error.message,
     });
   }
+
+  const inputTokens = numberFromMetadata(metadata, "input_tokens");
+  const outputTokens = numberFromMetadata(metadata, "output_tokens");
+  const cacheHitInputTokens = numberFromMetadata(
+    metadata,
+    "prompt_cache_hit_tokens",
+  );
+  const cacheMissInputTokens = numberFromMetadata(
+    metadata,
+    "prompt_cache_miss_tokens",
+  );
+  if (inputTokens > 0 || outputTokens > 0) {
+    await settleAnalysisCreditsShadow(userId, requestId, runId, {
+      terminalStatus,
+      inputTokens,
+      outputTokens,
+      cacheHitInputTokens,
+      cacheMissInputTokens,
+      chargeUserCredits:
+        terminalStatus === "completed" || terminalStatus === "partial_completed",
+      metadata,
+    });
+  } else {
+    await releaseAnalysisCreditsShadow(
+      userId,
+      requestId,
+      runId,
+      terminalStatus,
+    );
+  }
 }
 
 export async function releaseExecutionBudget(
@@ -227,6 +272,17 @@ export async function releaseExecutionBudget(
       message: error.message,
     });
   }
+  await releaseAnalysisCreditsShadow(userId, requestId, runId, reason);
+}
+
+function numberFromMetadata(metadata: Json, key: string): number {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return 0;
+  }
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.floor(value))
+    : 0;
 }
 
 export function getExecutionBudgetStatus(
@@ -270,6 +326,8 @@ export function getExecutionBudgetStatus(
     budget.budgetLimitUsd > 0
       ? Math.min(100, Math.round(((used + reserved) / budget.budgetLimitUsd) * 100))
       : 100;
+  const monthlyCreditLimit = creditLimit(budget.budgetLimitUsd);
+  const dailyCreditLimit = creditLimit(budget.dailyBudgetLimitUsd);
 
   return {
     budget_used_usd: used,
@@ -282,15 +340,24 @@ export function getExecutionBudgetStatus(
     daily_budget_reserved_usd: dailyReserved,
     daily_budget_limit_usd: budget.dailyBudgetLimitUsd,
     per_run_reserve_usd: budget.reserveCostUsd,
-    analysis_credits_used: usedCredits(used),
-    analysis_credits_reserved: usedCredits(reserved),
-    analysis_credits_limit: creditLimit(budget.budgetLimitUsd),
+    analysis_credits_used: Math.min(usedCredits(used), monthlyCreditLimit),
+    analysis_credits_reserved: Math.min(
+      usedCredits(reserved),
+      monthlyCreditLimit,
+    ),
+    analysis_credits_limit: monthlyCreditLimit,
     remaining_analysis_credits: remainingCredits(
       Math.max(0, budget.budgetLimitUsd - used - reserved),
     ),
-    daily_analysis_credits_used: usedCredits(dailyUsed),
-    daily_analysis_credits_reserved: usedCredits(dailyReserved),
-    daily_analysis_credits_limit: creditLimit(budget.dailyBudgetLimitUsd),
+    daily_analysis_credits_used: Math.min(
+      usedCredits(dailyUsed),
+      dailyCreditLimit,
+    ),
+    daily_analysis_credits_reserved: Math.min(
+      usedCredits(dailyReserved),
+      dailyCreditLimit,
+    ),
+    daily_analysis_credits_limit: dailyCreditLimit,
     per_run_analysis_credits: usedCredits(budget.reserveCostUsd),
     run_count: budget.runCount + (settledCostUsd > 0 ? 1 : 0),
     percent_used: percentUsed,

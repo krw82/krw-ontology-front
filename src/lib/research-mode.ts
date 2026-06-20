@@ -2,7 +2,7 @@ import type { KRWOntologyMCPToolName } from "@/types/api-contracts";
 
 export type ResearchMode = "fast" | "standard" | "deep";
 
-export const DEFAULT_RESEARCH_MODE: ResearchMode = "deep";
+export const DEFAULT_RESEARCH_MODE: ResearchMode = "standard";
 
 export const RESEARCH_MODE_LABELS: Record<ResearchMode, string> = {
   fast: "빠른 답변",

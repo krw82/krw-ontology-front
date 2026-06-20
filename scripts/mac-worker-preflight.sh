@@ -356,6 +356,14 @@ if (server.type === "http" || server.type === "sse") {
   console.log(`OK plugin MCP URL: ${server.url}`);
   const stockNewsServer = config.mcpServers && config.mcpServers["stock-news"];
   const expectedStockNewsUrl = process.env.STOCK_NEWS_MCP_URL || "http://127.0.0.1:8775/mcp";
+  const stockNewsEnabled = isStockNewsEnabled();
+  if (!stockNewsEnabled) {
+    if (stockNewsServer) {
+      throw new Error("Stock News MCP is disabled, but plugin .mcp.json still includes mcpServers.stock-news");
+    }
+    console.log("OK plugin Stock News MCP disabled");
+    process.exit(0);
+  }
   if (!stockNewsServer) throw new Error("Missing mcpServers.stock-news");
   if (stockNewsServer.type !== "http") {
     throw new Error(`Stock News MCP must use streamable HTTP MCP, got: ${stockNewsServer.type}`);
@@ -376,6 +384,28 @@ if (actualRoot && actualRoot !== expectedRoot) {
   throw new Error(`Plugin .mcp.json ontology root mismatch: ${actualRoot} !== ${expectedRoot}`);
 }
 console.log(`OK plugin MCP root: ${actualRoot || expectedRoot}`);
+
+function isStockNewsEnabled() {
+  if (truthyEnv(process.env.STOCK_NEWS_FORCE_DISABLED)) return false;
+  if (falseyEnv(process.env.STOCK_NEWS_ENABLED)) return false;
+  if (!process.env.FINNHUB_API_KEY) {
+    if (truthyEnv(process.env.STOCK_NEWS_ENABLED)) {
+      throw new Error("STOCK_NEWS_ENABLED=1 but FINNHUB_API_KEY is missing");
+    }
+    return false;
+  }
+  return true;
+}
+
+function truthyEnv(value) {
+  if (!value) return false;
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+}
+
+function falseyEnv(value) {
+  if (!value) return false;
+  return ["0", "false", "no", "off"].includes(value.trim().toLowerCase());
+}
 NODE
 
 if [ "$DEEP_CHECK" = "1" ]; then
@@ -542,12 +572,24 @@ const client = createClient(url, key, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 (async () => {
-  const { error } = await client
-    .from("agent_runs")
-    .select("id", { head: true, count: "exact" })
-    .limit(0);
-  if (error) throw error;
-  console.log("OK Supabase agent_runs read");
+  let lastError = null;
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    try {
+      const { error } = await client
+        .from("agent_runs")
+        .select("id", { head: true, count: "exact" })
+        .limit(0);
+      if (error) throw error;
+      console.log("OK Supabase agent_runs read");
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 5) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+      }
+    }
+  }
+  throw lastError || new Error("Supabase agent_runs read failed");
 })().catch((error) => {
   console.error(error.message || error);
   process.exit(1);

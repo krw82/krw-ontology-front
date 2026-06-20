@@ -4444,6 +4444,474 @@ export const COMPANY_RESEARCH_PROFILES = {
     ],
     questionChains: {},
   },
+  AEP: {
+    ticker: "AEP",
+    companyName: "American Electric Power Company, Inc.",
+    companyNameKo: "아메리칸 일렉트릭 파워",
+    sectorKo: "전력 유틸리티",
+    signature: "Vertically Integrated Utilities, Transmission and Distribution Utilities, AEP Transmission Holdco, Generation & Marketing을 나눠 보며, rate base 투자와 규제 회수가 현금흐름을 좌우하는 미국 전력 유틸리티.",
+    description: "기업 리포트: AEP는 발전·송전·배전을 묶은 Vertically Integrated Utilities, AEP Texas·OPCo 중심 Transmission and Distribution Utilities, FERC 규제 송전 자산을 보유한 AEP Transmission Holdco, 경쟁 전력 노출이 있는 Generation & Marketing을 함께 봐야 합니다. 공시 해석에서는 rate case, fuel recovery, transmission investment, load growth, generation mix, environmental compliance cost가 매출과 영업현금흐름을 어떻게 나누는지 확인해야 합니다. 전력망 투자는 장기 성장 기반이지만, 규제 승인 지연과 고금리 환경에서는 free cash flow와 차입 부담을 동시에 키웁니다.",
+    researchFocus: [
+      "Vertically Integrated Utilities의 generation mix, fuel recovery, customer load",
+      "Transmission and Distribution Utilities의 rate case, weather-normalized demand, grid investment",
+      "AEP Transmission Holdco의 FERC rate, transmission project spend, allowed return",
+      "Generation & Marketing의 wholesale power price, counterparty exposure, collateral needs"
+    ],
+    riskVariables: [
+      "요금 인가 지연과 비용 회수 불확실성이 rate base 성장의 현금 전환을 늦출 위험",
+      "석탄재, 배출규제, 발전소 폐쇄·개선 비용이 capex와 충당부담을 키울 가능성",
+      "기상·계절성 수요와 산업용 load 변동이 분기별 매출을 흔들 가능성",
+      "고금리, 차입 증가, 담보 요구가 배당·투자 여력을 제약할 위험"
+    ],
+    suggestedPrompts: [
+      "AEP의 Vertically Integrated Utilities, T&D Utilities, Transmission Holdco가 rate base와 현금흐름에 어떻게 다르게 기여하는지 정리해줘.",
+      "fuel recovery, rate case, transmission investment가 AEP의 영업이익과 free cash flow에 연결되는 경로를 설명해줘.",
+      "환경규제, 석탄재 비용, 고금리, 담보 요구가 AEP의 배당과 전력망 투자에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  AON: {
+    ticker: "AON",
+    companyName: "Aon plc",
+    companyNameKo: "에이온",
+    sectorKo: "보험중개·인적자본 컨설팅",
+    signature: "Risk Capital과 Human Capital로 재편된 구조에서 Commercial Risk, Reinsurance, Health, Wealth 수수료와 NFP 통합 효과를 함께 봐야 하는 전문 서비스 기업.",
+    description: "기업 리포트: Aon은 Risk Capital과 Human Capital을 통해 보험중개, 재보험, 리스크 컨설팅, 헬스·복지, 퇴직연금·투자 컨설팅을 제공합니다. Risk Capital에서는 Commercial Risk와 Reinsurance의 premium cycle, client retention, market capacity, capital markets solution이 수수료 성장을 좌우하고, Human Capital에서는 Health, Wealth, talent advisory, pension administration 수요가 margin을 움직입니다. NFP 인수 이후에는 중소형 고객 채널, producer compensation, systems integration, restructuring cost가 성장률과 영업이익률을 동시에 흔드는 변수입니다.",
+    researchFocus: [
+      "Risk Capital의 Commercial Risk, Reinsurance, market capacity, client retention",
+      "Human Capital의 Health, Wealth, pension administration, talent advisory 수요",
+      "NFP 인수 이후 producer network, cross-sell, integration cost",
+      "compensation and benefits, technology spend, restructuring cost가 operating margin에 미치는 영향"
+    ],
+    riskVariables: [
+      "보험 가격 사이클 둔화와 재보험 capacity 변화에 따른 brokerage 수수료 둔화",
+      "NFP 통합 지연, 시스템 전환, producer retention 실패에 따른 비용 초과",
+      "개인정보·사이버 사고와 E&O claim이 평판·규제 비용을 키울 위험",
+      "인재 확보 경쟁과 보상비 상승이 organic margin expansion을 제한할 가능성"
+    ],
+    suggestedPrompts: [
+      "Aon의 Risk Capital과 Human Capital이 매출 성장과 margin에서 어떻게 다르게 작동하는지 정리해줘.",
+      "Commercial Risk, Reinsurance, Health, Wealth 수요가 보험 사이클과 고용시장 변화에 어떻게 연결되는지 설명해줘.",
+      "NFP 통합, compensation, technology spend가 Aon의 영업이익률과 현금흐름에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  CL: {
+    ticker: "CL",
+    companyName: "Colgate-Palmolive Company",
+    companyNameKo: "콜게이트-팜올리브",
+    sectorKo: "생활소비재·펫 뉴트리션",
+    signature: "Oral, Personal and Home Care와 Hill's Pet Nutrition을 나눠 보며, 가격·물량·원재료·유통채널 mix가 마진을 좌우하는 글로벌 필수소비재 기업.",
+    description: "기업 리포트: Colgate-Palmolive는 Oral Care, Personal Care, Home Care와 Hill's Pet Nutrition을 통해 글로벌 소비재 매출을 만듭니다. 공시 해석에서는 지역별 organic sales를 price, volume, foreign exchange로 나누고, Hill's의 prescription diet와 science diet 같은 premium pet nutrition이 회사 전체 gross margin을 얼마나 보강하는지 봐야 합니다. resins, oils, pulp, tallow, corn, soybean 같은 원재료와 광고비, 유통 채널 재고 조정, retailer pricing pressure는 가격 전가력과 operating margin의 핵심 변수입니다.",
+    researchFocus: [
+      "Oral Care, Personal Care, Home Care의 price, volume, 지역별 organic sales",
+      "Hill's Pet Nutrition의 prescription diet, science diet, premium mix",
+      "Latin America, North America, Europe, Asia Pacific, Africa/Eurasia 매출 민감도",
+      "raw materials, advertising spend, retailer inventory, promotion이 gross margin에 미치는 영향"
+    ],
+    riskVariables: [
+      "resins, oils, pulp, tallow, corn, soybean 등 원재료 가격 상승",
+      "대형 유통채널의 재고 조정과 판촉 요구가 출하와 가격 전가력을 낮출 위험",
+      "환율 약세와 신흥국 소비 둔화가 reported sales와 margin을 압박할 가능성",
+      "pet nutrition 경쟁 심화와 프리미엄 제품 수요 둔화"
+    ],
+    suggestedPrompts: [
+      "콜게이트의 Oral, Personal and Home Care와 Hill's Pet Nutrition이 성장률과 마진에서 어떻게 다른지 정리해줘.",
+      "price, volume, FX, 원재료 비용이 Colgate의 organic sales와 gross margin에 전달되는 경로를 설명해줘.",
+      "유통채널 재고 조정, 판촉비, pet nutrition 경쟁이 Colgate의 성장 논지에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  CTAS: {
+    ticker: "CTAS",
+    companyName: "Cintas Corporation",
+    companyNameKo: "신타스",
+    sectorKo: "유니폼 렌탈·시설 서비스",
+    signature: "Uniform Rental and Facility Services와 First Aid and Safety Services가 route density, retention, labor cost, inventory amortization을 통해 마진을 만드는 현장형 B2B 서비스 기업.",
+    description: "기업 리포트: Cintas는 Uniform Rental and Facility Services에서 유니폼, flame resistant clothing, mats, mops, restroom supplies를 route 기반으로 렌탈·판매하고, First Aid and Safety Services에서 응급·안전 용품과 training 서비스를 제공합니다. Fire Protection Services와 Uniform Direct Sales는 All Other 성격으로 보조 수익을 만듭니다. 공시 해석에서는 route density, customer retention, new business wins, in-service inventory amortization, production labor, delivery fuel, textile cost가 gross margin과 operating margin에 어떻게 반영되는지 봐야 합니다.",
+    researchFocus: [
+      "Uniform Rental and Facility Services의 route density, customer retention, rental volume",
+      "First Aid and Safety Services의 안전 규제, workplace demand, product replenishment",
+      "Fire Protection Services와 Uniform Direct Sales의 보조 성장·마진 기여",
+      "in-service inventory, textile cost, production labor, delivery expense가 margin에 미치는 영향"
+    ],
+    riskVariables: [
+      "임금·운송비·섬유 원가 상승이 route profitability를 낮출 위험",
+      "employee-partner 확보와 이탈률 악화가 서비스 품질·납기 비용을 키울 가능성",
+      "중소기업 고객 경기 둔화와 신규 계약 감소",
+      "시스템 장애, 사이버보안, 규제·안전 기준 변화에 따른 운영비 증가"
+    ],
+    suggestedPrompts: [
+      "Cintas의 Uniform Rental and Facility Services와 First Aid and Safety Services가 매출과 margin에서 어떻게 다른지 정리해줘.",
+      "route density, customer retention, in-service inventory amortization이 Cintas의 영업 레버리지에 어떻게 연결되는지 설명해줘.",
+      "노동비, textile cost, delivery expense, 고객 경기 둔화가 Cintas의 현금흐름에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  DASH: {
+    ticker: "DASH",
+    companyName: "DoorDash, Inc.",
+    companyNameKo: "도어대시",
+    sectorKo: "온디맨드 커머스 플랫폼",
+    signature: "DoorDash Marketplace, Wolt, Deliveroo, Drive와 광고·멤버십을 묶어 GOV, Total Orders, contribution profit으로 수익성을 봐야 하는 온디맨드 커머스 플랫폼.",
+    description: "기업 리포트: DoorDash는 음식배달을 출발점으로 grocery, retail, convenience, alcohol 같은 local commerce로 확장하고, Wolt와 Deliveroo를 통해 해외 marketplace도 키웁니다. 공시 해석에서는 GOV, Total Orders, Marketplace GOV, Net Revenue Margin, contribution profit, consumer acquisition, merchant selection, Dasher supply를 함께 봐야 합니다. Drive와 white-label fulfillment, ads, DashPass·Wolt+·Deliveroo Plus 멤버십은 주문 빈도와 take rate를 보강하지만, 노동자 분류 규제와 지역별 경쟁은 unit economics를 흔드는 핵심 리스크입니다.",
+    researchFocus: [
+      "Marketplace GOV, Total Orders, Net Revenue Margin, contribution profit",
+      "restaurant, grocery, retail, convenience 카테고리 확장과 merchant selection",
+      "Wolt, Deliveroo 해외 marketplace와 통합 비용",
+      "Drive, ads, DashPass, Wolt+, Deliveroo Plus가 주문 빈도와 take rate에 미치는 영향"
+    ],
+    riskVariables: [
+      "food delivery, grocery, retail last-mile 경쟁 심화에 따른 promotion·incentive 증가",
+      "Dasher 분류 규제, 최저보상 규칙, 보험·안전 비용 상승",
+      "Wolt·Deliveroo 통합 지연과 지역별 규제·환율 리스크",
+      "merchant churn, consumer retention 약화, 개인정보·위치정보 보안 사고"
+    ],
+    suggestedPrompts: [
+      "DoorDash의 GOV, Total Orders, Net Revenue Margin, contribution profit이 수익성으로 연결되는 구조를 정리해줘.",
+      "restaurant, grocery, retail, Drive, ads, 멤버십이 DoorDash의 성장 경로에서 각각 어떤 역할을 하는지 설명해줘.",
+      "Dasher 규제, 경쟁 프로모션, Wolt·Deliveroo 통합이 DoorDash의 unit economics에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  ECL: {
+    ticker: "ECL",
+    companyName: "Ecolab Inc.",
+    companyNameKo: "이콜랩",
+    sectorKo: "물·위생·감염예방 서비스",
+    signature: "Global Water, Global Institutional & Specialty, Global Life Sciences, Global Pest Elimination을 통해 물 처리, 식품안전, 위생, 제약공정, 방제 서비스를 묶어 가격·물량·서비스 생산성이 마진을 좌우합니다.",
+    description: "기업 리포트: Ecolab은 Global Water, Global Institutional & Specialty, Global Life Sciences, Global Pest Elimination으로 재편된 구조에서 물 처리, 세정·위생, 식품·음료 공정, 제약·바이오 제조 환경, 상업용 pest elimination 서비스를 제공합니다. 공시 해석에서는 Food & Beverage, Global High-Tech, Paper, Institutional, Specialty, Life Sciences, Pest Elimination의 organic sales와 value pricing이 commodity cost, field service labor, digital solution 투자와 어떻게 맞물리는지 봐야 합니다. 고객의 물·에너지 절감, 식품안전, 감염예방, 규제 준수 니즈는 가격 전가력의 근거이지만, 원재료와 서비스 인건비가 margin expansion 속도를 제약할 수 있습니다.",
+    researchFocus: [
+      "Global Water의 Food & Beverage, Light & Heavy Water, Paper, Global High-Tech 수요",
+      "Global Institutional & Specialty의 restaurant, hospitality, lodging, healthcare hygiene 채널",
+      "Global Life Sciences의 pharma, biologics, cleaning validation, contamination control",
+      "Global Pest Elimination의 service route density, commercial accounts, digital monitoring"
+    ],
+    riskVariables: [
+      "commodity cost와 service labor inflation이 value pricing 효과를 상쇄할 가능성",
+      "restaurant, hospitality, foodservice 트래픽 둔화가 Institutional 수요를 낮출 위험",
+      "Life Sciences 고객의 biotech funding, pharma capex, validation cycle 지연",
+      "규제·환경 기준 변화, 제품 품질 이슈, 현장 서비스 인력 부족에 따른 비용 증가"
+    ],
+    suggestedPrompts: [
+      "Ecolab의 Global Water, Institutional & Specialty, Life Sciences, Pest Elimination이 매출과 margin에서 어떻게 다른지 정리해줘.",
+      "value pricing, commodity cost, field service labor가 Ecolab의 operating margin에 전달되는 경로를 설명해줘.",
+      "Food & Beverage, Global High-Tech, Life Sciences, Pest Elimination 수요 변화가 Ecolab의 성장 논지에 주는 의미를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  EOG: {
+    ticker: "EOG",
+    companyName: "EOG Resources, Inc.",
+    companyNameKo: "이오지 리소스",
+    sectorKo: "에너지·E&P",
+    signature: "Delaware Basin, Eagle Ford, Dorado, Rocky Mountain, Trinidad에서 crude oil, NGL, natural gas를 생산하며 well productivity와 cash return framework가 투자 판단의 핵심인 독립 E&P 기업.",
+    description: "기업 리포트: EOG Resources는 미국 중심의 crude oil, condensate, NGL, natural gas 탐사·개발·생산 기업입니다. 공시 해석에서는 Delaware Basin의 Wolfcamp·Bone Spring, South Texas Eagle Ford와 Dorado gas, Rocky Mountain 자산, Trinidad gas 노출을 나눠 생산량, realized price, lease and well expense, gathering·processing·transportation cost, finding and development cost를 봐야 합니다. drilling inventory와 well productivity는 장기 매장량 가치의 핵심이고, 배당·special dividend·share repurchase를 포함한 cash return framework는 commodity price cycle에서 자본배분 품질을 보여줍니다.",
+    researchFocus: [
+      "Delaware Basin, Eagle Ford, Dorado, Rocky Mountain, Trinidad 생산량·well productivity",
+      "crude oil, NGL, natural gas mix와 realized price",
+      "lease and well, gathering, processing, transportation cost",
+      "capex discipline, reserve replacement, dividend, special dividend, share repurchase"
+    ],
+    riskVariables: [
+      "원유·NGL·천연가스 가격 하락과 basis differential 악화",
+      "well productivity 저하, decline rate, reserve replacement 실패",
+      "서비스·장비·인력 비용 상승과 drilling/completion 지연",
+      "methane, flaring, water handling, permitting 규제가 비용 구조를 높일 위험"
+    ],
+    suggestedPrompts: [
+      "EOG의 Delaware Basin, Eagle Ford, Dorado, Rocky Mountain, Trinidad 자산이 생산량과 현금흐름에 어떻게 기여하는지 정리해줘.",
+      "crude oil, NGL, natural gas mix와 realized price가 EOG의 margin과 capex 회수에 미치는 영향을 설명해줘.",
+      "well productivity, decline rate, 서비스 비용, methane 규제가 EOG의 cash return framework에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  GM: {
+    ticker: "GM",
+    companyName: "General Motors Company",
+    companyNameKo: "제너럴 모터스",
+    sectorKo: "자동차",
+    signature: "GMNA, GMI, GM Financial을 나눠 보고 Chevrolet, GMC, Cadillac, Buick의 ICE·EV mix와 OnStar·Super Cruise, warranty, inventory가 마진을 좌우하는 완성차 기업.",
+    description: "기업 리포트: General Motors는 GM North America, GM International, GM Financial을 통해 차량 판매, 부품·서비스, 리스·대출 금융 수익을 만듭니다. 공시 해석에서는 Chevrolet, GMC, Cadillac, Buick의 truck·SUV mix, EV 전환 속도, dealer inventory, pricing, incentives, warranty and recall cost, raw materials, labor agreement, GM Financial의 credit loss와 lease residual을 함께 봐야 합니다. Cruise 로보택시 전략 축소 이후에는 Super Cruise, OnStar, software-enabled services와 개인 차량 ADAS 투자 효율이 더 중요해졌습니다.",
+    researchFocus: [
+      "GMNA와 GMI의 truck, SUV, EV, pricing, incentive mix",
+      "GM Financial의 loan, lease, residual value, credit loss",
+      "OnStar, Super Cruise, software-enabled services와 ADAS 투자",
+      "warranty, recall, raw materials, labor agreement, dealer inventory"
+    ],
+    riskVariables: [
+      "EV 수요 둔화와 보조금·배출규제 변화가 capex와 inventory를 압박할 위험",
+      "원자재, 관세, 부품 공급, 물류비 상승에 따른 manufacturing margin 악화",
+      "warranty, recall, 품질 이슈와 보증충당 추정 변동",
+      "GM Financial의 신용손실, 중고차 가격, lease residual 악화"
+    ],
+    suggestedPrompts: [
+      "GM의 GMNA, GMI, GM Financial이 매출과 adjusted EBIT에 어떻게 다르게 기여하는지 정리해줘.",
+      "Chevrolet, GMC, Cadillac, Buick의 truck·SUV·EV mix와 OnStar, Super Cruise가 GM의 성장 논지에 주는 의미를 설명해줘.",
+      "EV 수요 둔화, warranty, raw materials, GM Financial credit loss가 GM의 현금흐름에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  HLT: {
+    ticker: "HLT",
+    companyName: "Hilton Worldwide Holdings Inc.",
+    companyNameKo: "힐튼",
+    sectorKo: "호텔·여행",
+    signature: "Management & Franchise fee 중심의 asset-light 구조에서 RevPAR, net unit growth, Hilton Honors, owner economics가 fee base와 현금흐름을 좌우하는 글로벌 호텔 운영사.",
+    description: "기업 리포트: Hilton은 Management and Franchise와 Ownership을 나눠 봐야 합니다. Management and Franchise는 franchised hotels, managed hotels, licensing, Hilton Honors, co-branded card, strategic partnerships에서 fee revenue를 만들고, Ownership은 보유·임차 호텔의 객실 매출과 운영비가 직접 반영됩니다. 공시 해석에서는 RevPAR, occupancy, ADR, net unit growth, development pipeline, conversion, owner financing condition, loyalty program economics가 gross fee revenues와 adjusted EBITDA로 얼마나 전환되는지 확인해야 합니다.",
+    researchFocus: [
+      "Management and Franchise의 base fee, franchise fee, licensing fee, RevPAR 민감도",
+      "Ownership 호텔의 occupancy, ADR, labor cost, property-level margin",
+      "Hilton Honors, co-branded card, direct booking, strategic partnerships",
+      "development pipeline, conversion, net unit growth, owner financing"
+    ],
+    riskVariables: [
+      "RevPAR 둔화와 occupancy·ADR 약화가 fee growth를 낮출 가능성",
+      "호텔 오너 자금조달 악화와 개발 지연으로 pipeline 전환이 늦어질 위험",
+      "OTA 수수료, loyalty cost, 사이버보안 사고가 직접 채널 수익성을 해칠 가능성",
+      "노동비, 임대료, 재산세, 보험료 상승이 Ownership margin을 압박할 위험"
+    ],
+    suggestedPrompts: [
+      "힐튼의 Management & Franchise와 Ownership이 RevPAR, ADR, occupancy 변화에 어떻게 다르게 반응하는지 정리해줘.",
+      "Hilton Honors, co-branded card, direct booking이 Hilton의 fee business를 어떻게 보강하는지 설명해줘.",
+      "개발 pipeline, 호텔 오너 자금조달, OTA 수수료, 노동비가 Hilton의 성장 논지에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  ITW: {
+    ticker: "ITW",
+    companyName: "Illinois Tool Works Inc.",
+    companyNameKo: "일리노이 툴웍스",
+    sectorKo: "산업재·특수 제조",
+    signature: "Automotive OEM, Food Equipment, Test & Measurement and Electronics, Welding, Polymers & Fluids, Construction Products, Specialty Products의 7개 세그먼트에서 80/20 operating system과 가격·원가·수요 mix가 마진을 좌우합니다.",
+    description: "기업 리포트: Illinois Tool Works는 7개 세그먼트를 통해 자동차 부품, 식품 장비, 전자·측정 장비, 용접 장비, 폴리머·윤활·접착 제품, 건설용 fastening, specialty products를 공급합니다. 공시 해석에서는 Automotive OEM의 vehicle production, Food Equipment의 commercial kitchen demand, Test & Measurement and Electronics의 electronics·semiconductor demand, Welding의 industrial capex, Polymers & Fluids와 Construction Products의 원재료·건설 수요를 분리해 봐야 합니다. ITW Business Model과 80/20 process는 margin 방어의 핵심이지만, organic growth 둔화와 원가·환율 압박은 segment operating income을 흔듭니다.",
+    researchFocus: [
+      "Automotive OEM, Food Equipment, Welding의 end-market demand와 margin",
+      "Test & Measurement and Electronics의 electronics, semiconductor, industrial testing 수요",
+      "Polymers & Fluids, Construction Products, Specialty Products의 원재료·제품 mix",
+      "80/20 process, enterprise initiatives, price-cost, restructuring"
+    ],
+    riskVariables: [
+      "자동차 생산 둔화와 industrial capex 약화에 따른 organic revenue 둔화",
+      "원재료·부품·물류비 상승을 가격으로 상쇄하지 못할 위험",
+      "고객별 짧은 주문주기와 distributor inventory 조정",
+      "환율, 무역규제, 제품 품질·IP 분쟁에 따른 비용 증가"
+    ],
+    suggestedPrompts: [
+      "ITW의 7개 세그먼트를 end-market demand와 operating margin 기준으로 비교해줘.",
+      "80/20 process와 enterprise initiatives가 ITW의 가격 전가와 비용 효율에 어떻게 연결되는지 설명해줘.",
+      "자동차 생산, industrial capex, 원재료 비용, 환율이 ITW의 cash flow에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  KMI: {
+    ticker: "KMI",
+    companyName: "Kinder Morgan, Inc.",
+    companyNameKo: "킨더 모건",
+    sectorKo: "천연가스 인프라·미드스트림",
+    signature: "Natural Gas Pipelines, Products Pipelines, Terminals, CO2를 통해 fee-based cash flow를 만들고, contract renewal, volume, FERC rate, project backlog가 배당 여력을 좌우합니다.",
+    description: "기업 리포트: Kinder Morgan은 Natural Gas Pipelines, Products Pipelines, Terminals, CO2를 운영하는 북미 미드스트림 기업입니다. Natural Gas Pipelines는 transportation, storage, gathering, processing 수익과 firm contract가 핵심이고, Products Pipelines는 refined products, crude, condensate 운송·터미널 수익을 만듭니다. Terminals는 bulk, liquids, Jones Act tanker, storage services를 제공하고, CO2는 enhanced oil recovery와 commodity price 노출이 있습니다. 공시 해석에서는 take-or-pay, MVC, contract renewal, FERC rate, expansion backlog, maintenance capex, leverage, dividend coverage를 함께 봐야 합니다.",
+    researchFocus: [
+      "Natural Gas Pipelines의 firm transport, storage, gathering, processing contracts",
+      "Products Pipelines와 Terminals의 refined products, crude, liquids, bulk handling",
+      "CO2 segment의 EOR, oil price exposure, decline profile",
+      "project backlog, maintenance capex, leverage, dividend coverage"
+    ],
+    riskVariables: [
+      "FERC rate case, pipeline permitting, environmental review 지연",
+      "producer drilling activity 둔화와 gathering·processing volume 감소",
+      "contract renewal 시 tariff·volume 조건 악화",
+      "허리케인, 사이버보안, pipeline integrity, maintenance cost 증가"
+    ],
+    suggestedPrompts: [
+      "Kinder Morgan의 Natural Gas Pipelines, Products Pipelines, Terminals, CO2가 cash flow 안정성에서 어떻게 다른지 정리해줘.",
+      "firm contract, MVC, FERC rate, project backlog가 KMI의 배당 여력에 연결되는 경로를 설명해줘.",
+      "drilling activity 둔화, permitting, contract renewal, pipeline integrity가 KMI의 현금흐름에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  MPC: {
+    ticker: "MPC",
+    companyName: "Marathon Petroleum Corporation",
+    companyNameKo: "마라톤 페트롤리엄",
+    sectorKo: "정유·미드스트림",
+    signature: "Refining & Marketing, Midstream, Renewable Diesel을 나눠 보며, crack spread, throughput, MPLX cash flow, RIN·LCFS·feedstock cost가 실적 변동을 좌우하는 downstream 에너지 기업.",
+    description: "기업 리포트: Marathon Petroleum은 Refining & Marketing에서 원유 정제와 도매·소매 제품 판매를 담당하고, Midstream에서는 MPLX를 통해 crude, refined products, natural gas, NGL 운송·저장·처리 수익을 만듭니다. Renewable Diesel은 Martinez Renewables와 feedstock·규제 크레딧 구조를 통해 별도 수익성을 형성합니다. 공시 해석에서는 refinery throughput, utilization, crack spread, sour/sweet crude differential, turnaround cost, RIN cost, LCFS credit, MPLX distributions, working capital을 함께 봐야 합니다.",
+    researchFocus: [
+      "Refining & Marketing의 throughput, utilization, crack spread, product yield",
+      "Midstream과 MPLX의 pipeline, terminal, gathering, processing cash flow",
+      "Renewable Diesel의 feedstock cost, RIN, LCFS, utilization",
+      "turnaround expense, working capital, shareholder return, debt reduction"
+    ],
+    riskVariables: [
+      "정제 마진 축소와 원유 differential 악화",
+      "turnaround, refinery outage, safety incident에 따른 utilization 저하",
+      "RIN, LCFS, renewable diesel credit 가격 변동",
+      "MPLX volume, counterparty, regulatory, permitting 리스크"
+    ],
+    suggestedPrompts: [
+      "Marathon Petroleum의 Refining & Marketing, Midstream, Renewable Diesel이 실적 변동성에서 어떻게 다른지 정리해줘.",
+      "throughput, crack spread, RIN, LCFS, MPLX distribution이 MPC의 현금흐름에 연결되는 경로를 설명해줘.",
+      "turnaround, refinery outage, feedstock cost, 규제 크레딧 변동이 MPC의 자본배분에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  ORLY: {
+    ticker: "ORLY",
+    companyName: "O'Reilly Automotive, Inc.",
+    companyNameKo: "오라일리 오토모티브",
+    sectorKo: "자동차 애프터마켓 부품 유통",
+    signature: "DIY와 professional service provider 고객을 동시에 겨냥한 auto parts 매장·distribution network에서 comparable store sales, inventory availability, gross margin이 핵심인 애프터마켓 소매업체.",
+    description: "기업 리포트: O'Reilly Automotive는 자동차 부품, 공구, 액세서리, maintenance products를 DIY 고객과 professional service provider에게 판매합니다. 공시 해석에서는 comparable store sales를 ticket, transaction, price, mix로 나누고, store count expansion, distribution center, inventory availability, private label mix, shrink, freight cost가 gross margin과 operating margin에 어떻게 반영되는지 봐야 합니다. 노후 차량 증가와 주행거리 회복은 수요 기반이지만, 신차 판매, 전기차 보급, 기술 복잡도, 금리와 소비 여력은 장기 수요를 흔드는 변수입니다.",
+    researchFocus: [
+      "DIY와 professional customer mix, comparable store sales, ticket·transaction",
+      "store openings, distribution center, inventory availability, same-day fulfillment",
+      "private label, product mix, pricing, shrink, freight cost가 gross margin에 미치는 영향",
+      "vehicle age, miles driven, repair complexity, commercial account retention"
+    ],
+    riskVariables: [
+      "주행거리, 차량 연식, 소비 여력 변화에 따른 aftermarket demand 둔화",
+      "inventory shortage, supplier disruption, freight cost, shrink 증가",
+      "전기차 보급과 차량 기술 변화가 일부 부품 수요를 바꿀 가능성",
+      "고금리와 부채비용 상승이 자사주 매입·점포 확장 여력을 제약할 위험"
+    ],
+    suggestedPrompts: [
+      "O'Reilly의 DIY와 professional customer mix가 comparable store sales와 gross margin에 어떻게 다르게 반영되는지 정리해줘.",
+      "store openings, distribution center, inventory availability가 ORLY의 성장성과 현금흐름에 연결되는 경로를 설명해줘.",
+      "vehicle age, miles driven, EV 전환, freight cost가 ORLY의 장기 수요와 margin에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  PSX: {
+    ticker: "PSX",
+    companyName: "Phillips 66",
+    companyNameKo: "필립스 66",
+    sectorKo: "정유·화학·미드스트림",
+    signature: "Refining, Marketing and Specialties, Midstream, Chemicals, Renewable Fuels를 통해 realized margin, NGL throughput, CPChem 지분 성과, 규제 크레딧을 함께 봐야 하는 downstream 에너지 기업.",
+    description: "기업 리포트: Phillips 66은 정유소, refined products marketing, base oils·lubricants, midstream 파이프라인·NGL 자산, Chevron Phillips Chemical 지분, renewable fuels를 묶어 운영합니다. 공시 해석에서는 refinery utilization, realized margin, turnaround cost, Marketing and Specialties margin, Midstream NGL gathering·processing·fractionation·export, CPChem equity earnings, Rodeo renewable fuels, LCFS·RIN credit을 나눠 봐야 합니다. 정제 마진과 화학 사이클은 분기 변동성이 크고, renewable fuels는 정책·feedstock·가동률에 민감합니다.",
+    researchFocus: [
+      "Refining의 utilization, realized margin, turnaround expense, crude slate",
+      "Marketing and Specialties의 refined products, base oils, lubricants margin",
+      "Midstream의 NGL throughput, pipeline, fractionation, export, Y-grade integration",
+      "Chemicals CPChem 지분과 Renewable Fuels의 feedstock, LCFS, RIN, Rodeo 가동률"
+    ],
+    riskVariables: [
+      "정제 마진 축소와 crude differential 악화",
+      "CPChem의 petrochemical spread와 global plastics demand 둔화",
+      "NGL throughput, pipeline integration, project execution 지연",
+      "renewable fuels credit 가격, feedstock cost, 정책 변화"
+    ],
+    suggestedPrompts: [
+      "Phillips 66의 Refining, Marketing and Specialties, Midstream, Chemicals, Renewable Fuels 성과를 세그먼트별로 정리해줘.",
+      "realized margin, NGL throughput, CPChem equity earnings, LCFS·RIN이 PSX의 현금흐름에 연결되는 경로를 설명해줘.",
+      "정제 마진, 화학 사이클, renewable fuels 정책 변화가 PSX의 배당·자사주 여력에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  RCL: {
+    ticker: "RCL",
+    companyName: "Royal Caribbean Cruises Ltd.",
+    companyNameKo: "로열 캐리비안",
+    sectorKo: "크루즈·여행",
+    signature: "Royal Caribbean International, Celebrity Cruises, Silversea에서 passenger ticket revenue와 onboard revenue를 나눠 보며, load factor, net yield, fuel, newbuild capex가 현금흐름을 좌우하는 크루즈 기업.",
+    description: "기업 리포트: Royal Caribbean은 Royal Caribbean International, Celebrity Cruises, Silversea 브랜드를 통해 크루즈 여객권과 onboard and other revenues를 만듭니다. 공시 해석에서는 passenger ticket revenues, onboard spending, load factor, capacity days, net yields, occupancy, fuel expense, ship operating cost, newbuild delivery, drydock schedule, customer deposits를 함께 봐야 합니다. 수요 회복과 프리미엄화는 yield를 높이지만, 선박 건조 capex와 부채, 연료비, 항만·안전 규제는 free cash flow와 재무 레버리지를 흔듭니다.",
+    researchFocus: [
+      "passenger ticket revenues, onboard and other revenues, net yield",
+      "capacity days, occupancy, load factor, itinerary mix",
+      "newbuild delivery, drydock, ship operating expenses, fuel cost",
+      "customer deposits, debt maturity, interest expense, free cash flow"
+    ],
+    riskVariables: [
+      "여행 수요 둔화와 가격 민감도 상승에 따른 net yield 약화",
+      "연료비, 항만비, 선원비, 보험료 상승",
+      "신조선 인도 지연, drydock 일정, 안전·환경 규제 비용",
+      "고금리와 높은 부채가 capex·주주환원 여력을 제약할 위험"
+    ],
+    suggestedPrompts: [
+      "Royal Caribbean의 passenger ticket revenue와 onboard revenue가 net yield와 현금흐름에 어떻게 기여하는지 정리해줘.",
+      "capacity days, occupancy, load factor, itinerary mix가 RCL의 성장성과 margin에 주는 의미를 설명해줘.",
+      "fuel cost, newbuild capex, customer deposits, debt maturity가 RCL의 free cash flow에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  ROST: {
+    ticker: "ROST",
+    companyName: "Ross Stores, Inc.",
+    companyNameKo: "로스 스토어즈",
+    sectorKo: "오프프라이스 소매",
+    signature: "Ross Dress for Less와 dd's DISCOUNTS에서 closeout buying, comparable store sales, merchandise margin, occupancy cost가 수익성을 좌우하는 오프프라이스 소매업체.",
+    description: "기업 리포트: Ross Stores는 Ross Dress for Less와 dd's DISCOUNTS를 통해 apparel, accessories, footwear, home fashion을 할인 판매합니다. 공시 해석에서는 comparable store sales, store openings, average ticket, transactions, merchandise margin, buying and distribution cost, occupancy cost, packaway inventory를 함께 봐야 합니다. 오프프라이스 모델은 vendor closeout과 opportunistic buying이 강점이지만, 소비자 traffic 약화, wage·freight·rent 상승, inventory markdown은 operating margin을 빠르게 압박합니다.",
+    researchFocus: [
+      "Ross Dress for Less와 dd's DISCOUNTS의 comparable store sales, ticket, transactions",
+      "closeout buying, packaway inventory, merchandise margin",
+      "store openings, occupancy cost, distribution cost, shrink",
+      "apparel, home, footwear mix와 저소득·중산층 소비 민감도"
+    ],
+    riskVariables: [
+      "소비 둔화와 traffic 약화에 따른 comparable store sales 둔화",
+      "markdown, shrink, freight, wage, occupancy cost 상승",
+      "좋은 closeout inventory 확보 실패와 vendor supply 불균형",
+      "점포 확장 지연, 임대료·건설비 상승, 물류센터 병목"
+    ],
+    suggestedPrompts: [
+      "Ross와 dd's DISCOUNTS의 comparable store sales를 ticket, transactions, merchandise margin 관점에서 정리해줘.",
+      "closeout buying, packaway inventory, markdown이 Ross Stores의 gross margin에 어떻게 작동하는지 설명해줘.",
+      "wage, freight, occupancy cost, shrink가 ROST의 operating margin에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  VLO: {
+    ticker: "VLO",
+    companyName: "Valero Energy Corporation",
+    companyNameKo: "발레로 에너지",
+    sectorKo: "정유·재생연료",
+    signature: "Refining, Renewable Diesel, Ethanol을 나눠 보며, refining margin, throughput, DGD renewable diesel, ethanol crush spread가 실적을 좌우하는 downstream 에너지 기업.",
+    description: "기업 리포트: Valero는 Refining에서 원유를 가솔린, 디젤, jet fuel, petrochemical feedstock으로 전환하고, Renewable Diesel에서는 Diamond Green Diesel을 통해 renewable diesel, renewable naphtha, sustainable aviation fuel을 생산하며, Ethanol에서는 ethanol과 distillers grains를 판매합니다. 공시 해석에서는 refinery throughput, utilization, product yield, regional margin, turnaround cost, RIN·LCFS·blender credits, feedstock cost, ethanol crush spread를 함께 봐야 합니다. 정유 마진은 commodity cycle에 민감하고, renewable diesel은 정책·feedstock·가동률에 따라 수익성이 크게 달라집니다.",
+    researchFocus: [
+      "Refining의 throughput, utilization, regional margin, product yield",
+      "Diamond Green Diesel의 renewable diesel, renewable naphtha, SAF, feedstock cost",
+      "Ethanol의 corn cost, ethanol price, distillers grains, crush spread",
+      "RIN, LCFS, blender credits, turnaround expense, working capital"
+    ],
+    riskVariables: [
+      "정제 마진 축소와 원유·제품 스프레드 악화",
+      "refinery outage, turnaround, 안전·환경 사고에 따른 가동률 하락",
+      "renewable diesel credit, RIN, LCFS 정책 변화",
+      "corn, soybean oil, waste feedstock 가격 상승과 물류 병목"
+    ],
+    suggestedPrompts: [
+      "Valero의 Refining, Renewable Diesel, Ethanol 세그먼트를 수익원과 margin driver 기준으로 정리해줘.",
+      "throughput, regional margin, DGD renewable diesel, ethanol crush spread가 VLO의 현금흐름에 연결되는 경로를 설명해줘.",
+      "RIN, LCFS, feedstock cost, turnaround가 Valero의 free cash flow와 자본배분에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  WBD: {
+    ticker: "WBD",
+    companyName: "Warner Bros. Discovery, Inc.",
+    companyNameKo: "워너 브라더스 디스커버리",
+    sectorKo: "미디어·스트리밍",
+    signature: "Studios, Networks, DTC에서 theatrical, content licensing, advertising, distribution, streaming subscribers를 나눠 보며 debt reduction과 content spend가 핵심인 미디어 기업.",
+    description: "기업 리포트: Warner Bros. Discovery는 Studios, Networks, Direct-to-Consumer를 통해 영화·TV 제작, DC·Warner Bros. IP, cable networks, advertising, distribution, streaming을 운영합니다. Studios에서는 theatrical releases, games, TV production, content licensing, home entertainment를 보고, Networks에서는 affiliate fees와 advertising이 핵심입니다. DTC에서는 Max와 Discovery+ 기반 subscribers, ARPU, churn, content spend, marketing cost가 수익성 전환을 좌우합니다. 공시 해석에서는 linear TV decline, ad market, sports rights, content impairment, restructuring, debt repayment를 함께 봐야 합니다.",
+    researchFocus: [
+      "Studios의 theatrical slate, DC IP, TV production, games, content licensing",
+      "Networks의 affiliate revenue, advertising, distribution renewal, linear decline",
+      "DTC의 Max subscribers, ARPU, churn, content spend, marketing efficiency",
+      "free cash flow, debt reduction, restructuring, content impairment"
+    ],
+    riskVariables: [
+      "linear TV cord-cutting과 광고시장 둔화",
+      "DTC churn, 가격 인상 저항, content spend 증가",
+      "영화 slate 부진, games 실패, IP 가치 손상",
+      "높은 부채, 구조조정 비용, sports rights·distribution 협상 리스크"
+    ],
+    suggestedPrompts: [
+      "WBD의 Studios, Networks, DTC가 매출원과 현금흐름에서 어떻게 다른지 정리해줘.",
+      "Max subscribers, ARPU, churn, content spend가 WBD의 DTC 수익성에 연결되는 경로를 설명해줘.",
+      "linear TV decline, 광고시장, content impairment, debt reduction이 WBD의 투자 논지에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
 } satisfies Record<string, CompanyResearchProfile>;
 export const APPLE_RESEARCH_PROFILE = COMPANY_RESEARCH_PROFILES.AAPL;
 export { APPLE_QUESTION_CHAINS };

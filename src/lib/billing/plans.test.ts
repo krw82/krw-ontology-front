@@ -11,28 +11,31 @@ import {
 describe("billing plans", () => {
   it("defines public execution budgets", () => {
     expect(getBillingPlan("free")).toMatchObject({
-      budgetPeriod: "monthly",
-      monthlyBudgetUsd: 20,
+      budgetPeriod: "weekly",
+      monthlyPriceKrw: 0,
+      weeklyAnalysisCreditsRaw: 400000,
+      dailyBudgetUsd: null,
+      perRunReserveUsd: 0,
+      unlimited: false,
+    });
+    expect(getBillingPlan("standard")).toMatchObject({
+      budgetPeriod: "weekly",
+      monthlyPriceKrw: 7900,
+      weeklyAnalysisCreditsRaw: 2000000,
       dailyBudgetUsd: null,
       perRunReserveUsd: 0,
       unlimited: false,
     });
     expect(getBillingPlan("pro")).toMatchObject({
-      budgetPeriod: "monthly",
-      monthlyBudgetUsd: 200,
-      dailyBudgetUsd: null,
-      perRunReserveUsd: 0,
-      unlimited: false,
-    });
-    expect(getBillingPlan("power")).toMatchObject({
-      budgetPeriod: "monthly",
-      monthlyBudgetUsd: 600,
+      budgetPeriod: "weekly",
+      monthlyPriceKrw: 29000,
+      weeklyAnalysisCreditsRaw: 10000000,
       dailyBudgetUsd: null,
       perRunReserveUsd: 0,
       unlimited: false,
     });
     expect(getBillingPlan("internal")).toMatchObject({
-      budgetPeriod: "monthly",
+      budgetPeriod: "weekly",
       dailyBudgetUsd: null,
       perRunReserveUsd: 0,
       unlimited: true,
@@ -42,16 +45,16 @@ describe("billing plans", () => {
   it("exposes only public upgrade plans in display order", () => {
     expect(listPublicBillingPlans().map((plan) => plan.key)).toEqual([
       "free",
+      "standard",
       "pro",
-      "power",
     ]);
   });
 
-  it("derives user-facing analysis credit labels", () => {
+  it("derives user-facing usage labels", () => {
     const free = getBillingPlan("free");
-    expect(getBillingPlanAnalysisCredits(free)).toBe(20000);
+    expect(getBillingPlanAnalysisCredits(free)).toBe(400);
     expect(getBillingPlanBaseRunCredits(free)).toBe(0);
-    expect(getBillingPlanLimitLabel(free)).toBe("분석 크레딧/월");
+    expect(getBillingPlanLimitLabel(free)).toBe("사용량/주");
   });
 
   it("marks internal as unlimited", () => {
@@ -61,8 +64,9 @@ describe("billing plans", () => {
     );
   });
 
-  it("falls back to Beta for unknown plan keys", () => {
-    expect(resolvePlanKey("unknown")).toBe("beta");
-    expect(resolvePlanKey(null)).toBe("beta");
+  it("falls back to Free for unknown plan keys and maps legacy Power to Pro", () => {
+    expect(resolvePlanKey("power")).toBe("pro");
+    expect(resolvePlanKey("unknown")).toBe("free");
+    expect(resolvePlanKey(null)).toBe("free");
   });
 });

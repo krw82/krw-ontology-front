@@ -38,13 +38,36 @@ export function getCurrentMonthlyBillingPeriod(
   };
 }
 
+export function getCurrentWeeklyBillingPeriod(
+  anchor: Date | string,
+  now = new Date(),
+): BillingPeriod {
+  const anchorTime = new Date(anchor).getTime();
+  const nowTime = now.getTime();
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+
+  if (!Number.isFinite(anchorTime)) {
+    throw new Error("credit anchor must be a valid date");
+  }
+
+  const weekIndex = Math.max(0, Math.floor((nowTime - anchorTime) / weekMs));
+  const start = new Date(anchorTime + weekIndex * weekMs);
+  const end = new Date(start.getTime() + weekMs);
+
+  return {
+    start: start.toISOString(),
+    end: end.toISOString(),
+    label: "이번 주",
+  };
+}
+
 export function getCurrentBillingPeriod(
   period: EntitlementUsagePeriod,
   now = new Date(),
 ): BillingPeriod {
-  return period === "daily"
-    ? getCurrentDailyBillingPeriod(now)
-    : getCurrentMonthlyBillingPeriod(now);
+  if (period === "daily") return getCurrentDailyBillingPeriod(now);
+  if (period === "weekly") return getCurrentWeeklyBillingPeriod(now, now);
+  return getCurrentMonthlyBillingPeriod(now);
 }
 
 export function isDateWithinPeriod(

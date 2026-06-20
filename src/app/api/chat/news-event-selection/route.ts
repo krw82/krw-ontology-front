@@ -12,6 +12,12 @@ import {
   getClientIp,
 } from "@/lib/api/chat/rate-limit";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
+import {
+  attachAnalysisCreditRunShadow,
+  releaseAnalysisCreditsShadow,
+  reserveAnalysisCreditsShadow,
+} from "@/lib/concurrency/analysis-credits";
+import { shouldBlockAnalysisCreditReservation } from "@/lib/billing/credit-policy";
 import { getActiveOntologyCatalogRelease } from "@/lib/ontology/catalog";
 import { normalizeResearchMode } from "@/lib/research-mode";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -174,6 +180,35 @@ export async function POST(request: NextRequest) {
     researchMode,
   );
   if (!budgetResult.ok) return budgetResult.response;
+  const creditReservation = await reserveAnalysisCreditsShadow(user.id, requestId, {
+    runKind: "news_research",
+    researchMode,
+  });
+  if (
+    !budgetResult.budget.entitlement?.usage.unlimited &&
+    shouldBlockAnalysisCreditReservation(creditReservation)
+  ) {
+    await releaseExecutionBudget(
+      user.id,
+      requestId,
+      null,
+      "analysis_credit_reserve_blocked",
+    );
+    await releaseAnalysisCreditsShadow(
+      user.id,
+      requestId,
+      null,
+      "analysis_credit_reserve_blocked",
+    );
+    return errorResponse(
+      creditReservation.ok ? 429 : 500,
+      creditReservation.ok ? "cost_cap_exceeded" : "internal_error",
+      creditReservation.ok
+        ? "이번 주 분석 한도에 도달해 새 분석을 시작할 수 없습니다."
+        : "사용량 정보를 확인하지 못했습니다.",
+      requestId,
+    );
+  }
 
   const selectedEvent = artifactResult.event;
   const visibleUserMessage = selectedEventUserMessage(selectedEvent);
@@ -184,6 +219,12 @@ export async function POST(request: NextRequest) {
   );
   if (!historyResult.ok) {
     await releaseExecutionBudget(user.id, requestId, null, "history_fetch_failed");
+    await releaseAnalysisCreditsShadow(
+      user.id,
+      requestId,
+      null,
+      "history_fetch_failed",
+    );
     return historyResult.response;
   }
 
@@ -210,6 +251,12 @@ export async function POST(request: NextRequest) {
       enqueueResult.runId ?? null,
       enqueueResult.reason,
     );
+    await releaseAnalysisCreditsShadow(
+      user.id,
+      requestId,
+      enqueueResult.runId ?? null,
+      enqueueResult.reason,
+    );
     await getSupabaseAdmin()
       .from("messages")
       .delete()
@@ -226,6 +273,8 @@ export async function POST(request: NextRequest) {
       requestId,
     );
   }
+
+  await attachAnalysisCreditRunShadow(user.id, requestId, enqueueResult.runId);
 
   await upsertSelection({
     artifactId: artifactResult.artifact.id,

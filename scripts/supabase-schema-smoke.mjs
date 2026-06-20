@@ -73,6 +73,16 @@ const checks = [
     select: "worker_id,ontology_env,ontology_release_id,manifest_valid",
   },
   {
+    table: "desktop_authorization_requests",
+    select:
+      "id,client_id,redirect_uri,installation_id,device_name,status,user_id,device_id,expires_at,approved_at,consumed_at",
+  },
+  {
+    table: "desktop_llm_jobs",
+    select:
+      "id,user_id,device_id,local_run_id,status,provider,model_profile,sdk_model,upstream_model,request_count,max_request_count,expires_at,finalized_at",
+  },
+  {
     table: "ontology_catalog_releases",
     select: "env,release_id,active,company_count,document_count",
   },
@@ -103,6 +113,63 @@ const checks = [
   {
     table: "usage_ledger",
     select: "id,user_id,request_id,entry_type,amount_usd",
+  },
+  {
+    table: "credit_policies",
+    select: "version,input_token_weight,output_token_weight,display_scale",
+  },
+  {
+    table: "provider_pricing_policies",
+    select:
+      "version,provider,provider_model,input_cache_hit_cost_per_million,input_cache_miss_cost_per_million,output_cost_per_million,source_url,verified_at",
+  },
+  {
+    table: "billing_plan_versions",
+    select:
+      "id,plan_key,plan_version,monthly_price_krw,weekly_credit_limit_raw,credit_policy_version,is_current",
+  },
+  {
+    table: "billing_toss_customers",
+    select: "user_id,customer_key,created_at,updated_at",
+  },
+  {
+    table: "billing_toss_checkout_sessions",
+    select:
+      "id,user_id,plan_key,plan_version_id,amount_krw,customer_key,status,billing_key_idempotency_key,expires_at",
+  },
+  {
+    table: "billing_toss_subscriptions",
+    select:
+      "id,user_id,plan_key,plan_version_id,status,customer_key,billing_method,current_period_start,current_period_end,renewal_due_at,next_billing_at,grace_until,renewal_attempt_count,pending_plan_key",
+  },
+  {
+    table: "billing_toss_payments",
+    select:
+      "id,user_id,subscription_id,checkout_session_id,plan_key,payment_kind,order_id,amount_krw,billing_period_start,billing_period_end,attempt_number,status,provider_payment_key",
+  },
+  {
+    table: "usage_credit_balances",
+    select:
+      "user_id,period_kind,period_start,credits_limit_raw,credits_used_raw,credits_reserved_raw",
+  },
+  {
+    table: "run_credit_reservations",
+    select:
+      "id,user_id,request_id,run_id,credit_period_start,reserved_credits_raw,status",
+  },
+  {
+    table: "usage_credit_ledger",
+    select: "id,user_id,request_id,entry_type,amount_credits_raw",
+  },
+  {
+    table: "analysis_credit_run_costs",
+    select:
+      "reservation_id,user_id,request_id,input_tokens,output_tokens,settled_credits_raw,settled_credits_display,actual_provider_cost_usd",
+  },
+  {
+    table: "analysis_credit_weekly_usage_summary",
+    select:
+      "user_id,period_start,credits_used_raw,credits_used_display,run_count,avg_provider_cost_usd_per_run",
   },
   {
     table: "chat_message_artifacts",
@@ -215,6 +282,22 @@ if (reserveRpcError && reserveRpcError.code !== "23503") {
 }
 console.log("OK schema: reserve_execution_budget RPC");
 
+const { error: reserveAnalysisRpcError } = await supabase.rpc("reserve_analysis_credits", {
+  p_user_id: zeroUuid,
+  p_request_id: `schema-smoke-analysis:${Date.now()}`,
+  p_reserve_credits_raw: 1,
+  p_expires_at: new Date(Date.now() + 60_000).toISOString(),
+  p_now: new Date(Date.UTC(2099, 0, 1)).toISOString(),
+});
+
+if (reserveAnalysisRpcError && reserveAnalysisRpcError.code !== "23503") {
+  console.error(
+    `Schema smoke failed for reserve_analysis_credits RPC: ${reserveAnalysisRpcError.message}`,
+  );
+  process.exit(1);
+}
+console.log("OK schema: reserve_analysis_credits RPC");
+
 function isExpectedBlockedRpcError(error) {
   const code = String(error?.code ?? "");
   const message = String(error?.message ?? "").toLowerCase();
@@ -249,6 +332,46 @@ async function expectAnonRpcBlocked(name, args) {
 
   console.log(`OK schema: ${name} blocks anon execute`);
 }
+
+async function expectAnonTableBlocked(table, select) {
+  const { error, status } = await anonSupabase
+    .from(table)
+    .select(select, { head: true, count: "exact" })
+    .limit(1);
+
+  if (!error) {
+    console.error(
+      `Schema smoke failed for ${table}: anon role can inspect service-only billing table.`,
+    );
+    process.exit(1);
+  }
+
+  if (status !== 401 && status !== 403 && !isExpectedBlockedRpcError(error)) {
+    console.error(
+      `Schema smoke failed for ${table}: expected anon select denial, got ${error.code ?? "unknown"} ${error.message}`,
+    );
+    process.exit(1);
+  }
+
+  console.log(`OK schema: ${table} blocks anon select`);
+}
+
+await expectAnonTableBlocked(
+  "billing_toss_customers",
+  "user_id,customer_key",
+);
+await expectAnonTableBlocked(
+  "billing_toss_checkout_sessions",
+  "id,user_id,status",
+);
+await expectAnonTableBlocked(
+  "billing_toss_subscriptions",
+  "id,user_id,status,billing_key",
+);
+await expectAnonTableBlocked(
+  "billing_toss_payments",
+  "id,user_id,status",
+);
 
 await expectAnonRpcBlocked("claim_agent_run", {
   p_worker_id: "",
@@ -294,6 +417,50 @@ await expectAnonRpcBlocked("record_usage_event", {
   p_period_start: new Date().toISOString(),
   p_period_end: new Date().toISOString(),
   p_cost: 0,
+});
+await expectAnonRpcBlocked("reserve_analysis_credits", {
+  p_user_id: zeroUuid,
+  p_request_id: "schema-smoke",
+  p_reserve_credits_raw: 1,
+  p_expires_at: new Date(Date.now() + 60_000).toISOString(),
+  p_now: new Date().toISOString(),
+});
+await expectAnonRpcBlocked("attach_analysis_credit_run", {
+  p_user_id: zeroUuid,
+  p_request_id: "schema-smoke",
+  p_run_id: zeroUuid,
+});
+await expectAnonRpcBlocked("settle_analysis_credits", {
+  p_user_id: zeroUuid,
+  p_request_id: "schema-smoke",
+  p_run_id: zeroUuid,
+  p_terminal_status: "failed",
+  p_settled_credits_raw: 0,
+  p_input_tokens: 0,
+  p_output_tokens: 0,
+  p_prompt_cache_hit_tokens: 0,
+  p_prompt_cache_miss_tokens: 0,
+  p_provider: "deepseek",
+  p_provider_model: "deepseek-v4-flash",
+  p_provider_model_version: "DeepSeek-V4-Flash",
+  p_pricing_version: "deepseek-v4-flash-2026-06",
+  p_actual_provider_cost_usd: 0,
+  p_metadata: {},
+});
+await expectAnonRpcBlocked("release_analysis_credits", {
+  p_user_id: zeroUuid,
+  p_request_id: "schema-smoke",
+  p_run_id: zeroUuid,
+  p_reason: "schema_smoke",
+});
+await expectAnonRpcBlocked("expire_stale_analysis_credit_reservations", {
+  p_now: new Date().toISOString(),
+});
+await expectAnonRpcBlocked("claim_due_toss_subscriptions", {
+  p_worker_id: "schema-smoke",
+  p_now: new Date().toISOString(),
+  p_limit: 1,
+  p_lease_seconds: 60,
 });
 
 console.log("Supabase schema smoke test passed.");

@@ -17,7 +17,7 @@ const relatedLinks = {
     {
       href: "/pricing",
       label: "가격",
-      description: "무료 베타 한도를 확인합니다.",
+      description: "Free, Standard, Pro 플랜을 확인합니다.",
     },
   ],
   en: [
@@ -34,7 +34,7 @@ const relatedLinks = {
     {
       href: "/pricing",
       label: "Pricing",
-      description: "Review the free beta limits.",
+      description: "Review Free, Standard, and Pro plans.",
     },
   ],
 } as const;

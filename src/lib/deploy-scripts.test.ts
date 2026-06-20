@@ -46,6 +46,7 @@ describe("production deploy scripts", () => {
     expect(packageJson).toContain('"deploy:legacy:gcp-mcp": "scripts/deploy-plugin-production.sh"');
     expect(packageJson).toContain('"publish:web-catalog": "node scripts/publish-web-catalog.mjs"');
     expect(packageJson).toContain('"verify:web-catalog": "node scripts/verify-web-catalog-release.mjs"');
+    expect(packageJson).toContain('"billing:prod:readiness": "scripts/verify-billing-production-readiness.sh"');
     expect(packageJson).toContain('"mcp:prod:start": "scripts/start-mcp-server-production.sh"');
     expect(packageJson).toContain('"mcp:prod:verify": "scripts/verify-mcp-server-production.sh"');
     expect(packageJson).toContain('"mcp:prod:logs": "scripts/tail-mcp-logs.sh prod"');
@@ -128,6 +129,33 @@ describe("production deploy scripts", () => {
     expect(script).toContain("OK web ontology data boundary: Supabase catalog only");
   });
 
+  it("requires live Toss keys for paid production readiness", () => {
+    const deployVm = read("scripts/deploy-vm-compose.sh");
+    const readiness = read("scripts/verify-billing-production-readiness.sh");
+    const billingContract = read("docs/billing-credit-contract.md");
+    const commandDocs = read("docs/DEPLOY_COMMANDS.md");
+
+    expect(deployVm).toContain("ALLOW_MISSING_TOSS_PAYMENTS");
+    expect(deployVm).toContain("ALLOW_TOSS_TEST_KEYS");
+    expect(deployVm).toContain("require_env_exact ANALYSIS_CREDIT_ENFORCEMENT_MODE enforced");
+    expect(deployVm).toContain("require_toss_payments_key");
+    expect(deployVm).toContain("live_ck_");
+    expect(deployVm).toContain("live_sk_");
+
+    expect(readiness).toContain("/api/billing/toss/checkout");
+    expect(readiness).toContain("401");
+    expect(readiness).toContain("ANALYSIS_CREDIT_ENFORCEMENT_MODE");
+    expect(readiness).toContain("TOSS_PAYMENTS_CLIENT_KEY");
+    expect(readiness).toContain("billing-worker");
+
+    expect(billingContract).toContain("Production Readiness Gate");
+    expect(billingContract).toContain("npm run billing:prod:readiness");
+    expect(billingContract).toContain("live_sk_");
+    expect(commandDocs).toContain("Production billing");
+    expect(commandDocs).toContain("scripts/restart-production-compose.sh");
+    expect(commandDocs).toContain("npm run billing:prod:readiness");
+  });
+
   it("passes all production deploy switches through the safe queue wrapper", () => {
     const script = read("scripts/deploy-with-queue-pause.sh");
 
@@ -197,6 +225,12 @@ describe("production deploy scripts", () => {
     expect(workerSection).toContain("shard_manifest.json");
     expect(workerSection).not.toContain("agent_index.sqlite");
     expect(workerSection).toContain(".mcp.json");
+    const billingWorkerSection = compose.slice(compose.indexOf("  billing-worker:"));
+    expect(billingWorkerSection).toContain(
+      "BILLING_WORKER_REQUIRE_TOSS_PAYMENTS=${BILLING_WORKER_REQUIRE_TOSS_PAYMENTS:-1}",
+    );
+    expect(billingWorkerSection).toContain("live_ck_");
+    expect(billingWorkerSection).toContain("live_sk_");
     expect(webSection).not.toContain("KRW_ONTOLOGY_RELEASE_ROOT");
     expect(webSection).not.toContain("agent_index.sqlite");
     expect(webSection).not.toContain("/srv/krw-ontology-data:/srv/krw-ontology-data");
@@ -271,7 +305,7 @@ describe("production deploy scripts", () => {
 
     const initEnv = read("scripts/init-mac-worker-env.sh");
     expect(initEnv).toContain("~/.local/bin/claude-krw");
-    expect(initEnv).toContain("EXPECTED_CLAUDE_CODE_VERSION=2.1.111");
+    expect(initEnv).toContain("EXPECTED_CLAUDE_CODE_VERSION=2.1.141");
     expect(initEnv).toContain("KRW_ONTOLOGY_QUEUE_ROOT=~/krw-ontology-data-running");
     expect(initEnv).toContain("$HOME/krw-ontology");
     expect(initEnv).toContain("ref/plugins/prod/krw-ontology");

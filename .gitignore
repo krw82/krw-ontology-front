@@ -16,6 +16,7 @@
 # next.js
 /.next/
 /.worker/
+/.services/
 /.next-e2e/
 /.next-cua/
 /out/

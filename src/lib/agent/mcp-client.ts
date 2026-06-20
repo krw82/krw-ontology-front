@@ -75,6 +75,7 @@ export function isStockNewsEnabled(
 ): boolean {
   if (truthyEnv(env.STOCK_NEWS_FORCE_DISABLED)) return false;
   if (falseyEnv(env.STOCK_NEWS_ENABLED)) return false;
+  if (!env.FINNHUB_API_KEY) return false;
 
   return true;
 }

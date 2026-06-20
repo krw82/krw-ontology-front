@@ -10,22 +10,26 @@ interface UsageStatusProps {
 
 function usageLabel(entitlement: EntitlementStatus | null): string {
   if (!entitlement) return "사용량 확인 중";
-  if (entitlement.usage.unlimited) return "무제한";
-
-  return `분석 크레딧 ${entitlement.usage.remaining_analysis_credits.toLocaleString()}개 남음`;
+  if (entitlement.usage.unlimited) return "사용량 제한 없음";
+  if (entitlement.usage.alert_level === "blocked") return "이번 주 분석량 모두 사용";
+  if (entitlement.usage.percent_used >= 90) return "이번 주 분석량 거의 다 사용";
+  if (entitlement.usage.percent_used >= 50) return "이번 주 분석량 절반 이상 사용";
+  if (entitlement.usage.percent_used > 0) return "이번 주 분석량 여유 있음";
+  return "이번 주 분석량 사용 전";
 }
 
 function usageDetail(entitlement: EntitlementStatus | null): string {
-  if (!entitlement) return "오늘 리서치 사용량을 불러오는 중입니다.";
+  if (!entitlement) return "리서치 사용량을 불러오는 중입니다.";
   if (entitlement.usage.unlimited) {
-    return `${entitlement.usage.run_count.toLocaleString()}회 실행 · 한도 없음`;
+    return "제한 없이 새 분석을 시작할 수 있습니다.";
   }
-
-  const usedCredits =
-    entitlement.usage.analysis_credits_used +
-    entitlement.usage.analysis_credits_reserved;
-
-  return `${entitlement.usage.period_label} ${usedCredits.toLocaleString()} / ${entitlement.usage.analysis_credits_limit.toLocaleString()} 크레딧 사용 · ${entitlement.usage.run_count.toLocaleString()}회 실행`;
+  if (entitlement.usage.alert_level === "blocked") {
+    return "다음 충전 전까지 새 분석은 시작할 수 없습니다.";
+  }
+  if (entitlement.usage.alert_level === "warning") {
+    return "다음 충전 전까지 사용량을 확인하세요.";
+  }
+  return `${entitlement.usage.period_label} 사용량`;
 }
 
 export default function UsageStatus({
@@ -33,7 +37,9 @@ export default function UsageStatus({
   loading = false,
   variant = "composer",
 }: UsageStatusProps) {
-  const percent = loading ? 0 : entitlement?.usage.percent_used ?? 0;
+  const percent = loading
+    ? 0
+    : Math.max(0, Math.min(100, entitlement?.usage.percent_used ?? 0));
   const planLabel = entitlement?.plan.label ?? "Free";
   const alertLevel = entitlement?.usage.alert_level ?? "ok";
   const accentClass =
@@ -82,7 +88,7 @@ export default function UsageStatus({
           </div>
         )}
         <p className="mt-sm text-[13px] font-medium leading-5 text-muted">
-          {entitlement?.usage.period_label ?? "현재"} 사용량은 현재 플랜 분석 크레딧 기준으로 표시됩니다. 복잡한 분석은 더 많은 크레딧을 사용할 수 있습니다.
+          사용량은 분석 범위와 답변 길이에 따라 반영됩니다.
         </p>
       </div>
     );

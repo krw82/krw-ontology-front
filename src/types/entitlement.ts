@@ -1,8 +1,13 @@
-export type EntitlementPlanKey = "free" | "pro" | "power" | "beta" | "internal";
+export type EntitlementPlanKey =
+  | "free"
+  | "standard"
+  | "pro"
+  | "beta"
+  | "internal";
 
 export type EntitlementAlertLevel = "ok" | "warning" | "blocked";
 export type EntitlementAccessStatus = "standard" | "beta" | "admin";
-export type EntitlementUsagePeriod = "daily" | "monthly";
+export type EntitlementUsagePeriod = "daily" | "weekly" | "monthly";
 
 export interface EntitlementFeature {
   key:
@@ -30,6 +35,16 @@ export interface EntitlementUsage {
   daily_budget_reserved_usd: number;
   daily_budget_limit_usd: number;
   per_run_reserve_usd: number;
+  credits_used_raw?: number;
+  credits_reserved_raw?: number;
+  credits_limit_raw?: number;
+  credits_remaining_raw?: number;
+  credits_used_display?: number;
+  credits_reserved_display?: number;
+  credits_limit_display?: number;
+  credits_remaining_display?: number;
+  credit_policy_version?: string;
+  credit_enforcement_mode?: "shadow" | "soft_warning" | "enforced";
   analysis_credits_used: number;
   analysis_credits_reserved: number;
   analysis_credits_limit: number;

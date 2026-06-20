@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getConfiguredBillingRedirectOrigin,
   getConfiguredAppOrigin,
   getConfiguredRedirectOrigin,
   normalizeRedirectOrigin,
@@ -37,5 +38,27 @@ describe("auth origin helpers", () => {
         NEXT_PUBLIC_SITE_URL: "https://krwontology.com",
       }),
     ).toBe("https://auth.krwontology.com");
+  });
+
+  it("requires configured billing redirect origin in production", () => {
+    expect(
+      getConfiguredBillingRedirectOrigin("https://attacker.example", {
+        NODE_ENV: "production",
+      }),
+    ).toBeNull();
+    expect(
+      getConfiguredBillingRedirectOrigin("https://request.example", {
+        NODE_ENV: "production",
+        NEXT_PUBLIC_APP_URL: "https://app.krwontology.com/settings",
+      }),
+    ).toBe("https://app.krwontology.com");
+  });
+
+  it("allows request-origin fallback for billing redirects outside production", () => {
+    expect(
+      getConfiguredBillingRedirectOrigin("http://localhost:3000", {
+        NODE_ENV: "development",
+      }),
+    ).toBe("http://localhost:3000");
   });
 });

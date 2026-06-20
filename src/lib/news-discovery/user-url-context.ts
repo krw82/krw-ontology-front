@@ -1,7 +1,17 @@
 import "server-only";
 
 import { lookup } from "node:dns/promises";
+import {
+  request as httpRequest,
+  type IncomingHttpHeaders,
+  type RequestOptions as HttpRequestOptions,
+} from "node:http";
+import {
+  request as httpsRequest,
+  type RequestOptions as HttpsRequestOptions,
+} from "node:https";
 import { isIP } from "node:net";
+import { Readable } from "node:stream";
 
 const MAX_REDIRECTS = 3;
 const FETCH_TIMEOUT_MS = 8_000;
@@ -54,6 +64,12 @@ interface ExtractedUserUrlDocument {
   canonicalUrl: string;
   visibleText: string;
   textTruncated: boolean;
+}
+
+interface PublicHttpUrlResolution {
+  parsed: URL;
+  hostname: string;
+  address: string;
 }
 
 export async function buildUserUrlNewsEventContext(
@@ -260,8 +276,8 @@ export async function fetchUserUrlDocument(
   let currentUrl = sourceUrl;
 
   for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
-    await assertPublicHttpUrl(currentUrl);
-    const response = await fetchWithTimeout(currentUrl);
+    const resolution = await resolvePublicHttpUrl(currentUrl);
+    const response = await fetchWithTimeout(resolution);
 
     if (isRedirectStatus(response.status)) {
       const location = response.headers.get("location");
@@ -349,16 +365,17 @@ export function isPrivateIpAddress(address: string): boolean {
   return false;
 }
 
-async function assertPublicHttpUrl(url: string) {
+async function resolvePublicHttpUrl(url: string): Promise<PublicHttpUrlResolution> {
   const parsed = new URL(normalizeUserUrlForFetch(url));
-  if (parsed.hostname === "localhost" || parsed.hostname.endsWith(".localhost")) {
+  const hostname = normalizeLookupHostname(parsed.hostname);
+  if (hostname === "localhost" || hostname.endsWith(".localhost")) {
     throw new UserUrlContextError(
       "blocked_url",
       "로컬 주소는 읽을 수 없습니다.",
     );
   }
 
-  const records = await lookup(parsed.hostname, { all: true, verbatim: true });
+  const records = await lookup(hostname, { all: true, verbatim: true });
   if (records.length === 0) {
     throw new UserUrlContextError(
       "fetch_failed",
@@ -373,34 +390,96 @@ async function assertPublicHttpUrl(url: string) {
       "내부 네트워크 주소는 읽을 수 없습니다.",
     );
   }
+
+  return {
+    parsed,
+    hostname,
+    address: records[0].address,
+  };
 }
 
-async function fetchWithTimeout(url: string): Promise<Response> {
+async function fetchWithTimeout(
+  resolution: PublicHttpUrlResolution,
+): Promise<Response> {
+  const { parsed, hostname, address } = resolution;
+  const isHttps = parsed.protocol === "https:";
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    return await fetch(url, {
-      redirect: "manual",
-      signal: controller.signal,
-      headers: {
-        Accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.1",
-        "User-Agent": USER_AGENT,
-      },
-    });
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new UserUrlContextError(
-        "fetch_failed",
-        "URL 응답 시간이 너무 깁니다.",
-      );
-    }
-    throw new UserUrlContextError(
-      "fetch_failed",
-      "URL을 읽지 못했습니다.",
-    );
-  } finally {
-    clearTimeout(timeoutId);
+  let timedOut = false;
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, FETCH_TIMEOUT_MS);
+
+  const requestOptions: HttpRequestOptions & HttpsRequestOptions = {
+    hostname: address,
+    port: parsed.port ? Number.parseInt(parsed.port, 10) : isHttps ? 443 : 80,
+    path: `${parsed.pathname}${parsed.search}`,
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.1",
+      Host: parsed.host,
+      "User-Agent": USER_AGENT,
+    },
+    signal: controller.signal,
+  };
+
+  if (isHttps) {
+    requestOptions.servername = hostname;
   }
+
+  return new Promise<Response>((resolve, reject) => {
+    const request = (isHttps ? httpsRequest : httpRequest)(
+      requestOptions,
+      (incoming) => {
+        clearTimeout(timeoutId);
+        resolve(
+          new Response(Readable.toWeb(incoming) as ReadableStream<Uint8Array>, {
+            status: incoming.statusCode ?? 599,
+            headers: headersFromIncoming(incoming.headers),
+          }),
+        );
+      },
+    );
+
+    request.on("error", (error) => {
+      clearTimeout(timeoutId);
+      if (timedOut || error.name === "AbortError") {
+        reject(
+          new UserUrlContextError(
+            "fetch_failed",
+            "URL 응답 시간이 너무 깁니다.",
+          ),
+        );
+        return;
+      }
+      reject(
+        new UserUrlContextError(
+          "fetch_failed",
+          "URL을 읽지 못했습니다.",
+        ),
+      );
+    });
+
+    request.end();
+  });
+}
+
+function headersFromIncoming(headers: IncomingHttpHeaders): Headers {
+  const result = new Headers();
+  for (const [key, value] of Object.entries(headers)) {
+    if (Array.isArray(value)) {
+      for (const item of value) result.append(key, item);
+    } else if (typeof value === "string") {
+      result.set(key, value);
+    }
+  }
+  return result;
+}
+
+function normalizeLookupHostname(hostname: string): string {
+  return hostname.startsWith("[") && hostname.endsWith("]")
+    ? hostname.slice(1, -1)
+    : hostname;
 }
 
 function isRedirectStatus(status: number): boolean {
@@ -626,6 +705,10 @@ function isPrivateIpv4(address: string): boolean {
 
 function isPrivateIpv6(address: string): boolean {
   const lower = address.toLowerCase();
+  if (lower.startsWith("::ffff:")) {
+    return isPrivateIpv4(lower.slice("::ffff:".length));
+  }
+
   return (
     lower === "::1" ||
     lower === "::" ||
@@ -634,10 +717,6 @@ function isPrivateIpv6(address: string): boolean {
     lower.startsWith("fe8") ||
     lower.startsWith("fe9") ||
     lower.startsWith("fea") ||
-    lower.startsWith("feb") ||
-    lower.startsWith("::ffff:10.") ||
-    lower.startsWith("::ffff:127.") ||
-    lower.startsWith("::ffff:169.254.") ||
-    lower.startsWith("::ffff:192.168.")
+    lower.startsWith("feb")
   );
 }

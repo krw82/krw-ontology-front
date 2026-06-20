@@ -5,7 +5,7 @@ usage() {
   cat <<'EOF'
 Usage: scripts/restart-production-compose.sh [--dry-run]
 
-Restart the production GCP web/reverse-proxy services and print their status.
+Restart the production GCP web/reverse-proxy/billing services and print their status.
 The GCP agent-worker is intentionally excluded because production agent
 execution is handled by Mac launchd workers.
 
@@ -55,7 +55,7 @@ require_command gcloud
 REMOTE_COMMAND=$(cat <<EOF
 set -eu
 cd '$REMOTE_FRONT_DIR'
-docker compose --project-name '$COMPOSE_PROJECT_NAME' --env-file '$ENV_FILE' restart reverse-proxy web
+docker compose --project-name '$COMPOSE_PROJECT_NAME' --env-file '$ENV_FILE' restart reverse-proxy web llm-gateway document-worker billing-worker
 docker compose --project-name '$COMPOSE_PROJECT_NAME' --env-file '$ENV_FILE' ps
 EOF
 )
@@ -65,7 +65,7 @@ echo "Remote frontend: $REMOTE_FRONT_DIR"
 echo "Compose project: $COMPOSE_PROJECT_NAME"
 
 if [ "$DRY_RUN" = "1" ]; then
-  echo "Dry run: would restart reverse-proxy and web on production."
+  echo "Dry run: would restart reverse-proxy, web, llm-gateway, document-worker, and billing-worker on production."
   exit 0
 fi
 

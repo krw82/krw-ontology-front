@@ -17,6 +17,17 @@ describe("getClientIp", () => {
     expect(getClientIp(headers)).toBe("203.0.113.20");
   });
 
+  it("does not trust the default client IP header in production", () => {
+    expect(
+      getClientIp(
+        new Headers({
+          "x-krw-client-ip": "203.0.113.20",
+        }),
+        { NODE_ENV: "production" },
+      ),
+    ).toBe("unknown");
+  });
+
   it("ignores directly supplied proxy headers", () => {
     expect(
       getClientIp(

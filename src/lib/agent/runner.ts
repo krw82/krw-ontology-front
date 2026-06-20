@@ -41,6 +41,7 @@ import {
   type ResearchModeToolBudget,
 } from "@/lib/research-mode";
 import { normalizeAnalysisMode, type AnalysisMode } from "@/lib/analysis-mode";
+import { isPreferredMarketNewsUrl } from "@/lib/news-discovery/source-policy";
 import {
   defaultRunKindForAnalysisMode,
   normalizeRunKind,
@@ -365,6 +366,9 @@ async function runSdkPass(params: {
     DEFAULT_STOCK_NEWS_MAX_CALLS,
     { min: 1 },
   );
+  const allowedStockNewsSourceUrls = extractAllowedStockNewsSourceUrls(
+    options.selectedNewsEventContext,
+  );
 
   try {
     const passCanUseTool = createToolPermissionGuard(
@@ -374,6 +378,7 @@ async function runSdkPass(params: {
       runKind,
       maxToolCalls,
       maxStockNewsCalls,
+      allowedStockNewsSourceUrls,
     );
     const sdkQuery = query({
       prompt,
@@ -441,7 +446,13 @@ async function runSdkPass(params: {
             addToken(acc, resultText);
           }
           const usage = usageFromSdkMessage(message);
-          setUsage(acc, usage.inputTokens, usage.outputTokens);
+          setUsage(
+            acc,
+            usage.inputTokens,
+            usage.outputTokens,
+            usage.cacheHitInputTokens,
+            usage.cacheMissInputTokens,
+          );
           finalResult = { acc, status: "completed" };
         } else {
           const rawErrorMessage =
@@ -451,7 +462,13 @@ async function runSdkPass(params: {
           const errorCode = errorCodeFromMessage(rawErrorMessage);
           if (errorCode === TOOL_BUDGET_EXCEEDED && acc.fullText.trim()) {
             const usage = usageFromSdkMessage(message);
-            setUsage(acc, usage.inputTokens, usage.outputTokens);
+            setUsage(
+              acc,
+              usage.inputTokens,
+              usage.outputTokens,
+              usage.cacheHitInputTokens,
+              usage.cacheMissInputTokens,
+            );
             finalResult = { acc, status: "completed" };
           } else {
             finalResult = {
@@ -629,6 +646,7 @@ function createToolPermissionGuard(
   runKind: RunKind,
   maxToolCalls: number,
   maxStockNewsCalls: number,
+  allowedStockNewsSourceUrls: string[] = [],
 ) {
   return async (
     toolName: string,
@@ -672,6 +690,25 @@ function createToolPermissionGuard(
           behavior: "deny",
           message: buildStockNewsBudgetDenyMessage(),
         };
+      }
+
+      if (stockNewsToolName === "read_news_sources") {
+        const constrainedInput = constrainReadNewsSourcesInput(
+          input,
+          allowedStockNewsSourceUrls,
+        );
+        if (!constrainedInput.ok) {
+          return {
+            behavior: "deny",
+            message: constrainedInput.message,
+          };
+        }
+        if (constrainedInput.changed) {
+          return {
+            behavior: "allow",
+            updatedInput: constrainedInput.input,
+          };
+        }
       }
 
       const preparedInput = prepareStockNewsToolInputForRun(
@@ -849,6 +886,121 @@ function prepareStockNewsToolInputForRun(
   }
 
   return { input: next, changed };
+}
+
+function constrainReadNewsSourcesInput(
+  input: Record<string, unknown>,
+  allowedSourceUrls: string[],
+):
+  | { ok: true; input: Record<string, unknown>; changed: boolean }
+  | { ok: false; message: string } {
+  const allowedUrls = uniqueUrls(allowedSourceUrls).slice(0, 3);
+  if (allowedUrls.length === 0) {
+    return {
+      ok: false,
+      message:
+        "read_news_sources is limited to selected preferred market-news URLs. No eligible selected URL is available.",
+    };
+  }
+
+  const allowedByKey = new Map(
+    allowedUrls.map((url) => [normalizeComparableUrl(url), url] as const),
+  );
+  const requestedUrls = Array.isArray(input.urls)
+    ? input.urls.filter((value): value is string => typeof value === "string")
+    : [];
+  const constrainedUrls = uniqueUrls(
+    requestedUrls
+      .map((url) => allowedByKey.get(normalizeComparableUrl(url)))
+      .filter((url): url is string => Boolean(url)),
+  );
+  const nextUrls = constrainedUrls.length > 0 ? constrainedUrls : allowedUrls;
+  const changed =
+    !Array.isArray(input.urls) ||
+    requestedUrls.length !== nextUrls.length ||
+    requestedUrls.some(
+      (url, index) =>
+        normalizeComparableUrl(url) !== normalizeComparableUrl(nextUrls[index]),
+    );
+
+  return {
+    ok: true,
+    input: changed ? { ...input, urls: nextUrls } : input,
+    changed,
+  };
+}
+
+function extractAllowedStockNewsSourceUrls(
+  selectedNewsEventContext: Record<string, unknown> | null | undefined,
+): string[] {
+  if (!selectedNewsEventContext) return [];
+  const urls: string[] = [];
+  const add = (value: unknown) => {
+    if (typeof value !== "string" || !value.trim()) return;
+    if (!isPreferredMarketNewsUrl(value)) return;
+    urls.push(normalizeDisplayUrl(value));
+  };
+  const addRecord = (record: Record<string, unknown>) => {
+    add(record.url);
+    add(record.link);
+    add(record.source_url);
+    add(record.canonical_url);
+    for (const key of ["source_urls", "reader_urls", "major_news_urls"]) {
+      for (const value of readStringArray(record[key])) add(value);
+    }
+    for (const key of ["source_previews", "primary_sources", "secondary_sources"]) {
+      for (const source of readRecordArray(record[key])) addRecord(source);
+    }
+    if (isRecord(record.primary_source)) addRecord(record.primary_source);
+    if (isRecord(record.source_pack)) addRecord(record.source_pack);
+    if (isRecord(record.selected_event)) addRecord(record.selected_event);
+  };
+
+  addRecord(selectedNewsEventContext);
+  return uniqueUrls(urls);
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function readRecordArray(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function uniqueUrls(urls: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const url of urls) {
+    const key = normalizeComparableUrl(url);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(url);
+  }
+  return result;
+}
+
+function normalizeDisplayUrl(value: string): string {
+  try {
+    const parsed = new URL(value);
+    parsed.hash = "";
+    return parsed.href;
+  } catch {
+    return value.trim();
+  }
+}
+
+function normalizeComparableUrl(value: string | undefined): string {
+  if (!value) return "";
+  try {
+    const parsed = new URL(value);
+    parsed.hash = "";
+    return parsed.href;
+  } catch {
+    return value.trim();
+  }
 }
 
 function inferPriceMoveDirectionFromQuestion(
@@ -1329,9 +1481,16 @@ function truncateLogValue(value: string): string {
 function usageFromSdkMessage(message: SDKMessage): {
   inputTokens: number;
   outputTokens: number;
+  cacheHitInputTokens: number;
+  cacheMissInputTokens: number;
 } {
   if (message.type !== "result") {
-    return { inputTokens: 0, outputTokens: 0 };
+    return {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheHitInputTokens: 0,
+      cacheMissInputTokens: 0,
+    };
   }
 
   const usage = message.usage as UnknownRecord;
@@ -1345,10 +1504,20 @@ function usageFromSdkMessage(message: SDKMessage): {
     numberValue(usage.output_tokens) ??
     numberValue(usage.outputTokens) ??
     sumModelUsage(modelUsage, "outputTokens");
+  const cacheHitInputTokens =
+    numberValue(usage.prompt_cache_hit_tokens) ??
+    numberValue(usage.promptCacheHitTokens) ??
+    sumModelUsage(modelUsage, "cacheHitInputTokens");
+  const cacheMissInputTokens =
+    numberValue(usage.prompt_cache_miss_tokens) ??
+    numberValue(usage.promptCacheMissTokens) ??
+    sumModelUsage(modelUsage, "cacheMissInputTokens");
 
   return {
     inputTokens: usageInput ?? 0,
     outputTokens: usageOutput ?? 0,
+    cacheHitInputTokens: cacheHitInputTokens ?? 0,
+    cacheMissInputTokens: cacheMissInputTokens ?? 0,
   };
 }
 
@@ -1367,7 +1536,11 @@ function modelFromSdkMessage(message: SDKMessage): string | null {
 
 function sumModelUsage(
   modelUsage: UnknownRecord,
-  field: "inputTokens" | "outputTokens",
+  field:
+    | "inputTokens"
+    | "outputTokens"
+    | "cacheHitInputTokens"
+    | "cacheMissInputTokens",
 ): number {
   return Object.values(modelUsage).reduce<number>((sum, value) => {
     if (!isRecord(value)) return sum;

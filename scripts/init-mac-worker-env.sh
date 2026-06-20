@@ -14,9 +14,9 @@ Defaults:
   --from  .env
   --out   .env.mac-worker.production
 
-The generated file intentionally starts with eight Mac production workers and
-GLOBAL_CONCURRENT_RUN_LIMIT=8. Lower both values together if you want a more
-conservative rollout.
+The generated file starts with one Mac production worker and
+GLOBAL_CONCURRENT_RUN_LIMIT=1. Raise both values together only after validating
+host capacity and provider concurrency.
 EOF
 }
 
@@ -123,7 +123,10 @@ if ! awk -F= '
 fi
 
 CLAUDE_KRW_PATH=~/.local/bin/claude-krw
-if [ -x "$CLAUDE_KRW_PATH" ]; then
+CLAUDE_SDK_PATH="$FRONT_DIR/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/claude"
+if [ -x "$CLAUDE_SDK_PATH" ]; then
+  CLAUDE_PATH=$CLAUDE_SDK_PATH
+elif [ -x "$CLAUDE_KRW_PATH" ]; then
   CLAUDE_PATH=$CLAUDE_KRW_PATH
 else
   CLAUDE_PATH=$(read_key_or_empty CLAUDE_CODE_EXECUTABLE)
@@ -140,6 +143,28 @@ fi
 CLAUDE_CONFIG=$(read_key_or_empty CLAUDE_CONFIG_DIR)
 if [ -z "$CLAUDE_CONFIG" ]; then
   CLAUDE_CONFIG=~/.claude-krw
+fi
+
+QUEUE_LISTEN_URL=$(read_key_or_empty AGENT_QUEUE_LISTEN_DATABASE_URL)
+CANCEL_LISTEN_URL=$(read_key_or_empty AGENT_RUN_CANCEL_LISTEN_DATABASE_URL)
+SOURCE_QUEUE_LISTEN_URL=$QUEUE_LISTEN_URL
+SOURCE_CANCEL_LISTEN_URL=$CANCEL_LISTEN_URL
+POOLER_URL_FILE="$FRONT_DIR/supabase/.temp/pooler-url"
+if [ -z "$QUEUE_LISTEN_URL" ] && [ -f "$POOLER_URL_FILE" ]; then
+  POOLER_URL=$(tr -d '\r\n' < "$POOLER_URL_FILE")
+  DB_PASSWORD=$(read_key_or_empty SUPABASE_DB_PASSWORD)
+  if [ -n "$POOLER_URL" ] && [ -n "$DB_PASSWORD" ]; then
+    QUEUE_LISTEN_URL=$(
+      node - "$POOLER_URL" "$DB_PASSWORD" <<'NODE'
+const url = new URL(process.argv[2]);
+url.password = process.argv[3];
+process.stdout.write(url.toString());
+NODE
+    )
+  fi
+fi
+if [ -z "$CANCEL_LISTEN_URL" ]; then
+  CANCEL_LISTEN_URL=$QUEUE_LISTEN_URL
 fi
 
 umask 077
@@ -170,6 +195,12 @@ trap cleanup EXIT INT TERM
   do
     copy_key "$key" 2>/dev/null || true
   done
+  if [ -z "$SOURCE_QUEUE_LISTEN_URL" ] && [ -n "$QUEUE_LISTEN_URL" ]; then
+    echo "AGENT_QUEUE_LISTEN_DATABASE_URL=$QUEUE_LISTEN_URL"
+  fi
+  if [ -z "$SOURCE_CANCEL_LISTEN_URL" ] && [ -n "$CANCEL_LISTEN_URL" ]; then
+    echo "AGENT_RUN_CANCEL_LISTEN_DATABASE_URL=$CANCEL_LISTEN_URL"
+  fi
   echo "KRW_ONTOLOGY_ENV=prod"
   echo "KRW_ONTOLOGY_RELEASE_ROOT=~/krw-ontology-data/releases/prod/current"
   echo "KRW_ONTOLOGY_ROOT=~/krw-ontology-data/releases/prod/current"
@@ -188,7 +219,7 @@ trap cleanup EXIT INT TERM
   echo "CLAUDE_AGENT_CWD=~/krw-ontology-front/.agent-workspace"
   echo "CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG"
   echo "CLAUDE_CODE_EXECUTABLE=$CLAUDE_PATH"
-  echo "EXPECTED_CLAUDE_CODE_VERSION=2.1.111"
+  echo "EXPECTED_CLAUDE_CODE_VERSION=2.1.141"
   echo "AGENT_SUPERVISOR_ID=mac-supervisor-jwc"
   echo "AGENT_SUPERVISOR_CONCURRENCY=1"
   echo "AGENT_WORKER_ID_PREFIX=mac-worker-jwc"
