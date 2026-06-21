@@ -1,6 +1,6 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import {
   reserveAnalysisCreditsShadow,
   settleAnalysisCreditsShadow,
@@ -51,9 +51,15 @@ export async function createDesktopLlmJob(
     profile.maxBudgetUsd,
     profile.maxBudgetUsd,
   );
+  const issuedAt = now;
   const expiresAt = new Date(now.getTime() + ttlSeconds * 1000);
-  const jobId = randomUUID();
-  const jti = randomUUID();
+  const jobId = deterministicUuid(
+    "desktop-llm-job",
+    auth.userId,
+    auth.deviceId ?? "no-device",
+    input.localRunId,
+  );
+  const jti = deterministicUuid("desktop-llm-token", jobId);
   const requestId = `desktop-llm:${jobId}`;
 
   const creditReservation = await reserveAnalysisCreditsShadow(
@@ -87,7 +93,7 @@ export async function createDesktopLlmJob(
     maxRequestCount: profile.maxRequestCount,
     maxBudgetUsd,
     expiresAt,
-    issuedAt: now,
+    issuedAt,
   });
 
   const metadata: Json = {
@@ -117,11 +123,23 @@ export async function createDesktopLlmJob(
       max_output_tokens: profile.maxOutputTokens,
       expires_at: expiresAt.toISOString(),
       metadata,
+      created_at: issuedAt.toISOString(),
+      updated_at: issuedAt.toISOString(),
     })
     .select(
       "id, user_id, device_id, local_session_id, local_run_id, runtime, token_jti, token_hash, status, provider, model_profile, sdk_model, upstream_model, gateway_base_url, max_budget_usd, max_request_count, request_count, max_input_tokens, max_output_tokens, expires_at, last_used_at, finalized_at, usage_input_tokens, usage_output_tokens, usage_cache_read_input_tokens, usage_cache_creation_input_tokens, actual_provider_cost_usd, error_code, metadata, created_at, updated_at",
     )
     .single<DesktopLlmJobRow>();
+
+  if (isUniqueViolation(error)) {
+    return existingDesktopLlmJobResponse({
+      auth,
+      input,
+      jobId,
+      secret,
+      now,
+    });
+  }
 
   if (error || !data) {
     throw new DesktopContractError("Failed to create Desktop LLM job", {
@@ -132,12 +150,92 @@ export async function createDesktopLlmJob(
     });
   }
 
+  return desktopLlmJobResponse(data, unsignedToken.token, unsignedToken.payload.aud);
+}
+
+async function existingDesktopLlmJobResponse(input: {
+  auth: DesktopAuthContext;
+  input: CreateDesktopLlmJobInput;
+  jobId: string;
+  secret: string;
+  now: Date;
+}) {
+  const { data, error } = await getSupabaseAdmin()
+    .from("desktop_llm_jobs")
+    .select(
+      "id, user_id, device_id, local_session_id, local_run_id, runtime, token_jti, token_hash, status, provider, model_profile, sdk_model, upstream_model, gateway_base_url, max_budget_usd, max_request_count, request_count, max_input_tokens, max_output_tokens, expires_at, last_used_at, finalized_at, usage_input_tokens, usage_output_tokens, usage_cache_read_input_tokens, usage_cache_creation_input_tokens, actual_provider_cost_usd, error_code, metadata, created_at, updated_at",
+    )
+    .eq("id", input.jobId)
+    .eq("user_id", input.auth.userId)
+    .maybeSingle<DesktopLlmJobRow>();
+
+  if (
+    error ||
+    !data ||
+    data.local_run_id !== input.input.localRunId ||
+    (input.auth.deviceId && data.device_id !== input.auth.deviceId)
+  ) {
+    throw new DesktopContractError("Failed to load idempotent Desktop LLM job", {
+      code: "provider_unavailable",
+      publicMessage: "LLM 연결 권한을 확인하지 못했습니다.",
+      status: 503,
+      retryable: true,
+    });
+  }
+
+  if (
+    data.status !== "active" ||
+    data.finalized_at ||
+    Date.parse(data.expires_at) <= input.now.getTime()
+  ) {
+    throw new DesktopContractError("Desktop LLM job is no longer reusable", {
+      code: "invalid_job_token",
+      publicMessage: "이미 종료되었거나 만료된 LLM 작업입니다.",
+      status: 409,
+    });
+  }
+
+  const token = createLlmJobToken({
+    secret: input.secret,
+    jobId: data.id,
+    jti: data.token_jti,
+    userId: data.user_id,
+    deviceId: data.device_id,
+    localRunId: data.local_run_id,
+    localSessionId: data.local_session_id,
+    provider: data.provider,
+    modelProfile: data.model_profile,
+    sdkModel: data.sdk_model,
+    upstreamModel: data.upstream_model,
+    maxRequestCount: data.max_request_count,
+    maxBudgetUsd: data.max_budget_usd,
+    expiresAt: new Date(data.expires_at),
+    issuedAt: new Date(data.created_at),
+  });
+
+  if (token.tokenHash !== data.token_hash) {
+    throw new DesktopContractError("Idempotent Desktop LLM job token mismatch", {
+      code: "provider_unavailable",
+      publicMessage: "LLM 연결 권한 무결성을 확인하지 못했습니다.",
+      status: 503,
+      retryable: true,
+    });
+  }
+
+  return desktopLlmJobResponse(data, token.token, token.payload.aud);
+}
+
+function desktopLlmJobResponse(
+  data: DesktopLlmJobRow,
+  token: string,
+  audience: string,
+) {
   return {
     ok: true as const,
     job_id: data.id,
-    token: unsignedToken.token,
+    token,
     expires_at: data.expires_at,
-    audience: unsignedToken.payload.aud,
+    audience,
     base_url: data.gateway_base_url,
     provider: data.provider,
     model_profile: data.model_profile,
@@ -287,7 +385,7 @@ export async function finalizeDesktopLlmJob(
     typeof metadata.credit_request_id === "string"
       ? metadata.credit_request_id
       : `desktop-llm:${job.id}`;
-  await settleAnalysisCreditsShadow(auth.userId, requestId, job.id, {
+  await settleAnalysisCreditsShadow(auth.userId, requestId, null, {
     terminalStatus: input.terminalStatus,
     inputTokens,
     outputTokens,
@@ -295,6 +393,7 @@ export async function finalizeDesktopLlmJob(
     cacheMissInputTokens: Math.max(0, inputTokens - cacheReadInputTokens),
     metadata: {
       source: "desktop_llm_gateway",
+      desktop_llm_job_id: job.id,
       local_run_id: job.local_run_id,
       model_profile: job.model_profile,
       upstream_model: job.upstream_model,
@@ -415,6 +514,25 @@ function plainJsonObject(value: Json): Record<string, Json | undefined> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value
     : {};
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== "object" || !("code" in error)) return false;
+  return (error as { code?: unknown }).code === "23505";
+}
+
+function deterministicUuid(...parts: string[]): string {
+  const bytes = createHash("sha256").update(parts.join("\u001f")).digest();
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.subarray(0, 16).toString("hex");
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    hex.slice(12, 16),
+    hex.slice(16, 20),
+    hex.slice(20, 32),
+  ].join("-");
 }
 
 function clampInteger(

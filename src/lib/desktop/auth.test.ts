@@ -194,6 +194,8 @@ describe("Desktop auth", () => {
   });
 
   it("blocks users without remaining desktop entitlement", async () => {
+    const adminClient = { from: vi.fn() };
+    vi.mocked(getSupabaseAdmin).mockReturnValue(adminClient as never);
     vi.mocked(getEntitlementStatus).mockResolvedValue(entitlement(false));
 
     await expect(
@@ -204,5 +206,10 @@ describe("Desktop auth", () => {
         authMethod: "desktop_access_token",
       }),
     ).rejects.toBeInstanceOf(DesktopAuthError);
+    expect(getEntitlementStatus).toHaveBeenCalledWith(
+      "user-1",
+      "user@example.test",
+      { supabase: adminClient },
+    );
   });
 });

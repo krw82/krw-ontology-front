@@ -28,8 +28,10 @@ export async function GET(request: NextRequest) {
           release?.release_id &&
           mcp.releaseId === release.release_id,
       );
-    const searchOk = Boolean(release?.release_id) && (!usesMcp || Boolean(mcp?.ok)) &&
-      releaseMatches;
+    const searchOk = usesMcp ? Boolean(mcp?.ok) : Boolean(release?.release_id);
+    const companyCount = release?.company_count ?? null;
+    const documentCount = release?.document_count ?? null;
+    const objectCount = release?.object_count ?? null;
 
     return Response.json({
       ok: searchOk,
@@ -39,6 +41,16 @@ export async function GET(request: NextRequest) {
       index_generated_at: release?.index_generated_at ?? null,
       executor: usesMcp ? "mcp" : "catalog",
       release_matches_executor: releaseMatches,
+      service: {
+        status: searchOk ? "ready" : "not_ready",
+        api_version: DESKTOP_ONTOLOGY_API_VERSION,
+        active_release_id: usesMcp
+          ? (mcp?.releaseId ?? release?.release_id ?? null)
+          : (release?.release_id ?? null),
+        company_count: companyCount,
+        document_count: documentCount,
+        object_count: objectCount,
+      },
       mcp: mcp
         ? {
             ok: mcp.ok,
@@ -50,9 +62,9 @@ export async function GET(request: NextRequest) {
         : null,
       catalog: release
         ? {
-            company_count: release.company_count,
-            document_count: release.document_count,
-            object_count: release.object_count,
+            company_count: companyCount,
+            document_count: documentCount,
+            object_count: objectCount,
           }
         : null,
     });

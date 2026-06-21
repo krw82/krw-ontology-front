@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getEntitlementStatus } from "@/lib/billing/entitlement";
+import {
+  getBillingPlan,
+  getEffectiveDailyBudgetUsd,
+} from "@/lib/billing/plans";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { EntitlementStatus } from "@/types/entitlement";
 import {
@@ -142,6 +146,7 @@ describe("execution budget", () => {
     vi.mocked(getSupabaseAdmin).mockReturnValue({ rpc } as never);
 
     const result = await reserveExecutionBudget("user-1", "req-1", null, "deep");
+    const fallbackFreePlan = getBillingPlan("free");
 
     expect(result.allowed).toBe(true);
     expect(result.reservationId).toBe("reservation-1");
@@ -153,8 +158,8 @@ describe("execution budget", () => {
       expect.objectContaining({
         p_user_id: "user-1",
         p_request_id: "req-1",
-        p_monthly_budget_usd: 0.182,
-        p_daily_budget_usd: 0.182,
+        p_monthly_budget_usd: fallbackFreePlan.monthlyBudgetUsd,
+        p_daily_budget_usd: getEffectiveDailyBudgetUsd(fallbackFreePlan),
         p_reserve_cost_usd: 0.5,
       }),
     );

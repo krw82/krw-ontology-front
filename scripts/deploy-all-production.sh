@@ -84,12 +84,27 @@ FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 if [ "$DB_CHECK" = "1" ]; then
   echo "Checking Supabase migration drift..."
   MIGRATION_DRY_RUN_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/krw-supabase-dry-run.XXXXXX")
+  SUPABASE_DB_PUSH_INCLUDE_ALL=0
   if (cd "$FRONT_DIR" && "$SCRIPT_DIR/supabase-cli.sh" db push --dry-run) >"$MIGRATION_DRY_RUN_OUTPUT" 2>&1; then
     cat "$MIGRATION_DRY_RUN_OUTPUT"
   else
-    cat "$MIGRATION_DRY_RUN_OUTPUT" >&2
-    rm -f "$MIGRATION_DRY_RUN_OUTPUT"
-    exit 1
+    if grep -q -- "--include-all" "$MIGRATION_DRY_RUN_OUTPUT"; then
+      cat "$MIGRATION_DRY_RUN_OUTPUT"
+      echo "Retrying Supabase migration dry run with --include-all for out-of-order local migrations..."
+      SUPABASE_DB_PUSH_INCLUDE_ALL=1
+      : >"$MIGRATION_DRY_RUN_OUTPUT"
+      if (cd "$FRONT_DIR" && "$SCRIPT_DIR/supabase-cli.sh" db push --include-all --dry-run) >"$MIGRATION_DRY_RUN_OUTPUT" 2>&1; then
+        cat "$MIGRATION_DRY_RUN_OUTPUT"
+      else
+        cat "$MIGRATION_DRY_RUN_OUTPUT" >&2
+        rm -f "$MIGRATION_DRY_RUN_OUTPUT"
+        exit 1
+      fi
+    else
+      cat "$MIGRATION_DRY_RUN_OUTPUT" >&2
+      rm -f "$MIGRATION_DRY_RUN_OUTPUT"
+      exit 1
+    fi
   fi
 
   if grep -q "Would push these migrations" "$MIGRATION_DRY_RUN_OUTPUT"; then
@@ -107,10 +122,18 @@ if [ "$DB_CHECK" = "1" ]; then
 
   if [ "$APPLY_MIGRATIONS" = "1" ]; then
     if [ "$DRY_RUN" = "1" ]; then
-      echo "Dry run: would apply Supabase migrations with Supabase CLI db push."
+      if [ "$SUPABASE_DB_PUSH_INCLUDE_ALL" = "1" ]; then
+        echo "Dry run: would apply Supabase migrations with Supabase CLI db push --include-all."
+      else
+        echo "Dry run: would apply Supabase migrations with Supabase CLI db push."
+      fi
     else
       echo "Applying Supabase migrations..."
-      (cd "$FRONT_DIR" && "$SCRIPT_DIR/supabase-cli.sh" db push)
+      if [ "$SUPABASE_DB_PUSH_INCLUDE_ALL" = "1" ]; then
+        (cd "$FRONT_DIR" && "$SCRIPT_DIR/supabase-cli.sh" db push --include-all)
+      else
+        (cd "$FRONT_DIR" && "$SCRIPT_DIR/supabase-cli.sh" db push)
+      fi
     fi
   fi
 

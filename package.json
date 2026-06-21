@@ -16,6 +16,8 @@
     "build:worker": "esbuild src/worker/agent-worker.ts --bundle --platform=node --target=node20 --format=esm --packages=external --alias:server-only=./src/worker/server-only-shim.ts --outfile=.worker/agent-worker.mjs && esbuild src/worker/document-worker.ts --bundle --platform=node --target=node20 --format=esm --packages=external --alias:server-only=./src/worker/server-only-shim.ts --outfile=.worker/document-worker.mjs && esbuild src/worker/billing-worker.ts --bundle --platform=node --target=node20 --format=esm --packages=external --alias:server-only=./src/worker/server-only-shim.ts --outfile=.worker/billing-worker.mjs",
     "build:llm-gateway": "esbuild services/llm-gateway/src/server.ts --bundle --platform=node --target=node20 --format=esm --packages=external --outfile=.services/llm-gateway.mjs",
     "dev:llm-gateway": "npm run build:llm-gateway && node --env-file-if-exists=.env .services/llm-gateway.mjs",
+    "desktop:live:preflight": "node scripts/desktop-live-preflight.mjs",
+    "desktop:live:stack": "node scripts/desktop-live-stack.mjs",
     "start": "node .next/standalone/server.js",
     "start:worker": "node .worker/agent-worker.mjs",
     "start:document-worker": "node .worker/document-worker.mjs",

@@ -19,6 +19,15 @@ import {
 import { getBillingPlanFromStore } from "./plan-store";
 import { DEFAULT_PLAN_KEY, resolvePlanKey } from "./plans";
 
+type EntitlementQueryClient = Pick<
+  Awaited<ReturnType<typeof createClient>>,
+  "from"
+>;
+
+interface GetEntitlementStatusOptions {
+  supabase?: EntitlementQueryClient;
+}
+
 function isMissingRelationError(error: { code?: string; message?: string }) {
   return (
     error.code === "42P01" ||
@@ -30,12 +39,14 @@ function isMissingRelationError(error: { code?: string; message?: string }) {
 export async function getEntitlementStatus(
   userId: string,
   userEmail?: string | null,
+  options: GetEntitlementStatusOptions = {},
 ): Promise<EntitlementStatus> {
   const now = new Date();
+  const supabase = options.supabase ?? (await createClient());
   const isAdmin = isAdminEntitlementEmail(userEmail);
   const entitlement = isAdmin
     ? { planKey: "internal" as const, creditAnchorAt: null }
-    : await loadEntitlementAccess(userId, now);
+    : await loadEntitlementAccess(supabase, userId, now);
   const planKey = entitlement.planKey;
   const plan = await getBillingPlanFromStore(planKey);
   const period =
@@ -48,11 +59,12 @@ export async function getEntitlementStatus(
   const monthlyPeriod = getCurrentMonthlyBillingPeriod(now);
   const dailyPeriod = getCurrentDailyBillingPeriod(now);
   const budget = await loadExecutionBudgetSnapshot(
+    supabase,
     userId,
     monthlyPeriod,
     dailyPeriod,
   );
-  const credit = await loadCreditBudgetSnapshot(userId, now);
+  const credit = await loadCreditBudgetSnapshot(supabase, userId, now);
 
   return buildEntitlementStatus({
     planKey,
@@ -93,11 +105,14 @@ function isUsableEntitlement(
   return Number.isFinite(periodEnd) && periodEnd > now.getTime();
 }
 
-async function loadEntitlementAccess(userId: string, now: Date): Promise<{
+async function loadEntitlementAccess(
+  supabase: EntitlementQueryClient,
+  userId: string,
+  now: Date,
+): Promise<{
   planKey: ReturnType<typeof resolvePlanKey>;
   creditAnchorAt: string | null;
 }> {
-  const supabase = await createClient();
   const { data, error } = await supabase
     .from("user_entitlements")
     .select(
@@ -123,10 +138,10 @@ async function loadEntitlementAccess(userId: string, now: Date): Promise<{
 }
 
 async function loadMonthlyQuestionCount(
+  supabase: EntitlementQueryClient,
   userId: string,
   period: { start: string; end: string },
 ) {
-  const supabase = await createClient();
   const { data, error } = await supabase
     .from("usage_period_counters")
     .select("question_count")
@@ -158,10 +173,10 @@ async function loadMonthlyQuestionCount(
 }
 
 async function loadDailyQuestionCount(
+  supabase: EntitlementQueryClient,
   userId: string,
   period: { start: string },
 ) {
-  const supabase = await createClient();
   const date = period.start.slice(0, 10);
   const { data, error } = await supabase
     .from("usage_daily")
@@ -181,11 +196,11 @@ interface BudgetSnapshotPart {
 }
 
 async function loadExecutionBudgetSnapshot(
+  supabase: EntitlementQueryClient,
   userId: string,
   monthlyPeriod: { start: string; end: string },
   dailyPeriod: { start: string; end: string },
 ) {
-  const supabase = await createClient();
   const { data, error } = await supabase
     .from("usage_budget_balances")
     .select(
@@ -228,8 +243,8 @@ async function loadExecutionBudgetSnapshot(
   }
 
   const [monthlyRuns, dailyRuns] = await Promise.all([
-    loadMonthlyQuestionCount(userId, monthlyPeriod),
-    loadDailyQuestionCount(userId, dailyPeriod),
+    loadMonthlyQuestionCount(supabase, userId, monthlyPeriod),
+    loadDailyQuestionCount(supabase, userId, dailyPeriod),
   ]);
 
   return {
@@ -262,6 +277,7 @@ function balancePart(
 }
 
 async function loadCreditBudgetSnapshot(
+  supabase: EntitlementQueryClient,
   userId: string,
   now: Date,
 ): Promise<{
@@ -271,7 +287,6 @@ async function loadCreditBudgetSnapshot(
   runCount: number;
   creditPolicyVersion: string;
 } | null> {
-  const supabase = await createClient();
   const { data, error } = await supabase
     .from("usage_credit_balances")
     .select(

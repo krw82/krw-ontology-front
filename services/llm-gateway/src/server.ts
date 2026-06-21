@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Readable, Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database, DesktopLlmJobRow } from "../../../src/types/database";
 import {
@@ -16,9 +17,9 @@ const SUPPORTED_PATHS = new Set([
   "/anthropic/v1/messages/count_tokens",
 ]);
 
-type GatewayEnv = NodeJS.ProcessEnv;
+export type GatewayEnv = NodeJS.ProcessEnv;
 
-interface GatewayContext {
+export interface GatewayContext {
   env: GatewayEnv;
   supabase: SupabaseClient<Database>;
   jobTokenSecret: string;
@@ -29,6 +30,10 @@ interface GatewayContext {
 
 export function createLlmGatewayServer(env: GatewayEnv = process.env) {
   const context = createGatewayContext(env);
+  return createLlmGatewayServerFromContext(context);
+}
+
+export function createLlmGatewayServerFromContext(context: GatewayContext) {
   return createServer((request, response) => {
     void handleRequest(request, response, context);
   });
@@ -78,7 +83,10 @@ async function handleRequest(
     const upstreamPath = url.pathname.replace(/^\/anthropic/, "");
     const upstreamUrl = `${context.upstreamBaseUrl}${upstreamPath}`;
     const controller = new AbortController();
-    const abort = () => controller.abort(new Error("Gateway client disconnected"));
+    const abort = () => {
+      if (response.writableEnded) return;
+      controller.abort(new GatewayClientDisconnectedError());
+    };
     response.once("close", abort);
 
     let upstream: Response;
@@ -91,6 +99,10 @@ async function handleRequest(
       });
     } catch (error) {
       response.removeListener("close", abort);
+      if (isClientDisconnectedError(error, controller)) {
+        await recordJobError(context.supabase, job.id, "client_disconnected");
+        return;
+      }
       await recordJobError(context.supabase, job.id, "upstream_unavailable");
       return sendJson(response, 502, {
         error: {
@@ -113,7 +125,15 @@ async function handleRequest(
       }
 
       if (upstreamBody.stream === true) {
-        await pipeStreamingResponse(upstream, response, context.supabase, job);
+        try {
+          await pipeStreamingResponse(upstream, response, context.supabase, job);
+        } catch (error) {
+          if (isClientDisconnectedError(error, controller)) {
+            await recordJobError(context.supabase, job.id, "client_disconnected");
+            return;
+          }
+          throw error;
+        }
         return;
       }
 
@@ -287,13 +307,7 @@ async function pipeStreamingResponse(
   job: DesktopLlmJobRow,
 ) {
   const usage = createSseUsageTransform();
-  await new Promise<void>((resolve, reject) => {
-    Readable.fromWeb(upstream.body as never)
-      .pipe(usage.transform)
-      .pipe(response)
-      .once("finish", resolve)
-      .once("error", reject);
-  });
+  await pipeline(Readable.fromWeb(upstream.body as never), usage.transform, response);
   await recordUsage(supabase, job, usage.snapshot(), upstream.ok);
 }
 
@@ -497,6 +511,30 @@ class RequestTooLargeError extends Error {
     super("Request body exceeds the configured gateway limit");
     this.name = "RequestTooLargeError";
   }
+}
+
+class GatewayClientDisconnectedError extends Error {
+  constructor() {
+    super("Gateway client disconnected");
+    this.name = "GatewayClientDisconnectedError";
+  }
+}
+
+function isClientDisconnectedError(error: unknown, controller: AbortController) {
+  if (error instanceof GatewayClientDisconnectedError) return true;
+  if (!controller.signal.aborted) return false;
+  const reason = controller.signal.reason;
+  if (reason instanceof GatewayClientDisconnectedError) return true;
+  if (!(error instanceof Error)) return false;
+  return (
+    error.name === "AbortError" ||
+    error.message === "Gateway client disconnected" ||
+    error.message === "Premature close" ||
+    (typeof (error as NodeJS.ErrnoException).code === "string" &&
+      ["ABORT_ERR", "ERR_STREAM_PREMATURE_CLOSE"].includes(
+        (error as NodeJS.ErrnoException).code ?? "",
+      ))
+  );
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -1,18 +1,44 @@
 # Product Marketing Context
 
-*Last updated: 2026-05-23*
+*Last updated: 2026-06-21*
 
 ## Product Overview
 
-**One-liner:** KRW Ontology is an evidence-path company filing research AI for investors who need faster answers they can verify.
+**One-liner:** KRW Ontology helps Korean investors ask questions about US companies and trace each answer back to the filing evidence behind it.
 
-**What it does:** KRW Ontology connects public company filing sentences, business activities, risks, and financial drivers into a research graph. Users ask a company or investment question, then receive an answer with a visible evidence path so they can inspect where the answer came from.
+**What it does:** KRW Ontology turns long US public company filings into source-checkable research answers. Users ask a company or investment question, then receive a readable answer with a trail back to the original filing context so they can inspect where the answer came from.
 
 **Product category:** AI equity research, SEC filing analysis, evidence-backed company intelligence, public company research assistant.
 
 **Product type:** Self-serve SaaS web application.
 
 **Business model:** Freemium to paid subscription. The primary value metric is monthly question/analysis volume. Higher tiers should add more analyses, longer chat history, priority throughput, and workflow convenience, but the current product promise stays centered on Markdown answers, citation/evidence review, and saved chat context.
+
+## Messaging Positioning
+
+**Core public promise:** AI can answer quickly. KRW Ontology helps users check whether the answer is actually grounded in the company's own disclosures.
+
+**Primary tension to lead with:** The user does not simply want more AI output. They want to avoid trusting a polished answer they cannot verify.
+
+**Best plain-language positioning lines:**
+
+- "AI 요약을 믿기 전에, 원문 근거까지 따라가세요."
+- "10-K를 전부 읽지 않아도, 답변의 근거는 놓치지 않게."
+- "미국 공시를 투자 질문 중심으로 읽고, 답변마다 출처를 남깁니다."
+- "빠른 답변보다 중요한 건, 확인할 수 있는 답변입니다."
+- "그럴듯한 AI 요약이 아니라, 원문으로 돌아갈 수 있는 기업 리서치."
+
+**Internal product truth:** The system links filing text, business activities, risk factors, segments, and financial drivers. This is useful for product and technical explanation.
+
+**External copy rule:** Do not lead social posts, landing page heroes, or ads with the raw mechanics: "공시 문장과 사업 활동, 리스크, 세그먼트, 실적 동인을 연결합니다." It is accurate but too dry for top-of-funnel marketing. Use it only after the reader already understands the problem.
+
+**Social hook angles:**
+
+- "AI가 그럴듯하게 말할수록 더 위험한 순간이 있습니다."
+- "10-K를 다 읽을 시간은 없지만, 근거 없는 요약을 믿을 수도 없습니다."
+- "미국주식 리서치에서 제일 비싼 실수는 틀린 답보다, 확인 못 한 답입니다."
+- "기업 공시를 읽는 이유는 결론을 얻기 위해서가 아니라, 결론을 의심할 근거를 얻기 위해서입니다."
+- "좋은 리서치 AI는 답을 빨리 주는 게 아니라, 답을 다시 검증할 수 있게 만들어야 합니다."
 
 ## Target Audience
 
@@ -72,16 +98,17 @@
 **Key differentiators:**
 
 - Evidence-first answers with visible source and reasoning path.
-- Ontology-based connection between filing text, business activity, risks, and drivers.
+- A source trail that lets users trace an answer back to the filing context behind it.
+- Ontology-based connections between filing text, business activity, risks, and drivers as the internal system of record.
 - Korean-first product surface for US company research.
 - Chat workflow that can start from a ticker, company list, or plain-language question.
 - Saved chat sessions that preserve context for follow-up questions.
 
-**How we do it differently:** The product does not treat the filing as a flat text blob. It turns filing context into connected research units, then uses those units to answer questions in readable Markdown with inspectable citations and source context.
+**How we do it differently:** The product does not treat the filing as a flat text blob or produce a standalone AI summary. It turns filing context into connected research units, then uses those units to answer questions in readable Markdown with inspectable citations and source context.
 
 **Why that's better:** Users can move faster without giving up verification. The product makes source review part of the answer instead of a separate manual step.
 
-**Why customers choose us:** They want research speed, but the decisive feature is trust: the answer must leave a path back to source material.
+**Why customers choose us:** They want research speed, but the decisive feature is trust: the answer must leave a path back to source material. The public message should frame this as "I can check this" rather than "the system has an ontology."
 
 ## Objections
 
@@ -120,10 +147,14 @@
 - "공시 원문 근거가 남는 리서치 AI."
 - "질문하면 답변과 근거 경로를 같이 보여주는 도구."
 - "긴 10-K를 투자 질문 중심으로 읽어주는 서비스."
+- "AI 요약을 원문 근거까지 확인하게 해주는 서비스."
+- "미국 기업 공시를 한국어 질문으로 파고드는 도구."
 
-**Words to use:** 근거 경로, 공시 원문, 출처, 검증 가능, 기업 리서치, 10-K, 10-Q, 사업 활동, 리스크 요인, 세그먼트, 실적 동인, 투자 thesis check, evidence-backed, citation-backed.
+**Words to use:** 원문 근거, 근거 경로, 출처, 확인 가능, 검증 가능, 기업 리서치, 10-K, 10-Q, 미국 공시, 투자 질문, thesis check, evidence-backed, citation-backed.
 
-**Words to avoid:** 수익 보장, 종목 추천, 매수 신호, 예측 확정, 자동 투자, 무조건 정확, 완전 대체, hallucination-free.
+**Words to use only in deeper product explanations:** 사업 활동, 리스크 요인, 세그먼트, 실적 동인, 온톨로지, 구조화된 지식 그래프.
+
+**Words to avoid:** 수익 보장, 종목 추천, 매수 신호, 예측 확정, 자동 투자, 무조건 정확, 완전 대체, hallucination-free, "공시 문장과 사업 활동, 리스크, 세그먼트, 실적 동인을 연결" as a first-line marketing hook.
 
 **Glossary:**
 
@@ -134,6 +165,7 @@
 | Markdown research answer | 채팅 화면에서 바로 읽고 후속 질문으로 이어갈 수 있는 공시 근거 기반 답변 |
 | Analysis credit | 사용자가 월간 한도 안에서 실행하는 질문/분석 단위 |
 | Supported company | 현재 온톨로지 인덱스에 포함되어 분석 가능한 회사 |
+| Source trail | 사용자가 답변에서 원문 근거로 되돌아갈 수 있게 남기는 확인 경로 |
 
 ## Brand Voice
 

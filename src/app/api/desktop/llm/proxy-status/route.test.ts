@@ -30,6 +30,8 @@ import { GET } from "./route";
 
 describe("GET /api/desktop/llm/proxy-status", () => {
   beforeEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     vi.clearAllMocks();
     vi.stubEnv(
       "KRW_LLM_JOB_TOKEN_SECRET",
@@ -60,11 +62,118 @@ describe("GET /api/desktop/llm/proxy-status", () => {
     expect(body).toMatchObject({
       ok: true,
       ready: true,
+      message: "LLM gateway configured",
+      gateway_health: null,
       provider: "deepseek",
       job_token_ttl_seconds: 600,
     });
     expect(body.models[0].sdk_model).toBe("deepseek-v4-flash");
     expect(authenticateDesktopRequest).toHaveBeenCalled();
     expect(requireDesktopEntitlement).toHaveBeenCalled();
+  });
+
+  it("reports not ready when the job token secret is missing", async () => {
+    vi.stubEnv("KRW_LLM_JOB_TOKEN_SECRET", undefined);
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/desktop/llm/proxy-status", {
+        headers: { authorization: "Bearer desktop-token" },
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: true,
+      ready: false,
+      message: "LLM gateway job token secret is not configured",
+      gateway_health: null,
+      provider: "deepseek",
+    });
+  });
+
+  it("reports not ready when the job token secret is too short", async () => {
+    vi.stubEnv("KRW_LLM_JOB_TOKEN_SECRET", "short");
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/desktop/llm/proxy-status", {
+        headers: { authorization: "Bearer desktop-token" },
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: true,
+      ready: false,
+      message: "LLM gateway job token secret must be at least 32 characters",
+      gateway_health: null,
+      provider: "deepseek",
+    });
+  });
+
+  it("probes the configured gateway health URL", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        ok: true,
+        service: "krw-llm-gateway",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("DESKTOP_LLM_GATEWAY_HEALTH_URL", "http://127.0.0.1:8787/healthz");
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/desktop/llm/proxy-status", {
+        headers: { authorization: "Bearer desktop-token" },
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:8787/healthz",
+      expect.objectContaining({
+        cache: "no-store",
+        headers: { accept: "application/json" },
+      }),
+    );
+    expect(body).toMatchObject({
+      ok: true,
+      ready: true,
+      message: "LLM gateway health check passed",
+      gateway_health: {
+        url: "http://127.0.0.1:8787/healthz",
+        status: 200,
+        service: "krw-llm-gateway",
+      },
+    });
+  });
+
+  it("reports not ready when the configured gateway health check fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({ ok: false, service: "krw-llm-gateway" }, { status: 503 }),
+      ),
+    );
+    vi.stubEnv("DESKTOP_LLM_GATEWAY_HEALTH_URL", "http://127.0.0.1:8787/healthz");
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/desktop/llm/proxy-status", {
+        headers: { authorization: "Bearer desktop-token" },
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      ok: true,
+      ready: false,
+      message: "LLM gateway health check failed",
+      gateway_health: {
+        status: 503,
+        service: "krw-llm-gateway",
+      },
+    });
   });
 });

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import SharedAnswerPageContent from "@/components/SharedAnswerPageContent";
 import { isLocale } from "@/i18n/config";
 import {
+  buildPublicShareMetadata,
   getPublicShareForPage,
   sharePageMetadataCopy,
 } from "@/lib/share/share-page";
@@ -25,11 +26,7 @@ export async function generateMetadata({
     };
   }
 
-  return {
-    title: `${share.title} | KRW Ontology`,
-    description: sharePageMetadataCopy(locale).description,
-    robots: { index: false, follow: false },
-  };
+  return buildPublicShareMetadata(share, locale);
 }
 
 export default async function LocalizedSharedAnswerPage({

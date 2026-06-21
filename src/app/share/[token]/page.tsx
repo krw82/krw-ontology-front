@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import SharedAnswerPageContent from "@/components/SharedAnswerPageContent";
 import {
+  buildPublicShareMetadata,
   getPublicShareForPage,
   sharePageMetadataCopy,
 } from "@/lib/share/share-page";
@@ -23,12 +24,7 @@ export async function generateMetadata({
     };
   }
 
-  const metadataCopy = sharePageMetadataCopy(share.locale);
-  return {
-    title: `${share.title} | KRW Ontology`,
-    description: metadataCopy.description,
-    robots: { index: false, follow: false },
-  };
+  return buildPublicShareMetadata(share, share.locale);
 }
 
 export default async function SharedAnswerPage({

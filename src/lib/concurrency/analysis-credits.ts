@@ -17,6 +17,8 @@ export function getInitialAnalysisCreditReservationRaw(
   _runKind?: RunKind,
   _researchMode?: ResearchMode,
 ): number {
+  void _runKind;
+  void _researchMode;
   return INITIAL_ANALYSIS_CREDIT_RESERVATION_RAW;
 }
 

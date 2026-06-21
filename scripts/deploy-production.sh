@@ -46,9 +46,22 @@ if [ "$DB_CHECK" = "1" ]; then
   if (cd "$FRONT_DIR" && "$SCRIPT_DIR/supabase-cli.sh" db push --dry-run) >"$MIGRATION_DRY_RUN_OUTPUT" 2>&1; then
     cat "$MIGRATION_DRY_RUN_OUTPUT"
   else
-    cat "$MIGRATION_DRY_RUN_OUTPUT" >&2
-    rm -f "$MIGRATION_DRY_RUN_OUTPUT"
-    exit 1
+    if grep -q -- "--include-all" "$MIGRATION_DRY_RUN_OUTPUT"; then
+      cat "$MIGRATION_DRY_RUN_OUTPUT"
+      echo "Retrying Supabase migration dry run with --include-all for out-of-order local migrations..."
+      : >"$MIGRATION_DRY_RUN_OUTPUT"
+      if (cd "$FRONT_DIR" && "$SCRIPT_DIR/supabase-cli.sh" db push --include-all --dry-run) >"$MIGRATION_DRY_RUN_OUTPUT" 2>&1; then
+        cat "$MIGRATION_DRY_RUN_OUTPUT"
+      else
+        cat "$MIGRATION_DRY_RUN_OUTPUT" >&2
+        rm -f "$MIGRATION_DRY_RUN_OUTPUT"
+        exit 1
+      fi
+    else
+      cat "$MIGRATION_DRY_RUN_OUTPUT" >&2
+      rm -f "$MIGRATION_DRY_RUN_OUTPUT"
+      exit 1
+    fi
   fi
 
   if grep -q "Would push these migrations" "$MIGRATION_DRY_RUN_OUTPUT"; then

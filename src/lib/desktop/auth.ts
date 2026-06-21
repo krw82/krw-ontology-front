@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getEntitlementStatus } from "@/lib/billing/entitlement";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { EntitlementStatus } from "@/types/entitlement";
 import { authenticateDesktopAccessToken } from "./device-auth";
 import type { DesktopErrorCode } from "./ontology-contracts";
@@ -75,7 +76,9 @@ export async function authenticateDesktopRequest(
 export async function requireDesktopEntitlement(
   auth: DesktopAuthContext,
 ): Promise<EntitlementStatus> {
-  const entitlement = await getEntitlementStatus(auth.userId, auth.userEmail);
+  const entitlement = await getEntitlementStatus(auth.userId, auth.userEmail, {
+    supabase: getSupabaseAdmin(),
+  });
   const evidenceResearch = entitlement.features.find(
     (feature) => feature.key === "evidence_research",
   );

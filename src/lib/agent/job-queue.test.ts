@@ -13,6 +13,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { HistoryResult } from "@/lib/api/chat/fetch-history";
 import type { ResolvedSession } from "@/lib/api/chat/resolve-session";
 import type { McpHealthResult } from "@/lib/agent/mcp-client";
+import { DEFAULT_RESEARCH_MODE } from "@/lib/research-mode";
 import {
   claimNextAgentRun,
   enqueueAgentRun,
@@ -263,10 +264,12 @@ describe("agent job queue", () => {
         message_id: "assistant-message-1",
         session_id: "session-1",
         request_id: "req-1",
-        research_mode: "deep",
+        research_mode: DEFAULT_RESEARCH_MODE,
         analysis_mode: "company",
+        run_kind: "company_research",
         response_locale: "ko",
         executor_type: "claude_agent",
+        queued_at: expect.any(String),
         queue: expect.objectContaining({
           concurrency_limit: expect.any(Number),
         }),
