@@ -106,6 +106,26 @@ function displaySector(sector: string | null | undefined, locale: Locale) {
   return englishSectorLabels[normalized] ?? normalized;
 }
 
+function researchAxisItemsFromValue(value: string | null): string[] {
+  if (!value) return [];
+
+  const cleaned = value
+    .replace(/^리서치\s*초점\s*:\s*/i, "")
+    .replace(/^핵심\s*성장\s*동력\s*:\s*/i, "")
+    .replace(/^주요\s*활동\s*:\s*/i, "")
+    .replace(/^Research\s*focus\s*:\s*/i, "")
+    .replace(/^Core\s*strengths\s*:\s*/i, "")
+    .replace(/^Primary\s*activit(?:y|ies)\s*:\s*/i, "")
+    .trim();
+
+  const items = cleaned
+    .split(/[,;\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return items.length > 0 ? items : [cleaned];
+}
+
 export default function CompanyCard({
   company,
   motionDelay = 0,
@@ -133,6 +153,9 @@ export default function CompanyCard({
   const secondaryLabel = [companyNameKo, sectorLabel]
     .filter(Boolean)
     .join(" · ");
+  const researchAxisItems = researchAxisItemsFromValue(
+    coreStrength ?? company.description,
+  );
   const accessibleSummary = [
     ticker,
     company.name && company.name !== ticker ? company.name : null,
@@ -203,16 +226,16 @@ export default function CompanyCard({
             : "Open this company research page"
         }`}
       >
-        <article className="grid gap-3 px-4 py-4 transition-[transform,color,background-color] duration-150 ease-out hover:-translate-y-[1px] hover:bg-surface 2xl:grid-cols-[116px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] 2xl:items-start active:scale-[0.995] active:bg-surface-soft">
-          <div className="flex min-w-0 items-start justify-between gap-4 2xl:block">
+        <article className="grid gap-3 px-4 py-3.5 transition-[transform,color,background-color] duration-150 ease-out hover:bg-surface xl:grid-cols-[104px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] xl:items-start active:bg-surface-soft">
+          <div className="flex min-w-0 items-start justify-between gap-4 xl:block">
             <div>
-              <h2 className="font-mono text-[22px] font-black leading-none text-ink transition-colors group-hover:text-primary group-active:text-primary sm:text-[24px] 2xl:text-[22px]">
+              <h2 className="font-mono text-[21px] font-black leading-none text-ink transition-colors group-hover:text-primary group-active:text-primary sm:text-[22px]">
                 {ticker}
               </h2>
             </div>
             <span
               aria-hidden="true"
-              className="material-symbols-outlined text-[22px] text-muted transition-colors group-hover:text-primary group-active:text-primary 2xl:hidden"
+              className="material-symbols-outlined text-[22px] text-muted transition-colors group-hover:text-primary group-active:text-primary xl:hidden"
             >
               arrow_forward
             </span>
@@ -231,22 +254,72 @@ export default function CompanyCard({
                 {secondaryLabel}
               </p>
             )}
-            <p className="mt-1 line-clamp-2 text-[13px] leading-5 text-muted 2xl:hidden">
-              {coreStrength ?? company.description}
-            </p>
+            <ResearchAxisSummary
+              items={researchAxisItems}
+              locale={locale}
+              className="mt-2 xl:hidden"
+            />
           </div>
 
-          <p className="hidden min-w-0 text-[13px] leading-5 text-body 2xl:line-clamp-2">
-            {coreStrength ?? company.description}
-          </p>
+          <ResearchAxisSummary
+            items={researchAxisItems}
+            locale={locale}
+            className="hidden min-w-0 xl:block"
+          />
 
-          <p className="hidden min-w-0 text-[13px] leading-5 text-muted 2xl:line-clamp-2">
+          <p className="hidden min-w-0 text-[13px] leading-5 text-muted xl:line-clamp-2">
             {criticalRisk ??
               (locale === "ko" ? "추적 변수 미등록" : "No watch item registered")}
           </p>
         </article>
       </Link>
     </motion.div>
+  );
+}
+
+function ResearchAxisSummary({
+  items,
+  locale,
+  className = "",
+}: {
+  items: string[];
+  locale: Locale;
+  className?: string;
+}) {
+  const [primaryItem, ...secondaryItems] = items;
+  const visibleSecondaryItems = secondaryItems.slice(0, 2);
+  const hiddenCount = Math.max(items.length - 1 - visibleSecondaryItems.length, 0);
+
+  if (!primaryItem) return null;
+
+  return (
+    <div
+      className={[
+        "grid min-w-0 grid-cols-[14px_minmax(0,1fr)] gap-2",
+        className,
+      ].join(" ")}
+      aria-label={locale === "ko" ? "리서치 축" : "Research axes"}
+    >
+      <span
+        aria-hidden="true"
+        className="mt-[9px] h-px w-full rounded-full bg-ink/45 transition-colors group-hover:bg-primary"
+      />
+      <div className="min-w-0">
+        <p className="line-clamp-2 text-[12px] font-bold leading-5 text-body [text-wrap:pretty]">
+          {primaryItem}
+        </p>
+        {visibleSecondaryItems.length > 0 && (
+          <p className="mt-0.5 line-clamp-1 text-[11px] font-semibold leading-4 text-muted">
+            {visibleSecondaryItems.join(" · ")}
+            {hiddenCount > 0 && (
+              <span className="ml-1 font-mono font-bold text-muted-soft">
+                +{hiddenCount}
+              </span>
+            )}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 

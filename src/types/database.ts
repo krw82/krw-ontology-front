@@ -31,6 +31,7 @@ export interface MessageRow extends Record<string, unknown> {
   content: string;
   status: "pending" | "streaming" | "completed" | "failed" | "cancelled";
   request_id: string | null;
+  metadata?: Json;
   created_at: string;
   updated_at: string;
 }
@@ -1033,10 +1034,11 @@ export interface Database {
         Row: MessageRow;
         Insert: Omit<
           MessageRow,
-          "id" | "created_at" | "updated_at" | "request_id"
+          "id" | "created_at" | "updated_at" | "request_id" | "metadata"
         > & {
           id?: string;
           request_id?: string | null;
+          metadata?: Json;
           created_at?: string;
           updated_at?: string;
         };

@@ -181,6 +181,8 @@ export async function POST(request: NextRequest) {
     : body.user_url
       ? [body.user_url]
       : [];
+  const userMessageMetadata =
+    userUrls.length > 0 ? { user_urls: userUrls } : {};
 
   if (userUrls.length > 0) {
     const ticker = session.defaultTickers[0];
@@ -188,7 +190,7 @@ export async function POST(request: NextRequest) {
       return errorResponse(
         400,
         "validation_error",
-        "URL 점검은 종목 기준 채팅에서만 사용할 수 있습니다.",
+        "URL 첨부는 종목 기준 채팅에서만 사용할 수 있습니다.",
         request_id,
       );
     }
@@ -259,7 +261,12 @@ export async function POST(request: NextRequest) {
   }
 
   // 7. Save user message idempotently & fetch history
-  const historyResult = await fetchHistory(session.id, content, request_id);
+  const historyResult = await fetchHistory(
+    session.id,
+    content,
+    request_id,
+    userMessageMetadata,
+  );
   if (!historyResult.ok) {
     await releaseExecutionBudget(userId, request_id, null, "history_fetch_failed");
     await releaseAnalysisCreditsShadow(

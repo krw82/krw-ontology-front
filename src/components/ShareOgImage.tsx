@@ -5,6 +5,13 @@ interface ShareOgImageProps {
 }
 
 export function ShareOgImage({ copy }: ShareOgImageProps) {
+  const isEnglish = copy.kicker.toUpperCase().includes("SHARED");
+  const questionLabel = isEnglish ? "01  QUESTION" : "01  질문";
+  const answerLabel = isEnglish ? "02  ANSWER" : "02  답변";
+  const questionText = copy.description;
+  const answerText = copy.title;
+  const tickerLine = copy.tickerLine;
+
   return (
     <div
       style={{
@@ -12,10 +19,8 @@ export function ShareOgImage({ copy }: ShareOgImageProps) {
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        justifyContent: "space-between",
-        background: "#f8fbff",
+        background: "#ffffff",
         color: "#07111f",
-        padding: "58px 64px",
         fontFamily:
           "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Apple SD Gothic Neo, Noto Sans KR, sans-serif",
         position: "relative",
@@ -24,75 +29,37 @@ export function ShareOgImage({ copy }: ShareOgImageProps) {
     >
       <div
         style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          opacity: 0.62,
-          backgroundImage:
-            "linear-gradient(#dbe5f2 1px, transparent 1px), linear-gradient(90deg, #dbe5f2 1px, transparent 1px)",
-          backgroundSize: "96px 96px",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 12,
-          display: "flex",
-          background: "#0b4eea",
-        }}
-      />
-
-      <div
-        style={{
-          position: "relative",
+          height: 84,
+          width: "100%",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 32,
+          borderBottom: "2px solid #e2e7f0",
+          padding: "0 58px",
+          background: "#ffffff",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
           <div
             style={{
-              width: 58,
-              height: 58,
+              width: 52,
+              height: 52,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               border: "2px solid #b9cdf9",
-              borderRadius: 14,
+              borderRadius: 13,
               background: "#ffffff",
               color: "#0b4eea",
               fontSize: 34,
-              fontWeight: 900,
+              fontWeight: 950,
               lineHeight: 1,
             }}
           >
             K
           </div>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 5,
-            }}
-          >
-            <div style={{ display: "flex", fontSize: 26, fontWeight: 900 }}>
-              {copy.brandName}
-            </div>
-            <div
-              style={{
-                display: "flex",
-                color: "#0b4eea",
-                fontSize: 17,
-                fontWeight: 900,
-              }}
-            >
-              {copy.kicker}
-            </div>
+          <div style={{ display: "flex", fontSize: 30, fontWeight: 950 }}>
+            {copy.brandName}
           </div>
         </div>
 
@@ -100,72 +67,206 @@ export function ShareOgImage({ copy }: ShareOgImageProps) {
           style={{
             display: "flex",
             alignItems: "center",
-            border: "2px solid #c9d8f6",
-            borderRadius: 999,
-            background: "#ffffff",
-            color: "#10223a",
-            padding: "13px 20px",
-            fontSize: 22,
-            fontWeight: 900,
-            maxWidth: 420,
+            border: "2px solid #d7e0f3",
+            borderRadius: 14,
+            background: "#f6f8fb",
+            color: "#0b4eea",
+            padding: "11px 18px",
+            fontSize: 18,
+            fontWeight: 950,
+            maxWidth: 360,
             overflow: "hidden",
             whiteSpace: "nowrap",
             textOverflow: "ellipsis",
           }}
         >
-          {copy.tickerLine}
+          {copy.kicker}
         </div>
       </div>
 
       <div
         style={{
-          position: "relative",
           display: "flex",
           flexDirection: "column",
-          gap: 26,
-          maxWidth: 1040,
+          flex: 1,
+          gap: 24,
+          padding: "36px 58px 24px",
+          background: "#ffffff",
         }}
       >
         <div
           style={{
             display: "flex",
-            color: "#07111f",
-            fontSize: 76,
-            fontWeight: 950,
-            lineHeight: 1.12,
+            gap: 28,
           }}
         >
-          {copy.title}
+          <div
+            style={{
+              width: 128,
+              flexShrink: 0,
+              display: "flex",
+              color: "#0b4eea",
+              fontSize: 19,
+              fontWeight: 950,
+              letterSpacing: 4,
+              lineHeight: 1.2,
+            }}
+          >
+            {questionLabel}
+          </div>
+          <div
+            style={{
+              minWidth: 0,
+              flex: 1,
+              display: "flex",
+              borderLeft: "5px solid #0b4eea",
+              paddingLeft: 28,
+              color: "#07111f",
+              fontSize: 36,
+              fontWeight: 900,
+              lineHeight: 1.28,
+            }}
+          >
+            {questionText}
+          </div>
         </div>
+
         <div
           style={{
             display: "flex",
-            color: "#5d6b7d",
-            fontSize: 30,
-            fontWeight: 700,
-            lineHeight: 1.45,
-            maxWidth: 960,
+            gap: 28,
           }}
         >
-          {copy.description}
+          <div
+            style={{
+              width: 128,
+              flexShrink: 0,
+              display: "flex",
+              color: "#0b4eea",
+              fontSize: 19,
+              fontWeight: 950,
+              letterSpacing: 4,
+              lineHeight: 1.2,
+            }}
+          >
+            {answerLabel}
+          </div>
+          <div
+            style={{
+              minWidth: 0,
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: 18,
+              border: "2px solid #d8dee8",
+              borderRadius: 22,
+              background: "#ffffff",
+              padding: "24px 30px 26px",
+              boxShadow: "0 16px 42px rgba(15, 23, 42, 0.08)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                color: "#07111f",
+                fontSize: 46,
+                fontWeight: 950,
+                lineHeight: 1.12,
+                maxWidth: 900,
+              }}
+            >
+              {answerText}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 14,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  color: "#0b4eea",
+                  fontSize: 18,
+                  fontWeight: 950,
+                  letterSpacing: 4,
+                }}
+              >
+                KRW RESEARCH
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  width: 8,
+                  height: 8,
+                  borderRadius: 999,
+                  background: "#c9d0da",
+                }}
+              />
+              <div
+                style={{
+                  display: "flex",
+                  minWidth: 0,
+                  maxWidth: 560,
+                  color: "#6c7685",
+                  fontSize: 22,
+                  fontWeight: 850,
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {tickerLine}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       <div
         style={{
-          position: "relative",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          borderTop: "2px solid #d8e2f0",
-          paddingTop: 28,
+          gap: 22,
+          height: 76,
+          padding: "0 58px 22px",
+          background: "#ffffff",
         }}
       >
-        <div style={{ display: "flex", color: "#5d6b7d", fontSize: 24, fontWeight: 800 }}>
+        <div
+          style={{
+            height: 54,
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            border: "2px solid #d8dee8",
+            borderRadius: 28,
+            background: "#ffffff",
+            color: "#7a8492",
+            padding: "0 26px",
+            fontSize: 21,
+            fontWeight: 850,
+          }}
+        >
           {copy.footer}
         </div>
-        <div style={{ display: "flex", color: "#0b4eea", fontSize: 24, fontWeight: 950 }}>
-          krwontology.com
+        <div
+          style={{
+            width: 54,
+            height: 54,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 999,
+            background: "#dfe2ee",
+            color: "#7a8492",
+            fontSize: 34,
+            fontWeight: 900,
+          }}
+        >
+          ↑
         </div>
       </div>
     </div>

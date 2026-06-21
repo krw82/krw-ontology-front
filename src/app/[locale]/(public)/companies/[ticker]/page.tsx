@@ -145,7 +145,7 @@ export default async function CompanyLandingPage({
           watchlistSaving: "저장 중",
           watchlistError: "종목 상태를 저장하지 못했습니다.",
           scopeEyebrow: "분석 범위",
-          scopeHeading: `${companyTitleName} 리서치 초점`,
+          scopeHeading: `${companyTitleName} 리서치 축`,
           businessActivity: "사업 활동",
           watchItem: "추적 변수",
           fallbackActivity: "회사별 사업 활동 인덱스 확인",
@@ -163,7 +163,7 @@ export default async function CompanyLandingPage({
           watchlistSaving: "Saving",
           watchlistError: "Could not save this company.",
           scopeEyebrow: "Analysis scope",
-          scopeHeading: `${displayCompany.name} research focus`,
+          scopeHeading: `${displayCompany.name} research axes`,
           businessActivity: "Business activity",
           watchItem: "Watch item",
           fallbackActivity: "Company-specific business activity index",
@@ -286,32 +286,30 @@ export default async function CompanyLandingPage({
             />
           </header>
 
-          <section className="border-b border-hairline pt-8 pb-3">
-            <div className="grid gap-6 md:grid-cols-[180px_minmax(0,1fr)] md:items-start">
-              <div>
+          <section className="border-b border-hairline py-7">
+            <div className="grid gap-5 md:grid-cols-[176px_minmax(0,1fr)] md:items-start">
+              <div className="min-w-0">
                 <p className="font-mono text-[11px] font-black uppercase tracking-[0.16em] text-primary">
                   {pageCopy.scopeEyebrow}
                 </p>
-                <h2 className="mt-2 text-[22px] font-black leading-7 text-ink">
+                <h2 className="mt-2 text-[20px] font-black leading-7 text-ink sm:text-[22px]">
                   {pageCopy.scopeHeading}
                 </h2>
               </div>
-              <div className="divide-y divide-hairline border-t border-hairline">
+              <div className="border-t border-hairline">
                 <ScopeRow
                   index="01"
                   label={pageCopy.businessActivity}
-                  value={
-                    displayCompany.core_strength ??
-                    pageCopy.fallbackActivity
-                  }
+                  items={scopeItemsFromValue(
+                    displayCompany.core_strength ?? pageCopy.fallbackActivity,
+                  )}
                 />
                 <ScopeRow
                   index="02"
                   label={pageCopy.watchItem}
-                  value={
-                    displayCompany.critical_risk ??
-                    pageCopy.fallbackRisk
-                  }
+                  items={scopeItemsFromValue(
+                    displayCompany.critical_risk ?? pageCopy.fallbackRisk,
+                  )}
                 />
               </div>
             </div>
@@ -326,25 +324,52 @@ export default async function CompanyLandingPage({
 function ScopeRow({
   index,
   label,
-  value,
+  items,
 }: {
   index: string;
   label: string;
-  value: string;
+  items: string[];
 }) {
   return (
-    <div className="grid gap-2 py-4 sm:grid-cols-[96px_minmax(0,1fr)] sm:gap-5">
+    <div className="grid gap-3 border-b border-hairline py-4 last:border-b-0 sm:grid-cols-[104px_minmax(0,1fr)] sm:gap-5">
       <div className="flex items-baseline gap-2">
-        <span className="font-mono text-[12px] font-black leading-none text-primary">
+        <span className="font-mono text-[11px] font-black leading-none text-primary">
           {index}
         </span>
-        <span className="text-[13px] font-extrabold leading-5 text-muted">
+        <span className="text-[12px] font-extrabold leading-5 text-muted">
           {label}
         </span>
       </div>
-      <p className="whitespace-pre-line text-[15px] font-extrabold leading-7 text-ink">
-        {value}
-      </p>
+      <ul className="flex min-w-0 flex-wrap gap-x-1.5 gap-y-2">
+        {items.map((item) => (
+          <li
+            key={item}
+            className="max-w-full rounded-[6px] border border-hairline bg-surface px-2 py-1 text-[12px] font-bold leading-5 text-ink [word-break:keep-all]"
+          >
+            {item}
+          </li>
+        ))}
+      </ul>
     </div>
   );
+}
+
+function scopeItemsFromValue(value: string): string[] {
+  const cleaned = value
+    .replace(/^리서치 초점\s*:\s*/, "")
+    .replace(/^핵심 성장 동력\s*:\s*/, "")
+    .replace(/^리스크 변수\s*:\s*/, "")
+    .replace(/^주요 리스크 요인\s*:\s*/, "")
+    .replace(/^Research focus\s*:\s*/i, "")
+    .replace(/^Core strengths\s*:\s*/i, "")
+    .replace(/^Risk variables\s*:\s*/i, "")
+    .replace(/^Key risks\s*:\s*/i, "")
+    .trim();
+
+  const items = cleaned
+    .split(/[,;\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return items.length > 0 ? items : [value];
 }

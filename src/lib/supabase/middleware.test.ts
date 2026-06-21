@@ -44,6 +44,19 @@ describe("updateSession auth redirects", () => {
     expect(response.headers.get("location")).toBe("http://localhost/companies");
   });
 
+  it("allows desktop approval login pages through dev auth bypass", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    process.env.DEV_AUTH_BYPASS = "1";
+
+    const response = await updateSession(
+      new NextRequest("http://localhost/login?desktop_code=ABCD-1234"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
+    expect(createServerClient).not.toHaveBeenCalled();
+  });
+
   it("redirects authenticated login requests to the normalized next path", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.example");
@@ -59,6 +72,21 @@ describe("updateSession auth redirects", () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("http://localhost/companies");
+  });
+
+  it("allows authenticated desktop approval login pages to render", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.example");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon");
+    process.env.DEV_AUTH_BYPASS = "0";
+    mockAuthUser({ id: "user-1" });
+
+    const response = await updateSession(
+      new NextRequest("http://localhost/login?desktop_code=ABCD-1234"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
   });
 
   it("routes misplaced OAuth codes through the callback handler", async () => {

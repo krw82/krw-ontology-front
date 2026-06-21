@@ -451,6 +451,7 @@ export interface Message {
   role: MessageRole;
   content: string;
   status: MessageStatus;
+  metadata?: Record<string, unknown> | null;
   readonly created_at: string;
   readonly updated_at?: string;
 }

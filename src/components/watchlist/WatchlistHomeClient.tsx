@@ -109,24 +109,39 @@ export default function WatchlistHomeClient({
   return (
     <main
       id="main-content"
-      className="px-base pb-[112px] pt-xl sm:px-md md:px-xl md:pb-[96px] md:pt-[72px]"
+      className="px-base pb-[112px] pt-lg sm:px-md md:px-xl md:pb-[96px] md:pt-xl"
     >
       <div className="mx-auto w-full max-w-[1200px]">
-        <header className="border-b border-hairline pb-8">
-          <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-primary">
-            Personal Research
-          </p>
-          <div className="mt-3">
+        <header className="grid gap-5 border-b border-hairline pb-5 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.72fr)] lg:items-end">
+          <div>
+            <p className="font-mono text-[12px] font-bold uppercase tracking-[0.14em] text-primary">
+              Personal Research
+            </p>
             <div className="min-w-0">
-              <h1 className="text-balance text-[32px] font-black leading-[1.08] tracking-normal text-ink sm:text-[44px]">
+              <h1 className="mt-2 text-balance text-[30px] font-black leading-[1.08] tracking-normal text-ink sm:text-[40px]">
                 리서치 노트북
               </h1>
-              <p className="mt-4 max-w-2xl text-[16px] leading-7 text-body sm:text-[18px]">
-                관심종목과 보유종목을 공시 근거로 계속 점검합니다.
-                매수·매도 추천이 아니라, 내가 왜 이 종목을 보는지와
-                무엇을 확인해야 하는지 정리하는 공간입니다.
+              <p className="mt-3 max-w-2xl text-[15px] leading-6 text-body sm:text-[16px]">
+                관심종목과 보유종목을 공시 근거로 계속 점검하고, 확인할 질문을 한곳에 쌓아둡니다.
               </p>
             </div>
+          </div>
+          <div className="relative min-w-0">
+            <p className="mb-2 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
+              Notebook search
+            </p>
+            <span
+              aria-hidden="true"
+              className="material-symbols-outlined absolute bottom-[12px] left-3 text-[20px] text-muted"
+            >
+              search
+            </span>
+            <input
+              className="h-11 w-full rounded-[8px] border border-hairline bg-canvas pl-10 pr-sm text-[14px] font-semibold leading-5 text-ink shadow-sm placeholder:text-muted focus:border-outline focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim/25"
+              placeholder="티커, 회사명, 노트 검색"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
           </div>
         </header>
 
@@ -142,32 +157,15 @@ export default function WatchlistHomeClient({
           onDismissQuestion={handleDismissInboxQuestion}
         />
 
-        <section className="mt-6">
-          <div className="grid gap-3">
-            <div className="relative">
-              <span
-                aria-hidden="true"
-                className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[20px] text-muted"
-              >
-                search
-              </span>
-              <input
-                className="h-11 w-full rounded-[8px] border border-hairline bg-surface pl-10 pr-sm text-[14px] font-semibold leading-5 text-ink placeholder:text-muted focus:border-primary focus:bg-canvas focus:outline-none"
-                placeholder="티커, 회사명, 노트 검색"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </div>
-          </div>
-
+        <section className="mt-5">
           {companies.length === 0 ? (
             <EmptyWatchlist />
           ) : filteredCompanies.length === 0 ? (
-            <div className="mt-6 border border-hairline bg-surface-soft p-lg text-center text-[15px] font-bold leading-6 text-muted">
+            <div className="mt-5 rounded-[8px] border border-hairline bg-surface-soft p-lg text-center text-[15px] font-bold leading-6 text-muted">
               조건에 맞는 종목이 없습니다.
             </div>
           ) : (
-            <div className="mt-6 grid gap-7">
+            <div className="grid gap-6">
               {companySections
                 .filter(
                   (section) => section.companies.length > 0 || showEmptySections,
@@ -200,8 +198,8 @@ function CompanySection({
   return (
     <section>
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-        <h2 className="text-[20px] font-black leading-7 text-ink">{title}</h2>
-        <span className="font-mono text-[13px] font-black leading-5 text-muted">
+        <h2 className="text-[18px] font-black leading-7 text-ink">{title}</h2>
+        <span className="font-mono text-[12px] font-bold leading-5 text-muted">
           {companies.length.toLocaleString()}개
         </span>
       </div>
@@ -212,7 +210,7 @@ function CompanySection({
         </div>
       ) : (
         <div className="overflow-hidden rounded-[8px] border border-hairline bg-canvas">
-          <div className="hidden grid-cols-[116px_minmax(220px,1fr)_120px] border-b border-hairline bg-surface px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted xl:grid">
+          <div className="hidden grid-cols-[104px_minmax(220px,1fr)_120px] border-b border-hairline bg-surface px-4 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted xl:grid">
             <span>ticker</span>
             <span>research state</span>
             <span>activity</span>
@@ -234,7 +232,7 @@ function CompanyRow({ company }: { company: WatchlistCompanySummary }) {
   return (
     <Link
       href={`/watchlist/${encodeURIComponent(company.ticker)}`}
-      className="grid gap-3 px-4 py-4 transition-colors hover:bg-surface-soft xl:grid-cols-[116px_minmax(220px,1fr)_120px] xl:items-center"
+      className="grid gap-3 px-4 py-3.5 transition-colors hover:bg-surface-soft xl:grid-cols-[104px_minmax(220px,1fr)_120px] xl:items-center"
     >
       <div className="flex items-center gap-2">
         <span className="font-mono text-[18px] font-black leading-6 text-ink">
@@ -249,7 +247,7 @@ function CompanyRow({ company }: { company: WatchlistCompanySummary }) {
       </div>
       <div className="min-w-0">
         {companyName && (
-          <p className="truncate text-[15px] font-black leading-5 text-ink">
+          <p className="truncate text-[14px] font-black leading-5 text-ink">
             {companyName}
           </p>
         )}
@@ -289,11 +287,11 @@ function ResearchInboxPanel({
 
   if (inbox.length === 0) {
     return (
-      <section className="mt-6 flex flex-wrap items-center justify-between gap-2 border border-hairline bg-canvas px-sm py-xs">
-        <p className="font-mono text-[12px] font-bold uppercase tracking-[0.14em] text-primary">
+      <section className="mt-5 flex flex-wrap items-center justify-between gap-2 rounded-[8px] border border-hairline bg-canvas px-sm py-xs shadow-sm">
+        <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
           Research Inbox
         </p>
-        <p className="text-[14px] font-black leading-5 text-ink">
+        <p className="text-[13px] font-bold leading-5 text-ink">
           오늘 처리할 리서치 없음
         </p>
       </section>
@@ -301,13 +299,13 @@ function ResearchInboxPanel({
   }
 
   return (
-    <section className="mt-6 border border-hairline bg-canvas">
-      <div className="border-b border-hairline px-sm py-sm md:px-md">
+    <section className="mt-5 overflow-hidden rounded-[8px] border border-hairline bg-canvas">
+      <div className="flex flex-wrap items-end justify-between gap-2 border-b border-hairline px-sm py-3 md:px-md">
         <div>
-          <p className="font-mono text-[12px] font-bold uppercase tracking-[0.14em] text-primary">
+          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
             Research Inbox
           </p>
-          <h2 className="mt-1 text-[22px] font-black leading-7 text-ink">
+          <h2 className="mt-0.5 text-[18px] font-black leading-7 text-ink">
             오늘 처리할 리서치 {inbox.length.toLocaleString()}개
           </h2>
         </div>
@@ -324,7 +322,7 @@ function ResearchInboxPanel({
         ))}
         {hiddenCount > 0 && (
           <button
-            className="flex h-11 w-full items-center justify-center gap-1 px-sm text-[13px] font-extrabold leading-5 text-muted transition-colors hover:bg-surface-soft hover:text-primary md:px-md"
+            className="flex h-10 w-full items-center justify-center gap-1 px-sm text-[13px] font-bold leading-5 text-muted transition-colors hover:bg-surface-soft hover:text-ink md:px-md"
             type="button"
             onClick={() => setIsExpanded(true)}
           >
@@ -339,7 +337,7 @@ function ResearchInboxPanel({
         )}
         {shouldCollapse && isExpanded && (
           <button
-            className="flex h-11 w-full items-center justify-center gap-1 px-sm text-[13px] font-extrabold leading-5 text-muted transition-colors hover:bg-surface-soft hover:text-primary md:px-md"
+            className="flex h-10 w-full items-center justify-center gap-1 px-sm text-[13px] font-bold leading-5 text-muted transition-colors hover:bg-surface-soft hover:text-ink md:px-md"
             type="button"
             onClick={() => setIsExpanded(false)}
           >
@@ -374,17 +372,17 @@ function ResearchInboxRow({
     return (
       <Link
         href={item.action_href}
-        className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-sm py-sm transition-colors hover:bg-surface-soft md:grid-cols-[116px_minmax(0,1fr)_auto] md:px-md"
+        className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-sm py-3 transition-colors hover:bg-surface-soft md:grid-cols-[104px_minmax(0,1fr)_auto] md:px-md"
         aria-label={`${item.ticker} 리서치 노트북 열기`}
       >
         <div className="min-w-0 md:contents">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[18px] font-black leading-6 text-ink">
+            <span className="font-mono text-[17px] font-black leading-6 text-ink">
               {item.ticker}
             </span>
           </div>
           <div className="mt-3 min-w-0 md:mt-0">
-            <p className="text-[15px] font-black leading-5 text-ink">
+            <p className="text-[14px] font-black leading-5 text-ink">
               {item.title}
             </p>
             {item.description && (
@@ -396,7 +394,7 @@ function ResearchInboxRow({
         </div>
         <span
           aria-hidden="true"
-          className="material-symbols-outlined justify-self-end text-[28px] text-muted transition-colors group-hover:text-primary"
+          className="material-symbols-outlined justify-self-end text-[22px] text-muted transition-colors group-hover:text-ink"
         >
           arrow_forward
         </span>
@@ -405,14 +403,14 @@ function ResearchInboxRow({
   }
 
   return (
-    <div className="grid gap-3 px-sm py-sm md:grid-cols-[116px_minmax(0,1fr)_auto] md:items-center md:px-md">
+    <div className="grid gap-3 px-sm py-3 md:grid-cols-[104px_minmax(0,1fr)_auto] md:items-center md:px-md">
       <div className="flex items-center gap-2">
-        <span className="font-mono text-[18px] font-black leading-6 text-ink">
+        <span className="font-mono text-[17px] font-black leading-6 text-ink">
           {item.ticker}
         </span>
       </div>
       <div className="min-w-0">
-        <p className="text-[15px] font-black leading-5 text-ink">
+        <p className="text-[14px] font-black leading-5 text-ink">
           {item.title}
         </p>
         {item.description && (
@@ -424,21 +422,21 @@ function ResearchInboxRow({
       <div className="flex flex-wrap gap-2 md:justify-end">
         <Link
           href={item.action_href}
-          className="inline-flex h-10 items-center justify-center rounded-[8px] bg-surface-dark px-sm text-[13px] font-extrabold text-on-dark transition-colors hover:bg-primary-active"
+          className="inline-flex h-9 items-center justify-center rounded-[8px] bg-ink px-sm text-[12px] font-bold text-on-dark transition-colors hover:bg-primary-active"
         >
           {item.action_label}
         </Link>
         {item.secondary_action_href && item.secondary_action_label && (
           <Link
             href={item.secondary_action_href}
-            className="inline-flex h-10 items-center justify-center rounded-[8px] border border-hairline bg-canvas px-sm text-[13px] font-extrabold text-ink transition-colors hover:border-primary hover:text-primary"
+            className="inline-flex h-9 items-center justify-center rounded-[8px] border border-hairline bg-canvas px-sm text-[12px] font-bold text-ink transition-colors hover:bg-surface-soft"
           >
             {item.secondary_action_label}
           </Link>
         )}
         {item.dismiss_question_id && (
           <button
-            className="inline-flex h-10 items-center justify-center rounded-[8px] border border-hairline bg-canvas px-sm text-[13px] font-extrabold text-ink transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-9 items-center justify-center rounded-[8px] border border-hairline bg-canvas px-sm text-[12px] font-bold text-ink transition-colors hover:bg-surface-soft disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isDismissing}
             type="button"
             onClick={() => onDismissQuestion(item)}
@@ -453,7 +451,7 @@ function ResearchInboxRow({
 
 function EmptyWatchlist() {
   return (
-    <div className="mt-6 border border-hairline bg-surface-soft p-lg">
+    <div className="mt-5 rounded-[8px] border border-hairline bg-surface-soft p-lg">
       <p className="text-[18px] font-black leading-6 text-ink">
         아직 저장한 종목이 없습니다.
       </p>

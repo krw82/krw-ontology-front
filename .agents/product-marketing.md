@@ -40,6 +40,19 @@
 - "기업 공시를 읽는 이유는 결론을 얻기 위해서가 아니라, 결론을 의심할 근거를 얻기 위해서입니다."
 - "좋은 리서치 AI는 답을 빨리 주는 게 아니라, 답을 다시 검증할 수 있게 만들어야 합니다."
 
+## Social Publishing Preferences
+
+**Default cadence:** When the user asks to fill a day with scheduled social posts, use 20-minute spacing unless they specify a different cadence.
+
+**Language by time window, Asia/Seoul time:**
+
+- 00:00-07:40: English posts for international/US-market reach.
+- 08:00 onward: Korean posts for the primary Korean investor audience.
+
+**Cross-posting rule:** Treat one scheduled content idea as one content set, then adapt it for Mastodon, Threads, and Bluesky. Exclude X while API credits are unavailable.
+
+**Threads rule:** Use one topic tag only. Default to `aithreads` unless the user asks for another topic.
+
 ## Target Audience
 
 **Target companies:** Not company buyers in the first self-serve motion. The primary buyer is an individual user: Korean-speaking individual investors, pro investors, independent analysts, newsletter writers, and finance creators who read US public company filings.

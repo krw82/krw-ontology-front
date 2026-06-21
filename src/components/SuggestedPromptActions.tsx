@@ -42,14 +42,14 @@ function PromptContent({
         <motion.span
           layoutId="empty-state-prompt-active"
           aria-hidden="true"
-          className="absolute inset-0 rounded-[10px] bg-surface"
+          className="absolute inset-0 rounded-[8px] bg-surface"
           transition={{
             duration: 0.36,
             ease: [0.16, 1, 0.3, 1],
           }}
         />
       )}
-      <span className="relative z-10 shrink-0 font-mono text-[13px] font-black leading-6 text-muted">
+      <span className="relative z-10 shrink-0 font-mono text-[12px] font-bold leading-6 text-muted-soft">
         {index + 1}.
       </span>
       <span className="relative z-10 min-w-0 flex-1">{prompt}</span>
@@ -59,7 +59,7 @@ function PromptContent({
             key="active-prompt-arrow"
             layoutId="empty-state-prompt-arrow"
             aria-hidden="true"
-            className="material-symbols-outlined relative z-10 shrink-0 text-[18px] text-muted transition-colors group-hover:text-primary"
+            className="material-symbols-outlined relative z-10 shrink-0 text-[18px] text-muted transition-colors group-hover:text-ink"
             initial={{ opacity: 0, x: -3 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 3 }}
@@ -105,7 +105,7 @@ export default function SuggestedPromptActions({
   if (prompts.length === 0) return null;
 
   const itemClassName =
-    "group relative flex w-full items-center gap-3 overflow-hidden rounded-[10px] px-3 py-3 text-left text-[14px] font-semibold leading-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60";
+    "group relative flex w-full items-center gap-3 overflow-hidden rounded-[8px] border border-transparent px-3 py-2.5 text-left text-[14px] font-semibold leading-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60";
 
   const trackPromptClick = (prompt: string, index: number): Promise<void> => {
     if (!analytics) return Promise.resolve();
@@ -131,8 +131,8 @@ export default function SuggestedPromptActions({
             className: cn(
               itemClassName,
               isActivePrompt
-                ? "text-ink"
-                : "text-body hover:bg-surface-soft hover:text-ink",
+                ? "border-hairline text-ink"
+                : "text-body hover:border-hairline-soft hover:bg-surface-soft hover:text-ink",
             ),
             onFocus: () => setRawActivePromptIndex(index),
             onMouseEnter: () => setRawActivePromptIndex(index),

@@ -28,6 +28,8 @@ export async function updateSession(
     request.nextUrl.pathname.startsWith(p),
   );
   const isLogin = request.nextUrl.pathname === "/login";
+  const isDesktopLoginApproval =
+    isLogin && request.nextUrl.searchParams.has("desktop_code");
   const hasOAuthCode = request.nextUrl.searchParams.has("code");
 
   if (
@@ -43,7 +45,7 @@ export async function updateSession(
   }
 
   if (isDevAuthBypassEnabledForHost(request.nextUrl.hostname)) {
-    if (request.nextUrl.pathname === "/login") {
+    if (request.nextUrl.pathname === "/login" && !isDesktopLoginApproval) {
       const url = new URL(
         normalizeInternalNextPath(request.nextUrl.searchParams.get("next")),
         request.nextUrl.origin,
@@ -93,7 +95,7 @@ export async function updateSession(
   }
 
   // Redirect authenticated users away from login
-  if (user && isLogin) {
+  if (user && isLogin && !isDesktopLoginApproval) {
     const url = new URL(
       normalizeInternalNextPath(request.nextUrl.searchParams.get("next")),
       request.nextUrl.origin,

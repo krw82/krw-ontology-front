@@ -98,7 +98,7 @@ export async function GET(
 
   const messagesBaseQuery = supabase
     .from("messages")
-    .select("id, session_id, role, content, status, created_at, updated_at")
+    .select("id, session_id, role, content, status, metadata, created_at, updated_at")
     .eq("session_id", sessionId);
   const messagesQuery = beforeCreatedAt
     ? messagesBaseQuery.lt("created_at", beforeCreatedAt)

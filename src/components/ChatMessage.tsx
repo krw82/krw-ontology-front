@@ -27,6 +27,7 @@ import { sanitizeAssistantContent } from "@/lib/chat/assistant-content";
 interface ChatMessageProps {
   role: "user" | "assistant";
   content: string;
+  metadata?: Record<string, unknown> | null;
   isStreaming?: boolean;
   activity?: ResearchActivityUpdate | null;
   citations?: ChatCitation[];
@@ -387,6 +388,70 @@ function CompletedAssistantContent({ content }: { content: string }) {
   return <ResearchMarkdown content={content} />;
 }
 
+function userUrlsFromMetadata(
+  metadata: Record<string, unknown> | null | undefined,
+): string[] {
+  const urls = metadata?.user_urls;
+  if (!Array.isArray(urls)) return [];
+
+  return urls
+    .filter((url): url is string => typeof url === "string")
+    .map((url) => url.trim())
+    .filter((url) => /^https?:\/\//i.test(url))
+    .slice(0, 3);
+}
+
+function urlDisplayParts(url: string): { host: string; shortUrl: string } {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./i, "");
+    const path = `${parsed.pathname}${parsed.search}`.replace(/\/$/, "");
+    return {
+      host: host || "URL",
+      shortUrl: path ? `${host}${path}` : host,
+    };
+  } catch {
+    return { host: "URL", shortUrl: url };
+  }
+}
+
+function UserUrlAttachments({ urls }: { urls: string[] }) {
+  if (urls.length === 0) return null;
+
+  return (
+    <div className="mt-sm flex max-w-full flex-col items-end gap-xs">
+      {urls.map((url, index) => {
+        const display = urlDisplayParts(url);
+
+        return (
+          <a
+            key={`${url}-${index}`}
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="group inline-flex max-w-full items-center gap-xs rounded-[8px] border border-hairline bg-canvas px-sm py-xs text-left text-[12px] leading-none text-body transition-colors hover:border-primary-fixed-dim hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label={`URL 자료 열기: ${display.shortUrl}`}
+          >
+            <span
+              aria-hidden="true"
+              className="material-symbols-outlined shrink-0 text-[16px] text-primary"
+            >
+              link
+            </span>
+            <span className="min-w-0 max-w-[190px] truncate font-bold text-body sm:max-w-[280px]">
+              {display.host}
+            </span>
+            <span className="hidden shrink-0 text-muted sm:inline">·</span>
+            <span className="hidden min-w-0 max-w-[260px] truncate text-muted md:inline">
+              {display.shortUrl}
+            </span>
+          </a>
+        );
+      })}
+    </div>
+  );
+}
+
 function terminalAssistantContent(status: MessageStatus | undefined) {
   if (status === "cancelled") return CANCELLED_ASSISTANT_MESSAGE;
   if (status === "failed") return FAILED_ASSISTANT_MESSAGE;
@@ -400,6 +465,7 @@ export default function ChatMessage({
   activity,
   citations,
   artifacts,
+  metadata,
   artifactSelections,
   onSelectNewsEvent,
   newsEventSelectionDisabled,
@@ -413,6 +479,7 @@ export default function ChatMessage({
 }: ChatMessageProps) {
   if (role === "user") {
     const { visibleText, attachments } = parseChatAttachmentContent(content);
+    const userUrls = userUrlsFromMetadata(metadata);
 
     return (
       <motion.div
@@ -427,6 +494,7 @@ export default function ChatMessage({
               {visibleText}
             </p>
           ) : null}
+          <UserUrlAttachments urls={userUrls} />
           {attachments.length > 0 && (
             <div
               className={[
@@ -447,9 +515,6 @@ export default function ChatMessage({
                   </span>
                   <span className="max-w-[180px] truncate text-ink sm:max-w-[240px]">
                     {attachment.name}
-                  </span>
-                  <span className="shrink-0 text-muted">
-                    {attachment.characterCount.toLocaleString()}자
                   </span>
                 </div>
               ))}

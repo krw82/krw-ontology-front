@@ -3,6 +3,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { WebSocketLikeConstructor } from "@supabase/realtime-js";
+import WebSocket from "ws";
 import type { Database, DesktopLlmJobRow } from "../../../src/types/database";
 import {
   hashLlmJobToken,
@@ -168,8 +170,9 @@ function createGatewayContext(env: GatewayEnv): GatewayContext {
 
   return {
     env,
-    supabase: createClient<Database>(supabaseUrl, serviceRoleKey, {
+    supabase: createClient<Database, "public", "public">(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
+      realtime: { transport: WebSocket as unknown as WebSocketLikeConstructor },
     }),
     jobTokenSecret,
     deepSeekApiKey: requireEnv(env, "DEEPSEEK_API_KEY"),

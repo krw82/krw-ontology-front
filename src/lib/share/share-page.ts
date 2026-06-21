@@ -32,8 +32,8 @@ export function buildPublicShareMetadata(
   share: PublicMessageShare,
   locale: Locale,
 ): Metadata {
-  const pageTitle = `${share.title} | ${SITE_NAME}`;
   const ogCopy = buildShareOgCopy(share);
+  const pageTitle = `${ogCopy.title} | ${SITE_NAME}`;
   const imageUrl = buildShareOgImageUrl(share.token);
   const pageUrl = buildShareCanonicalUrl(share.token, locale);
 

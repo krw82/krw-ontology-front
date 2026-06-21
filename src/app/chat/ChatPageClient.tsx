@@ -23,7 +23,10 @@ import {
   buildChatSessionHref,
 } from "@/lib/chat/history-state";
 import { DEFAULT_LOCALE, isLocale } from "@/i18n/config";
-import { getSuggestedPromptDisplaysForTickers } from "@/content/companies/display";
+import {
+  getCompanyDisplayCopyForTicker,
+  getSuggestedPromptDisplaysForTickers,
+} from "@/content/companies/display";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import { findQuestionTopic } from "@/lib/marketing/site";
 import { createClientId } from "@/lib/client-id";
@@ -154,7 +157,7 @@ function CreditLimitErrorCard({
     >
       <div className="h-1 bg-primary" aria-hidden="true" />
       <div className="p-base sm:p-lg">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="w-full min-w-0 flex-1 [overflow-wrap:normal]">
             <p className="font-mono text-[11px] font-black uppercase tracking-[0.16em] text-primary">
               WEEKLY LIMIT
@@ -162,7 +165,7 @@ function CreditLimitErrorCard({
             <h3 className="mt-2 text-[20px] font-black leading-7 text-ink sm:text-[22px]">
               주간 분석 한도를 모두 사용했습니다.
             </h3>
-            <p className="mt-2 w-full max-w-none break-normal text-[14px] font-semibold leading-6 text-body [overflow-wrap:normal] [word-break:keep-all] sm:max-w-xl sm:text-[15px]">
+            <p className="mt-2 w-full max-w-[36rem] break-normal text-[14px] font-semibold leading-6 text-body [overflow-wrap:normal] [word-break:keep-all] sm:text-[15px]">
               다음 충전 전까지 새 분석은 시작할 수 없습니다. 기존 리서치와
               노트북은 계속 볼 수 있습니다.
             </p>
@@ -553,6 +556,12 @@ function ChatContent() {
   const contextTickerText = contextCompanies
     .map((company) => company.ticker)
     .join(" / ");
+  const contextDisplayText = contextCompanies
+    .map((company) => {
+      const copy = getCompanyDisplayCopyForTicker(responseLocale, company.ticker);
+      return copy.companyNameKo || copy.name || company.name || company.ticker;
+    })
+    .join(" / ");
   const contextNameText = contextCompanies
     .map((company) => company.name)
     .filter((name): name is string => Boolean(name))
@@ -572,20 +581,16 @@ function ChatContent() {
   const emptyStateCopy =
     responseLocale === "ko"
       ? {
-          headingWithContext: `${contextTickerText}에서 무엇을 확인할까요?`,
-          headingWithoutContext: "무엇을 확인할까요?",
-          introWithContext:
-            "매출 변화, 마진 흐름, 리스크 요인을 회사 보고서 기준으로 정리합니다.",
-          introWithoutContext:
-            "기업, 기간, 사업 흐름을 함께 적어 리서치를 시작하세요.",
+          headingWithContext: `${contextDisplayText}에서 무엇을 확인할까요?`,
+          headingWithoutContext: "와이드 리서치",
+          descriptionWithoutContext:
+            "티커 없이 아이디어, 산업, 리스크 키워드로 관련 회사를 넓게 탐색합니다.",
         }
       : {
-          headingWithContext: `What should we check for ${contextTickerText}?`,
-          headingWithoutContext: "What should we check?",
-          introWithContext:
-            "Review revenue changes, margin trends, and risk factors from company filings.",
-          introWithoutContext:
-            "Start with a company, period, or business trend to begin the research.",
+          headingWithContext: `What should we check for ${contextDisplayText}?`,
+          headingWithoutContext: "Wide research",
+          descriptionWithoutContext:
+            "Explore related companies from an idea, industry, or risk keyword without starting from a ticker.",
         };
   const queryValue = queryParam?.trim() || null;
   const shareQuestionValue = shareStarter?.question_content.trim() || null;
@@ -1062,6 +1067,7 @@ function ChatContent() {
                       key={msg.id}
                       role={msg.role}
                       content={msg.content}
+                      metadata={msg.metadata}
                       status={msg.status}
                       messageId={msg.role === "assistant" ? msg.id : undefined}
                       createdAt={
@@ -1146,6 +1152,7 @@ function ChatContent() {
                 )}
                 {shouldShowChatError && (
                   <motion.div
+                    className="w-full"
                     key={
                       shouldPreviewCreditLimitCard
                         ? "credit-limit-preview"
@@ -1188,49 +1195,54 @@ function ChatContent() {
                 !isHydratingSession &&
                 !isActiveRun &&
                 !sessionError && (
-                  <div className="mx-auto grid w-full max-w-4xl gap-7 py-lg sm:py-xxl md:grid-cols-[minmax(0,1fr)_320px] md:items-start">
-                  <motion.div
-                    className="min-w-0 border-b border-hairline-soft pb-6 md:border-b-0 md:pb-0 md:pr-6"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.24, ease: "easeOut" }}
-                  >
-                    <h2 className="text-balance text-[24px] font-black leading-[1.16] text-ink sm:text-[38px]">
-                      {contextTickers.length > 0
-                        ? emptyStateCopy.headingWithContext
-                        : emptyStateCopy.headingWithoutContext}
-                    </h2>
-                    <p className="mt-4 max-w-2xl text-[15px] leading-7 text-body sm:text-[16px]">
-                      {contextTickers.length > 0
-                        ? emptyStateCopy.introWithContext
-                        : emptyStateCopy.introWithoutContext}
-                    </p>
-                  </motion.div>
+                  <div className="mx-auto flex min-h-[46dvh] w-full max-w-2xl flex-col items-center justify-center py-lg text-center sm:py-xxl md:min-h-[56dvh]">
+                    <motion.div
+                      className="w-full min-w-0"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.24, ease: "easeOut" }}
+                    >
+                      <h2 className="text-balance text-[26px] font-black leading-[1.12] text-ink sm:text-[36px]">
+                        {contextTickers.length > 0
+                          ? emptyStateCopy.headingWithContext
+                          : emptyStateCopy.headingWithoutContext}
+                      </h2>
+                      {contextTickers.length === 0 ? (
+                        <p className="mx-auto mt-3 max-w-[34rem] text-balance text-[15px] font-semibold leading-6 text-body sm:text-[16px]">
+                          {emptyStateCopy.descriptionWithoutContext}
+                        </p>
+                      ) : null}
+                    </motion.div>
 
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.24, delay: 0.06, ease: "easeOut" }}
-                  >
-                    <SuggestedPromptActions
-                      prompts={suggestedPrompts}
-                      groupId="empty-state-prompts"
-                      disabled={isActiveRun || Boolean(effectiveSessionError)}
-                      analytics={{
-                        sourceSurface: "chat_empty_state",
-                        ticker: contextTickers[0] ?? null,
-                        tickers: contextTickers,
-                        promptCategory: "starter",
-                        promptIds: suggestedPrompts.map(
-                          (_, index) => `chat_empty_starter_${index + 1}`,
-                        ),
+                    <motion.div
+                      className="mt-6 w-full max-w-[36rem] text-left"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{
+                        duration: 0.24,
+                        delay: 0.06,
+                        ease: "easeOut",
                       }}
-                      onSelect={(prompt) => {
-                        void handlePromptSend(prompt);
-                      }}
-                    />
-                  </motion.div>
-                </div>
+                    >
+                      <SuggestedPromptActions
+                        prompts={suggestedPrompts}
+                        groupId="empty-state-prompts"
+                        disabled={isActiveRun || Boolean(effectiveSessionError)}
+                        analytics={{
+                          sourceSurface: "chat_empty_state",
+                          ticker: contextTickers[0] ?? null,
+                          tickers: contextTickers,
+                          promptCategory: "starter",
+                          promptIds: suggestedPrompts.map(
+                            (_, index) => `chat_empty_starter_${index + 1}`,
+                          ),
+                        }}
+                        onSelect={(prompt) => {
+                          void handlePromptSend(prompt);
+                        }}
+                      />
+                    </motion.div>
+                  </div>
               )}
 
               {/* Spacer for fixed composer overlay — dynamically measured */}
@@ -1336,10 +1348,10 @@ function ChatContent() {
                   ease: [0.16, 1, 0.3, 1],
                 }}
               >
-                <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-hairline bg-canvas/94 p-1 shadow-[0_14px_42px_rgba(10,11,13,0.18)] backdrop-blur-md">
+                <div className="pointer-events-auto flex items-center gap-1 rounded-[14px] border border-hairline bg-canvas p-1.5 shadow-sm">
                   <button
                     type="button"
-                    className="inline-flex h-10 items-center gap-2 rounded-full px-4 text-[14px] font-extrabold text-ink active:bg-surface-dim"
+                    className="inline-flex h-9 items-center gap-2 rounded-[10px] px-3 text-[13px] font-bold text-ink active:bg-surface-dim"
                     onClick={isActiveRun ? revealComposer : revealComposerForTyping}
                     aria-label={isActiveRun ? "분석 상태 보기" : "질문 입력"}
                   >
@@ -1364,7 +1376,7 @@ function ChatContent() {
                   {isActiveRun && (
                     <button
                       type="button"
-                      className="inline-flex h-10 items-center rounded-full bg-surface-dim px-3 text-[13px] font-extrabold text-error active:scale-95"
+                      className="inline-flex h-9 items-center rounded-[10px] border border-hairline bg-surface px-3 text-[12px] font-bold text-error active:scale-95"
                       onClick={handleCancel}
                       aria-label="응답 생성 중지"
                     >

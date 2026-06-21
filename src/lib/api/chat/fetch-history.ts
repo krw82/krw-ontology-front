@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { MAX_PROMPT_HISTORY_MESSAGES } from "@/lib/agent/system-prompt";
 import type { ErrorCode } from "@/types/api-contracts";
+import type { Json } from "@/types/database";
 
 export interface HistoryResult {
   userMessageId: string;
@@ -27,7 +28,8 @@ function errorResponse(
 export async function fetchHistory(
   sessionId: string,
   content: string,
-  requestId?: string
+  requestId?: string,
+  metadata: Json = {},
 ): Promise<{ ok: true; result: HistoryResult } | { ok: false; response: Response }> {
   const admin = getSupabaseAdmin();
 
@@ -36,6 +38,7 @@ export async function fetchHistory(
     sessionId,
     content,
     requestId,
+    metadata,
   );
 
   if (!userMessageResult) {
@@ -92,6 +95,7 @@ async function getOrCreateUserMessage(
   sessionId: string,
   content: string,
   requestId?: string,
+  metadata: Json = {},
 ): Promise<{ id: string; created: boolean } | null> {
   const insertPayload = {
     session_id: sessionId,
@@ -99,6 +103,7 @@ async function getOrCreateUserMessage(
     content,
     status: "completed" as const,
     request_id: requestId ?? null,
+    metadata,
   };
 
   const { data: userMessage, error } = await admin

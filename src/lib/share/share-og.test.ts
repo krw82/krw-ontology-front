@@ -46,6 +46,44 @@ describe("share OG helpers", () => {
     expect(copy.description).toBe("AI 데이터센터 투자에서 MU가 가장 수혜를 받는지 분석해줘.");
   });
 
+  it("removes trailing filing-basis text from preview titles", () => {
+    const copy = buildShareOgCopy(
+      shareFixture({
+        title: "인텔(CY2026Q1 10-Q, CY2025 10-K 기준)",
+        tickers: ["INTC"],
+      }),
+      "Intel Corporation",
+    );
+
+    expect(copy.title).toBe("인텔 리서치 답변");
+    expect(copy.alt).toBe("인텔 리서치 답변 | KRW Ontology");
+  });
+
+  it("removes non-parenthesized document-basis text from preview titles", () => {
+    const copy = buildShareOgCopy(
+      shareFixture({
+        title: "인텔 - 문서 10-Q 기준",
+        tickers: ["INTC"],
+      }),
+      "Intel Corporation",
+    );
+
+    expect(copy.title).toBe("인텔 리서치 답변");
+  });
+
+  it("removes English filing-basis text from preview titles", () => {
+    const copy = buildShareOgCopy(
+      shareFixture({
+        title: "Intel (CY2026Q1 10-Q, CY2025 10-K basis)",
+        locale: "en",
+        tickers: ["INTC"],
+      }),
+      "Intel Corporation",
+    );
+
+    expect(copy.title).toBe("Intel research answer");
+  });
+
   it("falls back without company or question content", () => {
     const copy = buildShareOgCopy(
       shareFixture({

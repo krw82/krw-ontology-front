@@ -93,13 +93,12 @@ export default function CompaniesBrowser({
         eyebrow: "회사 찾기",
         heading: "분석할 회사를 고르세요.",
         intro:
-          "티커를 알면 바로 검색하고, 회사명이 떠오르지 않으면 사업 활동이나 리스크 키워드로 찾아보세요. 선택한 회사는 채팅에서 이어서 분석할 수 있습니다.",
+          "티커, 회사명, 사업 활동, 리스크 키워드로 바로 찾고 채팅 리서치로 이어갑니다.",
         searchLabel: "Ticker 검색",
         searchPlaceholder: "예: AAPL, NVDA, TSLA",
         searchAria: "티커 검색",
-        multiCompanyCta: "아이디어 하나로 여러 회사 리서치해 보세요",
-        multiCompanyLineOne: "아이디어 하나로",
-        multiCompanyLineTwo: "여러 회사 리서치해 보세요",
+        multiCompanyCta: "와이드 리서치",
+        multiCompanyLineOne: "와이드 리서치",
         emptyCatalog:
           "현재 환경의 웹 카탈로그에서 인덱싱된 회사를 찾지 못했습니다.",
         availableCompanies: "분석 가능한 회사",
@@ -112,13 +111,12 @@ export default function CompaniesBrowser({
         eyebrow: "Find a company",
         heading: "Choose a company to analyze.",
         intro:
-          "Search by ticker, or browse by business activity and risk keyword when the company name is not top of mind. Selected companies can continue into chat analysis.",
+          "Search by ticker, company name, activity, or risk keyword, then continue into chat research.",
         searchLabel: "Ticker search",
         searchPlaceholder: "e.g. AAPL, NVDA, TSLA",
         searchAria: "Ticker search",
-        multiCompanyCta: "Research multiple companies from one idea",
-        multiCompanyLineOne: "Research multiple companies",
-        multiCompanyLineTwo: "from one idea",
+        multiCompanyCta: "Wide research",
+        multiCompanyLineOne: "Wide research",
         emptyCatalog:
           "No indexed companies were found in the current web catalog.",
         availableCompanies: "Available companies",
@@ -133,69 +131,66 @@ export default function CompaniesBrowser({
   }, [initialCompanies, search]);
 
   return (
-    <div className="relative mx-auto w-full max-w-[1600px]">
+    <div className="relative mx-auto w-full max-w-[1440px]">
       <main
         id="main-content"
-        className="w-full px-base pb-[112px] pt-xl sm:px-md md:px-xl md:pb-[96px] md:pt-[72px]"
+        className="w-full px-base pb-[112px] pt-lg sm:px-md md:px-xl md:pb-[96px] md:pt-xl"
       >
-        <header className="border-b border-hairline pb-8">
-          <div className="w-full">
-            <div className="min-w-0 max-w-3xl">
-              <p className="text-[13px] font-extrabold leading-5 text-primary">
+        <header className="border-b border-hairline pb-5">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.82fr)] lg:items-end">
+            <div className="min-w-0 max-w-2xl">
+              <p className="font-mono text-[12px] font-bold uppercase tracking-[0.14em] leading-5 text-primary">
                 {copy.eyebrow}
               </p>
-              <h1 className="mt-3 max-w-3xl text-balance text-[32px] font-black leading-[1.08] tracking-normal text-ink sm:text-[44px]">
+              <h1 className="mt-2 max-w-3xl text-balance text-[30px] font-black leading-[1.08] tracking-normal text-ink sm:text-[40px]">
                 {copy.heading}
               </h1>
-              <p className="mt-4 max-w-2xl text-[16px] leading-7 text-body sm:text-[18px]">
+              <p className="mt-3 max-w-2xl text-[15px] leading-6 text-body sm:text-[16px]">
                 {copy.intro}
               </p>
             </div>
-          </div>
 
-          <div className="mt-5">
-            <p className="mb-2 font-mono text-[12px] font-bold uppercase tracking-[0.1em] text-muted">
-              {copy.searchLabel}
-            </p>
-            <div className="relative w-full">
-              <motion.span
-                aria-hidden="true"
-                className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[20px]"
-                animate={{
-                  color: normalizedSearch
-                    ? "var(--color-primary)"
-                    : "var(--color-primary-container)",
-                }}
-                transition={{
-                  duration: reducedMotion ? 0 : 0.16,
-                  ease: easeOutExpo,
-                }}
-              >
-                search
-              </motion.span>
-              <input
-                className="h-[52px] w-full rounded-[8px] border border-hairline bg-surface pl-11 pr-sm font-mono text-[15px] font-semibold uppercase leading-[1.5] tracking-wide transition-all duration-300 ease-out placeholder:normal-case placeholder:tracking-normal placeholder:text-muted focus:border-primary-fixed-dim focus:bg-canvas focus:ring-4 focus:ring-primary-fixed-dim/20 focus:outline-none"
-                placeholder={copy.searchPlaceholder}
-                type="text"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                aria-label={copy.searchAria}
-              />
+            <div className="min-w-0">
+              <p className="mb-2 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
+                {copy.searchLabel}
+              </p>
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
+                <div className="relative min-w-0">
+                  <motion.span
+                    aria-hidden="true"
+                    className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[20px]"
+                    animate={{
+                      color: normalizedSearch
+                        ? "var(--color-primary)"
+                        : "var(--color-muted)",
+                    }}
+                    transition={{
+                      duration: reducedMotion ? 0 : 0.16,
+                      ease: easeOutExpo,
+                    }}
+                  >
+                    search
+                  </motion.span>
+                  <input
+                    className="h-11 w-full rounded-[8px] border border-hairline bg-canvas pl-10 pr-sm font-mono text-[14px] font-semibold uppercase leading-[1.5] tracking-wide shadow-sm transition-all duration-150 ease-out placeholder:normal-case placeholder:tracking-normal placeholder:text-muted focus:border-outline focus:ring-2 focus:ring-primary-fixed-dim/25 focus:outline-none"
+                    placeholder={copy.searchPlaceholder}
+                    type="text"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    aria-label={copy.searchAria}
+                  />
+                </div>
+                <Link
+                  href={buildNewChatHref(undefined, { locale })}
+                  className="group inline-flex h-11 min-w-0 items-center justify-between gap-2 rounded-[8px] bg-ink px-3 text-[13px] font-bold leading-5 text-canvas shadow-sm transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  aria-label={copy.multiCompanyCta}
+                >
+                  <span className="truncate">{copy.multiCompanyLineOne}</span>
+                  <FlowAnimation disabled={reducedMotion} />
+                </Link>
+              </div>
             </div>
           </div>
-
-          {/* CTA: 아이디어 하나로 여러 회사 리서치 */}
-          <Link
-            href={buildNewChatHref(undefined, { locale })}
-            className="group mt-3 grid min-h-[72px] w-full grid-cols-[minmax(0,1fr)_56px] items-center gap-3 rounded-[8px] bg-ink px-6 py-5 text-[15px] font-extrabold leading-6 text-canvas shadow-sm transition-all hover:bg-ink/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas sm:min-h-[80px] sm:grid-cols-[minmax(0,1fr)_64px] sm:gap-4 sm:px-7 sm:text-[16px]"
-            aria-label={copy.multiCompanyCta}
-          >
-            <span className="min-w-0 leading-[1.45]">
-              <span className="block">{copy.multiCompanyLineOne}</span>
-              <span className="block">{copy.multiCompanyLineTwo}</span>
-            </span>
-            <FlowAnimation disabled={reducedMotion} />
-          </Link>
         </header>
 
         {initialCompanies.length === 0 ? (
@@ -203,9 +198,9 @@ export default function CompaniesBrowser({
             {copy.emptyCatalog}
           </div>
         ) : (
-          <div className="mt-8">
+          <div className="mt-5">
             <div className="mb-3 flex items-center justify-between gap-4">
-              <p className="text-[13px] font-extrabold leading-5 text-ink">
+              <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] leading-5 text-muted">
                 {copy.availableCompanies}
               </p>
               <p className="text-[12px] font-bold leading-4 text-muted" aria-live="polite">
@@ -233,7 +228,7 @@ export default function CompaniesBrowser({
                 ease: easeOutExpo,
               }}
             >
-              <div className="hidden grid-cols-[116px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] border-b border-hairline bg-surface px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted 2xl:grid">
+              <div className="hidden grid-cols-[104px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] border-b border-hairline bg-surface px-4 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted xl:grid">
                 <span>ticker</span>
                 <span>company</span>
                 <span>activity</span>

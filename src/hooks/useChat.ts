@@ -1147,12 +1147,22 @@ export function useChat({
       activeAssistantMessageIdRef.current = null;
       sessionSyncRequestedRef.current = false;
 
+      const normalizedUserUrls =
+        options.userUrls?.map((url) => url.trim()).filter(Boolean) ??
+        (options.userUrl ? [options.userUrl] : []);
+      const primaryUserUrl = normalizedUserUrls[0] ?? options.userUrl;
+      const attachmentIds =
+        options.attachmentIds?.map((id) => id.trim()).filter(Boolean) ?? [];
+
       const userMessage: Message = {
         id: createClientId(),
         session_id: targetSessionId || "pending",
         role: "user",
         content: content.trim(),
         status: "completed",
+        ...(normalizedUserUrls.length > 0
+          ? { metadata: { user_urls: normalizedUserUrls } }
+          : {}),
         created_at: new Date().toISOString(),
       };
 
@@ -1178,13 +1188,6 @@ export function useChat({
 
       const abortController = new AbortController();
       abortRef.current = abortController;
-
-      const normalizedUserUrls =
-        options.userUrls?.map((url) => url.trim()).filter(Boolean) ??
-        (options.userUrl ? [options.userUrl] : []);
-      const primaryUserUrl = normalizedUserUrls[0] ?? options.userUrl;
-      const attachmentIds =
-        options.attachmentIds?.map((id) => id.trim()).filter(Boolean) ?? [];
 
       let response: Response;
       try {

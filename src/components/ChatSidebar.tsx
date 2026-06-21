@@ -266,7 +266,7 @@ export default function ChatSidebar({
           <div className="fixed inset-0 z-[80] md:hidden">
             <motion.button
               type="button"
-              className="absolute inset-0 bg-black/35"
+              className="absolute inset-0 bg-black/30"
               aria-label={copy.closeHistory}
               onClick={closeMobileSidebar}
               initial="hidden"
@@ -276,7 +276,7 @@ export default function ChatSidebar({
             />
             <motion.aside
               id="mobile-chat-sidebar"
-              className="absolute bottom-0 left-0 top-0 flex w-[min(88vw,340px)] flex-col border-r border-hairline bg-canvas shadow-2xl"
+              className="absolute bottom-0 left-0 top-0 flex w-[min(86vw,328px)] flex-col border-r border-hairline bg-surface shadow-xl"
               role="dialog"
               aria-modal="true"
               aria-label={copy.history}
@@ -285,11 +285,13 @@ export default function ChatSidebar({
               exit="exit"
               variants={sidebarPanel}
             >
-              <div className="flex h-[64px] items-center justify-between border-b border-hairline px-md">
-                <span aria-hidden="true" />
+              <div className="flex h-[56px] items-center justify-between border-b border-hairline px-sm">
+                <p className="text-[13px] font-bold leading-5 text-ink">
+                  {copy.history}
+                </p>
                 <button
                   type="button"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-surface hover:text-ink"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-canvas hover:text-ink"
                   aria-label={copy.closeHistory}
                   onClick={closeMobileSidebar}
                 >
@@ -298,16 +300,16 @@ export default function ChatSidebar({
                   </span>
                 </button>
               </div>
-              <div className="border-b border-hairline px-sm py-xs">
+              <div className="border-b border-hairline px-xs py-xs">
                 <Link
                   href="/watchlist"
-                  className="group flex h-12 items-center gap-sm rounded-[8px] px-xs text-[15px] font-extrabold leading-5 text-ink transition-colors hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  className="group flex h-10 items-center gap-xs rounded-[8px] px-xs text-[14px] font-bold leading-5 text-ink transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                   aria-label={copy.openResearchNotebook}
                   onClick={closeMobileSidebar}
                 >
                   <span
                     aria-hidden="true"
-                    className="material-symbols-outlined text-[22px] text-muted transition-colors group-hover:text-primary"
+                    className="material-symbols-outlined text-[20px] text-muted transition-colors group-hover:text-ink"
                   >
                     article
                   </span>
@@ -337,21 +339,21 @@ export default function ChatSidebar({
                 </Link>
                 <Link
                   href={localizedPath(locale, "/companies")}
-                  className="group flex h-12 items-center gap-sm rounded-[8px] px-xs text-[15px] font-extrabold leading-5 text-ink transition-colors hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  className="group flex h-10 items-center gap-xs rounded-[8px] px-xs text-[14px] font-bold leading-5 text-ink transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                   aria-label={copy.openCompanySearch}
                   onClick={closeMobileSidebar}
                 >
                   <span
                     aria-hidden="true"
-                    className="material-symbols-outlined text-[22px] text-muted transition-colors group-hover:text-primary"
+                    className="material-symbols-outlined text-[20px] text-muted transition-colors group-hover:text-ink"
                   >
                     search
                   </span>
                   <span className="truncate">{copy.companySearch}</span>
                 </Link>
               </div>
-              <div className="border-b border-hairline px-md py-xs">
-                <p className="text-[12px] font-bold leading-4 text-muted">
+              <div className="border-b border-hairline px-sm py-xs">
+                <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] leading-4 text-muted">
                   {copy.recentChats}
                 </p>
               </div>
@@ -490,7 +492,7 @@ function SidebarContent({
 
   return (
     <>
-      <div ref={menuRootRef} className="flex-1 overflow-y-auto p-sm">
+      <div ref={menuRootRef} className="flex-1 overflow-y-auto p-xs">
         {(mutationError || notice) && (
           <div
             className={[
@@ -505,20 +507,20 @@ function SidebarContent({
           </div>
         )}
         {loading && sessions.length === 0 ? (
-          <div className="space-y-xs">
+          <div className="space-y-1">
             {Array.from({ length: 6 }).map((_, index) => (
               <div
                 key={index}
-                className="h-[72px] animate-pulse rounded-[8px] bg-surface-strong"
+                className="h-14 animate-pulse rounded-[8px] bg-surface-strong"
               />
             ))}
           </div>
         ) : sessions.length === 0 ? (
-          <div className="rounded-[8px] border border-dashed border-hairline bg-canvas px-sm py-md text-[13px] font-semibold leading-[1.45] text-muted">
+          <div className="rounded-[8px] border border-dashed border-hairline bg-canvas px-sm py-sm text-[13px] font-medium leading-[1.45] text-muted">
             {copy.empty}
           </div>
         ) : (
-          <nav className="space-y-xs" aria-label={copy.history}>
+          <nav className="space-y-1" aria-label={copy.history}>
             {sessions.map((session) => {
               const isActive = session.id === activeSessionId;
               const isRunning =
@@ -644,7 +646,7 @@ function SessionRow({
       {isActive && (
         <span
           aria-hidden="true"
-          className="absolute bottom-2 left-0 top-2 z-10 w-[3px] rounded-r-full bg-primary"
+          className="absolute bottom-2 left-0 top-2 z-10 w-[2px] rounded-r-full bg-ink/70"
         />
       )}
 
@@ -696,38 +698,38 @@ function SessionRow({
           <Link
             href={buildChatSessionHref(session.id, { locale })}
             className={[
-              "block rounded-[8px] border py-xs pl-sm pr-10 transition-colors",
+              "block rounded-[8px] border px-sm py-2 pr-9 transition-colors",
               isActive || isNavigating
-                ? "border-primary bg-primary-fixed text-on-primary-fixed"
-                : "border-transparent hover:border-hairline hover:bg-canvas",
+                ? "border-hairline bg-canvas text-ink shadow-sm"
+                : "border-transparent hover:border-hairline-soft hover:bg-canvas/70",
             ].join(" ")}
             aria-busy={isNavigating}
             onClick={handleSessionClick}
           >
             <div className="flex items-start justify-between gap-xs">
               <div className="min-w-0">
-                <p className="truncate text-[14px] font-semibold leading-[1.4] text-ink">
+                <p className="truncate text-[13px] font-semibold leading-5 text-ink">
                   {session.title || copy.newChat}
                 </p>
-                <p className="mt-xxs line-clamp-2 text-[12px] leading-[1.35] text-muted">
+                <p className="mt-0.5 line-clamp-1 text-[12px] leading-4 text-muted">
                   {session.last_message_preview || copy.noMessage}
                 </p>
               </div>
               {isNavigating ? (
                 <span
-                  className="mt-[3px] h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-primary-container/25 border-t-primary-container"
+                  className="mt-[3px] h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-outline-variant border-t-primary"
                   aria-label={copy.opening}
                 />
               ) : isRunning && (
                 <span
-                  className="relative mt-[3px] h-2.5 w-2.5 shrink-0"
+                  className="relative mt-[5px] h-2 w-2 shrink-0"
                   aria-label={copy.generating}
                 >
-                  <span className="absolute inset-[1px] rounded-full bg-primary-container" />
+                  <span className="absolute inset-0 rounded-full bg-primary" />
                   {!reducedMotion && (
                     <motion.span
                       aria-hidden="true"
-                      className="absolute inset-0 rounded-full border border-primary-container"
+                      className="absolute inset-0 rounded-full border border-primary"
                       animate={{ opacity: [0.48, 0], scale: [1, 2.2] }}
                       transition={{
                         duration: 1.2,
@@ -739,7 +741,7 @@ function SessionRow({
                 </span>
               )}
             </div>
-            <div className="mt-xs flex items-center justify-between gap-xs text-[11px] leading-[1.3] text-muted-soft">
+            <div className="mt-1 flex items-center justify-between gap-xs text-[11px] leading-4 text-muted-soft">
               <span>{formatRelativeDate(session.updated_at, locale)}</span>
               {visibleTickers.length > 0 && (
                 <span className="truncate font-mono">
@@ -752,8 +754,12 @@ function SessionRow({
           <button
             type="button"
             className={[
-              "absolute right-1.5 top-1.5 z-20 inline-flex h-8 w-8 items-center justify-center rounded-[6px] border border-transparent bg-canvas/80 text-muted shadow-sm backdrop-blur transition-all hover:border-hairline hover:bg-canvas hover:text-ink focus-visible:opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100",
-              isActive || isMenuOpen ? "md:opacity-100" : "",
+              "absolute right-1.5 top-1.5 z-20 inline-flex h-7 w-7 items-center justify-center rounded-[6px] border border-transparent bg-surface text-muted transition-all hover:border-hairline hover:bg-canvas/70 hover:text-ink focus-visible:border-hairline focus-visible:bg-canvas/70 focus-visible:opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100",
+              isMenuOpen
+                ? "border-hairline bg-canvas/70 text-ink md:opacity-100"
+                : isActive
+                  ? "md:opacity-100"
+                  : "",
             ].join(" ")}
             aria-label={`${session.title || copy.newChat} ${copy.menu}`}
             aria-haspopup="menu"

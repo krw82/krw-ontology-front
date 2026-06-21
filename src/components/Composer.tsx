@@ -935,13 +935,13 @@ export default function Composer({
   const renderToolsContent = (variant: "popover" | "sheet") => {
     const isSheet = variant === "sheet";
     const itemBase = isSheet
-      ? "flex w-full items-center gap-3 rounded-[14px] px-3 py-3.5 text-left transition-colors active:bg-surface-dim"
-      : "flex min-h-11 w-full items-center gap-3 rounded-[10px] px-2 text-left text-[15px] font-extrabold leading-5 text-ink transition-colors hover:bg-surface-dim";
+      ? "flex w-full items-center gap-3 rounded-[12px] px-3 py-3 text-left transition-colors active:bg-surface-dim"
+      : "flex min-h-10 w-full items-center gap-2 rounded-[8px] px-2 text-left text-[14px] font-semibold leading-5 text-ink transition-colors hover:bg-surface-soft";
     const titleClass = isSheet
-      ? "block text-[17px] font-extrabold leading-6 text-ink"
+      ? "block text-[16px] font-bold leading-6 text-ink"
       : "";
     const descriptionClass = isSheet
-      ? "mt-0.5 block text-[13px] font-semibold leading-5 text-muted"
+      ? "mt-0.5 block text-[13px] font-medium leading-5 text-muted"
       : "sr-only";
 
     return (
@@ -960,19 +960,19 @@ export default function Composer({
             {!isSheet && (
               <span
                 aria-hidden="true"
-                className="material-symbols-outlined text-[22px] text-primary"
+                className="material-symbols-outlined text-[20px] text-muted"
               >
                 link
               </span>
             )}
             <span className="min-w-0">
-              <span className={titleClass || undefined}>URL 점검</span>
+              <span className={titleClass || undefined}>URL 첨부</span>
               <span className={descriptionClass}>
-                사용자가 넣은 URL 원문을 공시 기준 질문에 함께 보냅니다.
+                웹페이지 주소를 질문에 함께 보냅니다.
               </span>
             </span>
             {!isSheet && (
-              <span className="ml-auto rounded-full bg-primary-container/10 px-2 py-1 text-[11px] font-extrabold leading-none text-primary">
+              <span className="ml-auto rounded-[6px] border border-hairline bg-surface px-1.5 py-0.5 text-[10px] font-bold leading-none text-muted">
                 URL
               </span>
             )}
@@ -988,7 +988,7 @@ export default function Composer({
           {!isSheet && (
             <span
               aria-hidden="true"
-              className="material-symbols-outlined text-[22px] text-primary"
+              className="material-symbols-outlined text-[20px] text-muted"
             >
               attach_file
             </span>
@@ -1000,7 +1000,7 @@ export default function Composer({
             </span>
           </span>
           {!isSheet && (
-            <span className="ml-auto rounded-full bg-surface-dim px-2 py-1 text-[11px] font-extrabold leading-none text-muted">
+            <span className="ml-auto rounded-[6px] border border-hairline bg-surface px-1.5 py-0.5 text-[10px] font-bold leading-none text-muted">
               PDF
             </span>
           )}
@@ -1223,7 +1223,7 @@ export default function Composer({
       : null;
 
   return (
-    <div className="pointer-events-none bg-transparent px-[34px] pb-0 pt-0 sm:px-lg">
+    <div className="pointer-events-none bg-transparent px-xs pb-0 pt-0 sm:px-lg">
       {(attachments.length > 0 ||
         documentAttachments.length > 0 ||
         hasUserUrls ||
@@ -1241,11 +1241,11 @@ export default function Composer({
                   duration: motionConfig.duration,
                   ease: motionConfig.ease,
                 }}
-                className="inline-flex max-w-full items-center overflow-hidden rounded-full border border-primary/30 bg-primary-container/10 text-[12px] font-extrabold leading-[1.4] text-primary"
+                className="inline-flex max-w-full items-center overflow-hidden rounded-[8px] border border-hairline bg-canvas text-[12px] font-bold leading-[1.4] text-body shadow-sm"
               >
                 <button
                   type="button"
-                  className="inline-flex min-w-0 items-center gap-xs px-sm py-xxs transition-colors hover:bg-primary-container/10"
+                  className="inline-flex min-w-0 items-center gap-xs px-sm py-xxs transition-colors hover:bg-surface-soft"
                   onClick={openUrlSheet}
                   disabled={isInputBusy}
                   aria-label={`URL ${enteredUserUrls.length}개 수정`}
@@ -1259,11 +1259,11 @@ export default function Composer({
                   <span className="truncate">
                     URL {enteredUserUrls.length}개 첨부됨
                   </span>
-                  <span className="text-primary/70">수정</span>
+                  <span className="text-muted-soft">수정</span>
                 </button>
                 <button
                   type="button"
-                  className="inline-flex h-8 w-8 items-center justify-center border-l border-primary/20 text-primary transition-colors hover:bg-primary-container/12"
+                  className="inline-flex h-8 w-8 items-center justify-center border-l border-hairline text-muted transition-colors hover:bg-surface-soft hover:text-ink"
                   aria-label="URL 자료 모두 제거"
                   onClick={clearUserUrls}
                   disabled={isInputBusy}
@@ -1288,9 +1288,9 @@ export default function Composer({
                   duration: motionConfig.duration,
                   ease: motionConfig.ease,
                 }}
-                className="inline-flex max-w-full items-center gap-xs rounded-full border border-hairline bg-surface-soft px-sm py-xxs text-[12px] leading-[1.4] text-body"
+                className="inline-flex max-w-full items-center gap-xs rounded-[8px] border border-hairline bg-canvas px-sm py-xxs text-[12px] leading-[1.4] text-body shadow-sm"
               >
-                <span className="material-symbols-outlined text-[16px] text-primary">
+                <span className="material-symbols-outlined text-[16px] text-muted">
                   description
                 </span>
                 <span className="max-w-[160px] truncate sm:max-w-[220px]">
@@ -1301,7 +1301,7 @@ export default function Composer({
                 </span>
                 <button
                   type="button"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-dim hover:text-ink"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-[6px] text-muted transition-colors hover:bg-surface-soft hover:text-ink"
                   aria-label={`${file.name} 첨부 제거`}
                   onClick={() => removeAttachment(file.id)}
                   disabled={isInputBusy}
@@ -1327,13 +1327,13 @@ export default function Composer({
                   ease: motionConfig.ease,
                 }}
                 className={[
-                  "inline-flex max-w-full items-center gap-xs rounded-full border px-sm py-xxs text-[12px] leading-[1.4]",
+                  "inline-flex max-w-full items-center gap-xs rounded-[8px] border px-sm py-xxs text-[12px] leading-[1.4] shadow-sm",
                   file.status === "failed"
                     ? "border-error/25 bg-error-container text-error"
-                    : "border-primary/20 bg-primary-container/10 text-body",
+                    : "border-hairline bg-canvas text-body",
                 ].join(" ")}
               >
-                <span className="material-symbols-outlined text-[16px] text-primary">
+                <span className="material-symbols-outlined text-[16px] text-muted">
                   picture_as_pdf
                 </span>
                 <span className="max-w-[150px] truncate sm:max-w-[220px]">
@@ -1343,7 +1343,7 @@ export default function Composer({
                   className={
                     file.status === "failed"
                       ? "font-bold text-error"
-                      : "font-bold text-primary"
+                      : "font-bold text-muted"
                   }
                 >
                   {documentAttachmentStatusLabel(file.status)}
@@ -1353,7 +1353,7 @@ export default function Composer({
                 </span>
                 <button
                   type="button"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-dim hover:text-ink"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-[6px] text-muted transition-colors hover:bg-surface-soft hover:text-ink"
                   aria-label={`${file.name} 첨부 제거`}
                   onClick={() => removeDocumentAttachmentChip(file.id)}
                   disabled={isInputBusy}
@@ -1385,7 +1385,7 @@ export default function Composer({
         </div>
       )}
       <div
-        className="pointer-events-auto relative mx-auto flex max-w-4xl items-center rounded-[26px] border border-hairline bg-canvas/92 p-[5px] shadow-[0_14px_42px_rgba(10,11,13,0.14)] backdrop-blur-md transition-all duration-150 focus-within:border-outline-variant focus-within:bg-canvas/96 focus-within:shadow-[0_16px_46px_rgba(10,11,13,0.16)]"
+        className="pointer-events-auto relative mx-auto flex max-w-3xl items-center rounded-[16px] border border-outline-variant/80 bg-canvas p-2 shadow-sm transition-all duration-150 focus-within:border-outline focus-within:shadow-[0_0_0_3px_rgba(0,82,255,0.08)]"
       >
         <input
           ref={fileInputRef}
@@ -1399,9 +1399,9 @@ export default function Composer({
         <div ref={toolsRef} className="relative flex-shrink-0 self-center">
           <button
             className={[
-              "inline-flex h-11 w-11 items-center justify-center rounded-full border transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40",
+              "inline-flex h-9 w-9 items-center justify-center rounded-[8px] border transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40",
               isToolsOpen
-                ? "border-primary bg-surface text-primary shadow-[0_0_0_3px_rgba(0,82,255,0.10)]"
+                ? "border-outline-variant bg-surface text-ink"
                 : "border-transparent text-muted hover:bg-surface-soft hover:text-ink",
             ].join(" ")}
             onClick={() => setIsToolsOpen((open) => !open)}
@@ -1411,7 +1411,7 @@ export default function Composer({
             aria-haspopup={motionConfig.isMobile ? "dialog" : "menu"}
             type="button"
           >
-            <span className="material-symbols-outlined text-[24px] leading-none">
+            <span className="material-symbols-outlined text-[22px] leading-none">
               add
             </span>
           </button>
@@ -1427,7 +1427,7 @@ export default function Composer({
                   duration: motionConfig.duration,
                   ease: motionConfig.ease,
                 }}
-                className="absolute bottom-[calc(100%+10px)] left-0 z-30 w-[282px] overflow-hidden rounded-[18px] border border-hairline bg-canvas p-3 text-ink shadow-[0_18px_48px_rgba(10,11,13,0.16)]"
+                className="absolute bottom-[calc(100%+8px)] left-0 z-30 w-[272px] overflow-hidden rounded-[12px] border border-hairline bg-canvas p-1.5 text-ink shadow-lg"
                 role="menu"
                 aria-label="입력 도구"
               >
@@ -1439,7 +1439,7 @@ export default function Composer({
         <div className="relative min-w-0 flex-1">
           <textarea
             ref={textareaRef}
-            className="max-h-[120px] w-full resize-none border-none bg-transparent px-xs py-sm text-[16px] font-medium leading-[1.5] text-on-surface placeholder:text-muted focus:outline-none focus:ring-0 disabled:cursor-not-allowed sm:px-sm sm:py-md"
+            className="max-h-[120px] w-full resize-none border-none bg-transparent px-xs py-xs text-[16px] font-medium leading-[1.5] text-on-surface placeholder:text-muted focus:outline-none focus:ring-0 disabled:cursor-not-allowed sm:px-sm"
             maxLength={MAX_CHAT_MESSAGE_CHARS}
             placeholder={
               isGenerating
@@ -1451,7 +1451,7 @@ export default function Composer({
                   : placeholder
             }
             rows={1}
-            style={{ minHeight: 44 }}
+            style={{ minHeight: 38 }}
             value={value}
             data-client-ready={isClientReady ? "true" : "false"}
             onChange={(event) => syncTextareaValue(event.currentTarget.value)}
@@ -1503,17 +1503,17 @@ export default function Composer({
         {isGenerating && !isComposerFocused && onCancel && (
           <button
             type="button"
-            className="ml-2 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center self-center rounded-full bg-surface-dim text-error shadow-[0_8px_22px_rgba(10,11,13,0.14)] transition-all duration-150 hover:scale-[1.03] active:scale-95 disabled:cursor-not-allowed disabled:opacity-55"
+            className="ml-1 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center self-center rounded-full bg-surface text-error transition-colors duration-150 hover:bg-surface-dim active:scale-95 disabled:cursor-not-allowed disabled:opacity-55"
             onClick={() => void onCancel?.()}
             disabled={disabled || isSubmitting}
             aria-label="응답 생성 중지"
           >
-            <span className="material-symbols-outlined text-[22px]">stop</span>
+            <span className="material-symbols-outlined text-[20px]">stop</span>
           </button>
         )}
         {!isGenerating && (
           <button
-            className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center self-center rounded-full bg-primary-container text-on-primary shadow-[0_8px_22px_rgba(0,82,255,0.24)] transition-all duration-150 hover:scale-[1.03] hover:bg-primary-active active:scale-95 disabled:cursor-not-allowed disabled:bg-primary-container disabled:text-on-primary disabled:opacity-55"
+            className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center self-center rounded-full bg-ink text-on-dark transition-colors duration-150 hover:bg-primary-active active:scale-95 disabled:cursor-not-allowed disabled:bg-surface-dim disabled:text-muted"
             onClick={handlePrimaryAction}
             disabled={!canSubmit}
             aria-label="메시지 보내기"
@@ -1529,7 +1529,7 @@ export default function Composer({
                   duration: motionConfig.duration,
                   ease: motionConfig.ease,
                 }}
-                className="material-symbols-outlined text-[22px]"
+                className="material-symbols-outlined text-[20px]"
               >
                 arrow_upward
               </motion.span>

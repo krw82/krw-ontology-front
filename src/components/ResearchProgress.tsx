@@ -34,13 +34,15 @@ export default function ResearchProgress({
   isStreaming = false,
   activity,
   toolCalls = [],
+  workDurationMs,
   runStartedAt,
 }: ResearchProgressProps) {
-  const elapsedMs = useRunningDurationMs({
+  const runningElapsedMs = useRunningDurationMs({
     isRunning: isStreaming,
     runStartedAt,
     toolCalls,
   });
+  const elapsedMs = workDurationMs ?? runningElapsedMs;
 
   if (!isStreaming) return null;
 

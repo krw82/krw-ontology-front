@@ -79,7 +79,7 @@ export async function buildUserUrlNewsEventContext(
   if (!ticker) {
     throw new UserUrlContextError(
       "invalid_url",
-      "URL 점검은 종목 기준이 필요합니다.",
+      "URL 첨부는 종목 기준이 필요합니다.",
     );
   }
 

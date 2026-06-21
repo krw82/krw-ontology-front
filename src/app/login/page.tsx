@@ -68,6 +68,10 @@ function LoginContent() {
     ease: easeOutExpo,
   };
 
+  const openDesktopApp = () => {
+    window.location.href = "krw-desktop://device-login-approved";
+  };
+
   useEffect(() => {
     let didUpdate = true;
     requestAnimationFrame(() => {
@@ -126,7 +130,8 @@ function LoginContent() {
         );
       }
       setDesktopApprovalStatus("approved");
-      setDesktopApprovalMessage("승인 완료. KRW Desktop 앱으로 돌아가세요.");
+      setDesktopApprovalMessage("승인 완료. KRW Desktop 앱으로 이동 중입니다.");
+      window.setTimeout(openDesktopApp, 120);
     } catch (approvalError) {
       setDesktopApprovalStatus("error");
       setDesktopApprovalMessage(
@@ -308,6 +313,15 @@ function LoginContent() {
                     {desktopApprovalStatus === "approving"
                       ? "승인 중..."
                       : "Desktop 연결 승인"}
+                  </button>
+                )}
+                {desktopApprovalStatus === "approved" && (
+                  <button
+                    type="button"
+                    onClick={openDesktopApp}
+                    className="mt-3 h-[44px] w-full rounded-[8px] border border-primary bg-primary px-base text-[14px] font-extrabold leading-[1.15] text-on-primary transition-opacity"
+                  >
+                    KRW Desktop 열기
                   </button>
                 )}
                 {desktopApprovalMessage && (
