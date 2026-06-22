@@ -33,11 +33,11 @@ export function KrwMark({ className = "h-9 w-9" }: KrwMarkProps) {
 }
 
 export function KrwBrand({
-  href = "/",
+  href = "/companies",
   dark = false,
   compact = false,
   className = "",
-  ariaLabel = "KRW Ontology 홈",
+  ariaLabel = "회사 목록으로 이동",
 }: KrwBrandProps) {
   return (
     <Link

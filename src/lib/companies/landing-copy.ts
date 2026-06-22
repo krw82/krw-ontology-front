@@ -4912,6 +4912,396 @@ export const COMPANY_RESEARCH_PROFILES = {
     ],
     questionChains: {},
   },
+  APD: {
+    ticker: "APD",
+    companyName: "Air Products and Chemicals, Inc.",
+    companyNameKo: "에어 프로덕츠 앤 케미컬스",
+    sectorKo: "산업가스",
+    signature: "Industrial Gases Americas, Asia, Europe, Middle East and India를 중심으로 onsite gas, merchant gas, hydrogen, helium, LNG process technology와 대형 project backlog가 현금흐름을 좌우하는 산업가스 기업.",
+    description: "기업 리포트: Air Products는 산소, 질소, 아르곤, 수소, 헬륨 같은 산업가스를 에너지, 화학, 전자, 제조, 의료, 식품 고객에게 공급합니다. 공시 해석에서는 onsite 계약과 merchant liquid/bulk 판매의 가격·물량 차이, Industrial Gases Americas·Asia·Europe·Middle East and India 지역별 수요, hydrogen·helium supply, LNG heat exchanger·process technology, 대형 clean hydrogen·gasification project의 capex와 지연 리스크를 함께 봐야 합니다.",
+    researchFocus: [
+      "Industrial Gases Americas, Asia, Europe, Middle East and India의 volume, price, energy pass-through",
+      "onsite long-term contract와 merchant gas 판매의 margin·현금흐름 차이",
+      "hydrogen, helium, electronics gas, LNG process technology 수요",
+      "대형 clean hydrogen, gasification, carbon capture project의 capex·backlog·시운전 일정"
+    ],
+    riskVariables: [
+      "대형 project cost overrun, 시운전 지연, 고객 off-take 조건 변경",
+      "전력·천연가스 비용과 energy pass-through 시차가 margin을 압박할 위험",
+      "중국·전자·화학 고객 수요 둔화와 merchant volume 약화",
+      "수소·탄소저감 프로젝트의 정책 지원, tax credit, 허가 지연 리스크"
+    ],
+    suggestedPrompts: [
+      "Air Products의 지역별 Industrial Gases 사업이 onsite 계약과 merchant 판매에서 어떻게 다른 현금흐름을 만드는지 정리해줘.",
+      "hydrogen, helium, electronics gas, LNG process technology가 APD의 성장 논지에서 어떤 역할을 하는지 설명해줘.",
+      "대형 clean hydrogen project, energy cost, capex 지연이 APD의 free cash flow에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  BKR: {
+    ticker: "BKR",
+    companyName: "Baker Hughes Company",
+    companyNameKo: "베이커 휴즈",
+    sectorKo: "유전 서비스·에너지 기술",
+    signature: "Oilfield Services & Equipment와 Industrial & Energy Technology를 나눠 보며, upstream activity, LNG turbomachinery, gas technology, backlog 전환이 실적을 좌우하는 에너지 기술 기업.",
+    description: "기업 리포트: Baker Hughes는 Oilfield Services & Equipment에서 drilling, completions, production, artificial lift, pressure pumping, subsea equipment를 제공하고, Industrial & Energy Technology에서 LNG, gas technology, turbomachinery, pumps, valves, inspection, industrial asset management를 제공합니다. 공시 해석에서는 rig count, international offshore activity, orders, backlog conversion, equipment vs services mix, LNG project awards, TPS margin, supply chain cost가 매출과 free cash flow에 어떻게 이어지는지 봐야 합니다.",
+    researchFocus: [
+      "Oilfield Services & Equipment의 drilling, completions, production, subsea orders",
+      "Industrial & Energy Technology의 LNG turbomachinery, gas technology, pumps, valves",
+      "orders, backlog, book-to-bill, equipment delivery와 services mix",
+      "international offshore, North America activity, supply chain, restructuring"
+    ],
+    riskVariables: [
+      "E&P capex 둔화와 rig count 하락에 따른 OFSE 수요 약화",
+      "LNG project sanction 지연과 turbomachinery delivery schedule 변동",
+      "장기 fixed-price 장비계약의 원가 상승과 supply chain 병목",
+      "에너지 전환, 제재·수출통제, 국가별 프로젝트 리스크"
+    ],
+    suggestedPrompts: [
+      "Baker Hughes의 OFSE와 IET가 orders, backlog, margin에서 어떻게 다른지 정리해줘.",
+      "LNG turbomachinery와 gas technology backlog가 BKR의 매출 가시성에 어떤 의미를 갖는지 설명해줘.",
+      "upstream capex, project delay, supply chain cost가 BKR의 free cash flow에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  ELV: {
+    ticker: "ELV",
+    companyName: "Elevance Health, Inc.",
+    companyNameKo: "엘리번스 헬스",
+    sectorKo: "건강보험·헬스케어 서비스",
+    signature: "Health Benefits, CarelonRx, Carelon Services를 통해 Commercial, Medicare, Medicaid 회원 믹스와 medical cost trend, pharmacy spread, value-based care가 수익성을 좌우합니다.",
+    description: "기업 리포트: Elevance Health는 Anthem Blue Cross Blue Shield 브랜드 기반 Health Benefits와 CarelonRx, Carelon Services를 통해 보험료, 약제급여관리, care delivery, behavioral health, analytics 서비스를 제공합니다. 공시 해석에서는 Commercial, Medicaid, Medicare 회원 수와 premium yield, medical loss ratio, risk adjustment, Medicaid redetermination, Medicare Advantage star ratings, CarelonRx pharmacy claim volume과 rebate 구조를 함께 봐야 합니다.",
+    researchFocus: [
+      "Health Benefits의 Commercial, Medicaid, Medicare membership와 premium yield",
+      "medical loss ratio, utilization, risk adjustment, Medicaid redetermination",
+      "CarelonRx의 pharmacy claim volume, specialty mix, rebate·spread",
+      "Carelon Services의 care delivery, behavioral health, analytics, value-based care"
+    ],
+    riskVariables: [
+      "의료 이용률 상승과 acuity mix 악화에 따른 medical loss ratio 상승",
+      "Medicaid redetermination과 Medicare Advantage rate·star ratings 변화",
+      "pharmacy rebate 규제, PBM scrutiny, specialty drug cost 상승",
+      "provider contract, cybersecurity, government program audit 리스크"
+    ],
+    suggestedPrompts: [
+      "Elevance의 Commercial, Medicaid, Medicare 회원 믹스가 premium yield와 medical loss ratio에 어떻게 연결되는지 정리해줘.",
+      "CarelonRx와 Carelon Services가 ELV의 보험 사업 margin을 어떻게 보완하는지 설명해줘.",
+      "Medicaid redetermination, MA rate, pharmacy rebate 규제가 ELV의 현금흐름에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  F: {
+    ticker: "F",
+    companyName: "Ford Motor Company",
+    companyNameKo: "포드 모터",
+    sectorKo: "자동차",
+    signature: "Ford Blue, Ford Model e, Ford Pro, Ford Credit을 나눠 보며 F-Series, Super Duty, Transit, EV 손실, warranty, residual value가 수익성을 좌우하는 완성차 기업.",
+    description: "기업 리포트: Ford는 Ford Blue에서 ICE·hybrid 차량과 F-Series franchise를 운영하고, Ford Model e에서 EV와 software-defined vehicle 투자를 진행하며, Ford Pro에서 상용차·fleet·service·charging을 묶어 수익을 만듭니다. Ford Credit은 dealer·consumer financing과 lease residual value에 민감합니다. 공시 해석에서는 wholesale volume, mix, net pricing, incentives, warranty cost, UAW labor cost, battery·EV capex, Ford Pro service attach, credit loss, used vehicle value를 함께 봐야 합니다.",
+    researchFocus: [
+      "Ford Blue의 F-Series, Super Duty, Bronco, hybrid mix와 pricing",
+      "Ford Model e의 EV volume, battery cost, software, gross margin loss",
+      "Ford Pro의 Transit, Super Duty, fleet services, charging, parts revenue",
+      "Ford Credit의 lease residual, credit loss, funding cost, dealer finance"
+    ],
+    riskVariables: [
+      "EV 수요 둔화와 가격 경쟁으로 Model e 손실이 확대될 위험",
+      "warranty, recall, 품질 비용과 UAW labor cost 상승",
+      "원자재·부품 공급망과 관세·물류비 부담",
+      "Ford Credit의 중고차 가격, residual value, consumer credit 악화"
+    ],
+    suggestedPrompts: [
+      "Ford Blue, Model e, Ford Pro, Ford Credit이 매출과 EBIT에서 어떻게 다른지 정리해줘.",
+      "F-Series, Super Duty, Transit, EV 라인업이 Ford의 mix와 margin에 주는 의미를 설명해줘.",
+      "EV 손실, warranty, UAW labor cost, Ford Credit residual value가 Ford의 현금흐름에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  FTNT: {
+    ticker: "FTNT",
+    companyName: "Fortinet, Inc.",
+    companyNameKo: "포티넷",
+    sectorKo: "사이버보안",
+    signature: "FortiGate appliance, FortiGuard, FortiCare, Secure Networking, Unified SASE, Security Operations를 묶어 billings, deferred revenue, service mix가 성장과 margin을 좌우하는 보안 플랫폼 기업.",
+    description: "기업 리포트: Fortinet은 FortiGate firewall과 Fortinet Security Fabric을 기반으로 secure networking, unified SASE, AI-driven security operations 제품과 서비스를 제공합니다. 공시 해석에서는 product revenue와 service revenue, FortiGuard subscriptions, FortiCare support, billings, deferred revenue, renewal rate, appliance refresh cycle, firewall demand, SASE attach, data center·branch security 수요를 함께 봐야 합니다. 서비스 mix 확대는 gross margin을 보강하지만, hardware cycle 둔화와 경쟁 심화는 billings 성장률을 흔듭니다.",
+    researchFocus: [
+      "product revenue와 service revenue, FortiGate appliance refresh cycle",
+      "FortiGuard subscriptions, FortiCare support, deferred revenue, renewal",
+      "Secure Networking, Unified SASE, Security Operations platform attach",
+      "billings, channel inventory, enterprise deal timing, gross margin mix"
+    ],
+    riskVariables: [
+      "firewall appliance 수요 둔화와 channel inventory 조정",
+      "SASE·cloud security 경쟁 심화와 pricing pressure",
+      "서비스 갱신률 하락, deferred revenue 성장 둔화",
+      "제품 취약점, 보안 사고, supply chain·component cost 리스크"
+    ],
+    suggestedPrompts: [
+      "Fortinet의 product revenue, service revenue, billings, deferred revenue가 성장률 해석에서 어떻게 다른지 정리해줘.",
+      "FortiGate, FortiGuard, FortiCare, Unified SASE가 FTNT의 margin mix에 어떤 영향을 주는지 설명해줘.",
+      "firewall refresh 둔화, channel inventory, SASE 경쟁이 FTNT의 투자 논지에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  GWW: {
+    ticker: "GWW",
+    companyName: "W.W. Grainger, Inc.",
+    companyNameKo: "그레인저",
+    sectorKo: "MRO 산업유통",
+    signature: "High-Touch Solutions North America와 Endless Assortment(Zoro, MonotaRO)를 나눠 보며 MRO volume, price realization, private label, fulfillment cost가 margin을 좌우하는 산업유통 기업.",
+    description: "기업 리포트: Grainger는 maintenance, repair and operations(MRO) 제품을 기업·기관 고객에게 공급합니다. High-Touch Solutions North America는 대형·중견 고객과 branch·salesforce·inventory management 서비스를 통해 반복 구매를 만들고, Endless Assortment는 Zoro와 MonotaRO 기반 온라인 long-tail SKU 판매를 담당합니다. 공시 해석에서는 daily sales, price realization, volume, gross margin, product mix, KeepStock inventory services, private label, freight, fulfillment, digital acquisition cost를 함께 봐야 합니다.",
+    researchFocus: [
+      "High-Touch Solutions North America의 daily sales, price, volume, customer retention",
+      "Endless Assortment의 Zoro, MonotaRO, SKU breadth, online customer acquisition",
+      "KeepStock, inventory management, private label, product mix",
+      "freight, fulfillment, supplier cost, operating expense leverage"
+    ],
+    riskVariables: [
+      "industrial production 둔화와 MRO demand 약화",
+      "가격 전가력 하락과 supplier cost·freight 상승",
+      "Endless Assortment customer acquisition cost 증가와 online price competition",
+      "대형 고객 계약 갱신, inventory availability, distribution center 병목"
+    ],
+    suggestedPrompts: [
+      "Grainger의 High-Touch Solutions와 Endless Assortment가 daily sales와 margin에서 어떻게 다른지 정리해줘.",
+      "price realization, product mix, KeepStock, private label이 GWW의 gross margin에 연결되는 경로를 설명해줘.",
+      "MRO demand 둔화, freight, 온라인 가격 경쟁이 Grainger의 현금흐름에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  MSI: {
+    ticker: "MSI",
+    companyName: "Motorola Solutions, Inc.",
+    companyNameKo: "모토로라 솔루션즈",
+    sectorKo: "공공안전 기술",
+    signature: "Products and Systems Integration과 Software and Services에서 land mobile radio, video security, command center, managed services backlog가 실적 가시성을 좌우하는 공공안전 기술 기업.",
+    description: "기업 리포트: Motorola Solutions는 공공안전·기업보안 고객에게 land mobile radio(LMR), public safety communications, video security, access control, command center software, records, dispatch, managed and support services를 제공합니다. 공시 해석에서는 Products and Systems Integration의 radio·video hardware와 deployment timing, Software and Services의 recurring revenue, backlog, service attach, government funding, federal·state·local public safety budget을 함께 봐야 합니다. 장기 프로젝트와 mission-critical 고객 기반은 안정성을 주지만, supply chain과 large system acceptance timing은 분기 매출을 흔듭니다.",
+    researchFocus: [
+      "Products and Systems Integration의 LMR, video security, access control, deployment timing",
+      "Software and Services의 command center, records, dispatch, managed services",
+      "backlog, recurring revenue, service attach, public safety budget",
+      "state and local government, federal, commercial customers mix"
+    ],
+    riskVariables: [
+      "대형 public safety system acceptance 지연과 backlog 전환 시점 변동",
+      "반도체·부품 공급, hardware cost, 설치 인력 병목",
+      "정부 예산·조달 지연과 계약 취소·항의 리스크",
+      "cybersecurity, product reliability, mission-critical outage 비용"
+    ],
+    suggestedPrompts: [
+      "Motorola Solutions의 Products and Systems Integration과 Software and Services가 backlog와 recurring revenue에서 어떻게 다른지 정리해줘.",
+      "LMR, video security, command center software가 MSI의 공공안전 플랫폼에서 어떤 역할을 하는지 설명해줘.",
+      "정부 조달 지연, system acceptance, supply chain이 MSI의 현금흐름에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  PCAR: {
+    ticker: "PCAR",
+    companyName: "PACCAR Inc",
+    companyNameKo: "파카",
+    sectorKo: "상용 트럭·부품",
+    signature: "Kenworth, Peterbilt, DAF 트럭과 PACCAR Parts, PACCAR Financial을 나눠 보며 truck deliveries, aftermarket parts, residual value, credit loss가 실적을 좌우하는 상용차 기업.",
+    description: "기업 리포트: PACCAR는 Kenworth, Peterbilt, DAF 브랜드로 heavy-duty·medium-duty trucks를 생산하고, PACCAR Parts로 aftermarket parts를 공급하며, PACCAR Financial로 dealer·customer financing과 leasing을 제공합니다. 공시 해석에서는 Class 8 truck industry retail sales, build rate, order backlog, truck gross margin, engine and powertrain, PACCAR Parts margin, fleet utilization, used truck values, finance receivables, credit loss를 함께 봐야 합니다. 상용차 사이클 둔화와 배출규제 전환은 생산량과 재고·금융 리스크를 동시에 키웁니다.",
+    researchFocus: [
+      "Kenworth, Peterbilt, DAF truck deliveries, order backlog, build rate",
+      "PACCAR Parts의 aftermarket parts, distribution, gross margin",
+      "PACCAR Financial의 finance receivables, lease residual, credit loss",
+      "engine, powertrain, emissions regulation, electric·hydrogen truck investment"
+    ],
+    riskVariables: [
+      "북미·유럽 truck cycle 둔화와 fleet replacement 지연",
+      "배출규제 전환, 원자재·부품 비용, supplier constraints",
+      "used truck value 하락과 lease residual 악화",
+      "PACCAR Financial의 고객 신용손실과 funding cost 상승"
+    ],
+    suggestedPrompts: [
+      "PACCAR의 Truck, Parts, Financial Services가 매출과 margin에서 어떻게 다른지 정리해줘.",
+      "Kenworth, Peterbilt, DAF deliveries와 PACCAR Parts가 truck cycle에서 어떤 신호를 주는지 설명해줘.",
+      "used truck values, lease residual, emissions regulation이 PCAR의 현금흐름에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  REGN: {
+    ticker: "REGN",
+    companyName: "Regeneron Pharmaceuticals, Inc.",
+    companyNameKo: "리제네론",
+    sectorKo: "바이오의약품",
+    signature: "EYLEA HD/EYLEA, Dupixent, Libtayo와 antibody pipeline을 나눠 보며 retinal franchise 경쟁, Sanofi·Bayer collaboration, R&D productivity가 핵심인 바이오의약품 기업.",
+    description: "기업 리포트: Regeneron은 EYLEA와 EYLEA HD 안과 franchise, Dupixent collaboration, Libtayo oncology, Praluent, Kevzara, Evkeeza, Inmazeb 같은 제품과 VelociSuite 기반 antibody pipeline을 운영합니다. 공시 해석에서는 U.S. EYLEA HD 전환, EYLEA biosimilar·Vabysmo 경쟁, Bayer ex-U.S. profit share, Sanofi Dupixent collaboration economics, Libtayo uptake, R&D spend, acquired IPR&D, pipeline clinical readouts를 함께 봐야 합니다.",
+    researchFocus: [
+      "EYLEA HD/EYLEA의 retinal franchise, U.S. share, biosimilar·Vabysmo 경쟁",
+      "Dupixent collaboration with Sanofi, profit share, indication expansion",
+      "Libtayo oncology, Praluent, Kevzara, Evkeeza, rare disease products",
+      "R&D pipeline, VelociSuite, acquired IPR&D, clinical milestones"
+    ],
+    riskVariables: [
+      "EYLEA franchise의 가격·점유율 하락과 biosimilar 경쟁",
+      "Dupixent collaboration economics와 Sanofi 의존도",
+      "임상 실패, 규제 승인 지연, R&D 비용 증가",
+      "약가 규제, Medicare Part D/IRA 영향, manufacturing quality 리스크"
+    ],
+    suggestedPrompts: [
+      "Regeneron의 EYLEA HD/EYLEA와 Dupixent가 매출과 margin에서 어떻게 다른지 정리해줘.",
+      "Bayer, Sanofi collaboration economics가 REGN의 수익 인식과 현금흐름에 어떻게 연결되는지 설명해줘.",
+      "EYLEA 경쟁, 약가 규제, pipeline 실패가 REGN의 성장 논지에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  RSG: {
+    ticker: "RSG",
+    companyName: "Republic Services, Inc.",
+    companyNameKo: "리퍼블릭 서비스",
+    sectorKo: "폐기물·환경 서비스",
+    signature: "collection, transfer, landfill, recycling, environmental solutions를 묶어 price-over-volume, landfill MSW volume, recycling commodity, fuel·labor cost가 margin을 좌우하는 환경서비스 기업.",
+    description: "기업 리포트: Republic Services는 residential, small-container, large-container, industrial collection과 transfer stations, landfills, recycling centers, environmental solutions를 운영합니다. 공시 해석에서는 core price, volume, landfill municipal solid waste, special waste, recycling processing and commodity sales, renewable natural gas, Environmental Solutions 인수·통합, fuel recovery fee, labor, maintenance, disposal cost를 함께 봐야 합니다. 폐기물 사업은 가격 전가력이 강하지만, volume 둔화와 recycling commodity 가격, 규제·환경 책임은 현금흐름을 흔듭니다.",
+    researchFocus: [
+      "collection pricing, volume, churn, municipal and commercial contracts",
+      "landfill MSW, special waste, transfer, disposal yield",
+      "recycling processing, commodity price, renewable natural gas projects",
+      "Environmental Solutions, hazardous waste, acquisition integration"
+    ],
+    riskVariables: [
+      "industrial volume 둔화와 construction waste 감소",
+      "recycling commodity 가격 하락과 processing cost 상승",
+      "fuel, labor, maintenance, insurance cost 증가",
+      "landfill permit, environmental liability, PFAS 규제 리스크"
+    ],
+    suggestedPrompts: [
+      "Republic Services의 collection, landfill, recycling, Environmental Solutions가 매출과 margin에서 어떻게 다른지 정리해줘.",
+      "core price, volume, landfill disposal yield, recycling commodity가 RSG의 현금흐름에 연결되는 경로를 설명해줘.",
+      "PFAS, landfill permit, fuel·labor cost, commodity price가 RSG의 투자 논지에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  SPG: {
+    ticker: "SPG",
+    companyName: "Simon Property Group, Inc.",
+    companyNameKo: "사이먼 프로퍼티 그룹",
+    sectorKo: "리테일 리츠",
+    signature: "regional malls, Premium Outlets, The Mills, international investments에서 occupancy, base minimum rent, tenant sales, redevelopment, debt cost가 FFO를 좌우하는 리테일 REIT.",
+    description: "기업 리포트: Simon Property Group은 U.S. malls and Premium Outlets, The Mills, international properties, redevelopment projects, 그리고 일부 retail brand investments를 통해 임대수익과 FFO를 만듭니다. 공시 해석에서는 occupancy, base minimum rent per square foot, leasing spreads, retailer sales per square foot, percentage rent, tenant bankruptcies, redevelopment yield, joint venture debt, interest expense를 함께 봐야 합니다. 고품질 리테일 부동산은 임대료 방어력이 있지만, retailer health와 금리·refinancing 환경이 배당 여력을 좌우합니다.",
+    researchFocus: [
+      "occupancy, base minimum rent, leasing spreads, tenant sales",
+      "Premium Outlets, The Mills, international properties, JV income",
+      "redevelopment, mixed-use projects, capex yield",
+      "FFO, debt maturity, interest expense, dividend coverage"
+    ],
+    riskVariables: [
+      "소매 판매 둔화와 tenant bankruptcy로 occupancy·rent가 약화될 위험",
+      "금리 상승과 refinancing cost가 FFO와 배당 여력을 압박",
+      "redevelopment 지연, 건설비 상승, anchor tenant 이탈",
+      "international JV, 환율, retailer investment 손상 리스크"
+    ],
+    suggestedPrompts: [
+      "Simon Property의 occupancy, base minimum rent, tenant sales가 FFO에 어떻게 연결되는지 정리해줘.",
+      "Premium Outlets, The Mills, international JV, redevelopment가 SPG의 성장 논지에서 어떤 역할을 하는지 설명해줘.",
+      "tenant bankruptcy, 금리, refinancing, redevelopment 지연이 SPG의 배당 여력에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  SRE: {
+    ticker: "SRE",
+    companyName: "Sempra",
+    companyNameKo: "셈프라",
+    sectorKo: "전력·가스·LNG 인프라",
+    signature: "SDG&E, SoCalGas, Sempra Texas, Sempra Infrastructure를 통해 regulated utility rate base와 LNG·energy infrastructure project가 현금흐름을 나누는 에너지 인프라 기업.",
+    description: "기업 리포트: Sempra는 California utilities인 San Diego Gas & Electric과 Southern California Gas, Texas utility investment인 Sempra Texas, 그리고 Sempra Infrastructure의 LNG, energy networks, clean power 자산을 운영합니다. 공시 해석에서는 electric and gas rate base, CPUC rate cases, wildfire mitigation, gas storage·pipeline safety, Oncor equity earnings, Port Arthur LNG와 Energía Costa Azul 같은 LNG project의 offtake, financing, construction schedule을 함께 봐야 합니다.",
+    researchFocus: [
+      "SDG&E와 SoCalGas의 rate base, GRC, wildfire mitigation, gas safety spend",
+      "Sempra Texas와 Oncor equity earnings, Texas load growth, transmission investment",
+      "Sempra Infrastructure의 LNG offtake, Port Arthur LNG, ECA LNG, project finance",
+      "dividend, parent leverage, capex plan, asset recycling"
+    ],
+    riskVariables: [
+      "CPUC rate case, wildfire liability, gas safety 규제 비용",
+      "LNG project construction delay, cost overrun, offtake·financing 조건 변화",
+      "Texas storm, grid reliability, transmission investment approval 리스크",
+      "금리 상승, parent debt, 환율·멕시코 규제 노출"
+    ],
+    suggestedPrompts: [
+      "Sempra의 SDG&E, SoCalGas, Sempra Texas, Sempra Infrastructure가 현금흐름에서 어떻게 다른지 정리해줘.",
+      "rate base, wildfire mitigation, Oncor equity earnings, LNG offtake가 SRE의 성장 논지에 연결되는 경로를 설명해줘.",
+      "CPUC 규제, LNG project delay, 고금리, wildfire liability가 Sempra의 배당과 capex에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  TEL: {
+    ticker: "TEL",
+    companyName: "TE Connectivity plc",
+    companyNameKo: "TE 커넥티비티",
+    sectorKo: "커넥터·센서·산업기술",
+    signature: "Transportation Solutions와 Industrial Solutions로 재편된 구조에서 automotive connectivity, sensors, aerospace, defense, medical, energy, data networks가 성장과 margin mix를 좌우합니다.",
+    description: "기업 리포트: TE Connectivity는 connector, sensor, relay, heat shrink, cable assembly, application tooling을 차량, 산업, 항공우주·방산, 의료, 에너지, data networks 고객에게 공급합니다. 공시 해석에서는 Transportation Solutions의 automotive content, commercial transportation, sensors와 Industrial Solutions의 aerospace, defense and marine, medical, energy, digital data networks, automation and connected living 수요를 나눠 봐야 합니다. EV, ADAS, high-voltage, data center AI, factory automation은 성장축이지만, 자동차 생산 둔화와 distributor inventory 조정은 margin을 흔듭니다.",
+    researchFocus: [
+      "Transportation Solutions의 automotive, commercial transportation, sensors content",
+      "Industrial Solutions의 aerospace, defense, medical, energy, data networks, automation",
+      "EV, ADAS, high-voltage connectivity, thermal management, sensor demand",
+      "organic growth, price-cost, restructuring, acquisition integration"
+    ],
+    riskVariables: [
+      "자동차 생산 둔화와 EV 전환 속도 변화",
+      "industrial automation·data network customer inventory 조정",
+      "구리·수지·전자부품 원가와 supply chain 병목",
+      "환율, 관세, 품질·리콜, 고객 집중 리스크"
+    ],
+    suggestedPrompts: [
+      "TE Connectivity의 Transportation Solutions와 Industrial Solutions가 성장률과 margin에서 어떻게 다른지 정리해줘.",
+      "EV, ADAS, high-voltage connector, data networks 수요가 TEL의 제품 mix에 어떤 의미를 갖는지 설명해줘.",
+      "자동차 생산 둔화, 원재료 비용, inventory 조정이 TEL의 현금흐름에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  TFC: {
+    ticker: "TFC",
+    companyName: "Truist Financial Corporation",
+    companyNameKo: "트루이스트 파이낸셜",
+    sectorKo: "은행·금융서비스",
+    signature: "Consumer, Wholesale, Wealth, Payments, Investment Banking 수수료와 NII/NIM, deposits, credit cost를 함께 봐야 하는 미국 대형 지역은행.",
+    description: "기업 리포트: Truist는 consumer and small business banking, wholesale banking, commercial and corporate banking, investment banking, wealth management, payments, specialized lending을 운영합니다. 공시 해석에서는 NII와 NIM, deposit beta, loan growth, securities repositioning, CRE·C&I·consumer credit, allowance, net charge-off, mortgage banking, investment banking and trading, wealth fees, efficiency ratio를 함께 봐야 합니다. Truist Insurance Holdings 매각 이후에는 자본 완충력, buyback, fee mix 재구성과 비용 절감 속도가 투자 판단의 핵심입니다.",
+    researchFocus: [
+      "NII, NIM, deposits, loan growth, securities yield, funding cost",
+      "Consumer, Wholesale, Wealth, Payments, Investment Banking fee income",
+      "CRE, C&I, consumer, credit card, mortgage credit cost와 allowance",
+      "insurance sale proceeds, CET1, buyback, expense discipline, efficiency ratio"
+    ],
+    riskVariables: [
+      "예금 비용 상승과 loan growth 둔화에 따른 NIM 압박",
+      "CRE·C&I·consumer charge-off 증가와 provision 확대",
+      "investment banking, mortgage, wealth fees 변동성",
+      "capital rule, regulatory scrutiny, securities mark, rate cut timing 리스크"
+    ],
+    suggestedPrompts: [
+      "Truist의 NII/NIM을 deposits, loan growth, funding cost 기준으로 정리해줘.",
+      "Consumer, Wholesale, Wealth, Payments, Investment Banking 수수료가 TFC의 fee mix를 어떻게 바꾸는지 설명해줘.",
+      "CRE credit, charge-off, insurance sale 이후 자본배분이 Truist의 투자 논지에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
+  URI: {
+    ticker: "URI",
+    companyName: "United Rentals, Inc.",
+    companyNameKo: "유나이티드 렌탈스",
+    sectorKo: "장비 렌탈",
+    signature: "General Rentals와 Specialty Rentals에서 OEC, fleet productivity, rental rates, time utilization, used equipment sales가 현금흐름을 좌우하는 북미 장비 렌탈 기업.",
+    description: "기업 리포트: United Rentals는 General Rentals에서 construction and industrial equipment, aerial work platforms, earthmoving, forklifts, general tools를 임대하고, Specialty Rentals에서 trench safety, power and HVAC, fluid solutions, mobile storage, modular office, matting 등을 제공합니다. 공시 해석에서는 rental revenue, OEC, fleet productivity, rental rates, time utilization, average fleet size, capex, used equipment sales, OEC recovery rate, repair and maintenance, delivery labor, acquisition integration을 함께 봐야 합니다.",
+    researchFocus: [
+      "General Rentals의 construction, industrial, aerial, earthmoving fleet demand",
+      "Specialty Rentals의 trench safety, power and HVAC, fluid solutions, modular, matting",
+      "OEC, fleet productivity, rental rates, time utilization, capex cycle",
+      "used equipment sales, OEC recovery, repair cost, acquisition integration"
+    ],
+    riskVariables: [
+      "비주거 건설·산업 capex 둔화에 따른 rental demand 약화",
+      "fleet utilization 하락과 rental rates 압박",
+      "중고 장비 가격 하락과 OEC recovery 악화",
+      "고금리, 장비 capex, 인수 통합, 노동·배송비 상승"
+    ],
+    suggestedPrompts: [
+      "United Rentals의 General Rentals와 Specialty Rentals가 rental revenue와 margin에서 어떻게 다른지 정리해줘.",
+      "OEC, fleet productivity, rental rates, time utilization이 URI의 free cash flow에 연결되는 경로를 설명해줘.",
+      "건설 수요 둔화, used equipment 가격, capex cycle이 URI의 자본배분에 주는 리스크를 분석해줘."
+    ],
+    questionChains: {},
+  },
 } satisfies Record<string, CompanyResearchProfile>;
 export const APPLE_RESEARCH_PROFILE = COMPANY_RESEARCH_PROFILES.AAPL;
 export { APPLE_QUESTION_CHAINS };

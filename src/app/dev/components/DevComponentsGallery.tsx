@@ -785,7 +785,7 @@ export default function DevComponentsGallery() {
                 <TopNav
                   hideAccountMenu
                   showSidebarTrigger
-                  brandHref="/ko/companies"
+                  brandHref="/companies"
                   brandAriaLabel="회사 목록으로 이동"
                   actionSlot={
                     <div className="hidden gap-xs sm:flex">
@@ -819,7 +819,7 @@ export default function DevComponentsGallery() {
                   <KrwBrand />
                   <KrwBrand compact />
                   <div className="rounded-[8px] bg-ink p-sm">
-                    <KrwBrand dark href="/" />
+                    <KrwBrand dark href="/companies" />
                   </div>
                   <KrwMark className="h-12 w-12" />
                 </div>

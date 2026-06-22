@@ -8,6 +8,7 @@ import { trackClientEventSilently } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import { localizedPath } from "@/i18n/routing";
+import { createClient } from "@/lib/supabase/client";
 
 const traceTransitionMs = 0.12;
 const demoStepEvent = "krw-home-demo-step";
@@ -139,15 +140,57 @@ export function HomeHeaderActions({
   const companiesHref = localizedPath(locale, "/companies");
   const startLabel = locale === "ko" ? "무료로 시작" : "Start free";
   const loginLabel = locale === "ko" ? "로그인" : "Log in";
+  const researchLabel = locale === "ko" ? "내 리서치" : "My research";
+  const [authState, setAuthState] = useState<
+    "checking" | "anonymous" | "authenticated"
+  >("checking");
+
+  useEffect(() => {
+    let isMounted = true;
+    const supabase = createClient();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
+      setAuthState(session?.user ? "authenticated" : "anonymous");
+    });
+
+    supabase.auth
+      .getUser()
+      .then(({ data: { user } }) => {
+        if (isMounted) setAuthState(user ? "authenticated" : "anonymous");
+      })
+      .catch(() => {
+        if (isMounted) setAuthState("anonymous");
+      });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const isAuthenticated = authState === "authenticated";
+  const secondaryHref = isAuthenticated
+    ? "/chat"
+    : `/login?next=${encodeURIComponent(companiesHref)}`;
+  const secondaryLabel = isAuthenticated ? researchLabel : loginLabel;
 
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <Link
-        href="/login"
-        className="hidden rounded-[8px] border border-hairline px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-primary hover:text-primary sm:inline-flex"
-      >
-        {loginLabel}
-      </Link>
+      {authState === "checking" ? (
+        <span
+          aria-hidden="true"
+          className="hidden h-9 w-[72px] shrink-0 sm:inline-flex"
+        />
+      ) : (
+        <Link
+          href={secondaryHref}
+          className="hidden min-h-9 items-center rounded-[8px] border border-hairline px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-primary hover:text-primary sm:inline-flex"
+        >
+          {secondaryLabel}
+        </Link>
+      )}
       <Link
         href={companiesHref}
         onClick={() => {

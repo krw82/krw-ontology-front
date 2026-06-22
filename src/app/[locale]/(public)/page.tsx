@@ -292,7 +292,11 @@ export default async function Home({ params }: HomePageProps) {
       />
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-hairline bg-canvas/95 backdrop-blur-xl">
         <nav className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <KrwBrand href={localizedPath(locale)} compact />
+          <KrwBrand
+            href="/companies"
+            compact
+            ariaLabel={locale === "ko" ? "회사 목록으로 이동" : "Go to companies"}
+          />
 
           <div className="hidden items-center gap-8 text-sm font-semibold text-muted md:flex">
             <Link

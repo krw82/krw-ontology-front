@@ -47,8 +47,8 @@ export default async function WatchlistCompanyPage({
       <TopNav
         initialUserProfile={topNavProfileFromUser(user)}
         preserveInitialUserProfile={shouldPreserveInitialProfile(user)}
-        brandHref="/watchlist"
-        brandAriaLabel="리서치 노트북으로 이동"
+        brandHref="/companies"
+        brandAriaLabel="회사 목록으로 이동"
         showSidebarTrigger
       />
       <ChatSidebar

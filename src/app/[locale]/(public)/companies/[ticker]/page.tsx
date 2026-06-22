@@ -200,7 +200,7 @@ export default async function CompanyLandingPage({
       <TopNav
         initialUserProfile={initialUserProfile}
         preserveInitialUserProfile={preserveInitialUserProfile}
-        brandHref={localizedPath(locale, "/companies")}
+        brandHref="/companies"
         brandAriaLabel={locale === "ko" ? "회사 목록으로 이동" : "Go to companies"}
         showSidebarTrigger
         showLocaleSwitcher
