@@ -30,7 +30,11 @@ export default function PublicTopNav({
   return (
     <header className="sticky top-0 z-50 w-full flex-shrink-0 border-b border-hairline bg-canvas/95 backdrop-blur-xl">
       <div className="mx-auto flex h-[72px] w-full max-w-[1600px] items-center justify-between gap-sm px-base sm:px-md md:h-[64px]">
-        <KrwBrand href={localizedPath(locale)} compact />
+        <KrwBrand
+          href="/companies"
+          compact
+          ariaLabel={locale === "ko" ? "회사 목록으로 이동" : "Go to companies"}
+        />
 
         <nav
           className="hidden items-center gap-xs md:flex"

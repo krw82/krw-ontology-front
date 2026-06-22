@@ -33,8 +33,6 @@ interface TopNavProps {
   mobileOverlay?: boolean;
   preserveInitialUserProfile?: boolean;
   showLocaleSwitcher?: boolean;
-  accountIconHref?: string;
-  accountIconAriaLabel?: string;
   actionSlot?: ReactNode;
 }
 
@@ -93,7 +91,7 @@ function UserAvatar({
 
 export default function TopNav({
   initialUserProfile,
-  brandHref = "/",
+  brandHref = "/companies",
   brandAriaLabel,
   hideAccountMenu = false,
   showSidebarTrigger = false,
@@ -101,8 +99,6 @@ export default function TopNav({
   mobileOverlay = false,
   preserveInitialUserProfile = false,
   showLocaleSwitcher = false,
-  accountIconHref,
-  accountIconAriaLabel,
   actionSlot,
 }: TopNavProps = {}) {
   const router = useRouter();
@@ -298,24 +294,6 @@ export default function TopNav({
               aria-hidden="true"
               className="h-9 w-0 sm:h-10"
             />
-          ) : userProfile && accountIconHref ? (
-            <Link
-              href={accountIconHref}
-              className="relative flex h-9 w-9 items-center justify-center rounded-[8px] border border-hairline bg-surface-dark text-[13px] font-semibold text-on-dark shadow-sm transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas sm:h-10 sm:w-10"
-              aria-label={
-                accountIconAriaLabel ??
-                (currentLocale === "ko"
-                  ? "리서치 노트북으로 이동"
-                  : "Go to research notebook")
-              }
-            >
-              <span className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[7px]">
-                <UserAvatar
-                  profile={userProfile}
-                  onAvatarError={handleAvatarError}
-                />
-              </span>
-            </Link>
           ) : userProfile ? (
             <div ref={accountMenuRef} className="relative">
               <button

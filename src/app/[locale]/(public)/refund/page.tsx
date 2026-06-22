@@ -82,7 +82,11 @@ export default async function RefundPage({ params }: RefundPageProps) {
     <div className="min-h-[100dvh] bg-canvas text-ink">
       <header className="border-b border-hairline bg-canvas/95 backdrop-blur-xl">
         <nav className="mx-auto flex h-20 max-w-5xl items-center justify-between px-base sm:px-md">
-          <KrwBrand href={localizedPath(locale)} compact />
+          <KrwBrand
+            href="/companies"
+            compact
+            ariaLabel={locale === "ko" ? "회사 목록으로 이동" : "Go to companies"}
+          />
           <div className="flex items-center gap-xs">
             <LocaleSwitcher compact />
             <Link

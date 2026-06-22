@@ -3,13 +3,12 @@ import ResearchMarkdown from "@/components/ResearchMarkdown";
 import SharePageEvents from "@/components/SharePageEvents";
 import ShareStartLink from "@/components/ShareStartLink";
 import type { Locale } from "@/i18n/config";
-import { localizedPath } from "@/i18n/routing";
 import { buildNewChatHref } from "@/lib/chat/history-state";
 import type { PublicMessageShare } from "@/lib/share/message-share";
 
 const copy = {
   ko: {
-    brandAria: "KRW Ontology 홈",
+    brandAria: "회사 목록으로 이동",
     questionAria: "공유된 질문",
     questionLabel: "질문",
     answerAria: "공유된 답변 본문",
@@ -18,7 +17,7 @@ const copy = {
     cta: "다른 질문도 분석 시작",
   },
   en: {
-    brandAria: "KRW Ontology home",
+    brandAria: "Go to companies",
     questionAria: "Shared question",
     questionLabel: "Question",
     answerAria: "Shared answer",
@@ -49,7 +48,7 @@ export default function SharedAnswerPageContent({
         <div className="mx-auto flex h-20 w-full max-w-7xl items-center px-base sm:px-xl lg:px-8">
           <KrwBrand
             compact
-            href={localizedPath(locale)}
+            href="/companies"
             ariaLabel={strings.brandAria}
           />
         </div>

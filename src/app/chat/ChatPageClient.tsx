@@ -607,17 +607,17 @@ function ChatContent() {
             "Describe the business change or financial condition you want to find, and KRW Ontology will rank research candidates from filing evidence.",
         }
     : responseLocale === "ko"
-      ? {
+        ? {
           headingWithContext: `${contextDisplayText}에서 무엇을 확인할까요?`,
           headingWithoutContext: "와이드 리서치",
           descriptionWithoutContext:
-            "티커 없이 아이디어, 산업, 리스크 키워드로 관련 회사를 넓게 탐색합니다.",
+            "아이디어·산업·리스크 키워드로 연관 기업을 넓게 찾아봅니다.",
         }
       : {
           headingWithContext: `What should we check for ${contextDisplayText}?`,
           headingWithoutContext: "Wide research",
           descriptionWithoutContext:
-            "Explore related companies from an idea, industry, or risk keyword without starting from a ticker.",
+            "Explore related companies from idea, industry, and risk keywords to expand the candidate set.",
         };
   const queryValue = queryParam?.trim() || null;
   const shareQuestionValue = shareStarter?.question_content.trim() || null;

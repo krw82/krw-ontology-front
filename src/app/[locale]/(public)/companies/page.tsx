@@ -3,7 +3,6 @@ import CompaniesBrowser from "@/components/CompaniesBrowser";
 import { getCompanyDisplayCopyForTicker } from "@/content/companies/display";
 import { isLocale } from "@/i18n/config";
 import { localizedPageMetadata } from "@/i18n/metadata";
-import { localizedPath } from "@/i18n/routing";
 import { getAuthUser } from "@/lib/auth";
 import { listIndexedCompanies } from "@/lib/ontology/catalog";
 import { notFound } from "next/navigation";
@@ -80,16 +79,10 @@ export default async function CompaniesPage({ params }: CompaniesPageProps) {
       <TopNav
         initialUserProfile={initialUserProfile}
         preserveInitialUserProfile={preserveInitialUserProfile}
-        brandHref={localizedPath(locale)}
-        brandAriaLabel={locale === "ko" ? "홈으로 이동" : "Go home"}
+        brandHref="/companies"
+        brandAriaLabel={locale === "ko" ? "회사 목록으로 이동" : "Go to companies"}
         showSidebarTrigger
         showLocaleSwitcher
-        accountIconHref="/watchlist"
-        accountIconAriaLabel={
-          locale === "ko"
-            ? "리서치 노트북으로 이동"
-            : "Go to research notebook"
-        }
       />
       <CompaniesBrowser
         initialCompanies={displayCompanies}
