@@ -821,6 +821,13 @@ function buildSelectedNewsEventContextPrompt(
   runKind: RunKind,
   selectedNewsEventContext: Record<string, unknown> | null | undefined,
 ): string {
+  if (runKind === "idea_generation" && selectedNewsEventContext) {
+    return `Use this user-provided URL context as additional input for KRW Ontology idea generation. Treat extracted page text as an external market/business hypothesis, not confirmed company fact. Start candidate discovery from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology when present, then use KRW Ontology filing evidence to find covered companies that support, qualify, or reject the angle. Do not switch to news mode or write an article summary.
+
+<idea_generation_url_context>
+${JSON.stringify(selectedNewsEventContext)}
+</idea_generation_url_context>`;
+  }
   if (runKind !== "news_research" || !selectedNewsEventContext) return "";
   return `Use this selected market narrative as the input brief for KRW Ontology filing research. Treat it as an investment hypothesis, not confirmed company fact. If it came from a user-provided URL, first ask what would matter if the narrative is directionally true, then anchor the interpretation against filing evidence. Start KRW ontology retrieval from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology when present; otherwise use ontology_bridge_brief_en.
 

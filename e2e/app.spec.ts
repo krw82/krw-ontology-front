@@ -53,6 +53,37 @@ test.describe("dev auth bypass", () => {
     await expect(page.getByLabel("메시지 입력")).toBeEditable();
   });
 
+  test("opens stock discovery and carries the idea workflow into chat", async ({
+    page,
+  }) => {
+    const examplePrompt =
+      "AI 데이터센터 전력 수요의 직접 수혜 기업을 찾아줘.";
+
+    await page.goto("/discover", { waitUntil: "domcontentloaded" });
+
+    await expect(
+      page.getByRole("heading", { name: "종목 발굴기", level: 1 }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("main").getByText("깊은 리서치"),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Dev User 계정 메뉴" }),
+    ).toBeEnabled();
+
+    await page.getByRole("button", { name: examplePrompt }).click();
+    await expect(page.getByRole("textbox")).toHaveValue(examplePrompt);
+
+    await page.getByRole("button", { name: "후보 발굴 시작" }).click();
+    await expect(page).toHaveURL(
+      /\/chat\/new\?.*runKind=idea_generation/,
+    );
+    await expect(page.getByLabel("메시지 입력")).toHaveValue(examplePrompt);
+    await expect(
+      page.getByRole("heading", { name: "종목 발굴기", level: 2 }),
+    ).toBeVisible();
+  });
+
   test("starts a new chat by creating a session before running the agent", async ({
     page,
   }) => {

@@ -34,6 +34,7 @@ interface ComposerProps {
   researchMode?: ResearchMode;
   onResearchModeChange?: (mode: ResearchMode) => void;
   urlModeAvailable?: boolean;
+  urlOnlyFallbackMessage?: string;
   focusRequestKey?: number;
   onFocusChange?: (focused: boolean) => void;
 }
@@ -193,6 +194,7 @@ export default function Composer({
   isGenerating = false,
   placeholder = "기업에 대해 질문하세요...",
   urlModeAvailable = false,
+  urlOnlyFallbackMessage,
   initialValue,
   draftResetKey = 0,
   focusRequestKey = 0,
@@ -849,9 +851,10 @@ export default function Composer({
 
     const draftText =
       hasUserUrls && !latestValue.trim()
-        ? enteredUserUrls.length > 1
-          ? "이 URL들의 내용이 맞다면 회사에 어떤 의미인지 봐줘."
-          : "이 URL의 내용이 맞다면 회사에 어떤 의미인지 봐줘."
+        ? (urlOnlyFallbackMessage ??
+          (enteredUserUrls.length > 1
+            ? "이 URL들의 내용이 맞다면 회사에 어떤 의미인지 봐줘."
+            : "이 URL의 내용이 맞다면 회사에 어떤 의미인지 봐줘."))
         : latestValue;
     const message = composeMessage(draftText, attachments);
     if (!message.trim() || isInputBusy || isGenerating) return;

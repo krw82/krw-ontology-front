@@ -44,8 +44,12 @@ const sidebarCopy = {
     history: "채팅 기록",
     researchNotebook: "리서치 노트북",
     openResearchNotebook: "내 리서치 노트북 열기",
+    stockDiscovery: "종목 발굴하기",
+    openStockDiscovery: "종목 발굴하기",
     companySearch: "회사 찾기",
     openCompanySearch: "회사 찾기 열기",
+    wideResearch: "와이드 리서치",
+    openWideResearch: "와이드 리서치 시작",
     recentChats: "최근 채팅 목록",
     newChat: "새 채팅",
     nameSaved: "채팅 이름을 저장했습니다.",
@@ -73,8 +77,12 @@ const sidebarCopy = {
     history: "Chat history",
     researchNotebook: "Research notebook",
     openResearchNotebook: "Open my research notebook",
+    stockDiscovery: "Discover stocks",
+    openStockDiscovery: "Discover stocks",
     companySearch: "Find companies",
     openCompanySearch: "Open company search",
+    wideResearch: "Wide research",
+    openWideResearch: "Start wide research",
     recentChats: "Recent chats",
     newChat: "New chat",
     nameSaved: "Chat name saved.",
@@ -338,6 +346,20 @@ export default function ChatSidebar({
                   </span>
                 </Link>
                 <Link
+                  href="/discover"
+                  className="group flex h-10 items-center gap-xs rounded-[8px] px-xs text-[14px] font-bold leading-5 text-ink transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                  aria-label={copy.openStockDiscovery}
+                  onClick={closeMobileSidebar}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="material-symbols-outlined text-[20px] text-muted transition-colors group-hover:text-ink"
+                  >
+                    travel_explore
+                  </span>
+                  <span className="truncate">{copy.stockDiscovery}</span>
+                </Link>
+                <Link
                   href={localizedPath(locale, "/companies")}
                   className="group flex h-10 items-center gap-xs rounded-[8px] px-xs text-[14px] font-bold leading-5 text-ink transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                   aria-label={copy.openCompanySearch}
@@ -350,6 +372,20 @@ export default function ChatSidebar({
                     search
                   </span>
                   <span className="truncate">{copy.companySearch}</span>
+                </Link>
+                <Link
+                  href={buildNewChatHref(undefined, { locale })}
+                  className="group flex h-10 items-center gap-xs rounded-[8px] px-xs text-[14px] font-bold leading-5 text-ink transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                  aria-label={copy.openWideResearch}
+                  onClick={closeMobileSidebar}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="material-symbols-outlined text-[20px] text-muted transition-colors group-hover:text-ink"
+                  >
+                    hub
+                  </span>
+                  <span className="truncate">{copy.wideResearch}</span>
                 </Link>
               </div>
               <div className="border-b border-hairline px-sm py-xs">

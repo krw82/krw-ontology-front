@@ -156,6 +156,20 @@ function readNiceEnv(name, fallback) {
 const devWorkerNice = readNiceEnv("KRW_DEV_WORKER_NICE", 10);
 const devMcpNice = readNiceEnv("KRW_DEV_MCP_NICE", 10);
 
+function truthyEnv(value) {
+  if (!value) return false;
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+}
+
+function isStockNewsEnabled() {
+  if (truthyEnv(process.env.STOCK_NEWS_FORCE_DISABLED)) return false;
+  if (!truthyEnv(process.env.STOCK_NEWS_ENABLED)) return false;
+  if (!process.env.FINNHUB_API_KEY) {
+    throw new Error("STOCK_NEWS_ENABLED=1 but FINNHUB_API_KEY is missing");
+  }
+  return true;
+}
+
 function materializeDevPlugin() {
   const result = spawnSync(
     process.execPath,
@@ -181,7 +195,9 @@ function materializeDevPlugin() {
     throw new Error("Failed to materialize dev KRW Ontology plugin");
   }
 
-  exportDevStockNewsCoverage();
+  if (isStockNewsEnabled()) {
+    exportDevStockNewsCoverage();
+  }
 }
 
 function exportDevStockNewsCoverage() {
@@ -597,7 +613,11 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 }
 
 await ensureDevMcpServer();
-await ensureStockNewsMcpServer();
+if (isStockNewsEnabled()) {
+  await ensureStockNewsMcpServer();
+} else {
+  console.info("[dev:stock-news-mcp] disabled");
+}
 
 nextDev = spawnLabeled("web", "npm", ["run", "dev:web"], (code) => {
   void shutdown("web-exit").finally(() => process.exit(code ?? 1));

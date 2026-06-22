@@ -117,12 +117,9 @@ console.log(`Stock News MCP: ${isStockNewsEnabled() ? "enabled" : "disabled"}`);
 
 function isStockNewsEnabled() {
   if (truthyEnv(process.env.STOCK_NEWS_FORCE_DISABLED)) return false;
-  if (falseyEnv(process.env.STOCK_NEWS_ENABLED)) return false;
+  if (!truthyEnv(process.env.STOCK_NEWS_ENABLED)) return false;
   if (!process.env.FINNHUB_API_KEY) {
-    if (truthyEnv(process.env.STOCK_NEWS_ENABLED)) {
-      throw new Error("STOCK_NEWS_ENABLED=1 but FINNHUB_API_KEY is missing");
-    }
-    return false;
+    throw new Error("STOCK_NEWS_ENABLED=1 but FINNHUB_API_KEY is missing");
   }
   return true;
 }
@@ -130,9 +127,4 @@ function isStockNewsEnabled() {
 function truthyEnv(value) {
   if (!value) return false;
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
-}
-
-function falseyEnv(value) {
-  if (!value) return false;
-  return ["0", "false", "no", "off"].includes(value.trim().toLowerCase());
 }

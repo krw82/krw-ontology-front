@@ -7,6 +7,9 @@ export const KRW_ONTOLOGY_RESEARCH_SKILL =
 export const KRW_ONTOLOGY_RESEARCH_EN_SKILL =
   "/krw-ontology:krw-ontology-research-en";
 
+export const KRW_ONTOLOGY_IDEA_GENERATION_SKILL =
+  "/krw-ontology:krw-ontology-idea-generation";
+
 export const KRW_ONTOLOGY_NEWS_DISCOVERY_SKILL =
   "/krw-ontology:krw-ontology-news-discovery";
 
@@ -17,6 +20,9 @@ export function getKrwOntologySkillForRunKind(
   runKind: RunKind,
   responseLocale: Locale = DEFAULT_LOCALE,
 ): string {
+  if (runKind === "idea_generation") {
+    return KRW_ONTOLOGY_IDEA_GENERATION_SKILL;
+  }
   if (runKind === "news_discovery") return KRW_ONTOLOGY_NEWS_DISCOVERY_SKILL;
   if (runKind === "news_research") return KRW_ONTOLOGY_NEWS_RESEARCH_SKILL;
   return responseLocale === "en"
@@ -34,7 +40,9 @@ export function buildResearchPassPrompt(
 ): string {
   const skillCommand = getKrwOntologySkillForRunKind(runKind, responseLocale);
   const runtimeMode =
-    runKind === "news_discovery"
+    runKind === "idea_generation"
+      ? ideaGenerationRuntimePrompt()
+      : runKind === "news_discovery"
       ? newsDiscoveryRuntimePrompt(responseLocale)
       : runKind === "news_research"
         ? newsResearchRuntimePrompt(responseLocale)
@@ -43,6 +51,14 @@ export function buildResearchPassPrompt(
   return `${skillCommand} ${userMessage}
 
 ${runtimeMode}`;
+}
+
+function ideaGenerationRuntimePrompt(): string {
+  return `웹앱 종목 발굴 실행:
+- 이번 실행은 사용자의 조건에 맞는 온톨로지 지원 기업을 찾고, 다음 리서치 우선순위를 정하는 deep 리서치입니다.
+- 최종 매수·매도 추천이 아니라 공시 근거가 강한 후보, 약한 후보, 제외 후보를 구분합니다.
+- 최종 답변은 사용자에게 바로 보여줄 한국어 Markdown 본문만 작성합니다.
+- ResearchSynthesis, DisplayPlan, answer_blocks 같은 구조화 JSON이나 별도 아티팩트는 만들지 않습니다.`;
 }
 
 function newsDiscoveryRuntimePrompt(responseLocale: Locale): string {

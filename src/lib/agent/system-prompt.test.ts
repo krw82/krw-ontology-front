@@ -70,6 +70,24 @@ describe("buildSystemPrompt", () => {
     );
   });
 
+  it("uses the idea generation skill with a Markdown-only candidate brief", () => {
+    const researchPrompt = buildResearchPassPrompt(
+      "AI 데이터센터 전력 수혜 기업을 찾아줘",
+      "company",
+      "idea_generation",
+    );
+
+    expect(researchPrompt).toContain(
+      "/krw-ontology:krw-ontology-idea-generation AI 데이터센터 전력 수혜 기업을 찾아줘",
+    );
+    expect(researchPrompt).toContain("웹앱 종목 발굴 실행");
+    expect(researchPrompt).toContain("deep 리서치");
+    expect(researchPrompt).toContain("한국어 Markdown 본문만 작성합니다");
+    expect(researchPrompt).not.toContain(
+      "/krw-ontology:krw-ontology-research AI 데이터센터",
+    );
+  });
+
   it("uses the English research skill and English runtime instructions for English responses", () => {
     const researchPrompt = buildResearchPassPrompt(
       "Analyze AAPL",

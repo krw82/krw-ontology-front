@@ -52,6 +52,7 @@ vi.mock("./mcp-client", () => {
     ),
     getKrwOntologyPluginPath: () => "/tmp/krw-ontology-plugin",
     getStockNewsSdkAllowedTools: () =>
+      process.env.STOCK_NEWS_ENABLED === "1" &&
       process.env.STOCK_NEWS_FORCE_DISABLED !== "1"
         ? stockNewsTools.map(
             (toolName) => `mcp__plugin_krw-ontology_stock-news__${toolName}`,
@@ -60,6 +61,7 @@ vi.mock("./mcp-client", () => {
     isKrwOntologySdkTool: (toolName: string) =>
       toolName.startsWith("mcp__plugin_krw-ontology_krw-ontology__krw_ontology_"),
     isStockNewsEnabled: () =>
+      process.env.STOCK_NEWS_ENABLED === "1" &&
       process.env.STOCK_NEWS_FORCE_DISABLED !== "1",
     isStockNewsSdkTool: (toolName: string) =>
       toolName.startsWith("mcp__plugin_krw-ontology_stock-news__"),
@@ -372,7 +374,17 @@ describe("agent runner research budget recovery", () => {
     );
   });
 
-  it("allows Stock News MCP by default unless explicitly disabled", async () => {
+  it("denies Stock News MCP by default and allows it only when explicitly enabled", async () => {
+    await expect(
+      canUseTool(stockNewsSdkToolName("search_company_news_events"), {
+        ticker: "AVGO",
+        question: "AVGO recent AI networking news",
+      }),
+    ).resolves.toMatchObject({
+      behavior: "deny",
+    });
+
+    process.env.STOCK_NEWS_ENABLED = "1";
     await expect(
       canUseTool(stockNewsSdkToolName("search_company_news_events"), {
         ticker: "AVGO",
@@ -517,6 +529,8 @@ describe("agent runner research budget recovery", () => {
   });
 
   it("uses discovery-only Stock News tools for the first news pass", async () => {
+    process.env.STOCK_NEWS_ENABLED = "1";
+
     sdkMocks.query.mockReturnValueOnce(
       makeSdkQuery([
         {
@@ -574,7 +588,58 @@ describe("agent runner research budget recovery", () => {
     );
   });
 
+  it("passes user URL context into idea generation without switching to news mode", async () => {
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        {
+          type: "result",
+          subtype: "success",
+          result: "URL 기반으로 후보를 발굴했습니다.",
+          usage: {
+            input_tokens: 10,
+            output_tokens: 12,
+          },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "이 URL을 바탕으로 관련 종목을 발굴해줘.",
+        scopeType: "global",
+        defaultTickers: [],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        analysisMode: "company",
+        runKind: "idea_generation",
+        selectedNewsEventContext: {
+          version: "idea-generation-user-url-context/v1",
+          source_pack: {
+            ontology_search_brief_en: "Find covered companies related to this URL.",
+            original_text_for_ontology: "Mechanically extracted page text.",
+          },
+        },
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
+    expect(result.status).toBe("completed");
+    const call = sdkMocks.query.mock.calls[0]?.[0];
+    expect(call.prompt).toContain("/krw-ontology:krw-ontology-idea-generation");
+    expect(call.prompt).toContain("<idea_generation_url_context>");
+    expect(call.prompt).toContain("Do not switch to news mode");
+    expect(call.prompt).not.toContain("<selected_news_event_context>");
+    expect(call.options.allowedTools).not.toContain(
+      stockNewsSdkToolName("search_company_news_events"),
+    );
+  });
+
   it("uses selected-source news tools and ontology tools for the news research pass", async () => {
+    process.env.STOCK_NEWS_ENABLED = "1";
+
     sdkMocks.query.mockReturnValueOnce(
       makeSdkQuery([
         {
@@ -632,6 +697,8 @@ describe("agent runner research budget recovery", () => {
   });
 
   it("passes Stock News MCP inputs unchanged before execution", async () => {
+    process.env.STOCK_NEWS_ENABLED = "1";
+
     const permission = await canUseTool(stockNewsSdkToolName("search_company_news_events"), {
       ticker: "AAPL",
       question: "AAPL latest services news",
@@ -642,6 +709,8 @@ describe("agent runner research budget recovery", () => {
   });
 
   it("binds read_news_sources to selected preferred source URLs", async () => {
+    process.env.STOCK_NEWS_ENABLED = "1";
+
     const selectedUrl =
       "https://www.reuters.com/markets/technology/broadcom-ai-networking-orders-2026-06-01/";
     const { permission } = await probeToolPermission({
@@ -670,6 +739,8 @@ describe("agent runner research budget recovery", () => {
   });
 
   it("denies read_news_sources when the selected event has no eligible source URL", async () => {
+    process.env.STOCK_NEWS_ENABLED = "1";
+
     const { permission } = await probeToolPermission({
       existingTools: [],
       attemptedTool: "read_news_sources",
@@ -690,6 +761,7 @@ describe("agent runner research budget recovery", () => {
   });
 
   it("limits Stock News MCP calls separately from ontology calls", async () => {
+    process.env.STOCK_NEWS_ENABLED = "1";
     process.env.STOCK_NEWS_MAX_CALLS = "2";
 
     const { permission, result } = await probeToolPermission({

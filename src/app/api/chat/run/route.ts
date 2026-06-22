@@ -31,6 +31,7 @@ import {
 import { shouldBlockAnalysisCreditReservation } from "@/lib/billing/credit-policy";
 import { parseChatAttachmentContent } from "@/lib/chat/attachments";
 import {
+  buildIdeaGenerationUserUrlContext,
   buildUserUrlNewsEventContext,
   buildUserUrlsNewsEventContext,
   UserUrlContextError,
@@ -184,7 +185,20 @@ export async function POST(request: NextRequest) {
   const userMessageMetadata =
     userUrls.length > 0 ? { user_urls: userUrls } : {};
 
-  if (userUrls.length > 0) {
+  if (userUrls.length > 0 && effectiveRunKind === "idea_generation") {
+    try {
+      selectedNewsEventContext = await buildIdeaGenerationUserUrlContext({
+        urls: userUrls,
+        userQuestion: content,
+      });
+    } catch (error) {
+      const message =
+        error instanceof UserUrlContextError
+          ? error.message
+          : "URL을 읽지 못했습니다.";
+      return errorResponse(400, "validation_error", message, request_id);
+    }
+  } else if (userUrls.length > 0) {
     const ticker = session.defaultTickers[0];
     if (!ticker) {
       return errorResponse(

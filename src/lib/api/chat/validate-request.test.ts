@@ -289,6 +289,24 @@ describe("validateRequest", () => {
     expect(result.data.body.run_kind).toBe("news_research");
   });
 
+  it("forces deep research mode for idea generation", async () => {
+    const result = await validateRequest(
+      makeRequest({
+        content: "AI 데이터센터 전력 수혜 기업을 찾아줘",
+        request_id: REQUEST_ID,
+        research_mode: "fast",
+        analysis_mode: "company",
+        run_kind: "idea_generation",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.body.analysis_mode).toBe("company");
+    expect(result.data.body.run_kind).toBe("idea_generation");
+    expect(result.data.body.research_mode).toBe("deep");
+  });
+
   it("accepts an explicit user URL for chat URL mode", async () => {
     const result = await validateRequest(
       makeRequest({

@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
 import { KrwBrand } from "@/components/KrwBrand";
 import { getAuthUser } from "@/lib/auth";
+import {
+  desktopAuthIdentifierHash,
+  logDesktopAuthEvent,
+} from "@/lib/desktop/auth-events";
 import { getDesktopAuthorizationRequestForWeb } from "@/lib/desktop/authorization";
 import { DesktopConnectClient } from "./DesktopConnectClient";
 
@@ -35,6 +39,12 @@ export default async function DesktopConnectPage({
         : "이 Desktop 로그인 요청은 이미 처리되었습니다.";
     return <InvalidRequest message={message} />;
   }
+  logDesktopAuthEvent("auth_web_signed_in", {
+    request_id_hash: desktopAuthIdentifierHash(authorization.id),
+    attempt_id_hash: desktopAuthIdentifierHash(authorization.state),
+    user_id_hash: desktopAuthIdentifierHash(user.id),
+    status: "succeeded",
+  });
 
   return (
     <main className="min-h-[100dvh] bg-canvas text-ink">

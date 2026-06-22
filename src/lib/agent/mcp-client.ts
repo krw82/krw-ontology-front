@@ -74,7 +74,7 @@ export function isStockNewsEnabled(
   env: Record<string, string | undefined> = process.env,
 ): boolean {
   if (truthyEnv(env.STOCK_NEWS_FORCE_DISABLED)) return false;
-  if (falseyEnv(env.STOCK_NEWS_ENABLED)) return false;
+  if (!truthyEnv(env.STOCK_NEWS_ENABLED)) return false;
   if (!env.FINNHUB_API_KEY) return false;
 
   return true;
@@ -89,11 +89,6 @@ export function getStockNewsSdkAllowedTools(
 function truthyEnv(value: string | undefined): boolean {
   if (!value) return false;
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
-}
-
-function falseyEnv(value: string | undefined): boolean {
-  if (!value) return false;
-  return ["0", "false", "no", "off"].includes(value.trim().toLowerCase());
 }
 
 export interface McpHealthResult {
@@ -435,6 +430,7 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
   const mcpConfigPath = path.join(pluginPath, ".mcp.json");
   const requiredSkillPaths = [
     path.join(pluginPath, "skills", "krw-ontology-research", "SKILL.md"),
+    path.join(pluginPath, "skills", "krw-ontology-idea-generation", "SKILL.md"),
     path.join(pluginPath, "skills", "krw-ontology-news-discovery", "SKILL.md"),
   ];
 

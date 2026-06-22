@@ -132,6 +132,11 @@ export default function TopNav({
   );
   const navLinks = [
     {
+      href: "/discover",
+      label: currentLocale === "ko" ? "종목 발굴하기" : "Discover stocks",
+      active: pathname.startsWith("/discover"),
+    },
+    {
       href: localizedPath(currentLocale, "/companies"),
       label: currentLocale === "ko" ? "회사" : "Companies",
       active: pathname.includes("/companies"),

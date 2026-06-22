@@ -10,7 +10,6 @@ import { easeOutExpo } from "@/lib/animation";
 import { filterAndSortCompanies } from "@/lib/companies/filter";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
-import { buildNewChatHref } from "@/lib/chat/history-state";
 
 interface CompaniesBrowserProps {
   initialCompanies: CompanyCardData[];
@@ -97,8 +96,8 @@ export default function CompaniesBrowser({
         searchLabel: "Ticker 검색",
         searchPlaceholder: "예: AAPL, NVDA, TSLA",
         searchAria: "티커 검색",
-        multiCompanyCta: "와이드 리서치",
-        multiCompanyLineOne: "와이드 리서치",
+        multiCompanyCta: "종목 발굴하기",
+        multiCompanyLineOne: "종목 발굴하기",
         emptyCatalog:
           "현재 환경의 웹 카탈로그에서 인덱싱된 회사를 찾지 못했습니다.",
         availableCompanies: "분석 가능한 회사",
@@ -115,8 +114,8 @@ export default function CompaniesBrowser({
         searchLabel: "Ticker search",
         searchPlaceholder: "e.g. AAPL, NVDA, TSLA",
         searchAria: "Ticker search",
-        multiCompanyCta: "Wide research",
-        multiCompanyLineOne: "Wide research",
+        multiCompanyCta: "Discover stocks",
+        multiCompanyLineOne: "Discover stocks",
         emptyCatalog:
           "No indexed companies were found in the current web catalog.",
         availableCompanies: "Available companies",
@@ -181,7 +180,7 @@ export default function CompaniesBrowser({
                   />
                 </div>
                 <Link
-                  href={buildNewChatHref(undefined, { locale })}
+                  href="/discover"
                   className="group inline-flex h-11 min-w-0 items-center justify-between gap-2 rounded-[8px] bg-ink px-3 text-[13px] font-bold leading-5 text-canvas shadow-sm transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                   aria-label={copy.multiCompanyCta}
                 >

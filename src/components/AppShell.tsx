@@ -13,17 +13,25 @@ function shouldShowGlobalSidebar(pathname: string): boolean {
   return (
     pathname === "/chat" ||
     pathname.startsWith("/chat/") ||
+    pathname === "/discover" ||
     pathname === "/companies" ||
     pathname.startsWith("/companies/")
   );
 }
 
 function isBrowseWorkspace(pathname: string): boolean {
-  return pathname === "/companies" || pathname.startsWith("/companies/");
+  return (
+    pathname === "/companies" ||
+    pathname.startsWith("/companies/")
+  );
 }
 
 function isChatWorkspace(pathname: string): boolean {
-  return pathname === "/chat" || pathname.startsWith("/chat/");
+  return (
+    pathname === "/discover" ||
+    pathname === "/chat" ||
+    pathname.startsWith("/chat/")
+  );
 }
 
 export default function AppShell({ children }: AppShellProps) {

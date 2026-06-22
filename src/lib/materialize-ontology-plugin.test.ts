@@ -75,9 +75,22 @@ describe("materialize-ontology-plugin", () => {
     }
   });
 
-  it("adds Stock News MCP when Finnhub is configured", () => {
+  it("keeps Stock News MCP absent unless explicitly enabled", () => {
     const { stdout, mcpConfig } = runMaterialize({
       FINNHUB_API_KEY: "test-finnhub-key",
+      STOCK_NEWS_ENABLED: undefined,
+      STOCK_NEWS_FORCE_DISABLED: undefined,
+      ZAI_API_KEY: undefined,
+    });
+
+    expect(Object.keys(mcpConfig.mcpServers)).toEqual(["krw-ontology"]);
+    expect(stdout).toContain("Stock News MCP: disabled");
+  });
+
+  it("adds Stock News MCP when explicitly enabled and Finnhub is configured", () => {
+    const { stdout, mcpConfig } = runMaterialize({
+      FINNHUB_API_KEY: "test-finnhub-key",
+      STOCK_NEWS_ENABLED: "1",
       ZAI_API_KEY: undefined,
     });
 

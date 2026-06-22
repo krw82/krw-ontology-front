@@ -48,6 +48,11 @@ interface BuildUserUrlsNewsEventContextParams {
   userQuestion: string;
 }
 
+interface BuildIdeaGenerationUserUrlContextParams {
+  urls: string[];
+  userQuestion: string;
+}
+
 interface FetchedUserUrlDocument {
   sourceUrl: string;
   finalUrl: string;
@@ -266,6 +271,123 @@ export async function buildUserUrlsNewsEventContext(
     extracted_text_truncated: extractedTextTruncated,
     ontology_bridge_brief_en: ontologyBrief,
     source_pack: sourcePack,
+  };
+}
+
+export async function buildIdeaGenerationUserUrlContext(
+  params: BuildIdeaGenerationUserUrlContextParams,
+): Promise<Record<string, unknown>> {
+  const urls = Array.from(
+    new Set(params.urls.map((url) => url.trim()).filter(Boolean)),
+  );
+  if (urls.length === 0) {
+    throw new UserUrlContextError(
+      "invalid_url",
+      "올바른 http 또는 https URL을 입력해주세요.",
+    );
+  }
+
+  const documents = await Promise.all(
+    urls.map(async (url) => {
+      const fetched = await fetchUserUrlDocument(url);
+      const extracted = extractUserUrlDocument(fetched);
+      const sourceUrl = fetched.finalUrl;
+      const canonicalUrl = extracted.canonicalUrl || sourceUrl;
+      const title =
+        extracted.title || `${fetched.domain} 사용자가 제공한 URL`;
+      return {
+        fetched,
+        extracted,
+        sourceUrl,
+        canonicalUrl,
+        title,
+      };
+    }),
+  );
+  const readAt = new Date().toISOString();
+  const sourceUrls = documents.map((document) => document.canonicalUrl);
+  const sourcePreviews = documents.map((document) => ({
+    url: document.canonicalUrl,
+    title: document.title,
+    publisher: document.fetched.domain,
+    snippet_summary: document.extracted.description,
+  }));
+  const reads = documents.map((document) => ({
+    url: document.sourceUrl,
+    ok: true,
+    title: document.title,
+    content_type: document.fetched.contentType,
+    downloaded_bytes: document.fetched.downloadedBytes,
+    text: document.extracted.visibleText,
+    truncated:
+      document.extracted.textTruncated || document.fetched.downloadTruncated,
+  }));
+  const originalText = documents
+    .map((document, index) =>
+      buildIdeaGenerationOriginalText({
+        index,
+        userQuestion: params.userQuestion,
+        sourceUrl: document.sourceUrl,
+        canonicalUrl: document.canonicalUrl,
+        domain: document.fetched.domain,
+        title: document.title,
+        description: document.extracted.description,
+        visibleText: document.extracted.visibleText,
+        textTruncated:
+          document.extracted.textTruncated || document.fetched.downloadTruncated,
+      }),
+    )
+    .join("\n\n---\n\n");
+  const extractedTextCharCount = documents.reduce(
+    (sum, document) => sum + document.extracted.visibleText.length,
+    0,
+  );
+  const extractedTextTruncated = documents.some(
+    (document) =>
+      document.extracted.textTruncated || document.fetched.downloadTruncated,
+  );
+  const ontologyBrief = [
+    "Source kind: user-provided external URL context for equity idea generation.",
+    `User question: ${params.userQuestion.trim()}`,
+    "URLs:",
+    ...sourceUrls.map((url, index) => `${index + 1}. ${url}`),
+    "Use the mechanically extracted page text as a market or business hypothesis, not as company-confirmed fact.",
+    "Find covered companies whose filing evidence can support, qualify, or reject the user's requested discovery angle.",
+    "Prefer KRW Ontology company coverage and filing evidence over introducing uncovered companies.",
+  ].join("\n");
+
+  return {
+    version: "idea-generation-user-url-context/v1",
+    source_kind: "user_provided_urls",
+    source_url: sourceUrls[0] ?? urls[0],
+    canonical_url: sourceUrls[0] ?? urls[0],
+    source_urls: sourceUrls,
+    source_domain:
+      documents.length === 1 ? documents[0].fetched.domain : `${documents.length} user URLs`,
+    title:
+      documents.length === 1
+        ? documents[0].title
+        : `사용자가 제공한 URL ${documents.length}개`,
+    description:
+      documents.length === 1
+        ? documents[0].extracted.description
+        : "사용자가 직접 입력한 여러 URL을 함께 읽어 만든 종목 발굴 컨텍스트입니다.",
+    user_question: params.userQuestion.trim(),
+    extraction_status: reads.length > 0 ? "read" : "metadata_only",
+    extracted_text_char_count: extractedTextCharCount,
+    extracted_text_truncated: extractedTextTruncated,
+    ontology_bridge_brief_en: ontologyBrief,
+    source_pack: {
+      version: "idea-generation-user-url-source-pack/v1",
+      selected_event_id: `idea-url-${Date.now()}`,
+      read_at: readAt,
+      source_urls: sourceUrls,
+      source_previews: sourcePreviews,
+      reads,
+      ontology_search_brief_en: ontologyBrief,
+      original_text_for_ontology: originalText,
+      source_read_status: reads.length > 0 ? "read" : "metadata_only",
+    },
   };
 }
 
@@ -573,6 +695,33 @@ function buildOriginalTextForOntology(params: {
 }) {
   return [
     `Ticker: ${params.ticker}`,
+    `User question: ${params.userQuestion.trim()}`,
+    `Source URL: ${params.canonicalUrl || params.sourceUrl}`,
+    `Domain: ${params.domain}`,
+    `Title: ${params.title}`,
+    params.description ? `Description: ${params.description}` : "",
+    params.textTruncated
+      ? "[The following visible page text was mechanically truncated for safety.]"
+      : "[The following visible page text was mechanically extracted.]",
+    params.visibleText,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function buildIdeaGenerationOriginalText(params: {
+  index: number;
+  userQuestion: string;
+  sourceUrl: string;
+  canonicalUrl: string;
+  domain: string;
+  title: string;
+  description: string;
+  visibleText: string;
+  textTruncated: boolean;
+}) {
+  return [
+    `URL ${params.index + 1}`,
     `User question: ${params.userQuestion.trim()}`,
     `Source URL: ${params.canonicalUrl || params.sourceUrl}`,
     `Domain: ${params.domain}`,

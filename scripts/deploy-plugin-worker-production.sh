@@ -79,18 +79,15 @@ set -a
 . "$ENV_PATH"
 set +a
 
-STOCK_NEWS_RUNTIME_ENABLED=1
-if truthy_env "${STOCK_NEWS_FORCE_DISABLED:-}" || falsey_env "${STOCK_NEWS_ENABLED:-}"; then
+STOCK_NEWS_RUNTIME_ENABLED=0
+if truthy_env "${STOCK_NEWS_FORCE_DISABLED:-}"; then
   STOCK_NEWS_RUNTIME_ENABLED=0
-elif [ -z "${FINNHUB_API_KEY:-}" ]; then
-  if truthy_env "${STOCK_NEWS_ENABLED:-}"; then
+elif truthy_env "${STOCK_NEWS_ENABLED:-}"; then
+  if [ -z "${FINNHUB_API_KEY:-}" ]; then
     echo "STOCK_NEWS_ENABLED=1 but FINNHUB_API_KEY is missing in $ENV_PATH" >&2
     exit 1
   fi
-  STOCK_NEWS_RUNTIME_ENABLED=0
-  STOCK_NEWS_FORCE_DISABLED=1
-  export STOCK_NEWS_FORCE_DISABLED
-  echo "Stock News MCP disabled: FINNHUB_API_KEY is not set."
+  STOCK_NEWS_RUNTIME_ENABLED=1
 fi
 
 ONTOLOGY_SOURCE_DIR=${KRW_ONTOLOGY_SOURCE_DIR:-"$HOME/krw-ontology"}

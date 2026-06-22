@@ -32,6 +32,7 @@ vi.mock("@/lib/concurrency/execution-budget", () => ({
   releaseExecutionBudget: vi.fn(),
 }));
 vi.mock("@/lib/news-discovery/user-url-context", () => ({
+  buildIdeaGenerationUserUrlContext: vi.fn(),
   buildUserUrlNewsEventContext: vi.fn(),
   buildUserUrlsNewsEventContext: vi.fn(),
   UserUrlContextError: class UserUrlContextError extends Error {},
@@ -59,6 +60,7 @@ import {
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
+  buildIdeaGenerationUserUrlContext,
   buildUserUrlNewsEventContext,
   buildUserUrlsNewsEventContext,
 } from "@/lib/news-discovery/user-url-context";
@@ -264,6 +266,15 @@ describe("POST /api/chat/run worker admission", () => {
       runId: "run-1",
       assistantMessageId: "assistant-message-1",
       queuedAt: "2026-05-27T00:00:00.000Z",
+    });
+    vi.mocked(buildIdeaGenerationUserUrlContext).mockResolvedValue({
+      version: "idea-generation-user-url-context/v1",
+      source_kind: "user_provided_urls",
+      source_urls: ["https://example.com/angle"],
+      source_pack: {
+        version: "idea-generation-user-url-source-pack/v1",
+        original_text_for_ontology: "idea generation page text",
+      },
     });
     vi.mocked(buildUserUrlNewsEventContext).mockResolvedValue({
       version: "user-url-event/v1",
@@ -576,6 +587,49 @@ describe("POST /api/chat/run worker admission", () => {
         properties: expect.objectContaining({
           has_user_url: true,
           user_url_count: 2,
+        }),
+      }),
+    );
+  });
+
+  it("allows user URLs for idea generation without a ticker", async () => {
+    vi.mocked(getReadyAgentWorker).mockResolvedValue({
+      ok: true,
+      worker: { worker_id: "mac-worker-jwc-1" } as never,
+      mcpHealth: readyMcpHealth,
+    });
+    vi.mocked(validateRequest).mockResolvedValue({
+      ok: true,
+      data: {
+        userId: "user-1",
+        userEmail: "user@example.test",
+        body: {
+          content: "이 URL을 바탕으로 관련 종목을 발굴해줘.",
+          request_id: "550e8400-e29b-41d4-a716-446655440001",
+          session_id: "11111111-1111-4111-8111-111111111111",
+          research_mode: "deep",
+          analysis_mode: "company",
+          run_kind: "idea_generation",
+          user_url: "https://example.com/angle",
+        },
+      },
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(buildIdeaGenerationUserUrlContext).toHaveBeenCalledWith({
+      urls: ["https://example.com/angle"],
+      userQuestion: "이 URL을 바탕으로 관련 종목을 발굴해줘.",
+    });
+    expect(buildUserUrlNewsEventContext).not.toHaveBeenCalled();
+    expect(buildUserUrlsNewsEventContext).not.toHaveBeenCalled();
+    expect(enqueueAgentRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        analysisMode: "company",
+        runKind: "idea_generation",
+        selectedNewsEventContext: expect.objectContaining({
+          version: "idea-generation-user-url-context/v1",
         }),
       }),
     );

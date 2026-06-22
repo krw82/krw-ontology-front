@@ -31,6 +31,8 @@ import { trackClientEventSilently } from "@/lib/analytics/client";
 import { findQuestionTopic } from "@/lib/marketing/site";
 import { createClientId } from "@/lib/client-id";
 import { normalizeTicker } from "@/lib/ontology/ticker";
+import { normalizeRunKind } from "@/lib/run-kind";
+import type { ResearchMode } from "@/lib/research-mode";
 import type {
   CreateSessionRequest,
   CreateSessionResponse,
@@ -229,9 +231,17 @@ function ChatContent() {
   const templateId = searchParams.get("templateId");
   const draftMessageId = searchParams.get("draftMessageId");
   const localeParam = searchParams.get("locale");
+  const runKindParam = searchParams.get("runKind");
+  const isDiscoverRoute = pathname === "/discover";
   const templateTopic = templateId ? findQuestionTopic(templateId) : null;
   const existingSessionId = searchParams.get("sessionId");
   const responseLocale = isLocale(localeParam) ? localeParam : DEFAULT_LOCALE;
+  const requestedRunKind = isDiscoverRoute
+    ? "idea_generation"
+    : runKindParam
+      ? normalizeRunKind(runKindParam)
+      : undefined;
+  const isIdeaGeneration = requestedRunKind === "idea_generation";
 
   const sessionId = existingSessionId;
   const [sessionError, setSessionError] = useState<string | null>(null);
@@ -251,9 +261,12 @@ function ChatContent() {
   const prevMessagesCountRef = useRef(0);
   const { entitlement, refresh: refreshEntitlement } = useEntitlement();
   const [researchMode, setResearchMode] = useResearchModePreference(sessionId);
+  const effectiveResearchMode: ResearchMode = isIdeaGeneration
+    ? "deep"
+    : researchMode;
   const [composerDraftResetKey, setComposerDraftResetKey] = useState(0);
 
-  const isDraftRoute = pathname === "/chat/new";
+  const isDraftRoute = pathname === "/chat/new" || isDiscoverRoute;
   const shareStarterTicker = normalizeTicker(shareStarter?.tickers[0] ?? "");
   const activeTicker = normalizeTicker(ticker ?? "") ?? shareStarterTicker;
 
@@ -342,7 +355,8 @@ function ChatContent() {
     sessionId: sessionId ?? "",
     scopeType: activeTicker ? "company" : "global",
     defaultTickers: activeTicker ? [activeTicker] : [],
-    researchMode,
+    researchMode: effectiveResearchMode,
+    runKind: requestedRunKind,
     responseLocale,
     onSessionCreated: handleSessionCreated,
   });
@@ -578,8 +592,21 @@ function ChatContent() {
     responseLocale,
     contextTickers,
   );
-  const emptyStateCopy =
-    responseLocale === "ko"
+  const emptyStateCopy = isIdeaGeneration
+    ? responseLocale === "ko"
+      ? {
+          headingWithContext: "종목 발굴하기",
+          headingWithoutContext: "종목 발굴하기",
+          descriptionWithoutContext:
+            "찾고 싶은 사업 변화나 재무 조건을 입력하면 공시 근거로 리서치 후보를 정리합니다.",
+        }
+      : {
+          headingWithContext: "Discover stocks",
+          headingWithoutContext: "Discover stocks",
+          descriptionWithoutContext:
+            "Describe the business change or financial condition you want to find, and KRW Ontology will rank research candidates from filing evidence.",
+        }
+    : responseLocale === "ko"
       ? {
           headingWithContext: `${contextDisplayText}에서 무엇을 확인할까요?`,
           headingWithoutContext: "와이드 리서치",
@@ -651,12 +678,22 @@ function ChatContent() {
     nextParams.delete("templateId");
     nextParams.delete("shareToken");
     const nextQuery = nextParams.toString();
-    const basePath = isDraftRoute ? "/chat/new" : "/chat";
+    const basePath = isDiscoverRoute
+      ? "/discover"
+      : isDraftRoute
+        ? "/chat/new"
+        : "/chat";
     setShareStarter(null);
     router.replace(`${basePath}${nextQuery ? `?${nextQuery}` : ""}`, {
       scroll: false,
     });
-  }, [hasComposerPrefillParams, isDraftRoute, router, serializedSearchParams]);
+  }, [
+    hasComposerPrefillParams,
+    isDiscoverRoute,
+    isDraftRoute,
+    router,
+    serializedSearchParams,
+  ]);
 
   useEffect(() => {
     const token = shareToken?.trim();
@@ -866,6 +903,9 @@ function ChatContent() {
         if (responseLocale !== DEFAULT_LOCALE) {
           nextParams.set("locale", responseLocale);
         }
+        if (isIdeaGeneration) {
+          nextParams.set("runKind", "idea_generation");
+        }
         router.replace(`/chat?${nextParams.toString()}`, {
           scroll: false,
         });
@@ -899,6 +939,7 @@ function ChatContent() {
       sendMessage,
       sessionId,
       responseLocale,
+      isIdeaGeneration,
       setComposerExpanded,
       setSessionError,
       shouldStickToBottomRef,
@@ -1323,9 +1364,14 @@ function ChatContent() {
               initialValue={initialComposerValue}
               draftResetKey={composerDraftResetKey}
               runStartedAt={chat.runStartedAt}
-              researchMode={researchMode}
+              researchMode={effectiveResearchMode}
               onResearchModeChange={setResearchMode}
-              urlModeAvailable={contextTickers.length > 0}
+              urlModeAvailable={isIdeaGeneration || contextTickers.length > 0}
+              urlOnlyFallbackMessage={
+                isIdeaGeneration
+                  ? "이 URL을 바탕으로 관련 종목을 발굴해줘."
+                  : undefined
+              }
               focusRequestKey={composerFocusRequestKey}
               onFocusChange={handleComposerFocusChange}
             />

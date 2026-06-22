@@ -3,6 +3,10 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { DesktopAuthorizationRequestRow } from "@/types/database";
+import {
+  desktopAuthIdentifierHash,
+  logDesktopAuthEvent,
+} from "./auth-events";
 import { DesktopAuthError } from "./auth";
 import { tokenHash } from "./device-auth";
 
@@ -44,6 +48,11 @@ export async function startDesktopAuthorization(
   requestOrigin: string,
   now = new Date(),
 ) {
+  const startedAt = Date.now();
+  logDesktopAuthEvent("auth_start_requested", {
+    attempt_id_hash: desktopAuthIdentifierHash(input.state),
+    status: "started",
+  });
   validateClient(input.clientId, input.redirectUri);
   if (
     input.codeChallengeMethod !== "S256" ||
@@ -112,6 +121,12 @@ export async function startDesktopAuthorization(
     requestOrigin.replace(/\/+$/, "");
   const authorizationUrl = new URL("/desktop/connect", appOrigin);
   authorizationUrl.searchParams.set("request", data.id);
+  logDesktopAuthEvent("auth_start_succeeded", {
+    attempt_id_hash: desktopAuthIdentifierHash(data.state),
+    request_id_hash: desktopAuthIdentifierHash(data.id),
+    status: "succeeded",
+    latency_ms: Date.now() - startedAt,
+  });
 
   return {
     ok: true as const,
@@ -209,6 +224,15 @@ export async function decideDesktopAuthorizationRequest(input: {
   } else {
     redirect.searchParams.set("error", "access_denied");
   }
+  logDesktopAuthEvent(
+    authorizationCode ? "auth_device_approved" : "auth_device_denied",
+    {
+      attempt_id_hash: desktopAuthIdentifierHash(data.state),
+      request_id_hash: desktopAuthIdentifierHash(data.id),
+      user_id_hash: desktopAuthIdentifierHash(input.userId),
+      status: authorizationCode ? "succeeded" : "denied",
+    },
+  );
 
   return {
     ok: true as const,
@@ -221,6 +245,7 @@ export async function exchangeDesktopAuthorizationCode(
   input: ExchangeDesktopAuthorizationInput,
   now = new Date(),
 ) {
+  const startedAt = Date.now();
   validateClient(input.clientId, input.redirectUri);
   if (!input.authorizationCode.startsWith("krw_ac_")) {
     throw invalidAuthorization(
@@ -275,6 +300,12 @@ export async function exchangeDesktopAuthorizationCode(
       401,
     );
   }
+  logDesktopAuthEvent("auth_token_issued", {
+    device_id_hash: desktopAuthIdentifierHash(exchange.device_id),
+    user_id_hash: desktopAuthIdentifierHash(exchange.user_id),
+    status: "succeeded",
+    latency_ms: Date.now() - startedAt,
+  });
 
   return {
     ok: true as const,

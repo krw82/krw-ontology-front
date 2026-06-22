@@ -31,6 +31,21 @@ STOCK_NEWS_MCP_PORT=${STOCK_NEWS_MCP_PORT:-8776}
 STOCK_NEWS_MCP_PATH=${STOCK_NEWS_MCP_PATH:-/mcp}
 DEFAULT_STOCK_NEWS_COVERAGE_PATH="${KRW_ONTOLOGY_PLUGIN_PATH:-}/stock-news/coverage_companies.json"
 
+truthy_env() {
+  case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+if truthy_env "${STOCK_NEWS_FORCE_DISABLED:-}" || ! truthy_env "${STOCK_NEWS_ENABLED:-}"; then
+  echo "Stock News MCP disabled by environment."
+  exit 0
+fi
+if [ -z "${FINNHUB_API_KEY:-}" ]; then
+  echo "STOCK_NEWS_ENABLED=1 but FINNHUB_API_KEY is missing" >&2
+  exit 1
+fi
 if [ ! -f "$STOCK_NEWS_MCP_ROOT/package.json" ]; then
   echo "Missing stock-news-mcp package: $STOCK_NEWS_MCP_ROOT" >&2
   exit 1

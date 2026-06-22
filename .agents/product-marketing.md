@@ -42,7 +42,7 @@
 
 ## Social Publishing Preferences
 
-**Default cadence:** When the user asks to fill a day with scheduled social posts, use 20-minute spacing unless they specify a different cadence.
+**Default cadence:** When the user asks to fill a day with scheduled social posts, use 1-hour spacing unless they specify a different cadence. Avoid 20-minute spacing by default because Postiz and platform API limits can be hit during high-volume scheduling.
 
 **Language by time window, Asia/Seoul time:**
 

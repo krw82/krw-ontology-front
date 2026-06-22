@@ -89,15 +89,15 @@ MCP_SERVER_MAXFILES=${MCP_SERVER_MAXFILES:-4096}
 MCP_LOG_DIR=${MCP_LOG_DIR:-"$HOME/Library/Logs/krw-ontology"}
 STOCK_NEWS_MCP_PORT=${STOCK_NEWS_MCP_PORT:-8775}
 
-STOCK_NEWS_RUNTIME_ENABLED=1
-if truthy_env "${STOCK_NEWS_FORCE_DISABLED:-}" || falsey_env "${STOCK_NEWS_ENABLED:-}"; then
+STOCK_NEWS_RUNTIME_ENABLED=0
+if truthy_env "${STOCK_NEWS_FORCE_DISABLED:-}"; then
   STOCK_NEWS_RUNTIME_ENABLED=0
-elif [ -z "${FINNHUB_API_KEY:-}" ]; then
-  if truthy_env "${STOCK_NEWS_ENABLED:-}"; then
+elif truthy_env "${STOCK_NEWS_ENABLED:-}"; then
+  if [ -z "${FINNHUB_API_KEY:-}" ]; then
     echo "STOCK_NEWS_ENABLED=1 but FINNHUB_API_KEY is missing in $ENV_PATH" >&2
     exit 1
   fi
-  STOCK_NEWS_RUNTIME_ENABLED=0
+  STOCK_NEWS_RUNTIME_ENABLED=1
 fi
 
 if [ "$STOCK_NEWS_RUNTIME_ENABLED" != "1" ]; then

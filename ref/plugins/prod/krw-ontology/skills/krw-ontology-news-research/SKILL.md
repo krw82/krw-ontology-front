@@ -1,6 +1,6 @@
 ---
 name: krw-ontology-news-research
-description: Use for selected market narrative or user-provided URL equity research. Treat the narrative as an investment hypothesis, then use KRW ontology evidence to interpret company-specific financial, business, risk, and capital-allocation meaning. Final answers are Korean investor prose.
+description: Use for selected market narrative or user-provided URL equity research. Treat the narrative as an investment hypothesis, then use KRW ontology evidence to interpret company-specific financial, business, risk, capital-allocation, and economic-impact meaning. Apply a causal event-to-equity framework when the user asks how a current event, policy, financing action, industry development, or macro shock changes a covered company. Final answers are Korean investor prose.
 ---
 
 # KRW Ontology News Research Skill
@@ -68,7 +68,8 @@ Follow this order unless the user explicitly asks for a different format:
 5. Convert the narrative into an ontology-aware internal English investment brief.
 6. Use KRW ontology query_context to retrieve the company-specific baseline.
 7. Use targeted ontology follow-up only for a specific missing metric, filing comment, exposure, or comparison axis.
-8. Write one fused Korean investor interpretation.
+8. If the user asks for event impact, apply the economic-impact causal spine.
+9. Write one fused Korean investor interpretation.
 ```
 
 Never expose the internal English brief.
@@ -180,7 +181,45 @@ MD&A, notes, and management discussion
 
 Do not send broad Korean topic text directly to ontology `query_context`.
 
-## 7. KRW Ontology Use
+## 7. Economic Impact Path
+
+Use this path when the user asks what a specific current event changes for a company, rather than merely asking what happened.
+
+Read:
+
+```text
+references/economic-impact-framework.md
+```
+
+Internal flow:
+
+```text
+current event
+-> what is genuinely new versus the filing baseline
+-> direct transmission channel
+-> first affected business or financial variable
+-> revenue, margin, cash-flow, balance-sheet, or dilution effect
+-> immediate versus structural impact
+-> offsetting factor and strongest counterargument
+-> observable confirmation and falsification conditions
+```
+
+Use it for:
+
+```text
+policy and regulation
+capital raise or debt financing
+M&A, partnership, contract, or investment plan
+legal or regulatory outcomes
+commodity, FX, rate, demand, or supply shock
+industry technology or capacity change
+```
+
+Do not force this full structure onto a simple headline request.
+
+Do not claim what is priced in, estimate revisions, portfolio impact, or current valuation without appropriate external evidence. Translate the event through the filing-supported company mechanism instead.
+
+## 8. KRW Ontology Use
 
 Use ontology after news discovery. The first ontology call should normally be `query_context` with the event-specific internal English investment brief.
 
@@ -197,7 +236,7 @@ specific trace/chain root
 
 Do not loop over similar searches. Do not use broad retrieve after sufficient `query_context`.
 
-## 8. Answer Style
+## 9. Answer Style
 
 Write for an investor, not for a data auditor.
 
@@ -232,7 +271,7 @@ Prefer interpretation tables only when a table helps:
 
 Do not mechanically separate "news evidence" and "ontology evidence" unless the user asks for audit-style separation.
 
-## 9. Latest Filing And Period Policy
+## 10. Latest Filing And Period Policy
 
 Use `CY` labels in final answers.
 
@@ -253,7 +292,7 @@ filing period = financial baseline period
 
 If `CY2025 10-K` and `CY2026Q1 10-Q` are both available, use `CY2026Q1` as the current driver and `CY2025` as annual/business baseline.
 
-## 10. Financial Interpretation Guardrails
+## 11. Financial Interpretation Guardrails
 
 Preserve these accounting boundaries:
 
@@ -269,7 +308,7 @@ AI/platform/product attribution requires explicit support or must be framed as i
 
 Use `references/financial-statement-interpretation.md` for detailed rules.
 
-## 11. Coverage Boundary
+## 12. Coverage Boundary
 
 Do not introduce non-covered companies, tickers, or peers in normal answers unless:
 
@@ -281,7 +320,7 @@ the answer clearly says the company is outside the covered evidence set and that
 
 Follow-up questions should also avoid non-covered companies.
 
-## 12. Stop Rules
+## 13. Stop Rules
 
 Stop searching when:
 
@@ -295,7 +334,7 @@ the claim would require market price, valuation, or non-filing external data not
 
 If no meaningful recent event is found, answer narrowly: say the recent-news window did not confirm a material new event, then interpret from the latest filing baseline.
 
-## 13. Forbidden User-Facing Language
+## 14. Forbidden User-Facing Language
 
 Never expose:
 
@@ -327,7 +366,7 @@ Use investor-facing language:
 사업/리스크 요인
 ```
 
-## 14. Follow-Up Questions
+## 15. Follow-Up Questions
 
 Normal answers should end with:
 
@@ -339,7 +378,7 @@ Include exactly 3 concise Korean questions unless the user explicitly asks for n
 
 Do not run tools to create follow-up questions.
 
-## 15. References
+## 16. References
 
 Load only the references needed for the question:
 
@@ -349,6 +388,9 @@ references/tool-policy.md
 
 references/news-event-policy.md
 - News recency, source priority, event extraction, conflict handling, and ontology augmentation.
+
+references/economic-impact-framework.md
+- Event-to-company causal analysis for policy, financing, industry, legal, and macro shocks.
 
 references/query-context-contract.md
 - Internal English investment brief and query_context handling.

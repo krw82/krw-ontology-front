@@ -21,6 +21,7 @@ import type {
   ChatArtifact,
   ChatArtifactSelection,
   AtomicNewsEventCard,
+  RunKind,
 } from "@/types/api-contracts";
 import { getChatContentLimit } from "@/lib/chat-limits";
 import { deriveLoadedChatState } from "@/lib/chat/history-state";
@@ -44,6 +45,7 @@ interface UseChatOptions {
   defaultDocumentTypes?: string[];
   researchMode?: ResearchMode;
   analysisMode?: AnalysisMode;
+  runKind?: RunKind;
   responseLocale?: Locale;
   onSessionCreated?: (sessionId: string) => void;
 }
@@ -280,6 +282,7 @@ export function useChat({
   defaultDocumentTypes = [],
   researchMode = DEFAULT_RESEARCH_MODE,
   analysisMode = DEFAULT_ANALYSIS_MODE,
+  runKind,
   responseLocale = DEFAULT_LOCALE,
   onSessionCreated,
 }: UseChatOptions) {
@@ -1204,6 +1207,7 @@ export function useChat({
             request_id: requestId,
             research_mode: researchMode,
             analysis_mode: analysisMode,
+            ...(runKind ? { run_kind: runKind } : {}),
             scope_type: scopeType,
             default_tickers: defaultTickers,
             default_document_types: defaultDocumentTypes,
@@ -1286,6 +1290,7 @@ export function useChat({
       analysisMode,
       processRunResponse,
       researchMode,
+      runKind,
       responseLocale,
       scopeType,
       sessionId,

@@ -5,7 +5,8 @@ export type { RunKind };
 export const DEFAULT_RUN_KIND: RunKind = "company_research";
 
 export function normalizeRunKind(value: unknown): RunKind {
-  return value === "news_discovery" ||
+  return value === "idea_generation" ||
+    value === "news_discovery" ||
     value === "news_research" ||
     value === "company_research"
     ? value

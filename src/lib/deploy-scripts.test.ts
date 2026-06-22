@@ -238,8 +238,8 @@ describe("production deploy scripts", () => {
     expect(dockerfileWeb).toContain(
       '"/opt/krw-ontology-venv/bin/krw-ontology-mcp"',
     );
-    expect(dockerfileWeb).toContain('"stock-news"');
-    expect(dockerfileWeb).toContain('"http://127.0.0.1:8775/mcp"');
+    expect(dockerfileWeb).not.toContain('"stock-news"');
+    expect(dockerfileWeb).not.toContain('"http://127.0.0.1:8775/mcp"');
     expect(dockerfileWeb).not.toContain("krw-ontology-mcp-stdio");
   });
 
