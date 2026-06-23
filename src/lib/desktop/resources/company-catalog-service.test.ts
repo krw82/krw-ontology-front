@@ -76,26 +76,35 @@ describe("Desktop company catalog service", () => {
         companies: [
           {
             ticker: "AAPL",
-            display_name: "Apple Inc.",
-            localized_name: null,
+            name: "Apple Inc.",
+            display_name: "애플",
+            localized_name: "애플",
             coverage_label: "8개 공시 · 최신 2026Q1",
+            suggested_prompts: expect.arrayContaining([expect.any(String)]),
           },
         ],
       },
       meta: {
         catalog_release_id: "release-1",
+        total_count: 2,
         returned_count: 1,
         has_more: true,
       },
     });
     expect(first.payload.meta.next_cursor).toEqual(expect.any(String));
     expect(first.etag).toMatch(/^"catalog-/);
+    expect(first.payload.data.companies[0]).toHaveProperty("logo_url");
+    expect(
+      first.payload.data.companies[0].logo_url === null ||
+        typeof first.payload.data.companies[0].logo_url === "string",
+    ).toBe(true);
 
     const second = await listDesktopCompanies({
       limit: 1,
       cursor: first.payload.meta.next_cursor,
     });
     expect(second.payload.data.companies[0].ticker).toBe("MSFT");
+    expect(second.payload.meta.total_count).toBe(2);
     expect(second.payload.meta.has_more).toBe(false);
   });
 
@@ -111,6 +120,18 @@ describe("Desktop company catalog service", () => {
     ).rejects.toMatchObject({
       code: "validation_error",
       status: 409,
+    });
+  });
+
+  it("matches localized desktop display copy in search", async () => {
+    const result = await listDesktopCompanies({ query: "애플" });
+
+    expect(result.payload.data.companies).toHaveLength(1);
+    expect(result.payload.meta.total_count).toBe(1);
+    expect(result.payload.data.companies[0]).toMatchObject({
+      ticker: "AAPL",
+      display_name: "애플",
+      localized_name: "애플",
     });
   });
 

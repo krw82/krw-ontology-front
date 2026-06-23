@@ -4,6 +4,10 @@
 
 Use event paths for contracts, projects, products, acquisitions, litigation, regulation, and milestones.
 
+An event path should test the investment assumption created by the event. Do
+not summarize the event as news. Identify the business mechanism that must
+convert after the event, then follow the financial path.
+
 Default tree:
 
 ```text
@@ -15,6 +19,7 @@ failure, cancellation, or adverse outcome
 For each branch state:
 
 ```text
+tested assumption
 what has to happen
 timing evidence
 affected business activity
@@ -38,6 +43,11 @@ operating cash generation
 -> external financing or dilution risk
 ```
 
+Start with the company's current cash-flow and liquidity evidence before
+describing financing risk. A high-investment period is only a financing problem
+when operating cash conversion, commitments, debt maturities, or capital
+allocation pressure make flexibility visibly weaker.
+
 Separate:
 
 ```text
@@ -49,6 +59,16 @@ shareholder distribution
 ```
 
 Do not describe every high-capex period as a financing crisis.
+
+Tie liquidity language to evidence:
+
+```text
+operating cash flow does or does not fund the investment path
+commitments and lease obligations reduce future flexibility
+debt maturities or refinancing windows create timing pressure
+buybacks, dividends, M&A, or strategic investments compete with reinvestment
+external financing becomes a conditional path, not an assumed outcome
+```
 
 ## Dilution
 

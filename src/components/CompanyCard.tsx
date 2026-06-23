@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { MouseEvent } from "react";
+import { type MouseEvent } from "react";
 import { motion } from "motion/react";
+import CompanyLogo from "@/components/CompanyLogo";
 import { easeOutExpo, listRow } from "@/lib/animation";
 import { trackClientEventWithTimeout } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
@@ -226,19 +227,14 @@ export default function CompanyCard({
             : "Open this company research page"
         }`}
       >
-        <article className="grid gap-3 px-4 py-3.5 transition-[transform,color,background-color] duration-150 ease-out hover:bg-surface xl:grid-cols-[104px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] xl:items-start active:bg-surface-soft">
-          <div className="flex min-w-0 items-start justify-between gap-4 xl:block">
-            <div>
+        <article className="grid gap-3 px-4 py-3.5 transition-[transform,color,background-color] duration-150 ease-out hover:bg-surface xl:grid-cols-[148px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] xl:items-start active:bg-surface-soft">
+          <div className="flex min-w-0 items-start gap-4 xl:block">
+            <div className="flex min-w-0 items-center gap-3 xl:items-start">
+              <CompanyLogo ticker={ticker} companyName={companyLabel || ticker} />
               <h2 className="font-mono text-[21px] font-black leading-none text-ink transition-colors group-hover:text-primary group-active:text-primary sm:text-[22px]">
                 {ticker}
               </h2>
             </div>
-            <span
-              aria-hidden="true"
-              className="material-symbols-outlined text-[22px] text-muted transition-colors group-hover:text-primary group-active:text-primary xl:hidden"
-            >
-              arrow_forward
-            </span>
           </div>
 
           <div className="min-w-0">

@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import {
+  forwardRef,
+  useImperativeHandle,
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import { createPortal } from "react-dom";
 import { flushSync } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
@@ -35,6 +43,10 @@ interface ComposerProps {
   onResearchModeChange?: (mode: ResearchMode) => void;
   urlModeAvailable?: boolean;
   urlOnlyFallbackMessage?: string;
+  attachmentCoachmarkEnabled?: boolean;
+  inputSurfaceVisible?: boolean;
+  onUserUrlsChange?: (hasUserUrls: boolean) => void;
+  onAttachmentsChange?: (hasAttachments: boolean) => void;
   focusRequestKey?: number;
   onFocusChange?: (focused: boolean) => void;
 }
@@ -47,6 +59,10 @@ export interface ComposerSendOptions {
   userUrl?: string;
   userUrls?: string[];
   attachmentIds?: string[];
+}
+
+export interface ComposerHandle {
+  requestAction: (type: "url" | "file" | "focus") => void;
 }
 
 interface TextAttachment {
@@ -81,6 +97,9 @@ const ACCEPTED_TEXT_FILE_TYPES =
 const ACCEPTED_FILE_TYPES = `${ACCEPTED_TEXT_FILE_TYPES},.pdf,application/pdf`;
 const MAX_DOCUMENT_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 const MAX_USER_URL_COUNT = 3;
+const ATTACHMENT_COACHMARK_STORAGE_KEY =
+  "krw:composer-attachment-coachmark-seen:v1";
+const IS_DEV_ENV = process.env.NODE_ENV === "development";
 
 function isAcceptedTextFile(file: File): boolean {
   const name = file.name.toLowerCase();
@@ -186,7 +205,7 @@ function createEmptyUrlDraft(): UserUrlDraft {
   return { id: createClientId(), value: "" };
 }
 
-export default function Composer({
+const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
   onSend,
   onCancel,
   activity,
@@ -195,11 +214,15 @@ export default function Composer({
   placeholder = "기업에 대해 질문하세요...",
   urlModeAvailable = false,
   urlOnlyFallbackMessage,
+  attachmentCoachmarkEnabled = true,
+  inputSurfaceVisible = true,
+  onUserUrlsChange,
+  onAttachmentsChange,
   initialValue,
   draftResetKey = 0,
   focusRequestKey = 0,
   onFocusChange,
-}: ComposerProps) {
+}: ComposerProps, ref) {
   const initialDraftValue = initialValue ?? "";
   const [value, setValue] = useState(initialDraftValue);
   const [attachments, setAttachments] = useState<TextAttachment[]>([]);
@@ -209,6 +232,8 @@ export default function Composer({
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [isUrlSheetOpen, setIsUrlSheetOpen] = useState(false);
+  const [showAttachmentCoachmark, setShowAttachmentCoachmark] =
+    useState(IS_DEV_ENV && attachmentCoachmarkEnabled);
   const [committedUserUrls, setCommittedUserUrls] = useState<string[]>([]);
   const [userUrlDrafts, setUserUrlDrafts] = useState<UserUrlDraft[]>([]);
   const [isClientReady, setIsClientReady] = useState(false);
@@ -279,6 +304,14 @@ export default function Composer({
   const generatingLabel =
     activity?.stage === "queued" ? "대기 중" : "분석 진행중";
   const showGeneratingOverlay = isGenerating && !isComposerFocused && !value.trim();
+  const shouldShowAttachmentCoachmark =
+    attachmentCoachmarkEnabled &&
+    showAttachmentCoachmark &&
+    !isToolsOpen &&
+    !isUrlSheetOpen &&
+    !hasUserUrls &&
+    attachments.length === 0 &&
+    documentAttachments.length === 0;
 
   const syncTextareaValue = useCallback((nextValue: string) => {
     setValue(nextValue);
@@ -308,6 +341,31 @@ export default function Composer({
 
     return () => window.clearTimeout(timeoutId);
   }, []);
+
+  useEffect(() => {
+    if (!attachmentCoachmarkEnabled) return undefined;
+    if (IS_DEV_ENV) return undefined;
+
+    try {
+      if (
+        window.localStorage.getItem(ATTACHMENT_COACHMARK_STORAGE_KEY) === "1"
+      ) {
+        return undefined;
+      }
+      window.localStorage.setItem(ATTACHMENT_COACHMARK_STORAGE_KEY, "1");
+    } catch {
+      // If storage is unavailable, show the tip for this page view.
+    }
+
+    const showTimer = window.setTimeout(
+      () => setShowAttachmentCoachmark(true),
+      0,
+    );
+
+    return () => {
+      window.clearTimeout(showTimer);
+    };
+  }, [attachmentCoachmarkEnabled]);
 
   useEffect(() => {
     return () => clearDocumentPollTimers();
@@ -517,6 +575,7 @@ export default function Composer({
         isOptimistic: true,
       },
     ]);
+    onAttachmentsChange?.(true);
 
     try {
       const formData = new FormData();
@@ -679,6 +738,9 @@ export default function Composer({
       }
 
       setAttachments(nextAttachments);
+      if (loadedFiles.length > 0 || pdfFiles.length > 0) {
+        onAttachmentsChange?.(true);
+      }
       await Promise.all(pdfFiles.map((file) => uploadDocumentAttachment(file)));
       trackClientEventSilently("attachment_added", {
         file_count: loadedFiles.length + pdfFiles.length,
@@ -745,6 +807,7 @@ export default function Composer({
   };
 
   const openUrlSheet = () => {
+    setShowAttachmentCoachmark(false);
     setIsToolsOpen(false);
     setAttachmentError(null);
     setUserUrlDrafts(
@@ -799,6 +862,7 @@ export default function Composer({
     setUserUrlDrafts([]);
     setIsUrlSheetOpen(false);
     setAttachmentError(null);
+    onUserUrlsChange?.(false);
   };
 
   const confirmUserUrls = () => {
@@ -827,6 +891,7 @@ export default function Composer({
     );
     setAttachmentError(null);
     setIsUrlSheetOpen(false);
+    onUserUrlsChange?.(true);
   };
 
   const handleSubmit = async () => {
@@ -931,9 +996,36 @@ export default function Composer({
   };
 
   const openFilePicker = () => {
+    setShowAttachmentCoachmark(false);
     setIsToolsOpen(false);
     fileInputRef.current?.click();
   };
+
+  const focusComposerInput = () => {
+    setShowAttachmentCoachmark(false);
+    setIsToolsOpen(false);
+    window.requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+  };
+
+  useImperativeHandle(ref, () => ({
+    requestAction(type) {
+      if (isInputBusy || isGenerating) return;
+
+      if (type === "url") {
+        if (urlModeAvailable) openUrlSheet();
+        return;
+      }
+
+      if (type === "file") {
+        openFilePicker();
+        return;
+      }
+
+      focusComposerInput();
+    },
+  }));
 
   const renderToolsContent = (variant: "popover" | "sheet") => {
     const isSheet = variant === "sheet";
@@ -1227,7 +1319,16 @@ export default function Composer({
 
   return (
     <div className="pointer-events-none bg-transparent px-xs pb-0 pt-0 sm:px-lg">
-      {(attachments.length > 0 ||
+      <input
+        ref={fileInputRef}
+        className="hidden"
+        type="file"
+        accept={ACCEPTED_FILE_TYPES}
+        multiple
+        onChange={handleFileChange}
+        disabled={isInputBusy}
+      />
+      {inputSurfaceVisible && (attachments.length > 0 ||
         documentAttachments.length > 0 ||
         hasUserUrls ||
         attachmentError) && (
@@ -1387,19 +1488,47 @@ export default function Composer({
           </AnimatePresence>
         </div>
       )}
-      <div
-        className="pointer-events-auto relative mx-auto flex max-w-3xl items-center rounded-[16px] border border-outline-variant/80 bg-canvas p-2 shadow-sm transition-all duration-150 focus-within:border-outline focus-within:shadow-[0_0_0_3px_rgba(0,82,255,0.08)]"
-      >
-        <input
-          ref={fileInputRef}
-          className="hidden"
-          type="file"
-          accept={ACCEPTED_FILE_TYPES}
-          multiple
-          onChange={handleFileChange}
-          disabled={isInputBusy}
-        />
+      {inputSurfaceVisible && (
+        <div
+          className="pointer-events-auto relative mx-auto flex max-w-3xl items-center rounded-[16px] border border-outline-variant/80 bg-canvas p-2 shadow-sm transition-all duration-150 focus-within:border-outline focus-within:shadow-[0_0_0_3px_rgba(0,82,255,0.08)]"
+        >
         <div ref={toolsRef} className="relative flex-shrink-0 self-center">
+          <AnimatePresence initial={false}>
+            {shouldShowAttachmentCoachmark ? (
+              <motion.div
+                key="composer-attachment-coachmark"
+                className="absolute bottom-[calc(100%+10px)] left-0 z-40 inline-flex max-w-[220px] items-center gap-2 rounded-[8px] border border-outline bg-canvas px-3 py-2 text-[12px] font-bold leading-4 text-ink shadow-lg"
+                initial={{ opacity: 0, y: motionConfig.y }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: motionConfig.y }}
+                transition={{
+                  duration: motionConfig.duration,
+                  ease: motionConfig.ease,
+                }}
+              >
+                <span className="min-w-0 whitespace-nowrap">
+                  URL·파일 첨부는 여기에서
+                </span>
+                <button
+                  type="button"
+                  className="-mr-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  aria-label="첨부 안내 닫기"
+                  onClick={() => setShowAttachmentCoachmark(false)}
+                >
+                  <span
+                    className="material-symbols-outlined text-[15px]"
+                    aria-hidden="true"
+                  >
+                    close
+                  </span>
+                </button>
+                <span
+                  aria-hidden="true"
+                  className="absolute -bottom-[5px] left-4 h-2.5 w-2.5 rotate-45 border-b border-r border-outline bg-canvas"
+                />
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
           <button
             className={[
               "inline-flex h-9 w-9 items-center justify-center rounded-[8px] border transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40",
@@ -1407,7 +1536,10 @@ export default function Composer({
                 ? "border-outline-variant bg-surface text-ink"
                 : "border-transparent text-muted hover:bg-surface-soft hover:text-ink",
             ].join(" ")}
-            onClick={() => setIsToolsOpen((open) => !open)}
+            onClick={() => {
+              setShowAttachmentCoachmark(false);
+              setIsToolsOpen((open) => !open);
+            }}
             disabled={isInputBusy}
             aria-label="입력 도구 열기"
             aria-expanded={isToolsOpen}
@@ -1539,9 +1671,12 @@ export default function Composer({
             </AnimatePresence>
           </button>
         )}
-      </div>
+        </div>
+      )}
       {mobileToolsSheet}
       {urlSheet}
     </div>
   );
-}
+});
+
+export default Composer;

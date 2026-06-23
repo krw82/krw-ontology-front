@@ -16,6 +16,7 @@ Use:
 
 ```text
 ## 실적 한 줄 판단
+## 이번 분기가 검증한 투자 가설
 ## 이번 분기에 달라진 것
 ## 숫자보다 중요한 회사 코멘트
 ## 성장·마진·현금흐름 품질
@@ -35,6 +36,8 @@ When useful, prefer:
 ```
 
 Do not default to a wide quarter-by-quarter raw-number table.
+Do not use an upside/base/downside scenario table unless the user explicitly
+asked for conditional scenario analysis.
 
 ## Number Use
 

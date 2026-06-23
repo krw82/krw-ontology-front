@@ -131,6 +131,22 @@ describe("proxy", () => {
     expect(apiOptions?.requestHeaderOverrides?.get("x-krw-locale")).toBe("en");
   });
 
+  it("uses the locale query for app routes without a path locale", async () => {
+    await proxy(request("/chat/new?ticker=AAPL&locale=en"));
+
+    const pageOptions = vi.mocked(updateSession).mock.calls.at(-1)?.[1];
+    expect(pageOptions?.requestHeaderOverrides?.get("x-krw-locale")).toBe("en");
+  });
+
+  it("uses the nested next locale for login redirects", async () => {
+    await proxy(
+      request("/login?next=%2Fchat%2Fnew%3Fticker%3DAAPL%26locale%3Den"),
+    );
+
+    const pageOptions = vi.mocked(updateSession).mock.calls.at(-1)?.[1];
+    expect(pageOptions?.requestHeaderOverrides?.get("x-krw-locale")).toBe("en");
+  });
+
   it("lets normal chat run requests pass through to session middleware", async () => {
     const response = await proxy(
       request("/api/chat/run", {

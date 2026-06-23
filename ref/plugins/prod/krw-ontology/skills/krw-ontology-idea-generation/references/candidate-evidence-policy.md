@@ -4,6 +4,9 @@
 
 Advance candidates from filing evidence, not from theme familiarity.
 
+The first task is to translate the user's broad idea into a screen. Evidence is
+judged against that screen, not against the company's general quality.
+
 The strongest candidate evidence usually combines:
 
 ```text
@@ -12,6 +15,7 @@ specific business activity
 orders, backlog, contracts, pricing, volume, or demand
 a metric or financial-statement connection
 an identified burden or counter-signal
+a reason this candidate deserves research priority now
 ```
 
 ## Evidence Priority
@@ -35,11 +39,16 @@ An A candidate should answer all of these:
 What does the company actually do that connects to the screen?
 What changed or remained important in the latest filing?
 How could the driver reach a financial line item?
+Why should this candidate be researched before other candidates in the screen?
 What burden could offset the benefit?
 What evidence would reject the idea first?
 ```
 
 If one material answer is missing, use B or C.
+
+Why-now evidence does not mean a stock catalyst. It means the latest filing made
+the exposure, conversion path, burden, or rejection risk important enough to
+prioritize.
 
 ## Numbers And Commentary
 
@@ -55,6 +64,7 @@ change the priority bucket
 ```
 
 Do not rank candidates by the number of extracted metrics or quotes.
+Do not rank candidates by brand familiarity or common theme association.
 
 ## Cross-Company Consistency
 

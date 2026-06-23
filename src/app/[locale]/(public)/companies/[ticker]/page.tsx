@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import TopNav from "@/components/TopNav";
+import CompanyLogo from "@/components/CompanyLogo";
 import CompanyWatchlistActions from "@/components/CompanyWatchlistActions";
 import MarketingCtaLink from "@/components/MarketingCtaLink";
 import SuggestedPromptActions from "@/components/SuggestedPromptActions";
@@ -219,12 +220,22 @@ export default async function CompanyLandingPage({
           </nav>
 
           <header className="border-b border-hairline pb-8">
-            <p className="font-mono text-[14px] font-black leading-5 tracking-[0.08em] text-primary">
-              {displayCompany.name}
-            </p>
-            <h1 className="mt-3 max-w-4xl text-balance text-[34px] font-black leading-[1.08] tracking-normal text-ink sm:text-[48px]">
-              {pageCopy.heroHeading}
-            </h1>
+            <div className="flex min-w-0 items-start gap-4 sm:gap-5">
+              <CompanyLogo
+                ticker={displayCompany.ticker}
+                companyName={companyTitleName}
+                imageSize={128}
+                className="h-14 w-14 text-[13px] sm:h-16 sm:w-16"
+              />
+              <div className="min-w-0">
+                <p className="font-mono text-[14px] font-black leading-5 tracking-[0.08em] text-primary">
+                  {displayCompany.ticker}
+                </p>
+                <h1 className="mt-2 max-w-4xl text-balance text-[34px] font-black leading-[1.08] tracking-normal text-ink sm:text-[48px]">
+                  {pageCopy.heroHeading}
+                </h1>
+              </div>
+            </div>
             <p className="mt-4 max-w-3xl text-[16px] leading-7 text-body sm:text-[18px]">
               {displayCompany.description}
             </p>

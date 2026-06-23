@@ -4,6 +4,10 @@
 
 Numbers show direction and materiality. Commentary and notes explain mechanism, durability, and accounting treatment.
 
+Use this reconciliation to answer the quarter-update question, not to produce a
+full company profile. Focus on the few changes that update the operating
+thesis.
+
 ## Reconciliation Questions
 
 For each material change ask:
@@ -14,6 +18,7 @@ What reason did management give?
 Which note or segment disclosure supports that reason?
 Do reported metrics move in the same direction?
 Is the explanation current, structural, temporary, or still unproven?
+Does this change strengthen, maintain, weaken, or complicate the operating thesis?
 ```
 
 ## Agreement

@@ -1,4 +1,4 @@
 interface:
   display_name: "KRW Ontology Scenario & Sensitivity"
-  short_description: "공시 근거로 시나리오와 판단 변경 조건을 분석합니다"
-  default_prompt: "Use $krw-ontology-scenario-sensitivity to build filing-grounded upside, base, and downside scenarios with sensitivity and thesis-break conditions."
+  short_description: "공시 근거로 투자 가정이 강화·약화·파기되는 조건을 검증합니다"
+  default_prompt: "Use $krw-ontology-scenario-sensitivity to stress-test the filing-grounded investment assumption and identify what strengthens, weakens, or breaks it."

@@ -33,6 +33,10 @@ the strongest counter-signal
 the next proof point
 ```
 
+This is a quarter-update judgment, not a scenario tree. Explain how the latest
+reported quarter changes the evidence base. Do not create upside/base/downside
+cases unless the user explicitly asks for a conditional scenario.
+
 ## No Invented Prior Thesis
 
 If the user did not provide an existing thesis:
@@ -41,6 +45,15 @@ If the user did not provide an existing thesis:
 assess the filing-supported operating thesis
 do not claim the user's conviction increased or decreased
 do not infer position status, cost basis, or holding period
+```
+
+When deriving a filing-supported operating thesis, keep it narrow:
+
+```text
+which revenue, segment, margin, cash-flow, or capital-allocation mechanism the quarter is testing
+what management says changed
+what the representative numbers confirm or fail to confirm
+what next quarterly evidence would change the status
 ```
 
 ## Capital Allocation

@@ -16,6 +16,10 @@ share-count change
 one-time gains, charges, settlements, impairments, or restructuring
 ```
 
+Only investigate the quality issues that can change the quarter-update
+judgment. Do not audit every accounting line when the user asked what the latest
+quarter means.
+
 ## Cash Conversion
 
 Separate:
@@ -53,3 +57,13 @@ what it means for the investment interpretation
 ```
 
 If no material distortion is supported, do not manufacture one.
+
+Tie the conclusion back to the quarter's role:
+
+```text
+operating proof
+timing noise
+accounting distortion
+cash-flow delay
+capital-allocation pressure
+```

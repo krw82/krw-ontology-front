@@ -1,19 +1,30 @@
 ---
 name: krw-ontology-scenario-sensitivity
-description: Use when the user asks for filing-grounded upside/base/downside scenarios, operating-driver sensitivity, macro or business-factor sensitivity, liquidity or dilution downside, event-path consequences, breakpoints, thesis-break conditions, or evidence-based action thresholds for a covered public company. Do not use for ordinary company research, generic risk explanation, first-pass idea discovery, current-news discovery, target prices, or personalized buy/sell advice.
+description: Use when the user asks to stress-test filing-grounded investment assumptions through upside/base/downside scenarios, operating-driver sensitivity, macro or business-factor sensitivity, liquidity or dilution downside, event-path consequences, breakpoints, thesis-break conditions, or evidence-based action thresholds for a covered public company. Do not use for ordinary company research, generic risk explanation, first-pass idea discovery, current-news discovery, target prices, or personalized buy/sell advice.
 ---
 
 # KRW Ontology Scenario And Sensitivity
 
 ## 1. Purpose
 
-Turn a covered-company filing baseline into conditional scenarios that show:
+Stress-test a specific investment assumption for a covered company.
+
+This is not a general company research pass and not a latest-quarter earnings
+update. Use only enough filing context to define the current assumption, then
+test how that assumption strengthens, holds, weakens, or breaks.
+
+Do not begin by inventing scenario narratives. Begin by stating the assumption
+being tested.
+
+The research flow is:
 
 ```text
-what must change
--> which business channel moves
--> how revenue, margin, cash flow, or liquidity responds
--> what strengthens, weakens, or breaks the investment view
+user scenario or thesis-break question
+-> current assumption being tested
+-> narrow filing evidence that supports or pressures that assumption
+-> one to three binding variables
+-> business and financial transmission path
+-> evidence that strengthens, maintains, weakens, or breaks the assumption
 ```
 
 This skill analyzes scenario mechanics. It does not invent a valuation model, market probability, target price, position size, stop-loss level, or trade instruction.
@@ -90,16 +101,16 @@ portfolio sizing, hedging, borrow, options, or execution
 
 If the user asks what a current news event means, use the news-research workflow first. This skill may analyze a user-supplied scenario, but it does not discover current events.
 
-## 4. Internal Scenario Brief
+## 4. Internal Investment-Assumption Brief
 
-Before calling ontology tools, rewrite the request as a concise internal English scenario brief.
+Before calling ontology tools, rewrite the request as a concise internal English investment-assumption brief.
 
 Preserve:
 
 ```text
 ticker and company
 latest reported period
-scenario variable or event
+scenario variable, thesis variable, or event
 direction of change
 time horizon if supplied
 financial channels
@@ -110,14 +121,23 @@ requested downside or thesis-break focus
 Add evidence axes:
 
 ```text
-latest management commentary and filing notes
+latest management commentary, MD&A, and segment discussion
+filing notes, commitments, risk factors, and liquidity disclosures
 current business and financial baseline
 direct exposure and transmission mechanism
-revenue, margin, cash-flow, capex, debt, and liquidity path
+revenue, margin, working-capital, cash-flow, capex, debt, and liquidity path
 offsetting factors
 first observable confirmers and falsifiers
 ```
 
+The brief must state the investment assumption being tested in one sentence:
+
+```text
+The assumption being tested is that <driver/event> can or cannot convert into <business/financial outcome>.
+```
+
+Do not turn the brief into a company overview, latest-quarter recap, or broad
+risk memo.
 Do not expose the internal English brief.
 
 ## 5. Scenario Modes
@@ -156,16 +176,20 @@ references/output-contract.md
 Follow this order:
 
 ```text
-1. Build the internal English scenario brief.
-2. Start with query_context for the named company and scenario variable.
-3. Anchor the current driver on the newest available 10-Q; use the latest 10-K for annual mix, historical trend, and structural risk.
-4. Identify one to three load-bearing variables. Do not model every possible input.
-5. Separate reported facts, filing-derived assumptions, user assumptions, and analyst conditional inference.
-6. Build base, upside, and downside cases around the same variables and comparable time context.
-7. Map each case through business mechanism -> financial channel -> investor meaning.
-8. Use one targeted query only for a material missing axis.
-9. Use selected trace/chain only when a strong mechanism, amount, date, term, or direct-exposure claim needs support.
-10. Write the Korean scenario report.
+1. Build the internal English investment-assumption brief.
+2. Classify the request: downside, upside, thesis-break, sensitivity, event path, or liquidity stress.
+3. Confirm the covered company and newest available filing boundary without doing a broad company overview.
+4. Start with query_context for the named company plus the assumption variable, event, or downside path.
+5. Define the current tested assumption in one sentence.
+6. Collect only evidence relevant to that assumption: management commentary, notes, segment discussion, risk factors, commitments, liquidity, capex, debt, and cash-flow path.
+7. Identify one to three binding variables. Do not model every possible input.
+8. Map the assumption through company evidence -> business mechanism -> revenue/margin/working-capital/cash-flow/liquidity path -> investor meaning.
+9. Separate reported facts, filing-derived assumptions, user assumptions, and analyst conditional inference.
+10. Build base, upside, and downside cases only as different states of the same tested assumption.
+11. Define observable evidence that strengthens, maintains, weakens, or breaks the assumption.
+12. Use one targeted query only for a material missing axis.
+13. Use selected trace/chain only when a strong mechanism, amount, date, term, or direct-exposure claim needs support.
+14. Write the Korean assumption stress-test report.
 ```
 
 Do not request `response_detail="full"` in normal web chat.

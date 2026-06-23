@@ -2,7 +2,11 @@
 
 ## Purpose
 
-Translate scenarios into observable evidence conditions. Do not create personalized trading rules.
+Translate tested assumptions into observable evidence conditions. Do not create
+personalized trading rules.
+
+The threshold is not "what should the user trade?" It is "what evidence would
+change the filing-grounded judgment?"
 
 ## Standard States
 
@@ -27,10 +31,27 @@ Use this priority:
 ```text
 1. Explicit company guidance, covenant, contract, or filing threshold
 2. User-provided threshold
-3. Qualitative evidence condition derived from filing mechanics
+3. Qualitative evidence condition derived from filing mechanics, company commentary, notes, risk factors, or cash-flow path
 ```
 
 Do not invent a number merely to make the answer look actionable.
+
+## Evidence Conditions
+
+Write conditions as evidence the user can check in later company materials:
+
+```text
+management commentary confirms the same demand path
+orders, backlog, or usage convert into reported revenue
+gross margin or operating margin absorbs the investment burden
+working capital normalizes instead of consuming more cash
+capex intensity begins to show operating proof
+liquidity remains flexible after commitments, debt maturities, and capital allocation
+risk-factor language becomes more concrete or starts matching reported results
+```
+
+Avoid thresholds that require the user to know market consensus, target prices,
+technical chart levels, or portfolio loss tolerance.
 
 ## Good Conditions
 
@@ -38,6 +59,7 @@ Do not invent a number merely to make the answer look actionable.
 수주 증가가 실제 매출과 현금흐름 개선으로 이어질 때 판단이 강해집니다.
 투자 지출은 늘지만 본업 수익성이 따라오지 않으면 판단이 약해집니다.
 차입과 주식 발행 없이는 투자 계획을 유지하기 어려워지면 기존 가정을 다시 봐야 합니다.
+회사 코멘트가 여전히 긍정적인데 현금흐름이 따라오지 않으면 판단은 유지보다 약화에 가깝습니다.
 ```
 
 ## Bad Conditions

@@ -17,6 +17,10 @@ import { useEntitlement } from "@/hooks/useEntitlement";
 import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 
+const SIDEBAR_COACHMARK_STORAGE_KEY =
+  "krw:topnav-sidebar-coachmark-seen:v1";
+const IS_DEV_ENV = process.env.NODE_ENV === "development";
+
 export interface TopNavUserProfile {
   email: string;
   name: string | null;
@@ -113,6 +117,8 @@ export default function TopNav({
   );
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [clientReady, setClientReady] = useState(false);
+  const [showSidebarCoachmark, setShowSidebarCoachmark] =
+    useState(IS_DEV_ENV);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const shouldLoadAccount = !hideAccountMenu;
   const { entitlement } = useEntitlement(shouldLoadAccount && Boolean(userProfile));
@@ -143,6 +149,18 @@ export default function TopNav({
       active: pathname.startsWith("/watchlist"),
     },
   ];
+  const sidebarCoachmarkCopy =
+    currentLocale === "ko"
+      ? {
+          body: "이전 리서치는 여기에서",
+          dismiss: "리서치 기록 안내 닫기",
+        }
+      : {
+          body: "Past research lives here",
+          dismiss: "Dismiss research history tip",
+        };
+  const shouldShowSidebarCoachmark =
+    showSidebarTrigger && clientReady && showSidebarCoachmark;
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -151,6 +169,31 @@ export default function TopNav({
 
     return () => window.clearTimeout(timeoutId);
   }, []);
+
+  useEffect(() => {
+    if (!showSidebarTrigger) return undefined;
+    if (IS_DEV_ENV) return undefined;
+
+    try {
+      if (
+        window.localStorage.getItem(SIDEBAR_COACHMARK_STORAGE_KEY) === "1"
+      ) {
+        return undefined;
+      }
+      window.localStorage.setItem(SIDEBAR_COACHMARK_STORAGE_KEY, "1");
+    } catch {
+      // If storage is unavailable, still show the tip for this page view.
+    }
+
+    const showTimer = window.setTimeout(
+      () => setShowSidebarCoachmark(true),
+      0,
+    );
+
+    return () => {
+      window.clearTimeout(showTimer);
+    };
+  }, [showSidebarTrigger]);
 
   // M-08: onAuthStateChange listener
   useEffect(() => {
@@ -247,21 +290,59 @@ export default function TopNav({
       <div className="mx-auto flex h-full w-full max-w-[1600px] items-center justify-between gap-sm px-base sm:px-md md:pl-md">
         <div className="flex min-w-0 items-center gap-sm sm:gap-lg">
           {showSidebarTrigger && (
-            <button
-              type="button"
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55 md:hidden"
-              aria-label={
-                currentLocale === "ko" ? "채팅 기록 열기" : "Open chat history"
-              }
-              aria-controls="mobile-chat-sidebar"
-              onClick={dispatchOpenChatSidebar}
-              disabled={!clientReady}
-            >
-              <span aria-hidden="true" className="relative block h-5 w-6">
-                <span className="absolute left-0 top-[3px] h-[2px] w-5 rounded-full bg-ink" />
-                <span className="absolute bottom-[3px] left-0 h-[2px] w-3.5 rounded-full bg-ink" />
-              </span>
-            </button>
+            <div className="relative shrink-0 md:hidden">
+              <AnimatePresence initial={false}>
+                {shouldShowSidebarCoachmark ? (
+                  <motion.div
+                    key="sidebar-coachmark"
+                    className="absolute left-0 top-[calc(100%+8px)] z-50 inline-flex max-w-[220px] items-center gap-2 rounded-[8px] border border-outline bg-canvas px-3 py-2 text-[12px] font-bold leading-4 text-ink shadow-lg"
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                  >
+                    <span className="min-w-0 whitespace-nowrap">
+                      {sidebarCoachmarkCopy.body}
+                    </span>
+                    <button
+                      type="button"
+                      className="-mr-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      aria-label={sidebarCoachmarkCopy.dismiss}
+                      onClick={() => setShowSidebarCoachmark(false)}
+                    >
+                      <span
+                        className="material-symbols-outlined text-[15px]"
+                        aria-hidden="true"
+                      >
+                        close
+                      </span>
+                    </button>
+                    <span
+                      aria-hidden="true"
+                      className="absolute -top-[5px] left-4 h-2.5 w-2.5 rotate-45 border-l border-t border-outline bg-canvas"
+                    />
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+              <button
+                type="button"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55"
+                aria-label={
+                  currentLocale === "ko" ? "채팅 기록 열기" : "Open chat history"
+                }
+                aria-controls="mobile-chat-sidebar"
+                onClick={() => {
+                  setShowSidebarCoachmark(false);
+                  dispatchOpenChatSidebar();
+                }}
+                disabled={!clientReady}
+              >
+                <span aria-hidden="true" className="relative block h-5 w-6">
+                  <span className="absolute left-0 top-[3px] h-[2px] w-5 rounded-full bg-ink" />
+                  <span className="absolute bottom-[3px] left-0 h-[2px] w-3.5 rounded-full bg-ink" />
+                </span>
+              </button>
+            </div>
           )}
           <KrwBrand
             href={brandHref}

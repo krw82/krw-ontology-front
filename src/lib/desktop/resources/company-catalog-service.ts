@@ -13,6 +13,8 @@ import {
   toDesktopCompanySummary,
 } from "@/lib/desktop/dto/company-catalog-dto";
 import { DesktopContractError } from "@/lib/desktop/ontology-contracts";
+import { getCompanyDisplayCopyForTicker } from "@/content/companies/display";
+import { DEFAULT_LOCALE } from "@/i18n/config";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
@@ -44,6 +46,7 @@ export async function listDesktopCompanies(input: {
           catalog_release_id: null,
           generated_at: null,
           query,
+          total_count: 0,
           returned_count: 0,
           next_cursor: null,
           has_more: false,
@@ -67,12 +70,13 @@ export async function listDesktopCompanies(input: {
   }
 
   const limit = clampLimit(input.limit);
-  const companies = (await listIndexedCompanies())
+  const matchingCompanies = (await listIndexedCompanies())
     .filter((company) => matchesQuery(company, query))
-    .filter((company) =>
-      cursor ? company.ticker > cursor.last_ticker : true,
-    )
     .sort((left, right) => left.ticker.localeCompare(right.ticker));
+  const totalCount = matchingCompanies.length;
+  const companies = matchingCompanies.filter((company) =>
+    cursor ? company.ticker > cursor.last_ticker : true,
+  );
   const page = companies.slice(0, limit);
   const hasMore = companies.length > page.length;
   const lastTicker = page.at(-1)?.ticker ?? null;
@@ -96,6 +100,7 @@ export async function listDesktopCompanies(input: {
         catalog_release_id: release.release_id,
         generated_at: release.generated_at,
         query,
+        total_count: totalCount,
         returned_count: page.length,
         next_cursor: nextCursor,
         has_more: hasMore,
@@ -135,13 +140,20 @@ function matchesQuery(
 ) {
   if (!query) return true;
   const needle = query.toLocaleLowerCase();
+  const copy = getCompanyDisplayCopyForTicker(DEFAULT_LOCALE, company.ticker);
   return [
     company.ticker,
     company.name,
+    copy.name,
+    copy.companyNameKo,
     company.sector,
+    copy.sector,
     company.description,
+    copy.description,
     company.core_strength,
+    copy.core_strength,
     company.critical_risk,
+    copy.critical_risk,
   ]
     .filter(Boolean)
     .join(" ")

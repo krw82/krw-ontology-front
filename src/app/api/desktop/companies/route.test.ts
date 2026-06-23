@@ -44,11 +44,12 @@ describe("GET /api/desktop/companies", () => {
       payload: {
         ok: true,
         contract_version: "desktop-company-catalog/v1",
-        data: { companies: [{ ticker: "AAPL" }] },
+        data: { companies: [{ ticker: "AAPL", logo_url: null }] },
         meta: {
           catalog_release_id: "release-1",
           generated_at: null,
           query: "apple",
+          total_count: 1,
           returned_count: 1,
           next_cursor: null,
           has_more: false,
@@ -65,7 +66,7 @@ describe("GET /api/desktop/companies", () => {
     expect(response.headers.get("etag")).toBe('"catalog-etag"');
     expect(await response.json()).toMatchObject({
       contract_version: "desktop-company-catalog/v1",
-      data: { companies: [{ ticker: "AAPL" }] },
+      data: { companies: [{ ticker: "AAPL", logo_url: null }] },
     });
     expect(requireDesktopFeatureAccess).toHaveBeenCalledWith(
       expect.objectContaining({ userId: "user-1" }),

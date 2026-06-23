@@ -11,9 +11,11 @@ Use this skill to turn a broad investment question into a bounded, filing-ground
 
 ```text
 investment theme or screen
--> covered-company candidates
--> filing evidence validation
+-> explicit screen definition
+-> covered-company candidate discovery
+-> filing evidence validation, not keyword promotion
 -> financial pathway and rejection risk
+-> why this deserves research attention now
 -> A / B / C / Reject research priority
 -> next deep-research question
 ```
@@ -96,6 +98,28 @@ recent strengthening or weakening
 first rejection evidence
 ```
 
+The brief must also define the screen before discovery:
+
+```text
+Screen:
+what kind of company should qualify
+
+Evidence required:
+what filing evidence would prove direct exposure
+
+Financial path:
+how the driver could reach revenue, margin, cash flow, capex, or balance sheet
+
+Reject if:
+what evidence would make the candidate a false positive
+
+Why now:
+what recent filing evidence, change, pressure, or catalyst makes the candidate worth prioritizing now
+```
+
+Do not treat "why now" as stock timing. It means research timing: the latest
+filing made the exposure, pathway, burden, or risk more important to investigate.
+
 Do not expose the internal English brief.
 
 Example:
@@ -106,10 +130,13 @@ AI 데이터센터 전력 수요 수혜 기업을 찾아줘.
 
 Internal brief:
 Covered-company idea screen for AI data-center power demand:
-direct business exposure, latest management commentary,
-orders or backlog linkage, revenue and margin pathway,
-capex and cash-flow burden, recent filing change,
-and first rejection evidence.
+Screen = companies with direct operating exposure to AI/data-center power demand.
+Evidence required = management commentary, customer demand, orders, backlog,
+capacity, or contract evidence.
+Financial path = demand -> orders/pricing/volume/capacity -> revenue/margin/cash flow.
+Reject if = only generic AI or data-center language with no economic linkage.
+Why now = latest filing shows a stronger or weaker conversion signal worth
+prioritizing for deeper research.
 ```
 
 ## 4. Request Types
@@ -139,6 +166,26 @@ portfolio sizing or benchmark construction
 Route those requests to the appropriate workflow instead of inventing unavailable inputs.
 
 ## 5. Candidate Discovery
+
+Before discovery, read and apply:
+
+```text
+references/search-order.md
+```
+
+Use a three-phase workflow:
+
+```text
+1. Screen definition:
+   Translate the user's broad question into qualification, evidence, financial path, rejection, and why-now criteria.
+
+2. Candidate discovery:
+   Use v3 global-spine routing or the user's ticker list to find at most 5 covered candidates.
+   Do not finalize ranking in this phase.
+
+3. Candidate validation:
+   Verify each material candidate on the same axes before assigning A / B / C / Reject.
+```
 
 ### 5.1 Theme or condition without a ticker list
 
@@ -184,9 +231,12 @@ Validate the top candidates with the smallest useful evidence path:
 
 ```text
 1. Use compact query_context evidence by selected ticker.
-2. Use one targeted query only for a material missing axis.
-3. Use selected trace/chain only when a top-candidate claim needs stronger support.
-4. Stop when the candidate can be classified reliably.
+2. Verify direct exposure against the screen definition.
+3. Verify financial pathway and why-now evidence.
+4. Identify the strongest burden and first rejection risk.
+5. Use one targeted query only for a material missing axis.
+6. Use selected trace/chain only when a top-candidate claim needs stronger support.
+7. Stop when the candidate can be classified reliably.
 ```
 
 Never request `response_detail="full"` in normal web chat.
@@ -196,6 +246,7 @@ Never request `response_detail="full"` in normal web chat.
 Read and apply:
 
 ```text
+references/search-order.md
 references/candidate-funnel.md
 references/candidate-evidence-policy.md
 references/rejection-policy.md
@@ -216,6 +267,9 @@ How could the driver affect revenue, margin, cash flow, capital intensity, or ba
 
 Recent change:
 Did the latest available filing strengthen, weaken, or leave the idea unchanged?
+
+Why now:
+Why should this company be researched before other candidates in this screen?
 
 Burden:
 What cost, capex, financing, execution, concentration, or cycle risk offsets the potential benefit?
@@ -260,6 +314,7 @@ credible direct or operational exposure
 recent filing evidence
 a plausible revenue, margin, cash-flow, or balance-sheet pathway
 at least one explicit offset or first-rejection risk
+clear reason to research this candidate first within the screen
 ```
 
 B may have a credible pathway with one important evidence gap.

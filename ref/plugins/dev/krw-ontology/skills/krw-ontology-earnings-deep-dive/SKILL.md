@@ -7,14 +7,20 @@ description: Use when the user asks for a filing-grounded deep analysis of a cov
 
 ## 1. Purpose
 
-Analyze the latest reported quarter as an investment update:
+Analyze the latest reported quarter as new evidence that updates the filing-supported operating thesis.
+
+This is not a general company research pass and not an upside/base/downside
+scenario stress test. The unit of analysis is the latest reported quarter:
+what changed, why it changed, whether the explanation matches the numbers, and
+how that evidence updates the investment view.
 
 ```text
 latest quarter
--> what changed
+-> operating thesis being updated
+-> what changed this quarter
 -> why management says it changed
 -> whether numbers, commentary, and notes agree
--> how the change affects growth, margin, cash flow, and the thesis
+-> whether the change is timing noise or thesis-relevant evidence
 ```
 
 This skill is not a raw earnings table and not a market-reaction report.
@@ -118,6 +124,13 @@ cash-flow conversion and investment burden
 confirming and disconfirming thesis evidence
 ```
 
+The brief must state the quarter update question in one sentence:
+
+```text
+This quarter tests whether <operating mechanism> is strengthening, intact, mixed, weakening, or needs re-underwriting.
+```
+
+Do not turn the brief into a broad company overview or a scenario stress-test.
 Do not expose the internal English brief.
 
 ## 5. Period Map
@@ -153,14 +166,16 @@ Follow this order:
 1. Build the internal English earnings brief.
 2. Start with query_context for the latest reported quarter and the user's focus.
 3. Confirm the newest available 10-Q or latest 10-K when no newer quarter exists.
-4. Read management discussion, explanatory notes, segment commentary, and business descriptions before expanding metric searches.
-5. Identify three to five material changes, not every reported line.
-6. Use representative metrics to verify direction, magnitude, and period alignment.
-7. Reconcile company commentary with reported numbers and notes.
-8. Check earnings quality, cash-flow conversion, capex, acquisitions, buybacks, debt, and dilution only when material.
-9. Classify the thesis effect: strengthened, intact, mixed, weakened, or requires re-underwriting.
-10. Use one targeted query for a material missing axis and selected trace/chain for load-bearing claims.
-11. Write the Korean earnings report.
+4. Define the operating thesis being updated. If the user supplied a thesis, use it; otherwise derive the narrow filing-supported operating thesis from the latest quarter evidence.
+5. Read management discussion, explanatory notes, segment commentary, and business descriptions before expanding metric searches.
+6. Identify three to five material quarterly changes, not every reported line.
+7. Use representative metrics to verify direction, magnitude, and period alignment.
+8. Reconcile company commentary with reported numbers and notes.
+9. Decide whether each change is timing noise, accounting effect, operating proof, or thesis-relevant deterioration.
+10. Check earnings quality, cash-flow conversion, capex, acquisitions, buybacks, debt, and dilution only when material to the quarter update.
+11. Classify the thesis effect: strengthened, intact, mixed, weakened, or requires re-underwriting.
+12. Use one targeted query for a material missing axis and selected trace/chain for load-bearing claims.
+13. Write the Korean earnings update report.
 ```
 
 Do not request `response_detail="full"` in normal web chat.
@@ -226,6 +241,10 @@ what next evidence would confirm or reverse the judgment
 ```
 
 Do not infer the user's original thesis if none was supplied. In that case assess the filing-supported operating thesis.
+
+Do not build upside/base/downside cases unless the user explicitly asks for a
+conditional scenario. For scenario stress tests, use the scenario-sensitivity
+workflow instead.
 
 ## 10. Unsupported Market Inputs
 

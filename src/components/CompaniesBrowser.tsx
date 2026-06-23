@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import CompanyCard, {
@@ -24,6 +24,8 @@ interface CompaniesBrowserProps {
 const FLOW_CYCLE = 4.5; // total seconds per loop
 const LINE_MOVE = 1.0; // how long lines travel
 const ARROW_NUDGE_DELAY = 0.9; // when the arrow kicks
+const SEARCH_COACHMARK_STORAGE_KEY = "krw:companies-search-coachmark-seen:v1";
+const IS_DEV_ENV = process.env.NODE_ENV === "development";
 
 function FlowAnimation({ disabled }: { disabled: boolean }) {
   return (
@@ -85,6 +87,7 @@ export default function CompaniesBrowser({
   locale = DEFAULT_LOCALE,
 }: CompaniesBrowserProps) {
   const [search, setSearch] = useState("");
+  const [showSearchCoachmark, setShowSearchCoachmark] = useState(IS_DEV_ENV);
   const reducedMotion = useReducedMotion();
   const normalizedSearch = search.trim();
   const copy = locale === "ko"
@@ -93,9 +96,11 @@ export default function CompaniesBrowser({
         heading: "분석할 회사를 고르세요.",
         intro:
           "티커, 회사명, 사업 활동, 리스크 키워드로 바로 찾고 채팅 리서치로 이어갑니다.",
-        searchLabel: "Ticker 검색",
-        searchPlaceholder: "예: AAPL, NVDA, TSLA",
-        searchAria: "티커 검색",
+        searchLabel: "회사 검색",
+        searchPlaceholder: "예: IBM, 브로드컴, 애플",
+        searchAria: "회사 검색",
+        searchCoachmark: "분석할 회사명이나 티커를 입력하세요",
+        dismissCoachmarkAria: "회사 검색 안내 닫기",
         multiCompanyCta: "종목 발굴하기",
         multiCompanyLineOne: "종목 발굴하기",
         emptyCatalog:
@@ -111,9 +116,11 @@ export default function CompaniesBrowser({
         heading: "Choose a company to analyze.",
         intro:
           "Search by ticker, company name, activity, or risk keyword, then continue into chat research.",
-        searchLabel: "Ticker search",
-        searchPlaceholder: "e.g. AAPL, NVDA, TSLA",
-        searchAria: "Ticker search",
+        searchLabel: "Company search",
+        searchPlaceholder: "e.g. IBM, Broadcom, Apple",
+        searchAria: "Company search",
+        searchCoachmark: "Type a company name or ticker to analyze",
+        dismissCoachmarkAria: "Dismiss company search tip",
         multiCompanyCta: "Discover stocks",
         multiCompanyLineOne: "Discover stocks",
         emptyCatalog:
@@ -128,6 +135,31 @@ export default function CompaniesBrowser({
   const filteredCompanies = useMemo(() => {
     return filterAndSortCompanies(initialCompanies, search);
   }, [initialCompanies, search]);
+
+  useEffect(() => {
+    if (IS_DEV_ENV) {
+      return undefined;
+    }
+
+    try {
+      if (window.localStorage.getItem(SEARCH_COACHMARK_STORAGE_KEY) === "1") {
+        return undefined;
+      }
+      window.localStorage.setItem(SEARCH_COACHMARK_STORAGE_KEY, "1");
+    } catch {
+      // If storage is unavailable, still show the tip for this page view.
+    }
+
+    const showTimer = window.setTimeout(() => setShowSearchCoachmark(true), 0);
+
+    return () => {
+      window.clearTimeout(showTimer);
+    };
+  }, []);
+
+  function dismissSearchCoachmark() {
+    setShowSearchCoachmark(false);
+  }
 
   return (
     <div className="relative mx-auto w-full max-w-[1440px]">
@@ -153,6 +185,33 @@ export default function CompaniesBrowser({
               <p className="mb-2 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
                 {copy.searchLabel}
               </p>
+              <AnimatePresence initial={false}>
+                {showSearchCoachmark ? (
+                  <motion.div
+                    className="relative mb-2 inline-flex max-w-full items-center gap-2 rounded-[8px] border border-outline bg-canvas px-3 py-2 text-[12px] font-bold leading-4 text-ink shadow-lg"
+                    initial={{ opacity: 0, y: reducedMotion ? 0 : -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: reducedMotion ? 0 : -4 }}
+                    transition={{ duration: reducedMotion ? 0 : 0.16, ease: easeOutExpo }}
+                  >
+                    <span className="min-w-0 truncate">{copy.searchCoachmark}</span>
+                    <button
+                      type="button"
+                      className="-mr-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      aria-label={copy.dismissCoachmarkAria}
+                      onClick={dismissSearchCoachmark}
+                    >
+                      <span className="material-symbols-outlined text-[15px]" aria-hidden="true">
+                        close
+                      </span>
+                    </button>
+                    <span
+                      aria-hidden="true"
+                      className="absolute -bottom-[5px] left-8 h-2.5 w-2.5 rotate-45 border-b border-r border-outline bg-canvas"
+                    />
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
               <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
                 <div className="relative min-w-0">
                   <motion.span
@@ -227,7 +286,7 @@ export default function CompaniesBrowser({
                 ease: easeOutExpo,
               }}
             >
-              <div className="hidden grid-cols-[104px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] border-b border-hairline bg-surface px-4 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted xl:grid">
+              <div className="hidden grid-cols-[148px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] border-b border-hairline bg-surface px-4 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted xl:grid">
                 <span>ticker</span>
                 <span>company</span>
                 <span>activity</span>

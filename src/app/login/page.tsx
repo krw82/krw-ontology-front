@@ -11,6 +11,8 @@ import { trackClientEventWithTimeout } from "@/lib/analytics/client";
 import { createClient } from "@/lib/supabase/client";
 import { easeOutExpo } from "@/lib/animation";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
+import { localizedPath } from "@/i18n/routing";
 
 function GoogleMark() {
   return (
@@ -40,18 +42,130 @@ function GoogleMark() {
   );
 }
 
+const SAFE_INTERNAL_ORIGIN = "https://krw-ontology.local";
+
+const loginCopy: Record<
+  Locale,
+  {
+    oauthError: string;
+    googleError: string;
+    desktopApproveFailed: string;
+    desktopApproved: string;
+    headline: string;
+    intro: string;
+    desktopApprovalTitle: string;
+    approvalCodeLabel: string;
+    desktopChecking: string;
+    desktopSignedOut: string;
+    desktopApproving: string;
+    desktopApprove: string;
+    desktopOpen: string;
+    googleMoving: string;
+    googleContinue: string;
+    googleStart: string;
+    footnote: string;
+    copyright: string;
+    privacy: string;
+    terms: string;
+    refund: string;
+    pageTitle: string;
+  }
+> = {
+  ko: {
+    oauthError: "Google 인증을 완료하지 못했습니다. 다시 시도해주세요.",
+    googleError: "Google 로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+    desktopApproveFailed: "Desktop 연결을 승인하지 못했습니다.",
+    desktopApproved: "승인 완료. KRW Desktop 앱으로 이동 중입니다.",
+    headline: "무료 베타로 기업 분석 시작",
+    intro:
+      "카드 등록 없이 Google 계정으로 시작합니다. 선택한 회사, 질문 기록, 무료 베타 사용량을 안전하게 이어서 확인할 수 있습니다.",
+    desktopApprovalTitle: "KRW Desktop 연결 승인",
+    approvalCodeLabel: "승인 코드",
+    desktopChecking: "로그인 상태 확인 중...",
+    desktopSignedOut: "Google 로그인 후 이 Desktop 연결을 승인할 수 있습니다.",
+    desktopApproving: "승인 중...",
+    desktopApprove: "Desktop 연결 승인",
+    desktopOpen: "KRW Desktop 열기",
+    googleMoving: "Google로 이동 중...",
+    googleContinue: "Google로 로그인하고 계속",
+    googleStart: "Google로 무료 시작",
+    footnote: "무료 베타 · 카드 불필요 · 로그인 후 이전 화면으로 돌아갑니다.",
+    copyright: "© 2026 KRW Ontology. 모든 권리 보유.",
+    privacy: "개인정보처리방침",
+    terms: "서비스 약관",
+    refund: "환불정책",
+    pageTitle: "무료 베타 로그인 | KRW Ontology",
+  },
+  en: {
+    oauthError: "Google authentication could not be completed. Please try again.",
+    googleError: "Something went wrong while signing in with Google. Please try again shortly.",
+    desktopApproveFailed: "Could not approve the Desktop connection.",
+    desktopApproved: "Approved. Opening the KRW Desktop app.",
+    headline: "Start company analysis for free",
+    intro:
+      "Continue with your Google account. Your selected companies, question history, and free beta usage stay connected safely.",
+    desktopApprovalTitle: "Approve KRW Desktop connection",
+    approvalCodeLabel: "Approval code",
+    desktopChecking: "Checking sign-in status...",
+    desktopSignedOut: "Sign in with Google to approve this Desktop connection.",
+    desktopApproving: "Approving...",
+    desktopApprove: "Approve Desktop connection",
+    desktopOpen: "Open KRW Desktop",
+    googleMoving: "Opening Google...",
+    googleContinue: "Sign in with Google and continue",
+    googleStart: "Start free with Google",
+    footnote: "Free beta · no card required · returns to the previous screen after sign-in.",
+    copyright: "© 2026 KRW Ontology. All rights reserved.",
+    privacy: "Privacy Policy",
+    terms: "Terms of Service",
+    refund: "Refund Policy",
+    pageTitle: "Free beta login | KRW Ontology",
+  },
+};
+
+function getLocaleFromInternalPath(value: string | null): Locale | null {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
+
+  try {
+    const url = new URL(value, SAFE_INTERNAL_ORIGIN);
+    const [, pathLocale] = url.pathname.split("/");
+    if (isLocale(pathLocale)) return pathLocale;
+
+    const queryLocale = url.searchParams.get("locale");
+    return isLocale(queryLocale) ? queryLocale : null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveLoginLocale(
+  localeParam: string | null,
+  nextParam: string | null,
+): Locale {
+  if (isLocale(localeParam)) return localeParam;
+  return getLocaleFromInternalPath(nextParam) ?? DEFAULT_LOCALE;
+}
+
 function LoginContent() {
   const searchParams = useSearchParams();
   const reducedMotion = useReducedMotion();
   const initialError = searchParams.get("error") === "oauth";
-  const nextPath = normalizeInternalNextPath(searchParams.get("next"));
+  const rawNextPath = searchParams.get("next");
+  const loginLocale = resolveLoginLocale(searchParams.get("locale"), rawNextPath);
+  const copy = loginCopy[loginLocale];
+  const nextPath = normalizeInternalNextPath(
+    rawNextPath,
+    localizedPath(loginLocale, "/companies"),
+  );
   const desktopCode = normalizeDesktopCode(searchParams.get("desktop_code"));
   const desktopNextPath = desktopCode
-    ? `/login?desktop_code=${encodeURIComponent(desktopCode)}`
+    ? `/login?desktop_code=${encodeURIComponent(desktopCode)}${
+        loginLocale === DEFAULT_LOCALE ? "" : `&locale=${loginLocale}`
+      }`
     : nextPath;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(
-    initialError ? "Google 인증을 완료하지 못했습니다. 다시 시도해주세요." : null,
+    initialError ? copy.oauthError : null,
   );
   const [desktopApprovalStatus, setDesktopApprovalStatus] = useState<
     "idle" | "checking" | "signed_out" | "ready" | "approving" | "approved" | "error"
@@ -67,6 +181,10 @@ function LoginContent() {
     duration: reducedMotion ? 0 : 0.22,
     ease: easeOutExpo,
   };
+
+  useEffect(() => {
+    document.title = copy.pageTitle;
+  }, [copy.pageTitle]);
 
   const openDesktopApp = () => {
     window.location.href = "krw-desktop://device-login-approved";
@@ -126,18 +244,18 @@ function LoginContent() {
         throw new Error(
           payload?.error?.public_message ??
             payload?.error?.message ??
-            "Desktop 연결을 승인하지 못했습니다.",
+            copy.desktopApproveFailed,
         );
       }
       setDesktopApprovalStatus("approved");
-      setDesktopApprovalMessage("승인 완료. KRW Desktop 앱으로 이동 중입니다.");
+      setDesktopApprovalMessage(copy.desktopApproved);
       window.setTimeout(openDesktopApp, 120);
     } catch (approvalError) {
       setDesktopApprovalStatus("error");
       setDesktopApprovalMessage(
         approvalError instanceof Error
           ? approvalError.message
-          : "Desktop 연결을 승인하지 못했습니다.",
+          : copy.desktopApproveFailed,
       );
     }
   };
@@ -168,7 +286,7 @@ function LoginContent() {
       if (authError) throw authError;
     } catch {
       oauthInFlightRef.current = false;
-      setError("Google 로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+      setError(copy.googleError);
       setLoading(false);
     }
   };
@@ -242,7 +360,7 @@ function LoginContent() {
               ease: easeOutExpo,
             }}
           >
-            무료 베타로 기업 분석 시작
+            {copy.headline}
           </motion.h1>
           <motion.p
             className="mt-4 text-[15px] leading-6 text-body sm:text-[16px] sm:leading-7"
@@ -254,8 +372,7 @@ function LoginContent() {
               ease: easeOutExpo,
             }}
           >
-            카드 등록 없이 Google 계정으로 시작합니다. 선택한 회사,
-            질문 기록, 무료 베타 사용량을 안전하게 이어서 확인할 수 있습니다.
+            {copy.intro}
           </motion.p>
 
           <motion.div
@@ -286,19 +403,20 @@ function LoginContent() {
             {desktopCode && (
               <div className="rounded-[8px] border border-primary/25 bg-primary-fixed/55 p-sm text-left">
                 <p className="text-[14px] font-extrabold leading-5 text-ink">
-                  KRW Desktop 연결 승인
+                  {copy.desktopApprovalTitle}
                 </p>
                 <p className="mt-1 text-[13px] font-semibold leading-5 text-body">
-                  승인 코드 <span className="font-black text-ink">{desktopCode}</span>
+                  {copy.approvalCodeLabel}{" "}
+                  <span className="font-black text-ink">{desktopCode}</span>
                 </p>
                 {desktopApprovalStatus === "checking" && (
                   <p className="mt-2 text-[13px] font-semibold leading-5 text-muted">
-                    로그인 상태 확인 중...
+                    {copy.desktopChecking}
                   </p>
                 )}
                 {desktopApprovalStatus === "signed_out" && (
                   <p className="mt-2 text-[13px] font-semibold leading-5 text-muted">
-                    Google 로그인 후 이 Desktop 연결을 승인할 수 있습니다.
+                    {copy.desktopSignedOut}
                   </p>
                 )}
                 {(desktopApprovalStatus === "ready" ||
@@ -311,8 +429,8 @@ function LoginContent() {
                     className="mt-3 h-[44px] w-full rounded-[8px] border border-primary bg-primary px-base text-[14px] font-extrabold leading-[1.15] text-on-primary transition-opacity disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {desktopApprovalStatus === "approving"
-                      ? "승인 중..."
-                      : "Desktop 연결 승인"}
+                      ? copy.desktopApproving
+                      : copy.desktopApprove}
                   </button>
                 )}
                 {desktopApprovalStatus === "approved" && (
@@ -321,7 +439,7 @@ function LoginContent() {
                     onClick={openDesktopApp}
                     className="mt-3 h-[44px] w-full rounded-[8px] border border-primary bg-primary px-base text-[14px] font-extrabold leading-[1.15] text-on-primary transition-opacity"
                   >
-                    KRW Desktop 열기
+                    {copy.desktopOpen}
                   </button>
                 )}
                 {desktopApprovalMessage && (
@@ -368,15 +486,15 @@ function LoginContent() {
                   />
                 </span>
                 {loading
-                  ? "Google로 이동 중..."
+                  ? copy.googleMoving
                   : desktopCode
-                    ? "Google로 로그인하고 계속"
-                    : "Google로 무료 시작"}
+                    ? copy.googleContinue
+                    : copy.googleStart}
               </motion.button>
             )}
 
             <p className="text-center text-[13px] font-semibold leading-5 text-muted">
-              무료 베타 · 카드 불필요 · 로그인 후 이전 화면으로 돌아갑니다.
+              {copy.footnote}
             </p>
           </motion.div>
         </motion.section>
@@ -384,15 +502,24 @@ function LoginContent() {
 
       <footer className="relative z-10 border-t border-hairline bg-canvas px-base py-lg text-center">
         <div className="flex flex-col items-center justify-center gap-2 text-[13px] font-semibold leading-[1.5] text-muted sm:flex-row sm:gap-3">
-          <span>© 2026 KRW Ontology. 모든 권리 보유.</span>
-          <Link href="/privacy" className="transition-colors hover:text-ink">
-            개인정보처리방침
+          <span>{copy.copyright}</span>
+          <Link
+            href={localizedPath(loginLocale, "/privacy")}
+            className="transition-colors hover:text-ink"
+          >
+            {copy.privacy}
           </Link>
-          <Link href="/terms" className="transition-colors hover:text-ink">
-            서비스 약관
+          <Link
+            href={localizedPath(loginLocale, "/terms")}
+            className="transition-colors hover:text-ink"
+          >
+            {copy.terms}
           </Link>
-          <Link href="/refund" className="transition-colors hover:text-ink">
-            환불정책
+          <Link
+            href={localizedPath(loginLocale, "/refund")}
+            className="transition-colors hover:text-ink"
+          >
+            {copy.refund}
           </Link>
         </div>
       </footer>

@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const isDevelopment = process.env.NODE_ENV === "development";
+const SAFE_INTERNAL_ORIGIN = "https://krw-ontology.local";
 
 function shouldApplyContentSecurityPolicy(pathname: string) {
   return !pathname.startsWith("/api/");
@@ -56,6 +57,14 @@ function getRequestLocale(request: NextRequest): Locale {
   const pathLocale = getPathLocale(request.nextUrl.pathname);
   if (pathLocale) return pathLocale;
 
+  const queryLocale = request.nextUrl.searchParams.get("locale");
+  if (isLocale(queryLocale)) return queryLocale;
+
+  const nextLocale = getLocaleFromInternalPath(
+    request.nextUrl.searchParams.get("next"),
+  );
+  if (nextLocale) return nextLocale;
+
   const referer = request.headers.get("referer");
   if (referer) {
     try {
@@ -67,6 +76,21 @@ function getRequestLocale(request: NextRequest): Locale {
   }
 
   return DEFAULT_LOCALE;
+}
+
+function getLocaleFromInternalPath(value: string | null): Locale | null {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
+
+  try {
+    const url = new URL(value, SAFE_INTERNAL_ORIGIN);
+    const pathLocale = getPathLocale(url.pathname);
+    if (pathLocale) return pathLocale;
+
+    const queryLocale = url.searchParams.get("locale");
+    return isLocale(queryLocale) ? queryLocale : null;
+  } catch {
+    return null;
+  }
 }
 
 function getLocaleRedirectUrl(request: NextRequest): URL | null {

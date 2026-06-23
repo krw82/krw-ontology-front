@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildSystemPrompt,
   MAX_PROMPT_HISTORY_CONTEXT_CHARS,
@@ -11,10 +11,28 @@ import {
 } from "./workflow";
 
 describe("buildSystemPrompt", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("uses the Asia/Seoul calendar date at the UTC date boundary", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-22T15:30:00.000Z"));
+
+    const prompt = buildSystemPrompt();
+
+    expect(prompt).toContain("Runtime as-of date: 2026-06-23");
+    expect(prompt).toContain("Runtime timezone: Asia/Seoul");
+  });
+
   it("keeps orchestration out of the system prompt", () => {
     const prompt = buildSystemPrompt();
 
     expect(prompt).toContain("exact KRW-AI skill command");
+    expect(prompt).toMatch(/Runtime as-of date: \d{4}-\d{2}-\d{2}/);
+    expect(prompt).toContain("Runtime timezone: Asia/Seoul");
+    expect(prompt).toContain("does not prove that a filing");
+    expect(prompt).toContain("Never invent an unconfirmed future period label");
     expect(prompt).not.toContain("krw-ontology-web-answer");
     expect(prompt).not.toContain("answer_blocks");
     expect(prompt).not.toContain("Match the user's latest message language");
@@ -151,12 +169,16 @@ describe("buildSystemPrompt", () => {
       ],
     });
 
-    expect(prompt).not.toContain("Runtime current date:");
+    expect(prompt).toMatch(/Runtime as-of date: \d{4}-\d{2}-\d{2}/);
     expect(prompt).toContain("Company filing anchor");
     expect(prompt).toContain("latest available filing: CY2026Q1 10-Q");
     expect(prompt).toContain("current driver: CY2026Q1 10-Q");
     expect(prompt).toContain("annual baseline: CY2025 10-K");
     expect(prompt).toContain("historical context: CY2024 10-K");
+    expect(prompt).toContain(
+      "Confirmed recent filing periods: CY2026Q1, CY2025, CY2024",
+    );
+    expect(prompt).toContain("Do not infer a newer filing or period");
     expect(prompt).toContain("Start current company and investment-decision judgments");
   });
 

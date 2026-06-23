@@ -33,7 +33,7 @@ VST와 ETN을 사는 것이 좋습니다.
 Use a compact interpretation table:
 
 ```text
-| 등급 | 기업 | 후보로 잡힌 이유 | 실적 연결 | 첫 반증 위험 |
+| 등급 | 기업 | 후보로 잡힌 이유 | 실적 연결 | 왜 지금 보나 | 첫 반증 위험 |
 ```
 
 Keep the normal list to 3-5 candidates. Include Reject rows only when they teach the user why a tempting false positive was removed.
@@ -82,6 +82,9 @@ Always clarify:
 ```text
 등급은 리서치 우선순위이며 매수·매도 의견이 아니다.
 ```
+
+The label depends on the screen, not the company's overall quality. A company
+can be excellent but C or Reject for this specific screen.
 
 ## Handoff
 

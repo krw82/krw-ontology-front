@@ -23,6 +23,9 @@ describe("security headers", () => {
     expect(contentSecurityPolicy).toContain("object-src 'none'");
     expect(contentSecurityPolicy).toContain("https://*.supabase.co");
     expect(contentSecurityPolicy).toContain("media-src 'self' data: blob:");
+    expect(cspDirective(contentSecurityPolicy, "img-src")).toContain(
+      "https://cdn.brandfetch.io",
+    );
     expect(contentSecurityPolicy).toContain("upgrade-insecure-requests");
     expect(contentSecurityPolicy).not.toContain("http://localhost:*");
     expect(cspDirective(contentSecurityPolicy, "script-src")).not.toContain(

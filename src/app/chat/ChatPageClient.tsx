@@ -7,7 +7,9 @@ import { Suspense } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import TopNav from "@/components/TopNav";
 import ChatMessage from "@/components/ChatMessage";
+import CompanyLogo from "@/components/CompanyLogo";
 import Composer, {
+  type ComposerHandle,
   type ComposerSendOptions,
   type ComposerSendResult,
 } from "@/components/Composer";
@@ -221,6 +223,209 @@ type ShareStarter = {
   title?: string | null;
 };
 
+type DiscoverGuideStep = "url" | "file" | "idea";
+
+type DiscoverGuideFlowProps = {
+  locale: string;
+  step: DiscoverGuideStep;
+  disabled?: boolean;
+  onAddUrl: () => void;
+  onSkipUrl: () => void;
+  onAddFile: () => void;
+  onSkipFile: () => void;
+  onFocusIdea: () => void;
+  onSelectExample: (prompt: string) => void;
+};
+
+function DiscoverGuideFlow({
+  locale,
+  step,
+  disabled = false,
+  onAddUrl,
+  onSkipUrl,
+  onAddFile,
+  onSkipFile,
+  onFocusIdea,
+  onSelectExample,
+}: DiscoverGuideFlowProps) {
+  const isKo = locale === "ko";
+  const stepOrder: DiscoverGuideStep[] = ["url", "file", "idea"];
+  const activeIndex = stepOrder.indexOf(step);
+  const examples = isKo
+    ? [
+        "AI 데이터센터 전력 수요 수혜 기업",
+        "메모리 가격 상승에 유리한 반도체 기업",
+        "소비 둔화에도 마진을 방어할 기업",
+      ]
+    : [
+        "AI data center power demand beneficiaries",
+        "Semiconductor companies helped by memory pricing",
+        "Companies that can defend margins in a slowdown",
+      ];
+  const copy = {
+    url: isKo
+      ? {
+          eyebrow: "선택사항",
+          title: "참고할 URL이 있나요?",
+          description:
+            "뉴스, 공시, 리포트 링크가 있으면 같이 확인합니다. 없어도 바로 넘어갈 수 있습니다.",
+          primary: "URL 추가",
+          secondary: "건너뛰기",
+        }
+      : {
+          eyebrow: "Optional",
+          title: "Do you have a URL to reference?",
+          description:
+            "Add a news, filing, or report link if you have one. You can skip this.",
+          primary: "Add URL",
+          secondary: "Skip",
+        },
+    file: isKo
+      ? {
+          eyebrow: "선택사항",
+          title: "첨부할 파일이 있나요?",
+          description:
+            "PDF, txt, md 문서를 질문과 함께 보낼 수 있습니다. 없으면 다음으로 넘어가세요.",
+          primary: "파일 첨부",
+          secondary: "건너뛰기",
+        }
+      : {
+          eyebrow: "Optional",
+          title: "Do you have a file to attach?",
+          description:
+            "Attach PDF, txt, or md documents with the question, or skip this step.",
+          primary: "Attach file",
+          secondary: "Skip",
+        },
+    idea: isKo
+      ? {
+          eyebrow: "시작",
+          title: "어떤 아이디어로 종목을 발굴할까요?",
+          description:
+            "산업, 변화, 리스크 키워드를 한 문장으로 적으면 관련 회사를 넓게 찾아봅니다.",
+          primary: "직접 입력하기",
+          secondary: "예시 선택",
+        }
+      : {
+          eyebrow: "Start",
+          title: "What idea should we use to discover stocks?",
+          description:
+            "Describe an industry, shift, or risk keyword and we will explore related companies.",
+          primary: "Type directly",
+          secondary: "Pick an example",
+        },
+  }[step];
+
+  const handlePrimary = () => {
+    if (step === "url") {
+      onAddUrl();
+      return;
+    }
+    if (step === "file") {
+      onAddFile();
+      return;
+    }
+    onFocusIdea();
+  };
+  const handleSecondary = () => {
+    if (step === "url") {
+      onSkipUrl();
+      return;
+    }
+    if (step === "file") {
+      onSkipFile();
+      return;
+    }
+    onFocusIdea();
+  };
+
+  return (
+    <div className="mx-auto w-full max-w-[38rem] text-left">
+      <div
+        className="mb-sm grid grid-cols-3 gap-1.5"
+        aria-label={isKo ? "종목 발굴 단계" : "Discovery steps"}
+      >
+        {stepOrder.map((item, index) => (
+          <span
+            key={item}
+            className={[
+              "h-1.5 rounded-full transition-colors",
+              index <= activeIndex ? "bg-primary" : "bg-surface-dim",
+            ].join(" ")}
+            aria-hidden="true"
+          />
+        ))}
+      </div>
+
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.section
+          key={step}
+          className="overflow-hidden rounded-[8px] border border-hairline bg-canvas shadow-[0_18px_48px_rgba(10,11,13,0.08)]"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.22, ease: "easeOut" }}
+        >
+          <div className="flex items-center justify-between border-b border-hairline px-base py-sm">
+            <p className="font-mono text-[11px] font-black uppercase tracking-[0.16em] text-primary">
+              {copy.eyebrow}
+            </p>
+            <p className="font-mono text-[11px] font-black tracking-[0.14em] text-muted">
+              {String(activeIndex + 1).padStart(2, "0")} / 03
+            </p>
+          </div>
+
+          <div className="p-base sm:p-lg">
+            <div className="min-w-0">
+              <h3 className="text-[20px] font-black leading-7 text-ink sm:text-[24px] sm:leading-8">
+                {copy.title}
+              </h3>
+              <p className="mt-2 text-[14px] font-semibold leading-6 text-body sm:text-[15px]">
+                {copy.description}
+              </p>
+            </div>
+
+            {step === "idea" ? (
+              <div className="mt-base grid gap-2">
+                {examples.map((example) => (
+                  <button
+                    key={example}
+                    type="button"
+                    className="group flex min-h-12 w-full items-center justify-between gap-3 rounded-[8px] border border-hairline bg-surface px-sm py-xs text-left text-[14px] font-bold leading-5 text-ink transition-colors hover:border-outline hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-55"
+                    onClick={() => onSelectExample(example)}
+                    disabled={disabled}
+                  >
+                    <span className="min-w-0">{example}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="mt-base grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <button
+                type="button"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[8px] bg-surface-dark px-5 py-3 text-[15px] font-extrabold leading-5 text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55"
+                onClick={handlePrimary}
+                disabled={disabled}
+              >
+                {copy.primary}
+              </button>
+              <button
+                type="button"
+                className="inline-flex min-h-12 items-center justify-center rounded-[8px] border border-hairline bg-canvas px-5 py-3 text-[15px] font-extrabold leading-5 text-body transition-colors hover:bg-surface-soft hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55"
+                onClick={handleSecondary}
+                disabled={disabled}
+              >
+                {copy.secondary}
+              </button>
+            </div>
+          </div>
+        </motion.section>
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function ChatContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -265,6 +470,10 @@ function ChatContent() {
     ? "deep"
     : researchMode;
   const [composerDraftResetKey, setComposerDraftResetKey] = useState(0);
+  const [discoverGuideStep, setDiscoverGuideStep] =
+    useState<DiscoverGuideStep>("url");
+  const [discoverComposerVisible, setDiscoverComposerVisible] = useState(false);
+  const composerRef = useRef<ComposerHandle>(null);
 
   const isDraftRoute = pathname === "/chat/new" || isDiscoverRoute;
   const shareStarterTicker = normalizeTicker(shareStarter?.tickers[0] ?? "");
@@ -480,6 +689,14 @@ function ChatContent() {
       message.status === "completed" &&
       message.content.trim().length > 0,
   );
+  const shouldShowDiscoverGuide =
+    isIdeaGeneration &&
+    !discoverComposerVisible &&
+    chat.messages.length === 0 &&
+    !isHydratingSession &&
+    !isActiveRun &&
+    !effectiveSessionError;
+  const shouldHideDiscoverComposer = shouldShowDiscoverGuide;
   const streamingTransition = {
     duration: 0.14,
     ease: [0.16, 1, 0.3, 1] as const,
@@ -588,6 +805,7 @@ function ChatContent() {
     ),
   ).join(" / ");
   const headerActionTicker = contextTickers[0] ?? null;
+  const primaryContextCompany = contextCompanies[0] ?? null;
   const suggestedPrompts = getSuggestedPromptDisplaysForTickers(
     responseLocale,
     contextTickers,
@@ -595,16 +813,16 @@ function ChatContent() {
   const emptyStateCopy = isIdeaGeneration
     ? responseLocale === "ko"
       ? {
-          headingWithContext: "종목 발굴하기",
-          headingWithoutContext: "종목 발굴하기",
+          headingWithContext: "어떤 종목을 발굴할까요?",
+          headingWithoutContext: "어떤 종목을 발굴할까요?",
           descriptionWithoutContext:
-            "찾고 싶은 사업 변화나 재무 조건을 입력하면 공시 근거로 리서치 후보를 정리합니다.",
+            "아이디어, 산업, 리스크 키워드를 넣으면 관련 회사를 넓게 찾아봅니다.",
         }
       : {
-          headingWithContext: "Discover stocks",
-          headingWithoutContext: "Discover stocks",
+          headingWithContext: "What stocks should we discover?",
+          headingWithoutContext: "What stocks should we discover?",
           descriptionWithoutContext:
-            "Describe the business change or financial condition you want to find, and KRW Ontology will rank research candidates from filing evidence.",
+            "Enter an idea, industry, or risk keyword to explore related companies broadly.",
         }
     : responseLocale === "ko"
         ? {
@@ -951,6 +1169,58 @@ function ChatContent() {
     await handleSend(prompt);
   }
 
+  const requestComposerAction = useCallback(
+    (type: Parameters<ComposerHandle["requestAction"]>[0]) => {
+      composerRef.current?.requestAction(type);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!discoverComposerVisible) return;
+    const frameId = window.requestAnimationFrame(() => {
+      requestComposerAction("focus");
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [discoverComposerVisible, requestComposerAction]);
+
+  const handleDiscoverAddUrl = useCallback(() => {
+    requestComposerAction("url");
+  }, [requestComposerAction]);
+
+  const handleDiscoverSkipUrl = useCallback(() => {
+    setDiscoverGuideStep("file");
+  }, []);
+
+  const handleDiscoverAddFile = useCallback(() => {
+    requestComposerAction("file");
+  }, [requestComposerAction]);
+
+  const handleDiscoverSkipFile = useCallback(() => {
+    setDiscoverGuideStep("idea");
+  }, []);
+
+  const handleDiscoverFocusIdea = useCallback(() => {
+    setDiscoverComposerVisible(true);
+  }, []);
+
+  const handleDiscoverUserUrlsChange = useCallback((hasUserUrls: boolean) => {
+    if (hasUserUrls) {
+      setDiscoverGuideStep((current) => (current === "url" ? "file" : current));
+    }
+  }, []);
+
+  const handleDiscoverAttachmentsChange = useCallback(
+    (hasAttachments: boolean) => {
+      if (hasAttachments) {
+        setDiscoverGuideStep((current) =>
+          current === "file" ? "idea" : current,
+        );
+      }
+    },
+    [],
+  );
+
   const handleCancel = useCallback(async () => {
     await cancelRun();
   }, [cancelRun]);
@@ -1039,17 +1309,29 @@ function ChatContent() {
             {contextTickers.length > 0 && (
               <div className="mx-auto mb-base w-full max-w-3xl">
                 <div
-                  className="max-w-full"
+                  className="flex max-w-full items-center gap-3 sm:gap-4"
                   aria-label={`분석 대상: ${contextLabel}`}
                 >
-                  <p className="font-mono text-[14px] font-black leading-5 tracking-[0.08em] text-primary sm:text-[15px]">
-                    {contextTickerText}
-                  </p>
-                  <p className="mt-0.5 truncate text-[12px] font-bold leading-5 text-muted sm:text-[13px]">
-                    {[contextNameText || "기업 리서치", contextSectorText]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
+                  {primaryContextCompany ? (
+                    <CompanyLogo
+                      ticker={primaryContextCompany.ticker}
+                      companyName={
+                        contextDisplayText || primaryContextCompany.name || primaryContextCompany.ticker
+                      }
+                      imageSize={112}
+                      className="h-12 w-12 text-[12px] sm:h-14 sm:w-14"
+                    />
+                  ) : null}
+                  <div className="min-w-0">
+                    <p className="font-mono text-[14px] font-black leading-5 tracking-[0.08em] text-primary sm:text-[15px]">
+                      {contextTickerText}
+                    </p>
+                    <p className="mt-0.5 truncate text-[12px] font-bold leading-5 text-muted sm:text-[13px]">
+                      {[contextNameText || "기업 리서치", contextSectorText]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
@@ -1236,7 +1518,14 @@ function ChatContent() {
                 !isHydratingSession &&
                 !isActiveRun &&
                 !sessionError && (
-                  <div className="mx-auto flex min-h-[46dvh] w-full max-w-2xl flex-col items-center justify-center py-lg text-center sm:py-xxl md:min-h-[56dvh]">
+                  <div
+                    className={[
+                      "mx-auto flex w-full flex-col items-center justify-center py-lg text-center sm:py-xxl",
+                      shouldShowDiscoverGuide
+                        ? "min-h-[calc(100dvh-132px)] max-w-[42rem] md:min-h-[calc(100dvh-96px)]"
+                        : "min-h-[46dvh] max-w-2xl md:min-h-[56dvh]",
+                    ].join(" ")}
+                  >
                     <motion.div
                       className="w-full min-w-0"
                       initial={{ opacity: 0, y: 8 }}
@@ -1256,7 +1545,7 @@ function ChatContent() {
                     </motion.div>
 
                     <motion.div
-                      className="mt-6 w-full max-w-[36rem] text-left"
+                      className="mt-6 w-full max-w-[38rem] text-left"
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{
@@ -1265,23 +1554,43 @@ function ChatContent() {
                         ease: "easeOut",
                       }}
                     >
-                      <SuggestedPromptActions
-                        prompts={suggestedPrompts}
-                        groupId="empty-state-prompts"
-                        disabled={isActiveRun || Boolean(effectiveSessionError)}
-                        analytics={{
-                          sourceSurface: "chat_empty_state",
-                          ticker: contextTickers[0] ?? null,
-                          tickers: contextTickers,
-                          promptCategory: "starter",
-                          promptIds: suggestedPrompts.map(
-                            (_, index) => `chat_empty_starter_${index + 1}`,
-                          ),
-                        }}
-                        onSelect={(prompt) => {
-                          void handlePromptSend(prompt);
-                        }}
-                      />
+                      {isIdeaGeneration ? (
+                        shouldShowDiscoverGuide ? (
+                          <DiscoverGuideFlow
+                            locale={responseLocale}
+                            step={discoverGuideStep}
+                            disabled={
+                              isBudgetBlocked || Boolean(effectiveSessionError)
+                            }
+                            onAddUrl={handleDiscoverAddUrl}
+                            onSkipUrl={handleDiscoverSkipUrl}
+                            onAddFile={handleDiscoverAddFile}
+                            onSkipFile={handleDiscoverSkipFile}
+                            onFocusIdea={handleDiscoverFocusIdea}
+                            onSelectExample={(prompt) => {
+                              void handlePromptSend(prompt);
+                            }}
+                          />
+                        ) : null
+                      ) : (
+                        <SuggestedPromptActions
+                          prompts={suggestedPrompts}
+                          groupId="empty-state-prompts"
+                          disabled={isActiveRun || Boolean(effectiveSessionError)}
+                          analytics={{
+                            sourceSurface: "chat_empty_state",
+                            ticker: contextTickers[0] ?? null,
+                            tickers: contextTickers,
+                            promptCategory: "starter",
+                            promptIds: suggestedPrompts.map(
+                              (_, index) => `chat_empty_starter_${index + 1}`,
+                            ),
+                          }}
+                          onSelect={(prompt) => {
+                            void handlePromptSend(prompt);
+                          }}
+                        />
+                      )}
                     </motion.div>
                   </div>
               )}
@@ -1291,7 +1600,9 @@ function ChatContent() {
                 className="md:hidden"
                 style={{
                   height: isBodyScrollChat
-                    ? isComposerCompact
+                    ? shouldHideDiscoverComposer
+                      ? 0
+                      : isComposerCompact
                       ? 88
                       : composerHeight + 28
                     : undefined,
@@ -1333,21 +1644,28 @@ function ChatContent() {
             ref={composerHostRef}
             className={[
               "pointer-events-none fixed inset-x-0 bottom-0 z-30 transform-gpu transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:pointer-events-auto md:static md:z-auto md:translate-y-0 md:opacity-100 md:transition-none",
-              isComposerCompact ? "opacity-0" : "opacity-100",
+              isComposerCompact || shouldHideDiscoverComposer
+                ? "opacity-0"
+                : "opacity-100",
               isActiveRun ? "md:hidden" : "",
             ].join(" ")}
             style={{
               transform: isBodyScrollChat
-                ? isComposerCompact
+                ? isComposerCompact || shouldHideDiscoverComposer
                   ? `translate3d(0, calc(100% + 24px), 0)`
                   : `translate3d(0, -${keyboardOffset}px, 0)`
                 : "translate3d(0, 0, 0)",
             }}
-            aria-hidden={isComposerCompact ? true : undefined}
-            inert={isComposerCompact ? true : undefined}
+            aria-hidden={
+              isComposerCompact || shouldHideDiscoverComposer ? true : undefined
+            }
+            inert={
+              isComposerCompact || shouldHideDiscoverComposer ? true : undefined
+            }
             onPointerDownCapture={handleComposerPointerDown}
           >
             <Composer
+              ref={composerRef}
               onSend={handleSend}
               onCancel={handleCancel}
               activity={chat.activity}
@@ -1358,6 +1676,10 @@ function ChatContent() {
                   ? "인덱스에 있는 회사만 채팅할 수 있습니다."
                   : isBudgetBlocked
                   ? "주간 분석 한도에 도달했습니다."
+                  : isIdeaGeneration
+                  ? responseLocale === "ko"
+                    ? "예: AI 데이터센터 전력 수요 수혜 기업"
+                    : "e.g. AI data center power demand beneficiaries"
                   : "기업에 대해 질문하세요..."
               }
               toolCalls={chat.toolCalls}
@@ -1372,6 +1694,14 @@ function ChatContent() {
                   ? "이 URL을 바탕으로 관련 종목을 발굴해줘."
                   : undefined
               }
+              attachmentCoachmarkEnabled={!isIdeaGeneration}
+              onUserUrlsChange={
+                isIdeaGeneration ? handleDiscoverUserUrlsChange : undefined
+              }
+              onAttachmentsChange={
+                isIdeaGeneration ? handleDiscoverAttachmentsChange : undefined
+              }
+              inputSurfaceVisible={!shouldHideDiscoverComposer}
               focusRequestKey={composerFocusRequestKey}
               onFocusChange={handleComposerFocusChange}
             />
@@ -1379,7 +1709,7 @@ function ChatContent() {
 
           {/* Compact pill — shown when full composer slides away */}
           <AnimatePresence>
-            {isComposerCompact && (
+            {isComposerCompact && !shouldHideDiscoverComposer && (
               <motion.div
                 key="compact-composer-pill"
                 className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-base pb-[calc(env(safe-area-inset-bottom)+10px)] md:hidden"

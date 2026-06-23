@@ -13,6 +13,7 @@ the company has no credible direct or operational exposure
 the connection comes only from generic risk-factor language
 the theme appears only as a broad market statement
 the financial pathway is absent or contradicted
+there is no filing-supported reason to prioritize the company for this screen
 the relevant evidence belongs to another company, segment, or period
 the candidate was surfaced by ranking but filing evidence does not validate it
 ```
@@ -28,6 +29,7 @@ some exposure exists but materiality is unclear
 the evidence is old and awaits current confirmation
 the company names the theme but does not connect it to orders, revenue, margin, or cash flow
 the pathway is plausible but still mostly inferred
+the company may fit structurally, but the latest filing does not yet create a clear research-priority reason
 ```
 
 ## Common False Positives

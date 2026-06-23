@@ -34,6 +34,7 @@ export interface PromptRuntimeFeatures {
 export const MAX_PROMPT_HISTORY_MESSAGES = 12;
 export const MAX_PROMPT_HISTORY_MESSAGE_CHARS = 8_000;
 export const MAX_PROMPT_HISTORY_CONTEXT_CHARS = 48_000;
+const RUNTIME_TIME_ZONE = "Asia/Seoul";
 
 type PromptHistoryMessage = { role: string; content: string };
 
@@ -47,6 +48,7 @@ export function buildSystemPrompt(
   const responseLanguagePolicy = buildResponseLanguagePolicy(
     features.responseLocale ?? DEFAULT_LOCALE,
   );
+  const runtimeDatePolicy = buildRuntimeDatePolicy();
 
   return `You are the KRW Ontology web chat runtime.
 
@@ -54,8 +56,37 @@ The user prompt begins with the exact KRW-AI skill command for the active pass. 
 Use configured read-only KRW Ontology tools for filing evidence retrieval and, when explicitly enabled, the configured read-only stock-news MCP tool for current context.
 ${stockNewsPolicy}
 ${responseLanguagePolicy}
+${runtimeDatePolicy}
 Use the runtime context only as scope and history for that active pass.
 Return only the final user-visible answer in Markdown. Do not include tool-use narration, hidden planning notes, or progress phrases such as "I will query", "Let me get", "Let me verify", "Now let me", or "I'll check". Do not expose internal provenance labels such as "verified by trace", "trace", "chain", "query_context", "tool", or "MCP".${contextBlock}`;
+}
+
+function buildRuntimeDatePolicy(now = new Date()): string {
+  return [
+    `Runtime as-of date: ${formatDateInTimeZone(now, RUNTIME_TIME_ZONE)}`,
+    `Runtime timezone: ${RUNTIME_TIME_ZONE}`,
+    "The runtime date is temporal context only. It does not prove that a filing, earnings release, or reporting period exists.",
+    "Use an explicit period label only when it appears in the Company filing anchor, retrieved evidence, or the user's request.",
+    'Never invent an unconfirmed future period label. Refer to unpublished or unconfirmed future evidence relatively, such as "the next earnings release", "a future filing", or "the next results update", including in tables and follow-up prompts.',
+  ].join("\n");
+}
+
+function formatDateInTimeZone(date: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  if (!year || !month || !day) {
+    throw new Error(`Unable to format runtime date for ${timeZone}`);
+  }
+
+  return `${year}-${month}-${day}`;
 }
 
 function buildStockNewsPolicy(features: PromptRuntimeFeatures): string {
@@ -130,7 +161,9 @@ function formatCompanyContext(company: CompanyPromptContext): string {
   return [
     base,
     `  Company filing anchor: latest available filing: ${anchor.latestAvailable ?? "unknown"}; current driver: ${anchor.currentDriver ?? "unknown"}; annual baseline: ${anchor.annualBaseline ?? "unknown"}; historical context: ${anchor.historicalContext.join(", ") || "none"}.`,
+    `  Confirmed recent filing periods: ${company.latestPeriods.join(", ") || "none"}.`,
     "  Anchor instruction: Start current company and investment-decision judgments from Current driver. Use Annual baseline only for annual business mix, historical trend, and risk baseline. Use Historical context only for cycle comparison or change over time.",
+    "  Period boundary instruction: Do not infer a newer filing or period from the runtime date. Treat only periods listed here, returned by tools, or explicitly supplied by the user as confirmed.",
   ].join("\n");
 }
 

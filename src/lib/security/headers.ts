@@ -43,7 +43,7 @@ export function buildContentSecurityPolicy({
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",
-    "img-src 'self' data: blob: https://lh3.googleusercontent.com",
+    "img-src 'self' data: blob: https://lh3.googleusercontent.com https://cdn.brandfetch.io",
     "font-src 'self' data:",
     "media-src 'self' data: blob:",
     "style-src 'self' 'unsafe-inline'",

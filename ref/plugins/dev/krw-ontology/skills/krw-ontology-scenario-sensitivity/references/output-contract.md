@@ -15,10 +15,9 @@ Example:
 Use:
 
 ```text
-## 현재 기준점
+## 현재 투자 가정
+## 가정이 걸려 있는 변수
 ## 시나리오 지도
-## 핵심 민감도
-## 하방과 유동성
 ## 판단이 바뀌는 조건
 ## 최종 해석
 ### 이어서 볼 질문
@@ -31,7 +30,7 @@ Do not add a separate generic limitation section.
 Prefer:
 
 ```text
-| 시나리오 | 발생 조건 | 실적 연결 | 투자 해석 |
+| 경로 | 무엇이 달라져야 하나 | 실적·현금흐름 연결 | 투자 해석 |
 ```
 
 Keep it interpretation-first. Include exact figures only when they materially change the judgment.
