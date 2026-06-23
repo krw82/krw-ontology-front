@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/desktop/auth", () => ({
   authenticateDesktopRequest: vi.fn(),
-  requireDesktopEntitlement: vi.fn(),
   DesktopAuthError: class DesktopAuthError extends Error {
     code = "authentication_error";
     publicMessage = "로그인이 필요합니다.";
@@ -20,10 +19,7 @@ vi.mock("@/lib/desktop/ontology-mcp-client", () => ({
   shouldUseDesktopOntologyMcp: vi.fn(),
 }));
 
-import {
-  authenticateDesktopRequest,
-  requireDesktopEntitlement,
-} from "@/lib/desktop/auth";
+import { authenticateDesktopRequest } from "@/lib/desktop/auth";
 import {
   checkKrwOntologyMcpHealth,
   shouldUseDesktopOntologyMcp,
@@ -48,7 +44,6 @@ describe("GET /api/desktop/ontology/health", () => {
       deviceId: "device-1",
       authMethod: "desktop_access_token",
     });
-    vi.mocked(requireDesktopEntitlement).mockResolvedValue({} as never);
     vi.mocked(shouldUseDesktopOntologyMcp).mockReturnValue(false);
     vi.mocked(checkKrwOntologyMcpHealth).mockResolvedValue({
       ok: true,

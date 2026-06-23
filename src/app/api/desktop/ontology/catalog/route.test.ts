@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/desktop/auth", () => ({
   authenticateDesktopRequest: vi.fn(),
-  requireDesktopEntitlement: vi.fn(),
+  requireDesktopFeatureAccess: vi.fn(),
   DesktopAuthError: class DesktopAuthError extends Error {
     code = "authentication_error";
     publicMessage = "로그인이 필요합니다.";
@@ -18,7 +18,7 @@ vi.mock("@/lib/ontology/catalog", () => ({
 
 import {
   authenticateDesktopRequest,
-  requireDesktopEntitlement,
+  requireDesktopFeatureAccess,
 } from "@/lib/desktop/auth";
 import { searchIndexedCompanies } from "@/lib/ontology/catalog";
 import { GET } from "./route";
@@ -40,7 +40,7 @@ describe("GET /api/desktop/ontology/catalog", () => {
       deviceId: "device-1",
       authMethod: "desktop_access_token",
     });
-    vi.mocked(requireDesktopEntitlement).mockResolvedValue({} as never);
+    vi.mocked(requireDesktopFeatureAccess).mockResolvedValue({} as never);
     vi.mocked(searchIndexedCompanies).mockResolvedValue([
       {
         ticker: "AAPL",
@@ -62,8 +62,9 @@ describe("GET /api/desktop/ontology/catalog", () => {
       companies: [{ ticker: "AAPL" }],
     });
     expect(authenticateDesktopRequest).toHaveBeenCalledTimes(1);
-    expect(requireDesktopEntitlement).toHaveBeenCalledWith(
+    expect(requireDesktopFeatureAccess).toHaveBeenCalledWith(
       expect.objectContaining({ userId: "user-1" }),
+      "evidence_research",
     );
     expect(searchIndexedCompanies).toHaveBeenCalledWith({
       query: "apple",

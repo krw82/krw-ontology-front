@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://krwontology.com/contracts/desktop/v1/notebook-overview.schema.json",
+  "title": "KRW Desktop Notebook Overview v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "contract_version", "data", "meta"],
+  "properties": {
+    "ok": { "const": true },
+    "contract_version": { "const": "desktop-notebook/v1" },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stats", "companies", "inbox"],
+      "properties": {
+        "stats": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "total_companies",
+            "watchlisted",
+            "holdings",
+            "open_questions",
+            "notes",
+            "recent_activity"
+          ],
+          "properties": {
+            "total_companies": { "type": "integer", "minimum": 0 },
+            "watchlisted": { "type": "integer", "minimum": 0 },
+            "holdings": { "type": "integer", "minimum": 0 },
+            "open_questions": { "type": "integer", "minimum": 0 },
+            "notes": { "type": "integer", "minimum": 0 },
+            "recent_activity": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "companies": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/company" }
+        },
+        "inbox": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/inbox" }
+        }
+      }
+    },
+    "meta": { "$ref": "#/$defs/meta" }
+  },
+  "$defs": {
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generated_at", "max_age_seconds"],
+      "properties": {
+        "generated_at": { "type": "string", "format": "date-time" },
+        "max_age_seconds": { "type": "integer", "minimum": 0, "maximum": 86400 }
+      }
+    },
+    "mark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "is_watchlisted",
+        "is_holding",
+        "priority",
+        "interest_reason",
+        "tags",
+        "last_activity_at",
+        "created_at",
+        "updated_at",
+        "version"
+      ],
+      "properties": {
+        "is_watchlisted": { "type": "boolean" },
+        "is_holding": { "type": "boolean" },
+        "priority": { "type": "integer" },
+        "interest_reason": { "type": ["string", "null"] },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "last_activity_at": { "type": ["string", "null"], "format": "date-time" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "version": { "type": "string" }
+      }
+    },
+    "company": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ticker",
+        "name",
+        "display_name",
+        "localized_name",
+        "sector",
+        "description",
+        "latest_period",
+        "coverage_label",
+        "document_count",
+        "document_types",
+        "notebook_preview",
+        "open_question_count",
+        "note_count",
+        "recent_research_count",
+        "latest_activity_at",
+        "research_status",
+        "research_status_label",
+        "research_status_reason",
+        "notebook_updated_at",
+        "notebook_age_days",
+        "mark"
+      ],
+      "properties": {
+        "ticker": { "type": "string" },
+        "name": { "type": "string" },
+        "display_name": { "type": "string" },
+        "localized_name": { "type": ["string", "null"] },
+        "sector": { "type": ["string", "null"] },
+        "description": { "type": "string" },
+        "latest_period": { "type": ["string", "null"] },
+        "coverage_label": { "type": "string" },
+        "document_count": { "type": "integer", "minimum": 0 },
+        "document_types": { "type": "array", "items": { "type": "string" } },
+        "notebook_preview": { "type": "string" },
+        "open_question_count": { "type": "integer", "minimum": 0 },
+        "note_count": { "type": "integer", "minimum": 0 },
+        "recent_research_count": { "type": "integer", "minimum": 0 },
+        "latest_activity_at": { "type": ["string", "null"], "format": "date-time" },
+        "research_status": {
+          "enum": ["ready", "empty", "has_open_questions", "stale"]
+        },
+        "research_status_label": { "type": "string" },
+        "research_status_reason": {
+          "type": ["string", "null"],
+          "enum": [null, "empty_notebook", "open_questions", "stale_notebook"]
+        },
+        "notebook_updated_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "notebook_age_days": { "type": ["integer", "null"], "minimum": 0 },
+        "mark": { "$ref": "#/$defs/mark" }
+      }
+    },
+    "inbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "ticker",
+        "company_name",
+        "status",
+        "status_label",
+        "reason",
+        "title",
+        "description",
+        "priority",
+        "age_days",
+        "open_question_count",
+        "action"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "ticker": { "type": "string" },
+        "company_name": { "type": "string" },
+        "status": { "enum": ["ready", "empty", "has_open_questions", "stale"] },
+        "status_label": { "type": "string" },
+        "reason": {
+          "enum": ["empty_notebook", "open_questions", "stale_notebook"]
+        },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "priority": { "type": "integer" },
+        "age_days": { "type": ["integer", "null"], "minimum": 0 },
+        "open_question_count": { "type": "integer", "minimum": 0 },
+        "action": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["type", "ticker"],
+              "properties": {
+                "type": { "const": "open_company" },
+                "ticker": { "type": "string" }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["type", "ticker", "question_id", "question"],
+              "properties": {
+                "type": { "const": "run_question" },
+                "ticker": { "type": "string" },
+                "question_id": { "type": ["string", "null"] },
+                "question": { "type": ["string", "null"] }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

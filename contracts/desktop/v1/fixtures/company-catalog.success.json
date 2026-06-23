@@ -1,0 +1,31 @@
+{
+  "ok": true,
+  "contract_version": "desktop-company-catalog/v1",
+  "data": {
+    "companies": [
+      {
+        "ticker": "AAPL",
+        "name": "Apple Inc.",
+        "display_name": "애플",
+        "localized_name": "애플",
+        "sector": "기술",
+        "description": "소비자 기기와 서비스 생태계를 운영합니다.",
+        "core_strength": "기기와 서비스의 결합",
+        "critical_risk": "지역별 수요와 규제",
+        "latest_period": "FY2025",
+        "document_count": 4,
+        "document_types": ["10-K", "10-Q"],
+        "coverage_label": "10-K, 10-Q"
+      }
+    ]
+  },
+  "meta": {
+    "catalog_release_id": "fixture-release",
+    "generated_at": "2026-06-23T00:00:00.000Z",
+    "query": "apple",
+    "returned_count": 1,
+    "next_cursor": null,
+    "has_more": false,
+    "max_age_seconds": 300
+  }
+}

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import {
   authenticateDesktopRequest,
-  requireDesktopEntitlement,
+  getDesktopEntitlement,
 } from "@/lib/desktop/auth";
 import { handleDesktopApiError } from "@/lib/desktop/api-responses";
 
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const auth = await authenticateDesktopRequest(request);
-    const entitlement = await requireDesktopEntitlement(auth);
+    const entitlement = await getDesktopEntitlement(auth);
 
     return Response.json({
       ok: true,

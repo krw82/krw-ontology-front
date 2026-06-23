@@ -1,8 +1,5 @@
 import type { NextRequest } from "next/server";
-import {
-  authenticateDesktopRequest,
-  requireDesktopEntitlement,
-} from "@/lib/desktop/auth";
+import { authenticateDesktopRequest } from "@/lib/desktop/auth";
 import { handleDesktopApiError } from "@/lib/desktop/api-responses";
 import { DESKTOP_ONTOLOGY_API_VERSION } from "@/lib/desktop/ontology-contracts";
 import {
@@ -16,8 +13,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await authenticateDesktopRequest(request);
-    await requireDesktopEntitlement(auth);
+    await authenticateDesktopRequest(request);
     const release = await getActiveOntologyCatalogRelease();
     const usesMcp = shouldUseDesktopOntologyMcp();
     const mcp = usesMcp ? await checkKrwOntologyMcpHealth() : null;

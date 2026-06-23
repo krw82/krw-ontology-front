@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/desktop/auth", () => ({
   authenticateDesktopRequest: vi.fn(),
-  requireDesktopEntitlement: vi.fn(),
+  getDesktopEntitlement: vi.fn(),
   DesktopAuthError: class DesktopAuthError extends Error {
     code = "authentication_error";
     publicMessage = "로그인이 필요합니다.";
@@ -15,7 +15,7 @@ vi.mock("@/lib/desktop/auth", () => ({
 
 import {
   authenticateDesktopRequest,
-  requireDesktopEntitlement,
+  getDesktopEntitlement,
 } from "@/lib/desktop/auth";
 import { GET } from "./route";
 
@@ -28,7 +28,7 @@ describe("GET /api/desktop/entitlement", () => {
       deviceId: "device-1",
       authMethod: "desktop_access_token",
     });
-    vi.mocked(requireDesktopEntitlement).mockResolvedValue({
+    vi.mocked(getDesktopEntitlement).mockResolvedValue({
       usage: {
         can_run: true,
       },
@@ -58,7 +58,7 @@ describe("GET /api/desktop/entitlement", () => {
         },
       },
     });
-    expect(requireDesktopEntitlement).toHaveBeenCalledWith(
+    expect(getDesktopEntitlement).toHaveBeenCalledWith(
       expect.objectContaining({ userId: "user-1" }),
     );
   });

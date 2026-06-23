@@ -17,7 +17,10 @@ import { authenticateDesktopAccessToken } from "./device-auth";
 import {
   authenticateDesktopRequest,
   DesktopAuthError,
+  getDesktopEntitlement,
+  requireDesktopFeatureAccess,
   requireDesktopEntitlement,
+  requireDesktopRunEntitlement,
 } from "./auth";
 import type { EntitlementStatus } from "@/types/entitlement";
 
@@ -211,5 +214,53 @@ describe("Desktop auth", () => {
       "user@example.test",
       { supabase: adminClient },
     );
+  });
+
+  it("allows authenticated feature reads when run usage is exhausted", async () => {
+    const adminClient = { from: vi.fn() };
+    vi.mocked(getSupabaseAdmin).mockReturnValue(adminClient as never);
+    vi.mocked(getEntitlementStatus).mockResolvedValue(entitlement(false));
+    const auth = {
+      userId: "user-1",
+      userEmail: "user@example.test",
+      deviceId: "device-1",
+      authMethod: "desktop_access_token" as const,
+    };
+
+    await expect(getDesktopEntitlement(auth)).resolves.toMatchObject({
+      usage: { can_run: false },
+    });
+    await expect(
+      requireDesktopFeatureAccess(auth, "evidence_research"),
+    ).resolves.toMatchObject({
+      usage: { can_run: false },
+    });
+    await expect(requireDesktopRunEntitlement(auth)).rejects.toMatchObject({
+      code: "entitlement_required",
+      status: 403,
+    });
+  });
+
+  it("blocks feature reads when the feature is disabled", async () => {
+    const adminClient = { from: vi.fn() };
+    vi.mocked(getSupabaseAdmin).mockReturnValue(adminClient as never);
+    const disabled = entitlement(true);
+    disabled.features[0].enabled = false;
+    vi.mocked(getEntitlementStatus).mockResolvedValue(disabled);
+
+    await expect(
+      requireDesktopFeatureAccess(
+        {
+          userId: "user-1",
+          userEmail: "user@example.test",
+          deviceId: "device-1",
+          authMethod: "desktop_access_token",
+        },
+        "evidence_research",
+      ),
+    ).rejects.toMatchObject({
+      code: "entitlement_required",
+      status: 403,
+    });
   });
 });

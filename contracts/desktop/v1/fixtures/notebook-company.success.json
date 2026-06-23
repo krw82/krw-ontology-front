@@ -1,0 +1,82 @@
+{
+  "ok": true,
+  "contract_version": "desktop-notebook-company/v1",
+  "data": {
+    "company": {
+      "ticker": "AAPL",
+      "name": "Apple Inc.",
+      "display_name": "애플",
+      "localized_name": "애플",
+      "sector": "기술",
+      "description": "소비자 기기와 서비스 생태계를 운영합니다.",
+      "latest_period": "FY2025",
+      "coverage_label": "10-K, 10-Q",
+      "document_count": 4,
+      "document_types": ["10-K", "10-Q"],
+      "notebook_preview": "서비스 성장과 지역별 수요를 추적합니다.",
+      "open_question_count": 1,
+      "note_count": 1,
+      "recent_research_count": 2,
+      "latest_activity_at": "2026-06-23T00:00:00.000Z",
+      "research_status": "has_open_questions",
+      "research_status_label": "질문 확인",
+      "research_status_reason": "open_questions",
+      "notebook_updated_at": "2026-06-23T00:00:00.000Z",
+      "notebook_age_days": 0,
+      "mark": {
+        "is_watchlisted": true,
+        "is_holding": false,
+        "priority": 1,
+        "interest_reason": "서비스 성장",
+        "tags": ["품질"],
+        "last_activity_at": "2026-06-23T00:00:00.000Z",
+        "created_at": "2026-06-22T00:00:00.000Z",
+        "updated_at": "2026-06-23T00:00:00.000Z",
+        "version": "2026-06-23T00:00:00.000Z"
+      }
+    },
+    "notebook": {
+      "ticker": "AAPL",
+      "title": "애플 리서치 노트",
+      "content_md": "## 핵심\n\n서비스 성장과 지역별 수요를 추적합니다.",
+      "basis_release_id": "fixture-release",
+      "basis_period": "FY2025",
+      "created_at": "2026-06-22T00:00:00.000Z",
+      "updated_at": "2026-06-23T00:00:00.000Z",
+      "version": "2026-06-23T00:00:00.000Z"
+    },
+    "questions": [
+      {
+        "id": "question-1",
+        "ticker": "AAPL",
+        "question": "서비스 성장률은?",
+        "status": "open",
+        "source": "manual",
+        "answered_at": null,
+        "visible_after_at": "2026-06-23T00:00:00.000Z",
+        "created_at": "2026-06-22T00:00:00.000Z",
+        "updated_at": "2026-06-23T00:00:00.000Z",
+        "version": "2026-06-23T00:00:00.000Z"
+      }
+    ],
+    "notes": [
+      {
+        "id": "note-1",
+        "ticker": "AAPL",
+        "title": "확인 항목",
+        "body": "지역별 수요와 서비스 매출을 함께 본다.",
+        "note_type": "manual",
+        "tags": [],
+        "created_at": "2026-06-22T00:00:00.000Z",
+        "updated_at": "2026-06-23T00:00:00.000Z"
+      }
+    ],
+    "card": null,
+    "theses": [],
+    "thesis_checks": []
+  },
+  "meta": {
+    "generated_at": "2026-06-23T00:00:00.000Z",
+    "max_age_seconds": 120
+  }
+}

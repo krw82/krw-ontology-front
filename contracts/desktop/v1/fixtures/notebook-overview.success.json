@@ -1,0 +1,74 @@
+{
+  "ok": true,
+  "contract_version": "desktop-notebook/v1",
+  "data": {
+    "stats": {
+      "total_companies": 1,
+      "watchlisted": 1,
+      "holdings": 0,
+      "open_questions": 1,
+      "notes": 1,
+      "recent_activity": 1
+    },
+    "companies": [
+      {
+        "ticker": "AAPL",
+        "name": "Apple Inc.",
+        "display_name": "애플",
+        "localized_name": "애플",
+        "sector": "기술",
+        "description": "소비자 기기와 서비스 생태계를 운영합니다.",
+        "latest_period": "FY2025",
+        "coverage_label": "10-K, 10-Q",
+        "document_count": 4,
+        "document_types": ["10-K", "10-Q"],
+        "notebook_preview": "서비스 성장과 지역별 수요를 추적합니다.",
+        "open_question_count": 1,
+        "note_count": 1,
+        "recent_research_count": 2,
+        "latest_activity_at": "2026-06-23T00:00:00.000Z",
+        "research_status": "has_open_questions",
+        "research_status_label": "질문 확인",
+        "research_status_reason": "open_questions",
+        "notebook_updated_at": "2026-06-23T00:00:00.000Z",
+        "notebook_age_days": 0,
+        "mark": {
+          "is_watchlisted": true,
+          "is_holding": false,
+          "priority": 1,
+          "interest_reason": "서비스 성장",
+          "tags": ["품질"],
+          "last_activity_at": "2026-06-23T00:00:00.000Z",
+          "created_at": "2026-06-22T00:00:00.000Z",
+          "updated_at": "2026-06-23T00:00:00.000Z",
+          "version": "2026-06-23T00:00:00.000Z"
+        }
+      }
+    ],
+    "inbox": [
+      {
+        "id": "AAPL:open_questions:question-1",
+        "ticker": "AAPL",
+        "company_name": "애플",
+        "status": "has_open_questions",
+        "status_label": "질문 확인",
+        "reason": "open_questions",
+        "title": "서비스 성장 확인",
+        "description": "다음 질문을 이어서 확인합니다.",
+        "priority": 1,
+        "age_days": 0,
+        "open_question_count": 1,
+        "action": {
+          "type": "run_question",
+          "ticker": "AAPL",
+          "question_id": "question-1",
+          "question": "서비스 성장률은?"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "generated_at": "2026-06-23T00:00:00.000Z",
+    "max_age_seconds": 120
+  }
+}

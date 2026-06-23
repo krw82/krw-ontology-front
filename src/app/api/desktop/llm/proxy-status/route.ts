@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import {
   authenticateDesktopRequest,
-  requireDesktopEntitlement,
+  requireDesktopFeatureAccess,
 } from "@/lib/desktop/auth";
 import { handleDesktopApiError } from "@/lib/desktop/api-responses";
 import {
@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const auth = await authenticateDesktopRequest(request);
-    await requireDesktopEntitlement(auth);
+    await requireDesktopFeatureAccess(auth, "evidence_research");
     const profile = resolveDesktopLlmModelProfile();
     const readiness = await resolveGatewayReadiness();
 

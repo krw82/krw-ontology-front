@@ -44,6 +44,7 @@
     "mcp:dev:launchd:install": "scripts/install-mcp-server-dev-launchd.sh",
     "mcp:dev:launchd:uninstall": "scripts/uninstall-mcp-server-dev-launchd.sh",
     "desktop:ontology:smoke": "node scripts/smoke-desktop-ontology-mcp.mjs",
+    "contracts:desktop:verify": "node scripts/verify-desktop-contracts.mjs",
     "stock-news:prod:start": "scripts/start-stock-news-mcp-production.sh",
     "stock-news:prod:verify": "scripts/verify-stock-news-mcp-production.sh",
     "stock-news:prod:status": "scripts/verify-stock-news-mcp-production.sh",

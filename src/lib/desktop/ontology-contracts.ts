@@ -17,6 +17,10 @@ export type DesktopOntologyToolName =
 export type DesktopErrorCode =
   | "authentication_error"
   | "entitlement_required"
+  | "validation_error"
+  | "not_found"
+  | "resource_conflict"
+  | "contract_mismatch"
   | "provider_unavailable"
   | "llm_job_token_unavailable"
   | "invalid_job_token"

@@ -491,6 +491,12 @@ export interface UserResearchNoteRow extends Record<string, unknown> {
   tags: string[];
   source_chat_session_id: string | null;
   source_message_id: string | null;
+  client_operation_id?: string | null;
+  source_origin?: "web" | "desktop";
+  source_device_id?: string | null;
+  source_local_session_id?: string | null;
+  source_local_run_id?: string | null;
+  source_local_message_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1501,6 +1507,12 @@ export interface Database {
           | "basis_document_type"
           | "source_chat_session_id"
           | "source_message_id"
+          | "client_operation_id"
+          | "source_origin"
+          | "source_device_id"
+          | "source_local_session_id"
+          | "source_local_run_id"
+          | "source_local_message_id"
           | "created_at"
           | "updated_at"
         > & {
@@ -1513,6 +1525,12 @@ export interface Database {
           basis_document_type?: string | null;
           source_chat_session_id?: string | null;
           source_message_id?: string | null;
+          client_operation_id?: string | null;
+          source_origin?: "web" | "desktop";
+          source_device_id?: string | null;
+          source_local_session_id?: string | null;
+          source_local_run_id?: string | null;
+          source_local_message_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };

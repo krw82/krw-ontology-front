@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/desktop/auth", () => ({
   authenticateDesktopRequest: vi.fn(),
-  requireDesktopEntitlement: vi.fn(),
+  requireDesktopFeatureAccess: vi.fn(),
 }));
 vi.mock("@/lib/desktop/llm-models", () => ({
   resolveDesktopLlmModelProfile: vi.fn(() => ({
@@ -24,7 +24,7 @@ vi.mock("@/lib/desktop/llm-models", () => ({
 
 import {
   authenticateDesktopRequest,
-  requireDesktopEntitlement,
+  requireDesktopFeatureAccess,
 } from "@/lib/desktop/auth";
 import { GET } from "./route";
 
@@ -47,7 +47,7 @@ describe("GET /api/desktop/llm/proxy-status", () => {
       deviceId: "device-1",
       authMethod: "desktop_access_token",
     });
-    vi.mocked(requireDesktopEntitlement).mockResolvedValue({} as never);
+    vi.mocked(requireDesktopFeatureAccess).mockResolvedValue({} as never);
   });
 
   it("returns the configured DeepSeek gateway model profile", async () => {
@@ -69,7 +69,10 @@ describe("GET /api/desktop/llm/proxy-status", () => {
     });
     expect(body.models[0].sdk_model).toBe("deepseek-v4-flash");
     expect(authenticateDesktopRequest).toHaveBeenCalled();
-    expect(requireDesktopEntitlement).toHaveBeenCalled();
+    expect(requireDesktopFeatureAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user-1" }),
+      "evidence_research",
+    );
   });
 
   it("reports not ready when the job token secret is missing", async () => {

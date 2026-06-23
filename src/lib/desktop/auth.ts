@@ -76,17 +76,49 @@ export async function authenticateDesktopRequest(
 export async function requireDesktopEntitlement(
   auth: DesktopAuthContext,
 ): Promise<EntitlementStatus> {
-  const entitlement = await getEntitlementStatus(auth.userId, auth.userEmail, {
+  return requireDesktopRunEntitlement(auth);
+}
+
+export async function getDesktopEntitlement(
+  auth: DesktopAuthContext,
+): Promise<EntitlementStatus> {
+  return getEntitlementStatus(auth.userId, auth.userEmail, {
     supabase: getSupabaseAdmin(),
   });
-  const evidenceResearch = entitlement.features.find(
-    (feature) => feature.key === "evidence_research",
+}
+
+export async function requireDesktopFeatureAccess(
+  auth: DesktopAuthContext,
+  featureKey: EntitlementStatus["features"][number]["key"] = "evidence_research",
+): Promise<EntitlementStatus> {
+  const entitlement = await getDesktopEntitlement(auth);
+  const feature = entitlement.features.find(
+    (candidate) => candidate.key === featureKey,
   );
 
-  if (!entitlement.usage.can_run || evidenceResearch?.enabled === false) {
+  if (feature?.enabled === false) {
+    throw new DesktopAuthError("Desktop feature access required", {
+      code: "entitlement_required",
+      publicMessage: "현재 플랜에서 사용할 수 없는 기능입니다.",
+      status: 403,
+    });
+  }
+
+  return entitlement;
+}
+
+export async function requireDesktopRunEntitlement(
+  auth: DesktopAuthContext,
+): Promise<EntitlementStatus> {
+  const entitlement = await requireDesktopFeatureAccess(
+    auth,
+    "evidence_research",
+  );
+
+  if (!entitlement.usage.can_run) {
     throw new DesktopAuthError("Desktop entitlement required", {
       code: "entitlement_required",
-      publicMessage: "KRW Desktop 사용 권한 또는 사용량이 부족합니다.",
+      publicMessage: "새 분석을 시작할 수 있는 사용량이 부족합니다.",
       status: 403,
     });
   }
