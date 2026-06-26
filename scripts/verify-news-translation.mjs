@@ -32,6 +32,10 @@ const script =
   process.env.NEWS_TRANSLATION_GOOGLETRANS_SCRIPT?.trim() ||
   path.join(process.cwd(), "scripts", "translate-news-googletrans.py");
 const timeoutMs = positiveInt(process.env.NEWS_TRANSLATION_TIMEOUT_MS, 7000);
+const maxAttempts = positiveInt(
+  process.env.NEWS_TRANSLATION_SMOKE_ATTEMPTS,
+  3,
+);
 const payload = JSON.stringify({
   src: "en",
   dest: "ko",
@@ -39,16 +43,31 @@ const payload = JSON.stringify({
 });
 
 const startedAt = Date.now();
-const result = await runTranslator({ python, script, payload, timeoutMs });
-if (!result.ok) fail(result.error);
+let attempt = 0;
+let lastFailure = "";
+for (; attempt < maxAttempts; attempt += 1) {
+  const result = await runTranslator({ python, script, payload, timeoutMs });
+  if (!result.ok) {
+    lastFailure = result.error || "unknown_googletrans_error";
+  } else {
+    const translated = result.translations[0]?.trim();
+    if (translated && /[가-힣]/.test(translated)) break;
+    lastFailure = `no Korean text: ${formatObservedText(translated)}`;
+  }
 
-const translated = result.translations[0]?.trim();
-if (!translated || !/[가-힣]/.test(translated)) {
-  fail("News translation smoke returned no Korean text");
+  if (attempt + 1 < maxAttempts) {
+    await delay(Math.min(250 * (attempt + 1), 1000));
+  }
+}
+
+if (attempt >= maxAttempts) {
+  fail(
+    `News translation smoke failed after ${maxAttempts} attempts: ${lastFailure}`,
+  );
 }
 
 console.log(
-  `OK news translation: provider=${provider} python=${python} timeout_ms=${timeoutMs} latency_ms=${Date.now() - startedAt}`,
+  `OK news translation: provider=${provider} python=${python} timeout_ms=${timeoutMs} attempts=${attempt + 1} latency_ms=${Date.now() - startedAt}`,
 );
 
 function runTranslator({ python, script, payload, timeoutMs }) {
@@ -131,6 +150,20 @@ function structuredError(parsed) {
 function positiveInt(value, fallback) {
   const parsed = value ? Number.parseInt(value, 10) : NaN;
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function formatObservedText(value) {
+  if (!value) return "<empty>";
+  const normalized = String(value).replace(/\s+/g, " ").trim();
+  return JSON.stringify(
+    normalized.length > 120 ? `${normalized.slice(0, 117)}...` : normalized,
+  );
+}
+
+function delay(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 async function loadEnvFile(argv) {

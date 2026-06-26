@@ -28,6 +28,11 @@ import {
   releaseAnalysisCreditsShadow,
   reserveAnalysisCreditsShadow,
 } from "@/lib/concurrency/analysis-credits";
+import { normalizeAnalysisMode } from "@/lib/analysis-mode";
+import {
+  defaultRunKindForAnalysisMode,
+  normalizeRunKind,
+} from "@/lib/run-kind";
 import { shouldBlockAnalysisCreditReservation } from "@/lib/billing/credit-policy";
 import { parseChatAttachmentContent } from "@/lib/chat/attachments";
 import {
@@ -174,8 +179,12 @@ export async function POST(request: NextRequest) {
   });
   if (!sessionRateLimitResult.ok) return sessionRateLimitResult.response;
 
-  let effectiveAnalysisMode = body.analysis_mode;
-  let effectiveRunKind = body.run_kind;
+  let effectiveAnalysisMode = normalizeAnalysisMode(body.analysis_mode);
+  let effectiveRunKind = normalizeRunKind(
+    body.run_kind ?? defaultRunKindForAnalysisMode(effectiveAnalysisMode),
+  );
+  let routingMode: "auto" | "preserve" =
+    effectiveRunKind === "company_research" ? "auto" : "preserve";
   let selectedNewsEventContext: Record<string, unknown> | null = null;
   const userUrls = body.user_urls?.length
     ? body.user_urls
@@ -191,6 +200,7 @@ export async function POST(request: NextRequest) {
         urls: userUrls,
         userQuestion: content,
       });
+      routingMode = "preserve";
     } catch (error) {
       const message =
         error instanceof UserUrlContextError
@@ -224,6 +234,7 @@ export async function POST(request: NextRequest) {
             });
       effectiveAnalysisMode = "news";
       effectiveRunKind = "news_research";
+      routingMode = "preserve";
     } catch (error) {
       const message =
         error instanceof UserUrlContextError
@@ -358,6 +369,7 @@ export async function POST(request: NextRequest) {
       research_mode: body.research_mode,
       analysis_mode: effectiveAnalysisMode,
       run_kind: effectiveRunKind,
+      routing_mode: routingMode,
       has_user_url: userUrls.length > 0,
       user_url_count: userUrls.length,
       response_locale: responseLocale,
@@ -383,6 +395,7 @@ export async function POST(request: NextRequest) {
       ? "server_pipeline"
       : "claude_agent",
     selectedNewsEventContext,
+    routingMode,
   });
 
   if (!enqueueResult.ok) {

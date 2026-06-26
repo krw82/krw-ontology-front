@@ -360,6 +360,7 @@ describe("POST /api/chat/run worker admission", () => {
         researchMode: "fast",
         analysisMode: "company",
         runKind: "company_research",
+        routingMode: "auto",
         responseLocale: "ko",
       }),
     );
@@ -438,7 +439,6 @@ describe("POST /api/chat/run worker admission", () => {
         },
       },
     });
-
     const response = await POST(request());
 
     expect(response.status).toBe(200);
@@ -449,6 +449,7 @@ describe("POST /api/chat/run worker admission", () => {
         researchMode: "fast",
         analysisMode: "news",
         runKind: "news_discovery",
+        routingMode: "preserve",
         executorType: "server_pipeline",
       }),
     );
@@ -507,6 +508,7 @@ describe("POST /api/chat/run worker admission", () => {
       expect.objectContaining({
         analysisMode: "news",
         runKind: "news_research",
+        routingMode: "preserve",
         executorType: "claude_agent",
         selectedNewsEventContext: expect.objectContaining({
           version: "user-url-event/v1",
@@ -576,6 +578,7 @@ describe("POST /api/chat/run worker admission", () => {
       expect.objectContaining({
         analysisMode: "news",
         runKind: "news_research",
+        routingMode: "preserve",
         selectedNewsEventContext: expect.objectContaining({
           source_kind: "user_provided_urls",
         }),
@@ -628,8 +631,64 @@ describe("POST /api/chat/run worker admission", () => {
       expect.objectContaining({
         analysisMode: "company",
         runKind: "idea_generation",
+        routingMode: "preserve",
         selectedNewsEventContext: expect.objectContaining({
           version: "idea-generation-user-url-context/v1",
+        }),
+      }),
+    );
+  });
+
+  it("queues ordinary company questions for worker-side auto routing", async () => {
+    vi.mocked(getReadyAgentWorker).mockResolvedValue({
+      ok: true,
+      worker: { worker_id: "mac-worker-jwc-1" } as never,
+      mcpHealth: readyMcpHealth,
+    });
+    vi.mocked(validateRequest).mockResolvedValue({
+      ok: true,
+      data: {
+        userId: "user-1",
+        userEmail: "user@example.test",
+        body: {
+          content: "GOOGL 주가가 왜 6% 빠졌어?",
+          request_id: "550e8400-e29b-41d4-a716-446655440001",
+          session_id: "11111111-1111-4111-8111-111111111111",
+          research_mode: "standard",
+          analysis_mode: "company",
+          run_kind: "company_research",
+        },
+      },
+    });
+    vi.mocked(resolveSession).mockResolvedValue({
+      ok: true,
+      session: {
+        id: "11111111-1111-4111-8111-111111111111",
+        userId: "user-1",
+        scopeType: "global",
+        defaultTickers: [],
+        defaultDocumentTypes: [],
+      },
+    });
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(enqueueAgentRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        analysisMode: "company",
+        runKind: "company_research",
+        routingMode: "auto",
+        executorType: "claude_agent",
+        selectedNewsEventContext: null,
+      }),
+    );
+    expect(recordAnalyticsEventFromRequest).toHaveBeenCalledWith(
+      expect.any(NextRequest),
+      expect.objectContaining({
+        properties: expect.objectContaining({
+          analysis_mode: "company",
+          run_kind: "company_research",
+          routing_mode: "auto",
         }),
       }),
     );

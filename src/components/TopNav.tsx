@@ -118,7 +118,7 @@ export default function TopNav({
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [clientReady, setClientReady] = useState(false);
   const [showSidebarCoachmark, setShowSidebarCoachmark] =
-    useState(IS_DEV_ENV);
+    useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const shouldLoadAccount = !hideAccountMenu;
   const { entitlement } = useEntitlement(shouldLoadAccount && Boolean(userProfile));
@@ -129,13 +129,14 @@ export default function TopNav({
     [shouldLoadAccount],
   );
   const query = searchParams.toString();
+  const forceCoachmarks = searchParams.get("coach") === "1";
   const currentPath = normalizeInternalNextPath(
     query ? `${pathname}?${query}` : pathname,
   );
   const navLinks = [
     {
       href: "/discover",
-      label: currentLocale === "ko" ? "종목 발굴하기" : "Discover stocks",
+      label: currentLocale === "ko" ? "종목 발굴기" : "Stock discovery",
       active: pathname.startsWith("/discover"),
     },
     {
@@ -172,6 +173,15 @@ export default function TopNav({
 
   useEffect(() => {
     if (!showSidebarTrigger) return undefined;
+    if (forceCoachmarks) {
+      const showTimer = window.setTimeout(
+        () => setShowSidebarCoachmark(true),
+        0,
+      );
+      return () => {
+        window.clearTimeout(showTimer);
+      };
+    }
     if (IS_DEV_ENV) return undefined;
 
     try {
@@ -193,7 +203,7 @@ export default function TopNav({
     return () => {
       window.clearTimeout(showTimer);
     };
-  }, [showSidebarTrigger]);
+  }, [forceCoachmarks, showSidebarTrigger]);
 
   // M-08: onAuthStateChange listener
   useEffect(() => {

@@ -47,7 +47,9 @@ export type RunKind =
   | "company_research"
   | "idea_generation"
   | "news_discovery"
-  | "news_research";
+  | "news_research"
+  | "market_move_research"
+  | "scenario_sensitivity";
 
 export type AgentRunExecutorType = "claude_agent" | "server_pipeline";
 
@@ -61,6 +63,7 @@ export type StreamingEventType =
   | "activity_update"
   | "citation"
   | "artifact"
+  | "chart"
   | "state_sync"
   | "done"
   | "error"
@@ -154,8 +157,14 @@ export type StockNewsMCPToolName =
   | "build_news_timeline"
   | "audit_news_sources";
 
+/** Local presentation MCP tool names */
+export type ChartMCPToolName = "create_chart_v1";
+
 /** Allowed MCP tool names */
-export type MCPToolName = KRWOntologyMCPToolName | StockNewsMCPToolName;
+export type MCPToolName =
+  | KRWOntologyMCPToolName
+  | StockNewsMCPToolName
+  | ChartMCPToolName;
 
 /** Document types in the ontology */
 export type DocumentType =
@@ -569,6 +578,7 @@ export interface StreamingToolCallEnd {
 export type ResearchActivityStage =
   | "preparing"
   | "queued"
+  | "routing"
   | "connecting"
   | "researching"
   | "checking_evidence"
@@ -579,6 +589,19 @@ export interface ResearchActivityUpdate {
   stage: ResearchActivityStage;
   label: string;
   queue?: QueueStatus | null;
+  routing?: {
+    mode?: string;
+    source?: string;
+    confidence?: string;
+    original_analysis_mode?: string;
+    original_run_kind?: string;
+    analysis_mode?: string;
+    run_kind?: string;
+    executor_type?: string;
+    reason?: string;
+    note?: string | null;
+    has_selected_news_event_context?: boolean;
+  };
 }
 
 export interface QueueStatus {
@@ -1043,6 +1066,54 @@ export interface ChatArtifactSelection {
   readonly created_at: string;
 }
 
+export type KrwChartType = "line" | "bar";
+
+export interface KrwChartPointV1 {
+  period: string;
+  value: number;
+  formatted_value?: string | null;
+  evidence_ref: string;
+}
+
+export interface KrwChartSeriesV1 {
+  series_key: string;
+  label: string;
+  metric_name?: string | null;
+  unit?: string | null;
+  points: KrwChartPointV1[];
+}
+
+export interface KrwChartV1 {
+  version: "krw-chart/v1";
+  chart_type: KrwChartType;
+  title: string;
+  subtitle?: string | null;
+  unit?: string | null;
+  series: KrwChartSeriesV1[];
+  source: {
+    tool: "create_chart_v1";
+    source_tool_call_ids: string[];
+  };
+  quality: {
+    series_count: number;
+    point_count: number;
+    warnings: string[];
+  };
+}
+
+export interface ChatMessageChart {
+  readonly id: string;
+  session_id: string;
+  message_id: string;
+  run_id: string;
+  chart_ref: string;
+  insert_token: string;
+  title: string;
+  chart_type: KrwChartType;
+  payload_json: KrwChartV1;
+  readonly created_at: string;
+}
+
 // ============================================================
 // Release Metadata Types
 // ============================================================
@@ -1197,6 +1268,11 @@ export interface StreamingArtifactEvent extends StreamingEventBase {
   data: ChatArtifact;
 }
 
+export interface StreamingChartEvent extends StreamingEventBase {
+  event: "chart";
+  data: ChatMessageChart;
+}
+
 /** Server-side session state reconciliation after reconnect races */
 export interface StreamingStateSyncEvent extends StreamingEventBase {
   event: "state_sync";
@@ -1219,6 +1295,7 @@ export interface StreamingDoneEvent extends StreamingEventBase {
     rich_answers?: ResearchArtifact[];
     artifacts?: ResearchArtifact[];
     chat_artifacts?: ChatArtifact[];
+    charts?: ChatMessageChart[];
     release: ReleaseMetadata;
     usage: {
       input_tokens: number;
@@ -1259,6 +1336,7 @@ export type StreamingEvent =
   | StreamingActivityUpdateEvent
   | StreamingCitationEvent
   | StreamingArtifactEvent
+  | StreamingChartEvent
   | StreamingStateSyncEvent
   | StreamingDoneEvent
   | StreamingErrorEvent
@@ -1350,6 +1428,7 @@ export interface GetChatSessionResponse {
   citations?: Citation[];
   tool_calls?: ToolCall[];
   chat_artifacts?: ChatArtifact[];
+  charts?: ChatMessageChart[];
   artifact_selections?: ChatArtifactSelection[];
   rich_answers?: ResearchArtifact[];
   research_artifacts?: ResearchArtifact[];
@@ -1546,6 +1625,7 @@ export interface WebContainerEnv {
   BILLING_MUTATIONS_PER_USER_PER_MINUTE?: string;
   ANALYSIS_CREDIT_ENFORCEMENT_MODE?: "shadow" | "soft_warning" | "enforced";
   KRW_ONTOLOGY_PLUGIN_PATH: string;
+  KRW_CHAT_ROUTER_MODE?: "claude" | "1" | "true";
   WEB_COMMIT: string;
   KRW_ONTOLOGY_COMMIT: string;
   GLOBAL_CONCURRENT_RUN_LIMIT: string;  // "5"

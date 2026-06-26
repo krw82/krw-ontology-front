@@ -11,7 +11,7 @@ Default behavior:
   - build/promote a local release through ~/krw-ontology/scripts/deploy-with-local-release.sh
   - publish the compact web catalog to Supabase
   - deploy frontend, plugin, and MCP code
-  - write all output to ~/krw-deploy-logs/deploy-full-<timestamp>.log
+  - write all output to ~/krw-ontology-log/deploy/deploy-full-<timestamp>.log
 
 Options:
   --help, -h                 Show this help.
@@ -23,7 +23,8 @@ Examples:
   scripts/deploy-full-production-logged.sh --queue-timeout 7200 --apply-migrations
 
 Environment:
-  KRW_DEPLOY_LOG_DIR                 Defaults to $HOME/krw-deploy-logs
+  KRW_LOG_DIR                        Defaults to $HOME/krw-ontology-log
+  KRW_DEPLOY_LOG_DIR                 Defaults to $KRW_LOG_DIR/deploy
   KRW_ONTOLOGY_DEPLOY_WITH_RELEASE   Defaults to $HOME/krw-ontology/scripts/deploy-with-local-release.sh
   KRW_FRONT_DEPLOY_ALL               Defaults to this repo's scripts/deploy-all-production.sh
 EOF
@@ -58,7 +59,8 @@ done
 
 DEPLOY_WITH_RELEASE=${KRW_ONTOLOGY_DEPLOY_WITH_RELEASE:-"$HOME/krw-ontology/scripts/deploy-with-local-release.sh"}
 DEPLOY_ALL=${KRW_FRONT_DEPLOY_ALL:-"$FRONT_DIR/scripts/deploy-all-production.sh"}
-LOG_DIR=${KRW_DEPLOY_LOG_DIR:-"$HOME/krw-deploy-logs"}
+KRW_LOG_DIR=${KRW_LOG_DIR:-"$HOME/krw-ontology-log"}
+LOG_DIR=${KRW_DEPLOY_LOG_DIR:-"$KRW_LOG_DIR/deploy"}
 LOG_FILE="$LOG_DIR/deploy-full-$(date +%Y%m%d-%H%M%S).log"
 
 mkdir -p "$LOG_DIR"

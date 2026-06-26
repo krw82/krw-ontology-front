@@ -49,6 +49,7 @@ export function buildSystemPrompt(
     features.responseLocale ?? DEFAULT_LOCALE,
   );
   const runtimeDatePolicy = buildRuntimeDatePolicy();
+  const chartPolicy = buildChartPolicy();
 
   return `You are the KRW Ontology web chat runtime.
 
@@ -57,6 +58,7 @@ Use configured read-only KRW Ontology tools for filing evidence retrieval and, w
 ${stockNewsPolicy}
 ${responseLanguagePolicy}
 ${runtimeDatePolicy}
+${chartPolicy}
 Use the runtime context only as scope and history for that active pass.
 Return only the final user-visible answer in Markdown. Do not include tool-use narration, hidden planning notes, or progress phrases such as "I will query", "Let me get", "Let me verify", "Now let me", or "I'll check". Do not expose internal provenance labels such as "verified by trace", "trace", "chain", "query_context", "tool", or "MCP".${contextBlock}`;
 }
@@ -68,6 +70,19 @@ function buildRuntimeDatePolicy(now = new Date()): string {
     "The runtime date is temporal context only. It does not prove that a filing, earnings release, or reporting period exists.",
     "Use an explicit period label only when it appears in the Company filing anchor, retrieved evidence, or the user's request.",
     'Never invent an unconfirmed future period label. Refer to unpublished or unconfirmed future evidence relatively, such as "the next earnings release", "a future filing", or "the next results update", including in tables and follow-up prompts.',
+  ].join("\n");
+}
+
+function buildChartPolicy(): string {
+  return [
+    "Inline chart policy:",
+    "For user questions about numeric trends, period-over-period changes, revenue mix, segment/geography comparisons, margins, cash flow, capex, expenses, SBC, buybacks, M&A, or similar financial time series, actively look for retrieved KRW Ontology metric_series_pack data and prefer calling create_chart_v1 before the final answer.",
+    "When metric_series_pack contains aligned, supported numeric series relevant to the user's question, call create_chart_v1. Treat this as the default for metric trend/comparison answers, not as an optional decoration.",
+    "Pass only exact metric_series_pack.series[].series_key values to create_chart_v1; never hand-write chart JSON or raw chart numbers in the answer.",
+    "After create_chart_v1 returns insert_token, place that token exactly where the chart should appear in the final Markdown answer.",
+    "Use one to three charts for metric-heavy answers when supported; at most five. Prefer separate charts when units differ.",
+    "Do not create charts for qualitative claims, weak evidence, unaligned periods, mixed units, or values not retrieved from the ontology tools.",
+    "If create_chart_v1 returns an error, do not expose the tool error. Continue with a normal Markdown answer.",
   ].join("\n");
 }
 

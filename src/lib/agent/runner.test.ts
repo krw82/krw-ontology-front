@@ -9,6 +9,20 @@ import type {
 const sdkMocks = vi.hoisted(() => ({
   query: vi.fn(),
   getSessionInfo: vi.fn(),
+  createSdkMcpServer: vi.fn((options: { name: string }) => ({
+    type: "sdk",
+    name: options.name,
+    instance: {},
+  })),
+  tool: vi.fn(
+    (
+      name: string,
+      description: string,
+      inputSchema: Record<string, unknown>,
+      handler: unknown,
+      extras?: Record<string, unknown>,
+    ) => ({ name, description, inputSchema, handler, ...extras }),
+  ),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -41,14 +55,19 @@ vi.mock("./mcp-client", () => {
     "build_news_timeline",
     "audit_news_sources",
   ];
+  const chartTools = ["create_chart_v1"];
   return {
     KRW_ONTOLOGY_MCP_TOOLS: tools,
     STOCK_NEWS_MCP_TOOLS: stockNewsTools,
+    CHART_MCP_TOOLS: chartTools,
     KRW_ONTOLOGY_SDK_ALLOWED_TOOLS: tools.map(
       (toolName) => `mcp__plugin_krw-ontology_krw-ontology__${toolName}`,
     ),
     STOCK_NEWS_SDK_ALLOWED_TOOLS: stockNewsTools.map(
       (toolName) => `mcp__plugin_krw-ontology_stock-news__${toolName}`,
+    ),
+    CHART_SDK_ALLOWED_TOOLS: chartTools.map(
+      (toolName) => `mcp__krw_presentation__${toolName}`,
     ),
     getKrwOntologyPluginPath: () => "/tmp/krw-ontology-plugin",
     getStockNewsSdkAllowedTools: () =>
@@ -65,6 +84,8 @@ vi.mock("./mcp-client", () => {
       process.env.STOCK_NEWS_FORCE_DISABLED !== "1",
     isStockNewsSdkTool: (toolName: string) =>
       toolName.startsWith("mcp__plugin_krw-ontology_stock-news__"),
+    isChartSdkTool: (toolName: string) =>
+      toolName.startsWith("mcp__krw_presentation__"),
   };
 });
 
@@ -693,6 +714,68 @@ describe("agent runner research budget recovery", () => {
     expect(call.prompt).not.toContain(
       "/krw-ontology:krw-ontology-research 선택한 이벤트를 공시 기준으로 분석해줘",
     );
+    expect(call.prompt).toContain("<selected_news_event_context>");
+  });
+
+  it("uses market move skill with ontology tools and no Stock News tools", async () => {
+    process.env.STOCK_NEWS_ENABLED = "1";
+
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        {
+          type: "result",
+          subtype: "success",
+          result: "주가 변동과 공시 baseline을 연결했습니다.",
+          usage: {
+            input_tokens: 10,
+            output_tokens: 12,
+          },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "GOOGL 주가가 왜 6% 빠졌어?",
+        scopeType: "company",
+        defaultTickers: ["GOOGL"],
+        defaultDocumentTypes: [],
+        researchMode: "standard",
+        analysisMode: "news",
+        runKind: "market_move_research",
+        selectedNewsEventContext: {
+          version: "market-move-context/v1",
+          ticker: "GOOGL",
+          source_pack: {
+            ontology_search_brief_en:
+              "Investigate why Alphabet shares moved down.",
+            original_text_for_ontology:
+              "User question: GOOGL 주가가 왜 6% 빠졌어?",
+          },
+        },
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
+    expect(result.status).toBe("completed");
+    const call = sdkMocks.query.mock.calls[0]?.[0];
+    expect(call.options.allowedTools).toEqual(
+      expect.arrayContaining([sdkToolName("krw_ontology_query_context")]),
+    );
+    expect(call.options.allowedTools).not.toContain(
+      stockNewsSdkToolName("read_news_sources"),
+    );
+    expect(call.options.allowedTools).not.toContain(
+      stockNewsSdkToolName("search_company_news_events"),
+    );
+    expect(call.options.systemPrompt.append).not.toContain("Stock News MCP");
+    expect(call.prompt).toContain(
+      "/krw-ontology:krw-ontology-market-move-research",
+    );
+    expect(call.prompt).toContain("웹앱 주가 변동 research 실행");
     expect(call.prompt).toContain("<selected_news_event_context>");
   });
 

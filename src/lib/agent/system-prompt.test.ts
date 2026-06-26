@@ -106,6 +106,23 @@ describe("buildSystemPrompt", () => {
     );
   });
 
+  it("uses the scenario sensitivity skill for scenario run kinds", () => {
+    const researchPrompt = buildResearchPassPrompt(
+      "앞으로의 시나리오 알려줘",
+      "company",
+      "scenario_sensitivity",
+    );
+
+    expect(researchPrompt).toContain(
+      "/krw-ontology:krw-ontology-scenario-sensitivity 앞으로의 시나리오 알려줘",
+    );
+    expect(researchPrompt).toContain("웹앱 시나리오/민감도 research 실행");
+    expect(researchPrompt).toContain("강화 / 유지 / 약화 / 가정 파기 조건");
+    expect(researchPrompt).not.toContain(
+      "/krw-ontology:krw-ontology-research 앞으로의 시나리오 알려줘",
+    );
+  });
+
   it("uses the English research skill and English runtime instructions for English responses", () => {
     const researchPrompt = buildResearchPassPrompt(
       "Analyze AAPL",

@@ -39,6 +39,7 @@ const toolLabels: Partial<Record<MCPToolName, string>> = {
   read_news_sources: "뉴스 원문 확인",
   build_news_timeline: "뉴스 흐름 정리",
   audit_news_sources: "뉴스 출처 점검",
+  create_chart_v1: "차트 정리",
 };
 
 const toolStepMap: Record<MCPToolName, ResearchStepId> = {
@@ -62,6 +63,7 @@ const toolStepMap: Record<MCPToolName, ResearchStepId> = {
   read_news_sources: "search",
   build_news_timeline: "trace",
   audit_news_sources: "compose",
+  create_chart_v1: "compose",
 };
 
 const baseSteps: Array<{ id: ResearchStepId; label: string }> = [
@@ -91,6 +93,8 @@ export function getResearchActivityLabel(
   switch (activity?.stage) {
     case "queued":
       return "대기열 대기";
+    case "routing":
+      return "질문 유형 확인";
     case "connecting":
       return "자료 연결";
     case "checking_evidence":

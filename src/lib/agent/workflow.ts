@@ -16,6 +16,12 @@ export const KRW_ONTOLOGY_NEWS_DISCOVERY_SKILL =
 export const KRW_ONTOLOGY_NEWS_RESEARCH_SKILL =
   "/krw-ontology:krw-ontology-news-research";
 
+export const KRW_ONTOLOGY_MARKET_MOVE_RESEARCH_SKILL =
+  "/krw-ontology:krw-ontology-market-move-research";
+
+export const KRW_ONTOLOGY_SCENARIO_SENSITIVITY_SKILL =
+  "/krw-ontology:krw-ontology-scenario-sensitivity";
+
 export function getKrwOntologySkillForRunKind(
   runKind: RunKind,
   responseLocale: Locale = DEFAULT_LOCALE,
@@ -25,6 +31,12 @@ export function getKrwOntologySkillForRunKind(
   }
   if (runKind === "news_discovery") return KRW_ONTOLOGY_NEWS_DISCOVERY_SKILL;
   if (runKind === "news_research") return KRW_ONTOLOGY_NEWS_RESEARCH_SKILL;
+  if (runKind === "market_move_research") {
+    return KRW_ONTOLOGY_MARKET_MOVE_RESEARCH_SKILL;
+  }
+  if (runKind === "scenario_sensitivity") {
+    return KRW_ONTOLOGY_SCENARIO_SENSITIVITY_SKILL;
+  }
   return responseLocale === "en"
     ? KRW_ONTOLOGY_RESEARCH_EN_SKILL
     : KRW_ONTOLOGY_RESEARCH_SKILL;
@@ -46,7 +58,11 @@ export function buildResearchPassPrompt(
       ? newsDiscoveryRuntimePrompt(responseLocale)
       : runKind === "news_research"
         ? newsResearchRuntimePrompt(responseLocale)
-        : defaultRuntimePrompt(responseLocale);
+        : runKind === "market_move_research"
+          ? marketMoveResearchRuntimePrompt(responseLocale)
+          : runKind === "scenario_sensitivity"
+            ? scenarioSensitivityRuntimePrompt(responseLocale)
+            : defaultRuntimePrompt(responseLocale);
 
   return `${skillCommand} ${userMessage}
 
@@ -108,6 +124,54 @@ function newsResearchRuntimePrompt(responseLocale: Locale): string {
 - 사용자가 "점검", "검증", "fact-check"라고 말해도 답변을 감사 체크리스트처럼 쓰지 않습니다. "공시 기준으로 점검한 결과", "공시 확인됨", "공시에서 확인되지 않은 주장" 같은 제목/첫 문장과 ✅/❌ 라벨을 피합니다.
 - 고정된 섹션 템플릿을 강제하지 않습니다. 사용자의 질문 의도에 맞게 답변 구조를 정합니다.
 - 새로운 broad news discovery는 하지 않습니다.
+- 최종 답변은 사용자에게 바로 보여줄 한국어 Markdown 투자 해석만 작성합니다.`;
+}
+
+function marketMoveResearchRuntimePrompt(responseLocale: Locale): string {
+  if (responseLocale === "en") {
+    return `Web app market-move research run:
+- The user is asking why a covered stock moved now.
+- Use selected_news_event_context.version=market-move-context/v1 as the bounded market observation and recent-news prompt.
+- Treat app-provided quote/news candidates as market observations, not confirmed company disclosure.
+- Do not perform broad news discovery or ask for more tickers.
+- Default first answer: explain the observed move and likely market/news explanation candidates in lightweight investor prose.
+- Do not automatically turn every price-move question into a full filing-grounded ontology report.
+- Use KRW Ontology only when the user asks for filings, long-term thesis impact, revenue, margin, cash flow, balance sheet, dilution, risk, capital allocation, or when the answer would otherwise imply a durable investment-view change.
+- End with follow-up prompts that bridge the move/news into filing-grounded KRW Ontology research.
+- If provider.status is unavailable or context.status is partial, say the live market/news read was limited and still ground the answer in filings.
+- The final answer must be user-visible English Markdown investor interpretation only.`;
+  }
+
+  return `웹앱 주가 변동 research 실행:
+- 사용자는 현재 주가가 왜 움직였는지 묻고 있습니다.
+- selected_news_event_context.version=market-move-context/v1을 제한된 시장 관찰값과 최근 뉴스 후보로 사용합니다.
+- 앱이 제공한 가격/뉴스 후보는 시장 관찰값으로만 보고, 회사가 확인한 공시/발표처럼 취급하지 않습니다.
+- broad news discovery를 새로 하지 않고, 추가 ticker를 요구하지 않습니다.
+- 기본 첫 답변은 관찰된 주가 움직임과 시장/뉴스상 설명 후보를 가볍게 해석합니다.
+- 모든 가격 변동 질문을 자동으로 공시 기반 온톨로지 보고서로 바꾸지 않습니다.
+- 사용자가 공시, 장기 투자 가정, 매출, 마진, 현금흐름, 재무상태, 희석, 리스크, 자본배분을 묻거나 답변이 지속적인 투자 판단 변화를 암시할 때만 KRW Ontology를 사용합니다.
+- 후속질문은 이번 움직임/뉴스를 공시 기반 KRW Ontology 리서치로 이어갈 수 있게 작성합니다.
+- provider.status가 unavailable이거나 context.status가 partial이면 실시간 시장/뉴스 확인이 제한적이었다고 말하고, 확인된 범위 안에서만 설명합니다.
+- 최종 답변은 사용자에게 바로 보여줄 한국어 Markdown 투자 해석만 작성합니다.`;
+}
+
+function scenarioSensitivityRuntimePrompt(responseLocale: Locale): string {
+  if (responseLocale === "en") {
+    return `Web app scenario-sensitivity run:
+- The user is asking for scenarios, sensitivity, upside/base/downside paths, thesis-break conditions, or what would change the investment view.
+- Start from the latest available filing/company context, then extract the 1-3 investment assumptions that actually drive the scenario.
+- Connect business path and financial path before writing scenarios.
+- Define strengthen / maintain / weaken / thesis-break conditions.
+- Use explicit upside/base/downside scenarios only when they help the user's question; do not force a valuation model.
+- The final answer must be user-visible English Markdown investor interpretation only.`;
+  }
+
+  return `웹앱 시나리오/민감도 research 실행:
+- 사용자는 시나리오, 민감도, 상승/기준/하락 경로, 투자 가정 변화, 판단이 깨지는 조건을 묻고 있습니다.
+- 최신 available filing/company context에서 시작한 뒤, 시나리오를 실제로 움직이는 핵심 투자 가정 1~3개를 먼저 뽑습니다.
+- 사업 경로와 재무 경로를 연결한 뒤 시나리오를 작성합니다.
+- 강화 / 유지 / 약화 / 가정 파기 조건을 명확히 나눕니다.
+- 사용자 질문에 도움이 될 때만 상승/기준/하락 시나리오를 사용하고, 밸류에이션 모델을 억지로 만들지 않습니다.
 - 최종 답변은 사용자에게 바로 보여줄 한국어 Markdown 투자 해석만 작성합니다.`;
 }
 

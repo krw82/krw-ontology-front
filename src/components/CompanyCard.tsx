@@ -227,14 +227,24 @@ export default function CompanyCard({
             : "Open this company research page"
         }`}
       >
-        <article className="grid gap-3 px-4 py-3.5 transition-[transform,color,background-color] duration-150 ease-out hover:bg-surface xl:grid-cols-[148px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] xl:items-start active:bg-surface-soft">
-          <div className="flex min-w-0 items-start gap-4 xl:block">
-            <div className="flex min-w-0 items-center gap-3 xl:items-start">
-              <CompanyLogo ticker={ticker} companyName={companyLabel || ticker} />
-              <h2 className="font-mono text-[21px] font-black leading-none text-ink transition-colors group-hover:text-primary group-active:text-primary sm:text-[22px]">
+        <article className="grid grid-cols-[56px_minmax(0,1fr)] gap-x-3 gap-y-1 px-4 py-4 transition-[transform,color,background-color] duration-150 ease-out hover:bg-surface xl:grid-cols-[148px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] xl:items-start xl:gap-3 xl:py-3.5 active:bg-surface-soft">
+          <div className="row-span-4 flex min-w-0 items-start xl:row-auto xl:block">
+            <div className="flex min-w-0 items-start gap-3">
+              <CompanyLogo
+                ticker={ticker}
+                companyName={companyLabel || ticker}
+                className="h-12 w-12 text-[11px] sm:h-14 sm:w-14 xl:h-10 xl:w-10"
+              />
+              <h2 className="hidden font-mono text-[21px] font-black leading-none text-ink transition-colors group-hover:text-primary group-active:text-primary sm:text-[22px] xl:block">
                 {ticker}
               </h2>
             </div>
+          </div>
+
+          <div className="min-w-0 xl:hidden">
+            <h2 className="font-mono text-[23px] font-black leading-none text-ink transition-colors group-hover:text-primary group-active:text-primary">
+              {ticker}
+            </h2>
           </div>
 
           <div className="min-w-0">

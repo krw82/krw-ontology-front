@@ -596,7 +596,7 @@ const coverageItems: CoverageItem[] = [
   { name: "ChatArtifacts", state: "rendered", section: "채팅", note: "뉴스 선택 아티팩트와 선택 상태" },
   { name: "ChatMessage", state: "rendered", section: "채팅", note: "유저/URL/파일/응답/오류/스트리밍" },
   { name: "ChatSidebar", state: "runtime", section: "채팅", note: "API 기반 기록 패널, 실제 앱에서 확인" },
-  { name: "CompaniesBrowser", state: "rendered", section: "회사", note: "검색, 와이드 리서치 CTA, 리스트" },
+  { name: "CompaniesBrowser", state: "rendered", section: "회사", note: "검색, 종목 발굴기 CTA, 리스트" },
   { name: "CompanyCard", state: "rendered", section: "회사", note: "ko/en, 모바일/데스크톱 반응형" },
   { name: "CompanyWatchlistActions", state: "rendered", section: "회사", note: "로그아웃/관심/보유 상태" },
   { name: "Composer", state: "rendered", section: "입력", note: "기본, URL, 파일 메뉴, 전송 샌드박스" },
@@ -835,13 +835,13 @@ export default function DevComponentsGallery() {
               <PreviewCard title="Marketing / Share CTA">
                 <div className="grid gap-sm">
                   <MarketingCtaLink
-                    href="/ko/companies"
+                    href="/discover"
                     ctaId="dev_gallery_cta"
-                    ctaLabel="와이드 리서치"
+                    ctaLabel="종목 발굴기"
                     surface="dev_gallery"
                     className="inline-flex min-h-11 items-center justify-center rounded-[8px] bg-ink px-4 text-[14px] font-black text-canvas"
                   >
-                    와이드 리서치
+                    종목 발굴기
                   </MarketingCtaLink>
                   <ShareStartLink
                     href="/chat/new"

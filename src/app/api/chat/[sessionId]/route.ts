@@ -8,10 +8,12 @@ import type {
   AgentRunRow,
   ChatMessageArtifactRow,
   ChatMessageArtifactSelectionRow,
+  ChatMessageChartRow,
   ChatSessionRow,
   MessageRow,
 } from "@/types/database";
 import { toPublicChatArtifact } from "@/lib/chat-artifacts/news-event-selection";
+import { toPublicChatChart } from "@/lib/charts/db";
 
 const DEFAULT_CHAT_DETAIL_MESSAGE_LIMIT = 200;
 const MAX_CHAT_DETAIL_MESSAGE_LIMIT = 500;
@@ -146,6 +148,23 @@ export async function GET(
     return internalError("채팅 artifact를 불러오지 못했습니다.");
   }
 
+  const { data: chatCharts, error: chatChartsError } =
+    messageIds.length > 0
+      ? await supabase
+          .from("chat_message_charts")
+          .select(
+            "id, session_id, message_id, run_id, chart_ref, insert_token, title, chart_type, payload_json, created_at",
+          )
+          .eq("session_id", sessionId)
+          .in("message_id", messageIds)
+          .order("created_at", { ascending: true })
+          .returns<ChatMessageChartRow[]>()
+      : { data: [], error: null };
+
+  if (chatChartsError) {
+    return internalError("채팅 차트를 불러오지 못했습니다.");
+  }
+
   const artifactIds = (chatArtifacts ?? []).map((artifact) => artifact.id);
   const { data: artifactSelections, error: artifactSelectionsError } =
     artifactIds.length > 0
@@ -168,6 +187,7 @@ export async function GET(
     messages: (messages ?? []).map(toPublicMessage),
     runs: (runs ?? []).map(toPublicRunSummary),
     chat_artifacts: (chatArtifacts ?? []).map(toPublicChatArtifact),
+    charts: (chatCharts ?? []).map(toPublicChatChart),
     artifact_selections: artifactSelections ?? [],
     message_pagination: {
       limit: messageLimit,

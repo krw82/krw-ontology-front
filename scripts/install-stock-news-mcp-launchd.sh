@@ -86,7 +86,8 @@ falsey_env() {
 # immediately fails with "nice: setpriority: Permission denied".
 STOCK_NEWS_MCP_NICE=${STOCK_NEWS_MCP_NICE:-0}
 MCP_SERVER_MAXFILES=${MCP_SERVER_MAXFILES:-4096}
-MCP_LOG_DIR=${MCP_LOG_DIR:-"$HOME/Library/Logs/krw-ontology"}
+KRW_LOG_DIR=${KRW_LOG_DIR:-"$HOME/krw-ontology-log"}
+MCP_LOG_DIR=${MCP_LOG_DIR:-"$KRW_LOG_DIR/mcp/prod"}
 STOCK_NEWS_MCP_PORT=${STOCK_NEWS_MCP_PORT:-8775}
 
 STOCK_NEWS_RUNTIME_ENABLED=0

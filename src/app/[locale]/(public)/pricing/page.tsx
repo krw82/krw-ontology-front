@@ -24,6 +24,33 @@ const pricingCopy = {
     primaryCta: "무료로 첫 분석 시작",
     cardCta: "분석 시작",
     recommended: "추천",
+    comparisonHeading: "플랜 비교",
+    comparisonRows: [
+      {
+        label: "적합한 사용",
+        free: "첫 분석 체험",
+        standard: "개인 반복 분석",
+        pro: "여러 회사 비교",
+      },
+      {
+        label: "와이드 리서치",
+        free: "제한",
+        standard: "포함",
+        pro: "넉넉함",
+      },
+      {
+        label: "리서치 노트북",
+        free: "기본",
+        standard: "포함",
+        pro: "포함",
+      },
+      {
+        label: "주간 사용량",
+        free: "체험",
+        standard: "기본",
+        pro: "높음",
+      },
+    ],
     principlesHeading: "플랜을 나누는 기준",
     principles: [
       {
@@ -51,6 +78,33 @@ const pricingCopy = {
     primaryCta: "Start your first analysis",
     cardCta: "Start analysis",
     recommended: "Recommended",
+    comparisonHeading: "Plan comparison",
+    comparisonRows: [
+      {
+        label: "Best for",
+        free: "First analysis",
+        standard: "Repeated individual research",
+        pro: "Multi-company comparison",
+      },
+      {
+        label: "Wide research",
+        free: "Limited",
+        standard: "Included",
+        pro: "Generous",
+      },
+      {
+        label: "Research notebook",
+        free: "Basic",
+        standard: "Included",
+        pro: "Included",
+      },
+      {
+        label: "Weekly usage",
+        free: "Trial",
+        standard: "Standard",
+        pro: "High",
+      },
+    ],
     principlesHeading: "How plans are separated",
     principles: [
       {
@@ -78,6 +132,13 @@ const pricingCopy = {
     primaryCta: string;
     cardCta: string;
     recommended: string;
+    comparisonHeading: string;
+    comparisonRows: Array<{
+      label: string;
+      free: string;
+      standard: string;
+      pro: string;
+    }>;
     principlesHeading: string;
     principles: Array<{ title: string; body: string }>;
   }
@@ -281,6 +342,33 @@ export default async function PricingPage({ params }: PricingPageProps) {
                 </article>
               );
             })}
+          </section>
+
+          <section className="border-t border-hairline py-8">
+            <h2 className="text-[22px] font-black leading-7 text-ink">
+              {copy.comparisonHeading}
+            </h2>
+            <div className="mt-4 overflow-hidden rounded-[8px] border border-hairline bg-canvas">
+              <div className="grid grid-cols-[minmax(112px,0.9fr)_repeat(3,minmax(92px,1fr))] border-b border-hairline bg-surface px-sm py-2.5 font-mono text-[11px] font-black uppercase tracking-[0.12em] text-muted">
+                <span>{locale === "ko" ? "항목" : "Item"}</span>
+                <span>Free</span>
+                <span>Standard</span>
+                <span>Pro</span>
+              </div>
+              <div className="divide-y divide-hairline">
+                {copy.comparisonRows.map((row) => (
+                  <div
+                    key={row.label}
+                    className="grid grid-cols-[minmax(112px,0.9fr)_repeat(3,minmax(92px,1fr))] px-sm py-3 text-[13px] leading-5"
+                  >
+                    <span className="font-black text-ink">{row.label}</span>
+                    <span className="font-semibold text-body">{row.free}</span>
+                    <span className="font-semibold text-body">{row.standard}</span>
+                    <span className="font-semibold text-body">{row.pro}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </section>
 
           <section className="border-t border-hairline py-8">

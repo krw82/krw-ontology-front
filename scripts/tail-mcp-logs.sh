@@ -28,7 +28,8 @@ case "$1" in
     ;;
 esac
 
-MCP_LOG_DIR=${MCP_LOG_DIR:-"$HOME/Library/Logs/krw-ontology"}
+KRW_LOG_DIR=${KRW_LOG_DIR:-"$HOME/krw-ontology-log"}
+MCP_LOG_DIR=${MCP_LOG_DIR:-"$KRW_LOG_DIR/mcp/$ENV_NAME"}
 APP_LOG="$MCP_LOG_DIR/mcp-$ENV_NAME.log"
 OUT_LOG="$MCP_LOG_DIR/mcp-$ENV_NAME.out.log"
 ERR_LOG="$MCP_LOG_DIR/mcp-$ENV_NAME.err.log"

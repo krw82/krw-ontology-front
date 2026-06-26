@@ -7,6 +7,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { normalizeOntologyEnv, type OntologyEnv } from "@/lib/env";
 import type {
+  ChartMCPToolName,
   KRWOntologyMCPToolName,
   StockNewsMCPToolName,
 } from "@/types/api-contracts";
@@ -16,6 +17,7 @@ const KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX =
   "mcp__plugin_krw-ontology_krw-ontology__";
 const STOCK_NEWS_PLUGIN_TOOL_PREFIX =
   "mcp__plugin_krw-ontology_stock-news__";
+const CHART_MCP_TOOL_PREFIX = "mcp__krw_presentation__";
 
 export const KRW_ONTOLOGY_MCP_TOOLS = [
   "krw_ontology_catalog",
@@ -43,6 +45,10 @@ export const STOCK_NEWS_MCP_TOOLS = [
   "audit_news_sources",
 ] as const satisfies readonly StockNewsMCPToolName[];
 
+export const CHART_MCP_TOOLS = [
+  "create_chart_v1",
+] as const satisfies readonly ChartMCPToolName[];
+
 export const KRW_ONTOLOGY_SDK_ALLOWED_TOOLS = KRW_ONTOLOGY_MCP_TOOLS.map(
   (toolName) => `${KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX}${toolName}`,
 );
@@ -51,8 +57,13 @@ export const STOCK_NEWS_SDK_ALLOWED_TOOLS = STOCK_NEWS_MCP_TOOLS.map(
   (toolName) => `${STOCK_NEWS_PLUGIN_TOOL_PREFIX}${toolName}`,
 );
 
+export const CHART_SDK_ALLOWED_TOOLS = CHART_MCP_TOOLS.map(
+  (toolName) => `${CHART_MCP_TOOL_PREFIX}${toolName}`,
+);
+
 const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const STOCK_NEWS_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_MCP_TOOLS);
+const CHART_MCP_TOOL_SET = new Set<string>(CHART_MCP_TOOLS);
 const execFileAsync = promisify(execFile);
 const DEFAULT_MCP_HEALTH_TIMEOUT_MS = 30_000;
 
@@ -68,6 +79,13 @@ export function isStockNewsSdkTool(toolName: string): boolean {
   const bareName = toolName.slice(STOCK_NEWS_PLUGIN_TOOL_PREFIX.length);
 
   return Boolean(bareName && STOCK_NEWS_MCP_TOOL_SET.has(bareName));
+}
+
+export function isChartSdkTool(toolName: string): boolean {
+  if (!toolName.startsWith(CHART_MCP_TOOL_PREFIX)) return false;
+  const bareName = toolName.slice(CHART_MCP_TOOL_PREFIX.length);
+
+  return Boolean(bareName && CHART_MCP_TOOL_SET.has(bareName));
 }
 
 export function isStockNewsEnabled(
@@ -432,6 +450,9 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
     path.join(pluginPath, "skills", "krw-ontology-research", "SKILL.md"),
     path.join(pluginPath, "skills", "krw-ontology-idea-generation", "SKILL.md"),
     path.join(pluginPath, "skills", "krw-ontology-news-discovery", "SKILL.md"),
+    path.join(pluginPath, "skills", "krw-ontology-news-research", "SKILL.md"),
+    path.join(pluginPath, "skills", "krw-ontology-market-move-research", "SKILL.md"),
+    path.join(pluginPath, "skills", "krw-ontology-router", "SKILL.md"),
   ];
 
   try {

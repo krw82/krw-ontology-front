@@ -19,6 +19,7 @@ import type {
   MCPToolName,
   ToolCall,
   ChatArtifact,
+  ChatMessageChart,
   ChatArtifactSelection,
   AtomicNewsEventCard,
   RunKind,
@@ -91,6 +92,7 @@ export interface ChatState {
   toolCalls: ToolCallState[];
   citations: ChatCitation[];
   artifactsByMessageId: Record<string, ChatArtifact[]>;
+  chartsByMessageId: Record<string, ChatMessageChart[]>;
   artifactSelections: ChatArtifactSelection[];
   runDurationsByMessageId: Record<string, number>;
   runId: string | null;
@@ -117,6 +119,7 @@ function createInitialChatState(): ChatState {
     toolCalls: [],
     citations: [],
     artifactsByMessageId: {},
+    chartsByMessageId: {},
     artifactSelections: [],
     runDurationsByMessageId: {},
     runId: null,
@@ -189,6 +192,31 @@ function addArtifactToState(
   };
 }
 
+function groupChartsByMessageId(
+  charts: ChatMessageChart[] | undefined,
+): Record<string, ChatMessageChart[]> {
+  const grouped: Record<string, ChatMessageChart[]> = {};
+  for (const chart of charts ?? []) {
+    grouped[chart.message_id] = [
+      ...(grouped[chart.message_id] ?? []),
+      chart,
+    ];
+  }
+  return grouped;
+}
+
+function addChartToState(
+  chartsByMessageId: Record<string, ChatMessageChart[]>,
+  chart: ChatMessageChart,
+) {
+  const current = chartsByMessageId[chart.message_id] ?? [];
+  if (current.some((item) => item.id === chart.id)) return chartsByMessageId;
+  return {
+    ...chartsByMessageId,
+    [chart.message_id]: [...current, chart],
+  };
+}
+
 function findNewsEventSelection(
   artifactsByMessageId: Record<string, ChatArtifact[]>,
   artifactId: string,
@@ -228,6 +256,15 @@ function activityForTool(toolName: MCPToolName): ResearchActivityUpdate {
     return {
       stage: "researching",
       label: "최신 뉴스 이벤트 확인 중",
+    };
+  }
+
+  if (
+    toolName === "create_chart_v1"
+  ) {
+    return {
+      stage: "composing",
+      label: "차트 정리 중",
     };
   }
 
@@ -506,12 +543,21 @@ export function useChat({
         }));
         break;
       }
+      case "chart": {
+        const d = data as ChatMessageChart;
+        setState((prev) => ({
+          ...prev,
+          chartsByMessageId: addChartToState(prev.chartsByMessageId, d),
+        }));
+        break;
+      }
       case "done": {
         const d = data as {
           run_id: string;
           message_id: string;
           content?: string;
           chat_artifacts?: ChatArtifact[];
+          charts?: ChatMessageChart[];
           release: ReleaseMetadata;
           usage: {
             input_tokens: number;
@@ -574,6 +620,10 @@ export function useChat({
             artifactsByMessageId: (d.chat_artifacts ?? []).reduce(
               addArtifactToState,
               prev.artifactsByMessageId,
+            ),
+            chartsByMessageId: (d.charts ?? []).reduce(
+              addChartToState,
+              prev.chartsByMessageId,
             ),
             status: "completed",
             isHydratingSession: false,
@@ -736,6 +786,7 @@ export function useChat({
         toolCalls: [],
         citations: [],
         artifactsByMessageId: groupArtifactsByMessageId(data.chat_artifacts),
+        chartsByMessageId: groupChartsByMessageId(data.charts),
         artifactSelections: data.artifact_selections ?? [],
         runDurationsByMessageId: Object.fromEntries(
           (data.runs ?? [])

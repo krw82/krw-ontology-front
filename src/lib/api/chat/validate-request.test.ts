@@ -289,6 +289,40 @@ describe("validateRequest", () => {
     expect(result.data.body.run_kind).toBe("news_research");
   });
 
+  it("accepts explicit run kind for market move research", async () => {
+    const result = await validateRequest(
+      makeRequest({
+        content: "GOOGL 주가가 왜 빠졌어?",
+        request_id: REQUEST_ID,
+        research_mode: "standard",
+        analysis_mode: "news",
+        run_kind: "market_move_research",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.body.analysis_mode).toBe("news");
+    expect(result.data.body.run_kind).toBe("market_move_research");
+  });
+
+  it("accepts explicit run kind for scenario sensitivity", async () => {
+    const result = await validateRequest(
+      makeRequest({
+        content: "앞으로의 시나리오 알려줘",
+        request_id: REQUEST_ID,
+        research_mode: "standard",
+        analysis_mode: "company",
+        run_kind: "scenario_sensitivity",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.body.analysis_mode).toBe("company");
+    expect(result.data.body.run_kind).toBe("scenario_sensitivity");
+  });
+
   it("forces deep research mode for idea generation", async () => {
     const result = await validateRequest(
       makeRequest({

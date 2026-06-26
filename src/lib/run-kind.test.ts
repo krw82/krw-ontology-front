@@ -10,6 +10,18 @@ describe("run kind", () => {
     expect(normalizeRunKind("idea_generation")).toBe("idea_generation");
   });
 
+  it("accepts market move research as a durable run kind", () => {
+    expect(normalizeRunKind("market_move_research")).toBe(
+      "market_move_research",
+    );
+  });
+
+  it("accepts scenario sensitivity as a durable run kind", () => {
+    expect(normalizeRunKind("scenario_sensitivity")).toBe(
+      "scenario_sensitivity",
+    );
+  });
+
   it("keeps existing defaults for company and news analysis", () => {
     expect(normalizeRunKind("unsupported")).toBe(DEFAULT_RUN_KIND);
     expect(defaultRunKindForAnalysisMode("company")).toBe("company_research");

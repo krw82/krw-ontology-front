@@ -267,6 +267,7 @@ describe("agent job queue", () => {
         research_mode: DEFAULT_RESEARCH_MODE,
         analysis_mode: "company",
         run_kind: "company_research",
+        routing_mode: "preserve",
         response_locale: "ko",
         executor_type: "claude_agent",
         queued_at: expect.any(String),
@@ -302,6 +303,7 @@ describe("agent job queue", () => {
       mcpHealth,
       researchMode: "deep",
       analysisMode: "news",
+      routingMode: "auto",
     });
 
     expect(appendAgentRunEvent).toHaveBeenNthCalledWith(
@@ -312,6 +314,7 @@ describe("agent job queue", () => {
       expect.objectContaining({
         research_mode: "deep",
         analysis_mode: "news",
+        routing_mode: "auto",
       }),
     );
   });

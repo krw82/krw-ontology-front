@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import CompanyCard, {
   type CompanyCardData,
@@ -86,10 +87,12 @@ export default function CompaniesBrowser({
   initialCompanies,
   locale = DEFAULT_LOCALE,
 }: CompaniesBrowserProps) {
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
-  const [showSearchCoachmark, setShowSearchCoachmark] = useState(IS_DEV_ENV);
+  const [showSearchCoachmark, setShowSearchCoachmark] = useState(false);
   const reducedMotion = useReducedMotion();
   const normalizedSearch = search.trim();
+  const forceCoachmarks = searchParams.get("coach") === "1";
   const copy = locale === "ko"
     ? {
         eyebrow: "회사 찾기",
@@ -101,8 +104,11 @@ export default function CompaniesBrowser({
         searchAria: "회사 검색",
         searchCoachmark: "분석할 회사명이나 티커를 입력하세요",
         dismissCoachmarkAria: "회사 검색 안내 닫기",
-        multiCompanyCta: "종목 발굴하기",
-        multiCompanyLineOne: "종목 발굴하기",
+        discoveryEyebrow: "회사를 아직 모른다면",
+        discoveryTitle: "종목 발굴기",
+        discoveryDescription:
+          "아이디어, 산업, 리스크 키워드로 후보 종목을 발굴합니다.",
+        discoveryCta: "종목 발굴 시작",
         emptyCatalog:
           "현재 환경의 웹 카탈로그에서 인덱싱된 회사를 찾지 못했습니다.",
         availableCompanies: "분석 가능한 회사",
@@ -121,8 +127,11 @@ export default function CompaniesBrowser({
         searchAria: "Company search",
         searchCoachmark: "Type a company name or ticker to analyze",
         dismissCoachmarkAria: "Dismiss company search tip",
-        multiCompanyCta: "Discover stocks",
-        multiCompanyLineOne: "Discover stocks",
+        discoveryEyebrow: "If you do not know the company yet",
+        discoveryTitle: "Stock discovery",
+        discoveryDescription:
+          "Find candidate stocks from an idea, industry, or risk keyword.",
+        discoveryCta: "Start discovery",
         emptyCatalog:
           "No indexed companies were found in the current web catalog.",
         availableCompanies: "Available companies",
@@ -137,6 +146,16 @@ export default function CompaniesBrowser({
   }, [initialCompanies, search]);
 
   useEffect(() => {
+    if (forceCoachmarks) {
+      const showTimer = window.setTimeout(
+        () => setShowSearchCoachmark(true),
+        0,
+      );
+      return () => {
+        window.clearTimeout(showTimer);
+      };
+    }
+
     if (IS_DEV_ENV) {
       return undefined;
     }
@@ -155,7 +174,7 @@ export default function CompaniesBrowser({
     return () => {
       window.clearTimeout(showTimer);
     };
-  }, []);
+  }, [forceCoachmarks]);
 
   function dismissSearchCoachmark() {
     setShowSearchCoachmark(false);
@@ -212,7 +231,7 @@ export default function CompaniesBrowser({
                   </motion.div>
                 ) : null}
               </AnimatePresence>
-              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
+              <div className="grid gap-2">
                 <div className="relative min-w-0">
                   <motion.span
                     aria-hidden="true"
@@ -238,14 +257,29 @@ export default function CompaniesBrowser({
                     aria-label={copy.searchAria}
                   />
                 </div>
-                <Link
-                  href="/discover"
-                  className="group inline-flex h-11 min-w-0 items-center justify-between gap-2 rounded-[8px] bg-ink px-3 text-[13px] font-bold leading-5 text-canvas shadow-sm transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-                  aria-label={copy.multiCompanyCta}
-                >
-                  <span className="truncate">{copy.multiCompanyLineOne}</span>
-                  <FlowAnimation disabled={reducedMotion} />
-                </Link>
+              </div>
+              <div className="mt-4 rounded-[8px] border border-hairline bg-surface p-sm">
+                <p className="font-mono text-[10px] font-black uppercase tracking-[0.14em] text-primary">
+                  {copy.discoveryEyebrow}
+                </p>
+                <div className="mt-2 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-[15px] font-black leading-5 text-ink">
+                      {copy.discoveryTitle}
+                    </p>
+                    <p className="mt-1 text-[12px] font-semibold leading-5 text-muted">
+                      {copy.discoveryDescription}
+                    </p>
+                  </div>
+                  <Link
+                    href="/discover"
+                    className="group inline-flex h-10 min-w-0 shrink-0 items-center justify-between gap-2 rounded-[8px] bg-ink px-3 text-[13px] font-bold leading-5 text-canvas shadow-sm transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                    aria-label={copy.discoveryCta}
+                  >
+                    <span className="truncate">{copy.discoveryCta}</span>
+                    <FlowAnimation disabled={reducedMotion} />
+                  </Link>
+                </div>
               </div>
             </div>
           </div>

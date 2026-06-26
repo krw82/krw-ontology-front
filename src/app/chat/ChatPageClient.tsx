@@ -229,23 +229,49 @@ type DiscoverGuideFlowProps = {
   locale: string;
   step: DiscoverGuideStep;
   disabled?: boolean;
-  onAddUrl: () => void;
+  urlValue: string;
+  urlError?: string | null;
+  ideaValue: string;
+  ideaError?: string | null;
+  onUrlValueChange: (value: string) => void;
+  onCommitUrl: () => void;
   onSkipUrl: () => void;
   onAddFile: () => void;
   onSkipFile: () => void;
-  onFocusIdea: () => void;
+  onIdeaValueChange: (value: string) => void;
+  onSubmitIdea: () => void;
   onSelectExample: (prompt: string) => void;
 };
+
+function normalizeDiscoverUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
 
 function DiscoverGuideFlow({
   locale,
   step,
   disabled = false,
-  onAddUrl,
+  urlValue,
+  urlError,
+  ideaValue,
+  ideaError,
+  onUrlValueChange,
+  onCommitUrl,
   onSkipUrl,
   onAddFile,
   onSkipFile,
-  onFocusIdea,
+  onIdeaValueChange,
+  onSubmitIdea,
   onSelectExample,
 }: DiscoverGuideFlowProps) {
   const isKo = locale === "ko";
@@ -269,16 +295,18 @@ function DiscoverGuideFlow({
           title: "참고할 URL이 있나요?",
           description:
             "뉴스, 공시, 리포트 링크가 있으면 같이 확인합니다. 없어도 바로 넘어갈 수 있습니다.",
-          primary: "URL 추가",
+          primary: "다음",
           secondary: "건너뛰기",
+          urlPlaceholder: "https://example.com/report",
         }
       : {
           eyebrow: "Optional",
           title: "Do you have a URL to reference?",
           description:
             "Add a news, filing, or report link if you have one. You can skip this.",
-          primary: "Add URL",
+          primary: "Next",
           secondary: "Skip",
+          urlPlaceholder: "https://example.com/report",
         },
     file: isKo
       ? {
@@ -286,16 +314,18 @@ function DiscoverGuideFlow({
           title: "첨부할 파일이 있나요?",
           description:
             "PDF, txt, md 문서를 질문과 함께 보낼 수 있습니다. 없으면 다음으로 넘어가세요.",
-          primary: "파일 첨부",
+          primary: "파일 선택하기",
           secondary: "건너뛰기",
+          fileHint: "선택이 완료되면 다음 단계로 이동합니다.",
         }
       : {
           eyebrow: "Optional",
           title: "Do you have a file to attach?",
           description:
             "Attach PDF, txt, or md documents with the question, or skip this step.",
-          primary: "Attach file",
+          primary: "Choose file",
           secondary: "Skip",
+          fileHint: "The flow continues after a file is selected.",
         },
     idea: isKo
       ? {
@@ -303,29 +333,31 @@ function DiscoverGuideFlow({
           title: "어떤 아이디어로 종목을 발굴할까요?",
           description:
             "산업, 변화, 리스크 키워드를 한 문장으로 적으면 관련 회사를 넓게 찾아봅니다.",
-          primary: "직접 입력하기",
-          secondary: "예시 선택",
+          primary: "종목 발굴 시작",
+          secondary: "예시",
+          ideaPlaceholder: "예: AI 데이터센터 전력 수요 수혜 기업",
         }
       : {
           eyebrow: "Start",
           title: "What idea should we use to discover stocks?",
           description:
             "Describe an industry, shift, or risk keyword and we will explore related companies.",
-          primary: "Type directly",
-          secondary: "Pick an example",
+          primary: "Start discovery",
+          secondary: "Examples",
+          ideaPlaceholder: "e.g. AI data center power demand beneficiaries",
         },
   }[step];
 
   const handlePrimary = () => {
     if (step === "url") {
-      onAddUrl();
+      onCommitUrl();
       return;
     }
     if (step === "file") {
       onAddFile();
       return;
     }
-    onFocusIdea();
+    onSubmitIdea();
   };
   const handleSecondary = () => {
     if (step === "url") {
@@ -336,7 +368,7 @@ function DiscoverGuideFlow({
       onSkipFile();
       return;
     }
-    onFocusIdea();
+    onSubmitIdea();
   };
 
   return (
@@ -385,8 +417,64 @@ function DiscoverGuideFlow({
               </p>
             </div>
 
+            {step === "url" ? (
+              <div className="mt-base">
+                <label className="sr-only" htmlFor="discover-url-input">
+                  {copy.title}
+                </label>
+                <input
+                  id="discover-url-input"
+                  type="url"
+                  inputMode="url"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className="h-12 w-full rounded-[8px] border border-hairline bg-surface-soft px-sm text-[15px] font-bold leading-6 text-ink shadow-sm transition-colors placeholder:text-muted focus:border-primary focus:bg-canvas focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim/25"
+                  placeholder={copy.urlPlaceholder}
+                  value={urlValue}
+                  onChange={(event) => onUrlValueChange(event.currentTarget.value)}
+                  disabled={disabled}
+                />
+                {urlError ? (
+                  <p className="mt-2 text-[12px] font-bold leading-5 text-error">
+                    {urlError}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {step === "file" ? (
+              <div className="mt-base rounded-[8px] border border-hairline bg-surface-soft px-sm py-xs text-[13px] font-bold leading-5 text-muted">
+                {copy.fileHint}
+              </div>
+            ) : null}
+
+            {step === "idea" ? (
+              <div className="mt-base grid gap-3">
+                <label className="sr-only" htmlFor="discover-idea-input">
+                  {copy.title}
+                </label>
+                <textarea
+                  id="discover-idea-input"
+                  className="min-h-[112px] w-full resize-none rounded-[8px] border border-hairline bg-surface-soft px-sm py-sm text-[16px] font-bold leading-7 text-ink shadow-sm transition-colors placeholder:text-muted focus:border-primary focus:bg-canvas focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim/25"
+                  placeholder={copy.ideaPlaceholder}
+                  value={ideaValue}
+                  onChange={(event) => onIdeaValueChange(event.currentTarget.value)}
+                  disabled={disabled}
+                />
+                {ideaError ? (
+                  <p className="text-[12px] font-bold leading-5 text-error">
+                    {ideaError}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
             {step === "idea" ? (
               <div className="mt-base grid gap-2">
+                <p className="font-mono text-[10px] font-black uppercase tracking-[0.14em] text-muted">
+                  {copy.secondary}
+                </p>
                 {examples.map((example) => (
                   <button
                     key={example}
@@ -401,7 +489,12 @@ function DiscoverGuideFlow({
               </div>
             ) : null}
 
-            <div className="mt-base grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <div
+              className={[
+                "mt-base grid gap-2",
+                step === "idea" ? "" : "sm:grid-cols-[minmax(0,1fr)_auto]",
+              ].join(" ")}
+            >
               <button
                 type="button"
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[8px] bg-surface-dark px-5 py-3 text-[15px] font-extrabold leading-5 text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55"
@@ -410,14 +503,16 @@ function DiscoverGuideFlow({
               >
                 {copy.primary}
               </button>
-              <button
-                type="button"
-                className="inline-flex min-h-12 items-center justify-center rounded-[8px] border border-hairline bg-canvas px-5 py-3 text-[15px] font-extrabold leading-5 text-body transition-colors hover:bg-surface-soft hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55"
-                onClick={handleSecondary}
-                disabled={disabled}
-              >
-                {copy.secondary}
-              </button>
+              {step !== "idea" ? (
+                <button
+                  type="button"
+                  className="inline-flex min-h-12 items-center justify-center rounded-[8px] border border-hairline bg-canvas px-5 py-3 text-[15px] font-extrabold leading-5 text-body transition-colors hover:bg-surface-soft hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55"
+                  onClick={handleSecondary}
+                  disabled={disabled}
+                >
+                  {copy.secondary}
+                </button>
+              ) : null}
             </div>
           </div>
         </motion.section>
@@ -472,7 +567,10 @@ function ChatContent() {
   const [composerDraftResetKey, setComposerDraftResetKey] = useState(0);
   const [discoverGuideStep, setDiscoverGuideStep] =
     useState<DiscoverGuideStep>("url");
-  const [discoverComposerVisible, setDiscoverComposerVisible] = useState(false);
+  const [discoverUrlDraft, setDiscoverUrlDraft] = useState("");
+  const [discoverUrlError, setDiscoverUrlError] = useState<string | null>(null);
+  const [discoverIdeaDraft, setDiscoverIdeaDraft] = useState("");
+  const [discoverIdeaError, setDiscoverIdeaError] = useState<string | null>(null);
   const composerRef = useRef<ComposerHandle>(null);
 
   const isDraftRoute = pathname === "/chat/new" || isDiscoverRoute;
@@ -691,7 +789,6 @@ function ChatContent() {
   );
   const shouldShowDiscoverGuide =
     isIdeaGeneration &&
-    !discoverComposerVisible &&
     chat.messages.length === 0 &&
     !isHydratingSession &&
     !isActiveRun &&
@@ -1176,19 +1273,34 @@ function ChatContent() {
     [],
   );
 
-  useEffect(() => {
-    if (!discoverComposerVisible) return;
-    const frameId = window.requestAnimationFrame(() => {
-      requestComposerAction("focus");
-    });
-    return () => window.cancelAnimationFrame(frameId);
-  }, [discoverComposerVisible, requestComposerAction]);
+  const handleDiscoverCommitUrl = useCallback(() => {
+    const normalizedUrl = normalizeDiscoverUrl(discoverUrlDraft);
+    if (!normalizedUrl) {
+      setDiscoverUrlError(
+        responseLocale === "ko"
+          ? "확인할 URL을 입력하거나 건너뛰기를 눌러주세요."
+          : "Enter a URL to continue, or skip this step.",
+      );
+      return;
+    }
 
-  const handleDiscoverAddUrl = useCallback(() => {
-    requestComposerAction("url");
-  }, [requestComposerAction]);
+    const committed = composerRef.current?.commitUserUrls([normalizedUrl]);
+    if (!committed) {
+      setDiscoverUrlError(
+        responseLocale === "ko"
+          ? "http 또는 https URL만 입력할 수 있습니다."
+          : "Only http or https URLs can be attached.",
+      );
+      return;
+    }
+
+    setDiscoverUrlDraft(normalizedUrl);
+    setDiscoverUrlError(null);
+    setDiscoverGuideStep("file");
+  }, [discoverUrlDraft, responseLocale]);
 
   const handleDiscoverSkipUrl = useCallback(() => {
+    setDiscoverUrlError(null);
     setDiscoverGuideStep("file");
   }, []);
 
@@ -1200,12 +1312,24 @@ function ChatContent() {
     setDiscoverGuideStep("idea");
   }, []);
 
-  const handleDiscoverFocusIdea = useCallback(() => {
-    setDiscoverComposerVisible(true);
-  }, []);
+  const handleDiscoverSubmitIdea = useCallback(() => {
+    const trimmedIdea = discoverIdeaDraft.trim();
+    if (!trimmedIdea) {
+      setDiscoverIdeaError(
+        responseLocale === "ko"
+          ? "발굴할 아이디어나 산업, 리스크 키워드를 입력해주세요."
+          : "Enter an idea, industry, or risk keyword to start discovery.",
+      );
+      return;
+    }
+
+    setDiscoverIdeaError(null);
+    composerRef.current?.submitWithValue(trimmedIdea);
+  }, [discoverIdeaDraft, responseLocale]);
 
   const handleDiscoverUserUrlsChange = useCallback((hasUserUrls: boolean) => {
     if (hasUserUrls) {
+      setDiscoverUrlError(null);
       setDiscoverGuideStep((current) => (current === "url" ? "file" : current));
     }
   }, []);
@@ -1404,6 +1528,11 @@ function ChatContent() {
                           ? chat.artifactsByMessageId[msg.id]
                           : undefined
                       }
+                      charts={
+                        msg.role === "assistant"
+                          ? chat.chartsByMessageId[msg.id]
+                          : undefined
+                      }
                       artifactSelections={chat.artifactSelections}
                       onSelectNewsEvent={handleNewsEventSelection}
                       newsEventSelectionDisabled={isActiveRun || isBudgetBlocked}
@@ -1562,13 +1691,26 @@ function ChatContent() {
                             disabled={
                               isBudgetBlocked || Boolean(effectiveSessionError)
                             }
-                            onAddUrl={handleDiscoverAddUrl}
+                            urlValue={discoverUrlDraft}
+                            urlError={discoverUrlError}
+                            ideaValue={discoverIdeaDraft}
+                            ideaError={discoverIdeaError}
+                            onUrlValueChange={(value) => {
+                              setDiscoverUrlDraft(value);
+                              setDiscoverUrlError(null);
+                            }}
+                            onCommitUrl={handleDiscoverCommitUrl}
                             onSkipUrl={handleDiscoverSkipUrl}
                             onAddFile={handleDiscoverAddFile}
                             onSkipFile={handleDiscoverSkipFile}
-                            onFocusIdea={handleDiscoverFocusIdea}
+                            onIdeaValueChange={(value) => {
+                              setDiscoverIdeaDraft(value);
+                              setDiscoverIdeaError(null);
+                            }}
+                            onSubmitIdea={handleDiscoverSubmitIdea}
                             onSelectExample={(prompt) => {
-                              void handlePromptSend(prompt);
+                              setDiscoverIdeaDraft(prompt);
+                              setDiscoverIdeaError(null);
                             }}
                           />
                         ) : null

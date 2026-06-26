@@ -29,6 +29,15 @@ vi.mock("@/lib/news-discovery/discovery", () => ({
 vi.mock("@/lib/news-discovery/source-pack", () => ({
   buildSelectedNewsSourcePack: vi.fn(),
 }));
+vi.mock("@/lib/question-router/chat-question-router", () => ({
+  resolveChatQuestionRoute: vi.fn(),
+}));
+vi.mock("@/lib/market-move/target", () => ({
+  resolveMarketMoveTarget: vi.fn(),
+}));
+vi.mock("@/lib/market-move/context-builder", () => ({
+  buildMarketMoveContext: vi.fn(),
+}));
 
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { checkMcpHealth, type McpHealthResult } from "@/lib/agent/mcp-client";
@@ -37,6 +46,9 @@ import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { discoverNewsCards } from "@/lib/news-discovery/discovery";
 import { buildSelectedNewsSourcePack } from "@/lib/news-discovery/source-pack";
+import { resolveChatQuestionRoute } from "@/lib/question-router/chat-question-router";
+import { resolveMarketMoveTarget } from "@/lib/market-move/target";
+import { buildMarketMoveContext } from "@/lib/market-move/context-builder";
 import { runAgentJob } from "./job-runner";
 
 function createRunnerAdmin(params: {
@@ -44,6 +56,7 @@ function createRunnerAdmin(params: {
   previousMessagesError?: { code?: string; message: string } | null;
   runOverrides?: Record<string, unknown>;
   queuedEventPayload?: Record<string, unknown>;
+  userMessageContent?: string;
 } = {}) {
   const updates: Array<{
     table: string;
@@ -103,7 +116,7 @@ function createRunnerAdmin(params: {
         id: "user-message-1",
         session_id: "session-1",
         role: "user",
-        content: "Apple 매출 알려줘",
+        content: params.userMessageContent ?? "Apple 매출 알려줘",
         status: "completed",
       },
     ],
@@ -304,6 +317,224 @@ describe("agent job runner", () => {
       releaseMetadata: null,
       error: "MCP unavailable",
     });
+  });
+
+  it("runs auto routing inside the worker before the research SDK pass", async () => {
+    const marketMoveContext = {
+      version: "market-move-context/v1",
+      ticker: "AAPL",
+      company_name: "Apple Inc.",
+      user_question: "AAPL 오늘 왜 떨어져?",
+      as_of: "2026-06-24T00:00:00.000Z",
+      status: "ok",
+      provider: {
+        name: "yahoo-finance-mcp",
+        status: "ok",
+        error: null,
+      },
+      market_observation: {
+        ticker: "AAPL",
+        company_name: "Apple Inc.",
+        direction: "down",
+        requested_percent_move: null,
+        current_price: 100,
+        previous_close: 103,
+        absolute_change: -3,
+        percent_change: -2.91,
+        volume: 1000,
+        average_volume: 900,
+        volume_signal: "near_average",
+        market_time: "REGULAR",
+        currency: "USD",
+      },
+      event_candidates: [],
+      source_pack: {
+        version: "market-move-source-pack/v1",
+        ontology_search_brief_en:
+          "Investigate recent Apple stock weakness only if the user asks for filing-grounded implications.",
+        original_text_for_ontology: "User question: AAPL 오늘 왜 떨어져?",
+        source_urls: [],
+        source_previews: [],
+      },
+    } satisfies Awaited<ReturnType<typeof buildMarketMoveContext>>;
+    const fake = createRunnerAdmin({
+      userMessageContent: "AAPL 오늘 왜 떨어져?",
+      queuedEventPayload: {
+        research_mode: "standard",
+        analysis_mode: "company",
+        run_kind: "company_research",
+        routing_mode: "auto",
+        response_locale: "ko",
+      },
+    });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+    vi.mocked(checkMcpHealth).mockResolvedValue(readyMcpHealth());
+    vi.mocked(resolveChatQuestionRoute).mockResolvedValue({
+      analysisMode: "news",
+      runKind: "market_move_research",
+      source: "claude_router",
+      confidence: "medium",
+      reason: "test market move route",
+    });
+    vi.mocked(resolveMarketMoveTarget).mockResolvedValue({
+      ticker: "AAPL",
+      companyName: "Apple Inc.",
+    });
+    vi.mocked(buildMarketMoveContext).mockResolvedValue(marketMoveContext);
+    vi.mocked(runAgent).mockResolvedValue({
+      status: "completed",
+      acc: {
+        fullText: "오늘 주가 변동 요약",
+        structuredOutput: null,
+        researchSynthesisOutput: null,
+        researchSynthesisText: null,
+        displayPlanOutput: null,
+        toolCalls: [],
+        citations: [],
+        inputTokens: 10,
+        outputTokens: 20,
+        cacheHitInputTokens: 0,
+        cacheMissInputTokens: 0,
+      },
+    });
+
+    await runAgentJob("run-1", "worker-1");
+
+    expect(resolveChatQuestionRoute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: "AAPL 오늘 왜 떨어져?",
+        currentAnalysisMode: "company",
+        currentRunKind: "company_research",
+        defaultTickers: ["AAPL"],
+        scopeType: "company",
+      }),
+    );
+    expect(resolveMarketMoveTarget).toHaveBeenCalledWith({
+      content: "AAPL 오늘 왜 떨어져?",
+      defaultTickers: ["AAPL"],
+    });
+    expect(buildMarketMoveContext).toHaveBeenCalledWith({
+      ticker: "AAPL",
+      companyName: "Apple Inc.",
+      userQuestion: "AAPL 오늘 왜 떨어져?",
+    });
+    expect(runAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        analysisMode: "news",
+        runKind: "market_move_research",
+        selectedNewsEventContext: expect.objectContaining({
+          version: "market-move-context/v1",
+          ticker: "AAPL",
+        }),
+      }),
+      expect.any(Object),
+    );
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: "agent_runs",
+          payload: expect.objectContaining({
+            run_kind: "market_move_research",
+            executor_type: "claude_agent",
+            selected_news_event_context: expect.objectContaining({
+              version: "market-move-context/v1",
+              ticker: "AAPL",
+            }),
+          }),
+          filters: { id: "run-1" },
+        }),
+      ]),
+    );
+    expect(appendAgentRunEvent).toHaveBeenCalledWith(
+      fake.admin,
+      "run-1",
+      "activity_update",
+      expect.objectContaining({
+        stage: "routing",
+        label: "분석 방식 확인 완료",
+        routing: expect.objectContaining({
+          mode: "auto",
+          run_kind: "market_move_research",
+          has_selected_news_event_context: true,
+        }),
+      }),
+    );
+  });
+
+  it("keeps auto-routed scenario questions on the scenario sensitivity run kind", async () => {
+    const fake = createRunnerAdmin({
+      userMessageContent: "앞으로의 시나리오 알려줘",
+      queuedEventPayload: {
+        research_mode: "standard",
+        analysis_mode: "company",
+        run_kind: "company_research",
+        routing_mode: "auto",
+        response_locale: "ko",
+      },
+    });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+    vi.mocked(checkMcpHealth).mockResolvedValue(readyMcpHealth());
+    vi.mocked(resolveChatQuestionRoute).mockResolvedValue({
+      analysisMode: "company",
+      runKind: "scenario_sensitivity",
+      source: "claude_router",
+      confidence: "medium",
+      reason: "test scenario route",
+    });
+    vi.mocked(runAgent).mockResolvedValue({
+      status: "completed",
+      acc: {
+        fullText: "시나리오 분석 결과",
+        structuredOutput: null,
+        researchSynthesisOutput: null,
+        researchSynthesisText: null,
+        displayPlanOutput: null,
+        toolCalls: [],
+        citations: [],
+        inputTokens: 10,
+        outputTokens: 20,
+        cacheHitInputTokens: 0,
+        cacheMissInputTokens: 0,
+      },
+    });
+
+    await runAgentJob("run-1", "worker-1");
+
+    expect(resolveMarketMoveTarget).not.toHaveBeenCalled();
+    expect(buildMarketMoveContext).not.toHaveBeenCalled();
+    expect(runAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        analysisMode: "company",
+        runKind: "scenario_sensitivity",
+      }),
+      expect.any(Object),
+    );
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: "agent_runs",
+          payload: expect.objectContaining({
+            run_kind: "scenario_sensitivity",
+            executor_type: "claude_agent",
+          }),
+          filters: { id: "run-1" },
+        }),
+      ]),
+    );
+    expect(appendAgentRunEvent).toHaveBeenCalledWith(
+      fake.admin,
+      "run-1",
+      "activity_update",
+      expect.objectContaining({
+        stage: "routing",
+        label: "분석 방식 확인 완료",
+        routing: expect.objectContaining({
+          mode: "auto",
+          run_kind: "scenario_sensitivity",
+          has_selected_news_event_context: false,
+        }),
+      }),
+    );
   });
 
   it("runs queued server pipeline news discovery inside the worker", async () => {

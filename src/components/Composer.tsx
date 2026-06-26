@@ -11,6 +11,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { flushSync } from "react-dom";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
   MAX_CHAT_ATTACHMENT_BYTES,
@@ -63,6 +64,8 @@ export interface ComposerSendOptions {
 
 export interface ComposerHandle {
   requestAction: (type: "url" | "file" | "focus") => void;
+  commitUserUrls: (urls: string[]) => boolean;
+  submitWithValue: (message: string) => void;
 }
 
 interface TextAttachment {
@@ -223,6 +226,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
   focusRequestKey = 0,
   onFocusChange,
 }: ComposerProps, ref) {
+  const searchParams = useSearchParams();
   const initialDraftValue = initialValue ?? "";
   const [value, setValue] = useState(initialDraftValue);
   const [attachments, setAttachments] = useState<TextAttachment[]>([]);
@@ -233,7 +237,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [isUrlSheetOpen, setIsUrlSheetOpen] = useState(false);
   const [showAttachmentCoachmark, setShowAttachmentCoachmark] =
-    useState(IS_DEV_ENV && attachmentCoachmarkEnabled);
+    useState(false);
   const [committedUserUrls, setCommittedUserUrls] = useState<string[]>([]);
   const [userUrlDrafts, setUserUrlDrafts] = useState<UserUrlDraft[]>([]);
   const [isClientReady, setIsClientReady] = useState(false);
@@ -250,6 +254,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
   const lastInitialValueRef = useRef(initialDraftValue);
   const lastDraftResetKeyRef = useRef(draftResetKey);
   const motionConfig = useComposerMotionConfig();
+  const forceCoachmarks = searchParams.get("coach") === "1";
 
   const enteredUserUrls = useMemo(
     () => committedUserUrls.map((url) => url.trim()).filter(Boolean),
@@ -344,6 +349,15 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
 
   useEffect(() => {
     if (!attachmentCoachmarkEnabled) return undefined;
+    if (forceCoachmarks) {
+      const showTimer = window.setTimeout(
+        () => setShowAttachmentCoachmark(true),
+        0,
+      );
+      return () => {
+        window.clearTimeout(showTimer);
+      };
+    }
     if (IS_DEV_ENV) return undefined;
 
     try {
@@ -365,7 +379,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
     return () => {
       window.clearTimeout(showTimer);
     };
-  }, [attachmentCoachmarkEnabled]);
+  }, [attachmentCoachmarkEnabled, forceCoachmarks]);
 
   useEffect(() => {
     return () => clearDocumentPollTimers();
@@ -865,20 +879,20 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
     onUserUrlsChange?.(false);
   };
 
-  const confirmUserUrls = () => {
-    const entered = userUrlDrafts
-      .map((draft) => draft.value.trim())
+  const commitUserUrlValues = (values: string[]) => {
+    const entered = values
+      .map((value) => value.trim())
       .filter(Boolean);
 
     if (entered.length === 0) {
       clearUserUrls();
-      return;
+      return true;
     }
 
     const normalized = entered.map((url) => normalizeExplicitUserUrl(url));
     if (normalized.some((url) => !url)) {
       setAttachmentError("올바른 http 또는 https URL만 입력해주세요.");
-      return;
+      return false;
     }
     const nextUrls = normalized.filter((url): url is string => Boolean(url));
 
@@ -892,12 +906,20 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
     setAttachmentError(null);
     setIsUrlSheetOpen(false);
     onUserUrlsChange?.(true);
+    return true;
   };
 
-  const handleSubmit = async () => {
-    const latestValue = readTextareaValue();
+  const confirmUserUrls = () => {
+    commitUserUrlValues(userUrlDrafts.map((draft) => draft.value));
+  };
+
+  const handleSubmit = async (overrideValue?: string) => {
+    const latestValue = overrideValue ?? readTextareaValue();
     if (latestValue !== value) {
       setValue(latestValue);
+      if (textareaRef.current) {
+        textareaRef.current.value = latestValue;
+      }
     }
 
     if (hasUserUrls && !areUserUrlsValid) {
@@ -995,6 +1017,17 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
     void handleSubmit();
   };
 
+  const submitWithValue = (message: string) => {
+    const nextValue = message.trim();
+    if (!nextValue) return;
+    setValue(nextValue);
+    if (textareaRef.current) {
+      textareaRef.current.value = nextValue;
+      textareaRef.current.style.height = "auto";
+    }
+    void handleSubmit(nextValue);
+  };
+
   const openFilePicker = () => {
     setShowAttachmentCoachmark(false);
     setIsToolsOpen(false);
@@ -1024,6 +1057,14 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
       }
 
       focusComposerInput();
+    },
+    commitUserUrls(urls) {
+      if (isInputBusy || isGenerating) return false;
+      return commitUserUrlValues(urls);
+    },
+    submitWithValue(message) {
+      if (isInputBusy || isGenerating) return;
+      submitWithValue(message);
     },
   }));
 

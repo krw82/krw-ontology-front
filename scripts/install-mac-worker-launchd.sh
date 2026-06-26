@@ -101,6 +101,8 @@ AGENT_SUPERVISOR_CONCURRENCY=${AGENT_SUPERVISOR_CONCURRENCY:-${MAC_WORKER_COUNT:
 MAC_WORKER_NICE=${MAC_WORKER_NICE:--5}
 AGENT_WORKER_ID_PREFIX=${AGENT_WORKER_ID_PREFIX:-mac-worker-jwc}
 AGENT_WORKER_ID_PREFIX=${AGENT_WORKER_ID_PREFIX%-1}
+KRW_LOG_DIR=${KRW_LOG_DIR:-"$HOME/krw-ontology-log"}
+WORKER_LOG_DIR=${AGENT_WORKER_LOG_DIR:-"$KRW_LOG_DIR/agent-worker/prod"}
 export AGENT_SUPERVISOR_ID
 export AGENT_WORKER_ID
 export AGENT_SUPERVISOR_CONCURRENCY
@@ -134,7 +136,7 @@ if [ "$SKIP_PREFLIGHT" != "1" ]; then
     --skip-worker-duplicate-check
 fi
 
-mkdir -p "$PLIST_DIR" "$FRONT_DIR/logs"
+mkdir -p "$PLIST_DIR" "$WORKER_LOG_DIR"
 
 sed \
   -e "s#__LABEL__#$LABEL#g" \
@@ -142,6 +144,7 @@ sed \
   -e "s#__NICE__#$MAC_WORKER_NICE#g" \
   -e "s#__ENV_FILE__#$ENV_PATH#g" \
   -e "s#__FRONT_DIR__#$FRONT_DIR#g" \
+  -e "s#__WORKER_LOG_DIR__#$WORKER_LOG_DIR#g" \
   "$TEMPLATE" > "$PLIST"
 echo "Installed $PLIST for supervisor $AGENT_SUPERVISOR_ID"
 

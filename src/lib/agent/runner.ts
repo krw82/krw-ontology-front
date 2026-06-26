@@ -14,8 +14,11 @@ import {
   KRW_ONTOLOGY_MCP_TOOLS,
   KRW_ONTOLOGY_SDK_ALLOWED_TOOLS,
   STOCK_NEWS_MCP_TOOLS,
+  CHART_MCP_TOOLS,
+  CHART_SDK_ALLOWED_TOOLS,
   getStockNewsSdkAllowedTools,
   getKrwOntologyPluginPath,
+  isChartSdkTool,
   isKrwOntologySdkTool,
   isStockNewsEnabled,
   isStockNewsSdkTool,
@@ -48,6 +51,10 @@ import {
   type RunKind,
 } from "@/lib/run-kind";
 import {
+  CHART_MCP_SERVER_NAME,
+  createChartMcpServer,
+} from "@/lib/charts/create-chart-tool";
+import {
   createAccumulator,
   createSSEWriter,
   addToken,
@@ -61,6 +68,7 @@ import {
 } from "./stream-handler";
 import type {
   DocumentType,
+  ChartMCPToolName,
   KRWOntologyMCPToolName,
   MCPToolName,
   StreamingCitation,
@@ -69,6 +77,7 @@ import type {
 
 const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const STOCK_NEWS_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_MCP_TOOLS);
+const CHART_MCP_TOOL_SET = new Set<string>(CHART_MCP_TOOLS);
 const DEFAULT_MAX_TURNS = 20;
 const DEFAULT_AGENT_WORKSPACE_DIR = ".agent-workspace";
 const TOOL_BUDGET_EXCEEDED = "tool_budget_exceeded";
@@ -182,8 +191,8 @@ export async function runAgent(
     options.runKind ?? defaultRunKindForAnalysisMode(analysisMode),
   );
   const responseLocale = options.responseLocale ?? DEFAULT_LOCALE;
-  const stockNewsEnabledForRun =
-    analysisMode === "news" && isStockNewsEnabled();
+  const stockNewsRun = isStockNewsRunKind(runKind);
+  const stockNewsEnabledForRun = stockNewsRun && isStockNewsEnabled();
   const toolBudget = getResearchModeToolBudget(researchMode);
 
   const abortHandler = () => abortController.abort();
@@ -208,9 +217,8 @@ export async function runAgent(
     shouldResume ? [] : (options.history ?? []),
     {
       stockNewsEnabled: stockNewsEnabledForRun,
-      stockNewsRequired: analysisMode === "news" && stockNewsEnabledForRun,
-      stockNewsUnavailableForNews:
-        analysisMode === "news" && !stockNewsEnabledForRun,
+      stockNewsRequired: stockNewsRun && stockNewsEnabledForRun,
+      stockNewsUnavailableForNews: stockNewsRun && !stockNewsEnabledForRun,
       responseLocale,
     },
   );
@@ -380,12 +388,17 @@ async function runSdkPass(params: {
       maxStockNewsCalls,
       allowedStockNewsSourceUrls,
     );
+    const passSdkOptions: Options = {
+      ...sdkOptions,
+      canUseTool: passCanUseTool,
+      mcpServers: {
+        ...(sdkOptions.mcpServers ?? {}),
+        [CHART_MCP_SERVER_NAME]: createChartMcpServer(acc),
+      },
+    };
     const sdkQuery = query({
       prompt,
-      options: {
-        ...sdkOptions,
-        canUseTool: passCanUseTool,
-      },
+      options: passSdkOptions,
     });
     await reportSdkInitialization({
       passName,
@@ -395,10 +408,7 @@ async function runSdkPass(params: {
       cwd,
       pluginPath,
       prompt,
-      sdkOptions: {
-        ...sdkOptions,
-        canUseTool: passCanUseTool,
-      },
+      sdkOptions: passSdkOptions,
       researchMode,
       analysisMode,
       runKind,
@@ -592,6 +602,10 @@ export async function canUseTool(
   toolName: string,
   input: Record<string, unknown> = {},
 ): Promise<PermissionResult> {
+  if (isChartSdkTool(toolName)) {
+    return { behavior: "allow" };
+  }
+
   if (isKrwOntologySdkTool(toolName)) {
     const mcpToolName = normalizeKrwOntologyToolName(toolName);
     return allowWithInputPolicy(mcpToolName, input);
@@ -611,7 +625,7 @@ export async function canUseTool(
   return {
     behavior: "deny",
     message:
-      "Only configured read-only KRW Ontology and Stock News MCP tools are allowed in web chat.",
+      "Only configured KRW Ontology, Stock News, and presentation MCP tools are allowed in web chat.",
   };
 }
 
@@ -635,7 +649,8 @@ function allowedSdkToolsForResearchMode(
 
   return [
     ...(runKind === "news_discovery" ? [] : allowedOntologyTools),
-    ...(analysisMode === "news" ? allowedStockNewsTools : []),
+    ...(isStockNewsRunKind(runKind) ? allowedStockNewsTools : []),
+    ...(runKind === "news_discovery" ? [] : CHART_SDK_ALLOWED_TOOLS),
   ];
 }
 
@@ -652,11 +667,15 @@ function createToolPermissionGuard(
     toolName: string,
     input: Record<string, unknown> = {},
   ): Promise<PermissionResult> => {
+    if (isChartSdkTool(toolName)) {
+      return { behavior: "allow" };
+    }
+
     if (!isKrwOntologySdkTool(toolName) && !isStockNewsSdkTool(toolName)) {
       return {
         behavior: "deny",
         message:
-          "Only configured read-only KRW Ontology and Stock News MCP tools are allowed in web chat.",
+          "Only configured KRW Ontology, Stock News, and presentation MCP tools are allowed in web chat.",
       };
     }
 
@@ -807,6 +826,10 @@ function isStockNewsToolAllowedForRunKind(
   return false;
 }
 
+function isStockNewsRunKind(runKind: RunKind): boolean {
+  return runKind === "news_discovery" || runKind === "news_research";
+}
+
 function stockNewsDenyMessageForRunKind(runKind: RunKind): string {
   if (runKind === "news_discovery") {
     return "News discovery only finds event candidates. Do not read full sources or perform final research in this run.";
@@ -828,6 +851,13 @@ function buildSelectedNewsEventContextPrompt(
 ${JSON.stringify(selectedNewsEventContext)}
 </idea_generation_url_context>`;
   }
+  if (runKind === "market_move_research" && selectedNewsEventContext) {
+    return `Use this app-provided market move context as the bounded input brief for stock-move interpretation. Treat current market data and recent news candidates as market observations, not confirmed company disclosure. Default to a lightweight market/news explanation of the observed move. Use KRW Ontology retrieval from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology only when filing-grounded depth is required by the user's question or by a durable investment-view claim. Follow-up prompts should bridge the observed move/news into filing-grounded KRW Ontology research.
+
+<selected_news_event_context>
+${JSON.stringify(selectedNewsEventContext)}
+</selected_news_event_context>`;
+  }
   if (runKind !== "news_research" || !selectedNewsEventContext) return "";
   return `Use this selected market narrative as the input brief for KRW Ontology filing research. Treat it as an investment hypothesis, not confirmed company fact. If it came from a user-provided URL, first ask what would matter if the narrative is directionally true, then anchor the interpretation against filing evidence. Start KRW ontology retrieval from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology when present; otherwise use ontology_bridge_brief_en.
 
@@ -847,6 +877,9 @@ function prepareToolInputForRun(
   acc: AccumulatedRun,
 ): PreparedToolInput {
   if (isStockNewsMcpToolName(mcpToolName)) {
+    return { input, changed: false };
+  }
+  if (isChartMcpToolName(mcpToolName) || !mcpToolName) {
     return { input, changed: false };
   }
 
@@ -1340,7 +1373,11 @@ function summarizeToolResult(text: string): string | null {
 }
 
 function normalizeMcpToolName(name: unknown): MCPToolName | null {
-  return normalizeKrwOntologyToolName(name) ?? normalizeStockNewsToolName(name);
+  return (
+    normalizeKrwOntologyToolName(name) ??
+    normalizeStockNewsToolName(name) ??
+    normalizeChartToolName(name)
+  );
 }
 
 function normalizeKrwOntologyToolName(
@@ -1359,6 +1396,13 @@ function normalizeStockNewsToolName(
   const bareName = name.includes("__") ? name.split("__").at(-1) : name;
   if (!bareName || !STOCK_NEWS_MCP_TOOL_SET.has(bareName)) return null;
   return bareName as StockNewsMCPToolName;
+}
+
+function normalizeChartToolName(name: unknown): ChartMCPToolName | null {
+  if (typeof name !== "string") return null;
+  const bareName = name.includes("__") ? name.split("__").at(-1) : name;
+  if (!bareName || !CHART_MCP_TOOL_SET.has(bareName)) return null;
+  return bareName as ChartMCPToolName;
 }
 
 function pendingToolResultsFailure(
@@ -1412,6 +1456,12 @@ function countStockNewsToolCalls(
   toolCalls: Array<Pick<AccumulatedToolCall, "toolName">>,
 ): number {
   return toolCalls.filter((toolCall) => isStockNewsMcpToolName(toolCall.toolName)).length;
+}
+
+function isChartMcpToolName(
+  toolName: MCPToolName | null,
+): toolName is ChartMCPToolName {
+  return Boolean(toolName && CHART_MCP_TOOL_SET.has(toolName));
 }
 
 function isStockNewsMcpToolName(

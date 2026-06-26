@@ -11,6 +11,7 @@ import type { ToolCallState } from "@/hooks/useChat";
 import type {
   ChatCitation,
   ChatArtifact,
+  ChatMessageChart,
   ChatArtifactSelection,
   MessageStatus,
   ResearchActivityUpdate,
@@ -32,6 +33,7 @@ interface ChatMessageProps {
   activity?: ResearchActivityUpdate | null;
   citations?: ChatCitation[];
   artifacts?: ChatArtifact[];
+  charts?: ChatMessageChart[];
   artifactSelections?: ChatArtifactSelection[];
   onSelectNewsEvent?: (params: {
     artifactId: string;
@@ -330,6 +332,8 @@ function activityLabel(activity?: ResearchActivityUpdate | null): string {
   switch (activity?.stage) {
     case "queued":
       return "대기열에 추가됨";
+    case "routing":
+      return "질문 유형 확인 중";
     case "connecting":
       return "자료 연결 중";
     case "checking_evidence":
@@ -384,8 +388,14 @@ function StreamingContentBlocks({ content }: { content: string }) {
   );
 }
 
-function CompletedAssistantContent({ content }: { content: string }) {
-  return <ResearchMarkdown content={content} />;
+function CompletedAssistantContent({
+  content,
+  charts,
+}: {
+  content: string;
+  charts?: ChatMessageChart[];
+}) {
+  return <ResearchMarkdown content={content} charts={charts} />;
 }
 
 function userUrlsFromMetadata(
@@ -465,6 +475,7 @@ export default function ChatMessage({
   activity,
   citations,
   artifacts,
+  charts,
   metadata,
   artifactSelections,
   onSelectNewsEvent,
@@ -563,7 +574,7 @@ export default function ChatMessage({
       ) : (
         <div className="max-w-full pl-0 text-body sm:pl-[48px]">
           {assistantContent ? (
-            <CompletedAssistantContent content={assistantContent} />
+            <CompletedAssistantContent content={assistantContent} charts={charts} />
           ) : terminalAssistantContent(status) ? (
             <p className="text-[15px] leading-[1.5] text-muted">
               {terminalAssistantContent(status)}

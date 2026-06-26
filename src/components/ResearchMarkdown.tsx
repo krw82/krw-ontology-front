@@ -3,17 +3,22 @@
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import KrwChartCard from "@/components/KrwChartCard";
 import { normalizeTicker } from "@/lib/ontology/ticker";
+import type { ChatMessageChart } from "@/types/api-contracts";
 
 interface ResearchMarkdownProps {
   content: string;
   className?: string;
   normalizePlainText?: boolean;
+  charts?: ChatMessageChart[];
 }
 
 const SAFE_LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
 const SAFE_IMAGE_PROTOCOLS = new Set(["http:", "https:"]);
 const UNSAFE_URL_CHARACTERS = /[\u0000-\u001F\u007F]/;
+const CHART_TOKEN_PATTERN = /\[\[krw-chart:([A-Za-z0-9_-]+)\]\]/g;
+const CHART_TOKEN_LINE_PATTERN = /^\s*\[\[krw-chart:[A-Za-z0-9_-]+\]\]\s*$/;
 const FENCE_START_PATTERN = /^\s*(```|~~~)/;
 const MARKDOWN_BLOCK_PATTERN =
   /^\s*(#{1,6}\s|[-*+]\s+|\d+[.)]\s+|>\s|---+$|\|)/;
@@ -167,6 +172,15 @@ export function normalizeResearchMarkdown(content: string): string {
       continue;
     }
 
+    if (CHART_TOKEN_LINE_PATTERN.test(line)) {
+      pushBlankLine(output);
+      output.push(rawLine);
+      output.push("");
+      pendingBareList = false;
+      activeBareList = false;
+      continue;
+    }
+
     if ((pendingBareList || activeBareList) && isBareListItem(line)) {
       output.push(`- ${line}`);
       pendingBareList = false;
@@ -314,6 +328,7 @@ export default function ResearchMarkdown({
   content,
   className,
   normalizePlainText = true,
+  charts = [],
 }: ResearchMarkdownProps) {
   const classes = [
     "w-full max-w-[820px] break-words text-body",
@@ -321,15 +336,69 @@ export default function ResearchMarkdown({
   ]
     .filter(Boolean)
     .join(" ");
+  const markdownContent = normalizePlainText
+    ? normalizeResearchMarkdown(content)
+    : content;
+  const parts = splitChartTokens(markdownContent);
+  const chartsByRef = new Map<string, ChatMessageChart>();
+  for (const chart of charts) {
+    chartsByRef.set(chart.chart_ref, chart);
+    chartsByRef.set(chart.insert_token, chart);
+    chartsByRef.set(chart.id, chart);
+  }
 
   return (
     <div className={classes}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={RESEARCH_MARKDOWN_COMPONENTS}
-      >
-        {normalizePlainText ? normalizeResearchMarkdown(content) : content}
-      </ReactMarkdown>
+      {parts.map((part, index) => {
+        if (part.type === "chart") {
+          const chart = chartsByRef.get(part.ref);
+          return chart ? <KrwChartCard key={`${part.ref}-${index}`} chart={chart} /> : null;
+        }
+
+        if (!part.content.trim()) return null;
+        return (
+          <ReactMarkdown
+            key={`markdown-${index}`}
+            remarkPlugins={[remarkGfm]}
+            components={RESEARCH_MARKDOWN_COMPONENTS}
+          >
+            {part.content}
+          </ReactMarkdown>
+        );
+      })}
     </div>
   );
+}
+
+function splitChartTokens(
+  content: string,
+): Array<{ type: "markdown"; content: string } | { type: "chart"; ref: string }> {
+  const parts: Array<
+    { type: "markdown"; content: string } | { type: "chart"; ref: string }
+  > = [];
+  let lastIndex = 0;
+
+  for (const match of content.matchAll(CHART_TOKEN_PATTERN)) {
+    const matchIndex = match.index ?? 0;
+    if (matchIndex > lastIndex) {
+      parts.push({
+        type: "markdown",
+        content: content.slice(lastIndex, matchIndex),
+      });
+    }
+    parts.push({
+      type: "chart",
+      ref: match[1] ?? "",
+    });
+    lastIndex = matchIndex + match[0].length;
+  }
+
+  if (lastIndex < content.length) {
+    parts.push({
+      type: "markdown",
+      content: content.slice(lastIndex),
+    });
+  }
+
+  return parts.length > 0 ? parts : [{ type: "markdown", content }];
 }

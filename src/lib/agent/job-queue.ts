@@ -34,6 +34,8 @@ const GLOBAL_CONCURRENT_LIMIT = readIntEnv("GLOBAL_CONCURRENT_RUN_LIMIT", 5, {
 const LEASE_TIMEOUT_SECONDS =
   readIntEnv("LEASE_TIMEOUT_MINUTES", 10, { min: 1 }) * 60;
 
+export type AgentRunRoutingMode = "auto" | "preserve";
+
 export type EnqueueAgentRunResult =
   | {
       ok: true;
@@ -59,6 +61,7 @@ export async function enqueueAgentRun(params: {
   executorType?: AgentRunExecutorType;
   selectedNewsEventContext?: Record<string, unknown> | null;
   responseLocale?: Locale;
+  routingMode?: AgentRunRoutingMode;
   sourceArtifactId?: string | null;
   sourceEventId?: string | null;
 }): Promise<EnqueueAgentRunResult> {
@@ -75,6 +78,7 @@ export async function enqueueAgentRun(params: {
   );
   const executorType = params.executorType ?? "claude_agent";
   const responseLocale = params.responseLocale ?? DEFAULT_LOCALE;
+  const routingMode = params.routingMode ?? "preserve";
   const admin = getSupabaseAdmin();
 
   const existingRun = await findRunByRequestId(requestId, session.id);
@@ -168,6 +172,7 @@ export async function enqueueAgentRun(params: {
     research_mode: researchMode,
     analysis_mode: analysisMode,
     run_kind: runKind,
+    routing_mode: routingMode,
     response_locale: responseLocale,
     executor_type: executorType,
     queue,

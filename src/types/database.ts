@@ -129,7 +129,9 @@ export interface AgentRunRow extends Record<string, unknown> {
     | "company_research"
     | "idea_generation"
     | "news_discovery"
-    | "news_research";
+    | "news_research"
+    | "market_move_research"
+    | "scenario_sensitivity";
   executor_type: "claude_agent" | "server_pipeline";
   selected_news_event_context: Json | null;
   source_artifact_id: string | null;
@@ -141,6 +143,19 @@ export interface AgentRunEventRow extends Record<string, unknown> {
   run_id: string;
   event_type: string;
   payload: Json;
+  created_at: string;
+}
+
+export interface ChatMessageChartRow extends Record<string, unknown> {
+  id: string;
+  session_id: string;
+  message_id: string;
+  run_id: string;
+  chart_ref: string;
+  insert_token: string;
+  title: string;
+  chart_type: "line" | "bar";
+  payload_json: Json;
   created_at: string;
 }
 
@@ -2184,6 +2199,21 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<Omit<ChatMessageArtifactRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      chat_message_charts: {
+        Row: ChatMessageChartRow;
+        Insert: Omit<ChatMessageChartRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<ChatMessageChartRow, "id" | "created_at">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];

@@ -24,7 +24,10 @@ import {
   settleAnalysisCreditsShadow,
 } from "@/lib/concurrency/analysis-credits";
 import { getBillingPlanFromStore } from "@/lib/billing/plan-store";
-import { heartbeatAgentRun } from "@/lib/agent/job-queue";
+import {
+  heartbeatAgentRun,
+  type AgentRunRoutingMode,
+} from "@/lib/agent/job-queue";
 import { closeOpenToolCallsForRun } from "@/lib/agent/tool-call-cleanup";
 import { markAgentRunTerminal } from "@/lib/agent/run-lifecycle";
 import {
@@ -79,10 +82,15 @@ import {
   buildNewsEventSelectionArtifactFromDiscoveryResult,
   toPublicChatArtifact,
 } from "@/lib/chat-artifacts/news-event-selection";
+import { persistCreatedCharts } from "@/lib/charts/db";
 import { discoverNewsCards } from "@/lib/news-discovery/discovery";
 import { buildSelectedNewsSourcePack } from "@/lib/news-discovery/source-pack";
 import { appendDocumentContextToUserMessage } from "@/lib/document-ingestion/prompt-context";
 import type { ResolvedSession } from "@/lib/api/chat/resolve-session";
+import { resolveChatQuestionRoute } from "@/lib/question-router/chat-question-router";
+import { buildMarketMoveContext } from "@/lib/market-move/context-builder";
+import { resolveMarketMoveTarget } from "@/lib/market-move/target";
+import { writeLocalDebugLog } from "@/lib/observability/local-debug-log";
 
 const HEARTBEAT_INTERVAL_MS = readIntEnv("LEASE_HEARTBEAT_INTERVAL_MS", 60_000, {
   min: 1_000,
@@ -157,6 +165,7 @@ interface AgentJob {
   researchMode: ResearchMode;
   analysisMode: AnalysisMode;
   runKind: RunKind;
+  routingMode: AgentRunRoutingMode;
   responseLocale: Locale;
   executorType: AgentRunExecutorType;
   selectedNewsEventContext: Record<string, unknown> | null;
@@ -265,6 +274,12 @@ export async function runAgentJob(runId: string, workerId: string) {
         ontology_manifest: releaseSnapshot(mcpHealth),
       })
       .eq("id", runId);
+
+    job = await resolveAutoRoutedJob({
+      admin,
+      job,
+      sendEvent,
+    });
 
     if (job.executorType === "server_pipeline") {
       if (job.runKind === "news_discovery") {
@@ -431,6 +446,147 @@ export async function runAgentJob(runId: string, workerId: string) {
   }
 }
 
+async function resolveAutoRoutedJob(params: {
+  admin: SupabaseAdmin;
+  job: AgentJob;
+  sendEvent: (event: Parameters<typeof appendAgentRunEvent>[2], payload: unknown) => Promise<void>;
+}): Promise<AgentJob> {
+  const { admin, job, sendEvent } = params;
+  if (job.routingMode !== "auto") return job;
+
+  await sendEvent("activity_update", {
+    stage: "routing",
+    label: "질문 유형 확인 중",
+  });
+
+  const routeDecision = await resolveChatQuestionRoute({
+    content: job.userMessage.content,
+    currentAnalysisMode: job.analysisMode,
+    currentRunKind: job.runKind,
+    defaultTickers: job.session.default_tickers ?? [],
+    scopeType: job.session.scope_type,
+    hasUserUrls: false,
+    responseLocale: job.responseLocale,
+  });
+
+  if (routeDecision.source === "fallback") {
+    writeLocalDebugLog({
+      namespace: "question-router",
+      event: "fallback",
+      payload: {
+        run_id: job.run.id,
+        session_id: job.session.id,
+        original_analysis_mode: job.analysisMode,
+        original_run_kind: job.runKind,
+        diagnostic_code: routeDecision.diagnostic?.code ?? null,
+        diagnostic_message: routeDecision.diagnostic?.message ?? null,
+        reason: routeDecision.reason,
+      },
+    });
+    console.warn("[agent-worker] question router fallback", {
+      runId: job.run.id,
+      sessionId: job.session.id,
+      originalAnalysisMode: job.analysisMode,
+      originalRunKind: job.runKind,
+      diagnostic: routeDecision.diagnostic ?? null,
+      reason: routeDecision.reason,
+    });
+  }
+
+  let nextAnalysisMode = routeDecision.analysisMode;
+  let nextRunKind = routeDecision.runKind;
+  let nextExecutorType = executorTypeForRunKind(nextRunKind);
+  let nextSelectedNewsEventContext = job.selectedNewsEventContext;
+  let routingNote: string | null = null;
+
+  if (nextRunKind === "news_research") {
+    nextAnalysisMode = "company";
+    nextRunKind = "company_research";
+    nextExecutorType = "claude_agent";
+    routingNote = "news_research requires a selected event or URL context.";
+  }
+
+  if (nextRunKind === "market_move_research") {
+    const marketMoveContext = await buildRoutedMarketMoveContext(job).catch(
+      (error) => {
+        console.warn("[agent-worker] market-move routing context failed", {
+          runId: job.run.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return null;
+      },
+    );
+
+    if (marketMoveContext) {
+      nextSelectedNewsEventContext = marketMoveContext;
+    } else {
+      nextAnalysisMode = "company";
+      nextRunKind = "company_research";
+      nextExecutorType = "claude_agent";
+      nextSelectedNewsEventContext = null;
+      routingNote = "market_move_research requires a resolvable covered ticker.";
+    }
+  }
+
+  const runUpdate: Record<string, unknown> = {
+    run_kind: nextRunKind,
+    executor_type: nextExecutorType,
+  };
+  if (nextSelectedNewsEventContext) {
+    runUpdate.selected_news_event_context =
+      jsonForDb(nextSelectedNewsEventContext);
+  }
+
+  await admin.from("agent_runs").update(runUpdate).eq("id", job.run.id);
+
+  await sendEvent("activity_update", {
+    stage: "routing",
+    label: "분석 방식 확인 완료",
+    routing: {
+      mode: job.routingMode,
+      source: routeDecision.source,
+      confidence: routeDecision.confidence,
+      original_analysis_mode: job.analysisMode,
+      original_run_kind: job.runKind,
+      analysis_mode: nextAnalysisMode,
+      run_kind: nextRunKind,
+      executor_type: nextExecutorType,
+      reason: routeDecision.reason,
+      note: routingNote,
+      has_selected_news_event_context: Boolean(nextSelectedNewsEventContext),
+    },
+  });
+
+  return {
+    ...job,
+    analysisMode: nextAnalysisMode,
+    runKind: nextRunKind,
+    routingMode: "preserve",
+    executorType: nextExecutorType,
+    selectedNewsEventContext: nextSelectedNewsEventContext,
+  };
+}
+
+function executorTypeForRunKind(runKind: RunKind): AgentRunExecutorType {
+  return runKind === "news_discovery" ? "server_pipeline" : "claude_agent";
+}
+
+async function buildRoutedMarketMoveContext(
+  job: AgentJob,
+): Promise<Record<string, unknown> | null> {
+  const target = await resolveMarketMoveTarget({
+    content: job.userMessage.content,
+    defaultTickers: job.session.default_tickers ?? [],
+  });
+  if (!target) return null;
+
+  return buildMarketMoveContext({
+    ticker: target.ticker,
+    companyName: target.companyName,
+    userQuestion: job.userMessage.content,
+  });
+}
+
 function runWithHardTimeout<T>(
   promise: Promise<T>,
   abortController: AbortController,
@@ -581,6 +737,7 @@ async function loadAgentJob(
           normalizeAnalysisMode(queuedPayload.analysis_mode),
         ),
     ),
+    routingMode: normalizeRoutingMode(queuedPayload.routing_mode),
     responseLocale: normalizeResponseLocale(queuedPayload.response_locale),
     executorType: normalizeExecutorType(
       queuedPayload.executor_type ?? run.executor_type,
@@ -593,6 +750,10 @@ async function loadAgentJob(
 
 function normalizeExecutorType(value: unknown): AgentRunExecutorType {
   return value === "server_pipeline" ? "server_pipeline" : "claude_agent";
+}
+
+function normalizeRoutingMode(value: unknown): AgentRunRoutingMode {
+  return value === "auto" ? "auto" : "preserve";
 }
 
 function normalizeResponseLocale(value: unknown): Locale {
@@ -966,6 +1127,7 @@ async function handleServerPipelineNewsDiscoveryJob(params: {
       rich_answers: [],
       artifacts: [],
       chat_artifacts: chatArtifacts,
+      charts: [],
       release: publicReleaseMetadata(publicReleaseInputFromMcpHealth(mcpHealth)),
       usage: {
         input_tokens: inputTokens,
@@ -1179,6 +1341,14 @@ async function handleCompletedJob(params: {
           acc,
         })
       : [];
+  const chatCharts = await persistCreatedCharts({
+    admin,
+    acc,
+    sessionId: job.session.id,
+    messageId: job.assistantMessageId,
+    runId: job.run.id,
+    content: visibleAnswer,
+  });
 
   await admin
     .from("messages")
@@ -1234,6 +1404,8 @@ async function handleCompletedJob(params: {
       citation_count: acc.citations.length,
       artifact_count: chatArtifacts.length,
       artifact_created: chatArtifacts.length > 0,
+      chart_count: chatCharts.length,
+      chart_created: chatCharts.length > 0,
       input_tokens: acc.inputTokens,
       output_tokens: acc.outputTokens,
       tool_call_count: acc.toolCalls.length,
@@ -1248,6 +1420,9 @@ async function handleCompletedJob(params: {
   for (const artifact of chatArtifacts) {
     await sendEvent("artifact", artifact);
   }
+  for (const chart of chatCharts) {
+    await sendEvent("chart", chart);
+  }
 
   await sendEvent("done", {
     run_id: job.run.id,
@@ -1256,6 +1431,7 @@ async function handleCompletedJob(params: {
     rich_answers: [],
     artifacts: [],
     chat_artifacts: chatArtifacts,
+    charts: chatCharts,
     release: publicReleaseMetadata(release),
     usage: {
       input_tokens: acc.inputTokens,

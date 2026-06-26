@@ -176,6 +176,12 @@ function createSupabase(overrides: {
                   error: null,
                 });
               }
+              if (table === "chat_message_charts") {
+                return Promise.resolve({
+                  data: [],
+                  error: null,
+                });
+              }
               throw new Error(`Unexpected table: ${table}`);
             },
           };
@@ -251,9 +257,11 @@ describe("GET /api/chat/[sessionId]", () => {
       "messages",
       "agent_runs",
       "chat_message_artifacts",
+      "chat_message_charts",
     ]);
     expect(body).toMatchObject({
       chat_artifacts: [],
+      charts: [],
       artifact_selections: [],
       message_pagination: {
         limit: 200,

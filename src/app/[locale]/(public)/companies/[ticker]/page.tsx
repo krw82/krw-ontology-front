@@ -307,20 +307,26 @@ export default async function CompanyLandingPage({
                   {pageCopy.scopeHeading}
                 </h2>
               </div>
-              <div className="border-t border-hairline">
-                <ScopeRow
+              <div className="grid gap-3 md:grid-cols-2">
+                <ScopeActionGroup
                   index="01"
                   label={pageCopy.businessActivity}
                   items={scopeItemsFromValue(
                     displayCompany.core_strength ?? pageCopy.fallbackActivity,
                   )}
+                  companyName={companyTitleName}
+                  locale={locale}
+                  ticker={displayCompany.ticker}
                 />
-                <ScopeRow
+                <ScopeActionGroup
                   index="02"
                   label={pageCopy.watchItem}
                   items={scopeItemsFromValue(
                     displayCompany.critical_risk ?? pageCopy.fallbackRisk,
                   )}
+                  companyName={companyTitleName}
+                  locale={locale}
+                  ticker={displayCompany.ticker}
                 />
               </div>
             </div>
@@ -332,18 +338,27 @@ export default async function CompanyLandingPage({
   );
 }
 
-function ScopeRow({
+function ScopeActionGroup({
   index,
   label,
   items,
+  companyName,
+  locale,
+  ticker,
 }: {
   index: string;
   label: string;
   items: string[];
+  companyName: string;
+  locale: Locale;
+  ticker: string;
 }) {
+  const ctaLabel =
+    locale === "ko" ? "이 축으로 질문하기" : "Ask with this axis";
+
   return (
-    <div className="grid gap-3 border-b border-hairline py-4 last:border-b-0 sm:grid-cols-[104px_minmax(0,1fr)] sm:gap-5">
-      <div className="flex items-baseline gap-2">
+    <section className="overflow-hidden rounded-[8px] border border-hairline bg-canvas">
+      <div className="flex items-baseline gap-2 border-b border-hairline bg-surface px-sm py-xs">
         <span className="font-mono text-[11px] font-black leading-none text-primary">
           {index}
         </span>
@@ -351,18 +366,51 @@ function ScopeRow({
           {label}
         </span>
       </div>
-      <ul className="flex min-w-0 flex-wrap gap-x-1.5 gap-y-2">
-        {items.map((item) => (
-          <li
+      <div className="divide-y divide-hairline">
+        {items.map((item, itemIndex) => (
+          <Link
             key={item}
-            className="max-w-full rounded-[6px] border border-hairline bg-surface px-2 py-1 text-[12px] font-bold leading-5 text-ink [word-break:keep-all]"
+            href={chatHref(
+              ticker,
+              buildScopeQuestion({ companyName, item, label, locale }),
+              locale,
+            )}
+            className="group grid min-h-[76px] gap-2 px-sm py-3 transition-colors hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
           >
-            {item}
-          </li>
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <p className="min-w-0 text-[14px] font-black leading-6 text-ink [word-break:keep-all]">
+                {item}
+              </p>
+              <span className="font-mono text-[11px] font-black leading-5 text-muted">
+                {String(itemIndex + 1).padStart(2, "0")}
+              </span>
+            </div>
+            <p className="text-[12px] font-bold leading-5 text-primary transition-colors group-hover:text-primary-active">
+              {ctaLabel}
+            </p>
+          </Link>
         ))}
-      </ul>
-    </div>
+      </div>
+    </section>
   );
+}
+
+function buildScopeQuestion({
+  companyName,
+  item,
+  label,
+  locale,
+}: {
+  companyName: string;
+  item: string;
+  label: string;
+  locale: Locale;
+}): string {
+  if (locale === "ko") {
+    return `${companyName}의 ${item}을 ${label} 관점에서 공시 근거로 정리해줘.`;
+  }
+
+  return `Analyze ${companyName}'s ${item} from the ${label.toLowerCase()} perspective using filing evidence.`;
 }
 
 function scopeItemsFromValue(value: string): string[] {

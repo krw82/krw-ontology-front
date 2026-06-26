@@ -116,8 +116,10 @@ fi
 
 safe_worker_id=$(printf '%s' "$AGENT_SUPERVISOR_ID" | tr -cs 'A-Za-z0-9_.-' '-' | sed 's/^-//; s/-$//')
 LOCK_DIR=${MAC_WORKER_LOCK_DIR:-/tmp/krw-ontology-agent-worker-$safe_worker_id.lock}
+KRW_LOG_DIR=${KRW_LOG_DIR:-"$HOME/krw-ontology-log"}
+WORKER_LOG_DIR=${AGENT_WORKER_LOG_DIR:-"$KRW_LOG_DIR/agent-worker/prod"}
 if [ -z "$LOG_FILE" ]; then
-  LOG_FILE="$FRONT_DIR/logs/mac-agent-worker-$safe_worker_id.log"
+  LOG_FILE="$WORKER_LOG_DIR/mac-agent-worker-$safe_worker_id.log"
 fi
 
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
@@ -151,7 +153,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-mkdir -p "$CLAUDE_AGENT_CWD" "$CLAUDE_CONFIG_DIR" "$FRONT_DIR/logs"
+mkdir -p "$CLAUDE_AGENT_CWD" "$CLAUDE_CONFIG_DIR" "$WORKER_LOG_DIR" "$(dirname "$LOG_FILE")"
 
 if [ "$BUILD" = "1" ]; then
   (cd "$FRONT_DIR" && npm run build:worker)

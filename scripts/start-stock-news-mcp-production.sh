@@ -67,7 +67,8 @@ STOCK_NEWS_MCP_ROOT=${STOCK_NEWS_MCP_ROOT:-"$HOME/mcp-servers/stock-news-mcp"}
 STOCK_NEWS_MCP_HOST=${STOCK_NEWS_MCP_HOST:-127.0.0.1}
 STOCK_NEWS_MCP_PORT=${STOCK_NEWS_MCP_PORT:-8775}
 STOCK_NEWS_MCP_PATH=${STOCK_NEWS_MCP_PATH:-/mcp}
-MCP_LOG_DIR=${MCP_LOG_DIR:-"$HOME/Library/Logs/krw-ontology"}
+KRW_LOG_DIR=${KRW_LOG_DIR:-"$HOME/krw-ontology-log"}
+MCP_LOG_DIR=${MCP_LOG_DIR:-"$KRW_LOG_DIR/mcp/prod"}
 DEFAULT_STOCK_NEWS_COVERAGE_PATH="${KRW_ONTOLOGY_PLUGIN_PATH:-}/stock-news/coverage_companies.json"
 
 if truthy_env "${STOCK_NEWS_FORCE_DISABLED:-}" || ! truthy_env "${STOCK_NEWS_ENABLED:-}"; then
