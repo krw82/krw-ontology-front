@@ -18,6 +18,7 @@ function shareFixture(overrides: Partial<PublicMessageShare> = {}): PublicMessag
     title: "AI 모멘텀만 따지면 마이크론이 최고지",
     question_content: "AI 데이터센터 투자에서 MU가 가장 수혜를 받는지 분석해줘.",
     question_created_at: "2026-06-21T00:00:00.000Z",
+    question_attachments: { urls: [], files: [] },
     answer_content: "공유된 답변입니다.",
     answer_created_at: "2026-06-21T00:01:00.000Z",
     tickers: ["MU"],

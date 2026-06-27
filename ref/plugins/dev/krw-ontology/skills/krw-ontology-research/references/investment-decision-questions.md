@@ -301,6 +301,16 @@ Default follow-up pattern:
 3. Opposite view: weak assumptions, downside risks, thesis-break signals, or conflicting company comments
 ```
 
+One of the three prompts must be a scenario-sensitivity prompt that the user can send directly. Prefer plain Korean trigger wording such as:
+
+```text
+상승·하락·횡보 시나리오별 체크포인트를 보여줘.
+이 판단이 좋아지는 경우와 나빠지는 경우를 나눠줘.
+판단이 바뀌는 조건을 시나리오별로 정리해줘.
+```
+
+Do not replace this with a raw valuation, target-price, or model-building prompt.
+
 Choose the set that matches the user's intent:
 
 General investment-decision follow-ups:
@@ -334,7 +344,7 @@ Good follow-ups:
 ```text
 - 보유자가 계속 봐도 되는 조건만 정리해줘.
 - 매도 판단이 강해지는 신호만 따로 뽑아줘.
-- 이 종목을 버티기 어려워지는 공시 코멘트가 있는지 봐줘.
+- 이 종목을 버티기 어려워지는 회사 코멘트가 있는지 봐줘.
 - 지금 신규 매수자가 확인해야 할 조건만 정리해줘.
 - 기다려야 하는 이유와 지금 봐도 되는 이유를 나눠줘.
 - 이 판단이 유지되는 조건과 깨지는 조건을 나눠줘.

@@ -1531,9 +1531,14 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
       )}
       {inputSurfaceVisible && (
         <div
+          data-onboarding-target="chat-composer-input"
           className="pointer-events-auto relative mx-auto flex max-w-3xl items-center rounded-[16px] border border-outline-variant/80 bg-canvas p-2 shadow-sm transition-all duration-150 focus-within:border-outline focus-within:shadow-[0_0_0_3px_rgba(0,82,255,0.08)]"
         >
-        <div ref={toolsRef} className="relative flex-shrink-0 self-center">
+        <div
+          ref={toolsRef}
+          className="relative flex-shrink-0 self-center"
+          data-onboarding-target="chat-composer-tools"
+        >
           <AnimatePresence initial={false}>
             {shouldShowAttachmentCoachmark ? (
               <motion.div

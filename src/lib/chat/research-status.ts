@@ -39,6 +39,8 @@ const toolLabels: Partial<Record<MCPToolName, string>> = {
   read_news_sources: "뉴스 원문 확인",
   build_news_timeline: "뉴스 흐름 정리",
   audit_news_sources: "뉴스 출처 점검",
+  get_yahoo_finance_news: "최근 뉴스 확인",
+  get_stock_info: "티커 정보 확인",
   create_chart_v1: "차트 정리",
 };
 
@@ -63,6 +65,8 @@ const toolStepMap: Record<MCPToolName, ResearchStepId> = {
   read_news_sources: "search",
   build_news_timeline: "trace",
   audit_news_sources: "compose",
+  get_yahoo_finance_news: "search",
+  get_stock_info: "search",
   create_chart_v1: "compose",
 };
 

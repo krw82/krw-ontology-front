@@ -37,6 +37,61 @@ function createPublicShareAdmin(data: Record<string, unknown> | null) {
   } as unknown as ReturnType<typeof getSupabaseAdmin>;
 }
 
+function createPublicShareAdminWithQuestionAttachments(params: {
+  share: Record<string, unknown>;
+  questionMessage: MessageRow;
+  documentFiles?: Array<{
+    file_name: string;
+    mime_type: string;
+    file_size: number;
+  }>;
+}) {
+  return {
+    from(table: string) {
+      return {
+        select() {
+          const query = {
+            eq() {
+              return query;
+            },
+            is() {
+              return query;
+            },
+            order() {
+              return query;
+            },
+            maybeSingle() {
+              if (table === "message_shares") {
+                return Promise.resolve({ data: params.share, error: null });
+              }
+              if (table === "messages") {
+                return Promise.resolve({
+                  data: {
+                    content: params.questionMessage.content,
+                    metadata: params.questionMessage.metadata ?? null,
+                  },
+                  error: null,
+                });
+              }
+              throw new Error(`Unexpected maybeSingle table: ${table}`);
+            },
+            returns() {
+              if (table === "chat_attachments") {
+                return Promise.resolve({
+                  data: params.documentFiles ?? [],
+                  error: null,
+                });
+              }
+              throw new Error(`Unexpected returns table: ${table}`);
+            },
+          };
+          return query;
+        },
+      };
+    },
+  } as unknown as ReturnType<typeof getSupabaseAdmin>;
+}
+
 function createSnapshotAdmin(params: {
   userMessage: MessageRow;
   insertedPayloads: Array<Record<string, unknown>>;
@@ -151,6 +206,62 @@ describe("findPublicMessageShare", () => {
         "Based on Micron's latest filing, cutting losses now looks premature. *(Source: CY2025 10-K, Item 7 MD&A)*",
       locale: "en",
     });
+  });
+
+  it("returns public URL and file attachment chips without exposing attachment content", async () => {
+    const questionMessage = {
+      id: "user-message-1",
+      session_id: "session-1",
+      role: "user",
+      content:
+        "이게뭐야?\n\n<attached_file name=\"notes.md\">\nsecret inline attachment\n</attached_file>",
+      metadata: {
+        user_urls: [
+          "https://www.google.com/search?q=x.com&newwindow=1",
+          "javascript:alert(1)",
+        ],
+      },
+      status: "completed",
+      request_id: null,
+      created_at: "2026-05-31T00:00:00.000Z",
+      updated_at: "2026-05-31T00:00:00.000Z",
+    } satisfies MessageRow;
+
+    vi.mocked(getSupabaseAdmin).mockReturnValue(
+      createPublicShareAdminWithQuestionAttachments({
+        share: {
+          token: "share-token",
+          title: "공유된 답변",
+          question_content: "이게뭐야?",
+          question_created_at: "2026-05-31T00:00:00.000Z",
+          source_question_message_id: questionMessage.id,
+          answer_content: "답변 본문",
+          answer_created_at: "2026-05-31T00:01:00.000Z",
+          tickers: ["AAPL"],
+          created_at: "2026-05-31T00:02:00.000Z",
+        },
+        questionMessage,
+        documentFiles: [
+          {
+            file_name: "filing.pdf",
+            mime_type: "application/pdf",
+            file_size: 2048,
+          },
+        ],
+      }),
+    );
+
+    const share = await findPublicMessageShare("share-token");
+
+    expect(share?.question_attachments).toEqual({
+      urls: ["https://www.google.com/search?q=x.com&newwindow=1"],
+      files: [
+        { name: "notes.md", mimeType: null, size: 24 },
+        { name: "filing.pdf", mimeType: "application/pdf", size: 2048 },
+      ],
+    });
+    expect(JSON.stringify(share)).not.toContain("secret inline attachment");
+    expect(JSON.stringify(share)).not.toContain("javascript:");
   });
 });
 

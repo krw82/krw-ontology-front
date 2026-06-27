@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
   );
   if (!budgetResult.ok) return budgetResult.response;
   const creditReservation = await reserveAnalysisCreditsShadow(user.id, requestId, {
-    runKind: "news_research",
+    runKind: "company_research",
     researchMode,
   });
   if (
@@ -236,8 +236,8 @@ export async function POST(request: NextRequest) {
     model,
     mcpHealth,
     researchMode,
-    analysisMode: "news",
-    runKind: "news_research",
+    analysisMode: "company",
+    runKind: "company_research",
     responseLocale,
     selectedNewsEventContext: selectedEvent,
     sourceArtifactId: artifactResult.artifact.id,

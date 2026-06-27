@@ -4,9 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import ChatArtifacts from "@/components/ChatArtifacts";
 import EvidenceGraphPreview from "@/components/EvidenceGraphPreview";
+import FollowUpQuestionActions from "@/components/FollowUpQuestionActions";
 import QueueRemotionAnimation from "@/components/QueueRemotionAnimation";
 import ResearchMarkdown from "@/components/ResearchMarkdown";
 import ResearchProgress from "@/components/ResearchProgress";
+import MessageAttachments, {
+  filesFromParsedAttachments,
+  userUrlsFromMessageMetadata,
+} from "@/components/MessageAttachments";
 import type { ToolCallState } from "@/hooks/useChat";
 import type {
   ChatCitation,
@@ -24,6 +29,7 @@ import {
 } from "@/lib/chat/message-status";
 import { parseChatAttachmentContent } from "@/lib/chat/attachments";
 import { sanitizeAssistantContent } from "@/lib/chat/assistant-content";
+import { extractFollowUpQuestions } from "@/lib/chat/follow-up-questions";
 
 interface ChatMessageProps {
   role: "user" | "assistant";
@@ -39,6 +45,8 @@ interface ChatMessageProps {
     artifactId: string;
     eventId: string;
   }) => void | Promise<void>;
+  onFollowUpQuestionSelect?: (question: string) => void;
+  followUpQuestionDisabled?: boolean;
   newsEventSelectionDisabled?: boolean;
   showHeader?: boolean;
   toolCalls?: ToolCallState[];
@@ -391,74 +399,32 @@ function StreamingContentBlocks({ content }: { content: string }) {
 function CompletedAssistantContent({
   content,
   charts,
+  onFollowUpQuestionSelect,
+  followUpQuestionDisabled,
 }: {
   content: string;
   charts?: ChatMessageChart[];
+  onFollowUpQuestionSelect?: (question: string) => void;
+  followUpQuestionDisabled?: boolean;
 }) {
-  return <ResearchMarkdown content={content} charts={charts} />;
-}
+  const followUpQuestions = useMemo(() => {
+    if (!onFollowUpQuestionSelect) return null;
+    return extractFollowUpQuestions(content);
+  }, [content, onFollowUpQuestionSelect]);
 
-function userUrlsFromMetadata(
-  metadata: Record<string, unknown> | null | undefined,
-): string[] {
-  const urls = metadata?.user_urls;
-  if (!Array.isArray(urls)) return [];
-
-  return urls
-    .filter((url): url is string => typeof url === "string")
-    .map((url) => url.trim())
-    .filter((url) => /^https?:\/\//i.test(url))
-    .slice(0, 3);
-}
-
-function urlDisplayParts(url: string): { host: string; shortUrl: string } {
-  try {
-    const parsed = new URL(url);
-    const host = parsed.hostname.replace(/^www\./i, "");
-    const path = `${parsed.pathname}${parsed.search}`.replace(/\/$/, "");
-    return {
-      host: host || "URL",
-      shortUrl: path ? `${host}${path}` : host,
-    };
-  } catch {
-    return { host: "URL", shortUrl: url };
+  if (!followUpQuestions || !onFollowUpQuestionSelect) {
+    return <ResearchMarkdown content={content} charts={charts} />;
   }
-}
-
-function UserUrlAttachments({ urls }: { urls: string[] }) {
-  if (urls.length === 0) return null;
 
   return (
-    <div className="mt-sm flex max-w-full flex-col items-end gap-xs">
-      {urls.map((url, index) => {
-        const display = urlDisplayParts(url);
-
-        return (
-          <a
-            key={`${url}-${index}`}
-            href={url}
-            target="_blank"
-            rel="noreferrer"
-            className="group inline-flex max-w-full items-center gap-xs rounded-[8px] border border-hairline bg-canvas px-sm py-xs text-left text-[12px] leading-none text-body transition-colors hover:border-primary-fixed-dim hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            aria-label={`URL 자료 열기: ${display.shortUrl}`}
-          >
-            <span
-              aria-hidden="true"
-              className="material-symbols-outlined shrink-0 text-[16px] text-primary"
-            >
-              link
-            </span>
-            <span className="min-w-0 max-w-[190px] truncate font-bold text-body sm:max-w-[280px]">
-              {display.host}
-            </span>
-            <span className="hidden shrink-0 text-muted sm:inline">·</span>
-            <span className="hidden min-w-0 max-w-[260px] truncate text-muted md:inline">
-              {display.shortUrl}
-            </span>
-          </a>
-        );
-      })}
-    </div>
+    <>
+      <ResearchMarkdown content={followUpQuestions.body} charts={charts} />
+      <FollowUpQuestionActions
+        questions={followUpQuestions.questions}
+        disabled={followUpQuestionDisabled}
+        onSelect={onFollowUpQuestionSelect}
+      />
+    </>
   );
 }
 
@@ -479,6 +445,8 @@ export default function ChatMessage({
   metadata,
   artifactSelections,
   onSelectNewsEvent,
+  onFollowUpQuestionSelect,
+  followUpQuestionDisabled,
   newsEventSelectionDisabled,
   showHeader = true,
   toolCalls,
@@ -490,7 +458,9 @@ export default function ChatMessage({
 }: ChatMessageProps) {
   if (role === "user") {
     const { visibleText, attachments } = parseChatAttachmentContent(content);
-    const userUrls = userUrlsFromMetadata(metadata);
+    const userUrls = userUrlsFromMessageMetadata(metadata);
+    const attachmentFiles = filesFromParsedAttachments(attachments);
+    const hasAttachments = userUrls.length > 0 || attachmentFiles.length > 0;
 
     return (
       <motion.div
@@ -499,39 +469,22 @@ export default function ChatMessage({
         animate="visible"
         variants={chatMessageUser}
       >
-        <div className="max-w-[92%] rounded-[8px] border border-hairline bg-surface p-base text-ink sm:max-w-[80%] sm:p-lg">
-          {visibleText ? (
+        {hasAttachments ? (
+          <MessageAttachments
+            urls={userUrls}
+            files={attachmentFiles}
+            align="end"
+            variant="icon"
+            className="mb-xs max-w-[92%] sm:max-w-[80%]"
+          />
+        ) : null}
+        {visibleText ? (
+          <div className="max-w-[92%] rounded-[8px] border border-hairline bg-surface p-base text-ink sm:max-w-[80%] sm:p-lg">
             <p className="whitespace-pre-wrap break-words text-[15px] font-normal leading-[1.5] sm:text-[16px]">
               {visibleText}
             </p>
-          ) : null}
-          <UserUrlAttachments urls={userUrls} />
-          {attachments.length > 0 && (
-            <div
-              className={[
-                "flex max-w-full flex-wrap justify-end gap-xs",
-                visibleText ? "mt-sm" : "",
-              ].join(" ")}
-            >
-              {attachments.map((attachment, index) => (
-                <div
-                  key={`${attachment.name}-${index}`}
-                  className="inline-flex max-w-full items-center gap-xs rounded-[8px] border border-hairline bg-canvas px-sm py-xs text-[12px] font-semibold leading-none text-body"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="material-symbols-outlined text-[16px] text-primary-container"
-                  >
-                    description
-                  </span>
-                  <span className="max-w-[180px] truncate text-ink sm:max-w-[240px]">
-                    {attachment.name}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+          </div>
+        ) : null}
       </motion.div>
     );
   }
@@ -574,7 +527,12 @@ export default function ChatMessage({
       ) : (
         <div className="max-w-full pl-0 text-body sm:pl-[48px]">
           {assistantContent ? (
-            <CompletedAssistantContent content={assistantContent} charts={charts} />
+            <CompletedAssistantContent
+              content={assistantContent}
+              charts={charts}
+              onFollowUpQuestionSelect={onFollowUpQuestionSelect}
+              followUpQuestionDisabled={followUpQuestionDisabled}
+            />
           ) : terminalAssistantContent(status) ? (
             <p className="text-[15px] leading-[1.5] text-muted">
               {terminalAssistantContent(status)}

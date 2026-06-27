@@ -4,6 +4,7 @@ import type {
   MCPToolName,
   RunKind,
   StockNewsMCPToolName,
+  YahooFinanceMCPToolName,
 } from "@/types/api-contracts";
 
 const sdkMocks = vi.hoisted(() => ({
@@ -56,15 +57,20 @@ vi.mock("./mcp-client", () => {
     "audit_news_sources",
   ];
   const chartTools = ["create_chart_v1"];
+  const yahooFinanceTools = ["get_yahoo_finance_news", "get_stock_info"];
   return {
     KRW_ONTOLOGY_MCP_TOOLS: tools,
     STOCK_NEWS_MCP_TOOLS: stockNewsTools,
+    YAHOO_FINANCE_MCP_TOOLS: yahooFinanceTools,
     CHART_MCP_TOOLS: chartTools,
     KRW_ONTOLOGY_SDK_ALLOWED_TOOLS: tools.map(
       (toolName) => `mcp__plugin_krw-ontology_krw-ontology__${toolName}`,
     ),
     STOCK_NEWS_SDK_ALLOWED_TOOLS: stockNewsTools.map(
       (toolName) => `mcp__plugin_krw-ontology_stock-news__${toolName}`,
+    ),
+    YAHOO_FINANCE_SDK_ALLOWED_TOOLS: yahooFinanceTools.map(
+      (toolName) => `mcp__yahoo_finance__${toolName}`,
     ),
     CHART_SDK_ALLOWED_TOOLS: chartTools.map(
       (toolName) => `mcp__krw_presentation__${toolName}`,
@@ -84,6 +90,8 @@ vi.mock("./mcp-client", () => {
       process.env.STOCK_NEWS_FORCE_DISABLED !== "1",
     isStockNewsSdkTool: (toolName: string) =>
       toolName.startsWith("mcp__plugin_krw-ontology_stock-news__"),
+    isYahooFinanceSdkTool: (toolName: string) =>
+      toolName.startsWith("mcp__yahoo_finance__"),
     isChartSdkTool: (toolName: string) =>
       toolName.startsWith("mcp__krw_presentation__"),
   };
@@ -136,11 +144,16 @@ function makeSdkQueryFromGenerator(generator: () => AsyncGenerator<unknown>) {
 
 function sdkToolName(toolName: MCPToolName): string {
   if (isStockNewsToolName(toolName)) return stockNewsSdkToolName(toolName);
+  if (isYahooFinanceToolName(toolName)) return yahooFinanceSdkToolName(toolName);
   return `mcp__plugin_krw-ontology_krw-ontology__${toolName}`;
 }
 
 function stockNewsSdkToolName(toolName: StockNewsMCPToolName): string {
   return `mcp__plugin_krw-ontology_stock-news__${toolName}`;
+}
+
+function yahooFinanceSdkToolName(toolName: YahooFinanceMCPToolName): string {
+  return `mcp__yahoo_finance__${toolName}`;
 }
 
 function isStockNewsToolName(toolName: MCPToolName): toolName is StockNewsMCPToolName {
@@ -154,6 +167,12 @@ function isStockNewsToolName(toolName: MCPToolName): toolName is StockNewsMCPToo
     "build_news_timeline",
     "audit_news_sources",
   ].includes(toolName);
+}
+
+function isYahooFinanceToolName(
+  toolName: MCPToolName,
+): toolName is YahooFinanceMCPToolName {
+  return ["get_yahoo_finance_news", "get_stock_info"].includes(toolName);
 }
 
 function toolUseMessage(toolName: MCPToolName, index: number) {
@@ -268,6 +287,8 @@ describe("agent runner research budget recovery", () => {
     delete process.env.STOCK_NEWS_FORCE_DISABLED;
     delete process.env.STOCK_NEWS_ENABLED;
     delete process.env.STOCK_NEWS_MAX_CALLS;
+    delete process.env.YAHOO_FINANCE_MAX_CALLS;
+    delete process.env.KRW_CHARTS_ENABLED;
     delete process.env.ZAI_API_KEY;
   });
 
@@ -390,9 +411,65 @@ describe("agent runner research budget recovery", () => {
     expect(call.options.allowedTools).not.toContain(
       stockNewsSdkToolName("search_company_news_events"),
     );
+    expect(call.options.allowedTools).not.toContain(
+      "mcp__krw_presentation__create_chart_v1",
+    );
+    expect(call.options.mcpServers).toBeUndefined();
     expect(call.options.systemPrompt.append).toContain(
       "Do not perform web searches",
     );
+    expect(call.options.systemPrompt.append).not.toContain("Inline chart policy");
+  });
+
+  it("enables chart tools only when the chart feature flag is on", async () => {
+    await expect(
+      canUseTool("mcp__krw_presentation__create_chart_v1"),
+    ).resolves.toMatchObject({
+      behavior: "deny",
+    });
+
+    process.env.KRW_CHARTS_ENABLED = "1";
+    await expect(
+      canUseTool("mcp__krw_presentation__create_chart_v1"),
+    ).resolves.toEqual({
+      behavior: "allow",
+    });
+
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        {
+          type: "result",
+          subtype: "success",
+          result: "Apple 매출 추이를 요약했습니다.",
+          usage: {
+            input_tokens: 10,
+            output_tokens: 12,
+          },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "Apple 매출 추이를 정리해줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
+    expect(result.status).toBe("completed");
+    const call = sdkMocks.query.mock.calls[0]?.[0];
+    expect(call.options.allowedTools).toContain(
+      "mcp__krw_presentation__create_chart_v1",
+    );
+    expect(call.options.mcpServers).toHaveProperty("krw_presentation");
+    expect(call.options.systemPrompt.append).toContain("Inline chart policy");
   });
 
   it("denies Stock News MCP by default and allows it only when explicitly enabled", async () => {
@@ -549,9 +626,7 @@ describe("agent runner research budget recovery", () => {
     );
   });
 
-  it("uses discovery-only Stock News tools for the first news pass", async () => {
-    process.env.STOCK_NEWS_ENABLED = "1";
-
+  it("uses Yahoo Finance MCP tools for first-pass news answers", async () => {
     sdkMocks.query.mockReturnValueOnce(
       makeSdkQuery([
         {
@@ -585,25 +660,26 @@ describe("agent runner research budget recovery", () => {
     const call = sdkMocks.query.mock.calls[0]?.[0];
     expect(call.options.allowedTools).toEqual(
       expect.arrayContaining([
-        stockNewsSdkToolName("search_company_news_events"),
-        stockNewsSdkToolName("build_news_timeline"),
+        yahooFinanceSdkToolName("get_yahoo_finance_news"),
+        yahooFinanceSdkToolName("get_stock_info"),
       ]),
-    );
-    expect(call.options.allowedTools).not.toContain(
-      stockNewsSdkToolName("read_news_sources"),
     );
     expect(call.options.allowedTools).not.toContain(
       sdkToolName("krw_ontology_query_context"),
     );
+    expect(call.options.allowedTools).not.toContain(
+      stockNewsSdkToolName("search_company_news_events"),
+    );
+    expect(call.options.mcpServers).toHaveProperty("yahoo_finance");
     expect(call.options.disallowedTools).toEqual(
       expect.arrayContaining(["WebFetch", "WebSearch"]),
     );
-    expect(call.options.systemPrompt.append).toContain("Stock News MCP");
+    expect(call.options.systemPrompt.append).toContain("Yahoo Finance MCP");
     expect(call.options.systemPrompt.append).toContain(
-      "current news/event discovery",
+      "current ticker market/news context",
     );
     expect(call.prompt).toContain("웹앱 뉴스 discovery 실행");
-    expect(call.prompt).toContain("read_news_sources와 KRW Ontology 도구는 호출하지 않습니다");
+    expect(call.prompt).toContain("Yahoo Finance MCP 도구를 런타임에서 직접 호출");
     expect(call.prompt).toContain(
       "/krw-ontology:krw-ontology-news-discovery",
     );
@@ -658,7 +734,7 @@ describe("agent runner research budget recovery", () => {
     );
   });
 
-  it("uses selected-source news tools and ontology tools for the news research pass", async () => {
+  it("uses selected news context with ordinary ontology company research", async () => {
     process.env.STOCK_NEWS_ENABLED = "1";
 
     sdkMocks.query.mockReturnValueOnce(
@@ -683,8 +759,8 @@ describe("agent runner research budget recovery", () => {
         defaultTickers: ["AVGO"],
         defaultDocumentTypes: [],
         researchMode: "deep",
-        analysisMode: "news",
-        runKind: "news_research",
+        analysisMode: "company",
+        runKind: "company_research",
         selectedNewsEventContext: {
           id: "event-1",
           event_title: "Broadcom AI networking order update",
@@ -700,24 +776,19 @@ describe("agent runner research budget recovery", () => {
     const call = sdkMocks.query.mock.calls[0]?.[0];
     expect(call.options.allowedTools).toEqual(
       expect.arrayContaining([
-        stockNewsSdkToolName("read_news_sources"),
         sdkToolName("krw_ontology_query_context"),
       ]),
     );
     expect(call.options.allowedTools).not.toContain(
       stockNewsSdkToolName("search_company_news_events"),
     );
-    expect(call.prompt).toContain("웹앱 뉴스 research 실행");
     expect(call.prompt).toContain(
-      "/krw-ontology:krw-ontology-news-research",
-    );
-    expect(call.prompt).not.toContain(
-      "/krw-ontology:krw-ontology-research 선택한 이벤트를 공시 기준으로 분석해줘",
+      "/krw-ontology:krw-ontology-research",
     );
     expect(call.prompt).toContain("<selected_news_event_context>");
   });
 
-  it("uses market move skill with ontology tools and no Stock News tools", async () => {
+  it("uses market move skill with runtime Yahoo Finance tools and no Stock News tools", async () => {
     process.env.STOCK_NEWS_ENABLED = "1";
 
     sdkMocks.query.mockReturnValueOnce(
@@ -742,18 +813,7 @@ describe("agent runner research budget recovery", () => {
         defaultTickers: ["GOOGL"],
         defaultDocumentTypes: [],
         researchMode: "standard",
-        analysisMode: "news",
         runKind: "market_move_research",
-        selectedNewsEventContext: {
-          version: "market-move-context/v1",
-          ticker: "GOOGL",
-          source_pack: {
-            ontology_search_brief_en:
-              "Investigate why Alphabet shares moved down.",
-            original_text_for_ontology:
-              "User question: GOOGL 주가가 왜 6% 빠졌어?",
-          },
-        },
       },
       {
         write: vi.fn().mockResolvedValue(undefined),
@@ -764,6 +824,12 @@ describe("agent runner research budget recovery", () => {
     const call = sdkMocks.query.mock.calls[0]?.[0];
     expect(call.options.allowedTools).toEqual(
       expect.arrayContaining([sdkToolName("krw_ontology_query_context")]),
+    );
+    expect(call.options.allowedTools).toEqual(
+      expect.arrayContaining([
+        yahooFinanceSdkToolName("get_stock_info"),
+        yahooFinanceSdkToolName("get_yahoo_finance_news"),
+      ]),
     );
     expect(call.options.allowedTools).not.toContain(
       stockNewsSdkToolName("read_news_sources"),
@@ -776,89 +842,90 @@ describe("agent runner research budget recovery", () => {
       "/krw-ontology:krw-ontology-market-move-research",
     );
     expect(call.prompt).toContain("웹앱 주가 변동 research 실행");
-    expect(call.prompt).toContain("<selected_news_event_context>");
+    expect(call.prompt).toContain("Yahoo Finance MCP 도구를 런타임에서 직접 호출");
+    expect(call.prompt).toContain("헤드라인 요약이 아니라");
+    expect(call.prompt).toContain("무엇을 추가로 확인해야 하는지");
+    expect(call.prompt).not.toContain("<selected_news_event_context>");
+    expect(call.options.mcpServers).toEqual(
+      expect.objectContaining({
+        yahoo_finance: expect.objectContaining({
+          name: "yahoo_finance",
+        }),
+      }),
+    );
   });
 
-  it("passes Stock News MCP inputs unchanged before execution", async () => {
-    process.env.STOCK_NEWS_ENABLED = "1";
-
-    const permission = await canUseTool(stockNewsSdkToolName("search_company_news_events"), {
+  it("passes Yahoo Finance MCP inputs unchanged before execution", async () => {
+    const permission = await canUseTool(yahooFinanceSdkToolName("get_yahoo_finance_news"), {
       ticker: "AAPL",
-      question: "AAPL latest services news",
-      max_events: 5,
     });
 
     expect(permission).toEqual({ behavior: "allow" });
   });
 
-  it("binds read_news_sources to selected preferred source URLs", async () => {
-    process.env.STOCK_NEWS_ENABLED = "1";
-
-    const selectedUrl =
-      "https://www.reuters.com/markets/technology/broadcom-ai-networking-orders-2026-06-01/";
+  it("allows Yahoo Finance news during first-pass news discovery", async () => {
     const { permission } = await probeToolPermission({
       existingTools: [],
-      attemptedTool: "read_news_sources",
+      attemptedTool: "get_yahoo_finance_news",
       analysisMode: "news",
-      runKind: "news_research",
+      runKind: "news_discovery",
       input: {
-        urls: [
-          "https://malicious.example/internal",
-          selectedUrl,
-        ],
-      },
-      selectedNewsEventContext: {
-        source_pack: {
-          source_urls: [selectedUrl],
-        },
-        source_previews: [{ title: "Reuters", url: selectedUrl }],
+        ticker: "AAPL",
       },
     });
 
     expect(permission.behavior).toBe("allow");
-    if (permission.behavior === "allow") {
-      expect(permission.updatedInput).toEqual({ urls: [selectedUrl] });
-    }
   });
 
-  it("denies read_news_sources when the selected event has no eligible source URL", async () => {
-    process.env.STOCK_NEWS_ENABLED = "1";
-
+  it("allows Yahoo Finance tools during market move research", async () => {
     const { permission } = await probeToolPermission({
       existingTools: [],
-      attemptedTool: "read_news_sources",
+      attemptedTool: "get_stock_info",
       analysisMode: "news",
-      runKind: "news_research",
+      runKind: "market_move_research",
       input: {
-        urls: ["https://www.reuters.com/markets/technology/broadcom-ai/"],
+        ticker: "JNJ",
       },
-      selectedNewsEventContext: {
-        source_previews: [{ title: "user URL", url: "https://example.test/a" }],
+    });
+
+    expect(permission.behavior).toBe("allow");
+  });
+
+  it("denies Yahoo Finance tools outside news and market-move workflows", async () => {
+    const { permission } = await probeToolPermission({
+      existingTools: [],
+      attemptedTool: "get_yahoo_finance_news",
+      analysisMode: "company",
+      runKind: "company_research",
+      input: {
+        ticker: "AAPL",
       },
     });
 
     expect(permission.behavior).toBe("deny");
     if (permission.behavior === "deny") {
-      expect(permission.message).toContain("selected preferred market-news URLs");
+      expect(permission.message).toContain("first-pass news and market-move");
     }
   });
 
-  it("limits Stock News MCP calls separately from ontology calls", async () => {
-    process.env.STOCK_NEWS_ENABLED = "1";
-    process.env.STOCK_NEWS_MAX_CALLS = "2";
+  it("limits Yahoo Finance MCP calls separately from ontology calls", async () => {
+    process.env.YAHOO_FINANCE_MAX_CALLS = "2";
 
     const { permission, result } = await probeToolPermission({
-      existingTools: ["search_company_news_events", "read_news_sources"],
-      attemptedTool: "audit_news_sources",
+      existingTools: ["get_yahoo_finance_news", "get_stock_info"],
+      attemptedTool: "get_yahoo_finance_news",
       analysisMode: "news",
-      runKind: "news_research",
+      runKind: "news_discovery",
+      input: {
+        ticker: "AAPL",
+      },
     });
 
     expect(result.status).toBe("completed");
     expect(permission.behavior).toBe("deny");
     if (permission.behavior === "deny") {
-      expect(permission.message).toContain("No more Stock News MCP tools");
-      expect(permission.message).toContain("filing evidence");
+      expect(permission.message).toContain("No more Yahoo Finance MCP tools");
+      expect(permission.message).toContain("news results");
     }
   });
 

@@ -33,18 +33,18 @@ type HomePageProps = {
 
 const homeCopy = {
   ko: {
-    metadataTitle: "근거가 보이는 기업 분석 AI",
+    metadataTitle: "AI 에이전트용 기업 리서치 데이터베이스",
     metadataDescription:
-      "미국 상장기업 공시에서 답의 단서를 찾고, 실적 변화·리스크·사업 흐름을 근거와 함께 정리합니다.",
+      "흩어진 기업 정보를 질문 중심으로 연결해, AI 에이전트가 답변을 만들고 사용자가 근거까지 확인할 수 있게 합니다.",
     navResearch: "리서치",
     navCompanies: "회사 목록",
     navQuestions: "질문 그래프",
     navPricing: "가격",
-    eyebrow: "회사 보고서에서 찾은 답의 단서",
-    headingLines: ["근거가 보이는"],
-    accentLine: "기업 분석 AI",
+    eyebrow: "AI 에이전트용 데이터베이스",
+    headingLines: ["기업 리서치를"],
+    accentLine: "AI가 바로 쓸 수 있게",
     subtext:
-      "궁금한 회사를 질문하면, 회사 보고서에서 답의 단서를 찾아 근거를 바탕으로 정리합니다. 실적 변화, 리스크, 사업 흐름을 더 쉽게 확인하세요.",
+      "흩어진 기업 정보를 질문 중심으로 연결해, AI 에이전트가 답변을 만들고 사용자가 근거까지 확인할 수 있게 합니다.",
     browseLinks: [
       { href: "/questions", label: "질문 예시" },
       { href: "/companies", label: "회사 목록" },

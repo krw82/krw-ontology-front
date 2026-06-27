@@ -54,6 +54,7 @@ interface UseChatOptions {
 interface SendMessageOptions {
   sessionId?: string;
   requestId?: string;
+  runKind?: RunKind;
   userUrl?: string;
   userUrls?: string[];
   attachmentIds?: string[];
@@ -1207,6 +1208,7 @@ export function useChat({
       const primaryUserUrl = normalizedUserUrls[0] ?? options.userUrl;
       const attachmentIds =
         options.attachmentIds?.map((id) => id.trim()).filter(Boolean) ?? [];
+      const effectiveRunKind = options.runKind ?? runKind;
 
       const userMessage: Message = {
         id: createClientId(),
@@ -1258,7 +1260,7 @@ export function useChat({
             request_id: requestId,
             research_mode: researchMode,
             analysis_mode: analysisMode,
-            ...(runKind ? { run_kind: runKind } : {}),
+            ...(effectiveRunKind ? { run_kind: effectiveRunKind } : {}),
             scope_type: scopeType,
             default_tickers: defaultTickers,
             default_document_types: defaultDocumentTypes,

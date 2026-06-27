@@ -278,7 +278,7 @@ describe("POST /api/chat/news-event-selection", () => {
     });
   });
 
-  it("queues a news_research run for the selected MCP event", async () => {
+  it("queues a company_research run for the selected MCP event", async () => {
     const fake = createAdmin();
     vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin as never);
 
@@ -304,8 +304,8 @@ describe("POST /api/chat/news-event-selection", () => {
     expect(enqueueAgentRun).toHaveBeenCalledWith(
       expect.objectContaining({
         requestId: REQUEST_ID,
-        analysisMode: "news",
-        runKind: "news_research",
+        analysisMode: "company",
+        runKind: "company_research",
         responseLocale: "ko",
         selectedNewsEventContext: expect.objectContaining({
           ...selectedEvent,

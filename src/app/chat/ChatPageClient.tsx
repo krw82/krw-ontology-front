@@ -33,7 +33,7 @@ import { trackClientEventSilently } from "@/lib/analytics/client";
 import { findQuestionTopic } from "@/lib/marketing/site";
 import { createClientId } from "@/lib/client-id";
 import { normalizeTicker } from "@/lib/ontology/ticker";
-import { normalizeRunKind } from "@/lib/run-kind";
+import { normalizeRunKind, type RunKind } from "@/lib/run-kind";
 import type { ResearchMode } from "@/lib/research-mode";
 import type {
   CreateSessionRequest,
@@ -52,6 +52,7 @@ const ALWAYS_SHOW_CREDIT_LIMIT_CARD_IN_DEV =
 type DraftMessagePayload = {
   content: string;
   requestId: string;
+  runKind?: RunKind;
   userUrl?: string;
   userUrls?: string[];
   attachmentIds?: string[];
@@ -87,6 +88,9 @@ function readDraftMessage(draftMessageId: string): DraftMessagePayload | null {
     const payload = JSON.parse(rawPayload) as Partial<DraftMessagePayload>;
     const content = payload.content?.trim();
     const requestId = payload.requestId?.trim();
+    const rawRunKind =
+      typeof payload.runKind === "string" ? payload.runKind : undefined;
+    const runKind = rawRunKind ? normalizeRunKind(rawRunKind) : undefined;
     const userUrls = Array.isArray(payload.userUrls)
       ? payload.userUrls
           .map((url) => (typeof url === "string" ? url.trim() : ""))
@@ -102,6 +106,7 @@ function readDraftMessage(draftMessageId: string): DraftMessagePayload | null {
     return {
       content,
       requestId,
+      ...(runKind ? { runKind } : {}),
       ...(userUrl ? { userUrl } : {}),
       ...(userUrls.length > 0 ? { userUrls } : {}),
       ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
@@ -279,14 +284,14 @@ function DiscoverGuideFlow({
   const activeIndex = stepOrder.indexOf(step);
   const examples = isKo
     ? [
-        "AI 데이터센터 전력 수요 수혜 기업",
-        "메모리 가격 상승에 유리한 반도체 기업",
-        "소비 둔화에도 마진을 방어할 기업",
+        "백로그 증가가 매출로 연결될 기업",
+        "구독 매출과 갱신율이 안정적인 기업",
+        "CapEx 부담을 현금흐름으로 버틸 기업",
       ]
     : [
-        "AI data center power demand beneficiaries",
-        "Semiconductor companies helped by memory pricing",
-        "Companies that can defend margins in a slowdown",
+        "Companies converting backlog growth into revenue",
+        "Companies with durable subscription revenue and renewals",
+        "Companies funding capex with resilient cash flow",
       ];
   const copy = {
     url: isKo
@@ -335,7 +340,7 @@ function DiscoverGuideFlow({
             "산업, 변화, 리스크 키워드를 한 문장으로 적으면 관련 회사를 넓게 찾아봅니다.",
           primary: "종목 발굴 시작",
           secondary: "예시",
-          ideaPlaceholder: "예: AI 데이터센터 전력 수요 수혜 기업",
+          ideaPlaceholder: "예: 백로그 증가가 매출로 연결될 기업",
         }
       : {
           eyebrow: "Start",
@@ -344,7 +349,7 @@ function DiscoverGuideFlow({
             "Describe an industry, shift, or risk keyword and we will explore related companies.",
           primary: "Start discovery",
           secondary: "Examples",
-          ideaPlaceholder: "e.g. AI data center power demand beneficiaries",
+          ideaPlaceholder: "e.g. Companies converting backlog growth into revenue",
         },
   }[step];
 
@@ -738,6 +743,7 @@ function ChatContent() {
       startedDraftMessageIdsRef.current.add(draftMessageId);
       void sendMessage(draftMessage.content, {
         requestId: draftMessage.requestId,
+        runKind: draftMessage.runKind,
         userUrl: draftMessage.userUrl,
         userUrls: draftMessage.userUrls,
         attachmentIds: draftMessage.attachmentIds,
@@ -1193,6 +1199,7 @@ function ChatContent() {
           !storeDraftMessage(nextDraftMessageId, {
             content: trimmed,
             requestId: nextRequestId,
+            ...(isIdeaGeneration ? { runKind: "idea_generation" } : {}),
             userUrl: options?.userUrl,
             userUrls: options?.userUrls,
             attachmentIds: options?.attachmentIds,
@@ -1217,9 +1224,6 @@ function ChatContent() {
         }
         if (responseLocale !== DEFAULT_LOCALE) {
           nextParams.set("locale", responseLocale);
-        }
-        if (isIdeaGeneration) {
-          nextParams.set("runKind", "idea_generation");
         }
         router.replace(`/chat?${nextParams.toString()}`, {
           scroll: false,
@@ -1433,6 +1437,7 @@ function ChatContent() {
             {contextTickers.length > 0 && (
               <div className="mx-auto mb-base w-full max-w-3xl">
                 <div
+                  data-onboarding-target="chat-context"
                   className="flex max-w-full items-center gap-3 sm:gap-4"
                   aria-label={`분석 대상: ${contextLabel}`}
                 >
@@ -1535,6 +1540,10 @@ function ChatContent() {
                       }
                       artifactSelections={chat.artifactSelections}
                       onSelectNewsEvent={handleNewsEventSelection}
+                      onFollowUpQuestionSelect={(question) => {
+                        void handlePromptSend(question);
+                      }}
+                      followUpQuestionDisabled={isActiveRun || isBudgetBlocked}
                       newsEventSelectionDisabled={isActiveRun || isBudgetBlocked}
                       showHeader={idx === 0 || arr[idx - 1]?.role !== "assistant"}
                       toolCalls={
@@ -1657,6 +1666,7 @@ function ChatContent() {
                   >
                     <motion.div
                       className="w-full min-w-0"
+                      data-onboarding-target="chat-empty-heading"
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.24, ease: "easeOut" }}
@@ -1675,6 +1685,7 @@ function ChatContent() {
 
                     <motion.div
                       className="mt-6 w-full max-w-[38rem] text-left"
+                      data-onboarding-target="chat-suggested-prompts"
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{
@@ -1784,6 +1795,7 @@ function ChatContent() {
           {/* Full composer (expanded / focused) */}
           <div
             ref={composerHostRef}
+            data-onboarding-target="chat-composer"
             className={[
               "pointer-events-none fixed inset-x-0 bottom-0 z-30 transform-gpu transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:pointer-events-auto md:static md:z-auto md:translate-y-0 md:opacity-100 md:transition-none",
               isComposerCompact || shouldHideDiscoverComposer
@@ -1820,8 +1832,8 @@ function ChatContent() {
                   ? "주간 분석 한도에 도달했습니다."
                   : isIdeaGeneration
                   ? responseLocale === "ko"
-                    ? "예: AI 데이터센터 전력 수요 수혜 기업"
-                    : "e.g. AI data center power demand beneficiaries"
+                    ? "예: 백로그 증가가 매출로 연결될 기업"
+                    : "e.g. Companies converting backlog growth into revenue"
                   : "기업에 대해 질문하세요..."
               }
               toolCalls={chat.toolCalls}
@@ -2034,7 +2046,10 @@ function ChatWatchlistHeaderActions({
   const hasSavedMark = Boolean(mark?.is_watchlisted || mark?.is_holding);
 
   return (
-    <div className="relative flex items-center gap-1">
+    <div
+      className="relative flex items-center gap-1"
+      data-onboarding-target="chat-notebook-actions"
+    >
       <ChatHeaderMarkButton
         active={Boolean(mark?.is_watchlisted)}
         disabled={pendingAction !== null}

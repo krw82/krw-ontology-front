@@ -353,9 +353,6 @@ function ScopeActionGroup({
   locale: Locale;
   ticker: string;
 }) {
-  const ctaLabel =
-    locale === "ko" ? "이 축으로 질문하기" : "Ask with this axis";
-
   return (
     <section className="overflow-hidden rounded-[8px] border border-hairline bg-canvas">
       <div className="flex items-baseline gap-2 border-b border-hairline bg-surface px-sm py-xs">
@@ -385,9 +382,6 @@ function ScopeActionGroup({
                 {String(itemIndex + 1).padStart(2, "0")}
               </span>
             </div>
-            <p className="text-[12px] font-bold leading-5 text-primary transition-colors group-hover:text-primary-active">
-              {ctaLabel}
-            </p>
           </Link>
         ))}
       </div>

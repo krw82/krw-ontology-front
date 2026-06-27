@@ -9,12 +9,12 @@ import type {
   YahooFinanceSnapshot,
 } from "@/lib/market-move/types";
 
-const DEFAULT_YAHOO_FINANCE_MCP_ARGS = [
+export const DEFAULT_YAHOO_FINANCE_MCP_ARGS = [
   "--from",
   "git+https://github.com/Alex2Yang97/yahoo-finance-mcp",
   "yahoo-finance-mcp",
 ];
-const DEFAULT_YAHOO_FINANCE_MCP_TIMEOUT_MS = 20_000;
+export const DEFAULT_YAHOO_FINANCE_MCP_TIMEOUT_MS = 20_000;
 
 export async function fetchYahooFinanceSnapshot(
   ticker: string,
@@ -51,6 +51,45 @@ export async function fetchYahooFinanceSnapshot(
   }
 }
 
+export async function fetchYahooFinanceNews(
+  ticker: string,
+): Promise<MarketMoveEventCandidate[]> {
+  const client = new Client({
+    name: "krw-ontology-news-provider",
+    version: "0.1.0",
+  });
+  const transport = createYahooFinanceTransport();
+
+  try {
+    await client.connect(transport);
+    const newsText = stringFromToolResult(
+      await callYahooTool(client, "get_yahoo_finance_news", { ticker }),
+    );
+    return parseYahooNewsText(newsText);
+  } finally {
+    await client.close().catch(() => undefined);
+  }
+}
+
+export async function fetchYahooFinanceStockInfo(
+  ticker: string,
+): Promise<Record<string, unknown>> {
+  const client = new Client({
+    name: "krw-ontology-news-provider",
+    version: "0.1.0",
+  });
+  const transport = createYahooFinanceTransport();
+
+  try {
+    await client.connect(transport);
+    return parseJsonObject(
+      await callYahooTool(client, "get_stock_info", { ticker }),
+    );
+  } finally {
+    await client.close().catch(() => undefined);
+  }
+}
+
 function createYahooFinanceTransport(): Transport {
   const url = process.env.YAHOO_FINANCE_MCP_URL?.trim();
   if (url) {
@@ -64,7 +103,7 @@ function createYahooFinanceTransport(): Transport {
   });
 }
 
-function getYahooFinanceMcpArgs(): string[] {
+export function getYahooFinanceMcpArgs(): string[] {
   const raw = process.env.YAHOO_FINANCE_MCP_ARGS?.trim();
   if (!raw) return DEFAULT_YAHOO_FINANCE_MCP_ARGS;
 

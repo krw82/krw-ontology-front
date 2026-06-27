@@ -28,6 +28,10 @@ export interface PromptRuntimeFeatures {
   stockNewsEnabled?: boolean;
   stockNewsRequired?: boolean;
   stockNewsUnavailableForNews?: boolean;
+  yahooFinanceNewsEnabled?: boolean;
+  yahooFinanceNewsRequired?: boolean;
+  yahooFinanceNewsUnavailableForNews?: boolean;
+  chartGenerationEnabled?: boolean;
   responseLocale?: Locale;
 }
 
@@ -49,12 +53,12 @@ export function buildSystemPrompt(
     features.responseLocale ?? DEFAULT_LOCALE,
   );
   const runtimeDatePolicy = buildRuntimeDatePolicy();
-  const chartPolicy = buildChartPolicy();
+  const chartPolicy = buildChartPolicy(Boolean(features.chartGenerationEnabled));
 
   return `You are the KRW Ontology web chat runtime.
 
 The user prompt begins with the exact KRW-AI skill command for the active pass. Follow that skill.
-Use configured read-only KRW Ontology tools for filing evidence retrieval and, when explicitly enabled, the configured read-only stock-news MCP tool for current context.
+Use configured read-only KRW Ontology tools for filing evidence retrieval and, when explicitly enabled, the configured read-only current-news MCP tools for current context.
 ${stockNewsPolicy}
 ${responseLanguagePolicy}
 ${runtimeDatePolicy}
@@ -73,7 +77,9 @@ function buildRuntimeDatePolicy(now = new Date()): string {
   ].join("\n");
 }
 
-function buildChartPolicy(): string {
+function buildChartPolicy(enabled: boolean): string {
+  if (!enabled) return "";
+
   return [
     "Inline chart policy:",
     "For user questions about numeric trends, period-over-period changes, revenue mix, segment/geography comparisons, margins, cash flow, capex, expenses, SBC, buybacks, M&A, or similar financial time series, actively look for retrieved KRW Ontology metric_series_pack data and prefer calling create_chart_v1 before the final answer.",
@@ -111,6 +117,28 @@ function buildStockNewsPolicy(features: PromptRuntimeFeatures): string {
       ? "English investor interpretation"
       : "Korean investor interpretation";
 
+  if (features.yahooFinanceNewsEnabled) {
+    return [
+      "Do not use built-in WebSearch or WebFetch.",
+      features.yahooFinanceNewsRequired
+        ? "This run requires current ticker market/news context: use the configured read-only Yahoo Finance MCP tools for that current context before the final answer."
+        : "When current ticker-news context is needed, use only the configured read-only Yahoo Finance MCP tools.",
+      "Yahoo Finance news is market reporting, not confirmed company disclosure.",
+      `Preserve market-news-vs-filing provenance internally, but synthesize the answer into one ${investorInterpretation}.`,
+      features.yahooFinanceNewsRequired
+        ? "If the Yahoo Finance MCP call fails, times out, returns no useful results, or the question has no resolvable ticker context, state that current news context could not be confirmed and do not invent a news explanation."
+        : "If the Yahoo Finance MCP call fails, times out, or returns no useful results, continue from available evidence and state that no additional current news context was confirmed.",
+    ].join("\n");
+  }
+
+  if (features.yahooFinanceNewsUnavailableForNews) {
+    return [
+      "Do not use built-in WebSearch or WebFetch.",
+      "The user selected news mode, but the configured Yahoo Finance MCP tools are unavailable in this runtime.",
+      "Do not attempt current-news search. State that current news context could not be checked.",
+    ].join("\n");
+  }
+
   if (features.stockNewsEnabled) {
     return [
       "Do not use built-in WebSearch or WebFetch.",
@@ -118,7 +146,9 @@ function buildStockNewsPolicy(features: PromptRuntimeFeatures): string {
         ? "This run is in news mode: use only the configured read-only Stock News MCP tool for current news/event discovery before the final answer."
         : "When recent, current, post-filing, or explicitly news-based context is needed, use only the configured read-only Stock News MCP tool.",
       `Preserve filing-vs-news source provenance internally, but synthesize both into one ${investorInterpretation} in the final answer.`,
-      "If the stock-news MCP call fails, times out, or returns no useful results, continue from filing evidence and state that no additional current news context was confirmed.",
+      features.stockNewsRequired
+        ? "If the stock-news MCP call fails, times out, or returns no useful results, state that current news context could not be confirmed and do not invent a news explanation."
+        : "If the stock-news MCP call fails, times out, or returns no useful results, continue from filing evidence and state that no additional current news context was confirmed.",
     ].join("\n");
   }
 

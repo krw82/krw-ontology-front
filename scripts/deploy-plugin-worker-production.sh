@@ -161,9 +161,6 @@ else
   echo "Stock News MCP: disabled"
 fi
 
-echo "Checking news translation readiness..."
-(cd "$FRONT_DIR" && node scripts/verify-news-translation.mjs)
-
 if [ "$DRY_RUN" = "1" ]; then
   "$SCRIPT_DIR/install-mcp-server-launchd.sh" --env-file "$ENV_PATH" --dry-run
   "$SCRIPT_DIR/install-stock-news-mcp-launchd.sh" --env-file "$ENV_PATH" --dry-run

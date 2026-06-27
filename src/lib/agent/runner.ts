@@ -1,7 +1,5 @@
 import "server-only";
 
-import { mkdir } from "node:fs/promises";
-import path from "node:path";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import {
   getSessionInfo,
@@ -14,6 +12,8 @@ import {
   KRW_ONTOLOGY_MCP_TOOLS,
   KRW_ONTOLOGY_SDK_ALLOWED_TOOLS,
   STOCK_NEWS_MCP_TOOLS,
+  YAHOO_FINANCE_MCP_TOOLS,
+  YAHOO_FINANCE_SDK_ALLOWED_TOOLS,
   CHART_MCP_TOOLS,
   CHART_SDK_ALLOWED_TOOLS,
   getStockNewsSdkAllowedTools,
@@ -22,8 +22,10 @@ import {
   isKrwOntologySdkTool,
   isStockNewsEnabled,
   isStockNewsSdkTool,
+  isYahooFinanceSdkTool,
 } from "./mcp-client";
 import { buildClaudeAgentEnv } from "./env";
+import { resolveClaudeAgentCwd } from "./claude-agent-cwd";
 import {
   buildSystemPrompt,
   type FilingAnchorContext,
@@ -54,6 +56,13 @@ import {
   CHART_MCP_SERVER_NAME,
   createChartMcpServer,
 } from "@/lib/charts/create-chart-tool";
+import { isChartGenerationEnabled } from "@/lib/features/charts";
+import {
+  createYahooFinanceNewsMcpServer,
+} from "@/lib/news-discovery/yahoo-finance-mcp-tool";
+import {
+  YAHOO_FINANCE_MCP_SERVER_NAME,
+} from "@/lib/news-discovery/yahoo-finance-mcp-constants";
 import {
   createAccumulator,
   createSSEWriter,
@@ -73,16 +82,18 @@ import type {
   MCPToolName,
   StreamingCitation,
   StockNewsMCPToolName,
+  YahooFinanceMCPToolName,
 } from "@/types/api-contracts";
 
 const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const STOCK_NEWS_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_MCP_TOOLS);
+const YAHOO_FINANCE_MCP_TOOL_SET = new Set<string>(YAHOO_FINANCE_MCP_TOOLS);
 const CHART_MCP_TOOL_SET = new Set<string>(CHART_MCP_TOOLS);
 const DEFAULT_MAX_TURNS = 20;
-const DEFAULT_AGENT_WORKSPACE_DIR = ".agent-workspace";
 const TOOL_BUDGET_EXCEEDED = "tool_budget_exceeded";
 const TOOL_RESULT_MISSING = "tool_result_missing";
 const DEFAULT_STOCK_NEWS_MAX_CALLS = 12;
+const DEFAULT_YAHOO_FINANCE_MAX_CALLS = 4;
 const DISALLOWED_SDK_TOOLS = [
   "Bash",
   "Read",
@@ -133,20 +144,6 @@ interface ToolResultRecord {
   json: unknown;
 }
 
-async function resolveClaudeAgentCwd(): Promise<string> {
-  const configured = process.env.CLAUDE_AGENT_CWD?.trim();
-  const cwd = configured || path.join(process.cwd(), DEFAULT_AGENT_WORKSPACE_DIR);
-
-  if (!path.isAbsolute(cwd)) {
-    throw new Error(
-      `CLAUDE_AGENT_CWD must be an absolute path when set: ${cwd}`,
-    );
-  }
-
-  await mkdir(cwd, { recursive: true });
-  return cwd;
-}
-
 export interface SdkDiagnostics {
   passName?: "research";
   requestedModel?: string;
@@ -186,13 +183,19 @@ export async function runAgent(
   const cwd = await resolveClaudeAgentCwd();
   const abortController = new AbortController();
   const researchMode = normalizeResearchMode(options.researchMode);
-  const analysisMode = normalizeAnalysisMode(options.analysisMode);
   const runKind = normalizeRunKind(
-    options.runKind ?? defaultRunKindForAnalysisMode(analysisMode),
+    options.runKind ??
+      defaultRunKindForAnalysisMode(normalizeAnalysisMode(options.analysisMode)),
+  );
+  const analysisMode = analysisModeForRunKind(
+    runKind,
+    normalizeAnalysisMode(options.analysisMode),
   );
   const responseLocale = options.responseLocale ?? DEFAULT_LOCALE;
   const stockNewsRun = isStockNewsRunKind(runKind);
   const stockNewsEnabledForRun = stockNewsRun && isStockNewsEnabled();
+  const yahooFinanceRun = isYahooFinanceRunKind(runKind);
+  const chartGenerationEnabled = isChartGenerationEnabled();
   const toolBudget = getResearchModeToolBudget(researchMode);
 
   const abortHandler = () => abortController.abort();
@@ -219,6 +222,9 @@ export async function runAgent(
       stockNewsEnabled: stockNewsEnabledForRun,
       stockNewsRequired: stockNewsRun && stockNewsEnabledForRun,
       stockNewsUnavailableForNews: stockNewsRun && !stockNewsEnabledForRun,
+      yahooFinanceNewsEnabled: yahooFinanceRun,
+      yahooFinanceNewsRequired: yahooFinanceRun,
+      chartGenerationEnabled,
       responseLocale,
     },
   );
@@ -236,6 +242,7 @@ export async function runAgent(
     researchMode,
     analysisMode,
     runKind,
+    chartGenerationEnabled,
   );
 
   const requestedModel = getClaudeAgentModel();
@@ -374,9 +381,15 @@ async function runSdkPass(params: {
     DEFAULT_STOCK_NEWS_MAX_CALLS,
     { min: 1 },
   );
+  const maxYahooFinanceCalls = readIntEnv(
+    "YAHOO_FINANCE_MAX_CALLS",
+    DEFAULT_YAHOO_FINANCE_MAX_CALLS,
+    { min: 1 },
+  );
   const allowedStockNewsSourceUrls = extractAllowedStockNewsSourceUrls(
     options.selectedNewsEventContext,
   );
+  const chartGenerationEnabled = isChartGenerationEnabled();
 
   try {
     const passCanUseTool = createToolPermissionGuard(
@@ -386,15 +399,28 @@ async function runSdkPass(params: {
       runKind,
       maxToolCalls,
       maxStockNewsCalls,
+      maxYahooFinanceCalls,
       allowedStockNewsSourceUrls,
+      chartGenerationEnabled,
     );
+    const mcpServers = {
+      ...(sdkOptions.mcpServers ?? {}),
+      ...(isYahooFinanceRunKind(runKind)
+        ? {
+            [YAHOO_FINANCE_MCP_SERVER_NAME]:
+              createYahooFinanceNewsMcpServer(),
+          }
+        : {}),
+      ...(chartGenerationEnabled
+        ? {
+            [CHART_MCP_SERVER_NAME]: createChartMcpServer(acc),
+          }
+        : {}),
+    };
     const passSdkOptions: Options = {
       ...sdkOptions,
       canUseTool: passCanUseTool,
-      mcpServers: {
-        ...(sdkOptions.mcpServers ?? {}),
-        [CHART_MCP_SERVER_NAME]: createChartMcpServer(acc),
-      },
+      ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
     };
     const sdkQuery = query({
       prompt,
@@ -603,7 +629,12 @@ export async function canUseTool(
   input: Record<string, unknown> = {},
 ): Promise<PermissionResult> {
   if (isChartSdkTool(toolName)) {
-    return { behavior: "allow" };
+    return isChartGenerationEnabled()
+      ? { behavior: "allow" }
+      : {
+          behavior: "deny",
+          message: "Inline chart generation is disabled for this runtime.",
+        };
   }
 
   if (isKrwOntologySdkTool(toolName)) {
@@ -622,10 +653,14 @@ export async function canUseTool(
     return { behavior: "allow" };
   }
 
+  if (isYahooFinanceSdkTool(toolName)) {
+    return { behavior: "allow" };
+  }
+
   return {
     behavior: "deny",
     message:
-      "Only configured KRW Ontology, Stock News, and presentation MCP tools are allowed in web chat.",
+      "Only configured KRW Ontology, Yahoo Finance, Stock News, and presentation MCP tools are allowed in web chat.",
   };
 }
 
@@ -633,6 +668,7 @@ function allowedSdkToolsForResearchMode(
   mode: ResearchMode,
   analysisMode: AnalysisMode,
   runKind: RunKind,
+  chartGenerationEnabled = isChartGenerationEnabled(),
 ): string[] {
   const allowedMcpTools = new Set(getAllowedMcpToolsForResearchMode(mode));
   const allowedOntologyTools = KRW_ONTOLOGY_SDK_ALLOWED_TOOLS.filter((toolName) => {
@@ -646,11 +682,23 @@ function allowedSdkToolsForResearchMode(
         isStockNewsToolAllowedForRunKind(stockNewsToolName, runKind),
     );
   });
+  const allowedYahooFinanceTools = YAHOO_FINANCE_SDK_ALLOWED_TOOLS.filter(
+    (toolName) => {
+      const yahooFinanceToolName = normalizeYahooFinanceToolName(toolName);
+      return Boolean(
+        yahooFinanceToolName &&
+          isYahooFinanceToolAllowedForRunKind(yahooFinanceToolName, runKind),
+      );
+    },
+  );
 
   return [
     ...(runKind === "news_discovery" ? [] : allowedOntologyTools),
     ...(isStockNewsRunKind(runKind) ? allowedStockNewsTools : []),
-    ...(runKind === "news_discovery" ? [] : CHART_SDK_ALLOWED_TOOLS),
+    ...(isYahooFinanceRunKind(runKind) ? allowedYahooFinanceTools : []),
+    ...(chartGenerationEnabled && runKind !== "news_discovery"
+      ? CHART_SDK_ALLOWED_TOOLS
+      : []),
   ];
 }
 
@@ -661,22 +709,66 @@ function createToolPermissionGuard(
   runKind: RunKind,
   maxToolCalls: number,
   maxStockNewsCalls: number,
+  maxYahooFinanceCalls: number,
   allowedStockNewsSourceUrls: string[] = [],
+  chartGenerationEnabled = isChartGenerationEnabled(),
 ) {
   return async (
     toolName: string,
     input: Record<string, unknown> = {},
   ): Promise<PermissionResult> => {
     if (isChartSdkTool(toolName)) {
-      return { behavior: "allow" };
+      return chartGenerationEnabled
+        ? { behavior: "allow" }
+        : {
+            behavior: "deny",
+            message: "Inline chart generation is disabled for this runtime.",
+          };
     }
 
-    if (!isKrwOntologySdkTool(toolName) && !isStockNewsSdkTool(toolName)) {
+    if (
+      !isKrwOntologySdkTool(toolName) &&
+      !isStockNewsSdkTool(toolName) &&
+      !isYahooFinanceSdkTool(toolName)
+    ) {
       return {
         behavior: "deny",
         message:
-          "Only configured KRW Ontology, Stock News, and presentation MCP tools are allowed in web chat.",
+          "Only configured KRW Ontology, Yahoo Finance, Stock News, and presentation MCP tools are allowed in web chat.",
       };
+    }
+
+    if (isYahooFinanceSdkTool(toolName)) {
+      const yahooFinanceToolName = normalizeYahooFinanceToolName(toolName);
+      if (analysisMode !== "news" || !isYahooFinanceRunKind(runKind)) {
+        return {
+          behavior: "deny",
+          message:
+            "Yahoo Finance MCP is only available for first-pass news and market-move research.",
+        };
+      }
+
+      if (
+        !yahooFinanceToolName ||
+        !isYahooFinanceToolAllowedForRunKind(yahooFinanceToolName, runKind)
+      ) {
+        return {
+          behavior: "deny",
+          message:
+            "This Yahoo Finance MCP tool is not available for this news workflow.",
+        };
+      }
+
+      const nextYahooFinanceCalls =
+        countYahooFinanceToolCalls(acc.toolCalls) + 1;
+      if (nextYahooFinanceCalls > maxYahooFinanceCalls) {
+        return {
+          behavior: "deny",
+          message: buildYahooFinanceBudgetDenyMessage(),
+        };
+      }
+
+      return { behavior: "allow" };
     }
 
     if (isStockNewsSdkTool(toolName)) {
@@ -757,7 +849,7 @@ function createToolPermissionGuard(
       return {
         behavior: "deny",
         message:
-          "News discovery only creates event cards. Do not call KRW Ontology tools in this run.",
+          "News discovery answers from current market news only. Do not call KRW Ontology tools in this run.",
       };
     }
 
@@ -802,40 +894,58 @@ function allowWithInputPolicy(
   return { behavior: "allow" };
 }
 
-const NEWS_DISCOVERY_TOOLS = new Set<StockNewsMCPToolName>([
-  "route_news_question",
-  "resolve_news_entities",
-  "search_company_news_events",
-  "search_market_news_events",
-  "build_news_timeline",
-  "audit_news_sources",
-]);
-
-const NEWS_RESEARCH_TOOLS = new Set<StockNewsMCPToolName>([
-  "read_news_sources",
-  "search_news_by_domain",
-  "audit_news_sources",
-]);
+const NEWS_DISCOVERY_YAHOO_FINANCE_TOOLS = new Set<YahooFinanceMCPToolName>(
+  YAHOO_FINANCE_MCP_TOOLS,
+);
 
 function isStockNewsToolAllowedForRunKind(
   toolName: StockNewsMCPToolName,
   runKind: RunKind,
 ): boolean {
-  if (runKind === "news_discovery") return NEWS_DISCOVERY_TOOLS.has(toolName);
-  if (runKind === "news_research") return NEWS_RESEARCH_TOOLS.has(toolName);
+  void toolName;
+  void runKind;
   return false;
 }
 
 function isStockNewsRunKind(runKind: RunKind): boolean {
-  return runKind === "news_discovery" || runKind === "news_research";
+  void runKind;
+  return false;
+}
+
+function isYahooFinanceRunKind(runKind: RunKind): boolean {
+  return runKind === "news_discovery" || runKind === "market_move_research";
+}
+
+function analysisModeForRunKind(
+  runKind: RunKind,
+  fallback: AnalysisMode,
+): AnalysisMode {
+  if (runKind === "news_discovery" || runKind === "market_move_research") {
+    return "news";
+  }
+  if (
+    runKind === "company_research" ||
+    runKind === "idea_generation" ||
+    runKind === "scenario_sensitivity"
+  ) {
+    return "company";
+  }
+  return fallback;
+}
+
+function isYahooFinanceToolAllowedForRunKind(
+  toolName: YahooFinanceMCPToolName,
+  runKind: RunKind,
+): boolean {
+  if (isYahooFinanceRunKind(runKind)) {
+    return NEWS_DISCOVERY_YAHOO_FINANCE_TOOLS.has(toolName);
+  }
+  return false;
 }
 
 function stockNewsDenyMessageForRunKind(runKind: RunKind): string {
   if (runKind === "news_discovery") {
-    return "News discovery only finds event candidates. Do not read full sources or perform final research in this run.";
-  }
-  if (runKind === "news_research") {
-    return "News research already has a selected event. Verify selected sources instead of broad event discovery.";
+    return "News discovery uses Yahoo Finance MCP for first-pass ticker news. Do not call Stock News MCP in this run.";
   }
   return "News tools are only available in news mode.";
 }
@@ -852,13 +962,13 @@ ${JSON.stringify(selectedNewsEventContext)}
 </idea_generation_url_context>`;
   }
   if (runKind === "market_move_research" && selectedNewsEventContext) {
-    return `Use this app-provided market move context as the bounded input brief for stock-move interpretation. Treat current market data and recent news candidates as market observations, not confirmed company disclosure. Default to a lightweight market/news explanation of the observed move. Use KRW Ontology retrieval from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology only when filing-grounded depth is required by the user's question or by a durable investment-view claim. Follow-up prompts should bridge the observed move/news into filing-grounded KRW Ontology research.
+    return `Use this app-provided market move context only as supplemental bounded context for stock-move interpretation. Runtime Yahoo Finance MCP lookup remains the primary current price/news read. Treat current market data and recent news candidates as market observations, not confirmed company disclosure. Default to a compact market/news explanation of the observed move. Use KRW Ontology retrieval from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology only when filing-grounded depth is required by the user's question or by a durable investment-view claim. Follow-up prompts should bridge the observed move/news into filing-grounded KRW Ontology research.
 
 <selected_news_event_context>
 ${JSON.stringify(selectedNewsEventContext)}
 </selected_news_event_context>`;
   }
-  if (runKind !== "news_research" || !selectedNewsEventContext) return "";
+  if (runKind !== "company_research" || !selectedNewsEventContext) return "";
   return `Use this selected market narrative as the input brief for KRW Ontology filing research. Treat it as an investment hypothesis, not confirmed company fact. If it came from a user-provided URL, first ask what would matter if the narrative is directionally true, then anchor the interpretation against filing evidence. Start KRW ontology retrieval from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology when present; otherwise use ontology_bridge_brief_en.
 
 <selected_news_event_context>
@@ -877,6 +987,9 @@ function prepareToolInputForRun(
   acc: AccumulatedRun,
 ): PreparedToolInput {
   if (isStockNewsMcpToolName(mcpToolName)) {
+    return { input, changed: false };
+  }
+  if (isYahooFinanceMcpToolName(mcpToolName)) {
     return { input, changed: false };
   }
   if (isChartMcpToolName(mcpToolName) || !mcpToolName) {
@@ -1111,6 +1224,14 @@ function buildStockNewsBudgetDenyMessage(): string {
     "No more Stock News MCP tools can be called in this run.",
     "Do not call another current-news tool.",
     "Continue with filing evidence and news results already collected.",
+  ].join(" ");
+}
+
+function buildYahooFinanceBudgetDenyMessage(): string {
+  return [
+    "No more Yahoo Finance MCP tools can be called in this run.",
+    "Do not call another current-news tool.",
+    "Write the final answer from the Yahoo Finance news results already collected.",
   ].join(" ");
 }
 
@@ -1376,6 +1497,7 @@ function normalizeMcpToolName(name: unknown): MCPToolName | null {
   return (
     normalizeKrwOntologyToolName(name) ??
     normalizeStockNewsToolName(name) ??
+    normalizeYahooFinanceToolName(name) ??
     normalizeChartToolName(name)
   );
 }
@@ -1396,6 +1518,15 @@ function normalizeStockNewsToolName(
   const bareName = name.includes("__") ? name.split("__").at(-1) : name;
   if (!bareName || !STOCK_NEWS_MCP_TOOL_SET.has(bareName)) return null;
   return bareName as StockNewsMCPToolName;
+}
+
+function normalizeYahooFinanceToolName(
+  name: unknown,
+): YahooFinanceMCPToolName | null {
+  if (typeof name !== "string") return null;
+  const bareName = name.includes("__") ? name.split("__").at(-1) : name;
+  if (!bareName || !YAHOO_FINANCE_MCP_TOOL_SET.has(bareName)) return null;
+  return bareName as YahooFinanceMCPToolName;
 }
 
 function normalizeChartToolName(name: unknown): ChartMCPToolName | null {
@@ -1458,6 +1589,14 @@ function countStockNewsToolCalls(
   return toolCalls.filter((toolCall) => isStockNewsMcpToolName(toolCall.toolName)).length;
 }
 
+function countYahooFinanceToolCalls(
+  toolCalls: Array<Pick<AccumulatedToolCall, "toolName">>,
+): number {
+  return toolCalls.filter((toolCall) =>
+    isYahooFinanceMcpToolName(toolCall.toolName),
+  ).length;
+}
+
 function isChartMcpToolName(
   toolName: MCPToolName | null,
 ): toolName is ChartMCPToolName {
@@ -1468,6 +1607,12 @@ function isStockNewsMcpToolName(
   toolName: MCPToolName | null,
 ): toolName is StockNewsMCPToolName {
   return Boolean(toolName && STOCK_NEWS_MCP_TOOL_SET.has(toolName));
+}
+
+function isYahooFinanceMcpToolName(
+  toolName: MCPToolName | null,
+): toolName is YahooFinanceMCPToolName {
+  return Boolean(toolName && YAHOO_FINANCE_MCP_TOOL_SET.has(toolName));
 }
 
 const SAFE_TOOL_ARGUMENT_KEYS = [

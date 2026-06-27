@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type {
   AgentRunRow,
+  ChatAttachmentRow,
   ChatSessionRow,
   MessageRow,
   MessageShareRow,
@@ -20,11 +21,23 @@ const MAX_SHARE_TITLE_LENGTH = 90;
 const MAX_SHARE_QUESTION_CHARS = 8_000;
 const SHARE_SNAPSHOT_VERSION = 2;
 
+export interface PublicShareQuestionAttachments {
+  urls: string[];
+  files: PublicShareQuestionAttachmentFile[];
+}
+
+export interface PublicShareQuestionAttachmentFile {
+  name: string;
+  mimeType: string | null;
+  size: number | null;
+}
+
 export interface PublicMessageShare {
   token: string;
   title: string;
   question_content: string | null;
   question_created_at: string | null;
+  question_attachments: PublicShareQuestionAttachments;
   answer_content: string;
   answer_created_at: string;
   tickers: string[] | null;
@@ -73,21 +86,31 @@ export async function findPublicMessageShare(
   const { data } = await admin
     .from("message_shares")
     .select(
-      "token, title, question_content, question_created_at, answer_content, answer_created_at, tickers, created_at",
+      "token, title, question_content, question_created_at, source_question_message_id, answer_content, answer_created_at, tickers, created_at",
     )
     .eq("token", token)
     .is("revoked_at", null)
-    .maybeSingle<PublicMessageShare>();
+    .maybeSingle<
+      Omit<PublicMessageShare, "question_attachments"> &
+        Pick<MessageShareRow, "source_question_message_id">
+    >();
 
   if (!data) return null;
 
   const answerContent = sanitizeAssistantContent(data.answer_content);
   const titleFallback = sanitizeAssistantPreviewContent(data.title);
   const questionContent = normalizeShareQuestion(data.question_content);
+  const questionAttachments = await loadPublicQuestionAttachments(
+    admin,
+    data.source_question_message_id,
+  );
+  const { source_question_message_id: _sourceQuestionMessageId, ...share } =
+    data;
   return {
-    ...data,
+    ...share,
     title: buildShareTitle(answerContent, titleFallback || undefined),
     question_content: questionContent,
+    question_attachments: questionAttachments,
     answer_content: answerContent,
     tickers: normalizeShareTickers(data.tickers),
     locale: inferShareLocale({
@@ -272,4 +295,71 @@ function normalizeShareQuestion(value: string | null | undefined): string | null
   const visibleText = parseChatAttachmentContent(value).visibleText;
   const normalized = visibleText.replace(/\s+\n/g, "\n").trim();
   return normalized ? normalized.slice(0, MAX_SHARE_QUESTION_CHARS) : null;
+}
+
+async function loadPublicQuestionAttachments(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  questionMessageId: string | null | undefined,
+): Promise<PublicShareQuestionAttachments> {
+  if (!questionMessageId) return emptyQuestionAttachments();
+
+  const { data: message } = await admin
+    .from("messages")
+    .select("content, metadata")
+    .eq("id", questionMessageId)
+    .maybeSingle<Pick<MessageRow, "content" | "metadata">>();
+
+  if (!message) return emptyQuestionAttachments();
+
+  const urls = userUrlsFromMetadata(message.metadata);
+  const inlineFiles = parseChatAttachmentContent(message.content).attachments.map(
+    (attachment) => ({
+      name: attachment.name,
+      mimeType: null,
+      size: attachment.byteLength,
+    }),
+  );
+
+  const { data: documentFiles } = await admin
+    .from("chat_attachments")
+    .select("file_name, mime_type, file_size")
+    .eq("message_id", questionMessageId)
+    .order("created_at", { ascending: true })
+    .returns<
+      Array<Pick<ChatAttachmentRow, "file_name" | "mime_type" | "file_size">>
+    >();
+
+  const files = [
+    ...inlineFiles,
+    ...(documentFiles ?? []).map((file) => ({
+      name: file.file_name,
+      mimeType: file.mime_type,
+      size: file.file_size,
+    })),
+  ]
+    .filter((file) => file.name.trim().length > 0)
+    .slice(0, 6);
+
+  return { urls, files };
+}
+
+function emptyQuestionAttachments(): PublicShareQuestionAttachments {
+  return { urls: [], files: [] };
+}
+
+function userUrlsFromMetadata(
+  metadata: MessageRow["metadata"] | null | undefined,
+): string[] {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return [];
+  }
+
+  const urls = metadata.user_urls;
+  if (!Array.isArray(urls)) return [];
+
+  return urls
+    .filter((url): url is string => typeof url === "string")
+    .map((url) => url.trim())
+    .filter((url) => /^https?:\/\//i.test(url))
+    .slice(0, 3);
 }

@@ -502,6 +502,7 @@ const sampleShare: PublicMessageShare = {
     "Apple의 매출은 iPhone 교체 수요와 Services 성장률을 나눠 봐야 합니다.\n\n- 제품 매출은 지역별 수요 편차를 확인합니다.\n- Services는 반복 매출과 규제 리스크를 같이 봅니다.",
   question_content: "Apple의 매출 성장은 어디서 나왔어?",
   question_created_at: sampleTenMinutesAgoIso,
+  question_attachments: { urls: [], files: [] },
   answer_created_at: sampleNowIso,
   tickers: ["AAPL"],
   title: "Apple 매출 성장 리서치 답변",

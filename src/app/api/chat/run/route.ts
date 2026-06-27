@@ -232,8 +232,8 @@ export async function POST(request: NextRequest) {
               ticker,
               userQuestion: content,
             });
-      effectiveAnalysisMode = "news";
-      effectiveRunKind = "news_research";
+      effectiveAnalysisMode = "company";
+      effectiveRunKind = "company_research";
       routingMode = "preserve";
     } catch (error) {
       const message =
@@ -243,9 +243,6 @@ export async function POST(request: NextRequest) {
       return errorResponse(400, "validation_error", message, request_id);
     }
   }
-
-  const isEffectiveServerPipelineNewsDiscovery =
-    effectiveAnalysisMode === "news" && effectiveRunKind === "news_discovery";
 
   // 6. Open an execution-budget record before creating durable chat work.
   const budgetResult = await reserveBudgetStep(
@@ -391,9 +388,7 @@ export async function POST(request: NextRequest) {
     analysisMode: effectiveAnalysisMode,
     runKind: effectiveRunKind,
     responseLocale,
-    executorType: isEffectiveServerPipelineNewsDiscovery
-      ? "server_pipeline"
-      : "claude_agent",
+    executorType: "claude_agent",
     selectedNewsEventContext,
     routingMode,
   });

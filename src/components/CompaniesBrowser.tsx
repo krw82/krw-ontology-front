@@ -232,7 +232,10 @@ export default function CompaniesBrowser({
                 ) : null}
               </AnimatePresence>
               <div className="grid gap-2">
-                <div className="relative min-w-0">
+                <div
+                  className="relative min-w-0"
+                  data-onboarding-target="company-search"
+                >
                   <motion.span
                     aria-hidden="true"
                     className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[20px]"
@@ -273,6 +276,7 @@ export default function CompaniesBrowser({
                   </div>
                   <Link
                     href="/discover"
+                    data-onboarding-target="stock-discovery-cta"
                     className="group inline-flex h-10 min-w-0 shrink-0 items-center justify-between gap-2 rounded-[8px] bg-ink px-3 text-[13px] font-bold leading-5 text-canvas shadow-sm transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                     aria-label={copy.discoveryCta}
                   >

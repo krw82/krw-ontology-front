@@ -48,7 +48,6 @@ import {
 import { MAX_PROMPT_HISTORY_MESSAGES } from "@/lib/agent/system-prompt";
 import type {
   AgentRunRow,
-  ChatMessageArtifactRow,
   ChatSessionRow,
   Json,
   MessageRow,
@@ -77,19 +76,14 @@ import {
   normalizeRunKind,
   type RunKind,
 } from "@/lib/run-kind";
-import {
-  buildNewsEventSelectionArtifact,
-  buildNewsEventSelectionArtifactFromDiscoveryResult,
-  toPublicChatArtifact,
-} from "@/lib/chat-artifacts/news-event-selection";
 import { persistCreatedCharts } from "@/lib/charts/db";
-import { discoverNewsCards } from "@/lib/news-discovery/discovery";
+import {
+  isChartGenerationEnabled,
+  stripChartTokens,
+} from "@/lib/features/charts";
 import { buildSelectedNewsSourcePack } from "@/lib/news-discovery/source-pack";
 import { appendDocumentContextToUserMessage } from "@/lib/document-ingestion/prompt-context";
-import type { ResolvedSession } from "@/lib/api/chat/resolve-session";
 import { resolveChatQuestionRoute } from "@/lib/question-router/chat-question-router";
-import { buildMarketMoveContext } from "@/lib/market-move/context-builder";
-import { resolveMarketMoveTarget } from "@/lib/market-move/target";
 import { writeLocalDebugLog } from "@/lib/observability/local-debug-log";
 
 const HEARTBEAT_INTERVAL_MS = readIntEnv("LEASE_HEARTBEAT_INTERVAL_MS", 60_000, {
@@ -281,37 +275,6 @@ export async function runAgentJob(runId: string, workerId: string) {
       sendEvent,
     });
 
-    if (job.executorType === "server_pipeline") {
-      if (job.runKind === "news_discovery") {
-        await runWithHardTimeout(
-          handleServerPipelineNewsDiscoveryJob({
-            admin,
-            job,
-            runStartedAt,
-            mcpHealth,
-            abortSignal: abortController.signal,
-            sendEvent,
-          }),
-          abortController,
-          AGENT_RUN_HARD_TIMEOUT_MS,
-        );
-        return;
-      }
-
-      await handleFailedJob({
-        admin,
-        job,
-        runStartedAt,
-        result: {
-          acc: emptyAccumulatedRun(),
-          errorCode: "internal_error",
-          errorMessage: `Unsupported server pipeline run kind: ${job.runKind}`,
-        },
-        sendEvent,
-      });
-      return;
-    }
-
     const selectedNewsEventContext = await prepareSelectedNewsEventContext({
       admin,
       job,
@@ -460,6 +423,7 @@ async function resolveAutoRoutedJob(params: {
   });
 
   const routeDecision = await resolveChatQuestionRoute({
+    sessionId: job.session.id,
     content: job.userMessage.content,
     currentAnalysisMode: job.analysisMode,
     currentRunKind: job.runKind,
@@ -498,35 +462,6 @@ async function resolveAutoRoutedJob(params: {
   let nextExecutorType = executorTypeForRunKind(nextRunKind);
   let nextSelectedNewsEventContext = job.selectedNewsEventContext;
   let routingNote: string | null = null;
-
-  if (nextRunKind === "news_research") {
-    nextAnalysisMode = "company";
-    nextRunKind = "company_research";
-    nextExecutorType = "claude_agent";
-    routingNote = "news_research requires a selected event or URL context.";
-  }
-
-  if (nextRunKind === "market_move_research") {
-    const marketMoveContext = await buildRoutedMarketMoveContext(job).catch(
-      (error) => {
-        console.warn("[agent-worker] market-move routing context failed", {
-          runId: job.run.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        return null;
-      },
-    );
-
-    if (marketMoveContext) {
-      nextSelectedNewsEventContext = marketMoveContext;
-    } else {
-      nextAnalysisMode = "company";
-      nextRunKind = "company_research";
-      nextExecutorType = "claude_agent";
-      nextSelectedNewsEventContext = null;
-      routingNote = "market_move_research requires a resolvable covered ticker.";
-    }
-  }
 
   const runUpdate: Record<string, unknown> = {
     run_kind: nextRunKind,
@@ -568,23 +503,8 @@ async function resolveAutoRoutedJob(params: {
 }
 
 function executorTypeForRunKind(runKind: RunKind): AgentRunExecutorType {
-  return runKind === "news_discovery" ? "server_pipeline" : "claude_agent";
-}
-
-async function buildRoutedMarketMoveContext(
-  job: AgentJob,
-): Promise<Record<string, unknown> | null> {
-  const target = await resolveMarketMoveTarget({
-    content: job.userMessage.content,
-    defaultTickers: job.session.default_tickers ?? [],
-  });
-  if (!target) return null;
-
-  return buildMarketMoveContext({
-    ticker: target.ticker,
-    companyName: target.companyName,
-    userQuestion: job.userMessage.content,
-  });
+  void runKind;
+  return "claude_agent";
 }
 
 function runWithHardTimeout<T>(
@@ -749,7 +669,8 @@ async function loadAgentJob(
 }
 
 function normalizeExecutorType(value: unknown): AgentRunExecutorType {
-  return value === "server_pipeline" ? "server_pipeline" : "claude_agent";
+  void value;
+  return "claude_agent";
 }
 
 function normalizeRoutingMode(value: unknown): AgentRunRoutingMode {
@@ -995,217 +916,6 @@ function createRunRecordPersister(
   };
 }
 
-async function handleServerPipelineNewsDiscoveryJob(params: {
-  admin: SupabaseAdmin;
-  job: AgentJob;
-  runStartedAt: string;
-  mcpHealth: McpHealthResult;
-  abortSignal: AbortSignal;
-  sendEvent: (event: Parameters<typeof appendAgentRunEvent>[2], payload: unknown) => Promise<void>;
-}) {
-  const { admin, job, runStartedAt, mcpHealth, abortSignal, sendEvent } = params;
-  let terminalHandled = false;
-  let inputTokens = 0;
-  let outputTokens = 0;
-  const cancelIfRequested = async () => {
-    if (!abortSignal.aborted) return false;
-    if (isHardTimeoutAbort(abortSignal)) return true;
-    terminalHandled = true;
-    await handleServerPipelineCancelledJob({
-      admin,
-      job,
-      inputTokens,
-      outputTokens,
-      sendEvent,
-    });
-    return true;
-  };
-
-  try {
-    await sendEvent("activity_update", {
-      stage: "researching",
-      label: "시장 뉴스 후보를 찾는 중",
-    });
-    if (await cancelIfRequested()) return;
-
-    const { discovery, composition } = await discoverNewsCards({
-      question: job.userMessage.content,
-      session: toResolvedSession(job.session),
-    });
-    inputTokens = composition.usage?.input_tokens ?? 0;
-    outputTokens = composition.usage?.output_tokens ?? 0;
-    if (await cancelIfRequested()) return;
-    const artifact = buildNewsEventSelectionArtifactFromDiscoveryResult({
-      result: {
-        cards: composition.cards,
-        events: composition.cards,
-        resolved_entities: discovery.intent.resolvedEntities,
-        lookback: {
-          hours: discovery.intent.lookbackHours,
-        },
-        discovery_policy: {
-          market_news_only: true,
-          english_question: discovery.intent.englishQuestion,
-          price_move_direction: discovery.intent.direction,
-          allowed_domains: discovery.selectedSourcePolicy.allowed_domains,
-          excluded_domains: discovery.selectedSourcePolicy.excluded_domains,
-        },
-        empty_state:
-          composition.cards.length === 0
-            ? composition.empty_state ?? {
-                reason: "no_preferred_market_news_found",
-                english_question: discovery.intent.englishQuestion,
-              }
-            : undefined,
-        raw_search_result: discovery.rawSearchResult,
-        raw_model_output: composition.raw_model_output,
-      },
-      originalQuestion: job.userMessage.content,
-    });
-    if (await cancelIfRequested()) return;
-    const chatArtifacts = artifact
-      ? await persistBuiltNewsDiscoveryArtifact({
-          admin,
-          artifact,
-          sessionId: job.session.id,
-          messageId: job.assistantMessageId,
-          runId: job.run.id,
-        })
-      : [];
-    if (await cancelIfRequested()) return;
-    const estimatedCost =
-      composition.usage?.estimated_cost_usd ??
-      estimateCost(inputTokens, outputTokens);
-    const finishedAt = new Date().toISOString();
-    const latencyMs = Date.now() - new Date(runStartedAt).getTime();
-    const content = buildDiscoveryAssistantContent({
-      cardCount: composition.cards.length,
-      englishQuestion: discovery.intent.englishQuestion,
-    });
-
-    await admin
-      .from("messages")
-      .update({
-        content,
-        status: "completed",
-      })
-      .eq("id", job.assistantMessageId);
-
-    await markAgentRunTerminal(admin, job.run.id, {
-      status: "completed",
-      finishedAt,
-      assistantMessageId: job.assistantMessageId,
-      inputTokens,
-      outputTokens,
-      estimatedCostUsd: estimatedCost,
-      latencyMs,
-    });
-
-    await settleExecutionBudgetForWorker(
-      job.session.user_id,
-      job.run.request_id,
-      job.run.id,
-      estimatedCost,
-      "completed",
-      {
-        executor_type: "server_pipeline",
-        run_kind: "news_discovery",
-        card_count: composition.cards.length,
-        input_tokens: inputTokens,
-        output_tokens: outputTokens,
-      },
-    );
-
-    for (const chatArtifact of chatArtifacts) {
-      await sendEvent("artifact", chatArtifact);
-    }
-
-    await sendEvent("done", {
-      run_id: job.run.id,
-      message_id: job.assistantMessageId,
-      content,
-      rich_answers: [],
-      artifacts: [],
-      chat_artifacts: chatArtifacts,
-      charts: [],
-      release: publicReleaseMetadata(publicReleaseInputFromMcpHealth(mcpHealth)),
-      usage: {
-        input_tokens: inputTokens,
-        output_tokens: outputTokens,
-        estimated_cost_usd: estimatedCost,
-        latency_ms: latencyMs,
-      },
-      execution_budget: await loadExecutionBudgetStatus(job.session.user_id),
-    });
-  } catch (error) {
-    if (abortSignal.aborted) {
-      if (!isHardTimeoutAbort(abortSignal) && !terminalHandled) {
-        await handleServerPipelineCancelledJob({
-          admin,
-          job,
-          inputTokens,
-          outputTokens,
-          sendEvent,
-        });
-      }
-      return;
-    }
-    const rawErrorMessage =
-      error instanceof Error ? error.message : "News discovery pipeline failed";
-    const publicMessage = "뉴스 후보를 찾는 중 오류가 발생했습니다.";
-    const finishedAt = new Date().toISOString();
-
-    await markAgentRunTerminal(admin, job.run.id, {
-      status: "failed",
-      finishedAt,
-      assistantMessageId: job.assistantMessageId,
-      errorCode: "internal_error",
-      errorMessage: rawErrorMessage,
-    });
-    await admin
-      .from("messages")
-      .update({
-        content: publicMessage,
-        status: "failed",
-      })
-      .eq("id", job.assistantMessageId);
-    await releaseExecutionBudgetForWorker(
-      job.session.user_id,
-      job.run.request_id,
-      job.run.id,
-      "news_discovery_failed",
-    );
-    await sendEvent("error", {
-      run_id: job.run.id,
-      error_code: "internal_error",
-      error_message: publicMessage,
-    });
-  }
-}
-
-async function handleServerPipelineCancelledJob(params: {
-  admin: SupabaseAdmin;
-  job: AgentJob;
-  inputTokens: number;
-  outputTokens: number;
-  sendEvent: (event: Parameters<typeof appendAgentRunEvent>[2], payload: unknown) => Promise<void>;
-}) {
-  const { admin, job, inputTokens, outputTokens, sendEvent } = params;
-
-  await handleCancelledJob({
-    admin,
-    job,
-    result: {
-      acc: {
-        ...emptyAccumulatedRun(),
-        inputTokens,
-        outputTokens,
-      },
-    },
-    sendEvent,
-  });
-}
-
 async function prepareSelectedNewsEventContext(params: {
   admin: SupabaseAdmin;
   job: AgentJob;
@@ -1213,7 +923,7 @@ async function prepareSelectedNewsEventContext(params: {
 }): Promise<Record<string, unknown> | null> {
   const { admin, job, sendEvent } = params;
   const context = job.selectedNewsEventContext;
-  if (job.runKind !== "news_research" || !context) return context;
+  if (job.runKind !== "company_research" || !context) return context;
   if (isRecord(context.source_pack)) return context;
 
   await sendEvent("activity_update", {
@@ -1246,64 +956,6 @@ async function prepareSelectedNewsEventContext(params: {
   return enriched;
 }
 
-async function persistBuiltNewsDiscoveryArtifact(params: {
-  admin: SupabaseAdmin;
-  artifact: {
-    type: "news_event_selection";
-    payload: unknown;
-  };
-  sessionId: string;
-  messageId: string;
-  runId: string;
-}): Promise<ChatArtifact[]> {
-  const { data, error } = await params.admin
-    .from("chat_message_artifacts")
-    .insert({
-      session_id: params.sessionId,
-      message_id: params.messageId,
-      run_id: params.runId,
-      type: params.artifact.type,
-      payload_json: jsonForDb(params.artifact.payload) ?? {},
-    })
-    .select("id, session_id, message_id, run_id, type, payload_json, created_at")
-    .single<ChatMessageArtifactRow>();
-
-  if (error || !data) {
-    console.warn("[agent-worker] failed to persist server pipeline artifact", {
-      runId: params.runId,
-      error: error?.message,
-    });
-    return [];
-  }
-
-  return [toPublicChatArtifact(data)];
-}
-
-function buildDiscoveryAssistantContent(params: {
-  cardCount: number;
-  englishQuestion: string;
-}): string {
-  if (params.cardCount > 0) {
-    return "분석할 시장 뉴스 후보를 찾았습니다. 아래 카드 중 하나를 선택하면 해당 뉴스 원문과 공시 데이터를 연결해 분석합니다.";
-  }
-
-  return [
-    "우선 소스에서 선택할 만한 시장 뉴스 후보를 찾지 못했습니다.",
-    "",
-    `검색 기준: ${params.englishQuestion}`,
-  ].join("\n");
-}
-
-function toResolvedSession(session: AgentJob["session"]): ResolvedSession {
-  return {
-    id: session.id,
-    userId: session.user_id,
-    scopeType: session.scope_type,
-    defaultTickers: session.default_tickers ?? [],
-    defaultDocumentTypes: session.default_document_types ?? [],
-  };
-}
-
 function publicReleaseInputFromMcpHealth(
   mcpHealth: McpHealthResult,
 ): PublicReleaseInput {
@@ -1329,26 +981,24 @@ async function handleCompletedJob(params: {
 }) {
   const { admin, job, runStartedAt, result, release, sendEvent } = params;
   const { acc } = result;
-  const visibleAnswer = acc.fullText.trim();
+  const chartGenerationEnabled = isChartGenerationEnabled();
+  const visibleAnswer = chartGenerationEnabled
+    ? acc.fullText.trim()
+    : stripChartTokens(acc.fullText);
   const estimatedCost = estimateCost(acc.inputTokens, acc.outputTokens);
   const finishedAt = new Date().toISOString();
   const latencyMs = Date.now() - new Date(runStartedAt).getTime();
-  const chatArtifacts =
-    job.runKind === "news_discovery"
-      ? await persistNewsDiscoveryArtifacts({
-          admin,
-          job,
-          acc,
-        })
-      : [];
-  const chatCharts = await persistCreatedCharts({
-    admin,
-    acc,
-    sessionId: job.session.id,
-    messageId: job.assistantMessageId,
-    runId: job.run.id,
-    content: visibleAnswer,
-  });
+  const chatArtifacts: ChatArtifact[] = [];
+  const chatCharts = chartGenerationEnabled
+    ? await persistCreatedCharts({
+        admin,
+        acc,
+        sessionId: job.session.id,
+        messageId: job.assistantMessageId,
+        runId: job.run.id,
+        content: visibleAnswer,
+      })
+    : [];
 
   await admin
     .from("messages")
@@ -1441,41 +1091,6 @@ async function handleCompletedJob(params: {
     },
     execution_budget: await loadExecutionBudgetStatus(job.session.user_id),
   });
-}
-
-async function persistNewsDiscoveryArtifacts(params: {
-  admin: SupabaseAdmin;
-  job: AgentJob;
-  acc: AccumulatedRun;
-}) {
-  const { admin, job, acc } = params;
-  const artifact = buildNewsEventSelectionArtifact({
-    acc,
-    originalQuestion: job.userMessage.content,
-  });
-  if (!artifact) return [];
-
-  const { data, error } = await admin
-    .from("chat_message_artifacts")
-    .insert({
-      session_id: job.session.id,
-      message_id: job.assistantMessageId,
-      run_id: job.run.id,
-      type: artifact.type,
-      payload_json: jsonForDb(artifact.payload) ?? {},
-    })
-    .select("id, session_id, message_id, run_id, type, payload_json, created_at")
-    .single<ChatMessageArtifactRow>();
-
-  if (error || !data) {
-    console.warn("[agent-worker] failed to persist chat artifact", {
-      runId: job.run.id,
-      error: error?.message,
-    });
-    return [];
-  }
-
-  return [toPublicChatArtifact(data)];
 }
 
 function mcpHealthReadinessError(mcpHealth: McpHealthResult): string | null {

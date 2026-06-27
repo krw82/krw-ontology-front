@@ -72,20 +72,17 @@ describe("buildSystemPrompt", () => {
     );
   });
 
-  it("uses the KRW ontology news research skill after a news event is selected", () => {
+  it("uses ordinary KRW ontology research for selected news event analysis", () => {
     const researchPrompt = buildResearchPassPrompt(
       "선택한 뉴스 이벤트를 공시 기준으로 분석해줘",
-      "news",
-      "news_research",
+      "company",
+      "company_research",
     );
 
     expect(researchPrompt).toContain(
-      "/krw-ontology:krw-ontology-news-research 선택한 뉴스 이벤트를 공시 기준으로 분석해줘",
-    );
-    expect(researchPrompt).toContain("웹앱 뉴스 research 실행");
-    expect(researchPrompt).not.toContain(
       "/krw-ontology:krw-ontology-research 선택한 뉴스 이벤트를 공시 기준으로 분석해줘",
     );
+    expect(researchPrompt).not.toContain("krw-ontology-news-research");
   });
 
   it("uses the idea generation skill with a Markdown-only candidate brief", () => {
@@ -144,19 +141,35 @@ describe("buildSystemPrompt", () => {
     const disabledPrompt = buildSystemPrompt();
     expect(disabledPrompt).toContain("Do not perform web searches");
     expect(disabledPrompt).not.toContain("Stock News MCP");
+    expect(disabledPrompt).not.toContain("Yahoo Finance MCP");
 
     const enabledPrompt = buildSystemPrompt(undefined, [], {
-      stockNewsEnabled: true,
+      yahooFinanceNewsEnabled: true,
+      yahooFinanceNewsRequired: true,
     });
     expect(enabledPrompt).toContain("Do not use built-in WebSearch or WebFetch");
-    expect(enabledPrompt).toContain("Stock News MCP");
-    expect(enabledPrompt).toContain("source provenance internally");
+    expect(enabledPrompt).toContain("Yahoo Finance MCP");
+    expect(enabledPrompt).toContain("market-news-vs-filing provenance internally");
+  });
+
+  it("omits chart instructions unless chart generation is explicitly enabled", () => {
+    const disabledPrompt = buildSystemPrompt();
+    expect(disabledPrompt).not.toContain("Inline chart policy");
+    expect(disabledPrompt).not.toContain("create_chart_v1");
+    expect(disabledPrompt).not.toContain("[[krw-chart:");
+
+    const enabledPrompt = buildSystemPrompt(undefined, [], {
+      chartGenerationEnabled: true,
+    });
+    expect(enabledPrompt).toContain("Inline chart policy");
+    expect(enabledPrompt).toContain("create_chart_v1");
+    expect(enabledPrompt).toContain("insert_token");
   });
 
   it("adds an English-only final answer policy when requested", () => {
     const prompt = buildSystemPrompt(undefined, [], {
       responseLocale: "en",
-      stockNewsEnabled: true,
+      yahooFinanceNewsEnabled: true,
     });
 
     expect(prompt).toContain("English Markdown only");
@@ -199,24 +212,24 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("Start current company and investment-decision judgments");
   });
 
-  it("marks stock-news discovery as required for news mode when the MCP is available", () => {
+  it("marks Yahoo Finance context as required for enabled news workflows", () => {
     const prompt = buildSystemPrompt(undefined, [], {
-      stockNewsEnabled: true,
-      stockNewsRequired: true,
+      yahooFinanceNewsEnabled: true,
+      yahooFinanceNewsRequired: true,
     });
 
-    expect(prompt).toContain("This run is in news mode");
-    expect(prompt).toContain("current news/event discovery");
-    expect(prompt).toContain("If the stock-news MCP call fails");
+    expect(prompt).toContain("requires current ticker market/news context");
+    expect(prompt).toContain("Yahoo Finance MCP tools for that current context");
+    expect(prompt).toContain("If the Yahoo Finance MCP call fails");
   });
 
-  it("falls back cleanly when news mode is selected but stock-news MCP is unavailable", () => {
+  it("falls back cleanly when news mode is selected but Yahoo Finance MCP is unavailable", () => {
     const prompt = buildSystemPrompt(undefined, [], {
-      stockNewsUnavailableForNews: true,
+      yahooFinanceNewsUnavailableForNews: true,
     });
 
     expect(prompt).toContain("selected news mode");
-    expect(prompt).toContain("stock-news MCP tool is unavailable");
+    expect(prompt).toContain("Yahoo Finance MCP tools are unavailable");
     expect(prompt).toContain("Do not attempt current-news search");
   });
 

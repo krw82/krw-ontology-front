@@ -59,49 +59,6 @@ export function buildNewsEventSelectionArtifact(params: {
   };
 }
 
-export function buildNewsEventSelectionArtifactFromDiscoveryResult(params: {
-  result: UnknownRecord;
-  originalQuestion: string;
-}): BuiltNewsEventSelectionArtifact | null {
-  const rawEvents = findEventArray(params.result);
-  const events = normalizeEvents(rawEvents);
-  const emptyState = isRecord(params.result.empty_state)
-    ? params.result.empty_state
-    : undefined;
-  if (events.length === 0 && !emptyState) return null;
-
-  return {
-    type: "news_event_selection",
-    payload: {
-      kind: "news_event_selection",
-      version: 1,
-      original_question: params.originalQuestion,
-      resolved_entities: readRecordArray(params.result.resolved_entities),
-      lookback: isRecord(params.result.lookback)
-        ? params.result.lookback
-        : undefined,
-      discovery_policy: isRecord(params.result.discovery_policy)
-        ? params.result.discovery_policy
-        : undefined,
-      events,
-      cards: events,
-      discovery_summary: {
-        event_count: events.length,
-        source_count: countSourcePreviews(events),
-        has_official_candidates: events.some(
-          (event) => (event.official_source_urls ?? []).length > 0,
-        ),
-        has_major_news_candidates: events.some(
-          (event) => (event.major_news_urls ?? []).length > 0,
-        ),
-        direct_pipeline: true,
-      },
-      empty_state: emptyState,
-      raw_result: jsonClone(params.result) as Record<string, unknown>,
-    },
-  };
-}
-
 export function toPublicChatArtifact(row: {
   id: string;
   session_id: string;

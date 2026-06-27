@@ -272,7 +272,7 @@ describe("validateRequest", () => {
     expect(result.data.body.run_kind).toBe("news_discovery");
   });
 
-  it("accepts explicit run kind for selected news research", async () => {
+  it("normalizes legacy selected news research to company research", async () => {
     const result = await validateRequest(
       makeRequest({
         content: "선택 이벤트를 분석해줘",
@@ -286,7 +286,7 @@ describe("validateRequest", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.body.analysis_mode).toBe("news");
-    expect(result.data.body.run_kind).toBe("news_research");
+    expect(result.data.body.run_kind).toBe("company_research");
   });
 
   it("accepts explicit run kind for market move research", async () => {

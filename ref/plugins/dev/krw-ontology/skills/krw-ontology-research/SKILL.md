@@ -1037,10 +1037,14 @@ Rules:
 - write prompts the user can send immediately, not abstract analyst research topics
 - reduce the user's next-step burden and create a natural second question
 - do not ask for investment period, risk tolerance, target price, position size, or other personal inputs unless the user already supplied them
-- default pattern: condition that keeps/strengthens/weakens/breaks the current judgment; scenario split; opposite view or thesis-break risk
+- default pattern: one company/filing continuation prompt, one scenario-sensitivity prompt, and one opposite-view or thesis-break prompt
+- at least one prompt must naturally route to the scenario-sensitivity workflow unless the current answer itself is already a scenario-sensitivity answer
+- scenario prompts should use plain user wording such as "상승·하락·횡보 시나리오별로 나눠줘", "판단이 바뀌는 조건을 정리해줘", or "좋게 볼 때와 나쁘게 볼 때를 나눠줘"
 - for holder/stuck-position/sell-risk questions, use holder prompts such as "보유자가 계속 봐도 되는 조건만 정리해줘."
 - for new-buy questions, use new-buyer prompts such as "지금 신규 매수자가 확인해야 할 조건만 정리해줘."
 - for general research questions, use simple continuation prompts such as "이 이슈가 실적에 연결되는 경로만 더 단순하게 정리해줘."
+- keep all three prompts focused on the same company or event context unless the user explicitly asked for cross-company comparison
+- write follow-ups in plain Korean for general retail investors; avoid unexplained English finance acronyms and professional filing jargon
 - avoid follow-ups that require the user to know specific filings, quarters, accounting terms, valuation models, or ontology concepts
 - never introduce an explicit future period label unless that period was confirmed by the runtime Company filing anchor, retrieved evidence, or the user
 - for unpublished or unconfirmed evidence, say "다음 실적 발표", "향후 공시", or "다음 실적 업데이트" instead of guessing a CY quarter or year
@@ -1053,8 +1057,8 @@ Preferred normal follow-up prompt examples:
 
 ```text
 - 이 이슈가 실적에 연결되는 경로만 더 단순하게 정리해줘.
-- 좋게 볼 근거와 나쁘게 볼 근거를 나눠줘.
-- 가장 먼저 확인해야 할 회사 코멘트 3개만 뽑아줘.
+- 상승·하락·횡보 시나리오별로 투자 판단이 어떻게 달라지는지 나눠줘.
+- 이 판단을 반대로 봐야 하는 리스크 신호만 따로 정리해줘.
 ```
 
 Avoid:

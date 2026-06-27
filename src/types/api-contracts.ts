@@ -47,11 +47,10 @@ export type RunKind =
   | "company_research"
   | "idea_generation"
   | "news_discovery"
-  | "news_research"
   | "market_move_research"
   | "scenario_sensitivity";
 
-export type AgentRunExecutorType = "claude_agent" | "server_pipeline";
+export type AgentRunExecutorType = "claude_agent";
 
 /** SSE streaming event types */
 export type StreamingEventType =
@@ -157,6 +156,11 @@ export type StockNewsMCPToolName =
   | "build_news_timeline"
   | "audit_news_sources";
 
+/** Allowed Yahoo Finance MCP tool names */
+export type YahooFinanceMCPToolName =
+  | "get_yahoo_finance_news"
+  | "get_stock_info";
+
 /** Local presentation MCP tool names */
 export type ChartMCPToolName = "create_chart_v1";
 
@@ -164,6 +168,7 @@ export type ChartMCPToolName = "create_chart_v1";
 export type MCPToolName =
   | KRWOntologyMCPToolName
   | StockNewsMCPToolName
+  | YahooFinanceMCPToolName
   | ChartMCPToolName;
 
 /** Document types in the ontology */

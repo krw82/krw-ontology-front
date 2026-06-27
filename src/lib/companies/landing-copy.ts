@@ -5302,6 +5302,2152 @@ export const COMPANY_RESEARCH_PROFILES = {
     ],
     questionChains: {},
   },
+  A: {
+    ticker: "A",
+    companyName: "Agilent Technologies, Inc.",
+    companyNameKo: "애질런트 테크놀로지스",
+    sectorKo: "생명과학·진단 장비",
+    signature:
+      "분석장비와 소모성 시약, 진단 솔루션으로 반복 수요를 쌓는 생명과학·진단 장비 회사.",
+    description:
+      "Agilent Technologies는 실험실 분석장비, 소모성 시약, 진단 솔루션을 판매한다. 장비 교체 주기와 소모품 반복 매출이 실적을 좌우한다.",
+    researchFocus: [
+      "분석장비 교체 수요와 신규 설치",
+      "소모성 시약과 반복 매출 비중",
+      "제약·바이오 연구 예산과 중국 수요",
+      "진단 사업의 성장과 마진 기여",
+      "재고와 운전자본 변화",
+    ],
+    riskVariables: [
+      "바이오·연구 예산 둔화로 장비 수요가 약해지는 점",
+      "중국 경기와 규제 변화로 출하가 흔들리는 점",
+    ],
+    suggestedPrompts: [
+      "Agilent의 매출에서 분석장비와 소모성 시약이 각각 얼마나 기여하는지 정리해줘.",
+      "Agilent의 중국 매출과 제약·바이오 연구 예산이 실적에 어떻게 연결되는지 설명해줘.",
+      "Agilent의 진단 사업이 전체 마진에 주는 영향과 최근 흐름을 봐줘.",
+    ],
+    questionChains: {},
+  },
+  ADSK: {
+    ticker: "ADSK",
+    companyName: "Autodesk, Inc.",
+    companyNameKo: "오토데스크",
+    sectorKo: "산업용 설계 소프트웨어",
+    signature:
+      "건축·제조 설계 워크플로를 구독형으로 묶어 파는 산업용 소프트웨어 회사.",
+    description:
+      "Autodesk는 AutoCAD, Revit, Fusion 같은 설계·제작 소프트웨어를 구독형으로 제공한다. 건설과 제조 투자 사이클, 활성 좌석 수, 갱신률이 핵심이다.",
+    researchFocus: [
+      "연간 반복매출과 갱신률",
+      "건축·토목·제조 고객의 활성 좌석 수",
+      "AutoCAD, Revit, Fusion 사용 확대",
+      "신규 도입보다 갱신과 상위 플랜 전환",
+      "영업현금흐름과 조정 영업이익률",
+    ],
+    riskVariables: [
+      "건설·제조 투자 둔화",
+      "구독 갱신률 하락과 가격 저항",
+    ],
+    suggestedPrompts: [
+      "Autodesk의 ARR과 갱신률이 최근 어떻게 움직였는지 정리해줘.",
+      "Autodesk의 건축·제조 고객 수요가 AutoCAD, Revit, Fusion 매출에 어떻게 반영되는지 알려줘.",
+      "Autodesk의 마진 변화가 구독 전환과 좌석 수 확대 중 어디와 더 연결되는지 설명해줘.",
+    ],
+    questionChains: {},
+  },
+  AIG: {
+    ticker: "AIG",
+    companyName: "American International Group, Inc.",
+    companyNameKo: "아메리칸 인터내셔널 그룹",
+    sectorKo: "글로벌 손해보험",
+    signature:
+      "글로벌 손해보험과 특수보험에서 언더라이팅과 투자수익을 함께 보는 손해보험사.",
+    description:
+      "AIG는 글로벌 손해보험과 특수보험을 중심으로 보험료를 벌고, 자산 운용 수익을 더한다. 재해 손실, 준비금, 투자 수익률이 변동의 핵심이다.",
+    researchFocus: [
+      "글로벌 손해보험의 보험료 성장",
+      "합산비율과 손해율",
+      "대형 재해와 준비금 변동",
+      "투자 포트폴리오 수익률",
+      "자본배분과 주주환원",
+    ],
+    riskVariables: [
+      "대형 재해 손실과 준비금 추가 적립",
+      "금리·자산시장 변동에 따른 투자수익 흔들림",
+    ],
+    suggestedPrompts: [
+      "AIG의 글로벌 손해보험에서 보험료 성장과 합산비율이 어떻게 연결되는지 정리해줘.",
+      "AIG의 재해 손실과 준비금 변동이 최근 실적에 미친 영향을 알려줘.",
+      "AIG의 투자수익률과 언더라이팅 이익 중 어느 쪽이 실적을 더 좌우하는지 설명해줘.",
+    ],
+    questionChains: {},
+  },
+  AJG: {
+    ticker: "AJG",
+    companyName: "Arthur J. Gallagher & Co.",
+    companyNameKo: "아서 J. 갤러거 앤 컴퍼니",
+    sectorKo: "보험중개",
+    signature:
+      "보험중개와 복리후생 자문, M&A로 규모를 키우는 리스크 서비스 회사.",
+    description:
+      "Arthur J. Gallagher는 보험중개와 복리후생 자문, 리스크 서비스를 제공하고 인수합병으로 확장한다. 갱신률과 요율, 통합 효율이 실적을 좌우한다.",
+    researchFocus: [
+      "브로커리지의 유기적 성장률",
+      "보험과 복리후생 자문 수수료",
+      "갱신률과 요율 상승",
+      "인수합병으로 늘어나는 성장",
+      "조정 영업마진과 인력 유지",
+    ],
+    riskVariables: [
+      "M&A 둔화와 통합 비용 증가",
+      "보험 요율 상승세 둔화와 경쟁 심화",
+    ],
+    suggestedPrompts: [
+      "AJG의 유기적 성장률과 M&A 성장 기여도를 나눠서 설명해줘.",
+      "AJG의 보험중개 수수료가 갱신률과 요율 인상에 어떻게 반응하는지 알려줘.",
+      "AJG의 마진이 인수 통합 비용과 인력 비용에 의해 어떻게 흔들리는지 정리해줘.",
+    ],
+    questionChains: {},
+  },
+  ALL: {
+    ticker: "ALL",
+    companyName: "The Allstate Corporation",
+    companyNameKo: "올스테이트",
+    sectorKo: "개인손해보험",
+    signature:
+      "개인자동차와 주택보험에서 요율, 손해율, 재해 손실을 관리하는 개인손해보험사.",
+    description:
+      "Allstate는 개인자동차와 주택보험이 중심이다. 요율 인상, 손해 빈도·심도, 재해 손실, 재보험 구조가 수익성을 좌우한다.",
+    researchFocus: [
+      "개인자동차 보험의 요율 조정",
+      "주택보험과 재해 손실",
+      "보험계약 유지율과 신규 가입",
+      "손해율과 비용률",
+      "투자수익과 재보험 구조",
+    ],
+    riskVariables: [
+      "자동차 사고 빈도·심도 악화",
+      "허리케인·폭풍 같은 재해 손실과 규제 지연",
+    ],
+    suggestedPrompts: [
+      "Allstate의 자동차보험 손해율이 최근 왜 변했는지 요율과 손해 심도 기준으로 설명해줘.",
+      "Allstate의 주택보험이 재해 손실에 얼마나 민감한지 정리해줘.",
+      "Allstate의 투자수익과 언더라이팅 이익 중 어느 쪽이 전체 실적을 더 좌우하는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  AME: {
+    ticker: "AME",
+    companyName: "AMETEK, Inc.",
+    companyNameKo: "아메텍",
+    sectorKo: "산업재",
+    signature:
+      "계측기와 정밀 전기·전자 부품을 함께 키우는 특수 산업 장비 회사.",
+    description:
+      "산업용 계측, 정밀 구동부품, 전기·전자 장비를 중심으로 고부가 제품을 공급한다. 항공우주, 방산, 공정산업, 전력 자동화 수요가 실적을 좌우한다.",
+    researchFocus: [
+      "전자계측과 전기기계 부문의 성장률 차이",
+      "항공우주·방산·공정산업 주문 흐름",
+      "가격 인상과 원가 전가로 지키는 마진",
+      "인수합병 편입 자산의 실적 기여",
+      "백로그와 주문 흐름이 향후 매출로 이어지는 속도",
+    ],
+    riskVariables: [
+      "산업 설비투자 둔화",
+      "인수합병 통합 지연이나 평가 부담",
+      "항공우주와 일반 산업 수요의 동시 둔화",
+    ],
+    suggestedPrompts: [
+      "AMETEK의 전자계측과 전기기계 사업 중 어떤 쪽이 더 성장의 중심인지 나눠서 설명해줘.",
+      "주문과 백로그가 실적에 반영되는 경로를 쉽게 정리해줘.",
+      "인수합병이 마진과 성장에 어떤 도움을 주는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  AMP: {
+    ticker: "AMP",
+    companyName: "Ameriprise Financial, Inc.",
+    companyNameKo: "아메리프라이즈 파이낸셜",
+    sectorKo: "금융",
+    signature:
+      "자문 자산과 운용자산을 함께 굴리는 자산관리·운용 회사.",
+    description:
+      "개인자산관리 네트워크와 Columbia Threadneedle 운용 사업을 바탕으로 수수료 수익을 만든다. 시장 변동이 AUM과 순유입에 바로 반영되는 구조다.",
+    researchFocus: [
+      "자문 자산과 운용자산의 규모 변화",
+      "순유입과 고객 유지율",
+      "시장 상승·하락이 수수료 수익에 미치는 영향",
+      "자문가 생산성과 계정당 수익",
+      "배당과 자사주 매입을 포함한 자본환원",
+    ],
+    riskVariables: [
+      "증시 하락으로 인한 AUM 축소",
+      "자문가 이탈이나 순유입 둔화",
+      "수수료 압박과 상품 믹스 변화",
+    ],
+    suggestedPrompts: [
+      "아메리프라이즈의 AUM 변동이 수수료 수익에 어떻게 연결되는지 설명해줘.",
+      "자문 자산 순유입이 왜 중요한지 실적 관점에서 정리해줘.",
+      "시장 급락이 AMP의 이익과 자본환원에 어떤 영향을 주는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  APP: {
+    ticker: "APP",
+    companyName: "AppLovin Corporation",
+    companyNameKo: "앱러빈",
+    sectorKo: "커뮤니케이션 서비스",
+    signature:
+      "모바일 앱 광고 수익화와 게임 퍼블리싱을 묶은 AI 광고 플랫폼.",
+    description:
+      "광고주 수요를 앱 생태계와 연결해 수익을 만든다. MAX와 AppDiscovery를 통해 광고 단가와 집행 효율을 높이고, 게임 퍼블리싱은 보조 현금창출원으로 쓴다.",
+    researchFocus: [
+      "MAX와 AppDiscovery의 광고 수요와 단가",
+      "광고 경매 효율과 AI 추천 성능",
+      "자체 게임 퍼블리싱 매출의 변동성",
+      "모바일 광고 예산과 광고주 수익률",
+      "운영 레버리지로 이어지는 마진 확대",
+    ],
+    riskVariables: [
+      "모바일 광고 경기 둔화",
+      "메타·구글 등 대형 플랫폼과의 경쟁",
+      "개인정보 추적 제한과 게임 퍼블리싱 변동성",
+    ],
+    suggestedPrompts: [
+      "AppLovin의 MAX와 AppDiscovery가 각각 어떤 역할을 하는지 쉽게 설명해줘.",
+      "게임 퍼블리싱이 APP의 실적에서 얼마나 변동적인지 정리해줘.",
+      "모바일 광고 둔화가 앱러빈의 마진에 어떻게 번지는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  AZO: {
+    ticker: "AZO",
+    companyName: "AutoZone, Inc.",
+    companyNameKo: "오토존",
+    sectorKo: "경기소비재",
+    signature:
+      "DIY와 상업용 자동차 부품 수요를 재고 회전으로 먹고사는 애프터마켓 유통사.",
+    description:
+      "차량 정비와 교체 수요에 맞춰 부품, 배터리, 소모품을 판매한다. 매장 확대와 상업용 배송이 성장 축이고, 재고 운영과 매장 생산성이 이익을 좌우한다.",
+    researchFocus: [
+      "DIY와 상업용 매출 비중",
+      "동일매장매출과 거래건수",
+      "차량 노후화가 부품 수요에 주는 영향",
+      "재고 회전과 부품 가용성",
+      "매장 확장과 상업용 배송 네트워크",
+    ],
+    riskVariables: [
+      "소비자 수리 수요 둔화",
+      "경쟁 심화와 가격 할인 압력",
+      "인건비·물류비·재고 손실 증가",
+    ],
+    suggestedPrompts: [
+      "오토존의 DIY와 상업용 판매가 실적에서 어떻게 다르게 움직이는지 설명해줘.",
+      "차량 노후화가 AZO 수요를 왜 받쳐주는지 정리해줘.",
+      "재고 회전과 매장 생산성이 이익률에 어떻게 연결되는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  BDX: {
+    ticker: "BDX",
+    companyName: "Becton, Dickinson and Company",
+    companyNameKo: "벡톤 디킨슨",
+    sectorKo: "헬스케어",
+    signature:
+      "주사기, 카테터, 진단 장비를 묶어 병원 소모품과 검사 수요를 받는 헬스케어 회사.",
+    description:
+      "병원용 소모품과 진단 장비, 인터벤셔널 제품을 함께 판다. 반복 구매가 많은 품목이 기반이라 경기민감도는 낮지만, 병원 예산과 품질 이슈에 민감하다.",
+    researchFocus: [
+      "병원 소모품과 진단 장비의 매출 비중",
+      "검사량과 장비 설치 수요",
+      "주사기·카테터·혈액채취 제품의 반복 구매",
+      "품질 개선과 공급 안정화",
+      "병원 예산과 절차량 변화가 수요에 미치는 영향",
+    ],
+    riskVariables: [
+      "병원 예산 압박으로 인한 장비 교체 지연",
+      "품질 문제나 리콜",
+      "규제와 해외 수요, 환율 변동",
+    ],
+    suggestedPrompts: [
+      "벡톤 디킨슨의 소모품과 진단 장비 중 어떤 쪽이 더 안정적인지 비교해줘.",
+      "병원 절차량 변화가 BDX 실적에 어떤 경로로 반영되는지 설명해줘.",
+      "품질 이슈나 리콜이 마진에 미치는 영향을 쉽게 정리해줘.",
+    ],
+    questionChains: {},
+  },
+  BNY: {
+    ticker: "BNY",
+    companyName: "The Bank of New York Mellon Corporation",
+    companyNameKo: "뱅크오브뉴욕멜론",
+    sectorKo: "금융 서비스",
+    signature:
+      "기관 자산을 보관·결제하는 글로벌 금융 인프라",
+    description:
+      "BNY는 기관투자자의 자산 보관, 결제, 펀드서비스, 담보관리, 트레저리와 자산운용을 제공한다. 수탁 자산과 자금 흐름, 금리, 거래량이 실적의 핵심이다.",
+    researchFocus: [
+      "수탁자산(AUC/A)과 운용자산(AUM)이 수수료 수익에 어떻게 연결되는지",
+      "순이자이익이 금리와 예금 믹스 변화에 얼마나 민감한지",
+      "펀드서비스와 결제·클리어링·외환 수익의 성장 동력",
+      "기관 고객 자산 흐름과 시장 변동성이 관리 자산에 미치는 영향",
+      "비용 효율과 자본 규제가 수익성에 주는 영향",
+    ],
+    riskVariables: [
+      "금리 하락에 따른 순이자이익 압박",
+      "고객 자산 유출과 거래량 둔화로 인한 수수료 기반 약화",
+    ],
+    suggestedPrompts: [
+      "BNY의 수탁자산과 AUM이 각각 어떤 수익 항목으로 연결되는지 설명해줘",
+      "금리 변화가 BNY의 순이자이익과 수수료 수익에 미치는 영향을 나눠서 봐줘",
+      "기관 고객 자산 흐름과 시장 변동성이 BNY 실적에 주는 신호를 정리해줘",
+    ],
+    questionChains: {},
+  },
+  CAH: {
+    ticker: "CAH",
+    companyName: "Cardinal Health, Inc.",
+    companyNameKo: "카디널 헬스",
+    sectorKo: "헬스케어",
+    signature:
+      "의약품 유통망과 의료소모품을 돌리는 헬스케어 공급망",
+    description:
+      "Cardinal Health는 병원, 약국, 수술센터에 의약품과 의료·수술용 제품을 유통하고 일부 제품은 직접 만든다. 유통 스프레드, 계약 조건, 처방 물량이 마진을 좌우한다.",
+    researchFocus: [
+      "의약품 유통과 의료제품 제조 비중이 실적에서 어떻게 나뉘는지",
+      "병원·약국·전문약국 고객 믹스가 매출과 마진에 주는 차이",
+      "제네릭 믹스와 공급업체 계약 조건이 스프레드에 미치는 영향",
+      "의료·수술용 소모품과 자체 브랜드 제품의 역할",
+      "규제, 소송, 공급망 차질이 현금흐름에 주는 영향",
+    ],
+    riskVariables: [
+      "유통 마진 압박과 계약 재협상",
+      "규제·소송 리스크와 공급 차질",
+    ],
+    suggestedPrompts: [
+      "Cardinal Health의 의약품 유통과 의료제품 제조 비중을 나눠서 설명해줘",
+      "병원과 약국 고객 믹스가 실적과 마진에 어떤 차이를 만드는지 알려줘",
+      "제네릭 스프레드와 공급업체 계약이 왜 중요한지 정리해줘",
+    ],
+    questionChains: {},
+  },
+  CARR: {
+    ticker: "CARR",
+    companyName: "Carrier Global Corporation",
+    companyNameKo: "캐리어 글로벌",
+    sectorKo: "산업재",
+    signature:
+      "건물의 온도와 안전을 관리하는 기후 솔루션",
+    description:
+      "Carrier는 주거용·상업용 HVAC, 냉동, 화재·보안, 건물자동화와 애프터마켓 서비스를 제공한다. 교체 수요, 설치 프로젝트, 서비스 매출이 성장 레버다.",
+    researchFocus: [
+      "주거용 교체 수요와 상업용 프로젝트 수요의 차이",
+      "HVAC, 냉동, 보안, 애프터마켓 서비스의 매출 믹스",
+      "가격 전가와 원가 구조가 마진에 미치는 영향",
+      "에너지 효율 규제와 히트펌프 수요가 시장을 어떻게 바꾸는지",
+      "인수·포트폴리오 재편이 성장과 마진에 주는 영향",
+    ],
+    riskVariables: [
+      "건설 경기 둔화와 교체 수요 약화",
+      "원자재·물류·환율 변동으로 인한 마진 압박",
+    ],
+    suggestedPrompts: [
+      "Carrier 매출에서 주거용 HVAC와 상업용 HVAC, 냉동, 서비스 비중을 나눠서 봐줘",
+      "교체 수요와 신규 설치 수요가 Carrier 실적에 어떤 순서로 영향을 주는지 설명해줘",
+      "히트펌프와 에너지 효율 규제가 Carrier 성장에 어떤 의미인지 정리해줘",
+    ],
+    questionChains: {},
+  },
+  CBRE: {
+    ticker: "CBRE",
+    companyName: "CBRE Group, Inc.",
+    companyNameKo: "CBRE 그룹",
+    sectorKo: "부동산 서비스",
+    signature:
+      "상업용 부동산 거래와 관리를 연결하는 플랫폼",
+    description:
+      "CBRE는 임대, 매매, 평가, 자산관리, 시설관리, 투자운용을 제공하는 글로벌 상업용 부동산 플랫폼이다. 거래 시장과 반복형 관리 수수료, 투자운용 AUM이 함께 움직인다.",
+    researchFocus: [
+      "거래형 수수료와 반복형 관리 수수료의 비중",
+      "오피스·물류·리테일 등 자산군별 거래 사이클",
+      "아웃소싱과 시설관리 같은 반복수익 사업의 성장성",
+      "Investment Management AUM과 신규 자금 유입",
+      "금리와 밸류에이션 변화가 개발·자문에 미치는 영향",
+    ],
+    riskVariables: [
+      "상업용 부동산 거래 둔화와 오피스 시장 약세",
+      "금리 상승이나 밸류에이션 하락에 따른 AUM 및 수수료 압박",
+    ],
+    suggestedPrompts: [
+      "CBRE 수익을 거래형 수수료와 반복형 관리 수수료로 나눠서 설명해줘",
+      "오피스 시장 둔화가 CBRE의 어떤 사업부터 먼저 흔드는지 알려줘",
+      "Investment Management의 AUM과 자금 유입이 왜 중요한지 정리해줘",
+    ],
+    questionChains: {},
+  },
+  CCI: {
+    ticker: "CCI",
+    companyName: "Crown Castle Inc.",
+    companyNameKo: "크라운 캐슬",
+    sectorKo: "통신 인프라",
+    signature:
+      "미국 통신 타워를 임대하는 순수 플레이 인프라 리츠",
+    description:
+      "Crown Castle은 미국 통신사에 타워를 임대해 장기 임대료를 받는 REIT다. Fiber와 Small Cell을 매각하며 타워 중심의 순수 플레이 인프라로 재편됐다.",
+    researchFocus: [
+      "타워 콜로케이션과 임대 갱신이 매출에 미치는 영향",
+      "통신사 capex와 5G 투자 속도가 신규 장착 수요를 얼마나 만드는지",
+      "토지 소유 확대와 타워 운영 효율이 마진에 주는 효과",
+      "Fiber·Small Cell 매각 이후의 자본배분과 부채 축소",
+      "장기 계약 구조와 고객 집중도",
+    ],
+    riskVariables: [
+      "대형 통신사 capex 둔화나 해지로 인한 성장 둔화",
+      "레버리지와 금리 상승에 따른 현금흐름 압박",
+    ],
+    suggestedPrompts: [
+      "Crown Castle의 타워 임대 매출이 어떤 KPI에 가장 민감한지 설명해줘",
+      "통신사 신규 colocation과 계약 갱신이 현금흐름에 어떻게 반영되는지 봐줘",
+      "Fiber와 Small Cell 매각 이후 CCI의 자본배분이 어떻게 달라졌는지 정리해줘",
+    ],
+    questionChains: {},
+  },
+  CHTR: {
+    ticker: "CHTR",
+    companyName: "Charter Communications, Inc.",
+    companyNameKo: "차터 커뮤니케이션스",
+    sectorKo: "통신",
+    signature:
+      "인터넷, 비디오, 모바일을 묶어 가정과 중소상공인에 파는 케이블 통신사.",
+    description:
+      "Charter는 Spectrum 브랜드로 광대역 인터넷, TV, 모바일 서비스를 제공한다. 가입자 순증, 요금 인상, 번들 유지율, 네트워크 투자와 경쟁 강도가 실적을 좌우한다.",
+    researchFocus: [
+      "광대역 가입자 순증과 해지율",
+      "인터넷 ARPU와 가격 인상 효과",
+      "모바일 라인 성장과 번들 비중",
+      "비디오 가입자 감소가 전체 매출에 미치는 영향",
+      "네트워크 투자와 현금흐름의 균형",
+    ],
+    riskVariables: [
+      "섬유망과 고정무선대체(FWA) 경쟁 심화",
+      "프로모션 경쟁과 해지율 상승",
+      "높은 설비투자와 부채 부담",
+    ],
+    suggestedPrompts: [
+      "Charter의 인터넷 가입자 순증과 요금 인상이 실적에 어떻게 연결되는지 설명해줘.",
+      "Spectrum 모바일 라인이 Charter의 성장에 어떤 역할을 하는지 정리해줘.",
+      "비디오 가입자 감소와 FWA 경쟁이 Charter의 매출과 현금흐름에 주는 영향을 알려줘.",
+    ],
+    questionChains: {},
+  },
+  CMG: {
+    ticker: "CMG",
+    companyName: "Chipotle Mexican Grill, Inc.",
+    companyNameKo: "치폴레",
+    sectorKo: "레스토랑",
+    signature:
+      "멕시칸 패스트 캐주얼에서 가격과 수요를 동시에 시험하는 레스토랑 브랜드.",
+    description:
+      "Chipotle는 매장 내 식사와 디지털 주문을 통해 멕시칸 패스트 캐주얼 식사를 판다. 동일매장매출, 메뉴 가격, 노동 생산성, 신규 점포 개설 속도가 핵심이다.",
+    researchFocus: [
+      "동일매장매출과 거래량",
+      "메뉴 가격 인상과 수요 탄력성",
+      "노동 생산성과 매장 throughput",
+      "디지털 주문과 배달 믹스",
+      "신규 점포 개설과 장기 성장 여력",
+    ],
+    riskVariables: [
+      "소비 둔화로 인한 거래량 감소",
+      "식자재·노동비 상승과 마진 압박",
+      "운영 차질이나 품질 이슈",
+    ],
+    suggestedPrompts: [
+      "Chipotle의 동일매장매출이 가격과 거래량 중 어디에서 더 많이 움직이는지 설명해줘.",
+      "치폴레의 매장 throughput이 왜 마진에 중요한지 쉽게 정리해줘.",
+      "디지털 주문과 신규 점포 개설이 CMG의 장기 성장에 어떻게 기여하는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  COR: {
+    ticker: "COR",
+    companyName: "Cencora, Inc.",
+    companyNameKo: "센코라",
+    sectorKo: "헬스케어",
+    signature:
+      "의약품 유통과 특수약 솔루션을 묶어 파는 헬스케어 공급망 회사.",
+    description:
+      "Cencora는 병원, 약국, 특수약 채널에 의약품을 유통하고 고부가 서비스도 제공한다. 낮은 마진 구조지만 거래량과 특수약 믹스가 이익의 질을 좌우한다.",
+    researchFocus: [
+      "의약품 유통량과 특수약 비중",
+      "약국, 병원, 전문채널 고객 믹스",
+      "제조사 서비스와 솔루션 사업의 성장",
+      "유통 마진과 운영 효율",
+      "자본배분과 인수합병의 역할",
+    ],
+    riskVariables: [
+      "유통 스프레드 압박과 고객/공급사 협상력 변화",
+      "규제·소송·공급망 차질",
+      "특수약 성장 둔화",
+    ],
+    suggestedPrompts: [
+      "Cencora의 의약품 유통과 특수약 서비스 중 어떤 쪽이 더 질 좋은 성장을 만드는지 설명해줘.",
+      "센코라의 고객 믹스가 마진과 현금흐름에 주는 차이를 정리해줘.",
+      "유통 스프레드가 왜 중요한지, 그리고 어디서 압박을 받을 수 있는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  CTSH: {
+    ticker: "CTSH",
+    companyName: "Cognizant Technology Solutions Corporation",
+    companyNameKo: "코그니전트",
+    sectorKo: "IT 서비스",
+    signature:
+      "엔터프라이즈 애플리케이션과 디지털 운영을 맡는 글로벌 IT 서비스 회사.",
+    description:
+      "Cognizant는 애플리케이션 개발, 클라우드 전환, 비즈니스 프로세스 아웃소싱을 기업 고객에게 제공한다. 금융, 헬스케어, 커뮤니케이션 고객의 IT 지출과 계약 갱신이 성장의 핵심이다.",
+    researchFocus: [
+      "북미 엔터프라이즈 IT 지출과 계약 갱신률",
+      "애플리케이션·클라우드·BPO 사업의 성장 차이",
+      "오프쇼어 배송 효율과 마진 개선",
+      "대형 딜 수주와 파이프라인",
+      "AI 도입이 생산성과 수익성에 주는 영향",
+    ],
+    riskVariables: [
+      "고객 IT 예산 축소와 프로젝트 지연",
+      "가격 경쟁과 인력 이탈",
+      "클라우드·AI 전환이 기대만큼 빠르지 않은 점",
+    ],
+    suggestedPrompts: [
+      "Cognizant의 애플리케이션, 클라우드, BPO 사업이 각각 어떤 성격인지 설명해줘.",
+      "IT 지출 둔화가 CTSH의 매출과 마진에 어떤 순서로 번지는지 정리해줘.",
+      "AI가 코그니전트의 생산성과 계약 구조를 어떻게 바꾸는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  CTVA: {
+    ticker: "CTVA",
+    companyName: "Corteva, Inc.",
+    companyNameKo: "코르테바",
+    sectorKo: "농업",
+    signature:
+      "종자와 작물보호제를 함께 파는 글로벌 농업 투입재 회사.",
+    description:
+      "Corteva는 종자, 작물보호제, 생명과학 기반 농업 솔루션을 판매한다. 파종 면적, 작물 가격, 날씨, 지역별 재고 조정이 실적을 크게 흔든다.",
+    researchFocus: [
+      "종자와 작물보호제의 매출 비중",
+      "파종 면적과 작물 가격이 수요에 미치는 영향",
+      "브라질·라틴아메리카와 북미 농가 수요",
+      "재고 조정과 유통 채널 상황",
+      "신제품과 특허/기술 경쟁력",
+    ],
+    riskVariables: [
+      "날씨와 병충해로 인한 수요 변동",
+      "작물 가격 하락과 농가 구매력 약화",
+      "지역별 재고 조정과 경쟁 심화",
+    ],
+    suggestedPrompts: [
+      "Corteva의 종자와 작물보호제 중 어떤 쪽이 더 실적 변동을 크게 만드는지 설명해줘.",
+      "작물 가격과 파종 면적이 CTVA 수요에 어떻게 연결되는지 정리해줘.",
+      "브라질과 북미 농가 수요 차이가 코르테바 실적에 어떤 의미인지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  DAL: {
+    ticker: "DAL",
+    companyName: "Delta Air Lines, Inc.",
+    companyNameKo: "델타항공",
+    sectorKo: "항공 운송",
+    signature:
+      "프리미엄 좌석과 로열티 수익으로 수익성을 지키는 미국 대형 항공사.",
+    description:
+      "Delta Air Lines는 국내선·국제선 여객 운송에 더해 프리미엄 좌석, 화물, 정비, 로열티 제휴로 돈을 번다. 탑승률, 운임, 연료비, 운영 안정성이 실적을 좌우한다.",
+    researchFocus: [
+      "프리미엄 좌석과 일반석의 믹스 변화",
+      "기업 여행과 국제선 수요 회복",
+      "좌석당 수익(PRASM)과 탑승률",
+      "연료비와 정비비 같은 비용 부담",
+      "SkyMiles와 제휴 수익의 기여",
+    ],
+    riskVariables: [
+      "경기 둔화로 인한 여행 수요 감소",
+      "유가 상승과 운항 차질",
+      "노사 비용과 정시 운항 리스크",
+    ],
+    suggestedPrompts: [
+      "Delta의 프리미엄 수요가 수익성에 어떤 차이를 만드는지 설명해줘.",
+      "연료비와 운임이 DAL 마진에 어떻게 같이 움직이는지 정리해줘.",
+      "기업 여행 회복이 Delta 실적에 왜 중요한지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  DD: {
+    ticker: "DD",
+    companyName: "DuPont de Nemours, Inc.",
+    companyNameKo: "듀폰",
+    sectorKo: "특수화학",
+    signature:
+      "반도체 소재와 수처리·보호소재를 함께 파는 특수화학 회사.",
+    description:
+      "DuPont는 전자재료, 수처리 멤브레인, 산업용 보호소재를 공급한다. 반도체 업황, 산업 수요, 포트폴리오 재편이 실적의 핵심 변수다.",
+    researchFocus: [
+      "반도체·전자재료 출하와 재고 사이클",
+      "수처리 멤브레인과 산업용 필터 수요",
+      "고마진 특수소재 믹스와 가격 전가력",
+      "포트폴리오 분할·매각이 이익 구조에 미치는 영향",
+      "원가와 에너지 가격이 마진에 주는 영향",
+    ],
+    riskVariables: [
+      "반도체 업황 둔화",
+      "산업 수요 약세와 재고 조정",
+      "포트폴리오 재편 지연과 비용 부담",
+    ],
+    suggestedPrompts: [
+      "DuPont의 전자재료와 수처리 사업이 각각 어떤 수요를 타는지 설명해줘.",
+      "DD의 반도체 업황 민감도를 실적 관점에서 정리해줘.",
+      "포트폴리오 재편이 마진과 현금흐름에 왜 중요한지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  DHI: {
+    ticker: "DHI",
+    companyName: "D.R. Horton, Inc.",
+    companyNameKo: "D.R. 호턴",
+    sectorKo: "주택건설",
+    signature:
+      "가격대별 주택을 대량으로 공급하는 미국 대형 주택건설사.",
+    description:
+      "D.R. Horton는 단독주택과 타운홈 중심으로 매출을 낸다. 신규 주문, 인도 물량, 평균판매가격, 인센티브, 토지 보유와 모기지 금리가 핵심이다.",
+    researchFocus: [
+      "신규 주문과 취소율",
+      "인도 물량과 평균판매가격",
+      "인센티브와 모기지 보조가 마진에 미치는 영향",
+      "토지·부지 확보와 착공 속도",
+      "임대사업과 금융서비스의 보조 기여",
+    ],
+    riskVariables: [
+      "모기지 금리 상승과 주택 구매 부담 악화",
+      "주택 재고 증가로 인한 가격 경쟁",
+      "토지비와 건설원가 상승",
+    ],
+    suggestedPrompts: [
+      "D.R. Horton의 주문과 인도 흐름이 어떻게 실적으로 이어지는지 설명해줘.",
+      "모기지 금리 변화가 DHI의 수요와 마진에 미치는 영향을 정리해줘.",
+      "인센티브 확대가 이익률에 어떤 부담을 주는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  DVN: {
+    ticker: "DVN",
+    companyName: "Devon Energy Corporation",
+    companyNameKo: "데번 에너지",
+    sectorKo: "석유·가스 E&P",
+    signature:
+      "델라웨어 분지 원유 비중과 변동 배당이 핵심인 미국 셰일 E&P.",
+    description:
+      "Devon Energy는 미국 육상 원유·가스 생산에 집중한다. 델라웨어 분지 중심의 생산량, 실현 유가, 헤지, 현금흐름, 변동 배당이 실적을 결정한다.",
+    researchFocus: [
+      "원유와 천연가스 생산량",
+      "실현 유가와 헤지 비중",
+      "델라웨어 분지 중심의 자본투입",
+      "잉여현금흐름과 변동 배당",
+      "시추·완결 속도와 단위당 원가",
+    ],
+    riskVariables: [
+      "유가·가스 가격 하락",
+      "서비스 비용 상승과 생산 감소",
+      "헤지 손실과 자본지출 과다",
+    ],
+    suggestedPrompts: [
+      "Devon의 변동 배당이 유가에 어떻게 연결되는지 설명해줘.",
+      "델라웨어 분지 생산이 DVN 실적에서 왜 중요한지 정리해줘.",
+      "유가가 내려갈 때 DVN의 현금흐름이 어떻게 흔들리는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  EA: {
+    ticker: "EA",
+    companyName: "Electronic Arts Inc.",
+    companyNameKo: "일렉트로닉 아츠",
+    sectorKo: "게임 퍼블리싱",
+    signature:
+      "스포츠 프랜차이즈와 라이브 서비스로 현금흐름을 쌓는 게임 퍼블리셔.",
+    description:
+      "EA는 콘솔·PC·모바일 게임과 라이브 서비스를 통해 수익을 낸다. EA SPORTS FC, Madden, The Sims 같은 반복 매출형 프랜차이즈와 신작 출시 주기가 중요하다.",
+    researchFocus: [
+      "라이브 서비스 예약 매출과 참여도",
+      "EA SPORTS FC·Madden 같은 스포츠 프랜차이즈 성과",
+      "신작 출시 일정과 지연 리스크",
+      "콘솔·PC·모바일 매출 믹스",
+      "마진과 주식보상비용(SBC)",
+    ],
+    riskVariables: [
+      "대형 신작 지연이나 흥행 실패",
+      "스포츠 프랜차이즈의 연간 성과 변동",
+      "라이브 서비스 지출 둔화와 플랫폼 경쟁",
+    ],
+    suggestedPrompts: [
+      "EA의 스포츠 프랜차이즈와 라이브 서비스가 각각 실적에 어떤 역할을 하는지 설명해줘.",
+      "신작 출시 일정이 EA 매출과 마진에 미치는 영향을 정리해줘.",
+      "라이브 서비스 지출 둔화가 EA의 성장에 어떤 신호인지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  FANG: {
+    ticker: "FANG",
+    companyName: "Diamondback Energy, Inc.",
+    companyNameKo: "다이아몬드백 에너지",
+    sectorKo: "석유·가스 탐사·생산",
+    signature:
+      "퍼미안 분지 셰일 유전과 자본 환원을 동시에 밀어붙이는 독립 셰일 생산사.",
+    description:
+      "Diamondback Energy는 퍼미안 분지의 원유·가스 자산을 중심으로 생산과 개발을 운영한다. 유가, 생산 효율, 인수 통합, 현금 환원이 실적을 좌우한다.",
+    researchFocus: [
+      "퍼미안 분지 생산량과 유정 생산성",
+      "실현 유가와 가스 가격",
+      "시추·완결 비용과 자본 효율",
+      "엔데버 인수 이후 통합 효과",
+      "잉여현금흐름과 배당·자사주 매입",
+    ],
+    riskVariables: [
+      "유가 급락",
+      "시추 서비스 비용 상승과 생산 둔화",
+      "인수 통합 지연과 규제 부담",
+    ],
+    suggestedPrompts: [
+      "Diamondback의 퍼미안 생산량과 실현유가가 이익에 어떻게 연결되는지 설명해줘.",
+      "엔데버 인수 이후 FANG의 통합 효과와 자본 효율을 정리해줘.",
+      "유가 변동이 다이아몬드백의 배당과 자사주 매입 여력에 어떤 영향을 주는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  FAST: {
+    ticker: "FAST",
+    companyName: "Fastenal Company",
+    companyNameKo: "패스널",
+    sectorKo: "산업용 유통",
+    signature:
+      "패스너와 유지보수 소모품을 현장 재고로 붙여 파는 산업용 유통사.",
+    description:
+      "Fastenal은 패스너와 유지보수 소모품을 고객 현장과 지역 물류망에 붙여 반복 주문을 만든다. 온사이트 계정, 제조 수요, 재고 운영이 성장과 마진을 좌우한다.",
+    researchFocus: [
+      "온사이트 계정 확대와 고객당 매출",
+      "패스너와 비패스너 믹스",
+      "제조·건설 경기와 지역 수요",
+      "디지털 주문과 공급망 효율",
+      "매장·물류 생산성과 영업마진",
+    ],
+    riskVariables: [
+      "제조 둔화",
+      "가격 정상화로 인한 성장 둔화",
+      "대형 유통 경쟁 심화",
+    ],
+    suggestedPrompts: [
+      "Fastenal의 온사이트 계정이 왜 중요한지 실적 관점에서 설명해줘.",
+      "패스너 매출과 비패스너 매출이 FAST 성장에서 어떻게 다르게 움직이는지 정리해줘.",
+      "제조 경기 둔화가 패스널의 마진에 어떻게 번지는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  FITB: {
+    ticker: "FITB",
+    companyName: "Fifth Third Bancorp",
+    companyNameKo: "피프스 서드",
+    sectorKo: "지역은행",
+    signature:
+      "중서부·남동부 기반 예금과 상업대출로 순이자이익을 버는 지역은행.",
+    description:
+      "Fifth Third는 상업대출, 소비자금융, 자산관리, 결제 수수료를 함께 제공한다. 예금 믹스, 대출 성장, 신용비용, 금리 방향이 실적을 좌우한다.",
+    researchFocus: [
+      "순이자이익과 예금 조달비용",
+      "상업대출과 소비자 대출 성장",
+      "신용비용과 연체 추세",
+      "결제·자산관리 수수료 기여",
+      "중서부·남동부 시장 점유율",
+    ],
+    riskVariables: [
+      "금리 하락에 따른 순이자마진 압박",
+      "예금 경쟁 심화",
+      "상업용 부동산과 경기 둔화에 따른 신용 악화",
+    ],
+    suggestedPrompts: [
+      "Fifth Third의 예금 믹스와 순이자마진이 어떻게 연결되는지 설명해줘.",
+      "상업대출과 소비자 대출 중 어떤 쪽이 FITB 성장의 중심인지 정리해줘.",
+      "금리 인하가 피프스 서드의 실적에 어떤 경로로 영향을 주는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  GRMN: {
+    ticker: "GRMN",
+    companyName: "Garmin Ltd.",
+    companyNameKo: "가민",
+    sectorKo: "웨어러블·항법 전자",
+    signature:
+      "스포츠 시계, 항법, 해양, 항공 전자기기를 직접 설계·판매하는 프리미엄 하드웨어 회사.",
+    description:
+      "Garmin은 스포츠 시계와 피트니스, 해양, 항공 장비, 차량 내비게이션을 판다. 신제품 주기, 채널 재고, 부문 믹스, 환율이 실적을 좌우한다.",
+    researchFocus: [
+      "피트니스·아웃도어·해양·항공 부문 믹스",
+      "신제품 출시와 교체 수요",
+      "채널 재고와 소매 판매 속도",
+      "매출총이익률과 제품 믹스",
+      "환율과 지역별 수요",
+    ],
+    riskVariables: [
+      "소비재 교체주기 둔화",
+      "채널 재고 조정",
+      "환율 변동과 제품 실패",
+    ],
+    suggestedPrompts: [
+      "Garmin 매출을 피트니스, 해양, 항공, 아웃도어로 나눠서 설명해줘.",
+      "가민의 마진이 제품 믹스와 환율에 얼마나 민감한지 정리해줘.",
+      "신제품 교체주기가 GRMN 실적을 어떻게 끌어올리는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  HOOD: {
+    ticker: "HOOD",
+    companyName: "Robinhood Markets, Inc.",
+    companyNameKo: "로빈후드",
+    sectorKo: "온라인 브로커리지",
+    signature:
+      "개인투자자 거래와 예치금, 옵션, 암호화폐, 구독 수익을 묶은 온라인 투자 플랫폼.",
+    description:
+      "Robinhood는 주식·옵션·암호화폐 거래와 현금관리, 마진, Gold 구독으로 돈을 번다. 활성 고객, 순예치금, 거래량, 금리 민감도가 핵심이다.",
+    researchFocus: [
+      "활성 고객과 순예치금",
+      "옵션·암호화폐·주식 거래 수익 비중",
+      "Gold 구독과 마진 대출",
+      "순이자수익과 금리 민감도",
+      "신규 기능 확장과 사용자 참여도",
+    ],
+    riskVariables: [
+      "거래대금 변동성",
+      "암호화폐 거래 둔화",
+      "규제 강화와 수수료 압박",
+    ],
+    suggestedPrompts: [
+      "Robinhood의 거래수익과 순이자수익이 각각 어떻게 벌리는 돈인지 설명해줘.",
+      "HOOD에서 활성 고객과 순예치금이 왜 중요한지 정리해줘.",
+      "로빈후드의 수익이 시장 변동성에 얼마나 의존하는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  EBAY: {
+    ticker: "EBAY",
+    companyName: "eBay Inc.",
+    companyNameKo: "이베이",
+    sectorKo: "이커머스 플랫폼",
+    signature:
+      "중고·희귀·부품 카테고리를 연결해 거래 수수료와 광고로 버는 글로벌 마켓플레이스.",
+    description:
+      "eBay는 경매와 즉시구매 마켓플레이스, 광고, 결제 서비스로 돈을 번다. 자동차 부품, 수집품, 리퍼비시드 상품 같은 니치 카테고리와 활성 구매자, GMV, take rate가 핵심이다.",
+    researchFocus: [
+      "자동차 부품·수집품·리퍼비시드 카테고리의 비중",
+      "활성 구매자와 GMV 추세",
+      "광고 수익과 take rate 변화",
+      "셀러 수수료와 결제 서비스 수익",
+      "국경 간 거래와 환율 영향",
+    ],
+    riskVariables: [
+      "소비 둔화로 인한 거래량 감소",
+      "대형 이커머스와 중고 거래 플랫폼 경쟁 심화",
+      "수수료 인상에 따른 셀러 이탈",
+    ],
+    suggestedPrompts: [
+      "eBay의 GMV가 어떤 카테고리에서 버티는지 설명해줘.",
+      "활성 구매자와 take rate가 EBAY 실적에 왜 중요한지 정리해줘.",
+      "광고 수익과 결제 수익이 마진에 주는 영향을 알려줘.",
+    ],
+    questionChains: {},
+  },
+  ED: {
+    ticker: "ED",
+    companyName: "Consolidated Edison, Inc.",
+    companyNameKo: "콘솔리데이티드 에디슨",
+    sectorKo: "전력·가스 유틸리티",
+    signature:
+      "뉴욕과 주변 지역의 전기·가스·스팀을 책임지는 규제 유틸리티.",
+    description:
+      "Consolidated Edison은 뉴욕시와 웨스트체스터의 전기, 가스, 스팀을 공급한다. 요율 조정, 설비투자, 복구 비용, 기상 영향, 고객 성장 속도가 실적을 좌우한다.",
+    researchFocus: [
+      "전기·가스·스팀 사업별 요율과 고객 믹스",
+      "송배전 설비투자와 허용 수익률",
+      "기상 정상화 후 수요와 고객 성장",
+      "안전성 강화와 배관 교체 같은 필수 투자",
+      "폭염·폭설·정전 복구 비용",
+    ],
+    riskVariables: [
+      "규제 승인 지연과 요율 회수 차질",
+      "대형 기상 이벤트로 인한 복구 비용 증가",
+      "금리 상승에 따른 자금조달 부담",
+    ],
+    suggestedPrompts: [
+      "콘에디슨의 요율 인상과 설비투자가 수익에 어떻게 반영되는지 설명해줘.",
+      "ED의 전기·가스·스팀 사업이 각각 어떤 리스크를 갖는지 나눠서 정리해줘.",
+      "폭염이나 폭설이 콘에디슨 실적에 미치는 영향을 알려줘.",
+    ],
+    questionChains: {},
+  },
+  ETR: {
+    ticker: "ETR",
+    companyName: "Entergy Corporation",
+    companyNameKo: "엔터지",
+    sectorKo: "전력 유틸리티",
+    signature:
+      "걸프사우스 규제 전력망과 대형 산업 수요를 함께 굴리는 전력회사.",
+    description:
+      "Entergy는 아칸소, 루이지애나, 미시시피, 텍사스의 규제 전력사업을 운영한다. 대형 산업 고객, 송전·배전 투자, 발전·원전 운영, 허리케인 복구가 핵심 변수다.",
+    researchFocus: [
+      "대형 산업 고객과 신규 부하 유입",
+      "송전·배전 투자와 rate base 성장",
+      "발전 포트폴리오와 원전 운영 안정성",
+      "요율 조정과 비용 회수 속도",
+      "허리케인 대응과 복구 비용",
+    ],
+    riskVariables: [
+      "산업 수요 둔화",
+      "태풍·허리케인으로 인한 복구 비용 급증",
+      "규제 지연과 자본회수 차질",
+    ],
+    suggestedPrompts: [
+      "Entergy의 대형 산업 수요가 실적을 어떻게 끌어올리는지 설명해줘.",
+      "ETR의 송배전 투자와 규제 요금이 연결되는 경로를 정리해줘.",
+      "허리케인과 복구비용이 엔터지 수익성에 어떤 부담을 주는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  EW: {
+    ticker: "EW",
+    companyName: "Edwards Lifesciences Corporation",
+    companyNameKo: "에드워즈 라이프사이언시스",
+    sectorKo: "구조적 심장 의료기기",
+    signature:
+      "TAVR로 대표되는 구조적 심장 치료에서 고마진을 쌓는 의료기기 회사.",
+    description:
+      "Edwards Lifesciences는 경피적 대동맥판막치환술(TAVR)과 구조적 심장 치료 기기를 만든다. 시술 건수, 적응증 확대, 병원 채택, 경쟁 구도가 성장 속도를 좌우한다.",
+    researchFocus: [
+      "TAVR 시술 건수와 환자 믹스",
+      "삼첨판·승모판 등 신규 구조적 심장 파이프라인",
+      "병원 채택 속도와 보험 보상",
+      "경쟁사와 가격 압력",
+      "제품 믹스와 매출총이익률",
+    ],
+    riskVariables: [
+      "시술 성장 둔화",
+      "경쟁 심화와 가격 압박",
+      "보험 보상이나 가이드라인 변화",
+    ],
+    suggestedPrompts: [
+      "Edwards의 TAVR 매출이 시술 건수와 어떻게 연결되는지 설명해줘.",
+      "EW의 구조적 심장 파이프라인에서 다음 성장축이 어디인지 정리해줘.",
+      "병원 도입 속도와 경쟁 심화가 에드워즈 마진에 주는 영향을 알려줘.",
+    ],
+    questionChains: {},
+  },
+  EXC: {
+    ticker: "EXC",
+    companyName: "Exelon Corporation",
+    companyNameKo: "엑셀론",
+    sectorKo: "전력 유틸리티",
+    signature:
+      "송배전 설비투자와 규제 요율로 수익을 쌓는 미국 대형 전력 유틸리티 지주회사.",
+    description:
+      "Exelon은 ComEd, PECO, BGE, Pepco, Delmarva Power, Atlantic City Electric 같은 규제 자회사를 통해 전력 배전과 송전을 운영한다. rate base 성장, 규제 승인, 자본투자 회수, 정전 신뢰도가 핵심이다.",
+    researchFocus: [
+      "자회사별 요율과 실적 기여",
+      "rate base 성장과 capex 집행",
+      "규제 승인과 자본비 회수",
+      "신뢰도 개선과 정전 복구 비용",
+      "전기화 수요와 고객 성장",
+    ],
+    riskVariables: [
+      "불리한 요율 결정과 회수 지연",
+      "금리 상승에 따른 자금조달 부담",
+      "대형 정전·폭풍으로 인한 비용 증가",
+    ],
+    suggestedPrompts: [
+      "Exelon의 규제 자회사별 실적을 나눠서 설명해줘.",
+      "EXC의 rate base 성장과 capex 회수 구조를 쉽게 정리해줘.",
+      "요율 협상 지연이나 금리 상승이 엑셀론에 왜 부담인지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  IDXX: {
+    ticker: "IDXX",
+    companyName: "IDEXX Laboratories, Inc.",
+    companyNameKo: "아이덱스 래버러토리스",
+    sectorKo: "수의진단·물검사",
+    signature:
+      "반려동물 진단 장비와 소모품 반복 매출로 버티는 수의 헬스케어 회사.",
+    description:
+      "반려동물 진단 장비, 검사 소모품, 소프트웨어, 물 미생물 검사 솔루션을 판다. 병원 설치대수와 검사량, 소모품 반복 구매가 실적을 좌우한다.",
+    researchFocus: [
+      "진단 장비 설치와 소모품 반복 매출",
+      "반려동물 병원 방문과 검사량",
+      "물 미생물 검사와 축우·가금류 진단 수요",
+      "소프트웨어와 서비스의 부가 매출",
+      "해외 성장과 환율 영향",
+    ],
+    riskVariables: [
+      "반려동물 진료량 둔화",
+      "병원 장비 투자 지연",
+      "해외 수요 둔화와 환율 변동",
+    ],
+    suggestedPrompts: [
+      "IDXX 매출에서 장비 설치와 소모품 반복 매출을 나눠서 설명해줘.",
+      "반려동물 병원 방문이 실적에 어떻게 연결되는지 정리해줘.",
+      "물 검사와 축우·가금류 진단이 전체 성장에서 어떤 역할인지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  IR: {
+    ticker: "IR",
+    companyName: "Ingersoll Rand Inc.",
+    companyNameKo: "잉거솔 랜드",
+    sectorKo: "산업용 장비",
+    signature:
+      "압축공기, 진공, 펌프와 서비스로 산업 현장의 필수 설비를 파는 장비 회사.",
+    description:
+      "산업용 컴프레서, 블로워, 진공펌프, 액체펌프와 연결 서비스, 디지털 모니터링을 제공한다. 공정산업의 설비투자와 애프터마켓이 수익을 만든다.",
+    researchFocus: [
+      "압축공기·진공 장비의 신규 수주",
+      "애프터마켓과 서비스 매출 비중",
+      "식음료·제약·전자 등 공정산업 수요",
+      "가격 전가와 인수합병 효과",
+      "현금흐름과 마진 개선",
+    ],
+    riskVariables: [
+      "공정산업 설비투자 둔화",
+      "대형 프로젝트 지연",
+      "원가·환율 부담",
+    ],
+    suggestedPrompts: [
+      "IR의 장비 판매와 애프터마켓 서비스 비중을 나눠서 설명해줘.",
+      "공정산업 수요가 잉거솔 랜드 실적에 어떻게 연결되는지 알려줘.",
+      "가격 전가와 인수 효과가 마진에 어떤 도움을 주는지 정리해줘.",
+    ],
+    questionChains: {},
+  },
+  JBL: {
+    ticker: "JBL",
+    companyName: "Jabil Inc.",
+    companyNameKo: "제이빌",
+    sectorKo: "전자제조서비스",
+    signature:
+      "설계, 조달, 제조를 묶어 브랜드 고객의 공급망을 대신 운영하는 전자제조 서비스 회사.",
+    description:
+      "글로벌 브랜드를 대상으로 엔지니어링, 공급망, 제조 솔루션을 제공한다. AI 인프라, 클라우드, 헬스케어, 산업용 장비처럼 고객 믹스가 실적을 가른다.",
+    researchFocus: [
+      "대형 고객 프로그램과 매출 집중도",
+      "AI 인프라와 클라우드 관련 수요",
+      "헬스케어·산업·패키징 부문의 믹스",
+      "설계·조달·제조 일괄 서비스의 마진",
+      "현금흐름과 자본집약도",
+    ],
+    riskVariables: [
+      "고객 재고 조정",
+      "프로그램 종료나 물량 이전",
+      "마진 압박과 공급망 차질",
+    ],
+    suggestedPrompts: [
+      "JBL 매출에서 AI 인프라와 기존 제조 물량이 어떻게 다르게 움직이는지 설명해줘.",
+      "제이빌의 고객 집중도가 실적 변동성에 왜 중요한지 정리해줘.",
+      "설계·조달·제조 모델이 수익성에 어떤 구조적 장점을 주는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  KDP: {
+    ticker: "KDP",
+    companyName: "Keurig Dr Pepper Inc.",
+    companyNameKo: "큐리그 닥터 페퍼",
+    sectorKo: "음료",
+    signature:
+      "커피와 탄산, 편의점 음료를 함께 굴리는 북미 음료 회사.",
+    description:
+      "K-Cup 커피, 캡슐 커피 시스템, 탄산음료, 차, 물, 주스, 믹서 브랜드를 보유한 북미 음료 회사다. 커피와 탄산음료의 볼륨, 가격, 유통망이 실적을 좌우한다.",
+    researchFocus: [
+      "K-Cup와 커피 캡슐의 반복 수요",
+      "탄산·향미음료의 가격과 판매량",
+      "편의점·외식 채널 유통",
+      "원두·포장재·물류 원가",
+      "커피와 음료 사업 분리 계획의 영향",
+    ],
+    riskVariables: [
+      "커피 원가 상승",
+      "탄산음료 판매량 둔화",
+      "사업 재편과 실행 비용",
+    ],
+    suggestedPrompts: [
+      "KDP의 커피와 탄산음료 중 어느 쪽이 실적을 더 좌우하는지 설명해줘.",
+      "큐리그의 K-Cup 반복 수요가 왜 중요한지 정리해줘.",
+      "사업 분리 계획이 KDP의 가치평가에 어떤 의미인지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  KR: {
+    ticker: "KR",
+    companyName: "The Kroger Co.",
+    companyNameKo: "크로거",
+    sectorKo: "식료품 소매",
+    signature:
+      "식료품, 약국, 자사브랜드, 연료를 묶어 회전율과 가격경쟁으로 버티는 대형 유통사.",
+    description:
+      "미국 대형 식료품 소매업체로, 식료품점과 약국, 연료, 전자상거래, 자사브랜드, 리테일 미디어를 함께 운영한다. 동일매장매출, 식품 인플레이션, 인건비, 폐기율, 고객 유지가 핵심이다.",
+    researchFocus: [
+      "연료 제외 동일매장매출",
+      "자사브랜드와 약국 매출 비중",
+      "전자상거래와 리테일 미디어 수익",
+      "인건비·폐기·물류비가 마진에 미치는 영향",
+      "가격 투자와 고객 점유율",
+    ],
+    riskVariables: [
+      "식품 가격 안정으로 거래량 둔화",
+      "가격 경쟁 심화",
+      "인건비·폐기율 상승",
+    ],
+    suggestedPrompts: [
+      "KR의 동일매장매출이 연료를 제외했을 때 왜 중요한지 설명해줘.",
+      "크로거의 자사브랜드와 약국 사업이 실적에 어떤 역할을 하는지 정리해줘.",
+      "리테일 미디어와 전자상거래가 마진에 주는 의미를 알려줘.",
+    ],
+    questionChains: {},
+  },
+  LHX: {
+    ticker: "LHX",
+    companyName: "L3Harris Technologies, Inc.",
+    companyNameKo: "엘쓰리해리스 테크놀로지스",
+    sectorKo: "방산·미션시스템",
+    signature:
+      "군 통신, 전자전, 우주, 항공 개조를 묶어 파는 핵심 임무용 방산 전자 회사.",
+    description:
+      "L3Harris Technologies는 방산 통신, 전자전, 우주, 항공 시스템을 공급한다. 미군과 동맹국의 조달 예산, 프로그램 납기, 통합 마진이 실적을 좌우한다.",
+    researchFocus: [
+      "국방 예산과 수주 흐름이 매출로 이어지는 속도",
+      "전자전, 통신, 우주, 항공 프로그램의 믹스 변화",
+      "수주잔고와 납기 지연이 분기 실적에 주는 영향",
+      "통합과 포트폴리오 재편이 마진에 미치는 효과",
+      "대형 프로그램의 원가와 실행 리스크",
+    ],
+    riskVariables: [
+      "국방 조달 일정 지연",
+      "대형 프로그램의 원가 상승과 납기 차질",
+      "부품 공급과 생산 실행 리스크",
+    ],
+    suggestedPrompts: [
+      "L3Harris의 사업을 전자전, 통신, 우주, 항공으로 나눠서 설명해줘.",
+      "수주잔고와 수주가 LHX 실적에 어떻게 반영되는지 쉽게 정리해줘.",
+      "방산 예산 변화가 L3Harris의 마진과 성장에 어떤 영향을 주는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  MCHP: {
+    ticker: "MCHP",
+    companyName: "Microchip Technology, Inc.",
+    companyNameKo: "마이크로칩 테크놀로지",
+    sectorKo: "임베디드 반도체",
+    signature:
+      "마이크로컨트롤러와 아날로그, 전력반도체를 길게 깔고 가는 임베디드 반도체 회사.",
+    description:
+      "Microchip Technology는 마이크로컨트롤러, 아날로그, 전력반도체, 개발툴을 공급한다. 산업과 자동차 고객의 재고 조정, 채널 정상화, 가격과 믹스가 실적을 좌우한다.",
+    researchFocus: [
+      "산업·자동차 수요와 채널 재고 정상화",
+      "마이크로컨트롤러와 아날로그 믹스",
+      "전력반도체와 실리콘 카바이드 기여",
+      "가격과 출하량이 총이익률에 미치는 영향",
+      "유통 채널과 재고 회전 속도",
+    ],
+    riskVariables: [
+      "산업과 자동차 수요 둔화",
+      "채널 재고 조정 장기화",
+      "가격 경쟁과 마진 압박",
+    ],
+    suggestedPrompts: [
+      "Microchip의 실적이 채널 재고 정상화와 어떻게 연결되는지 설명해줘.",
+      "MCHP에서 마이크로컨트롤러, 아날로그, 전력반도체 중 뭐가 더 중요한지 정리해줘.",
+      "산업과 자동차 수요가 마이크로칩의 매출총이익률에 어떻게 번지는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  MET: {
+    ticker: "MET",
+    companyName: "MetLife, Inc.",
+    companyNameKo: "메트라이프",
+    sectorKo: "생명보험",
+    signature:
+      "보험, 연금, 복리후생으로 장기 스프레드와 운용수익을 함께 버는 글로벌 생명보험사.",
+    description:
+      "MetLife는 생명보험, 연금, 복리후생, 퇴직서비스를 제공한다. 금리, 투자수익률, 청구 손해율, 일본과 미국 사업 믹스가 실적을 좌우한다.",
+    researchFocus: [
+      "보험 스프레드와 투자수익률",
+      "그룹복리후생과 기업 고객 유지율",
+      "연금, 퇴직서비스, 해약과 자금 흐름",
+      "일본, 미국, 라틴아메리카 사업 믹스",
+      "자본비율과 자사주 매입",
+    ],
+    riskVariables: [
+      "금리 하락에 따른 스프레드 압박",
+      "보험금 청구 증가와 해약률 변동",
+      "주식·채권 시장 변동에 따른 투자수익 흔들림",
+    ],
+    suggestedPrompts: [
+      "MetLife의 수익이 보험 스프레드와 투자수익으로 어떻게 나뉘는지 설명해줘.",
+      "MET에서 일본 사업과 미국 사업이 실적에 주는 차이를 정리해줘.",
+      "금리 변화가 메트라이프의 이익과 자본환원에 미치는 영향을 알려줘.",
+    ],
+    questionChains: {},
+  },
+  MRVL: {
+    ticker: "MRVL",
+    companyName: "Marvell Technology, Inc.",
+    companyNameKo: "마벨 테크놀로지",
+    sectorKo: "데이터센터·네트워크 반도체",
+    signature:
+      "AI 데이터센터용 맞춤형 반도체와 연결칩으로 먹는 데이터 인프라 회사.",
+    description:
+      "Marvell Technology는 데이터센터, 네트워크, 저장장치용 반도체를 설계한다. 하이퍼스케일러의 설비투자, 맞춤형 칩 채택, 연결 제품 믹스가 실적을 좌우한다.",
+    researchFocus: [
+      "AI와 데이터센터 설비투자 흐름",
+      "맞춤형 실리콘과 설계 채택 속도",
+      "스위치, 광·전기 연결칩, 저장장치의 믹스",
+      "주요 고객 집중도와 프로그램 일정",
+      "제품 믹스와 총이익률 변화",
+    ],
+    riskVariables: [
+      "하이퍼스케일러 설비투자 둔화",
+      "대형 고객 일정 변경과 설계 지연",
+      "경쟁 심화와 마진 변동성",
+    ],
+    suggestedPrompts: [
+      "Marvell의 데이터센터 매출이 왜 중요한지 AI 설비투자 관점에서 설명해줘.",
+      "MRVL에서 맞춤형 칩과 연결칩이 각각 어떤 역할을 하는지 알려줘.",
+      "고객 투자 일정이 마벨의 성장과 마진에 어떻게 번지는지 정리해줘.",
+    ],
+    questionChains: {},
+  },
+  MSCI: {
+    ticker: "MSCI",
+    companyName: "MSCI Inc.",
+    companyNameKo: "엠에스씨아이",
+    sectorKo: "금융정보·지수",
+    signature:
+      "지수와 리스크·ESG 데이터로 자산운용사의 기준을 만드는 금융 데이터 회사.",
+    description:
+      "MSCI는 지수, 분석도구, 데이터, 리스크 관리 솔루션을 제공한다. 지수에 연동된 자산 규모, 구독 갱신률, 기관 고객의 데이터 사용 확대가 실적을 좌우한다.",
+    researchFocus: [
+      "지수 라이선스와 AUM 연동 수수료",
+      "분석도구와 데이터 구독의 갱신률",
+      "기관 고객의 상위 솔루션 전환과 교차판매",
+      "ESG, 기후, 사모자산 솔루션 수요",
+      "시장 하락이 수수료 기반에 미치는 영향",
+    ],
+    riskVariables: [
+      "주식시장 하락으로 인한 연동 AUM 감소",
+      "구독 가격 저항과 갱신률 둔화",
+      "ESG 관련 수요 변화와 규제 불확실성",
+    ],
+    suggestedPrompts: [
+      "MSCI의 지수와 데이터 구독 수익이 각각 어떻게 벌리는 돈인지 설명해줘.",
+      "엠에스씨아이에서 AUM 연동 수수료가 왜 중요한지 정리해줘.",
+      "시장 급락이 MSCI 실적에 어떤 경로로 영향 주는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  MTD: {
+    ticker: "MTD",
+    companyName: "Mettler-Toledo International Inc.",
+    companyNameKo: "메틀러-토레도 인터내셔널",
+    sectorKo: "정밀 계측·분석 장비",
+    signature:
+      "실험실과 생산현장용 정밀 계측·분석 장비를 파는 고마진 장비 회사.",
+    description:
+      "Mettler-Toledo는 실험실 저울, 분석장비, 공정 계측, 식품 소매용 계량기를 판매한다. 장비 교체와 서비스·소모품 반복 매출이 실적을 받치고, 중국과 산업 설비투자가 흔들리면 성장률도 바로 꺾인다.",
+    researchFocus: [
+      "실험실·산업·식품 소매 세 부문의 매출 믹스",
+      "서비스와 소모품 같은 반복 매출 비중",
+      "중국 수요와 연구·설비투자 사이클",
+      "가격 인상과 총이익률 방어",
+      "재고와 채널 조정이 출하에 미치는 영향",
+    ],
+    riskVariables: [
+      "연구·산업 장비 투자 둔화",
+      "중국 경기와 규제 변화",
+      "환율과 가격 경쟁에 따른 마진 압박",
+    ],
+    suggestedPrompts: [
+      "Mettler-Toledo의 실험실, 산업, 식품 소매 사업이 각각 어떤 역할을 하는지 설명해줘.",
+      "서비스·소모품 반복 매출이 MTD 실적을 왜 안정시키는지 정리해줘.",
+      "중국 수요가 메틀러-토레도 성장에 미치는 영향을 최근 흐름 기준으로 알려줘.",
+    ],
+    questionChains: {},
+  },
+  NDAQ: {
+    ticker: "NDAQ",
+    companyName: "Nasdaq, Inc.",
+    companyNameKo: "나스닥",
+    sectorKo: "거래소·시장 인프라",
+    signature:
+      "상장·거래·지수·데이터·금융기술을 묶어 파는 시장 인프라 회사.",
+    description:
+      "Nasdaq은 거래소, 상장 서비스, 시장 데이터, 지수 라이선스, 금융기술 솔루션을 제공한다. 거래량과 상장 파이프라인, 데이터 수요, 반복형 소프트웨어 매출이 함께 실적을 만든다.",
+    researchFocus: [
+      "거래소 수수료와 시장 데이터 수익",
+      "상장 기업 수와 IPO·추가상장 파이프라인",
+      "지수 라이선스와 패시브 자금 수요",
+      "금융기술 소프트웨어의 반복 매출 성장",
+      "거래량 변동이 시장 서비스 매출에 주는 영향",
+    ],
+    riskVariables: [
+      "IPO·상장 시장 둔화",
+      "데이터·거래소 경쟁과 규제 압박",
+      "금융기술 통합 비용과 고객 유지율 저하",
+    ],
+    suggestedPrompts: [
+      "Nasdaq의 거래소 수익과 데이터·지수 수익을 나눠서 설명해줘.",
+      "NDAQ 실적에서 상장 시장과 금융기술 중 어느 쪽이 더 안정적인지 정리해줘.",
+      "IPO 시장이 나스닥 성장에 왜 중요한지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  NKE: {
+    ticker: "NKE",
+    companyName: "NIKE, Inc.",
+    companyNameKo: "나이키",
+    sectorKo: "스포츠웨어",
+    signature:
+      "운동화·의류·장비를 브랜드 파워로 파는 글로벌 스포츠웨어 회사.",
+    description:
+      "NIKE는 풋웨어, 의류, 장비를 도매와 직영 채널로 판다. 제품 출시와 브랜드 수요, 재고 조정, 중국과 북미 판매가 매출과 마진을 좌우한다.",
+    researchFocus: [
+      "풋웨어·의류·장비 매출 비중",
+      "도매와 직영 채널 믹스",
+      "재고 수준과 할인율",
+      "중국, 북미, EMEA 지역 수요",
+      "Jordan, Running, Basketball 같은 핵심 프랜차이즈",
+    ],
+    riskVariables: [
+      "재고 누증과 판촉 확대",
+      "중국 수요 둔화",
+      "도매 파트너와의 채널 조정",
+    ],
+    suggestedPrompts: [
+      "NIKE의 도매와 직영 채널 구조가 매출과 마진에 어떻게 다르게 작동하는지 설명해줘.",
+      "나이키의 재고 조정이 할인과 이익률에 주는 영향을 정리해줘.",
+      "중국 수요와 신제품 출시가 NKE 성장에 왜 중요한지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  ODFL: {
+    ticker: "ODFL",
+    companyName: "Old Dominion Freight Line, Inc.",
+    companyNameKo: "올드 도미니언 프레이트 라인",
+    sectorKo: "LTL 화물운송",
+    signature:
+      "북미 LTL 네트워크와 서비스 품질로 단가를 지키는 화물운송사.",
+    description:
+      "Old Dominion은 북미 LTL 화물을 지역·권역·국가 단위로 운송한다. 터미널 밀도와 서비스 품질, 운임, 화물 중량, 연료비, 운영 효율이 수익성을 좌우한다.",
+    researchFocus: [
+      "출하 건수와 화물 중량 추세",
+      "수익률과 톤당·중량당 운임",
+      "터미널 네트워크 밀도와 서비스 품질",
+      "운영 비율과 라우팅 효율",
+      "터미널·차량 capex와 네트워크 확장",
+    ],
+    riskVariables: [
+      "화물 수요 둔화",
+      "운임 경쟁 심화",
+      "인건비·연료비·설비투자 부담",
+    ],
+    suggestedPrompts: [
+      "Old Dominion의 LTL 네트워크가 왜 경쟁력인지 설명해줘.",
+      "ODFL의 운임과 물동량이 수익성에 어떻게 연결되는지 정리해줘.",
+      "터미널 밀도와 서비스 품질이 실적에 미치는 영향을 알려줘.",
+    ],
+    questionChains: {},
+  },
+  OKE: {
+    ticker: "OKE",
+    companyName: "ONEOK, Inc.",
+    companyNameKo: "원오크",
+    sectorKo: "미드스트림 에너지 인프라",
+    signature:
+      "천연가스와 NGL, 원유를 모으고 옮기는 미드스트림 인프라 회사.",
+    description:
+      "ONEOK은 셰일 생산지의 천연가스와 NGL을 모으고 처리·분리·수송·저장해 수수료를 번다. 물량, 가동률, 파이프라인 이용률, 인수합병 통합 효과가 현금흐름을 좌우한다.",
+    researchFocus: [
+      "가스·NGL 수집·처리 물량",
+      "분리·수송·저장 설비 가동률",
+      "수수료 기반 현금흐름과 계약 구조",
+      "Magellan 인수 이후 통합 시너지",
+      "부채 감축과 capex 우선순위",
+    ],
+    riskVariables: [
+      "핵심 분지 생산 둔화",
+      "인수 통합과 부채 부담",
+      "규제와 물동량 변화",
+    ],
+    suggestedPrompts: [
+      "ONEOK의 수수료 기반 현금흐름이 어떤 물량에서 나오는지 설명해줘.",
+      "OKE의 NGL과 가스 처리 사업이 실적에 어떻게 연결되는지 정리해줘.",
+      "Magellan 인수 이후 통합 효과와 부채 부담을 함께 봐줘.",
+    ],
+    questionChains: {},
+  },
+  ON: {
+    ticker: "ON",
+    companyName: "onsemi",
+    companyNameKo: "온세미",
+    sectorKo: "전력·아날로그 반도체",
+    signature:
+      "자동차와 산업용 전력·센서 반도체를 묶어 파는 아날로그·전력 반도체 회사.",
+    description:
+      "onsemi는 자동차 전장, 산업 자동화, 전력 관리용 반도체와 이미징 센서를 공급한다. EV 구동계, ADAS, 공장 자동화, 전력 효율 수요가 실적을 좌우한다.",
+    researchFocus: [
+      "자동차 전장과 EV 관련 수요 비중",
+      "SiC 전력반도체 채택 속도",
+      "산업 자동화와 전력 관리 수요",
+      "재고 조정과 채널 출하 흐름",
+      "제품 믹스와 총이익률",
+    ],
+    riskVariables: [
+      "자동차 생산 둔화",
+      "산업 고객의 재고 조정 장기화",
+      "가격 경쟁과 마진 압박",
+    ],
+    suggestedPrompts: [
+      "onsemi의 자동차 전장과 산업용 매출이 각각 어떤 역할을 하는지 설명해줘.",
+      "ON에서 SiC 전력반도체 수요가 왜 중요한지 정리해줘.",
+      "재고 조정이 온세미 실적과 마진에 어떻게 번지는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  OXY: {
+    ticker: "OXY",
+    companyName: "Occidental Petroleum Corporation",
+    companyNameKo: "옥시덴털 페트롤리엄",
+    sectorKo: "석유·가스 통합",
+    signature:
+      "퍼미안 원유 생산과 OxyChem, 탄소포집을 함께 굴리는 통합 에너지 회사.",
+    description:
+      "Occidental Petroleum은 퍼미안 분지 원유·가스 생산, OxyChem, 탄소포집·저탄소 프로젝트를 운영한다. 유가, 생산 효율, 화학 마진, 부채 감축이 실적을 좌우한다.",
+    researchFocus: [
+      "퍼미안 분지 생산량과 유정 생산성",
+      "실현 유가와 헤지 비중",
+      "OxyChem의 스프레드와 화학 마진",
+      "1PointFive 등 탄소포집·저탄소 프로젝트 진행",
+      "잉여현금흐름과 부채 감축",
+    ],
+    riskVariables: [
+      "유가 하락",
+      "화학 스프레드 축소",
+      "대형 프로젝트 capex와 실행 리스크",
+    ],
+    suggestedPrompts: [
+      "Occidental의 퍼미안 생산과 OxyChem이 각각 실적에 어떤 역할을 하는지 설명해줘.",
+      "OXY에서 탄소포집 프로젝트가 장기 성장에 왜 중요한지 정리해줘.",
+      "유가 하락이 옥시덴털의 현금흐름과 부채 감축 여력에 미치는 영향을 알려줘.",
+    ],
+    questionChains: {},
+  },
+  PCG: {
+    ticker: "PCG",
+    companyName: "PG&E Corporation",
+    companyNameKo: "퍼시픽 가스 앤 일렉트릭",
+    sectorKo: "전력·가스 유틸리티",
+    signature:
+      "북부 캘리포니아 전기·가스를 공급하며 산불 위험과 설비투자를 관리하는 규제 유틸리티.",
+    description:
+      "PG&E는 북부 캘리포니아에 전기와 천연가스를 공급한다. 산불 완화 투자, 송배전 설비교체, 요율 조정, 자금조달 비용이 실적을 좌우한다.",
+    researchFocus: [
+      "rate base 성장과 설비투자 집행",
+      "산불 완화와 안전성 강화 비용",
+      "고객 성장과 전기화 수요",
+      "전기·가스 수요 믹스와 날씨 영향",
+      "규제 회수와 신용도",
+    ],
+    riskVariables: [
+      "산불 관련 책임과 소송 리스크",
+      "요율 승인 지연",
+      "금리 상승에 따른 자금조달 부담",
+    ],
+    suggestedPrompts: [
+      "PG&E의 설비투자와 요율 회수가 실적에 어떻게 연결되는지 설명해줘.",
+      "PCG에서 산불 위험 관리가 왜 핵심인지 정리해줘.",
+      "금리 상승이 퍼시픽 가스 앤 일렉트릭의 성장과 이익에 어떤 부담을 주는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  PEG: {
+    ticker: "PEG",
+    companyName: "Public Service Enterprise Group Incorporated",
+    companyNameKo: "퍼블릭 서비스 엔터프라이즈 그룹",
+    sectorKo: "전력 유틸리티",
+    signature:
+      "뉴저지 규제 유틸리티와 원전 발전을 함께 굴리는 전력회사.",
+    description:
+      "PSEG는 PSE&G 규제 유틸리티와 PSEG Power의 원전 발전을 중심으로 수익을 낸다. rate base 성장, 원전 가동률, 규제 승인, 기상 비용이 핵심이다.",
+    researchFocus: [
+      "rate base 성장과 capex 집행",
+      "원전 출력과 capacity factor",
+      "규제 승인과 요율 회수",
+      "전기·가스 고객 수요와 지역 성장",
+      "재무 레버리지와 자본배분",
+    ],
+    riskVariables: [
+      "규제 지연과 요율 회수 차질",
+      "원전 정지나 전력가격 변동",
+      "폭풍·한파 같은 기상 비용과 차입 부담",
+    ],
+    suggestedPrompts: [
+      "PSEG의 규제 유틸리티와 원전 발전이 각각 어떤 역할을 하는지 설명해줘.",
+      "PEG의 rate base 성장과 요율 회수가 어떻게 연결되는지 정리해줘.",
+      "원전 가동률 변동이 퍼블릭 서비스 엔터프라이즈 그룹 실적에 미치는 영향을 알려줘.",
+    ],
+    questionChains: {},
+  },
+  PRU: {
+    ticker: "PRU",
+    companyName: "Prudential Financial, Inc.",
+    companyNameKo: "프루덴셜 파이낸셜",
+    sectorKo: "생명보험·자산운용",
+    signature:
+      "연금과 생명보험, PGIM 자산운용을 함께 굴리는 금융회사.",
+    description:
+      "Prudential Financial은 연금, 단체보험, 생명보험, PGIM 자산운용으로 수익을 만든다. 금리, 운용자산, 보험 손해율, 일본 사업 믹스가 실적을 좌우한다.",
+    researchFocus: [
+      "연금과 단체보험의 마진 구조",
+      "PGIM의 AUM과 수수료 수익",
+      "일본과 해외 생명보험 사업 믹스",
+      "자본비율과 주주환원",
+      "보험 스프레드와 투자수익",
+    ],
+    riskVariables: [
+      "주식·채권 시장 하락에 따른 운용자산 축소",
+      "청구 손해율과 해약률 변동",
+      "금리와 환율 변화에 따른 실적 변동",
+    ],
+    suggestedPrompts: [
+      "Prudential Financial의 보험 사업과 PGIM 수익을 나눠서 설명해줘.",
+      "PRU에서 일본 사업이 왜 중요한지 정리해줘.",
+      "금리 변화가 프루덴셜 파이낸셜의 이익과 자본환원에 미치는 영향을 알려줘.",
+    ],
+    questionChains: {},
+  },
+  PSA: {
+    ticker: "PSA",
+    companyName: "Public Storage",
+    companyNameKo: "퍼블릭 스토리지",
+    sectorKo: "셀프 스토리지 리츠",
+    signature:
+      "도심 셀프 스토리지의 점유율과 임대료를 조정하며 현금흐름을 쌓는 미국 최대 보관창고 리츠.",
+    description:
+      "Public Storage는 미국과 유럽에서 셀프 스토리지 시설을 운영·개발한다. 점유율, 평방피트당 임대료, 동일점포 성장, 개발 파이프라인이 실적을 좌우한다.",
+    researchFocus: [
+      "점유율과 평방피트당 임대료",
+      "동일점포 매출과 비용률",
+      "개발·증설 물량과 신규 공급",
+      "세입자 이동과 주택 거래가 수요에 주는 영향",
+      "제3자 관리와 브리지론 수익",
+    ],
+    riskVariables: [
+      "신규 공급 증가로 인한 가격 압박",
+      "주택 거래 둔화로 이동 수요 약화",
+      "개발 비용과 금리 상승",
+    ],
+    suggestedPrompts: [
+      "Public Storage의 점유율과 임대료가 실적에 어떻게 연결되는지 설명해줘.",
+      "PSA의 신규 개발과 기존 점포 운영 중 어느 쪽이 더 중요한지 정리해줘.",
+      "주택 거래 둔화가 퍼블릭 스토리지 수요에 왜 영향을 주는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  PYPL: {
+    ticker: "PYPL",
+    companyName: "PayPal Holdings, Inc.",
+    companyNameKo: "페이팔",
+    sectorKo: "디지털 결제",
+    signature:
+      "브랜드 체크아웃과 Venmo, 상인 결제를 묶어 결제 흐름을 잡는 글로벌 결제 플랫폼.",
+    description:
+      "PayPal은 소비자와 가맹점을 연결해 온라인·오프라인 결제를 처리한다. 브랜드 체크아웃, Braintree, Venmo, 활성 계정, 거래량, 수수료율이 핵심이다.",
+    researchFocus: [
+      "브랜드 체크아웃과 Venmo 사용성",
+      "Braintree와 비브랜드 결제 비중",
+      "활성 계정과 총 결제금액(TPV) 성장",
+      "수수료율(take rate)과 거래당 수익",
+      "운영비 절감과 마진 개선",
+    ],
+    riskVariables: [
+      "Apple Pay, Shop Pay 등과의 경쟁 심화",
+      "이커머스 성장 둔화",
+      "수수료 인하와 프로모션 비용 증가",
+    ],
+    suggestedPrompts: [
+      "PayPal의 브랜드 체크아웃과 Braintree가 각각 어떤 역할을 하는지 설명해줘.",
+      "PYPL에서 Venmo 수익화가 왜 중요한지 정리해줘.",
+      "활성 계정과 거래량이 페이팔의 이익에 어떻게 번지는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  RBLX: {
+    ticker: "RBLX",
+    companyName: "Roblox Corporation",
+    companyNameKo: "로블록스",
+    sectorKo: "게임 플랫폼",
+    signature:
+      "이용자와 크리에이터가 함께 만드는 3D 게임 플랫폼으로 참여 시간과 결제를 키우는 회사.",
+    description:
+      "Roblox는 이용자가 게임과 가상 경험을 만들고, 다른 이용자가 이를 소비하는 플랫폼이다. DAU, 참여 시간, bookings, 크리에이터 수익 배분, 안전 관리가 실적을 좌우한다.",
+    researchFocus: [
+      "DAU와 참여 시간",
+      "Bookings와 Robux 결제 흐름",
+      "크리에이터 생태계와 수익 배분",
+      "연령대별 사용자 확장",
+      "안전·콘텐츠 관리와 추천 품질",
+    ],
+    riskVariables: [
+      "사용자 참여 둔화",
+      "아동·청소년 안전 규제 강화",
+      "크리에이터 이탈과 지급 부담 증가",
+    ],
+    suggestedPrompts: [
+      "Roblox의 DAU와 참여 시간이 왜 중요한지 설명해줘.",
+      "RBLX의 bookings가 매출로 이어지는 경로를 정리해줘.",
+      "로블록스에서 크리에이터 생태계와 안전 관리가 실적에 미치는 영향을 알려줘.",
+    ],
+    questionChains: {},
+  },
+  RMD: {
+    ticker: "RMD",
+    companyName: "ResMed Inc.",
+    companyNameKo: "레스메드",
+    sectorKo: "호흡기 의료기기",
+    signature:
+      "수면무호흡 치료 기기와 마스크, 연결형 소프트웨어로 반복 매출을 만드는 의료기기 회사.",
+    description:
+      "ResMed는 수면무호흡과 COPD 같은 호흡기 질환 치료를 위한 기기, 마스크, 소프트웨어를 공급한다. 기기 교체 주기, 마스크 소모품, 보험 보상, 미국·중국 수요가 핵심이다.",
+    researchFocus: [
+      "CPAP 기기 교체 주기",
+      "마스크와 소모품 반복 매출",
+      "보험 보상과 진단·처방 흐름",
+      "연결형 소프트웨어와 홈케어 확장",
+      "미국·중국·해외 수요와 환율",
+    ],
+    riskVariables: [
+      "보험 보상 변화와 처방 지연",
+      "경쟁 심화와 가격 압박",
+      "중국과 해외 수요 둔화",
+    ],
+    suggestedPrompts: [
+      "ResMed의 기기와 마스크 중 어느 쪽이 더 안정적인지 설명해줘.",
+      "RMD의 수면무호흡 치료 수요가 실적에 어떻게 연결되는지 정리해줘.",
+      "보험 보상 변화가 레스메드에 왜 중요한지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  ROK: {
+    ticker: "ROK",
+    companyName: "Rockwell Automation, Inc.",
+    companyNameKo: "록웰 오토메이션",
+    sectorKo: "산업 자동화",
+    signature:
+      "공장 자동화 장비와 소프트웨어, 서비스로 제조 현장의 효율을 올리는 순수 플레이 산업 자동화 회사.",
+    description:
+      "Rockwell Automation은 컨트롤러, 드라이브, 소프트웨어, 서비스로 공장과 설비를 자동화한다. 주문 흐름, 프로젝트 수요, 소프트웨어 비중, 지역별 제조 경기와 마진이 핵심이다.",
+    researchFocus: [
+      "주문 흐름과 book-to-bill",
+      "이산제조와 공정제조 수요 차이",
+      "소프트웨어와 서비스 비중",
+      "가격 인상과 믹스가 마진에 주는 영향",
+      "중국·북미 제조 투자와 리쇼어링",
+    ],
+    riskVariables: [
+      "제조업 투자 둔화",
+      "대형 프로젝트 지연",
+      "중국 수요 약세와 부품 비용 변동",
+    ],
+    suggestedPrompts: [
+      "Rockwell Automation의 주문 흐름이 실적에 어떻게 반영되는지 설명해줘.",
+      "ROK에서 소프트웨어와 서비스가 왜 중요한지 정리해줘.",
+      "제조 투자 둔화가 록웰의 매출과 마진에 미치는 영향을 알려줘.",
+    ],
+    questionChains: {},
+  },
+  VRT: {
+    ticker: "VRT",
+    companyName: "Vertiv Holdings Co.",
+    companyNameKo: "버티브",
+    sectorKo: "데이터센터 인프라",
+    signature:
+      "데이터센터 전력과 냉각, 모듈형 인프라를 묶어 파는 디지털 인프라 회사.",
+    description:
+      "Vertiv는 데이터센터와 네트워크 시설에 전력, 냉각, 랙, 모듈형 인프라를 공급한다. AI 데이터센터 증설과 교체 수요가 성장 동력이지만, 프로젝트 타이밍과 공급망이 분기 변동성을 만든다.",
+    researchFocus: [
+      "AI 데이터센터 투자와 주문 흐름",
+      "전력·냉각·랙 제품 믹스",
+      "서비스와 애프터마켓 비중",
+      "프로젝트 수주와 출하 타이밍",
+      "마진과 공급망 효율",
+    ],
+    riskVariables: [
+      "데이터센터 capex 둔화",
+      "대형 프로젝트 지연",
+      "부품 공급과 관세 부담",
+    ],
+    suggestedPrompts: [
+      "Vertiv의 전력·냉각 사업이 AI 데이터센터 투자와 어떻게 연결되는지 설명해줘.",
+      "VRT에서 장비 판매와 서비스 수익이 각각 어떤 역할을 하는지 정리해줘.",
+      "프로젝트 지연이 버티브 실적과 마진에 어떤 영향을 주는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  VTR: {
+    ticker: "VTR",
+    companyName: "Ventas, Inc.",
+    companyNameKo: "벤타스",
+    sectorKo: "헬스케어 리츠",
+    signature:
+      "시니어 하우징과 외래 의료시설을 중심으로 의료 부동산 현금흐름을 쌓는 리츠.",
+    description:
+      "Ventas는 시니어 하우징, 외래 의료시설, 연구시설을 보유·운영하는 헬스케어 리츠다. 고령화 수요와 입주율, 임대료, 운영 효율이 현금흐름을 좌우한다.",
+    researchFocus: [
+      "시니어 하우징 입주율과 임대료",
+      "외래 의료시설 임대와 재계약",
+      "고령화 수요와 신규 자산 편입",
+      "운영형 자산의 마진과 회복 속도",
+      "자본조달과 자산 매각",
+    ],
+    riskVariables: [
+      "입주율 회복 지연",
+      "금리 상승에 따른 자본비용 부담",
+      "의료기관 임대 수요 둔화",
+    ],
+    suggestedPrompts: [
+      "Ventas의 시니어 하우징과 외래 의료시설이 각각 어떻게 돈을 버는지 설명해줘.",
+      "VTR에서 입주율과 임대료가 현금흐름에 어떻게 연결되는지 정리해줘.",
+      "금리 상승이 벤타스의 성장과 배당에 어떤 부담을 주는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  WAB: {
+    ticker: "WAB",
+    companyName: "Wabtec Corporation",
+    companyNameKo: "와브텍",
+    sectorKo: "철도 장비·서비스",
+    signature:
+      "철도차량과 시스템, 디지털 서비스로 화물과 여객 철도를 묶어 파는 장비 회사.",
+    description:
+      "Wabtec은 화물·여객 철도용 장비, 기관차, 제동·신호 시스템, 디지털 솔루션, 정비 서비스를 공급한다. 신차 수주보다 교체·정비 같은 반복 수요와 원가 관리가 중요하다.",
+    researchFocus: [
+      "화물·여객 철도 장비 수주",
+      "기관차와 부품 교체 수요",
+      "디지털 제어와 정비 서비스 비중",
+      "프리미엄 제품 믹스와 마진",
+      "북미·해외 철도 capex",
+    ],
+    riskVariables: [
+      "철도 설비투자 둔화",
+      "기관차 인도 지연",
+      "원가와 부품 공급 부담",
+    ],
+    suggestedPrompts: [
+      "Wabtec의 장비 판매와 정비 서비스 중 어느 쪽이 더 안정적인지 설명해줘.",
+      "WAB에서 화물철도와 여객철도 사업이 어떻게 다르게 움직이는지 정리해줘.",
+      "철도 capex 둔화가 와브텍 실적에 미치는 영향을 알려줘.",
+    ],
+    questionChains: {},
+  },
+  WAT: {
+    ticker: "WAT",
+    companyName: "Waters Corporation",
+    companyNameKo: "워터스",
+    sectorKo: "분석장비·소모품",
+    signature:
+      "LC와 MS 장비, 소모품, 소프트웨어로 분석 실험실 반복 수요를 잡는 회사.",
+    description:
+      "Waters는 액체크로마토그래피와 질량분석 장비, 소모품, 소프트웨어, 서비스를 제공한다. 제약 품질관리와 규제 환경에서 반복 교체와 소모품 매출이 실적을 받친다.",
+    researchFocus: [
+      "LC·MS 장비 교체 수요",
+      "소모품과 서비스 반복 매출",
+      "제약 품질관리와 규제 시험",
+      "중국과 학술·산업 연구 수요",
+      "가격 전가와 마진",
+    ],
+    riskVariables: [
+      "제약 R&D와 CAPEX 둔화",
+      "중국 수요 부진",
+      "장비 교체 주기 지연",
+    ],
+    suggestedPrompts: [
+      "Waters의 LC와 MS 장비가 각각 어디에 쓰이는지 설명해줘.",
+      "WAT에서 소모품과 서비스가 왜 중요한지 정리해줘.",
+      "중국과 제약 투자 둔화가 워터스 성장에 어떤 영향을 주는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  WEC: {
+    ticker: "WEC",
+    companyName: "WEC Energy Group, Inc.",
+    companyNameKo: "WEC 에너지 그룹",
+    sectorKo: "전력·가스 유틸리티",
+    signature:
+      "전기와 가스를 규제 요율로 회수하며 중서부 고객을 서비스하는 유틸리티 그룹.",
+    description:
+      "WEC Energy Group은 위스콘신과 일리노이 등 중서부에서 전기와 천연가스를 공급하는 규제 유틸리티다. 설비투자와 요율 회수, 기상, 대형 전력 수요가 실적을 좌우한다.",
+    researchFocus: [
+      "전기·가스 고객 기반과 수요 성장",
+      "송배전 설비투자와 rate base 확대",
+      "규제 승인과 요율 회수 속도",
+      "연료비와 운영비 회수 구조",
+      "대형 전력 수요와 신규 부하",
+    ],
+    riskVariables: [
+      "규제 지연",
+      "금리 상승에 따른 자금조달 부담",
+      "기상 변동과 복구 비용",
+    ],
+    suggestedPrompts: [
+      "WEC의 전기와 가스 사업이 각각 어떤 요율 구조를 갖는지 설명해줘.",
+      "WEC Energy Group의 설비투자와 rate base 성장이 왜 중요한지 정리해줘.",
+      "요율 승인 지연이 WEC 실적에 어떤 부담을 주는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  XEL: {
+    ticker: "XEL",
+    companyName: "Xcel Energy Inc.",
+    companyNameKo: "엑셀 에너지",
+    sectorKo: "전력·가스 유틸리티",
+    signature:
+      "서부·중서부 8개 주에서 전기와 천연가스를 공급하며 요율 회수와 설비투자로 현금흐름을 쌓는 규제 유틸리티.",
+    description:
+      "Xcel Energy는 미국 서부·중서부 8개 주에서 전기와 천연가스를 공급하는 규제 유틸리티다. 최근에는 전기 인프라 투자 회수와 전기 판매 증가가 실적을 받치고 있고, 금리·감가상각·O&M 비용과 산불 관련 리스크가 이익 변동의 핵심이다.",
+    researchFocus: [
+      "전기·가스 요율과 인프라 투자 회수",
+      "전력 판매와 날씨, 고객 수요 변화",
+      "송배전·재생에너지 설비투자와 규제 승인",
+      "금리, 감가상각, O&M 비용이 이익에 주는 영향",
+      "산불·폭풍·정전 복구와 보험 회수",
+    ],
+    riskVariables: [
+      "요율 승인 지연과 비용 회수 차질",
+      "금리 상승에 따른 자본조달 부담",
+      "산불과 극단적 기상으로 인한 복구·책임 비용",
+    ],
+    suggestedPrompts: [
+      "Xcel Energy의 수익이 요율 회수와 인프라 투자에 어떻게 연결되는지 설명해줘.",
+      "전기 판매 증가와 날씨 요인이 XEL 실적에 어떻게 반영되는지 정리해줘.",
+      "산불·복구 비용과 금리 상승이 엑셀 에너지에 주는 부담을 알려줘.",
+    ],
+    questionChains: {},
+  },
+  YUM: {
+    ticker: "YUM",
+    companyName: "Yum! Brands, Inc.",
+    companyNameKo: "얌! 브랜즈",
+    sectorKo: "글로벌 외식 프랜차이즈",
+    signature:
+      "KFC, Taco Bell, Pizza Hut, Habit Burger & Grill로 로열티와 광고 분담금을 거두는 글로벌 레스토랑 프랜차이즈.",
+    description:
+      "Yum! Brands는 전 세계 6만 1천여 개 매장을 KFC, Taco Bell, Pizza Hut, Habit Burger & Grill로 운영·가맹하는 회사다. 매장 대부분이 가맹점이고, 브랜드별 시스템 매출과 동일매장매출, 로열티·광고 분담금, 디지털 주문 비중이 실적을 좌우한다. 최근에는 Taco Bell과 KFC가 성장의 중심이고, Pizza Hut는 전략 재검토가 진행 중이다.",
+    researchFocus: [
+      "KFC와 Taco Bell의 동일매장매출과 출점 속도",
+      "Pizza Hut의 수익성 회복과 전략 재검토",
+      "가맹 로열티와 광고 분담금이 만드는 현금흐름",
+      "디지털 시스템 매출 비중과 앱 기반 주문",
+      "해외 브랜드 믹스와 환율 영향",
+    ],
+    riskVariables: [
+      "가맹점 수익성 악화와 브랜드 기준 위반",
+      "Pizza Hut 회복 지연과 구조조정 비용",
+      "해외 소비 둔화와 환율 변동",
+    ],
+    suggestedPrompts: [
+      "Yum! Brands의 수익이 로열티와 광고 분담금에서 어떻게 나오는지 설명해줘.",
+      "KFC와 Taco Bell이 YUM 성장의 중심인 이유를 브랜드별로 정리해줘.",
+      "Pizza Hut 전략 재검토가 얌! 브랜즈 가치에 어떤 의미인지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  TGT: {
+    ticker: "TGT",
+    companyName: "Target Corporation",
+    companyNameKo: "타깃",
+    sectorKo: "대형 할인점",
+    signature:
+      "가성비 스타일과 자체브랜드, 당일배송으로 차별화하는 미국 대형 할인점.",
+    description:
+      "Target은 식료품, 생활필수품, 의류, 홈데코, 자체브랜드를 매장·온라인·당일배송으로 묶어 파는 미국 대형 할인점이다. 매장·디지털 트래픽, 동종매장매출, 판촉 강도, 재고 손실, Target Circle 360과 Roundel 같은 비상품 매출이 실적을 좌우한다.",
+    researchFocus: [
+      "매장·디지털 트래픽과 동종매장매출",
+      "식료품·생활필수품과 재량소비재 믹스",
+      "자체브랜드와 스타일 상품 전략",
+      "Target Circle 360, Roundel, Shipt 같은 비상품 매출",
+      "재고 손실과 물류·배송 비용",
+    ],
+    riskVariables: [
+      "소비 둔화와 비필수품 수요 약화",
+      "판촉 경쟁과 할인 확대",
+      "재고 손실과 배송 비용 상승",
+    ],
+    suggestedPrompts: [
+      "타깃의 식료품과 스타일 상품이 각각 실적에 어떻게 기여하는지 설명해줘.",
+      "Target Circle 360과 Roundel이 TGT의 마진에 왜 중요한지 정리해줘.",
+      "재고 손실과 판촉 확대가 타깃 영업이익률에 어떻게 번지는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  TRGP: {
+    ticker: "TRGP",
+    companyName: "Targa Resources Corp.",
+    companyNameKo: "타르가 리소시즈",
+    sectorKo: "미드스트림 에너지 인프라",
+    signature:
+      "NGL을 모아 분리·수송·수출까지 잇는 걸프코스트 미드스트림 회사.",
+    description:
+      "Targa는 퍼미안과 걸프코스트를 잇는 천연가스액(NGL) 수집·처리·분리·수송·수출 인프라를 운영한다. 퍼미안 물량, 몬트벨뷰·갈레나 파크 네트워크의 가동률, LPG 수출 물동량, 신규 프로젝트가 실적을 좌우한다.",
+    researchFocus: [
+      "퍼미안 수집·처리 물량",
+      "몬트벨뷰·갈레나 파크 분리·수출 네트워크",
+      "NGL 분리 마진과 저장 가동률",
+      "LPG 수출 물동량과 장기 계약",
+      "신규 프로젝트와 capex 집행",
+    ],
+    riskVariables: [
+      "퍼미안 생산 둔화와 설비 가동 중단",
+      "NGL 스프레드 축소",
+      "프로젝트 지연과 차입 부담",
+    ],
+    suggestedPrompts: [
+      "TRGP의 수익이 물량 기반인지 가격 기반인지 나눠서 설명해줘.",
+      "퍼미안 생산 증가가 타르가 실적에 어떤 경로로 연결되는지 정리해줘.",
+      "NGL 수출과 분리 마진이 마진에 주는 영향을 알려줘.",
+    ],
+    questionChains: {},
+  },
+  TTWO: {
+    ticker: "TTWO",
+    companyName: "Take-Two Interactive Software, Inc.",
+    companyNameKo: "테이크투 인터랙티브",
+    sectorKo: "게임 퍼블리싱",
+    signature:
+      "GTA와 2K, Zynga를 묶어 대형 프랜차이즈와 모바일 수익을 같이 굴리는 게임 퍼블리셔.",
+    description:
+      "Take-Two는 Rockstar, 2K, Zynga를 통해 콘솔·PC·모바일 게임을 낸다. GTA, NBA 2K, Civilization 같은 대형 프랜차이즈의 출시 일정과 반복 지출이 실적을 좌우한다.",
+    researchFocus: [
+      "GTA VI 출시 일정",
+      "Rockstar·2K·Zynga 포트폴리오 믹스",
+      "반복 지출과 라이브 서비스",
+      "모바일 수익화와 사용자 지출",
+      "개발비 회수와 운영레버리지",
+    ],
+    riskVariables: [
+      "대형 신작 지연",
+      "히트 의존도와 프랜차이즈 집중",
+      "모바일 과금 변동성과 플랫폼 경쟁",
+    ],
+    suggestedPrompts: [
+      "TTWO의 실적에서 GTA와 2K, Zynga가 각각 어떤 역할을 하는지 설명해줘.",
+      "테이크투의 반복 지출 매출이 왜 중요한지 정리해줘.",
+      "GTA VI 일정이 테이크투 가치에 왜 큰 변수인지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  VMC: {
+    ticker: "VMC",
+    companyName: "Vulcan Materials Company",
+    companyNameKo: "벌컨 머티리얼즈",
+    sectorKo: "건자재",
+    signature:
+      "도로와 기초공사를 떠받치는 건설 골재를 가장 많이 파는 미국 최대 건자재 회사.",
+    description:
+      "Vulcan Materials는 미국 최대 건설 골재 회사로, crushed stone, sand, gravel을 중심으로 아스팔트와 레미콘도 판다. 도로·교량·공항·산업시설·주택 착공과 지역 가격, 운송비, 인수합병이 실적을 좌우한다.",
+    researchFocus: [
+      "aggregates 가격과 물량",
+      "공공 인프라와 민간 건설 수요",
+      "아스팔트와 레미콘 믹스",
+      "채석장 입지와 운송 거리",
+      "인수합병과 자원 매장량",
+    ],
+    riskVariables: [
+      "건설 경기 둔화",
+      "기상·에너지·디젤 비용 상승",
+      "지역 경쟁과 통합 부담",
+    ],
+    suggestedPrompts: [
+      "VMC의 aggregates 가격과 물량이 실적에 어떻게 연결되는지 설명해줘.",
+      "벌컨 머티리얼즈에서 도로·인프라 수요와 주택 수요가 각각 어떤 역할을 하는지 정리해줘.",
+      "운송비와 에너지 비용이 건자재 마진에 주는 영향을 알려줘.",
+    ],
+    questionChains: {},
+  },
+  VRSK: {
+    ticker: "VRSK",
+    companyName: "Verisk Analytics, Inc.",
+    companyNameKo: "베리스크 애널리틱스",
+    sectorKo: "보험 데이터·분석",
+    signature:
+      "보험 언더라이팅과 클레임 판단을 돕는 데이터·분석 플랫폼.",
+    description:
+      "Verisk은 보험사에 데이터, 위험모형, 재해모델, 사기 탐지, 청구 및 언더라이팅 분석을 제공한다. 구독 갱신률, 제품 채택, 보험사 예산, 재해·기후 리스크 수요가 실적을 좌우한다.",
+    researchFocus: [
+      "구독 갱신률과 가격 인상",
+      "언더라이팅·클레임 분석 채택",
+      "재해·기후 모델 수요",
+      "사기 탐지와 리스크 스코어링",
+      "보험사 예산과 도입 속도",
+    ],
+    riskVariables: [
+      "보험사 데이터 예산 압박",
+      "모델 경쟁과 기능 중복",
+      "규제·계약 갱신 압박",
+    ],
+    suggestedPrompts: [
+      "VRSK의 구독 수익과 데이터 서비스가 어떻게 다르게 벌어지는지 설명해줘.",
+      "베리스크의 재해모델과 언더라이팅 분석이 보험사에 왜 필요한지 정리해줘.",
+      "보험사 예산 압박이 베리스크 성장에 어떻게 번지는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  SNDK: {
+    ticker: "SNDK",
+    companyName: "Sandisk Corporation",
+    companyNameKo: "샌디스크",
+    sectorKo: "스토리지 반도체",
+    signature:
+      "플래시 메모리와 SSD로 데이터 저장 수요를 먹는 스토리지 반도체 회사.",
+    description:
+      "Sandisk는 데이터센터용 SSD와 소비자용 플래시 저장장치를 판다. NAND 가격, 유통 재고, AI 인프라 수요, 제품 믹스가 실적을 좌우한다.",
+    researchFocus: [
+      "데이터센터용 SSD와 소비자용 플래시 수요",
+      "NAND 가격과 재고 조정",
+      "AI 인프라와 기업용 SSD 채택 속도",
+      "제품 믹스와 매출총이익률",
+      "유통 재고와 공급 조절",
+    ],
+    riskVariables: [
+      "NAND 가격 하락",
+      "고객 재고 조정 장기화",
+      "공급 과잉과 데이터센터 투자 둔화",
+    ],
+    suggestedPrompts: [
+      "샌디스크의 데이터센터용 SSD와 소비자용 플래시 수요가 어떻게 다르게 움직이는지 설명해줘.",
+      "NAND 가격과 재고 조정이 SNDK 마진에 어떻게 번지는지 정리해줘.",
+      "AI 인프라 수요가 샌디스크 성장에 주는 의미를 알려줘.",
+    ],
+    questionChains: {},
+  },
+  STT: {
+    ticker: "STT",
+    companyName: "State Street Corporation",
+    companyNameKo: "스테이트 스트리트",
+    sectorKo: "기관 자산서비스",
+    signature:
+      "기관 자산을 보관·결제하고 ETF와 자산운용으로 수수료를 쌓는 금융 인프라 회사.",
+    description:
+      "State Street는 기관투자자의 자산 수탁, 펀드서비스, 결제, 자산운용을 제공한다. 수탁자산, 운용자산, SPDR ETF 흐름, 금리, 비용 관리가 실적을 좌우한다.",
+    researchFocus: [
+      "수탁자산과 운용자산의 성장",
+      "SPDR ETF와 기관 자금 흐름",
+      "순이자이익과 예금 믹스",
+      "서비스 수수료와 거래량 변화",
+      "비용 관리와 자본 효율",
+    ],
+    riskVariables: [
+      "금리 하락에 따른 순이자이익 압박",
+      "기관 자금 유출과 AUM 감소",
+      "수수료 경쟁과 비용 부담",
+    ],
+    suggestedPrompts: [
+      "State Street의 수탁자산과 운용자산이 수수료에 어떻게 연결되는지 설명해줘.",
+      "금리 변화가 STT의 순이자이익과 수수료에 각각 미치는 영향을 나눠서 봐줘.",
+      "기관 자금 유출입이 스테이트 스트리트 실적에 주는 신호를 정리해줘.",
+    ],
+    questionChains: {},
+  },
+  SUI: {
+    ticker: "SUI",
+    companyName: "Sun Communities, Inc.",
+    companyNameKo: "선 커뮤니티스",
+    sectorKo: "주거·레저 리츠",
+    signature:
+      "제조주택과 RV 커뮤니티로 장기 임대료를 쌓는 주거 리츠.",
+    description:
+      "Sun Communities는 제조주택 커뮤니티와 RV 커뮤니티를 운영하는 리츠다. 입주율, 임대료 인상, 지역 수요, 계절성, 금리가 현금흐름을 좌우한다.",
+    researchFocus: [
+      "제조주택 커뮤니티 점유율과 임대료 인상",
+      "RV 커뮤니티의 계절성",
+      "지역 수요와 입지 경쟁력",
+      "자산 인수와 포트폴리오 재편",
+      "금리와 자본조달 비용",
+    ],
+    riskVariables: [
+      "금리 상승으로 인한 자본비용 압박",
+      "입주율 둔화와 임대료 인상 여력 약화",
+      "지역 경기와 계절성 변동",
+    ],
+    suggestedPrompts: [
+      "Sun Communities의 입주율과 임대료 인상이 현금흐름에 어떻게 이어지는지 설명해줘.",
+      "제조주택 커뮤니티와 RV 커뮤니티 중 어느 쪽이 더 계절성에 민감한지 정리해줘.",
+      "금리 상승이 SUI 성장과 자본조달에 어떤 부담인지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  SYY: {
+    ticker: "SYY",
+    companyName: "Sysco Corporation",
+    companyNameKo: "시스코",
+    sectorKo: "식자재 유통",
+    signature:
+      "외식·급식 고객에게 식품과 관련 용품을 공급하는 식자재 유통사.",
+    description:
+      "Sysco는 외식, 병원, 학교, 호텔 고객에게 식품과 관련 용품을 유통한다. 케이스 볼륨, 가격 전가, 고객 믹스, 운송과 인건비가 마진을 결정한다.",
+    researchFocus: [
+      "케이스 볼륨과 고객 믹스",
+      "가격 전가와 식품 인플레이션",
+      "외식·급식 수요와 매장 트래픽",
+      "운송·창고·인건비 효율",
+      "자사브랜드와 조달 경쟁력",
+    ],
+    riskVariables: [
+      "외식 수요 둔화",
+      "식품 디플레이션과 마진 압박",
+      "운송·인건비 상승과 경쟁 심화",
+    ],
+    suggestedPrompts: [
+      "Sysco의 케이스 볼륨과 가격이 매출에 어떻게 같이 작동하는지 설명해줘.",
+      "외식 수요와 고객 믹스가 SYY 마진에 미치는 영향을 정리해줘.",
+      "연료비와 인건비가 시스코 수익성에 어떻게 번지는지 알려줘.",
+    ],
+    questionChains: {},
+  },
+  TER: {
+    ticker: "TER",
+    companyName: "Teradyne, Inc.",
+    companyNameKo: "테라다인",
+    sectorKo: "반도체 테스트·로봇",
+    signature:
+      "반도체 테스트와 협동로봇으로 공장 자동화를 돕는 장비 회사.",
+    description:
+      "Teradyne는 반도체와 전자제품용 자동화 테스트 장비를 만들고 협동로봇과 모바일 로봇을 판다. 반도체 설비투자, AI 칩 테스트 수요, 로봇 주문이 실적을 좌우한다.",
+    researchFocus: [
+      "반도체 테스트 수요와 AI 칩 투자 사이클",
+      "전자제품 테스트와 고객 설비투자",
+      "협동로봇과 모바일 로봇 수주",
+      "제품 믹스와 영업이익률",
+      "고객 재고 조정과 출하 타이밍",
+    ],
+    riskVariables: [
+      "반도체 설비투자 둔화",
+      "로봇 주문 변동성",
+      "고객 재고 조정과 경쟁 심화",
+    ],
+    suggestedPrompts: [
+      "Teradyne의 반도체 테스트 사업과 로봇 사업이 각각 어떤 역할을 하는지 설명해줘.",
+      "AI 칩 투자 사이클이 TER 실적에 왜 중요한지 정리해줘.",
+      "로봇 수요가 테라다인의 변동성을 얼마나 완화하는지 알려줘.",
+    ],
+    questionChains: {},
+  },
 } satisfies Record<string, CompanyResearchProfile>;
 export const APPLE_RESEARCH_PROFILE = COMPANY_RESEARCH_PROFILES.AAPL;
 export { APPLE_QUESTION_CHAINS };

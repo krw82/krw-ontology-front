@@ -343,45 +343,6 @@ describe("agent job queue", () => {
     );
   });
 
-  it("persists server pipeline executor type for queued runs", async () => {
-    const fake = createQueueAdmin();
-    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
-
-    await enqueueAgentRun({
-      session,
-      history,
-      requestId: "req-1",
-      model: "sonnet",
-      mcpHealth,
-      analysisMode: "news",
-      runKind: "news_discovery",
-      executorType: "server_pipeline",
-    });
-
-    expect(fake.inserted).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          table: "agent_runs",
-          payload: expect.objectContaining({
-            run_kind: "news_discovery",
-            executor_type: "server_pipeline",
-          }),
-        }),
-      ]),
-    );
-    expect(appendAgentRunEvent).toHaveBeenNthCalledWith(
-      1,
-      fake.admin,
-      "run-1",
-      "run_queued",
-      expect.objectContaining({
-        analysis_mode: "news",
-        run_kind: "news_discovery",
-        executor_type: "server_pipeline",
-      }),
-    );
-  });
-
   it("returns an existing run for duplicate request ids without creating rows", async () => {
     const fake = createQueueAdmin({
       requestLookups: [

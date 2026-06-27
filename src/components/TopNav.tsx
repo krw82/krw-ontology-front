@@ -336,6 +336,7 @@ export default function TopNav({
               </AnimatePresence>
               <button
                 type="button"
+                data-onboarding-target="sidebar-trigger"
                 className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55"
                 aria-label={
                   currentLocale === "ko" ? "채팅 기록 열기" : "Open chat history"
@@ -364,6 +365,13 @@ export default function TopNav({
               <Link
                 key={link.href}
                 href={link.href}
+                data-onboarding-target={
+                  link.href === "/discover"
+                    ? "stock-discovery-nav"
+                    : link.href === "/watchlist"
+                      ? "research-notebook-nav"
+                      : undefined
+                }
                 className={[
                   "rounded-[8px] px-sm py-xs text-[13px] font-extrabold leading-5 transition-colors",
                   link.active

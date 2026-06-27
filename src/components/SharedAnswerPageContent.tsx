@@ -1,9 +1,9 @@
 import { KrwBrand } from "@/components/KrwBrand";
+import MessageAttachments from "@/components/MessageAttachments";
 import ResearchMarkdown from "@/components/ResearchMarkdown";
 import SharePageEvents from "@/components/SharePageEvents";
 import ShareStartLink from "@/components/ShareStartLink";
 import type { Locale } from "@/i18n/config";
-import { buildNewChatHref } from "@/lib/chat/history-state";
 import type { PublicMessageShare } from "@/lib/share/message-share";
 
 const copy = {
@@ -39,8 +39,11 @@ export default function SharedAnswerPageContent({
   const strings = copy[locale];
   const tickers = share.tickers?.filter(Boolean) ?? [];
   const hasQuestion = Boolean(share.question_content);
+  const hasQuestionAttachments =
+    share.question_attachments.urls.length > 0 ||
+    share.question_attachments.files.length > 0;
   const answerIndex = hasQuestion ? "02" : "01";
-  const startHref = buildNewChatHref(undefined, { locale });
+  const startHref = "/";
 
   return (
     <div className="min-h-[100dvh] bg-canvas pb-[112px] text-on-surface">
@@ -68,6 +71,15 @@ export default function SharedAnswerPageContent({
                 01 {strings.questionLabel}
               </div>
               <div className="border-l-2 border-primary-container pl-md text-ink">
+                {hasQuestionAttachments ? (
+                  <MessageAttachments
+                    urls={share.question_attachments.urls}
+                    files={share.question_attachments.files}
+                    align="start"
+                    variant="icon"
+                    className="mb-sm"
+                  />
+                ) : null}
                 <p className="whitespace-pre-wrap break-words text-[18px] font-extrabold leading-[1.55] sm:text-[22px] sm:leading-[1.45]">
                   {share.question_content}
                 </p>

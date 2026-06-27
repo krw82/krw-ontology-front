@@ -225,9 +225,6 @@ require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.mcp.json"
 require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.claude-plugin/plugin.json"
 mkdir -p "$CLAUDE_AGENT_CWD" "$CLAUDE_CONFIG_DIR"
 
-echo "Checking news translation readiness..."
-(cd "$FRONT_DIR" && node scripts/verify-news-translation.mjs)
-
 if [ ! -L "$KRW_ONTOLOGY_RELEASE_ROOT" ]; then
   echo "KRW_ONTOLOGY_RELEASE_ROOT must be the prod/current symlink: $KRW_ONTOLOGY_RELEASE_ROOT" >&2
   exit 1

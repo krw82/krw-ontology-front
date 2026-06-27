@@ -418,7 +418,7 @@ describe("POST /api/chat/run worker admission", () => {
     );
   });
 
-  it("queues news discovery for the worker server pipeline", async () => {
+  it("queues news discovery for the worker Claude agent", async () => {
     vi.mocked(getReadyAgentWorker).mockResolvedValue({
       ok: true,
       worker: { worker_id: "mac-worker-jwc-1" } as never,
@@ -450,7 +450,7 @@ describe("POST /api/chat/run worker admission", () => {
         analysisMode: "news",
         runKind: "news_discovery",
         routingMode: "preserve",
-        executorType: "server_pipeline",
+        executorType: "claude_agent",
       }),
     );
     expect(streamAgentRunEventsResponse).toHaveBeenCalledWith(
@@ -463,7 +463,7 @@ describe("POST /api/chat/run worker admission", () => {
     );
   });
 
-  it("queues explicit user URL checks as selected news research", async () => {
+  it("queues explicit user URL checks as selected company research", async () => {
     vi.mocked(getReadyAgentWorker).mockResolvedValue({
       ok: true,
       worker: { worker_id: "mac-worker-jwc-1" } as never,
@@ -506,8 +506,8 @@ describe("POST /api/chat/run worker admission", () => {
     });
     expect(enqueueAgentRun).toHaveBeenCalledWith(
       expect.objectContaining({
-        analysisMode: "news",
-        runKind: "news_research",
+        analysisMode: "company",
+        runKind: "company_research",
         routingMode: "preserve",
         executorType: "claude_agent",
         selectedNewsEventContext: expect.objectContaining({
@@ -522,8 +522,8 @@ describe("POST /api/chat/run worker admission", () => {
       expect.any(NextRequest),
       expect.objectContaining({
         properties: expect.objectContaining({
-          analysis_mode: "news",
-          run_kind: "news_research",
+          analysis_mode: "company",
+          run_kind: "company_research",
           has_user_url: true,
           user_url_count: 1,
         }),
@@ -531,7 +531,7 @@ describe("POST /api/chat/run worker admission", () => {
     );
   });
 
-  it("queues multiple explicit user URL checks as one selected news research context", async () => {
+  it("queues multiple explicit user URL checks as one selected company research context", async () => {
     vi.mocked(getReadyAgentWorker).mockResolvedValue({
       ok: true,
       worker: { worker_id: "mac-worker-jwc-1" } as never,
@@ -576,8 +576,8 @@ describe("POST /api/chat/run worker admission", () => {
     });
     expect(enqueueAgentRun).toHaveBeenCalledWith(
       expect.objectContaining({
-        analysisMode: "news",
-        runKind: "news_research",
+        analysisMode: "company",
+        runKind: "company_research",
         routingMode: "preserve",
         selectedNewsEventContext: expect.objectContaining({
           source_kind: "user_provided_urls",

@@ -23,32 +23,19 @@ vi.mock("@/lib/agent/run-events", () => ({
     flush: vi.fn().mockResolvedValue(undefined),
   })),
 }));
-vi.mock("@/lib/news-discovery/discovery", () => ({
-  discoverNewsCards: vi.fn(),
-}));
 vi.mock("@/lib/news-discovery/source-pack", () => ({
   buildSelectedNewsSourcePack: vi.fn(),
 }));
 vi.mock("@/lib/question-router/chat-question-router", () => ({
   resolveChatQuestionRoute: vi.fn(),
 }));
-vi.mock("@/lib/market-move/target", () => ({
-  resolveMarketMoveTarget: vi.fn(),
-}));
-vi.mock("@/lib/market-move/context-builder", () => ({
-  buildMarketMoveContext: vi.fn(),
-}));
-
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { checkMcpHealth, type McpHealthResult } from "@/lib/agent/mcp-client";
 import { runAgent } from "@/lib/agent/runner";
 import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { discoverNewsCards } from "@/lib/news-discovery/discovery";
 import { buildSelectedNewsSourcePack } from "@/lib/news-discovery/source-pack";
 import { resolveChatQuestionRoute } from "@/lib/question-router/chat-question-router";
-import { resolveMarketMoveTarget } from "@/lib/market-move/target";
-import { buildMarketMoveContext } from "@/lib/market-move/context-builder";
 import { runAgentJob } from "./job-runner";
 
 function createRunnerAdmin(params: {
@@ -294,6 +281,7 @@ function readyMcpHealth(): McpHealthResult {
 describe("agent job runner", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.KRW_CHARTS_ENABLED;
     vi.mocked(checkMcpHealth).mockResolvedValue({
       connected: false,
       staticOk: true,
@@ -319,44 +307,64 @@ describe("agent job runner", () => {
     });
   });
 
+  it("strips chart tokens and skips chart persistence while chart generation is disabled", async () => {
+    const fake = createRunnerAdmin();
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+    vi.mocked(checkMcpHealth).mockResolvedValue(readyMcpHealth());
+    vi.mocked(runAgent).mockResolvedValue({
+      status: "completed",
+      acc: {
+        fullText: [
+          "요약입니다.",
+          "",
+          "[[krw-chart:chart_1_deadbeef]]",
+          "",
+          "후속 설명입니다.",
+        ].join("\n"),
+        structuredOutput: null,
+        researchSynthesisOutput: null,
+        researchSynthesisText: null,
+        displayPlanOutput: null,
+        toolCalls: [],
+        citations: [],
+        inputTokens: 10,
+        outputTokens: 20,
+        cacheHitInputTokens: 0,
+        cacheMissInputTokens: 0,
+      },
+    });
+
+    await runAgentJob("run-1", "worker-1");
+
+    expect(fake.inserted).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ table: "chat_message_charts" }),
+      ]),
+    );
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: "messages",
+          payload: expect.objectContaining({
+            content: "요약입니다.\n\n후속 설명입니다.",
+            status: "completed",
+          }),
+          filters: { id: "assistant-message-1" },
+        }),
+      ]),
+    );
+    expect(appendAgentRunEvent).toHaveBeenCalledWith(
+      fake.admin,
+      "run-1",
+      "done",
+      expect.objectContaining({
+        content: "요약입니다.\n\n후속 설명입니다.",
+        charts: [],
+      }),
+    );
+  });
+
   it("runs auto routing inside the worker before the research SDK pass", async () => {
-    const marketMoveContext = {
-      version: "market-move-context/v1",
-      ticker: "AAPL",
-      company_name: "Apple Inc.",
-      user_question: "AAPL 오늘 왜 떨어져?",
-      as_of: "2026-06-24T00:00:00.000Z",
-      status: "ok",
-      provider: {
-        name: "yahoo-finance-mcp",
-        status: "ok",
-        error: null,
-      },
-      market_observation: {
-        ticker: "AAPL",
-        company_name: "Apple Inc.",
-        direction: "down",
-        requested_percent_move: null,
-        current_price: 100,
-        previous_close: 103,
-        absolute_change: -3,
-        percent_change: -2.91,
-        volume: 1000,
-        average_volume: 900,
-        volume_signal: "near_average",
-        market_time: "REGULAR",
-        currency: "USD",
-      },
-      event_candidates: [],
-      source_pack: {
-        version: "market-move-source-pack/v1",
-        ontology_search_brief_en:
-          "Investigate recent Apple stock weakness only if the user asks for filing-grounded implications.",
-        original_text_for_ontology: "User question: AAPL 오늘 왜 떨어져?",
-        source_urls: [],
-        source_previews: [],
-      },
-    } satisfies Awaited<ReturnType<typeof buildMarketMoveContext>>;
     const fake = createRunnerAdmin({
       userMessageContent: "AAPL 오늘 왜 떨어져?",
       queuedEventPayload: {
@@ -376,11 +384,6 @@ describe("agent job runner", () => {
       confidence: "medium",
       reason: "test market move route",
     });
-    vi.mocked(resolveMarketMoveTarget).mockResolvedValue({
-      ticker: "AAPL",
-      companyName: "Apple Inc.",
-    });
-    vi.mocked(buildMarketMoveContext).mockResolvedValue(marketMoveContext);
     vi.mocked(runAgent).mockResolvedValue({
       status: "completed",
       acc: {
@@ -402,6 +405,7 @@ describe("agent job runner", () => {
 
     expect(resolveChatQuestionRoute).toHaveBeenCalledWith(
       expect.objectContaining({
+        sessionId: "session-1",
         content: "AAPL 오늘 왜 떨어져?",
         currentAnalysisMode: "company",
         currentRunKind: "company_research",
@@ -409,23 +413,11 @@ describe("agent job runner", () => {
         scopeType: "company",
       }),
     );
-    expect(resolveMarketMoveTarget).toHaveBeenCalledWith({
-      content: "AAPL 오늘 왜 떨어져?",
-      defaultTickers: ["AAPL"],
-    });
-    expect(buildMarketMoveContext).toHaveBeenCalledWith({
-      ticker: "AAPL",
-      companyName: "Apple Inc.",
-      userQuestion: "AAPL 오늘 왜 떨어져?",
-    });
     expect(runAgent).toHaveBeenCalledWith(
       expect.objectContaining({
         analysisMode: "news",
         runKind: "market_move_research",
-        selectedNewsEventContext: expect.objectContaining({
-          version: "market-move-context/v1",
-          ticker: "AAPL",
-        }),
+        selectedNewsEventContext: null,
       }),
       expect.any(Object),
     );
@@ -436,10 +428,6 @@ describe("agent job runner", () => {
           payload: expect.objectContaining({
             run_kind: "market_move_research",
             executor_type: "claude_agent",
-            selected_news_event_context: expect.objectContaining({
-              version: "market-move-context/v1",
-              ticker: "AAPL",
-            }),
           }),
           filters: { id: "run-1" },
         }),
@@ -455,7 +443,7 @@ describe("agent job runner", () => {
         routing: expect.objectContaining({
           mode: "auto",
           run_kind: "market_move_research",
-          has_selected_news_event_context: true,
+          has_selected_news_event_context: false,
         }),
       }),
     );
@@ -500,8 +488,6 @@ describe("agent job runner", () => {
 
     await runAgentJob("run-1", "worker-1");
 
-    expect(resolveMarketMoveTarget).not.toHaveBeenCalled();
-    expect(buildMarketMoveContext).not.toHaveBeenCalled();
     expect(runAgent).toHaveBeenCalledWith(
       expect.objectContaining({
         analysisMode: "company",
@@ -537,193 +523,7 @@ describe("agent job runner", () => {
     );
   });
 
-  it("runs queued server pipeline news discovery inside the worker", async () => {
-    const fake = createRunnerAdmin({
-      runOverrides: {
-        run_kind: "news_discovery",
-        executor_type: "server_pipeline",
-      },
-    });
-    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
-    vi.mocked(checkMcpHealth).mockResolvedValue(readyMcpHealth());
-    vi.mocked(discoverNewsCards).mockResolvedValue({
-      discovery: {
-        intent: {
-          originalQuestion: "Apple 오늘 왜 올라?",
-          englishQuestion: "Why is Apple stock rising today?",
-          direction: "up",
-          ticker: "AAPL",
-          companyName: "Apple Inc.",
-          resolvedEntities: [{ ticker: "AAPL" }],
-          lookbackHours: 48,
-        },
-        rawSearchResult: { events: [] },
-        selectedSourcePolicy: {
-          allowed_domains: ["reuters.com"],
-          excluded_domains: ["sec.gov"],
-          market_news_only: true,
-        },
-      },
-      composition: {
-        cards: [
-          {
-            id: "apple-market-news",
-            ticker: "AAPL",
-            event_title: "Apple shares rise after market news",
-            event_title_ko: "시장 뉴스 이후 애플 주가 상승",
-            short_summary:
-              "시장 뉴스는 애플 주가 상승 요인을 신제품 기대와 연결했습니다.",
-            summary_ko:
-              "로이터 시장 뉴스는 애플 주가 상승을 신제품 수요 기대와 투자자 위험 선호 회복에 연결했습니다.",
-            source_previews: [
-              {
-                publisher: "Reuters",
-                domain: "reuters.com",
-                title_original: "Apple shares rise after market news",
-                url: "https://example.test/apple",
-              },
-            ],
-          },
-        ],
-        usage: {
-          input_tokens: 100,
-          output_tokens: 50,
-          estimated_cost_usd: 0.001,
-        },
-      },
-    });
-
-    await runAgentJob("run-1", "worker-1");
-
-    expect(runAgent).not.toHaveBeenCalled();
-    expect(discoverNewsCards).toHaveBeenCalledWith(
-      expect.objectContaining({
-        question: "Apple 매출 알려줘",
-        session: expect.objectContaining({
-          id: "session-1",
-          userId: "user-1",
-          scopeType: "company",
-          defaultTickers: ["AAPL"],
-        }),
-      }),
-    );
-    expect(fake.inserted).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          table: "chat_message_artifacts",
-          payload: expect.objectContaining({
-            session_id: "session-1",
-            message_id: "assistant-message-1",
-            run_id: "run-1",
-            type: "news_event_selection",
-          }),
-        }),
-      ]),
-    );
-    expect(fake.updates).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          table: "messages",
-          payload: expect.objectContaining({
-            status: "completed",
-          }),
-          filters: { id: "assistant-message-1" },
-        }),
-        expect.objectContaining({
-          table: "agent_runs",
-          payload: expect.objectContaining({
-            status: "completed",
-            input_tokens: 100,
-            output_tokens: 50,
-            estimated_cost_usd: 0.001,
-            lease_expires_at: null,
-          }),
-          filters: { id: "run-1" },
-        }),
-      ]),
-    );
-    expect(fake.rpc).toHaveBeenCalledWith("settle_execution_budget", {
-      p_user_id: "user-1",
-      p_request_id: "req-1",
-      p_run_id: "run-1",
-      p_actual_cost_usd: 0.001,
-      p_terminal_status: "completed",
-      p_metadata: expect.objectContaining({
-        executor_type: "server_pipeline",
-        run_kind: "news_discovery",
-        card_count: 1,
-      }),
-    });
-    expect(appendAgentRunEvent).toHaveBeenCalledWith(
-      fake.admin,
-      "run-1",
-      "done",
-      expect.objectContaining({
-        run_id: "run-1",
-        chat_artifacts: expect.arrayContaining([
-          expect.objectContaining({ type: "news_event_selection" }),
-        ]),
-      }),
-    );
-  });
-
-  it("marks server pipeline news discovery cancelled when a cancel is requested", async () => {
-    const fake = createRunnerAdmin({
-      runOverrides: {
-        run_kind: "news_discovery",
-        executor_type: "server_pipeline",
-        cancel_requested_at: "2026-05-25T00:00:01.000Z",
-      },
-    });
-    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
-    vi.mocked(checkMcpHealth).mockResolvedValue(readyMcpHealth());
-
-    await runAgentJob("run-1", "worker-1");
-
-    expect(fake.updates).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          table: "messages",
-          payload: expect.objectContaining({
-            status: "cancelled",
-          }),
-          filters: { id: "assistant-message-1" },
-        }),
-        expect.objectContaining({
-          table: "agent_runs",
-          payload: expect.objectContaining({
-            status: "cancelled",
-            error_code: "cancelled",
-            lease_expires_at: null,
-          }),
-          filters: { id: "run-1" },
-        }),
-      ]),
-    );
-    expect(fake.rpc).toHaveBeenCalledWith("settle_execution_budget", {
-      p_user_id: "user-1",
-      p_request_id: "req-1",
-      p_run_id: "run-1",
-      p_actual_cost_usd: expect.any(Number),
-      p_terminal_status: "cancelled",
-      p_metadata: expect.objectContaining({
-        input_tokens: expect.any(Number),
-        output_tokens: expect.any(Number),
-        tool_call_count: 0,
-      }),
-    });
-    expect(appendAgentRunEvent).toHaveBeenCalledWith(
-      fake.admin,
-      "run-1",
-      "cancelled",
-      {
-        run_id: "run-1",
-        message_id: "assistant-message-1",
-      },
-    );
-  });
-
-  it("builds selected news source packs inside the worker before news research", async () => {
+  it("builds selected news source packs inside the worker before company research", async () => {
     const selectedEvent = {
       id: "apple-market-news",
       ticker: "AAPL",
@@ -739,13 +539,13 @@ describe("agent job runner", () => {
     };
     const fake = createRunnerAdmin({
       runOverrides: {
-        run_kind: "news_research",
+        run_kind: "company_research",
         executor_type: "claude_agent",
         selected_news_event_context: selectedEvent,
       },
       queuedEventPayload: {
-        analysis_mode: "news",
-        run_kind: "news_research",
+        analysis_mode: "company",
+        run_kind: "company_research",
         response_locale: "en",
       },
     });
@@ -792,7 +592,7 @@ describe("agent job runner", () => {
     expect(buildSelectedNewsSourcePack).toHaveBeenCalledWith(selectedEvent);
     expect(runAgent).toHaveBeenCalledWith(
       expect.objectContaining({
-        runKind: "news_research",
+        runKind: "company_research",
         responseLocale: "en",
         selectedNewsEventContext: expect.objectContaining({
           ...selectedEvent,

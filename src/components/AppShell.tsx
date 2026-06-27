@@ -3,6 +3,7 @@
 import { usePathname, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import ChatSidebar from "@/components/ChatSidebar";
+import ProductOnboardingTour from "@/components/ProductOnboardingTour";
 import { stripLocalePrefix } from "@/i18n/routing";
 
 interface AppShellProps {
@@ -82,6 +83,12 @@ export default function AppShell({ children }: AppShellProps) {
         >
           {children}
         </motion.div>
+        {unlocalizedPathname === "/companies" ? (
+          <ProductOnboardingTour
+            pathname={pathname}
+            force={searchParams.get("tour") === "1"}
+          />
+        ) : null}
       </div>
     );
   }
@@ -101,6 +108,14 @@ export default function AppShell({ children }: AppShellProps) {
         >
           {children}
         </motion.div>
+        {unlocalizedPathname === "/chat" ||
+        unlocalizedPathname.startsWith("/chat/") ? (
+          <ProductOnboardingTour
+            pathname={pathname}
+            tour="chat"
+            force={searchParams.get("tour") === "1"}
+          />
+        ) : null}
       </div>
     );
   }

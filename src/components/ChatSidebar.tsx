@@ -125,6 +125,14 @@ interface SidebarContentProps {
   onDeleteActiveSession?: () => void;
 }
 
+interface SidebarPrimaryLinksProps {
+  locale: Locale;
+  copy: SidebarCopy;
+  hasResearchInboxItems: boolean;
+  reducedMotion: boolean;
+  onNavigate?: () => void;
+}
+
 function formatRelativeDate(value: string, locale: Locale): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
@@ -218,8 +226,6 @@ export default function ChatSidebar({
   }, [closeMobileSidebar, mobileOpen]);
 
   useEffect(() => {
-    if (!mobileOpen) return;
-
     let stale = false;
     async function loadResearchInboxState() {
       try {
@@ -241,7 +247,7 @@ export default function ChatSidebar({
     return () => {
       stale = true;
     };
-  }, [mobileOpen]);
+  }, []);
 
   useEffect(() => {
     if (!pendingNavigationSessionId) return;
@@ -308,86 +314,13 @@ export default function ChatSidebar({
                   </span>
                 </button>
               </div>
-              <div className="border-b border-hairline px-xs py-xs">
-                <Link
-                  href="/watchlist"
-                  className="group flex h-10 items-center gap-xs rounded-[8px] px-xs text-[14px] font-bold leading-5 text-ink transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-                  aria-label={copy.openResearchNotebook}
-                  onClick={closeMobileSidebar}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="material-symbols-outlined text-[20px] text-muted transition-colors group-hover:text-ink"
-                  >
-                    article
-                  </span>
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="truncate">{copy.researchNotebook}</span>
-                    {hasResearchInboxItems ? (
-                      <span
-                        aria-hidden="true"
-                        className="relative h-2.5 w-2.5 shrink-0"
-                      >
-                        <span className="absolute inset-[1px] rounded-full bg-primary-container" />
-                        {!reducedMotion && (
-                          <motion.span
-                            aria-hidden="true"
-                            className="absolute inset-0 rounded-full border border-primary-container"
-                            animate={{ opacity: [0.48, 0], scale: [1, 2.2] }}
-                            transition={{
-                              duration: 1.2,
-                              repeat: Infinity,
-                              ease: "easeOut",
-                            }}
-                          />
-                        )}
-                      </span>
-                    ) : null}
-                  </span>
-                </Link>
-                <Link
-                  href="/discover"
-                  className="group flex h-10 items-center gap-xs rounded-[8px] px-xs text-[14px] font-bold leading-5 text-ink transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-                  aria-label={copy.openStockDiscovery}
-                  onClick={closeMobileSidebar}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="material-symbols-outlined text-[20px] text-muted transition-colors group-hover:text-ink"
-                  >
-                    travel_explore
-                  </span>
-                  <span className="truncate">{copy.stockDiscovery}</span>
-                </Link>
-                <Link
-                  href={localizedPath(locale, "/companies")}
-                  className="group flex h-10 items-center gap-xs rounded-[8px] px-xs text-[14px] font-bold leading-5 text-ink transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-                  aria-label={copy.openCompanySearch}
-                  onClick={closeMobileSidebar}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="material-symbols-outlined text-[20px] text-muted transition-colors group-hover:text-ink"
-                  >
-                    search
-                  </span>
-                  <span className="truncate">{copy.companySearch}</span>
-                </Link>
-                <Link
-                  href={buildNewChatHref(undefined, { locale })}
-                  className="group flex h-10 items-center gap-xs rounded-[8px] px-xs text-[14px] font-bold leading-5 text-ink transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-                  aria-label={copy.openWideResearch}
-                  onClick={closeMobileSidebar}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="material-symbols-outlined text-[20px] text-muted transition-colors group-hover:text-ink"
-                  >
-                    hub
-                  </span>
-                  <span className="truncate">{copy.wideResearch}</span>
-                </Link>
-              </div>
+              <SidebarPrimaryLinks
+                locale={locale}
+                copy={copy}
+                hasResearchInboxItems={hasResearchInboxItems}
+                reducedMotion={reducedMotion}
+                onNavigate={closeMobileSidebar}
+              />
               <div className="border-b border-hairline px-sm py-xs">
                 <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] leading-4 text-muted">
                   {copy.recentChats}
@@ -417,6 +350,17 @@ export default function ChatSidebar({
 
       {showDesktopSidebar && (
         <aside className="hidden w-[280px] shrink-0 flex-col border-r border-hairline bg-surface/80 md:sticky md:top-0 md:flex md:h-[100dvh] md:max-h-[100dvh]">
+          <SidebarPrimaryLinks
+            locale={locale}
+            copy={copy}
+            hasResearchInboxItems={hasResearchInboxItems}
+            reducedMotion={reducedMotion}
+          />
+          <div className="border-b border-hairline px-sm py-xs">
+            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] leading-4 text-muted">
+              {copy.recentChats}
+            </p>
+          </div>
           <SidebarContent
             activeSessionId={activeSessionId}
             locale={locale}
@@ -435,6 +379,90 @@ export default function ChatSidebar({
         </aside>
       )}
     </>
+  );
+}
+
+function SidebarPrimaryLinks({
+  locale,
+  copy,
+  hasResearchInboxItems,
+  reducedMotion,
+  onNavigate,
+}: SidebarPrimaryLinksProps) {
+  const linkClass =
+    "group flex h-10 items-center gap-xs rounded-[8px] px-xs text-[14px] font-bold leading-5 text-ink transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
+  const iconClass =
+    "material-symbols-outlined text-[20px] text-muted transition-colors group-hover:text-ink";
+
+  return (
+    <div className="border-b border-hairline px-xs py-xs">
+      <Link
+        href="/watchlist"
+        data-onboarding-target="research-notebook-sidebar"
+        className={linkClass}
+        aria-label={copy.openResearchNotebook}
+        onClick={onNavigate}
+      >
+        <span aria-hidden="true" className={iconClass}>
+          article
+        </span>
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate">{copy.researchNotebook}</span>
+          {hasResearchInboxItems ? (
+            <span aria-hidden="true" className="relative h-2.5 w-2.5 shrink-0">
+              <span className="absolute inset-[1px] rounded-full bg-primary-container" />
+              {!reducedMotion && (
+                <motion.span
+                  aria-hidden="true"
+                  className="absolute inset-0 rounded-full border border-primary-container"
+                  animate={{ opacity: [0.48, 0], scale: [1, 2.2] }}
+                  transition={{
+                    duration: 1.2,
+                    repeat: Infinity,
+                    ease: "easeOut",
+                  }}
+                />
+              )}
+            </span>
+          ) : null}
+        </span>
+      </Link>
+      <Link
+        href="/discover"
+        data-onboarding-target="stock-discovery-sidebar"
+        className={linkClass}
+        aria-label={copy.openStockDiscovery}
+        onClick={onNavigate}
+      >
+        <span aria-hidden="true" className={iconClass}>
+          travel_explore
+        </span>
+        <span className="truncate">{copy.stockDiscovery}</span>
+      </Link>
+      <Link
+        href={localizedPath(locale, "/companies")}
+        className={linkClass}
+        aria-label={copy.openCompanySearch}
+        onClick={onNavigate}
+      >
+        <span aria-hidden="true" className={iconClass}>
+          search
+        </span>
+        <span className="truncate">{copy.companySearch}</span>
+      </Link>
+      <Link
+        href={buildNewChatHref(undefined, { locale })}
+        data-onboarding-target="wide-research-sidebar"
+        className={linkClass}
+        aria-label={copy.openWideResearch}
+        onClick={onNavigate}
+      >
+        <span aria-hidden="true" className={iconClass}>
+          hub
+        </span>
+        <span className="truncate">{copy.wideResearch}</span>
+      </Link>
+    </div>
   );
 }
 

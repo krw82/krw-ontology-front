@@ -99,7 +99,7 @@ definitive buy/sell/hold advice
 portfolio sizing, hedging, borrow, options, or execution
 ```
 
-If the user asks what a current news event means, use the news-research workflow first. This skill may analyze a user-supplied scenario, but it does not discover current events.
+If the user asks what a current news event means and no event or market-move context is supplied, use the news-discovery or market-move workflow first. If the user refers to `이 뉴스`, `이 움직임`, `오늘 하락`, `방금 답변`, or another event already present in the current conversation, treat that as a user-supplied market premise and analyze the scenario mechanics from filing/company evidence. Do not rediscover current news or require a fresh price snapshot inside this skill.
 
 ## 4. Internal Investment-Assumption Brief
 

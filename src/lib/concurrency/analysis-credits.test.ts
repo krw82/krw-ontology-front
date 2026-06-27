@@ -12,7 +12,7 @@ describe("analysis credit reservations", () => {
     expect(getInitialAnalysisCreditReservationRaw("company_research", "deep")).toBe(
       1_000,
     );
-    expect(getInitialAnalysisCreditReservationRaw("news_research", "deep")).toBe(
+    expect(getInitialAnalysisCreditReservationRaw("news_discovery", "deep")).toBe(
       1_000,
     );
     expect(getInitialAnalysisCreditReservationRaw()).toBe(1_000);

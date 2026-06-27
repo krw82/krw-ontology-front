@@ -14,9 +14,10 @@ Defaults:
   --from  .env
   --out   .env.mac-worker.production
 
-The generated file starts with one Mac production worker and
-GLOBAL_CONCURRENT_RUN_LIMIT=1. Raise both values together only after validating
-host capacity and provider concurrency.
+The generated file starts with one Mac production supervisor and eight internal
+concurrent run slots. Keep GLOBAL_CONCURRENT_RUN_LIMIT aligned with
+AGENT_SUPERVISOR_CONCURRENCY after validating host capacity and provider
+concurrency.
 EOF
 }
 
@@ -221,9 +222,9 @@ trap cleanup EXIT INT TERM
   echo "CLAUDE_CODE_EXECUTABLE=$CLAUDE_PATH"
   echo "EXPECTED_CLAUDE_CODE_VERSION=2.1.141"
   echo "AGENT_SUPERVISOR_ID=mac-supervisor-jwc"
-  echo "AGENT_SUPERVISOR_CONCURRENCY=1"
+  echo "AGENT_SUPERVISOR_CONCURRENCY=8"
   echo "AGENT_WORKER_ID_PREFIX=mac-worker-jwc"
-  echo "MAC_WORKER_COUNT=1"
+  echo "MAC_WORKER_COUNT=8"
   echo "MAC_WORKER_NICE=-5"
   echo "MCP_SERVER_NICE=-5"
   echo "STOCK_NEWS_MCP_NICE=0"
@@ -235,7 +236,7 @@ trap cleanup EXIT INT TERM
   echo "KRW_MCP_STORE_MODE=persistent"
   echo "KRW_MCP_STORE_POOL_MAX=8"
   echo "AGENT_WORKER_ID=mac-supervisor-jwc"
-  echo "GLOBAL_CONCURRENT_RUN_LIMIT=1"
+  echo "GLOBAL_CONCURRENT_RUN_LIMIT=8"
   echo "AGENT_QUEUE_LISTEN_ENABLED=1"
   echo "AGENT_QUEUE_LISTEN_CHANNEL=agent_run_queued"
   echo "AGENT_QUEUE_RECONCILE_INTERVAL_MS=60000"
@@ -249,11 +250,9 @@ trap cleanup EXIT INT TERM
   echo "CLAUDE_MODEL=sonnet"
   echo "CLAUDE_AGENT_MAX_TURNS=20"
   echo "AGENT_MAX_TOOL_CALLS=32"
-  echo "NEWS_DISCOVERY_CARD_COMPOSER=fallback"
-  echo "NEWS_CARD_TRANSLATION_PROVIDER=googletrans"
-  echo "NEWS_TRANSLATION_PYTHON=~/.local/share/krw-ontology/news-translation-venv/bin/python"
-  echo "NEWS_TRANSLATION_TIMEOUT_MS=7000"
-  echo "NEWS_TRANSLATION_MAX_TEXTS=10"
+  echo "YAHOO_FINANCE_MAX_CALLS=4"
+  echo "KRW_CHARTS_ENABLED=0"
+  echo "KRW_CHART_SERIES_ENABLED=0"
   echo "STOCK_NEWS_MCP_HOST=127.0.0.1"
   echo "STOCK_NEWS_MCP_PORT=8775"
   echo "STOCK_NEWS_MCP_PATH=/mcp"

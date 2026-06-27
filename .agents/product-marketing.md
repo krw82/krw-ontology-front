@@ -1,14 +1,14 @@
 # Product Marketing Context
 
-*Last updated: 2026-06-21*
+*Last updated: 2026-06-27*
 
 ## Product Overview
 
-**One-liner:** KRW Ontology helps Korean investors ask questions about US companies and trace each answer back to the filing evidence behind it.
+**One-liner:** KRW Ontology is an AI-agent-ready company filing database that helps Korean investors ask questions about US companies and trace each answer back to the evidence behind it.
 
-**What it does:** KRW Ontology turns long US public company filings into source-checkable research answers. Users ask a company or investment question, then receive a readable answer with a trail back to the original filing context so they can inspect where the answer came from.
+**What it does:** KRW Ontology turns long US public company filings into a structured research database that AI agents can query, connect, and cite. Users ask a company or investment question, then receive a readable answer with a trail back to the original filing context so they can inspect where the answer came from.
 
-**Product category:** AI equity research, SEC filing analysis, evidence-backed company intelligence, public company research assistant.
+**Product category:** AI-agent database for company filings, AI equity research, SEC filing analysis, evidence-backed company intelligence, public company research assistant.
 
 **Product type:** Self-serve SaaS web application.
 
@@ -20,9 +20,14 @@
 
 **Primary tension to lead with:** The user does not simply want more AI output. They want to avoid trusting a polished answer they cannot verify.
 
+**Strategic positioning to emphasize:** The product is not just another chat UI over filings. KRW Ontology is building a dedicated database for AI agents: company disclosures are structured into reusable, connected research units so agents can answer with evidence instead of loose text recall.
+
 **Best plain-language positioning lines:**
 
-- "AI 요약을 믿기 전에, 원문 근거까지 따라가세요."
+- "AI 에이전트가 바로 읽고 답할 수 있는 기업 공시 데이터베이스."
+- "공시를 문서가 아니라, AI가 쓸 수 있는 리서치 데이터베이스로 바꿉니다."
+- "기업 공시를 에이전트가 검색하고 연결하고 인용할 수 있는 형태로 구조화합니다."
+- "AI 요약을 믿기 전에, 공시 데이터가 어떻게 연결됐는지 확인하세요."
 - "10-K를 전부 읽지 않아도, 답변의 근거는 놓치지 않게."
 - "미국 공시를 투자 질문 중심으로 읽고, 답변마다 출처를 남깁니다."
 - "빠른 답변보다 중요한 건, 확인할 수 있는 답변입니다."
@@ -30,10 +35,13 @@
 
 **Internal product truth:** The system links filing text, business activities, risk factors, segments, and financial drivers. This is useful for product and technical explanation.
 
-**External copy rule:** Do not lead social posts, landing page heroes, or ads with the raw mechanics: "공시 문장과 사업 활동, 리스크, 세그먼트, 실적 동인을 연결합니다." It is accurate but too dry for top-of-funnel marketing. Use it only after the reader already understands the problem.
+**External copy rule:** Do not lead social posts, landing page heroes, or ads with the raw mechanics: "공시 문장과 사업 활동, 리스크, 세그먼트, 실적 동인을 연결합니다." It is accurate but too dry for top-of-funnel marketing. Lead instead with the stronger frame: "AI 에이전트를 위한 기업 공시 데이터베이스" or "공시를 AI가 쓸 수 있는 데이터베이스로 바꾼다." Use the mechanics only after the reader understands the promise.
 
 **Social hook angles:**
 
+- "AI 에이전트가 기업 공시를 제대로 쓰려면, 그냥 PDF나 텍스트 덩어리로는 부족합니다."
+- "앞으로 중요한 건 더 긴 컨텍스트가 아니라, 에이전트가 믿고 쓸 수 있는 데이터베이스입니다."
+- "10-K를 AI에게 넣는 것과, 10-K를 AI가 쓸 수 있는 데이터베이스로 만드는 것은 다릅니다."
 - "AI가 그럴듯하게 말할수록 더 위험한 순간이 있습니다."
 - "10-K를 다 읽을 시간은 없지만, 근거 없는 요약을 믿을 수도 없습니다."
 - "미국주식 리서치에서 제일 비싼 실수는 틀린 답보다, 확인 못 한 답입니다."
@@ -111,17 +119,18 @@
 **Key differentiators:**
 
 - Evidence-first answers with visible source and reasoning path.
+- A dedicated filing database built for AI agents, not a generic document upload workflow.
 - A source trail that lets users trace an answer back to the filing context behind it.
 - Ontology-based connections between filing text, business activity, risks, and drivers as the internal system of record.
 - Korean-first product surface for US company research.
 - Chat workflow that can start from a ticker, company list, or plain-language question.
 - Saved chat sessions that preserve context for follow-up questions.
 
-**How we do it differently:** The product does not treat the filing as a flat text blob or produce a standalone AI summary. It turns filing context into connected research units, then uses those units to answer questions in readable Markdown with inspectable citations and source context.
+**How we do it differently:** The product does not treat the filing as a flat text blob or produce a standalone AI summary. It turns filing context into an AI-agent-ready research database: connected research units that agents can query, compare, reuse, and cite in readable Markdown with inspectable source context.
 
-**Why that's better:** Users can move faster without giving up verification. The product makes source review part of the answer instead of a separate manual step.
+**Why that's better:** Users can move faster without giving up verification. Agents get structured evidence instead of loose text, and users get answers that can be traced back to the source instead of summaries they have to blindly trust.
 
-**Why customers choose us:** They want research speed, but the decisive feature is trust: the answer must leave a path back to source material. The public message should frame this as "I can check this" rather than "the system has an ontology."
+**Why customers choose us:** They want research speed, but the decisive feature is trust: the answer must leave a path back to source material. The public message should frame this as "AI가 쓸 수 있는 공시 데이터베이스" and "I can check this" rather than "the system has an ontology."
 
 ## Objections
 
@@ -154,16 +163,19 @@
 - "어느 문장에서 나온 말인지 바로 확인하고 싶다."
 - "실적 변화가 어떤 사업 활동과 연결되는지 보고 싶다."
 - "투자 아이디어를 검증할 때 원문 근거가 필요하다."
+- "AI가 공시를 그냥 요약하는 게 아니라 제대로 근거를 잡고 답했으면 좋겠다."
+- "에이전트가 바로 쓸 수 있게 공시 데이터가 정리되어 있으면 좋겠다."
 
 **How they describe us:**
 
-- "공시 원문 근거가 남는 리서치 AI."
+- "AI 에이전트가 쓸 수 있는 기업 공시 데이터베이스."
+- "공시를 AI가 검색하고 연결하고 인용할 수 있게 만든 서비스."
 - "질문하면 답변과 근거 경로를 같이 보여주는 도구."
 - "긴 10-K를 투자 질문 중심으로 읽어주는 서비스."
-- "AI 요약을 원문 근거까지 확인하게 해주는 서비스."
+- "AI 요약을 데이터 출처까지 확인하게 해주는 서비스."
 - "미국 기업 공시를 한국어 질문으로 파고드는 도구."
 
-**Words to use:** 원문 근거, 근거 경로, 출처, 확인 가능, 검증 가능, 기업 리서치, 10-K, 10-Q, 미국 공시, 투자 질문, thesis check, evidence-backed, citation-backed.
+**Words to use:** AI 에이전트용 데이터베이스, AI-agent-ready database, 기업 공시 데이터베이스, 원문 근거, 근거 경로, 출처, 확인 가능, 검증 가능, 기업 리서치, 10-K, 10-Q, 미국 공시, 투자 질문, thesis check, evidence-backed, citation-backed.
 
 **Words to use only in deeper product explanations:** 사업 활동, 리스크 요인, 세그먼트, 실적 동인, 온톨로지, 구조화된 지식 그래프.
 
@@ -174,6 +186,7 @@
 | Term | Meaning |
 |------|---------|
 | Evidence path | 답변이 어떤 공시 문장과 연결에서 나왔는지 보여주는 근거 흐름 |
+| AI-agent-ready database | AI 에이전트가 기업 공시를 검색, 연결, 재사용, 인용할 수 있도록 구조화한 데이터베이스 |
 | Ontology | 공시 문장, 사업 활동, 리스크, 지표를 연결하는 구조화된 지식 그래프 |
 | Markdown research answer | 채팅 화면에서 바로 읽고 후속 질문으로 이어갈 수 있는 공시 근거 기반 답변 |
 | Analysis credit | 사용자가 월간 한도 안에서 실행하는 질문/분석 단위 |

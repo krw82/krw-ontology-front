@@ -12,12 +12,19 @@ import type {
   StockNewsMCPToolName,
 } from "@/types/api-contracts";
 import type { Json } from "@/types/database";
+import {
+  YAHOO_FINANCE_MCP_SERVER_NAME,
+  YAHOO_FINANCE_MCP_TOOLS,
+  YAHOO_FINANCE_SDK_ALLOWED_TOOLS,
+} from "@/lib/news-discovery/yahoo-finance-mcp-constants";
 
 const KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX =
   "mcp__plugin_krw-ontology_krw-ontology__";
 const STOCK_NEWS_PLUGIN_TOOL_PREFIX =
   "mcp__plugin_krw-ontology_stock-news__";
 const CHART_MCP_TOOL_PREFIX = "mcp__krw_presentation__";
+const YAHOO_FINANCE_MCP_TOOL_PREFIX =
+  `mcp__${YAHOO_FINANCE_MCP_SERVER_NAME}__`;
 
 export const KRW_ONTOLOGY_MCP_TOOLS = [
   "krw_ontology_catalog",
@@ -49,6 +56,11 @@ export const CHART_MCP_TOOLS = [
   "create_chart_v1",
 ] as const satisfies readonly ChartMCPToolName[];
 
+export {
+  YAHOO_FINANCE_MCP_TOOLS,
+  YAHOO_FINANCE_SDK_ALLOWED_TOOLS,
+};
+
 export const KRW_ONTOLOGY_SDK_ALLOWED_TOOLS = KRW_ONTOLOGY_MCP_TOOLS.map(
   (toolName) => `${KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX}${toolName}`,
 );
@@ -63,6 +75,7 @@ export const CHART_SDK_ALLOWED_TOOLS = CHART_MCP_TOOLS.map(
 
 const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const STOCK_NEWS_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_MCP_TOOLS);
+const YAHOO_FINANCE_MCP_TOOL_SET = new Set<string>(YAHOO_FINANCE_MCP_TOOLS);
 const CHART_MCP_TOOL_SET = new Set<string>(CHART_MCP_TOOLS);
 const execFileAsync = promisify(execFile);
 const DEFAULT_MCP_HEALTH_TIMEOUT_MS = 30_000;
@@ -79,6 +92,13 @@ export function isStockNewsSdkTool(toolName: string): boolean {
   const bareName = toolName.slice(STOCK_NEWS_PLUGIN_TOOL_PREFIX.length);
 
   return Boolean(bareName && STOCK_NEWS_MCP_TOOL_SET.has(bareName));
+}
+
+export function isYahooFinanceSdkTool(toolName: string): boolean {
+  if (!toolName.startsWith(YAHOO_FINANCE_MCP_TOOL_PREFIX)) return false;
+  const bareName = toolName.slice(YAHOO_FINANCE_MCP_TOOL_PREFIX.length);
+
+  return Boolean(bareName && YAHOO_FINANCE_MCP_TOOL_SET.has(bareName));
 }
 
 export function isChartSdkTool(toolName: string): boolean {
@@ -450,7 +470,6 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
     path.join(pluginPath, "skills", "krw-ontology-research", "SKILL.md"),
     path.join(pluginPath, "skills", "krw-ontology-idea-generation", "SKILL.md"),
     path.join(pluginPath, "skills", "krw-ontology-news-discovery", "SKILL.md"),
-    path.join(pluginPath, "skills", "krw-ontology-news-research", "SKILL.md"),
     path.join(pluginPath, "skills", "krw-ontology-market-move-research", "SKILL.md"),
     path.join(pluginPath, "skills", "krw-ontology-router", "SKILL.md"),
   ];
