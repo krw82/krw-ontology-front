@@ -9,6 +9,7 @@ import type {
   MarketMoveContext,
   MarketMoveEventCandidate,
   MarketMoveObservation,
+  TechnicalMarketSignal,
   YahooFinanceSnapshot,
 } from "@/lib/market-move/types";
 import { fetchYahooFinanceSnapshot } from "@/lib/market-move/yahoo-finance-mcp-client";
@@ -111,6 +112,14 @@ function buildObservation(params: {
     stockInfo.averageDailyVolume10Day,
     stockInfo.averageVolume10days,
   );
+  const technicalSignal = buildTechnicalSignal({
+    currentPrice,
+    previousClose,
+    percentChange,
+    volume,
+    averageVolume,
+    stockInfo,
+  });
 
   return {
     ticker: params.ticker,
@@ -127,6 +136,7 @@ function buildObservation(params: {
     volume,
     average_volume: averageVolume,
     volume_signal: volumeSignal(volume, averageVolume),
+    technical_signal: technicalSignal,
     market_time: stringValue(stockInfo.marketState) ?? null,
     currency: stringValue(stockInfo.currency, stockInfo.financialCurrency) ?? null,
   };
@@ -150,6 +160,7 @@ function buildFallbackObservation(params: {
     volume: null,
     average_volume: null,
     volume_signal: "unknown",
+    technical_signal: emptyTechnicalSignal(),
     market_time: null,
     currency: null,
   };
@@ -261,6 +272,15 @@ function buildObservationSummary(observation: MarketMoveObservation): string {
     observation.volume_signal !== "unknown"
       ? `volume_signal=${observation.volume_signal}`
       : "",
+    observation.technical_signal.overall !== "insufficient_data"
+      ? `technical_overall=${observation.technical_signal.overall}`
+      : "",
+    observation.technical_signal.trend.signal !== "unknown"
+      ? `technical_trend=${observation.technical_signal.trend.signal}`
+      : "",
+    observation.technical_signal.range_52w.signal !== "unknown"
+      ? `range_52w=${observation.technical_signal.range_52w.signal}`
+      : "",
   ].filter(Boolean);
   return parts.length ? parts.join(", ") : "market move requested, live price details unavailable";
 }
@@ -310,9 +330,260 @@ function volumeSignal(
 ): MarketMoveObservation["volume_signal"] {
   if (!volume || !averageVolume || averageVolume <= 0) return "unknown";
   const ratio = volume / averageVolume;
-  if (ratio >= 1.2) return "above_average";
-  if (ratio <= 0.8) return "below_average";
+  if (ratio >= 1.5) return "above_average";
+  if (ratio <= 0.7) return "below_average";
   return "near_average";
+}
+
+function buildTechnicalSignal(params: {
+  currentPrice: number | null;
+  previousClose: number | null;
+  percentChange: number | null;
+  volume: number | null;
+  averageVolume: number | null;
+  stockInfo: Record<string, unknown>;
+}): TechnicalMarketSignal {
+  const fiftyDayAverage = numberValue(params.stockInfo.fiftyDayAverage);
+  const twoHundredDayAverage = numberValue(params.stockInfo.twoHundredDayAverage);
+  const fiftyTwoWeekLow = numberValue(params.stockInfo.fiftyTwoWeekLow);
+  const fiftyTwoWeekHigh = numberValue(params.stockInfo.fiftyTwoWeekHigh);
+  const marketCap = numberValue(params.stockInfo.marketCap);
+
+  const price = {
+    direction: priceDirection(params.percentChange),
+    magnitude: priceMagnitude(params.percentChange, marketCap),
+  } satisfies TechnicalMarketSignal["price"];
+
+  const volume = technicalVolumeSignal(params.volume, params.averageVolume);
+  const trend = trendSignal({
+    currentPrice: params.currentPrice,
+    fiftyDayAverage,
+    twoHundredDayAverage,
+  });
+  const range52w = range52wSignal({
+    currentPrice: params.currentPrice,
+    fiftyTwoWeekLow,
+    fiftyTwoWeekHigh,
+  });
+  const size = {
+    market_cap: marketCap,
+    bucket: marketCapBucket(marketCap),
+  } satisfies TechnicalMarketSignal["size"];
+
+  return {
+    price,
+    volume,
+    trend,
+    range_52w: range52w,
+    size,
+    overall: overallTechnicalRead({
+      price,
+      volume,
+      trend,
+      range52w,
+    }),
+  };
+}
+
+function emptyTechnicalSignal(): TechnicalMarketSignal {
+  return {
+    price: {
+      direction: "unknown",
+      magnitude: "unknown",
+    },
+    volume: {
+      ratio: null,
+      signal: "unknown",
+    },
+    trend: {
+      vs_50d: "unknown",
+      vs_200d: "unknown",
+      signal: "unknown",
+    },
+    range_52w: {
+      position: null,
+      signal: "unknown",
+    },
+    size: {
+      market_cap: null,
+      bucket: "unknown",
+    },
+    overall: "insufficient_data",
+  };
+}
+
+function priceDirection(
+  percentChange: number | null,
+): TechnicalMarketSignal["price"]["direction"] {
+  if (percentChange === null) return "unknown";
+  if (percentChange > 0.2) return "up";
+  if (percentChange < -0.2) return "down";
+  return "flat";
+}
+
+function priceMagnitude(
+  percentChange: number | null,
+  marketCap: number | null,
+): TechnicalMarketSignal["price"]["magnitude"] {
+  if (percentChange === null) return "unknown";
+  const abs = Math.abs(percentChange);
+  const megaCap = marketCap !== null && marketCap >= 200_000_000_000;
+  if (abs >= 3 || (megaCap && abs >= 2)) return "large";
+  if (abs >= 1) return "moderate";
+  return "small";
+}
+
+function technicalVolumeSignal(
+  volume: number | null,
+  averageVolume: number | null,
+): TechnicalMarketSignal["volume"] {
+  if (!volume || !averageVolume || averageVolume <= 0) {
+    return {
+      ratio: null,
+      signal: "unknown",
+    };
+  }
+  const ratio = volume / averageVolume;
+  return {
+    ratio: Number(ratio.toFixed(2)),
+    signal:
+      ratio >= 1.5
+        ? "high_activity"
+        : ratio <= 0.7
+          ? "thin_activity"
+          : "normal_activity",
+  };
+}
+
+function trendSignal(params: {
+  currentPrice: number | null;
+  fiftyDayAverage: number | null;
+  twoHundredDayAverage: number | null;
+}): TechnicalMarketSignal["trend"] {
+  const vs50d = compareToReference(params.currentPrice, params.fiftyDayAverage);
+  const vs200d = compareToReference(params.currentPrice, params.twoHundredDayAverage);
+  const unknown = vs50d === "unknown" && vs200d === "unknown";
+
+  if (unknown) {
+    return {
+      vs_50d: vs50d,
+      vs_200d: vs200d,
+      signal: "unknown",
+    };
+  }
+
+  let signal: TechnicalMarketSignal["trend"]["signal"] = "neutral_or_mixed";
+  if (vs200d === "below") {
+    signal = "trend_break_risk";
+  } else if (
+    vs50d === "above" &&
+    vs200d === "above" &&
+    params.fiftyDayAverage !== null &&
+    params.twoHundredDayAverage !== null &&
+    params.fiftyDayAverage > params.twoHundredDayAverage
+  ) {
+    signal = "strong_uptrend";
+  } else if (
+    vs50d === "below" &&
+    (vs200d === "above" || vs200d === "near")
+  ) {
+    signal = "short_term_pullback_midterm_intact";
+  }
+
+  return {
+    vs_50d: vs50d,
+    vs_200d: vs200d,
+    signal,
+  };
+}
+
+function compareToReference(
+  current: number | null,
+  reference: number | null,
+): "above" | "below" | "near" | "unknown" {
+  if (current === null || reference === null || reference <= 0) return "unknown";
+  const diff = (current - reference) / reference;
+  if (Math.abs(diff) <= 0.02) return "near";
+  return diff > 0 ? "above" : "below";
+}
+
+function range52wSignal(params: {
+  currentPrice: number | null;
+  fiftyTwoWeekLow: number | null;
+  fiftyTwoWeekHigh: number | null;
+}): TechnicalMarketSignal["range_52w"] {
+  const { currentPrice, fiftyTwoWeekLow, fiftyTwoWeekHigh } = params;
+  if (
+    currentPrice === null ||
+    fiftyTwoWeekLow === null ||
+    fiftyTwoWeekHigh === null ||
+    fiftyTwoWeekHigh <= fiftyTwoWeekLow
+  ) {
+    return {
+      position: null,
+      signal: "unknown",
+    };
+  }
+  const rawPosition =
+    (currentPrice - fiftyTwoWeekLow) / (fiftyTwoWeekHigh - fiftyTwoWeekLow);
+  const position = Math.max(0, Math.min(1, rawPosition));
+  return {
+    position: Number(position.toFixed(2)),
+    signal:
+      position >= 0.8
+        ? "upper_range"
+        : position >= 0.4
+          ? "middle_range"
+          : "lower_range",
+  };
+}
+
+function marketCapBucket(
+  marketCap: number | null,
+): TechnicalMarketSignal["size"]["bucket"] {
+  if (marketCap === null || marketCap <= 0) return "unknown";
+  if (marketCap >= 200_000_000_000) return "mega_cap";
+  if (marketCap >= 10_000_000_000) return "large_cap";
+  if (marketCap >= 2_000_000_000) return "mid_cap";
+  return "small_cap";
+}
+
+function overallTechnicalRead(params: {
+  price: TechnicalMarketSignal["price"];
+  volume: TechnicalMarketSignal["volume"];
+  trend: TechnicalMarketSignal["trend"];
+  range52w: TechnicalMarketSignal["range_52w"];
+}): TechnicalMarketSignal["overall"] {
+  if (
+    params.trend.signal === "unknown" &&
+    params.price.direction === "unknown" &&
+    params.volume.signal === "unknown" &&
+    params.range52w.signal === "unknown"
+  ) {
+    return "insufficient_data";
+  }
+  if (params.trend.signal === "trend_break_risk") return "trend_break_risk";
+  if (params.trend.signal === "strong_uptrend") {
+    if (
+      params.price.direction === "down" &&
+      params.price.magnitude !== "small" &&
+      params.volume.signal === "high_activity"
+    ) {
+      return "neutral_or_mixed";
+    }
+    return "technically_strong";
+  }
+  if (params.trend.signal === "short_term_pullback_midterm_intact") {
+    return "short_term_pressure_but_midterm_trend_intact";
+  }
+  if (
+    params.price.direction === "down" &&
+    params.price.magnitude !== "small" &&
+    params.volume.signal === "high_activity"
+  ) {
+    return "short_term_pressure_but_midterm_trend_intact";
+  }
+  return "neutral_or_mixed";
 }
 
 function numberValue(...values: unknown[]): number | null {

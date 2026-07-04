@@ -660,7 +660,7 @@ export async function canUseTool(
   return {
     behavior: "deny",
     message:
-      "Only configured KRW Ontology, Yahoo Finance, Stock News, and presentation MCP tools are allowed in web chat.",
+      "Only configured ontology, current market-news, stock-news, and presentation tools are allowed in web chat.",
   };
 }
 
@@ -734,7 +734,7 @@ function createToolPermissionGuard(
       return {
         behavior: "deny",
         message:
-          "Only configured KRW Ontology, Yahoo Finance, Stock News, and presentation MCP tools are allowed in web chat.",
+          "Only configured ontology, current market-news, stock-news, and presentation tools are allowed in web chat.",
       };
     }
 
@@ -744,7 +744,7 @@ function createToolPermissionGuard(
         return {
           behavior: "deny",
           message:
-            "Yahoo Finance MCP is only available for first-pass news and market-move research.",
+            "The current market-news tool is only available for first-pass news and market-move research.",
         };
       }
 
@@ -755,7 +755,7 @@ function createToolPermissionGuard(
         return {
           behavior: "deny",
           message:
-            "This Yahoo Finance MCP tool is not available for this news workflow.",
+            "This current market-news tool is not available for this news workflow.",
         };
       }
 
@@ -945,7 +945,7 @@ function isYahooFinanceToolAllowedForRunKind(
 
 function stockNewsDenyMessageForRunKind(runKind: RunKind): string {
   if (runKind === "news_discovery") {
-    return "News discovery uses Yahoo Finance MCP for first-pass ticker news. Do not call Stock News MCP in this run.";
+    return "News discovery uses the current market-news tool for first-pass ticker news. Do not call Stock News MCP in this run.";
   }
   return "News tools are only available in news mode.";
 }
@@ -955,14 +955,14 @@ function buildSelectedNewsEventContextPrompt(
   selectedNewsEventContext: Record<string, unknown> | null | undefined,
 ): string {
   if (runKind === "idea_generation" && selectedNewsEventContext) {
-    return `Use this user-provided URL context as additional input for KRW Ontology idea generation. Treat extracted page text as an external market/business hypothesis, not confirmed company fact. Start candidate discovery from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology when present, then use KRW Ontology filing evidence to find covered companies that support, qualify, or reject the angle. Do not switch to news mode or write an article summary.
+    return `Use this user-provided URL context as additional input for KRW Ontology idea generation. Treat extracted page text as an external market/business hypothesis, not confirmed company fact. Follow the idea-generation skill's URL workflow for covered-company discovery. Start from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology when present. Do not switch to news mode or write an article summary.
 
 <idea_generation_url_context>
 ${JSON.stringify(selectedNewsEventContext)}
 </idea_generation_url_context>`;
   }
   if (runKind === "market_move_research" && selectedNewsEventContext) {
-    return `Use this app-provided market move context only as supplemental bounded context for stock-move interpretation. Runtime Yahoo Finance MCP lookup remains the primary current price/news read. Treat current market data and recent news candidates as market observations, not confirmed company disclosure. Default to a compact market/news explanation of the observed move. Use KRW Ontology retrieval from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology only when filing-grounded depth is required by the user's question or by a durable investment-view claim. Follow-up prompts should bridge the observed move/news into filing-grounded KRW Ontology research.
+    return `Use this app-provided market move context only as supplemental bounded context for stock-move interpretation. Runtime current market-news lookup remains the primary current price/news read. Treat current market data and recent news candidates as market observations, not confirmed company disclosure. Default to a compact market/news explanation of the observed move. Use KRW Ontology retrieval from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology only when filing-grounded depth is required by the user's question or by a durable investment-view claim. Follow-up prompts should bridge the observed move/news into filing-grounded KRW Ontology research. Provider/tool names are internal and must not appear in the final answer unless the user explicitly asks about data/debug provenance.
 
 <selected_news_event_context>
 ${JSON.stringify(selectedNewsEventContext)}
@@ -1229,9 +1229,9 @@ function buildStockNewsBudgetDenyMessage(): string {
 
 function buildYahooFinanceBudgetDenyMessage(): string {
   return [
-    "No more Yahoo Finance MCP tools can be called in this run.",
+    "No more current market-news tools can be called in this run.",
     "Do not call another current-news tool.",
-    "Write the final answer from the Yahoo Finance news results already collected.",
+    "Write the final answer from the market-news results already collected.",
   ].join(" ");
 }
 

@@ -222,7 +222,7 @@ describe("validateRequest", () => {
       scope_type: "company",
       default_tickers: ["AAPL"],
       default_document_types: ["10-K"],
-      research_mode: "standard",
+      research_mode: "deep",
       analysis_mode: "company",
       run_kind: "company_research",
     });
@@ -247,10 +247,10 @@ describe("validateRequest", () => {
     expect(missingResult.ok).toBe(true);
     expect(invalidResult.ok).toBe(true);
     if (!missingResult.ok || !invalidResult.ok) return;
-    expect(missingResult.data.body.research_mode).toBe("standard");
+    expect(missingResult.data.body.research_mode).toBe("deep");
     expect(missingResult.data.body.analysis_mode).toBe("company");
     expect(missingResult.data.body.run_kind).toBe("company_research");
-    expect(invalidResult.data.body.research_mode).toBe("standard");
+    expect(invalidResult.data.body.research_mode).toBe("deep");
     expect(invalidResult.data.body.analysis_mode).toBe("company");
     expect(invalidResult.data.body.run_kind).toBe("company_research");
   });
@@ -287,6 +287,7 @@ describe("validateRequest", () => {
     if (!result.ok) return;
     expect(result.data.body.analysis_mode).toBe("news");
     expect(result.data.body.run_kind).toBe("company_research");
+    expect(result.data.body.research_mode).toBe("deep");
   });
 
   it("accepts explicit run kind for market move research", async () => {
@@ -304,6 +305,7 @@ describe("validateRequest", () => {
     if (!result.ok) return;
     expect(result.data.body.analysis_mode).toBe("news");
     expect(result.data.body.run_kind).toBe("market_move_research");
+    expect(result.data.body.research_mode).toBe("deep");
   });
 
   it("accepts explicit run kind for scenario sensitivity", async () => {
@@ -321,6 +323,7 @@ describe("validateRequest", () => {
     if (!result.ok) return;
     expect(result.data.body.analysis_mode).toBe("company");
     expect(result.data.body.run_kind).toBe("scenario_sensitivity");
+    expect(result.data.body.research_mode).toBe("deep");
   });
 
   it("forces deep research mode for idea generation", async () => {

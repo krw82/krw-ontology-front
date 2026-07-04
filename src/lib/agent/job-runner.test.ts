@@ -8,7 +8,7 @@ vi.mock("@/lib/analytics/server", () => ({
   recordAnalyticsEvent: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@/lib/agent/mcp-client", () => ({
-  checkMcpHealth: vi.fn(),
+  checkMcpReady: vi.fn(),
 }));
 vi.mock("@/lib/agent/runner", () => ({
   runAgent: vi.fn(),
@@ -30,7 +30,7 @@ vi.mock("@/lib/question-router/chat-question-router", () => ({
   resolveChatQuestionRoute: vi.fn(),
 }));
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
-import { checkMcpHealth, type McpHealthResult } from "@/lib/agent/mcp-client";
+import { checkMcpReady, type McpHealthResult } from "@/lib/agent/mcp-client";
 import { runAgent } from "@/lib/agent/runner";
 import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -282,7 +282,7 @@ describe("agent job runner", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.KRW_CHARTS_ENABLED;
-    vi.mocked(checkMcpHealth).mockResolvedValue({
+    vi.mocked(checkMcpReady).mockResolvedValue({
       connected: false,
       staticOk: true,
       commandOk: true,
@@ -310,7 +310,7 @@ describe("agent job runner", () => {
   it("strips chart tokens and skips chart persistence while chart generation is disabled", async () => {
     const fake = createRunnerAdmin();
     vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
-    vi.mocked(checkMcpHealth).mockResolvedValue(readyMcpHealth());
+    vi.mocked(checkMcpReady).mockResolvedValue(readyMcpHealth());
     vi.mocked(runAgent).mockResolvedValue({
       status: "completed",
       acc: {
@@ -376,7 +376,7 @@ describe("agent job runner", () => {
       },
     });
     vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
-    vi.mocked(checkMcpHealth).mockResolvedValue(readyMcpHealth());
+    vi.mocked(checkMcpReady).mockResolvedValue(readyMcpHealth());
     vi.mocked(resolveChatQuestionRoute).mockResolvedValue({
       analysisMode: "news",
       runKind: "market_move_research",
@@ -461,7 +461,7 @@ describe("agent job runner", () => {
       },
     });
     vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
-    vi.mocked(checkMcpHealth).mockResolvedValue(readyMcpHealth());
+    vi.mocked(checkMcpReady).mockResolvedValue(readyMcpHealth());
     vi.mocked(resolveChatQuestionRoute).mockResolvedValue({
       analysisMode: "company",
       runKind: "scenario_sensitivity",
@@ -550,7 +550,7 @@ describe("agent job runner", () => {
       },
     });
     vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
-    vi.mocked(checkMcpHealth).mockResolvedValue(readyMcpHealth());
+    vi.mocked(checkMcpReady).mockResolvedValue(readyMcpHealth());
     vi.mocked(buildSelectedNewsSourcePack).mockResolvedValue({
       version: "news-source-pack/v1",
       selected_event_id: "apple-market-news",
@@ -773,7 +773,7 @@ describe("agent job runner", () => {
     vi.useFakeTimers();
     const fake = createRunnerAdmin();
     vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
-    vi.mocked(checkMcpHealth).mockResolvedValue({
+    vi.mocked(checkMcpReady).mockResolvedValue({
       connected: true,
       staticOk: true,
       commandOk: true,

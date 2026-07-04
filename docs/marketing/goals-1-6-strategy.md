@@ -12,18 +12,18 @@ Strategic defaults:
 - GTM: self-serve paid SaaS.
 - Pricing axis: monthly question/analysis volume.
 - Analytics: Supabase-owned event logging, not an external vendor.
-- Positioning: "근거 경로가 남는 기업 공시 리서치 AI."
+- Positioning: "기업 분석에 최적화된 공시 리서치 에이전트."
 
 ## Goal 1 - Positioning, Homepage, And CRO Direction
 
 **Outcome:** A first-time visitor should understand in 10 seconds that KRW Ontology answers company questions with filing evidence they can inspect.
 
-**Primary message:** 기업 공시를 질문 중심으로 읽고, 답변마다 근거 경로를 남깁니다.
+**Primary message:** 범용 GPT가 아니라, 기업 분석에 맞춰 공시 근거를 찾고 연결하고 답변마다 근거 경로를 남깁니다.
 
 **Homepage direction:**
 
 - Lead with the user job: "10-K를 다 읽기 전에, 먼저 투자 질문의 근거를 확인하세요."
-- Make the product category explicit: "기업 공시 리서치 AI" or "SEC filing research AI."
+- Make the product category explicit: "기업 분석 에이전트," "기업 공시 리서치 AI," or "SEC filing research AI."
 - Keep the existing evidence graph concept, but connect it to investor outcomes: faster thesis checks, margin driver analysis, segment/risk review.
 - Show sample question paths by ticker and topic, not only abstract workflow labels.
 - Use one primary CTA: "무료로 첫 분석 시작" for self-serve activation.
@@ -33,6 +33,7 @@ Strategic defaults:
 
 - State that the product supports research and verification, not investment recommendations.
 - Put "출처 확인", "공시 문장", and "근거 경로" near the first CTA.
+- Handle the GPT objection directly: general GPT is flexible, but KRW Ontology is optimized for company analysis, filing evidence, source paths, saved research sessions, and follow-up questions.
 - Surface coverage limits before users spend analysis credits.
 
 **Success metrics:**

@@ -674,12 +674,16 @@ describe("agent runner research budget recovery", () => {
     expect(call.options.disallowedTools).toEqual(
       expect.arrayContaining(["WebFetch", "WebSearch"]),
     );
-    expect(call.options.systemPrompt.append).toContain("Yahoo Finance MCP");
+    expect(call.options.systemPrompt.append).toContain("current market-news MCP");
+    expect(call.options.systemPrompt.append).toContain(
+      "Never mention provider names such as Yahoo Finance",
+    );
     expect(call.options.systemPrompt.append).toContain(
       "current ticker market/news context",
     );
     expect(call.prompt).toContain("웹앱 뉴스 discovery 실행");
-    expect(call.prompt).toContain("Yahoo Finance MCP 도구를 런타임에서 직접 호출");
+    expect(call.prompt).toContain("현재 시장/뉴스 MCP 도구를 런타임에서 직접 호출");
+    expect(call.prompt).toContain("최종 답변에는 Yahoo Finance 같은 provider 이름을 절대 쓰지 말고");
     expect(call.prompt).toContain(
       "/krw-ontology:krw-ontology-news-discovery",
     );
@@ -728,6 +732,8 @@ describe("agent runner research budget recovery", () => {
     expect(call.prompt).toContain("/krw-ontology:krw-ontology-idea-generation");
     expect(call.prompt).toContain("<idea_generation_url_context>");
     expect(call.prompt).toContain("Do not switch to news mode");
+    expect(call.prompt).toContain("Follow the idea-generation skill's URL workflow");
+    expect(call.prompt).not.toContain("at most 3 tickerless query_context calls");
     expect(call.prompt).not.toContain("<selected_news_event_context>");
     expect(call.options.allowedTools).not.toContain(
       stockNewsSdkToolName("search_company_news_events"),
@@ -842,7 +848,8 @@ describe("agent runner research budget recovery", () => {
       "/krw-ontology:krw-ontology-market-move-research",
     );
     expect(call.prompt).toContain("웹앱 주가 변동 research 실행");
-    expect(call.prompt).toContain("Yahoo Finance MCP 도구를 런타임에서 직접 호출");
+    expect(call.prompt).toContain("현재 시장/뉴스 MCP 도구를 런타임에서 직접 호출");
+    expect(call.prompt).toContain("최종 답변에는 Yahoo Finance 같은 provider 이름을 절대 쓰지 말고");
     expect(call.prompt).toContain("헤드라인 요약이 아니라");
     expect(call.prompt).toContain("무엇을 추가로 확인해야 하는지");
     expect(call.prompt).not.toContain("<selected_news_event_context>");
@@ -924,7 +931,7 @@ describe("agent runner research budget recovery", () => {
     expect(result.status).toBe("completed");
     expect(permission.behavior).toBe("deny");
     if (permission.behavior === "deny") {
-      expect(permission.message).toContain("No more Yahoo Finance MCP tools");
+      expect(permission.message).toContain("No more current market-news tools");
       expect(permission.message).toContain("news results");
     }
   });

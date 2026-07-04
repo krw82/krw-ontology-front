@@ -21,14 +21,10 @@ function makeSdkResult(runKind: string) {
 describe("chat question router", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
-  it("routes neutral Korean price-move questions through the no-tool SDK router", async () => {
-    vi.mocked(query).mockReturnValueOnce(
-      makeSdkResult("market_move_research") as never,
-    );
-
+  it("routes clear Korean price-move questions before invoking the SDK router", async () => {
     const decision = await resolveChatQuestionRoute({
       content: "오늘 가격 변동이 왜이래?",
       currentAnalysisMode: "company",
@@ -42,33 +38,12 @@ describe("chat question router", () => {
     expect(decision).toMatchObject({
       analysisMode: "news",
       runKind: "market_move_research",
-      source: "claude_router",
+      source: "deterministic",
     });
-    expect(query).toHaveBeenCalledWith(
-      expect.objectContaining({
-        prompt: expect.stringContaining("오늘 가격 변동이 왜이래?"),
-        options: expect.objectContaining({
-          maxTurns: 3,
-          allowedTools: [],
-          settingSources: [],
-          outputFormat: expect.objectContaining({ type: "json_schema" }),
-        }),
-      }),
-    );
-    const sdkCall = vi.mocked(query).mock.calls[0]?.[0] as {
-      options?: Record<string, unknown>;
-      prompt?: string;
-    };
-    expect(sdkCall.prompt).not.toContain("/krw-ontology:krw-ontology-router");
-    expect(sdkCall.options).not.toHaveProperty("plugins");
-    expect(sdkCall.options).not.toHaveProperty("resume");
+    expect(query).not.toHaveBeenCalled();
   });
 
-  it("tells the SDK router that mixed price-move and outlook questions belong to market move", async () => {
-    vi.mocked(query).mockReturnValueOnce(
-      makeSdkResult("market_move_research") as never,
-    );
-
+  it("routes mixed price-move and outlook questions to market move before invoking the SDK router", async () => {
     const decision = await resolveChatQuestionRoute({
       content: "오늘 가격이 왜이러고 향후전망",
       currentAnalysisMode: "company",
@@ -82,17 +57,9 @@ describe("chat question router", () => {
     expect(decision).toMatchObject({
       analysisMode: "news",
       runKind: "market_move_research",
-      source: "claude_router",
+      source: "deterministic",
     });
-    const sdkCall = vi.mocked(query).mock.calls[0]?.[0] as {
-      prompt?: string;
-    };
-    expect(sdkCall.prompt).toContain(
-      "Mixed price-move + outlook questions still route to market_move_research",
-    );
-    expect(sdkCall.prompt).toContain(
-      "'오늘 가격이 왜이러고 향후전망' => {\"run_kind\":\"market_move_research\"}",
-    );
+    expect(query).not.toHaveBeenCalled();
   });
 
   it("resumes an existing SDK session through a forked router session", async () => {
@@ -111,7 +78,7 @@ describe("chat question router", () => {
 
     const decision = await resolveChatQuestionRoute({
       sessionId: "11111111-1111-4111-8111-111111111111",
-      content: "이거에 대한 시나리오를 분석해줘",
+      content: "이전 답변 기준으로 더 이어서 봐줘",
       currentAnalysisMode: "company",
       currentRunKind: "company_research",
       defaultTickers: ["AAPL"],
@@ -141,7 +108,7 @@ describe("chat question router", () => {
     });
 
     const decision = await resolveChatQuestionRoute({
-      content: "AAPL 서비스 매출 구조를 정리해줘",
+      content: "AAPL에 대해 설명해줘",
       currentAnalysisMode: "company",
       currentRunKind: "company_research",
       defaultTickers: ["AAPL"],
@@ -157,11 +124,7 @@ describe("chat question router", () => {
     });
   });
 
-  it("uses an obvious market-move fallback when the SDK router fails on a price question", async () => {
-    vi.mocked(query).mockImplementationOnce(() => {
-      throw new Error("Reached maximum number of turns (3)");
-    });
-
+  it("does not need fallback for clear market-move questions", async () => {
     const decision = await resolveChatQuestionRoute({
       content: "오늘 가격이 왜이러고 향후전망",
       currentAnalysisMode: "company",
@@ -175,17 +138,14 @@ describe("chat question router", () => {
     expect(decision).toMatchObject({
       analysisMode: "news",
       runKind: "market_move_research",
-      source: "fallback",
-      confidence: "low",
+      source: "deterministic",
+      confidence: "high",
     });
     expect(decision.reason).toContain("stock-price move");
+    expect(query).not.toHaveBeenCalled();
   });
 
-  it("uses an obvious scenario fallback when the SDK router fails on a scenario question", async () => {
-    vi.mocked(query).mockImplementationOnce(() => {
-      throw new Error("router unavailable");
-    });
-
+  it("routes clear scenario questions before invoking the SDK router", async () => {
     const decision = await resolveChatQuestionRoute({
       content: "향후 전망만 시나리오로 나눠줘",
       currentAnalysisMode: "company",
@@ -199,15 +159,12 @@ describe("chat question router", () => {
     expect(decision).toMatchObject({
       analysisMode: "company",
       runKind: "scenario_sensitivity",
-      source: "fallback",
+      source: "deterministic",
     });
+    expect(query).not.toHaveBeenCalled();
   });
 
-  it("uses an obvious news fallback when the SDK router fails on a recent-news question", async () => {
-    vi.mocked(query).mockImplementationOnce(() => {
-      throw new Error("router unavailable");
-    });
-
+  it("routes explicit recent-news questions before invoking the SDK router", async () => {
     const decision = await resolveChatQuestionRoute({
       content: "최근 뉴스랑 앞으로 전망 알려줘",
       currentAnalysisMode: "company",
@@ -221,15 +178,84 @@ describe("chat question router", () => {
     expect(decision).toMatchObject({
       analysisMode: "news",
       runKind: "news_discovery",
-      source: "fallback",
+      source: "deterministic",
     });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("keeps filing-grounded recent-growth questions on company research without invoking the SDK router", async () => {
+    const decision = await resolveChatQuestionRoute({
+      content:
+        "애플의 아이폰, 서비스, 맥, 아이패드, 웨어러블 수익 구조를 공시 기준으로 정리하고 최근 성장 동인을 매출총이익률 중심으로 설명해줘.",
+      currentAnalysisMode: "company",
+      currentRunKind: "company_research",
+      defaultTickers: ["AAPL"],
+      scopeType: "company",
+      hasUserUrls: false,
+      responseLocale: "ko",
+    });
+
+    expect(decision).toMatchObject({
+      analysisMode: "company",
+      runKind: "company_research",
+      source: "deterministic",
+      confidence: "high",
+    });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("corrects sector/cohort macro interpretation away from idea generation", async () => {
+    vi.mocked(query).mockReturnValueOnce(
+      makeSdkResult("idea_generation") as never,
+    );
+
+    const decision = await resolveChatQuestionRoute({
+      content: "소비재 기업들을 살펴보고 소비자들 관련 매크로 현황 어떤지 알고싶어",
+      currentAnalysisMode: "company",
+      currentRunKind: "company_research",
+      defaultTickers: [],
+      scopeType: "global",
+      hasUserUrls: false,
+      responseLocale: "ko",
+    });
+
+    expect(decision).toMatchObject({
+      analysisMode: "company",
+      runKind: "company_research",
+      source: "claude_router",
+    });
+    expect(decision.reason).toContain("company-cohort research");
+    const sdkCall = vi.mocked(query).mock.calls[0]?.[0] as {
+      prompt?: string;
+    };
+    expect(sdkCall.prompt).toContain(
+      "sector, industry, or company-cohort interpretation questions",
+    );
+    expect(sdkCall.prompt).toContain(
+      "'소비재 기업들을 살펴보고 소비자들 관련 매크로 현황 어떤지 알고싶어' => {\"run_kind\":\"company_research\"}",
+    );
+  });
+
+  it("keeps explicit candidate discovery questions on idea generation", async () => {
+    const decision = await resolveChatQuestionRoute({
+      content: "소비 둔화에도 버틸 소비재 기업 후보 뽑아줘",
+      currentAnalysisMode: "company",
+      currentRunKind: "company_research",
+      defaultTickers: [],
+      scopeType: "global",
+      hasUserUrls: false,
+      responseLocale: "ko",
+    });
+
+    expect(decision).toMatchObject({
+      analysisMode: "company",
+      runKind: "idea_generation",
+      source: "deterministic",
+    });
+    expect(query).not.toHaveBeenCalled();
   });
 
   it("routes scenario follow-up questions to scenario sensitivity", async () => {
-    vi.mocked(query).mockReturnValueOnce(
-      makeSdkResult("scenario_sensitivity") as never,
-    );
-
     const decision = await resolveChatQuestionRoute({
       content: "앞으로의 시나리오 알려줘",
       currentAnalysisMode: "company",
@@ -243,8 +269,9 @@ describe("chat question router", () => {
     expect(decision).toMatchObject({
       analysisMode: "company",
       runKind: "scenario_sensitivity",
-      source: "claude_router",
+      source: "deterministic",
     });
+    expect(query).not.toHaveBeenCalled();
   });
 
   it("re-routes follow-up questions after an idea generation run", async () => {

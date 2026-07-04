@@ -230,14 +230,6 @@ Normal answers should end with:
 이어서 볼 질문
 ```
 
-Include exactly 3 concise Korean follow-up questions unless the user asks for no follow-ups or asks for raw/debug/status output.
+Include exactly 3 concise Korean follow-up questions as a numbered Markdown list using `1.`, `2.`, `3.` unless the user asks for no follow-ups or asks for raw/debug/status output.
 
-Follow-ups must bridge the observed price/news move into the next useful workflow. Use exactly this role mix:
-
-```text
-1. one same-company continuation prompt about what to check next in revenue, margin, cash flow, balance sheet, dilution, capital allocation, risk factors, or company comments
-2. one scenario-sensitivity prompt using plain Korean wording such as "상승·하락·횡보 시나리오별로 이 뉴스의 영향을 나눠줘" or "이 움직임이 과잉반응인지 시나리오별로 점검해줘"
-3. one opposite-view prompt about why the move/news may be overreaction, incomplete evidence, or a thesis-break signal
-```
-
-Use numbered prompts (`1.`, `2.`, `3.`). Write for general retail investors. Do not use generic company research follow-ups, raw filing assignments, unexplained English acronyms, or provider/tool terminology.
+Follow-ups must bridge the observed price/news move into KRW ontology research without sounding like a compliance task. Prefer "추가로 확인" over "공시로 확인" in user-facing prompts. Ask how the candidate news connects to revenue, margin, cash flow, balance sheet, dilution, capital allocation, risk factors, or company comments. At least one follow-up should invite scenario/sensitivity work such as upside/downside/sideways checkpoints or conditions that would change the view. Do not use generic company research follow-ups.

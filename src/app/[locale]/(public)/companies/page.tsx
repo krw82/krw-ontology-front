@@ -4,6 +4,7 @@ import { getCompanyDisplayCopyForTicker } from "@/content/companies/display";
 import { isLocale } from "@/i18n/config";
 import { localizedPageMetadata } from "@/i18n/metadata";
 import { getAuthUser } from "@/lib/auth";
+import { buildSiteOgImagePath, SITE_NAME } from "@/lib/marketing/site";
 import { listIndexedCompanies } from "@/lib/ontology/catalog";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -38,6 +39,10 @@ export async function generateMetadata({
     locale,
     ...companiesMetadataCopy[locale],
     path: "/companies",
+    image: {
+      url: buildSiteOgImagePath("companies", locale),
+      alt: `${companiesMetadataCopy[locale].title} | ${SITE_NAME}`,
+    },
   });
 }
 

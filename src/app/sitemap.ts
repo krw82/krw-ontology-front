@@ -10,6 +10,7 @@ import {
   type IndexedCompany,
   listIndexedCompanies,
 } from "@/lib/ontology/catalog";
+import { listCurated13FManagerPages } from "@/lib/sec-13f/seo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,6 +41,7 @@ async function listSitemapCompanies(): Promise<SitemapCompany[]> {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
   const companies = await listSitemapCompanies();
+  const managers = listCurated13FManagerPages();
   const lastModified = (value: string | null | undefined) => {
     if (!value) return now;
     const date = new Date(value);
@@ -92,6 +94,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.9,
     }),
     ...localizedEntries({
+      path: "/13f",
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.85,
+    }),
+    ...localizedEntries({
       path: "/pricing",
       lastModified: now,
       changeFrequency: "monthly",
@@ -121,6 +129,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: lastModified(company.generated_at),
         changeFrequency: "weekly",
         priority: 0.75,
+      }),
+    ),
+    ...managers.flatMap((manager) =>
+      localizedEntries({
+        path: `/13f/managers/${manager.slug}`,
+        lastModified: now,
+        changeFrequency: "weekly",
+        priority: 0.7,
       }),
     ),
   ];

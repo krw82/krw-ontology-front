@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import JsonLdScript from "@/components/JsonLdScript";
 import MarketingCtaLink from "@/components/MarketingCtaLink";
 import PublicRelatedLinks from "@/components/PublicRelatedLinks";
 import PublicTopNav from "@/components/PublicTopNav";
@@ -11,6 +12,7 @@ import { localizedPath } from "@/i18n/routing";
 import {
   absoluteUrl,
   buildQuestionChatHref,
+  buildSiteOgImagePath,
   QUESTION_TOPIC_PAGES,
   SITE_NAME,
 } from "@/lib/marketing/site";
@@ -71,6 +73,10 @@ export async function generateMetadata({
     description: questionsCopy[locale].description,
     path: "/questions",
     noIndex: true,
+    image: {
+      url: buildSiteOgImagePath("questions", locale),
+      alt: `${questionsCopy[locale].title} | ${SITE_NAME}`,
+    },
   });
 }
 
@@ -107,12 +113,7 @@ export default async function QuestionsIndexPage({
 
   return (
     <div className="min-h-[100dvh] bg-canvas text-ink">
-      <script
-        nonce={nonce}
-        type="application/ld+json"
-        suppressHydrationWarning
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <JsonLdScript nonce={nonce} data={jsonLd} />
       <PublicTopNav locale={locale} />
       <main
         id="main-content"

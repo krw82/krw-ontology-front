@@ -7,6 +7,7 @@ import {
 
 export const PUBLIC_LOCALIZED_PATH_PREFIXES = [
   "/companies",
+  "/13f",
   "/questions",
   "/use-cases",
   "/pricing",

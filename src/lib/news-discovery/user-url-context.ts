@@ -352,7 +352,7 @@ export async function buildIdeaGenerationUserUrlContext(
     "URLs:",
     ...sourceUrls.map((url, index) => `${index + 1}. ${url}`),
     "Use the mechanically extracted page text as a market or business hypothesis, not as company-confirmed fact.",
-    "Find covered companies whose filing evidence can support, qualify, or reject the user's requested discovery angle.",
+    "Use the idea-generation skill's URL workflow to decide how this external source should guide covered-company discovery.",
     "Prefer KRW Ontology company coverage and filing evidence over introducing uncovered companies.",
   ].join("\n");
 

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { checkMcpHealth } from "@/lib/agent/mcp-client";
+import { checkMcpReady } from "@/lib/agent/mcp-client";
 import { claimNextAgentRun } from "@/lib/agent/job-queue";
 import { runAgentJob } from "@/lib/agent/job-runner";
 import {
@@ -68,7 +68,7 @@ async function main() {
     reconcileIntervalMs: RECONCILE_INTERVAL_MS,
     claimHealthIntervalMs: CLAIM_HEALTH_INTERVAL_MS,
     idleLogIntervalMs: IDLE_LOG_INTERVAL_MS,
-    checkMcpHealth,
+    checkMcpReady,
     isReadyMcpHealth,
     claimNextAgentRun,
     runAgentJob,

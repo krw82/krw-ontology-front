@@ -10,13 +10,13 @@ import {
 } from "./research-mode";
 
 describe("research mode", () => {
-  it("uses standard as the default and normalizes invalid values", () => {
-    expect(DEFAULT_RESEARCH_MODE).toBe("standard");
-    expect(normalizeResearchMode("fast")).toBe("fast");
-    expect(normalizeResearchMode("standard")).toBe("standard");
+  it("uses deep as the enforced default and normalizes all values to deep", () => {
+    expect(DEFAULT_RESEARCH_MODE).toBe("deep");
+    expect(normalizeResearchMode("fast")).toBe("deep");
+    expect(normalizeResearchMode("standard")).toBe("deep");
     expect(normalizeResearchMode("deep")).toBe("deep");
-    expect(normalizeResearchMode("slow")).toBe("standard");
-    expect(normalizeResearchMode(undefined)).toBe("standard");
+    expect(normalizeResearchMode("slow")).toBe("deep");
+    expect(normalizeResearchMode(undefined)).toBe("deep");
   });
 
   it("keeps user-facing labels and descriptions product-friendly", () => {

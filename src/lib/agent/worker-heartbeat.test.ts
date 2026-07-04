@@ -10,10 +10,10 @@ vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: vi.fn(),
 }));
 vi.mock("@/lib/agent/mcp-client", () => ({
-  checkMcpHealth: vi.fn(),
+  checkMcpReady: vi.fn(),
 }));
 
-import { checkMcpHealth, type McpHealthResult } from "@/lib/agent/mcp-client";
+import { checkMcpReady, type McpHealthResult } from "@/lib/agent/mcp-client";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
   getReadyAgentWorker,
@@ -143,7 +143,7 @@ describe("agent worker heartbeat", () => {
   it("writes worker heartbeat metadata from local MCP health", async () => {
     const fake = createHeartbeatAdmin();
     vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
-    vi.mocked(checkMcpHealth).mockResolvedValue(mcpHealth);
+    vi.mocked(checkMcpReady).mockResolvedValue(mcpHealth);
 
     await writeCurrentWorkerHeartbeat("mac-worker-jwc-1", "idle");
 
@@ -165,7 +165,7 @@ describe("agent worker heartbeat", () => {
   it("falls back to unhealthy heartbeat when MCP health throws", async () => {
     const fake = createHeartbeatAdmin();
     vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
-    vi.mocked(checkMcpHealth).mockRejectedValue(new Error("mcp failed"));
+    vi.mocked(checkMcpReady).mockRejectedValue(new Error("mcp failed"));
 
     await writeCurrentWorkerHeartbeat("mac-worker-jwc-1", "idle");
 

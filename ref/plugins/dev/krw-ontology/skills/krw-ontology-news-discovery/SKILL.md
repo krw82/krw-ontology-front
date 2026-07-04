@@ -1,40 +1,37 @@
 ---
 name: krw-ontology-news-discovery
-description: Use for first-pass recent/current market-news discovery about a ticker, company, or named market issue. Use Yahoo Finance MCP at runtime when available, write a compact Korean investor news brief, do not call KRW Ontology tools, and guide the next turn into company filing research or scenario sensitivity.
+description: Use for news-mode discovery only. Curate recent market-news event cards that a user can choose before KRW Ontology filing analysis. Do not write final investment analysis.
 ---
 
 # KRW Ontology News Discovery Skill
 
-This skill is only for first-pass market-news discovery. It answers what recent/current news appears relevant and why it may matter to investors, but it stops before filing-grounded revenue, margin, cash-flow, balance-sheet, valuation, or long-term thesis conclusions.
+This skill is only for the first step of news mode: finding user-selectable market-news event candidates.
+
+It is not a final-answer skill.
 
 ```text
-market-news discovery -> Korean first-pass investor brief -> follow-up prompts into company research or scenario sensitivity
+market-news discovery -> Korean event cards -> hidden ontology bridge brief
 ```
 
-Do not call KRW Ontology tools in this skill.
+The selected card will later be analyzed by the normal news-research workflow. Do not call KRW Ontology tools in this skill.
 
 ## Operating Contract
 
-Default visible output is a compact but complete Korean Markdown investor brief.
+Default visible output is one short Korean 안내문 only.
 
-Use this rough shape when useful:
-
-```text
-첫 문단: 최근 뉴스 흐름을 한 문장으로 판단
-직접 관련된 뉴스: 회사/티커에 직접 닿는 내용
-같이 작용한 시장 맥락: 섹터/시장 전반 요인
-투자자가 봐야 할 의미: 어떤 투자자 가정에 닿는지
-아직 단정하면 안 되는 부분: 뉴스와 회사 실적/재무 영향 사이의 간격
-이어서 볼 질문
-```
-
-If the search result has zero usable recent/news context after filtering, say that directly:
+Good:
 
 ```text
-최근 뉴스에서 확인할 만한 직접 이슈를 찾지 못했습니다. 더 구체적인 기업명이나 이슈를 넣어 다시 물어봐 주세요.
+최근 시장 뉴스에서 분석할 만한 후보를 추렸습니다. 하나를 선택하면 공시 기준으로 연결해 분석하겠습니다.
 ```
 
-Do not write a long filing report, investment conclusion, valuation judgment, filing baseline, or card-selection UI. Do not write "분석이 필요하신 주제를 골라주세요", "선택해주세요", or "후보를 골라주세요".
+If the search result has zero usable `cards` after filtering, say that directly:
+
+```text
+최근 시장 뉴스에서 분석할 만한 후보를 찾지 못했습니다. 더 구체적인 기업명이나 기간을 넣어 다시 시도해주세요.
+```
+
+Do not write a long answer, investment conclusion, valuation judgment, filing baseline, or final Markdown report.
 
 ## Source Priority
 
@@ -179,20 +176,6 @@ Do not expose the English brief in visible chat text.
 
 ## Final Output
 
-End normal answers with:
-
-```text
-### 이어서 볼 질문
-```
-
-Include exactly 3 numbered Korean follow-up prompts. Use this role mix:
-
-```text
-1. one same-company continuation prompt about what to check next in revenue, margin, cash flow, balance sheet, dilution, capital allocation, risk factors, or company comments
-2. one scenario-sensitivity prompt using plain Korean wording such as "상승·하락·횡보 시나리오별로 이 뉴스의 영향을 나눠줘" or "좋게 볼 때와 나쁘게 볼 때를 나눠줘"
-3. one opposite-view prompt about why the news may be overreaction, incomplete evidence, or a thesis-break signal
-```
-
-Write for general retail investors. Avoid unexplained English finance acronyms, raw filing labels, valuation-model jargon, provider names as proof, and tool/plugin terminology.
+Write only the short Korean 안내문. The web runtime will create structured cards from the market/news provider or stock-news tool result.
 
 Do not print JSON or Markdown cards yourself.

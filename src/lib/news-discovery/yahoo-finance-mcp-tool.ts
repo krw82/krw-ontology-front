@@ -15,6 +15,7 @@ import {
   YAHOO_FINANCE_GET_STOCK_INFO_TOOL,
   YAHOO_FINANCE_MCP_SERVER_NAME,
 } from "@/lib/news-discovery/yahoo-finance-mcp-constants";
+import { buildSafeYahooStockInfo } from "@/lib/news-discovery/safe-yahoo-stock-info";
 
 const TICKER_SCHEMA = z
   .string()
@@ -67,8 +68,9 @@ export function createYahooFinanceNewsMcpServer() {
       tool(
         YAHOO_FINANCE_GET_STOCK_INFO_TOOL,
         [
-          "Read compact Yahoo Finance stock metadata for one ticker.",
-          "Use to verify company/ticker context and current quote context for first-pass news or stock-move answers.",
+          "Read safe Yahoo Finance stock metadata for one ticker.",
+          "Use only to verify company/ticker context, quote context, trading range, moving averages, and broad size for first-pass news or stock-move answers.",
+          "Valuation, analyst consensus, target price, recommendation, forward PE, PEG, and growth-estimate fields are intentionally excluded.",
         ].join(" "),
         {
           ticker: TICKER_SCHEMA,
@@ -78,7 +80,9 @@ export function createYahooFinanceNewsMcpServer() {
           if (!ticker) return toolError("Invalid ticker.");
 
           try {
-            const stockInfo = await fetchYahooFinanceStockInfo(ticker);
+            const stockInfo = buildSafeYahooStockInfo(
+              await fetchYahooFinanceStockInfo(ticker),
+            );
             return toolJson({
               provider: "yahoo-finance-mcp",
               tool: YAHOO_FINANCE_GET_STOCK_INFO_TOOL,

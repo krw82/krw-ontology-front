@@ -307,6 +307,7 @@ describe("production deploy scripts", () => {
     expect(initEnv).toContain("KRW_ONTOLOGY_PLUGIN_SOURCE_PATH");
     expect(initEnv).toContain("KRW_ONTOLOGY_MCP_URL=http://127.0.0.1:8765/mcp");
     expect(initEnv).toContain("KRW_ONTOLOGY_MCP_HEALTH_URL=http://127.0.0.1:8765/health");
+    expect(initEnv).toContain("KRW_ONTOLOGY_MCP_READY_URL=http://127.0.0.1:8765/readyz");
     expect(initEnv).toContain("AGENT_SUPERVISOR_ID=mac-supervisor-jwc");
     expect(initEnv).toContain("AGENT_SUPERVISOR_CONCURRENCY=8");
     expect(initEnv).toContain("MAC_WORKER_COUNT=8");

@@ -14,7 +14,26 @@ const ORIGINAL_AUTH_REDIRECT_ORIGIN = process.env.AUTH_REDIRECT_ORIGIN;
 const ORIGINAL_NEXT_PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
 const ORIGINAL_NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL;
 
-function mockSuccessfulExchange() {
+function mockChatSessionLookup(
+  sessions: Array<{ id: string }> = [{ id: "session-1" }],
+) {
+  return vi.fn(() => ({
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        is: vi.fn(() => ({
+          limit: vi.fn().mockResolvedValue({
+            data: sessions,
+            error: null,
+          }),
+        })),
+      })),
+    })),
+  }));
+}
+
+function mockSuccessfulExchange(options: {
+  sessions?: Array<{ id: string }>;
+} = {}) {
   vi.mocked(createClient).mockResolvedValue({
     auth: {
       exchangeCodeForSession: vi.fn().mockResolvedValue({
@@ -23,6 +42,7 @@ function mockSuccessfulExchange() {
       }),
       getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
     },
+    from: mockChatSessionLookup(options.sessions),
   } as unknown as Awaited<ReturnType<typeof createClient>>);
 }
 
@@ -102,6 +122,8 @@ describe("GET /auth/callback", () => {
   });
 
   it("preserves desktop approval code redirects after OAuth", async () => {
+    mockSuccessfulExchange({ sessions: [] });
+
     const response = await GET(
       new Request(
         "http://internal.local/auth/callback?code=ok&next=%2Flogin%3Fdesktop_code%3DABCD-1234",
@@ -110,6 +132,29 @@ describe("GET /auth/callback", () => {
 
     expect(response.headers.get("location")).toBe(
       "http://internal.local/login?desktop_code=ABCD-1234",
+    );
+  });
+
+  it("sends first-run web users to product onboarding with their original destination", async () => {
+    mockSuccessfulExchange({ sessions: [] });
+
+    const response = await GET(
+      new Request(
+        "http://internal.local/auth/callback?code=ok&next=%2Fchat%2Fnew%3Fticker%3DTSLA",
+      ),
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "http://internal.local/companies?onboarding=1&continue=%2Fchat%2Fnew%3Fticker%3DTSLA",
+    );
+    expect(recordAnalyticsEventFromRequest).toHaveBeenCalledWith(
+      expect.any(Request),
+      expect.objectContaining({
+        eventName: "login_completed",
+        properties: expect.objectContaining({
+          next_path: "/chat/new?ticker=TSLA",
+        }),
+      }),
     );
   });
 

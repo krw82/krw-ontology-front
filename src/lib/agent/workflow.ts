@@ -75,10 +75,12 @@ function newsDiscoveryRuntimePrompt(responseLocale: Locale): string {
   if (responseLocale === "en") {
     return `Web app news discovery run:
 - The user is asking about a recent/current market-news event, issue, or named news topic.
-- Use the Yahoo Finance MCP tools directly at runtime to find recent ticker news that answers the user's question.
-- Prefer the session/default ticker or the ticker/company named by the user. Yahoo Finance news is ticker-based; if no resolvable ticker/company context exists, say the current news read is limited and ask for a specific company.
+- Use the configured current market-news MCP tools directly at runtime to find recent ticker news that answers the user's question.
+- Prefer the session/default ticker or the ticker/company named by the user. The current market-news lookup is ticker-based; if no resolvable ticker/company context exists, say the current news read is limited and ask for a specific company.
 - Use get_yahoo_finance_news first. Use get_stock_info only when ticker/company identity needs confirmation.
-- Do not summarize Yahoo Finance results in returned order. First classify results into direct ticker news, indirect market/sector news, and low-relevance news.
+- Treat get_stock_info as safe quote/identity context only. Do not use provider valuation, analyst consensus, target price, recommendation, forward PE, PEG, or growth-estimate fields in the answer.
+- Provider names, MCP/tool names, API names, and raw provider payload labels are internal only. Never mention Yahoo Finance or similar provider names in the final answer unless the user explicitly asks about data/debug provenance; say recent market data, price data, or market reporting instead.
+- Do not summarize provider results in returned order. First classify results into direct ticker news, indirect market/sector news, and low-relevance news.
 - Separate company-specific news from indirect market/sector context. Do not present indirect market news as if it were company-specific news.
 - Do not call KRW Ontology tools in this run.
 - Treat news as market reporting, not confirmed company disclosure.
@@ -90,10 +92,12 @@ function newsDiscoveryRuntimePrompt(responseLocale: Locale): string {
 
   return `웹앱 뉴스 discovery 실행:
 - 사용자는 최근/현재 시장 뉴스, 특정 이슈, 또는 이름이 나온 뉴스 주제에 대해 묻고 있습니다.
-- Yahoo Finance MCP 도구를 런타임에서 직접 호출해서 사용자가 물어본 최근 ticker news를 확인합니다.
-- 세션/default ticker 또는 사용자가 말한 ticker/company를 우선합니다. Yahoo Finance 뉴스는 ticker 기반이므로, 확인 가능한 ticker/company 컨텍스트가 없으면 현재 뉴스 확인 범위가 제한적이라고 말하고 특정 회사를 물어봅니다.
+- 설정된 현재 시장/뉴스 MCP 도구를 런타임에서 직접 호출해서 사용자가 물어본 최근 ticker news를 확인합니다.
+- 세션/default ticker 또는 사용자가 말한 ticker/company를 우선합니다. 현재 시장/뉴스 조회는 ticker 기반이므로, 확인 가능한 ticker/company 컨텍스트가 없으면 현재 뉴스 확인 범위가 제한적이라고 말하고 특정 회사를 물어봅니다.
 - 먼저 get_yahoo_finance_news를 사용합니다. ticker/company 확인이 필요할 때만 get_stock_info를 보조로 사용합니다.
-- Yahoo Finance 결과를 나온 순서대로 요약하지 않습니다. 먼저 직접 ticker 뉴스, 간접 시장/섹터 뉴스, 낮은 관련 뉴스로 분류합니다.
+- get_stock_info는 안전한 가격/회사 식별 맥락으로만 사용합니다. provider의 밸류에이션, 애널리스트 컨센서스, 목표가, 추천등급, forward PE, PEG, 성장률 추정치는 답변에 쓰지 않습니다.
+- provider 이름, MCP/tool 이름, API 이름, 원본 provider payload 표현은 내부 정보입니다. 사용자가 데이터/debug 출처를 명시적으로 묻지 않는 한 최종 답변에는 Yahoo Finance 같은 provider 이름을 절대 쓰지 말고, "최근 시장 자료", "가격 데이터", "시장 보도"처럼 사용자-facing 표현으로 씁니다.
+- provider 결과를 나온 순서대로 요약하지 않습니다. 먼저 직접 ticker 뉴스, 간접 시장/섹터 뉴스, 낮은 관련 뉴스로 분류합니다.
 - 회사 직접 뉴스와 시장/섹터 간접 맥락을 반드시 분리합니다. 간접 시장 뉴스를 회사 고유 뉴스처럼 쓰지 않습니다.
 - 이벤트 선택 카드나 JSON을 만들지 않습니다.
 - 이 실행에서는 KRW Ontology 도구를 호출하지 않습니다.
@@ -114,30 +118,38 @@ function marketMoveResearchRuntimePrompt(responseLocale: Locale): string {
   if (responseLocale === "en") {
     return `Web app market-move research run:
 - The user is asking why a covered stock moved now.
-- Use the Yahoo Finance MCP tools directly at runtime. Use get_stock_info for current price/move context and get_yahoo_finance_news for recent ticker news candidates.
-- Prefer the session/default ticker or the ticker/company named by the user. Yahoo Finance news is ticker-based; if no ticker/company context is resolvable, say the live market/news read is limited and ask for a specific company.
+- Use the configured current market-news MCP tools directly at runtime. Use get_stock_info for current price/move and safe technical context, and get_yahoo_finance_news for recent ticker news candidates.
+- Treat get_stock_info as safe quote/identity/technical context only. Use only currentPrice, previousClose, regularMarketChangePercent, volume, averageVolume, fiftyDayAverage, twoHundredDayAverage, fiftyTwoWeekLow, fiftyTwoWeekHigh, and marketCap for market/technical interpretation. Do not use provider valuation, analyst consensus, target price, recommendation, forward PE, PEG, or growth-estimate fields in the answer.
+- Provider names, MCP/tool names, API names, and raw provider payload labels are internal only. Never mention Yahoo Finance or similar provider names in the final answer unless the user explicitly asks about data/debug provenance; say recent market data, price data, or market reporting instead.
+- Prefer the session/default ticker or the ticker/company named by the user. The current market-news lookup is ticker-based; if no ticker/company context is resolvable, say the live market/news read is limited and ask for a specific company.
 - Treat quote/news data as market observations, not confirmed company disclosure.
-- Do not summarize Yahoo Finance results in returned order. Classify results into direct company news, indirect market/sector context, and low-relevance/newsletter-style items; exclude low-relevance items from the explanation unless needed as a limitation.
+- Do not summarize provider results in returned order. Classify results into direct company news, indirect market/sector context, and low-relevance/newsletter-style items; exclude low-relevance items from the explanation unless needed as a limitation.
 - Default first answer: write a compact but substantive market/news investment brief, not a headline summary.
 - When there is a usable direct company-news candidate, do not stop after naming the catalyst. Explain what the news actually says, why it could move this stock, which investor assumption it touches, what still needs additional confirmation, and why the move may still be an overreaction or incomplete evidence.
+- If the user asks for technical analysis, chart position, moving averages, volume, or trend strength, interpret safe technical fields as market confirmation only. Do not create buy/sell signals, exact entry prices, target prices, or stop-loss levels.
+- When both news and technical signals are available, treat news as the catalyst candidate and technical signals as evidence of whether the market reaction is confirmed, stretched, weak, or mixed. Do not say a headline caused the move solely because it appeared near the price move.
 - The answer should create a natural next question by making the filing/scenario check feel useful, not by asking the user to choose from generic cards.
 - Do not automatically turn every price-move question into a full filing-grounded ontology report.
 - Use KRW Ontology only when the user asks for filings, long-term thesis impact, revenue, margin, cash flow, balance sheet, dilution, risk, capital allocation, or when the answer would otherwise imply a durable investment-view change.
 - For simple "why did it move" questions, normally stop before KRW Ontology and let numbered follow-up prompts re-enter the router for deeper filing or scenario work.
 - Do not write a full forward outlook or scenario analysis in the default market-move answer; offer a numbered scenario follow-up instead.
-- End with exactly 3 numbered follow-up prompts. Use one company filing-research continuation, one scenario-sensitivity prompt, and one opposite-view or thesis-break prompt.
-- If Yahoo Finance MCP fails, returns no useful direct/indirect results, or the price move cannot be confirmed, state the live market/news read was limited and do not invent a news explanation.
+- End with exactly 3 numbered follow-up prompts. For technical answers, frame them around whether the observed trend can continue, weaken, or reverse. If news and technical signals are both discussed, use one trend-continuation prompt tied to the news, one trend-break/risk prompt, and one scenario-sensitivity prompt. Avoid awkward prompts that mechanically connect a price move to revenue, margin, and cash flow.
+- If the current market-news lookup fails, returns no useful direct/indirect results, or the price move cannot be confirmed, state the live market/news read was limited and do not invent a news explanation.
 - The final answer must be user-visible English Markdown investor interpretation only.`;
   }
 
   return `웹앱 주가 변동 research 실행:
 - 사용자는 현재 주가가 왜 움직였는지 묻고 있습니다.
-- Yahoo Finance MCP 도구를 런타임에서 직접 호출합니다. get_stock_info로 현재 가격/변동 맥락을 확인하고, get_yahoo_finance_news로 최근 ticker news 후보를 확인합니다.
-- 세션/default ticker 또는 사용자가 말한 ticker/company를 우선합니다. Yahoo Finance 뉴스는 ticker 기반이므로, 확인 가능한 ticker/company 컨텍스트가 없으면 실시간 시장/뉴스 확인 범위가 제한적이라고 말하고 특정 회사를 물어봅니다.
+- 설정된 현재 시장/뉴스 MCP 도구를 런타임에서 직접 호출합니다. get_stock_info로 현재 가격/변동과 안전한 기술적 맥락을 확인하고, get_yahoo_finance_news로 최근 ticker news 후보를 확인합니다.
+- get_stock_info는 안전한 가격/회사 식별/기술적 맥락으로만 사용합니다. 기술적 해석에는 currentPrice, previousClose, regularMarketChangePercent, volume, averageVolume, fiftyDayAverage, twoHundredDayAverage, fiftyTwoWeekLow, fiftyTwoWeekHigh, marketCap만 사용합니다. provider의 밸류에이션, 애널리스트 컨센서스, 목표가, 추천등급, forward PE, PEG, 성장률 추정치는 답변에 쓰지 않습니다.
+- provider 이름, MCP/tool 이름, API 이름, 원본 provider payload 표현은 내부 정보입니다. 사용자가 데이터/debug 출처를 명시적으로 묻지 않는 한 최종 답변에는 Yahoo Finance 같은 provider 이름을 절대 쓰지 말고, "최근 시장 자료", "가격 데이터", "시장 보도"처럼 사용자-facing 표현으로 씁니다.
+- 세션/default ticker 또는 사용자가 말한 ticker/company를 우선합니다. 현재 시장/뉴스 조회는 ticker 기반이므로, 확인 가능한 ticker/company 컨텍스트가 없으면 실시간 시장/뉴스 확인 범위가 제한적이라고 말하고 특정 회사를 물어봅니다.
 - 가격/뉴스 데이터는 시장 관찰값으로만 보고, 회사가 확인한 공시/발표처럼 취급하지 않습니다.
-- Yahoo Finance 결과를 나온 순서대로 요약하지 않습니다. 먼저 회사 직접 뉴스, 간접 시장/섹터 맥락, 낮은 관련성/뉴스레터성 항목으로 분류하고, 낮은 관련성 항목은 한계 설명이 필요할 때 외에는 답변 근거에서 제외합니다.
+- provider 결과를 나온 순서대로 요약하지 않습니다. 먼저 회사 직접 뉴스, 간접 시장/섹터 맥락, 낮은 관련성/뉴스레터성 항목으로 분류하고, 낮은 관련성 항목은 한계 설명이 필요할 때 외에는 답변 근거에서 제외합니다.
 - 기본 첫 답변은 헤드라인 요약이 아니라, 짧지만 얕지 않은 시장/뉴스 투자 브리프로 작성합니다.
 - 쓸 만한 회사 직접 뉴스 후보가 있으면 촉매를 이름만 말하고 끝내지 않습니다. 그 뉴스가 실제로 무엇을 말하는지, 왜 이 종목을 움직일 수 있는지, 어떤 투자자 가정에 닿는지, 무엇을 추가로 확인해야 하는지, 아직 과잉반응이거나 불완전한 증거일 수 있는 이유를 설명합니다.
+- 사용자가 기술적 분석, 차트 위치, 이평선, 거래량, 추세 강도를 묻는 경우 안전한 기술적 필드만 시장 확인 신호로 해석합니다. 기술 지표만으로 매수/매도 신호, 정확한 진입가, 목표가, 손절가를 만들지 않습니다.
+- 뉴스와 기술 신호가 같이 있으면 뉴스는 촉매 후보로, 기술 신호는 시장 반응이 확인됐는지/과열됐는지/약한지/혼재됐는지를 보여주는 보조 신호로 해석합니다. 헤드라인과 가격 움직임이 가까이 있었다는 이유만으로 인과관계를 단정하지 않습니다.
 - 답변은 일반 카드 선택을 유도하기보다, 다음 공시/시나리오 확인이 자연스럽게 궁금해지도록 작성합니다.
 - 모든 가격 변동 질문을 자동으로 공시 기반 온톨로지 보고서로 바꾸지 않습니다.
 - 사용자가 공시, 장기 투자 가정, 매출, 마진, 현금흐름, 재무상태, 희석, 리스크, 자본배분을 묻거나 답변이 지속적인 투자 판단 변화를 암시할 때만 KRW Ontology를 사용합니다.
@@ -145,9 +157,11 @@ function marketMoveResearchRuntimePrompt(responseLocale: Locale): string {
 - 기본 주가 변동 답변 안에서 향후 전망/상승·하락 시나리오를 길게 쓰지 말고, 번호가 붙은 시나리오 후속질문으로 제안합니다.
 - 후속질문은 정확히 3개를 쓰고, 모두 "1.", "2.", "3." 번호가 붙은 형태로 작성합니다.
 - 후속질문은 1개는 같은 회사의 추가 확인 질문, 1개는 scenario_sensitivity로 이어지는 시나리오 질문, 1개는 반대 근거/과잉반응/판단이 깨지는 조건 질문으로 씁니다.
+- 기술적 분석 답변의 후속질문은 "이 추세가 이어질 수 있는 조건", "이 흐름이 꺾일 수 있는 리스크", "상승·하락·횡보 시나리오" 중심으로 씁니다. "이 가격 움직임이 매출·마진·현금흐름 변화와 연결되는지 확인해줘"처럼 부자연스러운 문구는 쓰지 않습니다.
+- 뉴스와 기술 신호를 같이 설명했다면 후속질문도 뉴스와 추세를 연결합니다. 예: "이 뉴스가 추세를 이어가게 만들 조건을 회사 자료 기준으로 확인해줘.", "이 흐름이 꺾일 수 있는 리스크 신호를 정리해줘.", "상승·하락·횡보 시나리오별로 이 뉴스와 추세를 나눠줘."
 - 시나리오 질문은 "상승·하락·횡보 시나리오별로 이 움직임을 나눠줘", "이 움직임이 과잉반응인지 시나리오별로 점검해줘"처럼 일반 개인투자자가 바로 보낼 수 있는 말로 씁니다.
 - 후속질문은 전문 리서치 과제처럼 쓰지 말고, 설명 없는 영어 약어·공시 항목명·밸류에이션 모델 용어를 피합니다.
-- Yahoo Finance MCP가 실패하거나, 직접/간접 관련 뉴스가 부족하거나, 가격 변동을 확인하지 못하면 실시간 시장/뉴스 확인이 제한적이었다고 말하고 뉴스 설명을 지어내지 않습니다.
+- 현재 시장/뉴스 조회가 실패하거나, 직접/간접 관련 뉴스가 부족하거나, 가격 변동을 확인하지 못하면 실시간 시장/뉴스 확인이 제한적이었다고 말하고 뉴스 설명을 지어내지 않습니다.
 - 최종 답변은 사용자에게 바로 보여줄 한국어 Markdown 투자 해석만 작성합니다.`;
 }
 

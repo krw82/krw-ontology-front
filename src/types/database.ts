@@ -530,6 +530,105 @@ export interface UserResearchNoteSourceRow extends Record<string, unknown> {
   created_at: string;
 }
 
+export interface InstitutionalManagerRow extends Record<string, unknown> {
+  cik: string;
+  name: string;
+  display_name: string | null;
+  country_code: string | null;
+  notes: string | null;
+  latest_refresh_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Institutional13FFilingRow extends Record<string, unknown> {
+  id: string;
+  cik: string;
+  accession_number: string;
+  form: "13F-HR" | "13F-HR/A";
+  report_period: string;
+  filing_date: string;
+  accepted_at: string | null;
+  filing_detail_url: string;
+  primary_document_url: string | null;
+  information_table_url: string;
+  entry_count: number;
+  total_value_usd: number;
+  source: "sec_edgar";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Institutional13FHoldingRow extends Record<string, unknown> {
+  id: string;
+  filing_id: string;
+  cik: string;
+  report_period: string;
+  position_key: string;
+  issuer_name: string;
+  title_of_class: string;
+  cusip: string;
+  ticker: string | null;
+  value_usd: number;
+  shares: number | null;
+  share_type: string | null;
+  put_call: string | null;
+  investment_discretion: string | null;
+  other_manager: string | null;
+  voting_authority_sole: number | null;
+  voting_authority_shared: number | null;
+  voting_authority_none: number | null;
+  created_at: string;
+}
+
+export interface Sec13FCusipMappingRow extends Record<string, unknown> {
+  cusip: string;
+  ticker: string | null;
+  name: string | null;
+  exch_code: string | null;
+  figi: string | null;
+  composite_figi: string | null;
+  share_class_figi: string | null;
+  market_sector: string | null;
+  security_type: string | null;
+  security_type_2: string | null;
+  security_description: string | null;
+  provider: "openfigi";
+  provider_status: "mapped" | "not_found" | "error";
+  raw_response: Json | null;
+  mapped_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Sec13FPositionChangeRow extends Record<string, unknown> {
+  id: string;
+  filing_id: string;
+  previous_filing_id: string | null;
+  cik: string;
+  report_period: string;
+  previous_report_period: string | null;
+  position_key: string;
+  issuer_name: string;
+  title_of_class: string | null;
+  cusip: string;
+  ticker: string | null;
+  change_type: "new" | "increased" | "decreased" | "unchanged" | "sold";
+  current_value_usd: number;
+  previous_value_usd: number | null;
+  value_change_usd: number | null;
+  value_change_pct: number | null;
+  current_weight: number | null;
+  previous_weight: number | null;
+  weight_change: number | null;
+  current_shares: number | null;
+  previous_shares: number | null;
+  shares_change: number | null;
+  shares_change_pct: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ToolCallRow extends Record<string, unknown> {
   id: string;
   run_id: string;
@@ -1203,6 +1302,153 @@ export interface Database {
         };
         Update: Partial<Omit<AgentWorkerHeartbeatRow, "worker_id" | "created_at">>;
         Relationships: [];
+      };
+      institutional_managers: {
+        Row: InstitutionalManagerRow;
+        Insert: Pick<InstitutionalManagerRow, "cik" | "name"> &
+          Partial<
+            Omit<InstitutionalManagerRow, "cik" | "name" | "created_at" | "updated_at">
+          > & {
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<InstitutionalManagerRow, "cik" | "created_at">>;
+        Relationships: [];
+      };
+      sec_13f_filings: {
+        Row: Institutional13FFilingRow;
+        Insert: Pick<
+          Institutional13FFilingRow,
+          | "cik"
+          | "accession_number"
+          | "form"
+          | "report_period"
+          | "filing_date"
+          | "filing_detail_url"
+          | "information_table_url"
+        > &
+          Partial<
+            Omit<
+              Institutional13FFilingRow,
+              | "id"
+              | "cik"
+              | "accession_number"
+              | "form"
+              | "report_period"
+              | "filing_date"
+              | "filing_detail_url"
+              | "information_table_url"
+              | "created_at"
+              | "updated_at"
+            >
+          > & {
+            id?: string;
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<Institutional13FFilingRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      sec_13f_holdings: {
+        Row: Institutional13FHoldingRow;
+        Insert: Pick<
+          Institutional13FHoldingRow,
+          | "filing_id"
+          | "cik"
+          | "report_period"
+          | "position_key"
+          | "issuer_name"
+          | "title_of_class"
+          | "cusip"
+          | "value_usd"
+        > &
+          Partial<
+            Omit<
+              Institutional13FHoldingRow,
+              | "id"
+              | "filing_id"
+              | "cik"
+              | "report_period"
+              | "position_key"
+              | "issuer_name"
+              | "title_of_class"
+              | "cusip"
+              | "value_usd"
+              | "created_at"
+            >
+          > & {
+            id?: string;
+            created_at?: string;
+          };
+        Update: Partial<Omit<Institutional13FHoldingRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      sec_13f_cusip_mappings: {
+        Row: Sec13FCusipMappingRow;
+        Insert: Pick<Sec13FCusipMappingRow, "cusip"> &
+          Partial<
+            Omit<
+              Sec13FCusipMappingRow,
+              "cusip" | "created_at" | "updated_at"
+            >
+          > & {
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<Sec13FCusipMappingRow, "cusip" | "created_at">>;
+        Relationships: [];
+      };
+      sec_13f_position_changes: {
+        Row: Sec13FPositionChangeRow;
+        Insert: Pick<
+          Sec13FPositionChangeRow,
+          | "filing_id"
+          | "cik"
+          | "report_period"
+          | "position_key"
+          | "issuer_name"
+          | "cusip"
+          | "change_type"
+        > &
+          Partial<
+            Omit<
+              Sec13FPositionChangeRow,
+              | "id"
+              | "filing_id"
+              | "cik"
+              | "report_period"
+              | "position_key"
+              | "issuer_name"
+              | "cusip"
+              | "change_type"
+              | "created_at"
+              | "updated_at"
+            >
+          > & {
+            id?: string;
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<Sec13FPositionChangeRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
       };
       desktop_devices: {
         Row: DesktopDeviceRow;

@@ -94,11 +94,11 @@ export default function CompaniesBrowser({
   const normalizedSearch = search.trim();
   const forceCoachmarks = searchParams.get("coach") === "1";
   const copy = locale === "ko"
-    ? {
+      ? {
         eyebrow: "회사 찾기",
         heading: "분석할 회사를 고르세요.",
         intro:
-          "티커, 회사명, 사업 활동, 리스크 키워드로 바로 찾고 채팅 리서치로 이어갑니다.",
+          "회사를 알고 있다면 바로 검색하세요. 질문은 회사 공시, 실적 변화, 리스크 맥락으로 이어집니다.",
         searchLabel: "회사 검색",
         searchPlaceholder: "예: IBM, 브로드컴, 애플",
         searchAria: "회사 검색",
@@ -107,7 +107,7 @@ export default function CompaniesBrowser({
         discoveryEyebrow: "회사를 아직 모른다면",
         discoveryTitle: "종목 발굴기",
         discoveryDescription:
-          "아이디어, 산업, 리스크 키워드로 후보 종목을 발굴합니다.",
+          "아이디어, 산업, 리스크, 재무 조건을 넣어 볼 만한 회사를 먼저 좁힙니다.",
         discoveryCta: "종목 발굴 시작",
         emptyCatalog:
           "현재 환경의 웹 카탈로그에서 인덱싱된 회사를 찾지 못했습니다.",
@@ -115,13 +115,13 @@ export default function CompaniesBrowser({
         countSuffix: "개 표시",
         emptySearch: "검색 조건에 맞는 회사가 없습니다.",
         footer:
-          "© 2026 KRW Ontology. 근거 기반 기업 리서치와 데이터 분석.",
+          "© 2026 KRW Ontology. 공시 근거 기반 기업 리서치.",
       }
     : {
         eyebrow: "Find a company",
         heading: "Choose a company to analyze.",
         intro:
-          "Search by ticker, company name, activity, or risk keyword, then continue into chat research.",
+          "If you know the company, search directly. Questions continue into filing, earnings, and risk context.",
         searchLabel: "Company search",
         searchPlaceholder: "e.g. IBM, Broadcom, Apple",
         searchAria: "Company search",
@@ -130,7 +130,7 @@ export default function CompaniesBrowser({
         discoveryEyebrow: "If you do not know the company yet",
         discoveryTitle: "Stock discovery",
         discoveryDescription:
-          "Find candidate stocks from an idea, industry, or risk keyword.",
+          "Start from an idea, industry, risk, or financial condition to narrow candidate companies.",
         discoveryCta: "Start discovery",
         emptyCatalog:
           "No indexed companies were found in the current web catalog.",
@@ -138,7 +138,7 @@ export default function CompaniesBrowser({
         countSuffix: "shown",
         emptySearch: "No companies match this search.",
         footer:
-          "© 2026 KRW Ontology. Evidence-first company research and data analysis.",
+          "© 2026 KRW Ontology. Filing-grounded company research.",
       };
 
   const filteredCompanies = useMemo(() => {

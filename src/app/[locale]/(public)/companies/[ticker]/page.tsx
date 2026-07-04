@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import TopNav from "@/components/TopNav";
 import CompanyLogo from "@/components/CompanyLogo";
 import CompanyWatchlistActions from "@/components/CompanyWatchlistActions";
+import JsonLdScript from "@/components/JsonLdScript";
 import MarketingCtaLink from "@/components/MarketingCtaLink";
 import SuggestedPromptActions from "@/components/SuggestedPromptActions";
 import {
@@ -16,7 +17,11 @@ import { localizedPath } from "@/i18n/routing";
 import { getAuthUser } from "@/lib/auth";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { normalizeTicker } from "@/lib/ontology/ticker";
-import { absoluteUrl, SITE_NAME } from "@/lib/marketing/site";
+import {
+  absoluteUrl,
+  buildCompanyOgImagePath,
+  SITE_NAME,
+} from "@/lib/marketing/site";
 import { getCspNonce } from "@/lib/security/csp-nonce";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { UserCompanyMarkRow } from "@/types/database";
@@ -77,6 +82,10 @@ export async function generateMetadata({
         ? `${displayCompany.name}${companyNameKo ? ` · ${companyNameKo}` : ""} (${displayCompany.ticker})의 실적 변화, 리스크, 사업 활동을 공시 근거 기반으로 질문해보세요.`
         : `Research ${displayCompany.name} (${displayCompany.ticker}) performance changes, risks, and business activity with filing-grounded evidence.`,
     path: `/companies/${displayCompany.ticker}`,
+    image: {
+      url: buildCompanyOgImagePath(displayCompany.ticker, locale),
+      alt: `${displayCompany.ticker} ${companyTitleName} | ${SITE_NAME}`,
+    },
   });
 }
 
@@ -173,31 +182,66 @@ export default async function CompanyLandingPage({
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "WebPage",
-    name: pageCopy.jsonLdName,
-    url: absoluteUrl(localizedPath(locale, `/companies/${displayCompany.ticker}`)),
-    isPartOf: {
-      "@type": "WebSite",
-      name: SITE_NAME,
-      url: absoluteUrl(localizedPath(locale)),
-    },
-    about: {
-      "@type": "Organization",
-      name: displayCompany.name,
-      tickerSymbol: displayCompany.ticker,
-    },
+    "@graph": [
+      {
+        "@type": "WebPage",
+        name: pageCopy.jsonLdName,
+        url: absoluteUrl(localizedPath(locale, `/companies/${displayCompany.ticker}`)),
+        isPartOf: {
+          "@type": "WebSite",
+          name: SITE_NAME,
+          url: absoluteUrl(localizedPath(locale)),
+        },
+        about: {
+          "@type": "Organization",
+          name: displayCompany.name,
+          alternateName: companyNameKo ?? undefined,
+          tickerSymbol: displayCompany.ticker,
+        },
+        mainEntity: {
+          "@type": "ItemList",
+          name:
+            locale === "ko"
+              ? `${companyTitleName} 대표 리서치 질문`
+              : `${displayCompany.name} representative research questions`,
+          itemListElement: prompts.map((prompt, index) => ({
+            "@type": "ListItem",
+            position: index + 1,
+            name: prompt,
+            url: absoluteUrl(
+              promptHrefs[index] ??
+                localizedPath(locale, `/companies/${displayCompany.ticker}`),
+            ),
+          })),
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: pageCopy.breadcrumbCompanies,
+            item: absoluteUrl(localizedPath(locale, "/companies")),
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: companyTitleName,
+            item: absoluteUrl(
+              localizedPath(locale, `/companies/${displayCompany.ticker}`),
+            ),
+          },
+        ],
+      },
+    ],
   };
   const watchlistPath = `/watchlist/${displayCompany.ticker}`;
   const watchlistLoginHref = `/login?next=${encodeURIComponent(watchlistPath)}`;
 
   return (
     <div className="min-h-[100dvh] bg-canvas text-ink">
-      <script
-        nonce={nonce}
-        type="application/ld+json"
-        suppressHydrationWarning
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <JsonLdScript nonce={nonce} data={jsonLd} />
       <TopNav
         initialUserProfile={initialUserProfile}
         preserveInitialUserProfile={preserveInitialUserProfile}

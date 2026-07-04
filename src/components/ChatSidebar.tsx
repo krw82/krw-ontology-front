@@ -50,6 +50,8 @@ const sidebarCopy = {
     openCompanySearch: "회사 찾기 열기",
     wideResearch: "와이드 리서치",
     openWideResearch: "와이드 리서치 시작",
+    institutionalHoldings: "13F 기관매수",
+    openInstitutionalHoldings: "13F 기관매수 열기",
     recentChats: "최근 채팅 목록",
     newChat: "새 채팅",
     nameSaved: "채팅 이름을 저장했습니다.",
@@ -83,6 +85,8 @@ const sidebarCopy = {
     openCompanySearch: "Open company search",
     wideResearch: "Wide research",
     openWideResearch: "Start wide research",
+    institutionalHoldings: "13F institutional buying",
+    openInstitutionalHoldings: "Open 13F institutional buying",
     recentChats: "Recent chats",
     newChat: "New chat",
     nameSaved: "Chat name saved.",
@@ -461,6 +465,17 @@ function SidebarPrimaryLinks({
           hub
         </span>
         <span className="truncate">{copy.wideResearch}</span>
+      </Link>
+      <Link
+        href="/institutional-holdings"
+        className={linkClass}
+        aria-label={copy.openInstitutionalHoldings}
+        onClick={onNavigate}
+      >
+        <span aria-hidden="true" className={iconClass}>
+          monitoring
+        </span>
+        <span className="truncate">{copy.institutionalHoldings}</span>
       </Link>
     </div>
   );

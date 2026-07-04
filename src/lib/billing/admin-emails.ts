@@ -1,6 +1,7 @@
 const DEFAULT_ADMIN_EMAILS = [
   "admin1@example.com",
   "admin2@example.com",
+  "dev@krw-ontology.local",
 ];
 
 function getDefaultAdminEmails() {

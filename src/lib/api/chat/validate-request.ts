@@ -89,10 +89,7 @@ export async function validateRequest(
     run_kind === undefined
       ? defaultRunKindForAnalysisMode(normalizedAnalysisMode)
       : normalizeRunKind(run_kind);
-  const normalizedResearchMode =
-    normalizedRunKind === "idea_generation"
-      ? "deep"
-      : normalizeResearchMode(research_mode);
+  const normalizedResearchMode = normalizeResearchMode(research_mode);
   if (content.trim().length === 0 || !normalizedRequestId) {
     return {
       ok: false,

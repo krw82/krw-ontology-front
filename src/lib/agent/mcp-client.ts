@@ -79,6 +79,7 @@ const YAHOO_FINANCE_MCP_TOOL_SET = new Set<string>(YAHOO_FINANCE_MCP_TOOLS);
 const CHART_MCP_TOOL_SET = new Set<string>(CHART_MCP_TOOLS);
 const execFileAsync = promisify(execFile);
 const DEFAULT_MCP_HEALTH_TIMEOUT_MS = 30_000;
+type McpProbeKind = "health" | "ready";
 
 export function isKrwOntologySdkTool(toolName: string): boolean {
   if (!toolName.startsWith(KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX)) return false;
@@ -235,12 +236,17 @@ function getHealthTimeoutMs(): number {
     : DEFAULT_MCP_HEALTH_TIMEOUT_MS;
 }
 
-function buildHealthCommand(serverConfig: PluginMcpServerConfig): {
+function buildHealthCommand(
+  serverConfig: PluginMcpServerConfig,
+  probeKind: McpProbeKind,
+): {
   command: string;
   args: string[];
 } {
   const command = serverConfig.command ?? "";
   const args = serverConfig.args ?? [];
+  const probePythonCode =
+    probeKind === "ready" ? MCP_READY_PYTHON_CODE : MCP_HEALTH_PYTHON_CODE;
 
   if (path.basename(command) === "uv") {
     const directoryIndex = args.indexOf("--directory");
@@ -254,7 +260,7 @@ function buildHealthCommand(serverConfig: PluginMcpServerConfig): {
         "run",
         "python",
         "-c",
-        MCP_HEALTH_PYTHON_CODE,
+        probePythonCode,
       ],
     };
   }
@@ -262,13 +268,13 @@ function buildHealthCommand(serverConfig: PluginMcpServerConfig): {
   if (path.isAbsolute(command)) {
     return {
       command: path.join(path.dirname(command), "python"),
-      args: ["-c", MCP_HEALTH_PYTHON_CODE],
+      args: ["-c", probePythonCode],
     };
   }
 
   return {
     command: process.env.KRW_ONTOLOGY_HEALTH_PYTHON || "python3",
-    args: ["-c", MCP_HEALTH_PYTHON_CODE],
+    args: ["-c", probePythonCode],
   };
 }
 
@@ -278,6 +284,16 @@ import os
 from krw_ontology.mcp_server.server import health_payload
 
 payload, status = health_payload()
+print(json.dumps({"status": status, "payload": payload}, ensure_ascii=False))
+raise SystemExit(0 if status == 200 and payload.get("ok") else 1)
+`;
+
+const MCP_READY_PYTHON_CODE = `
+import json
+import os
+from krw_ontology.mcp_server.server import ready_payload
+
+payload, status = ready_payload()
 print(json.dumps({"status": status, "payload": payload}, ensure_ascii=False))
 raise SystemExit(0 if status == 200 and payload.get("ok") else 1)
 `;
@@ -317,6 +333,14 @@ function getConfiguredMcpUrl(serverConfig: PluginMcpServerConfig): string | null
 function healthUrlFromMcpUrl(mcpUrl: string): string {
   const parsed = new URL(mcpUrl);
   parsed.pathname = "/health";
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.toString();
+}
+
+function readyUrlFromMcpUrl(mcpUrl: string): string {
+  const parsed = new URL(mcpUrl);
+  parsed.pathname = "/readyz";
   parsed.search = "";
   parsed.hash = "";
   return parsed.toString();
@@ -401,6 +425,7 @@ function parseMcpHealthPayload(
 async function runHttpMcpHealth(
   serverConfig: PluginMcpServerConfig,
   root: string | null,
+  probeKind: McpProbeKind,
 ): Promise<
   Awaited<ReturnType<typeof parseMcpHealthPayload>>
 > {
@@ -409,7 +434,9 @@ async function runHttpMcpHealth(
     throw new Error("KRW Ontology MCP HTTP URL is missing");
   }
   const healthUrl =
-    process.env.KRW_ONTOLOGY_MCP_HEALTH_URL || healthUrlFromMcpUrl(mcpUrl);
+    probeKind === "ready"
+      ? process.env.KRW_ONTOLOGY_MCP_READY_URL || readyUrlFromMcpUrl(mcpUrl)
+      : process.env.KRW_ONTOLOGY_MCP_HEALTH_URL || healthUrlFromMcpUrl(mcpUrl);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), getHealthTimeoutMs());
   try {
@@ -427,10 +454,11 @@ async function runHttpMcpHealth(
 async function runStdioMcpHealth(
   serverConfig: PluginMcpServerConfig,
   root: string | null,
+  probeKind: McpProbeKind,
 ): Promise<
   Awaited<ReturnType<typeof parseMcpHealthPayload>>
 > {
-  const healthCommand = buildHealthCommand(serverConfig);
+  const healthCommand = buildHealthCommand(serverConfig, probeKind);
   const env = {
     ...(serverConfig.env ?? {}),
     ...process.env,
@@ -462,7 +490,7 @@ async function runStdioMcpHealth(
   return parseMcpHealthPayload(parsed.status ?? 500, parsed.payload ?? {}, root);
 }
 
-export async function checkMcpHealth(): Promise<McpHealthResult> {
+async function checkMcpProbe(probeKind: McpProbeKind): Promise<McpHealthResult> {
   const pluginPath = getKrwOntologyPluginPath();
   const manifestPath = path.join(pluginPath, ".claude-plugin", "plugin.json");
   const mcpConfigPath = path.join(pluginPath, ".mcp.json");
@@ -554,8 +582,8 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
     }
 
     const liveHealth = isHttp
-      ? await runHttpMcpHealth(serverConfig, root)
-      : await runStdioMcpHealth(serverConfig, root);
+      ? await runHttpMcpHealth(serverConfig, root, probeKind)
+      : await runStdioMcpHealth(serverConfig, root, probeKind);
     if (!liveHealth.liveOk || !liveHealth.sqliteOk) {
       return {
         ...baseHealthResult(pluginPath, root),
@@ -563,7 +591,10 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
         commandOk,
         ...liveHealth,
         connected: false,
-        error: "KRW Ontology MCP live health check failed",
+        error:
+          probeKind === "ready"
+            ? "KRW Ontology MCP readiness check failed"
+            : "KRW Ontology MCP live health check failed",
       };
     }
 
@@ -581,4 +612,12 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
       error: err instanceof Error ? err.message : "Unknown plugin health error",
     };
   }
+}
+
+export async function checkMcpHealth(): Promise<McpHealthResult> {
+  return checkMcpProbe("health");
+}
+
+export async function checkMcpReady(): Promise<McpHealthResult> {
+  return checkMcpProbe("ready");
 }

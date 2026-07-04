@@ -1,7 +1,7 @@
 import "server-only";
 
 import { execFile } from "node:child_process";
-import { checkMcpHealth, type McpHealthResult } from "@/lib/agent/mcp-client";
+import { checkMcpReady, type McpHealthResult } from "@/lib/agent/mcp-client";
 import { getOntologyEnv, readIntEnv } from "@/lib/env";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { AgentWorkerHeartbeatRow, Json } from "@/types/database";
@@ -127,7 +127,7 @@ export async function writeCurrentWorkerHeartbeat(
   status: AgentWorkerStatus,
 ): Promise<void> {
   try {
-    const mcpHealth = await checkMcpHealth();
+    const mcpHealth = await checkMcpReady();
     await heartbeatAgentWorker({
       workerId,
       status: isReadyMcpHealth(mcpHealth) ? status : "unhealthy",

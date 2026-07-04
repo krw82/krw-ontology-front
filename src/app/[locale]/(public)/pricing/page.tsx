@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import JsonLdScript from "@/components/JsonLdScript";
 import MarketingCtaLink from "@/components/MarketingCtaLink";
 import PublicRelatedLinks from "@/components/PublicRelatedLinks";
 import PublicTopNav from "@/components/PublicTopNav";
@@ -7,6 +8,13 @@ import { isLocale, type Locale } from "@/i18n/config";
 import { localizedPageMetadata } from "@/i18n/metadata";
 import { localizedPath } from "@/i18n/routing";
 import { listPublicBillingPlansFromStore } from "@/lib/billing/plan-store";
+import { getBillingPlanAnalysisCredits } from "@/lib/billing/plans";
+import {
+  absoluteUrl,
+  buildSiteOgImagePath,
+  SITE_NAME,
+} from "@/lib/marketing/site";
+import { getCspNonce } from "@/lib/security/csp-nonce";
 
 type PricingPageProps = {
   params: Promise<{ locale: string }>;
@@ -240,18 +248,72 @@ export async function generateMetadata({
     title: pricingCopy[locale].title,
     description: pricingCopy[locale].description,
     path: "/pricing",
+    image: {
+      url: buildSiteOgImagePath("pricing", locale),
+      alt: `${pricingCopy[locale].title} | ${SITE_NAME}`,
+    },
   });
 }
 
 export default async function PricingPage({ params }: PricingPageProps) {
+  const nonce = await getCspNonce();
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
 
   const copy = pricingCopy[locale];
   const plans = await listPublicBillingPlansFromStore();
+  const pageUrl = absoluteUrl(localizedPath(locale, "/pricing"));
+  const offerItems = plans.map((plan, index) => {
+    const display = getPlanDisplay(plan, locale);
+    return {
+      "@type": "Offer",
+      position: index + 1,
+      name: display.label,
+      description: display.description,
+      price: plan.monthlyPriceKrw,
+      priceCurrency: "KRW",
+      availability: "https://schema.org/InStock",
+      eligibleQuantity: {
+        "@type": "QuantitativeValue",
+        value: getBillingPlanAnalysisCredits(plan),
+        unitText: "weekly analysis capacity",
+      },
+    };
+  });
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        name: SITE_NAME,
+        applicationCategory: "FinanceApplication",
+        operatingSystem: "Web",
+        url: absoluteUrl(localizedPath(locale)),
+        description: copy.description,
+        offers: {
+          "@type": "OfferCatalog",
+          name: copy.title,
+          url: pageUrl,
+          itemListElement: offerItems,
+        },
+      },
+      {
+        "@type": "OfferCatalog",
+        name: copy.title,
+        description: copy.description,
+        url: pageUrl,
+        itemListElement: offerItems.map((offer, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          item: offer,
+        })),
+      },
+    ],
+  };
 
   return (
     <div className="min-h-[100dvh] bg-canvas text-ink">
+      <JsonLdScript nonce={nonce} data={jsonLd} />
       <PublicTopNav locale={locale} />
       <main
         id="main-content"

@@ -140,6 +140,12 @@ describe("buildSystemPrompt", () => {
   it("keeps current-news search disabled in the prompt unless explicitly enabled", () => {
     const disabledPrompt = buildSystemPrompt();
     expect(disabledPrompt).toContain("Do not perform web searches");
+    expect(disabledPrompt).toContain(
+      "현재 보유한 공시 데이터 기준으로는 직접 확인되지 않습니다",
+    );
+    expect(disabledPrompt).toContain(
+      "do not imply that the company failed to disclose something",
+    );
     expect(disabledPrompt).not.toContain("Stock News MCP");
     expect(disabledPrompt).not.toContain("Yahoo Finance MCP");
 
@@ -148,7 +154,8 @@ describe("buildSystemPrompt", () => {
       yahooFinanceNewsRequired: true,
     });
     expect(enabledPrompt).toContain("Do not use built-in WebSearch or WebFetch");
-    expect(enabledPrompt).toContain("Yahoo Finance MCP");
+    expect(enabledPrompt).toContain("current market-news MCP");
+    expect(enabledPrompt).toContain("Never mention provider names such as Yahoo Finance");
     expect(enabledPrompt).toContain("market-news-vs-filing provenance internally");
   });
 
@@ -219,8 +226,9 @@ describe("buildSystemPrompt", () => {
     });
 
     expect(prompt).toContain("requires current ticker market/news context");
-    expect(prompt).toContain("Yahoo Finance MCP tools for that current context");
-    expect(prompt).toContain("If the Yahoo Finance MCP call fails");
+    expect(prompt).toContain("current market-news MCP tools for that current context");
+    expect(prompt).toContain("raw provider payloads in the final answer");
+    expect(prompt).toContain("If the current market-news tool call fails");
   });
 
   it("falls back cleanly when news mode is selected but Yahoo Finance MCP is unavailable", () => {
@@ -229,7 +237,7 @@ describe("buildSystemPrompt", () => {
     });
 
     expect(prompt).toContain("selected news mode");
-    expect(prompt).toContain("Yahoo Finance MCP tools are unavailable");
+    expect(prompt).toContain("current market-news tools are unavailable");
     expect(prompt).toContain("Do not attempt current-news search");
   });
 

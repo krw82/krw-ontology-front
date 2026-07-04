@@ -16,6 +16,7 @@ describe("isAdminEntitlementEmail", () => {
   it("recognizes default development admin emails", () => {
     expect(isAdminEntitlementEmail("admin1@example.com")).toBe(true);
     expect(isAdminEntitlementEmail("admin2@example.com")).toBe(true);
+    expect(isAdminEntitlementEmail("dev@krw-ontology.local")).toBe(true);
   });
 
   it("recognizes configured admin emails case-insensitively", () => {

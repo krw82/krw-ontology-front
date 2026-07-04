@@ -217,6 +217,7 @@ trap cleanup EXIT INT TERM
   echo "KRW_ONTOLOGY_MCP_PATH=/mcp"
   echo "KRW_ONTOLOGY_MCP_URL=http://127.0.0.1:8765/mcp"
   echo "KRW_ONTOLOGY_MCP_HEALTH_URL=http://127.0.0.1:8765/health"
+  echo "KRW_ONTOLOGY_MCP_READY_URL=http://127.0.0.1:8765/readyz"
   echo "CLAUDE_AGENT_CWD=~/krw-ontology-front/.agent-workspace"
   echo "CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG"
   echo "CLAUDE_CODE_EXECUTABLE=$CLAUDE_PATH"

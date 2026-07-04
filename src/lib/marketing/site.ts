@@ -8,6 +8,25 @@ export const DEFAULT_SITE_ORIGIN = "https://krwontology.com";
 export const SITE_DESCRIPTION =
   "공시 원문 근거를 따라가며 미국 상장기업의 실적 변화, 리스크, 사업 흐름을 확인하는 기업 리서치 AI.";
 
+export const PAGE_OG_IMAGE_SIZE = {
+  width: 1200,
+  height: 630,
+} as const;
+
+export type PageOgSiteVariant =
+  | "default"
+  | "home"
+  | "pricing"
+  | "companies"
+  | "questions";
+
+export interface PageMetadataImage {
+  url: string;
+  width?: number;
+  height?: number;
+  alt?: string;
+}
+
 export function getSiteOrigin(): string {
   const raw =
     process.env.NEXT_PUBLIC_SITE_URL ||
@@ -27,17 +46,67 @@ export function absoluteUrl(pathname = "/"): string {
   return `${getSiteOrigin()}${path}`;
 }
 
+export function buildSiteOgImagePath(
+  variant: PageOgSiteVariant = "default",
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const params = new URLSearchParams({ locale });
+  return `/api/og/site/${encodeURIComponent(variant)}?${params.toString()}`;
+}
+
+export function buildCompanyOgImagePath(
+  ticker: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const params = new URLSearchParams({ locale });
+  return `/api/og/company/${encodeURIComponent(normalizeTicker(ticker) || ticker)}?${params.toString()}`;
+}
+
+export function buildQuestionOgImagePath(
+  topic: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const params = new URLSearchParams({ locale });
+  return `/api/og/question/${encodeURIComponent(topic)}?${params.toString()}`;
+}
+
+export function absoluteMetadataImageUrl(url: string): string {
+  try {
+    return new URL(url).toString();
+  } catch {
+    return absoluteUrl(url);
+  }
+}
+
+export function normalizePageMetadataImage(
+  image: PageMetadataImage | undefined,
+  title: string,
+  locale: Locale = DEFAULT_LOCALE,
+): Required<PageMetadataImage> {
+  const fallbackUrl = buildSiteOgImagePath("default", locale);
+  return {
+    url: absoluteMetadataImageUrl(image?.url ?? fallbackUrl),
+    width: image?.width ?? PAGE_OG_IMAGE_SIZE.width,
+    height: image?.height ?? PAGE_OG_IMAGE_SIZE.height,
+    alt: image?.alt ?? `${title} | ${SITE_NAME}`,
+  };
+}
+
 export function pageMetadata({
   title,
   description = SITE_DESCRIPTION,
   path = "/",
   noIndex = false,
+  image,
 }: {
   title: string;
   description?: string;
   path?: string;
   noIndex?: boolean;
+  image?: PageMetadataImage;
 }): Metadata {
+  const metadataImage = normalizePageMetadataImage(image, title);
+
   return {
     title,
     description,
@@ -51,11 +120,13 @@ export function pageMetadata({
       siteName: SITE_NAME,
       locale: "ko_KR",
       type: "website",
+      images: [metadataImage],
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title,
       description,
+      images: [metadataImage.url],
     },
     robots: noIndex
       ? {

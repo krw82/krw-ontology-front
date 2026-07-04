@@ -25,7 +25,7 @@ export interface AgentSupervisorOptions {
   reconcileIntervalMs: number;
   claimHealthIntervalMs: number;
   idleLogIntervalMs: number;
-  checkMcpHealth: () => Promise<McpHealthResult>;
+  checkMcpReady: () => Promise<McpHealthResult>;
   isReadyMcpHealth: (health: McpHealthResult) => boolean;
   claimNextAgentRun: (workerId: string) => Promise<string | null>;
   runAgentJob: (runId: string, workerId: string) => Promise<void>;
@@ -245,7 +245,7 @@ export class AgentSupervisor {
       return this.lastReadyHealthOk;
     }
 
-    const mcpHealth = await this.options.checkMcpHealth();
+    const mcpHealth = await this.options.checkMcpReady();
     this.lastReadyHealthCheckAt = now;
     this.lastReadyHealthOk = this.options.isReadyMcpHealth(mcpHealth);
     if (this.lastReadyHealthOk) return true;

@@ -9,10 +9,23 @@ import {
   isLocale,
   localeToHtmlLang,
 } from "@/i18n/config";
-import { getSiteOrigin, SITE_DESCRIPTION, SITE_NAME } from "@/lib/marketing/site";
+import {
+  absoluteUrl,
+  buildSiteOgImagePath,
+  PAGE_OG_IMAGE_SIZE,
+  getSiteOrigin,
+  SITE_DESCRIPTION,
+  SITE_NAME,
+} from "@/lib/marketing/site";
 import "./globals.css";
 
 const googleSiteVerification = process.env.GOOGLE_SITE_VERIFICATION?.trim();
+const defaultOgImage = {
+  url: absoluteUrl(buildSiteOgImagePath("default")),
+  width: PAGE_OG_IMAGE_SIZE.width,
+  height: PAGE_OG_IMAGE_SIZE.height,
+  alt: `${SITE_NAME} | 근거가 보이는 기업 분석 AI`,
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteOrigin()),
@@ -66,11 +79,13 @@ export const metadata: Metadata = {
     siteName: SITE_NAME,
     locale: "ko_KR",
     type: "website",
+    images: [defaultOgImage],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: `${SITE_NAME} | 근거가 보이는 기업 분석 AI`,
     description: SITE_DESCRIPTION,
+    images: [defaultOgImage.url],
   },
   ...(googleSiteVerification
     ? {

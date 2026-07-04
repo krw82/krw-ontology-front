@@ -299,7 +299,7 @@ function DiscoverGuideFlow({
           eyebrow: "선택사항",
           title: "참고할 URL이 있나요?",
           description:
-            "뉴스, 공시, 리포트 링크가 있으면 같이 확인합니다. 없어도 바로 넘어갈 수 있습니다.",
+            "뉴스나 리포트 링크가 있으면 먼저 시장 맥락을 잡습니다. 없어도 바로 넘어갈 수 있습니다.",
           primary: "다음",
           secondary: "건너뛰기",
           urlPlaceholder: "https://example.com/report",
@@ -308,7 +308,7 @@ function DiscoverGuideFlow({
           eyebrow: "Optional",
           title: "Do you have a URL to reference?",
           description:
-            "Add a news, filing, or report link if you have one. You can skip this.",
+            "Add a news or report link to set market context first. You can skip this.",
           primary: "Next",
           secondary: "Skip",
           urlPlaceholder: "https://example.com/report",
@@ -337,19 +337,19 @@ function DiscoverGuideFlow({
           eyebrow: "시작",
           title: "어떤 아이디어로 종목을 발굴할까요?",
           description:
-            "산업, 변화, 리스크 키워드를 한 문장으로 적으면 관련 회사를 넓게 찾아봅니다.",
+            "산업, 변화, 리스크, 재무 조건을 한 문장으로 적으면 관련 회사를 넓게 찾아봅니다.",
           primary: "종목 발굴 시작",
           secondary: "예시",
-          ideaPlaceholder: "예: 백로그 증가가 매출로 연결될 기업",
+          ideaPlaceholder: "예: AI 데이터센터 수혜지만 부채 부담이 낮은 기업",
         }
       : {
           eyebrow: "Start",
           title: "What idea should we use to discover stocks?",
           description:
-            "Describe an industry, shift, or risk keyword and we will explore related companies.",
+            "Describe an industry, shift, risk, or financial condition and we will explore related companies.",
           primary: "Start discovery",
           secondary: "Examples",
-          ideaPlaceholder: "e.g. Companies converting backlog growth into revenue",
+          ideaPlaceholder: "e.g. AI data-center beneficiaries with lower debt burden",
         },
   }[step];
 
@@ -379,7 +379,7 @@ function DiscoverGuideFlow({
   return (
     <div className="mx-auto w-full max-w-[38rem] text-left">
       <div
-        className="mb-sm grid grid-cols-3 gap-1.5"
+        className="mb-2 grid grid-cols-3 gap-1.5"
         aria-label={isKo ? "종목 발굴 단계" : "Discovery steps"}
       >
         {stepOrder.map((item, index) => (
@@ -403,7 +403,7 @@ function DiscoverGuideFlow({
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.22, ease: "easeOut" }}
         >
-          <div className="flex items-center justify-between border-b border-hairline px-base py-sm">
+          <div className="flex items-center justify-between border-b border-hairline px-sm py-2 sm:px-base sm:py-sm">
             <p className="font-mono text-[11px] font-black uppercase tracking-[0.16em] text-primary">
               {copy.eyebrow}
             </p>
@@ -412,18 +412,18 @@ function DiscoverGuideFlow({
             </p>
           </div>
 
-          <div className="p-base sm:p-lg">
+          <div className="p-sm sm:p-lg">
             <div className="min-w-0">
-              <h3 className="text-[20px] font-black leading-7 text-ink sm:text-[24px] sm:leading-8">
+              <h3 className="text-[19px] font-black leading-7 text-ink sm:text-[24px] sm:leading-8">
                 {copy.title}
               </h3>
-              <p className="mt-2 text-[14px] font-semibold leading-6 text-body sm:text-[15px]">
+              <p className="mt-1.5 text-[14px] font-semibold leading-6 text-body sm:mt-2 sm:text-[15px]">
                 {copy.description}
               </p>
             </div>
 
             {step === "url" ? (
-              <div className="mt-base">
+              <div className="mt-sm">
                 <label className="sr-only" htmlFor="discover-url-input">
                   {copy.title}
                 </label>
@@ -449,13 +449,13 @@ function DiscoverGuideFlow({
             ) : null}
 
             {step === "file" ? (
-              <div className="mt-base rounded-[8px] border border-hairline bg-surface-soft px-sm py-xs text-[13px] font-bold leading-5 text-muted">
+              <div className="mt-sm rounded-[8px] border border-hairline bg-surface-soft px-sm py-xs text-[13px] font-bold leading-5 text-muted">
                 {copy.fileHint}
               </div>
             ) : null}
 
             {step === "idea" ? (
-              <div className="mt-base grid gap-3">
+              <div className="mt-sm grid gap-3">
                 <label className="sr-only" htmlFor="discover-idea-input">
                   {copy.title}
                 </label>
@@ -476,7 +476,7 @@ function DiscoverGuideFlow({
             ) : null}
 
             {step === "idea" ? (
-              <div className="mt-base grid gap-2">
+              <div className="mt-sm grid gap-2">
                 <p className="font-mono text-[10px] font-black uppercase tracking-[0.14em] text-muted">
                   {copy.secondary}
                 </p>
@@ -496,7 +496,7 @@ function DiscoverGuideFlow({
 
             <div
               className={[
-                "mt-base grid gap-2",
+                "mt-sm grid gap-2",
                 step === "idea" ? "" : "sm:grid-cols-[minmax(0,1fr)_auto]",
               ].join(" ")}
             >
@@ -919,26 +919,26 @@ function ChatContent() {
           headingWithContext: "어떤 종목을 발굴할까요?",
           headingWithoutContext: "어떤 종목을 발굴할까요?",
           descriptionWithoutContext:
-            "아이디어, 산업, 리스크 키워드를 넣으면 관련 회사를 넓게 찾아봅니다.",
+            "아이디어, 산업, 리스크, 재무 조건을 넣으면 관련 회사를 넓게 찾아봅니다.",
         }
       : {
           headingWithContext: "What stocks should we discover?",
           headingWithoutContext: "What stocks should we discover?",
           descriptionWithoutContext:
-            "Enter an idea, industry, or risk keyword to explore related companies broadly.",
+            "Enter an idea, industry, risk, or financial condition to explore related companies broadly.",
         }
     : responseLocale === "ko"
         ? {
           headingWithContext: `${contextDisplayText}에서 무엇을 확인할까요?`,
           headingWithoutContext: "와이드 리서치",
           descriptionWithoutContext:
-            "아이디어·산업·리스크 키워드로 연관 기업을 넓게 찾아봅니다.",
+            "회사를 모를 때는 아이디어·산업·리스크 조건으로 연관 기업을 넓게 찾아봅니다.",
         }
       : {
           headingWithContext: `What should we check for ${contextDisplayText}?`,
           headingWithoutContext: "Wide research",
           descriptionWithoutContext:
-            "Explore related companies from idea, industry, and risk keywords to expand the candidate set.",
+            "When you do not know the company yet, use idea, industry, and risk conditions to expand the candidate set.",
         };
   const queryValue = queryParam?.trim() || null;
   const shareQuestionValue = shareStarter?.question_content.trim() || null;
@@ -1658,10 +1658,10 @@ function ChatContent() {
                 !sessionError && (
                   <div
                     className={[
-                      "mx-auto flex w-full flex-col items-center justify-center py-lg text-center sm:py-xxl",
+                      "mx-auto flex w-full flex-col items-center text-center",
                       shouldShowDiscoverGuide
-                        ? "min-h-[calc(100dvh-132px)] max-w-[42rem] md:min-h-[calc(100dvh-96px)]"
-                        : "min-h-[46dvh] max-w-2xl md:min-h-[56dvh]",
+                        ? "min-h-[calc(100dvh-112px)] max-w-[42rem] justify-start pb-lg pt-md sm:pt-lg md:min-h-[calc(100dvh-96px)]"
+                        : "min-h-[46dvh] max-w-2xl justify-center py-lg sm:py-xxl md:min-h-[56dvh]",
                     ].join(" ")}
                   >
                     <motion.div
@@ -1684,7 +1684,10 @@ function ChatContent() {
                     </motion.div>
 
                     <motion.div
-                      className="mt-6 w-full max-w-[38rem] text-left"
+                      className={[
+                        "w-full max-w-[38rem] text-left",
+                        shouldShowDiscoverGuide ? "mt-4" : "mt-6",
+                      ].join(" ")}
                       data-onboarding-target="chat-suggested-prompts"
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}

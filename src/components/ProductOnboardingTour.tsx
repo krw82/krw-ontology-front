@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
 import { dispatchOpenChatSidebar } from "@/lib/chat/sidebar-events";
@@ -54,6 +55,7 @@ interface ProductOnboardingTourProps {
   pathname: string;
   tour?: "companies" | "chat";
   force?: boolean;
+  continuePath?: string | null;
 }
 
 const companyTourSteps: TourStep[] = [
@@ -66,8 +68,8 @@ const companyTourSteps: TourStep[] = [
       en: "Start with search when you know the company",
     },
     body: {
-      ko: "AAPL, 애플, 브로드컴처럼 티커나 회사명을 입력하면 해당 회사 리서치로 바로 이어집니다.",
-      en: "Enter a ticker or company name like AAPL, Apple, or Broadcom to start company research directly.",
+      ko: "AAPL, 애플, 브로드컴처럼 티커나 회사명을 입력하면 그 회사의 공시 근거 리서치로 바로 이어집니다.",
+      en: "Enter a ticker or company name like AAPL, Apple, or Broadcom to start filing-grounded research on that company.",
     },
   },
   {
@@ -79,8 +81,8 @@ const companyTourSteps: TourStep[] = [
       en: "Use discovery when you do not know the stock",
     },
     body: {
-      ko: "산업, 리스크, 재무 조건을 넣으면 여러 회사를 비교해 후보를 좁힙니다.",
-      en: "Add an industry, risk, or financial condition to compare multiple companies and narrow the candidate list.",
+      ko: "아이디어, 산업, 리스크, 재무 조건을 넣으면 여러 회사를 비교해 다음 리서치 후보를 좁힙니다.",
+      en: "Add an idea, industry, risk, or financial condition to compare companies and narrow the next research candidates.",
     },
   },
   {
@@ -93,8 +95,8 @@ const companyTourSteps: TourStep[] = [
       en: "Specific conditions make discovery faster",
     },
     body: {
-      ko: "“지금 살만한 기업”보다 “AI 투자 수혜지만 부채 부담이 낮은 기업”처럼 시작하면 더 정확합니다.",
-      en: "Instead of asking for any stock to buy now, start with a condition like AI beneficiaries with lower debt burden.",
+      ko: "“지금 살만한 기업”보다 “AI 데이터센터 수혜지만 부채 부담이 낮은 기업”처럼 물으면 더 빠르고 정확합니다.",
+      en: "Instead of asking for any stock to buy now, use a condition like AI data-center beneficiaries with lower debt burden.",
     },
   },
   {
@@ -107,8 +109,8 @@ const companyTourSteps: TourStep[] = [
       en: "Research notebook is where you continue",
     },
     body: {
-      ko: "관심·보유 종목과 이전 질문을 모아두고 다음에 이어서 볼 때 사용합니다.",
-      en: "Use the notebook to continue from watched companies, holdings, and past questions.",
+      ko: "관심·보유 종목과 이전 질문을 모아두고, 나중에 같은 맥락에서 다시 이어볼 때 사용합니다.",
+      en: "Use the notebook to keep watched companies, holdings, and past questions so you can continue from the same context later.",
     },
   },
 ];
@@ -124,8 +126,8 @@ const chatTourSteps: TourStep[] = [
       en: "Chat starts from the current research context",
     },
     body: {
-      ko: "회사 페이지에서 들어오면 그 회사 기준으로 깊게 봅니다. 회사가 없다면 여러 회사를 넓게 훑는 질문으로 시작합니다.",
-      en: "When you enter from a company page, chat goes deep on that company. Without one, it starts as broader multi-company research.",
+      ko: "회사 페이지에서 들어오면 그 회사 기준으로 봅니다. 뉴스나 가격 질문도 결국 매출, 마진, 현금흐름, 리스크로 이어서 확인할 수 있습니다.",
+      en: "From a company page, chat starts with that company. News or price questions can then continue into revenue, margin, cash-flow, and risk checks.",
     },
   },
   {
@@ -139,7 +141,7 @@ const chatTourSteps: TourStep[] = [
     },
     body: {
       ko: "일반 회사 채팅보다 더 걸릴 수 있지만, 아이디어·산업·리스크 조건으로 후보와 비교축을 함께 잡을 수 있습니다.",
-      en: "It can take longer than single-company chat, but it can find candidates and comparison angles from an idea, industry, or risk condition.",
+      en: "It can take longer than single-company chat, but it finds candidates and comparison angles from an idea, industry, or risk condition.",
     },
   },
   {
@@ -152,8 +154,8 @@ const chatTourSteps: TourStep[] = [
       en: "Use starter questions to set the direction",
     },
     body: {
-      ko: "무엇을 물어야 할지 애매하면 추천 질문으로 시작하세요. 답변 끝의 이어서 볼 질문도 바로 다음 질문으로 쓸 수 있습니다.",
-      en: "If the next question is unclear, start from suggested prompts. Follow-up prompts after answers can be sent as the next question.",
+      ko: "무엇을 물어야 할지 애매하면 추천 질문으로 시작하세요. 답변 끝의 이어서 볼 질문은 그대로 눌러 다음 리서치로 이어갈 수 있습니다.",
+      en: "If the next question is unclear, start from suggested prompts. Follow-up prompts after answers are written so you can send them directly.",
     },
   },
   {
@@ -190,7 +192,9 @@ export default function ProductOnboardingTour({
   pathname,
   tour = "companies",
   force = false,
+  continuePath = null,
 }: ProductOnboardingTourProps) {
+  const router = useRouter();
   const locale = getPathLocale(pathname) ?? "ko";
   const reducedMotion = useReducedMotion();
   const [ready, setReady] = useState(false);
@@ -293,7 +297,11 @@ export default function ProductOnboardingTour({
       }
     }
     setVisible(false);
-  }, [userStorageKey]);
+    const safeContinuePath = normalizeContinuePath(continuePath);
+    if (safeContinuePath) {
+      router.replace(safeContinuePath, { scroll: false });
+    }
+  }, [continuePath, router, userStorageKey]);
 
   const goToNextStep = useCallback(() => {
     if (isLastStep) {
@@ -614,6 +622,14 @@ function needsMobileSidebar(stepId: TourStepId): boolean {
 
 function isMobileViewport(): boolean {
   return window.matchMedia("(max-width: 767px)").matches;
+}
+
+function normalizeContinuePath(value: string | null): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return null;
+  if (trimmed.startsWith("/auth/") || trimmed.startsWith("/login")) return null;
+  return trimmed;
 }
 
 function getCardPosition(rect: SpotlightRect | null): {

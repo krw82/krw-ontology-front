@@ -6,6 +6,7 @@ import type { AnalysisMode, RunKind } from "@/types/api-contracts";
 
 type RouterSource =
   | "preserve"
+  | "deterministic"
   | "claude_router"
   | "fallback";
 
@@ -66,6 +67,9 @@ export async function resolveChatQuestionRoute(
   const preserved = preserveExplicitRoute(input);
   if (preserved) return preserved;
 
+  const deterministic = deterministicDecision(input);
+  if (deterministic) return deterministic;
+
   if (shouldDisableClaudeRouter()) {
     return fallbackDecision(input, {
       code: "router_disabled",
@@ -90,9 +94,6 @@ function fallbackDecision(
   input: ChatQuestionRouteInput,
   diagnostic: ChatQuestionRouteDiagnostic,
 ): ChatQuestionRouteDecision {
-  const obvious = obviousFallbackDecision(input, diagnostic);
-  if (obvious) return obvious;
-
   return {
     analysisMode: "company",
     runKind: "company_research",
@@ -103,33 +104,39 @@ function fallbackDecision(
   };
 }
 
-function obviousFallbackDecision(
+function deterministicDecision(
   input: ChatQuestionRouteInput,
-  diagnostic: ChatQuestionRouteDiagnostic,
 ): ChatQuestionRouteDecision | null {
-  if (diagnostic.code === "router_disabled") return null;
-
   if (hasCompanyContext(input) && isObviousMarketMoveQuestion(input.content)) {
     return {
       analysisMode: "news",
       runKind: "market_move_research",
-      source: "fallback",
-      confidence: "low",
+      source: "deterministic",
+      confidence: "high",
       reason:
-        "Router failed, but the question clearly starts from a current stock-price move.",
-      diagnostic,
+        "Question clearly starts from a current stock-price move.",
     };
   }
 
-  if (isObviousNewsQuestion(input.content)) {
+  if (isHighConfidenceNewsQuestion(input.content)) {
     return {
       analysisMode: "news",
       runKind: "news_discovery",
-      source: "fallback",
-      confidence: "low",
+      source: "deterministic",
+      confidence: "high",
       reason:
-        "Router failed, but the question clearly asks for recent market-news context.",
-      diagnostic,
+        "Question clearly asks for news or market-news context.",
+    };
+  }
+
+  if (isFilingGroundedResearchQuestion(input.content)) {
+    return {
+      analysisMode: "company",
+      runKind: "company_research",
+      source: "deterministic",
+      confidence: "high",
+      reason:
+        "Question uses filing, financial statement, business-model, margin, or cash-flow cues.",
     };
   }
 
@@ -137,11 +144,10 @@ function obviousFallbackDecision(
     return {
       analysisMode: "company",
       runKind: "idea_generation",
-      source: "fallback",
-      confidence: "low",
+      source: "deterministic",
+      confidence: "high",
       reason:
-        "Router failed, but the question clearly asks to discover candidate companies.",
-      diagnostic,
+        "Question clearly asks to discover candidate companies.",
     };
   }
 
@@ -149,11 +155,10 @@ function obviousFallbackDecision(
     return {
       analysisMode: "company",
       runKind: "scenario_sensitivity",
-      source: "fallback",
-      confidence: "low",
+      source: "deterministic",
+      confidence: "high",
       reason:
-        "Router failed, but the question clearly asks for scenarios or judgment-change conditions.",
-      diagnostic,
+        "Question clearly asks for scenarios or judgment-change conditions.",
     };
   }
 
@@ -243,21 +248,33 @@ function isObviousMarketMoveQuestion(content: string): boolean {
   ]);
 }
 
-function isObviousNewsQuestion(content: string): boolean {
+function isHighConfidenceNewsQuestion(content: string): boolean {
   const text = normalizedQuestion(content);
-  const hasNewsIntent = includesAny(text, [
+  const hasDirectNewsSignal = includesAny(text, [
     "뉴스",
     "소식",
-    "이슈",
     "보도",
     "기사",
-    "최근",
-    "오늘",
+    "헤드라인",
     "latest",
     "recent news",
     "news",
     "headline",
     "headlines",
+  ]);
+  const hasEventSignal = includesAny(text, [
+    "무슨 일",
+    "무슨일",
+    "무슨 이슈",
+    "최근 이슈",
+    "오늘 이슈",
+    "최근 뉴스",
+    "오늘 뉴스",
+    "최근 소식",
+    "오늘 소식",
+    "what happened",
+    "recent event",
+    "latest event",
   ]);
   const asksForDiscovery = includesAny(text, [
     "뭐",
@@ -266,12 +283,44 @@ function isObviousNewsQuestion(content: string): boolean {
     "알려",
     "있었",
     "정리",
+    "호재",
+    "악재",
     "find",
     "what",
     "show",
   ]);
 
-  return hasNewsIntent && asksForDiscovery;
+  return (hasDirectNewsSignal || hasEventSignal) && asksForDiscovery;
+}
+
+function isFilingGroundedResearchQuestion(content: string): boolean {
+  const text = normalizedQuestion(content);
+  return includesAny(text, [
+    "공시",
+    "보고서",
+    "10-q",
+    "10-k",
+    "10q",
+    "10k",
+    "수익 구조",
+    "매출 구조",
+    "매출총이익률",
+    "gross margin",
+    "마진",
+    "현금흐름",
+    "cash flow",
+    "free cash flow",
+    "fcf",
+    "비용 구조",
+    "자본 배분",
+    "사업부문",
+    "제품별",
+    "segment",
+    "revenue mix",
+    "사업 구조",
+    "리스크 요인",
+    "risk factor",
+  ]);
 }
 
 function isObviousIdeaGenerationQuestion(content: string): boolean {
@@ -290,6 +339,92 @@ function isObviousIdeaGenerationQuestion(content: string): boolean {
     "candidate",
     "candidates",
   ]);
+}
+
+function hasExplicitCandidateDiscoveryIntent(text: string): boolean {
+  return includesAny(text, [
+    "종목 찾아",
+    "종목 발굴",
+    "종목 추천",
+    "후보",
+    "수혜주",
+    "기업 찾아",
+    "회사 찾아",
+    "기업 발굴",
+    "회사 발굴",
+    "기업 추천",
+    "회사 추천",
+    "뽑아",
+    "골라",
+    "스크리닝",
+    "조건에 맞",
+    "찾아줘",
+    "찾아 줘",
+    "screen",
+    "find stocks",
+    "find companies",
+    "candidate",
+    "candidates",
+    "recommend stocks",
+    "stock ideas",
+  ]);
+}
+
+function isSectorOrCohortResearchQuestion(content: string): boolean {
+  const text = normalizedQuestion(content);
+  if (hasExplicitCandidateDiscoveryIntent(text)) return false;
+
+  const hasCohortSubject = includesAny(text, [
+    "기업들을",
+    "회사들을",
+    "기업군",
+    "업종",
+    "섹터",
+    "산업",
+    "소비재",
+    "반도체",
+    "빅테크",
+    "소프트웨어",
+    "리테일",
+    "은행",
+    "에너지",
+    "바이오",
+    "companies",
+    "sector",
+    "industry",
+    "consumer",
+    "retail",
+  ]);
+  const hasResearchIntent = includesAny(text, [
+    "살펴",
+    "보고",
+    "현황",
+    "상황",
+    "환경",
+    "어떤지",
+    "알고싶",
+    "알고 싶",
+    "정리",
+    "비교",
+    "흐름",
+    "매크로",
+    "수요",
+    "마진",
+    "가격",
+    "볼륨",
+    "리스크",
+    "해석",
+    "analyze",
+    "review",
+    "overview",
+    "compare",
+    "macro",
+    "demand",
+    "margin",
+    "trend",
+  ]);
+
+  return hasCohortSubject && hasResearchIntent;
 }
 
 function isObviousScenarioQuestion(content: string): boolean {
@@ -408,12 +543,19 @@ async function routeWithClaude(
           : JSON.stringify(message.structured_output ?? null).slice(0, 500),
       );
     }
+    const correctedRunKind =
+      runKind === "idea_generation" && isSectorOrCohortResearchQuestion(input.content)
+        ? "company_research"
+        : runKind;
     return {
-      analysisMode: analysisModeForRunKind(runKind),
-      runKind,
+      analysisMode: analysisModeForRunKind(correctedRunKind),
+      runKind: correctedRunKind,
       source: "claude_router",
       confidence: "medium",
-      reason: "KRW Ontology router selected the owning workflow.",
+      reason:
+        correctedRunKind === runKind
+          ? "KRW Ontology router selected the owning workflow."
+          : "KRW Ontology router selected idea generation, but the question asks for sector/company-cohort research rather than candidate discovery.",
     };
   }
 
@@ -474,9 +616,14 @@ function buildClaudeRouterPrompt(input: ChatQuestionRouteInput): string {
     "5. company_research: default filing-grounded company research, buy/sell/hold questions without a current price/news move, business model, financials, risk, capital allocation, filings.",
     "",
     "Important KRW Ontology policy:",
+    "- Do not route sector, industry, or company-cohort interpretation questions to idea_generation unless the user explicitly asks to find, recommend, screen, rank, pick, or shortlist candidates.",
+    "- Questions like '소비재 기업들을 살펴보고 소비자 관련 매크로 현황이 어떤지 알고싶어' are company_research/wide research, not idea_generation.",
+    "- idea_generation is for candidate discovery. company_research is for interpreting a known sector/cohort, macro channel, demand, margin, pricing, risk, or business trend across relevant covered companies.",
     "- Simple share-price move questions should route to market_move_research, unlike generic public-equity routers that exclude share-price questions.",
     "- Mixed price-move + outlook questions still route to market_move_research first. The market-move workflow can offer scenario follow-ups.",
     "- Mixed latest-news + outlook questions route to news_discovery first unless the user explicitly asks for scenarios only.",
+    "- The word 'recent/최근' alone is not enough for news_discovery. Phrases like 'recent growth drivers', '최근 성장 동인', 'recent margin trend', or '최근 수익 구조' are company_research unless the user explicitly asks for news/articles/headlines/events.",
+    "- Filing/accounting/business-model cues win over generic recency: 공시 기준, 10-Q, 10-K, 수익 구조, 매출총이익률, 사업부문, 제품별 매출, 비용 구조, 현금흐름, 자본 배분.",
     "- Follow-up questions like '앞으로의 시나리오 알려줘', '상승/하락 시나리오를 나눠줘', or '판단이 바뀌는 조건을 알려줘' should route to scenario_sensitivity when the prior/company context is already selected.",
     "- If prior conversation is available through a resumed session, use it only to resolve omitted subjects, corrections, and follow-up intent. Do not answer the user.",
     "- Do not route ordinary company overview or filing questions to market_move_research just because a ticker is present.",
@@ -487,8 +634,12 @@ function buildClaudeRouterPrompt(input: ChatQuestionRouteInput): string {
     "- '오늘 왜 빠졌고 앞으로는 어떨까?' => {\"run_kind\":\"market_move_research\"}",
     "- '오늘 왜 올랐어? 향후 전망도 같이' => {\"run_kind\":\"market_move_research\"}",
     "- '최근 뉴스랑 앞으로 전망 알려줘' => {\"run_kind\":\"news_discovery\"}",
+    "- '애플의 아이폰, 서비스, 맥, 아이패드, 웨어러블 수익 구조를 공시 기준으로 정리하고 최근 성장 동인을 매출총이익률 중심으로 설명해줘.' => {\"run_kind\":\"company_research\"}",
     "- '향후 전망만 시나리오로 나눠줘' => {\"run_kind\":\"scenario_sensitivity\"}",
     "- '이 판단이 바뀌는 조건 알려줘' => {\"run_kind\":\"scenario_sensitivity\"}",
+    "- '소비재 기업들을 살펴보고 소비자들 관련 매크로 현황 어떤지 알고싶어' => {\"run_kind\":\"company_research\"}",
+    "- '소비 둔화에도 버틸 소비재 기업 후보 뽑아줘' => {\"run_kind\":\"idea_generation\"}",
+    "- 'AI 데이터센터 수혜지만 부채 부담 낮은 기업 찾아줘' => {\"run_kind\":\"idea_generation\"}",
     "- '지금 사도 돼?' => {\"run_kind\":\"company_research\"}",
     "",
     "Context:",

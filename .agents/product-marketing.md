@@ -1,14 +1,14 @@
 # Product Marketing Context
 
-*Last updated: 2026-06-27*
+*Last updated: 2026-07-02*
 
 ## Product Overview
 
-**One-liner:** KRW Ontology is an AI-agent-ready company filing database that helps Korean investors ask questions about US companies and trace each answer back to the evidence behind it.
+**One-liner:** KRW Ontology is a company-analysis agent and AI-agent-ready filing database that helps Korean investors ask questions about US companies and trace each answer back to the evidence behind it.
 
 **What it does:** KRW Ontology turns long US public company filings into a structured research database that AI agents can query, connect, and cite. Users ask a company or investment question, then receive a readable answer with a trail back to the original filing context so they can inspect where the answer came from.
 
-**Product category:** AI-agent database for company filings, AI equity research, SEC filing analysis, evidence-backed company intelligence, public company research assistant.
+**Product category:** Company-analysis agent, AI-agent database for company filings, AI equity research, SEC filing analysis, evidence-backed company intelligence, public company research assistant.
 
 **Product type:** Self-serve SaaS web application.
 
@@ -22,9 +22,15 @@
 
 **Strategic positioning to emphasize:** The product is not just another chat UI over filings. KRW Ontology is building a dedicated database for AI agents: company disclosures are structured into reusable, connected research units so agents can answer with evidence instead of loose text recall.
 
+**Agent positioning to emphasize:** KRW Ontology should feel like an agent optimized for company analysis, not a general-purpose GPT wrapper. It starts from the company, filing, period, business segment, risk, and driver context; then it searches, connects, cites, and preserves the research trail.
+
+**Core difference from general GPT:** General GPT is flexible but user-operated: the user has to upload sources, specify context, check citations, and rebuild the workflow each time. KRW Ontology is purpose-built for company research: supported companies, filing evidence, ontology links, saved sessions, and source-path review are part of the default workflow.
+
 **Best plain-language positioning lines:**
 
 - "AI 에이전트가 바로 읽고 답할 수 있는 기업 공시 데이터베이스."
+- "범용 GPT가 아니라, 기업 분석에 맞춰진 리서치 에이전트."
+- "회사를 묻는 질문에 공시 근거를 찾고, 연결하고, 인용하는 기업 분석 에이전트."
 - "공시를 문서가 아니라, AI가 쓸 수 있는 리서치 데이터베이스로 바꿉니다."
 - "기업 공시를 에이전트가 검색하고 연결하고 인용할 수 있는 형태로 구조화합니다."
 - "AI 요약을 믿기 전에, 공시 데이터가 어떻게 연결됐는지 확인하세요."
@@ -119,6 +125,7 @@
 **Key differentiators:**
 
 - Evidence-first answers with visible source and reasoning path.
+- A company-analysis agent workflow built around filings, companies, periods, segments, risks, and drivers.
 - A dedicated filing database built for AI agents, not a generic document upload workflow.
 - A source trail that lets users trace an answer back to the filing context behind it.
 - Ontology-based connections between filing text, business activity, risks, and drivers as the internal system of record.
@@ -131,6 +138,15 @@
 **Why that's better:** Users can move faster without giving up verification. Agents get structured evidence instead of loose text, and users get answers that can be traced back to the source instead of summaries they have to blindly trust.
 
 **Why customers choose us:** They want research speed, but the decisive feature is trust: the answer must leave a path back to source material. The public message should frame this as "AI가 쓸 수 있는 공시 데이터베이스" and "I can check this" rather than "the system has an ontology."
+
+**Messaging contrast vs general GPT:**
+
+| General GPT | KRW Ontology |
+|-------------|--------------|
+| 범용 대화 도구 | 기업 분석에 최적화된 리서치 에이전트 |
+| 사용자가 공시 파일, 기간, 맥락을 매번 준비해야 함 | 지원 기업과 공시 컨텍스트에서 바로 질문 시작 |
+| 답변 후 출처 확인을 사용자가 별도로 해야 함 | 답변마다 공시 근거 경로와 재확인 흐름 제공 |
+| 대화 단위로 끝나기 쉬움 | 리서치 세션, 후속 질문, 근거 재사용을 전제로 설계 |
 
 ## Objections
 
@@ -165,17 +181,20 @@
 - "투자 아이디어를 검증할 때 원문 근거가 필요하다."
 - "AI가 공시를 그냥 요약하는 게 아니라 제대로 근거를 잡고 답했으면 좋겠다."
 - "에이전트가 바로 쓸 수 있게 공시 데이터가 정리되어 있으면 좋겠다."
+- "기업 분석용으로 처음부터 맞춰진 에이전트가 필요하다."
 
 **How they describe us:**
 
 - "AI 에이전트가 쓸 수 있는 기업 공시 데이터베이스."
+- "기업 분석에 최적화된 리서치 에이전트."
+- "ChatGPT처럼 모든 걸 하는 도구가 아니라, 공시 근거를 찾아 기업 질문에 답하는 도구."
 - "공시를 AI가 검색하고 연결하고 인용할 수 있게 만든 서비스."
 - "질문하면 답변과 근거 경로를 같이 보여주는 도구."
 - "긴 10-K를 투자 질문 중심으로 읽어주는 서비스."
 - "AI 요약을 데이터 출처까지 확인하게 해주는 서비스."
 - "미국 기업 공시를 한국어 질문으로 파고드는 도구."
 
-**Words to use:** AI 에이전트용 데이터베이스, AI-agent-ready database, 기업 공시 데이터베이스, 원문 근거, 근거 경로, 출처, 확인 가능, 검증 가능, 기업 리서치, 10-K, 10-Q, 미국 공시, 투자 질문, thesis check, evidence-backed, citation-backed.
+**Words to use:** 기업 분석 에이전트, 기업 분석에 최적화된 리서치 에이전트, AI 에이전트용 데이터베이스, AI-agent-ready database, 기업 공시 데이터베이스, 원문 근거, 근거 경로, 출처, 확인 가능, 검증 가능, 기업 리서치, 10-K, 10-Q, 미국 공시, 투자 질문, thesis check, evidence-backed, citation-backed.
 
 **Words to use only in deeper product explanations:** 사업 활동, 리스크 요인, 세그먼트, 실적 동인, 온톨로지, 구조화된 지식 그래프.
 
@@ -187,6 +206,7 @@
 |------|---------|
 | Evidence path | 답변이 어떤 공시 문장과 연결에서 나왔는지 보여주는 근거 흐름 |
 | AI-agent-ready database | AI 에이전트가 기업 공시를 검색, 연결, 재사용, 인용할 수 있도록 구조화한 데이터베이스 |
+| Company-analysis agent | 기업, 공시, 기간, 세그먼트, 리스크, 실적 동인 맥락에서 질문을 처리하도록 설계된 리서치 에이전트 |
 | Ontology | 공시 문장, 사업 활동, 리스크, 지표를 연결하는 구조화된 지식 그래프 |
 | Markdown research answer | 채팅 화면에서 바로 읽고 후속 질문으로 이어갈 수 있는 공시 근거 기반 답변 |
 | Analysis credit | 사용자가 월간 한도 안에서 실행하는 질문/분석 단위 |

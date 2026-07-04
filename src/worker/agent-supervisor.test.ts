@@ -68,7 +68,7 @@ function createSupervisor(overrides: {
     reconcileIntervalMs: 3_600_000,
     claimHealthIntervalMs: 30_000,
     idleLogIntervalMs: 3_600_000,
-    checkMcpHealth: vi.fn(async () => READY_HEALTH),
+    checkMcpReady: vi.fn(async () => READY_HEALTH),
     isReadyMcpHealth: vi.fn(() => true),
     claimNextAgentRun: overrides.claimNextAgentRun ?? vi.fn(async () => null),
     runAgentJob: overrides.runAgentJob ?? vi.fn(async () => undefined),

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  PAGE_OG_IMAGE_SIZE,
+  buildCompanyOgImagePath,
   buildQuestionChatHref,
+  buildSiteOgImagePath,
   buildUseCaseChatHref,
   findQuestionTopic,
   findUseCase,
@@ -113,5 +116,36 @@ describe("marketing site content model", () => {
       index: false,
       follow: false,
     });
+  });
+
+  it("adds large default OG and Twitter images to page metadata", () => {
+    const metadata = pageMetadata({
+      title: "분석 가능한 회사 목록",
+      path: "/companies",
+    });
+
+    expect(metadata.openGraph).toMatchObject({
+      images: [
+        {
+          url: expect.stringContaining("/api/og/site/default?locale=ko"),
+          width: PAGE_OG_IMAGE_SIZE.width,
+          height: PAGE_OG_IMAGE_SIZE.height,
+          alt: "분석 가능한 회사 목록 | KRW Ontology",
+        },
+      ],
+    });
+    expect(metadata.twitter).toMatchObject({
+      card: "summary_large_image",
+      images: [expect.stringContaining("/api/og/site/default?locale=ko")],
+    });
+  });
+
+  it("builds stable OG image paths", () => {
+    expect(buildSiteOgImagePath("companies", "en")).toBe(
+      "/api/og/site/companies?locale=en",
+    );
+    expect(buildCompanyOgImagePath("aapl", "ko")).toBe(
+      "/api/og/company/AAPL?locale=ko",
+    );
   });
 });

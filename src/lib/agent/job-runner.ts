@@ -1,7 +1,7 @@
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { checkMcpHealth, type McpHealthResult } from "@/lib/agent/mcp-client";
+import { checkMcpReady, type McpHealthResult } from "@/lib/agent/mcp-client";
 import { runAgent, type SdkDiagnostics } from "@/lib/agent/runner";
 import type {
   AccumulatedRun,
@@ -234,7 +234,7 @@ export async function runAgentJob(runId: string, workerId: string) {
       label: "분석 준비 중",
     });
 
-    const mcpHealth = await checkMcpHealth();
+    const mcpHealth = await checkMcpReady();
     const mcpReadinessError = mcpHealthReadinessError(mcpHealth);
     if (mcpReadinessError) {
       await handleFailedJob({

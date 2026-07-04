@@ -19,18 +19,18 @@ export interface ResearchStep {
 }
 
 const toolLabels: Partial<Record<MCPToolName, string>> = {
-  krw_ontology_catalog: "문서 범위 확인",
-  krw_ontology_company_context: "기업 컨텍스트 확인",
-  krw_ontology_index_context: "인덱스 컨텍스트 확인",
-  krw_ontology_topic_map: "관련 토픽 확인",
-  krw_ontology_plan_query: "검색 범위 구성",
-  krw_ontology_query: "공시 근거 검색",
-  krw_ontology_query_context: "검색 컨텍스트 확인",
-  krw_ontology_retrieve: "질문 기반 근거 검색",
-  krw_ontology_trace: "근거 연결 추적",
-  krw_ontology_chain: "주장-근거 체인 확인",
-  krw_ontology_quality: "근거 품질 점검",
-  krw_ontology_compare: "항목 비교",
+  krw_ontology_catalog: "최신 보고서 확인",
+  krw_ontology_company_context: "회사 구조 확인",
+  krw_ontology_index_context: "분석 범위 확인",
+  krw_ontology_topic_map: "관련 이슈 확인",
+  krw_ontology_plan_query: "확인할 단서 좁히기",
+  krw_ontology_query: "사업·재무 단서 확인",
+  krw_ontology_query_context: "핵심 근거 묶음 확인",
+  krw_ontology_retrieve: "질문 관련 근거 확인",
+  krw_ontology_trace: "근거 연결 확인",
+  krw_ontology_chain: "판단 근거 대조",
+  krw_ontology_quality: "답변 근거 점검",
+  krw_ontology_compare: "회사·항목 비교",
   route_news_question: "뉴스 질문 분류",
   resolve_news_entities: "뉴스 대상 확인",
   search_company_news_events: "기업 뉴스 이벤트 확인",
@@ -40,7 +40,7 @@ const toolLabels: Partial<Record<MCPToolName, string>> = {
   build_news_timeline: "뉴스 흐름 정리",
   audit_news_sources: "뉴스 출처 점검",
   get_yahoo_finance_news: "최근 뉴스 확인",
-  get_stock_info: "티커 정보 확인",
+  get_stock_info: "가격 움직임 확인",
   create_chart_v1: "차트 정리",
 };
 
@@ -71,10 +71,10 @@ const toolStepMap: Record<MCPToolName, ResearchStepId> = {
 };
 
 const baseSteps: Array<{ id: ResearchStepId; label: string }> = [
-  { id: "scope", label: "범위 설정" },
-  { id: "search", label: "근거 검색" },
-  { id: "trace", label: "경로 확인" },
-  { id: "compose", label: "답변 정리" },
+  { id: "scope", label: "최신 기준 확인" },
+  { id: "search", label: "사업·재무 단서 확인" },
+  { id: "trace", label: "영향 경로 확인" },
+  { id: "compose", label: "투자 해석 정리" },
 ];
 
 export function formatResearchDuration(milliseconds: number): string {
@@ -100,18 +100,18 @@ export function getResearchActivityLabel(
     case "routing":
       return "질문 유형 확인";
     case "connecting":
-      return "자료 연결";
+      return "자료 확인 시작";
     case "checking_evidence":
-      return "근거 정리";
+      return "사업·재무 영향 정리";
     case "composing":
-      return "답변 작성";
+      return "투자 해석 작성";
     case "complete":
       return "작업 완료";
     case "preparing":
-      return "분석 준비";
+      return "최신 기준 확인";
     case "researching":
     default:
-      return "근거 확인";
+      return "사업·재무 단서 확인";
   }
 }
 

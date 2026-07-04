@@ -7,6 +7,8 @@ import {
 import { localizedAlternates, localizedPath } from "@/i18n/routing";
 import {
   absoluteUrl,
+  normalizePageMetadataImage,
+  type PageMetadataImage,
   SITE_DESCRIPTION,
   SITE_NAME,
 } from "@/lib/marketing/site";
@@ -17,15 +19,18 @@ export function localizedPageMetadata({
   description = SITE_DESCRIPTION,
   path = "/",
   noIndex = false,
+  image,
 }: {
   locale: Locale;
   title: string;
   description?: string;
   path?: string;
   noIndex?: boolean;
+  image?: PageMetadataImage;
 }): Metadata {
   const canonicalPath = localizedPath(locale, path);
   const languages = localizedAlternates(path);
+  const metadataImage = normalizePageMetadataImage(image, title, locale);
 
   return {
     title,
@@ -49,11 +54,13 @@ export function localizedPageMetadata({
       siteName: SITE_NAME,
       locale: localeToOpenGraphLocale(locale),
       type: "website",
+      images: [metadataImage],
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title,
       description,
+      images: [metadataImage.url],
     },
     robots: noIndex
       ? {

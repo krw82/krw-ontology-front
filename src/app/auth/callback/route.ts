@@ -32,6 +32,48 @@ function loginErrorUrl(redirectOrigin: string, reason: string): URL {
   return url;
 }
 
+function isDesktopApprovalRedirect(next: string): boolean {
+  return next.startsWith("/login?");
+}
+
+function onboardingRedirectUrl(redirectOrigin: string, next: string): URL {
+  const url = new URL("/companies", redirectOrigin);
+  url.searchParams.set("onboarding", "1");
+  url.searchParams.set("continue", next);
+  return url;
+}
+
+async function shouldShowFirstRunOnboarding(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string | null | undefined,
+  next: string,
+): Promise<boolean> {
+  if (!userId || isDesktopApprovalRedirect(next)) return false;
+
+  try {
+    const { data, error } = await supabase
+      .from("chat_sessions")
+      .select("id")
+      .eq("user_id", userId)
+      .is("deleted_at", null)
+      .limit(1);
+
+    if (error) {
+      console.warn("[auth] failed to inspect first-run onboarding state", {
+        message: getErrorMessage(error),
+      });
+      return false;
+    }
+
+    return (data ?? []).length === 0;
+  } catch (error) {
+    console.warn("[auth] failed to inspect first-run onboarding state", {
+      message: getErrorMessage(error),
+    });
+    return false;
+  }
+}
+
 async function redirectIfSessionExists(
   supabase: Awaited<ReturnType<typeof createClient>>,
   next: string,
@@ -88,6 +130,11 @@ export async function GET(request: Request) {
         console.warn("[auth] failed to record login analytics", {
           message: getErrorMessage(analyticsError),
         });
+      }
+      if (
+        await shouldShowFirstRunOnboarding(supabase, data?.user?.id, next)
+      ) {
+        return NextResponse.redirect(onboardingRedirectUrl(redirectOrigin, next));
       }
       return NextResponse.redirect(new URL(next, redirectOrigin));
     }

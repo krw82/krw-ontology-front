@@ -1,7 +1,6 @@
 "use client";
 
-import { Player } from "@remotion/player";
-import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
+import { useEffect, useState } from "react";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 interface QueueRemotionAnimationProps {
@@ -14,63 +13,90 @@ const FPS = 30;
 const WIDTH = 96;
 const HEIGHT = 48;
 
-function QueueRemotionScene() {
-  const frame = useCurrentFrame() % DURATION_IN_FRAMES;
-  const travel = interpolate(frame, [0, 45, 89], [-18, 54, 126], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const runnerOpacity = interpolate(
-    frame,
-    [0, 10, 66, 89],
-    [0, 1, 1, 0],
-    {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    },
-  );
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function interpolate(value: number, input: [number, number], output: [number, number]) {
+  const ratio = (value - input[0]) / (input[1] - input[0]);
+  return output[0] + clamp(ratio, 0, 1) * (output[1] - output[0]);
+}
+
+function easedProgress(value: number, input: [number, number, number, number], output: [number, number, number, number]) {
+  if (value <= input[0]) {
+    return output[0];
+  }
+  if (value <= input[1]) {
+    return interpolate(value, [input[0], input[1]], [output[0], output[1]]);
+  }
+  if (value <= input[2]) {
+    return output[1] + ((value - input[1]) / (input[2] - input[1])) * (output[2] - output[1]);
+  }
+  if (value >= input[3]) {
+    return output[3];
+  }
+  return output[2] + ((value - input[2]) / (input[3] - input[2])) * (output[3] - output[2]);
+}
+
+function linearTravel(frame: number, width: number) {
+  const midpointFrame = 45;
+  const end = width + 36;
+
+  if (frame <= midpointFrame) {
+    const ratio = clamp(frame / midpointFrame, 0, 1);
+    return -18 + ratio * ((width - 42) - -18);
+  }
+
+  const ratio = clamp((frame - midpointFrame) / (89 - midpointFrame), 0, 1);
+  return (width - 42) + ratio * (end - (width - 42));
+}
+
+function pulse(frame: number) {
+  return clamp(easedProgress(frame, [0, 12, 36, DURATION_IN_FRAMES], [0.34, 1, 0.34, 0.34]), 0.34, 1);
+}
+
+function QueueRemotionScene({ frame, compact }: { frame: number; compact: boolean }) {
+  const width = compact ? WIDTH * 0.5 : WIDTH;
+  const trackWidth = 84;
+  const leftOffset = compact ? 0 : (WIDTH - trackWidth) / 2;
+  const travel = linearTravel(frame % DURATION_IN_FRAMES, width);
 
   return (
-    <AbsoluteFill
+    <span
+      aria-hidden="true"
       style={{
         alignItems: "center",
         background: "transparent",
         display: "flex",
+        height: compact ? 24 : 30,
         justifyContent: "center",
+        width: "100%",
       }}
     >
       <div
         style={{
-          height: 30,
+          height: compact ? 20 : 30,
           position: "relative",
-          width: 84,
+          width: trackWidth,
+          left: compact ? -10 : 0,
         }}
       >
         {[0, 1, 2].map((index) => {
-          const slotFrame = (frame - index * 10 + DURATION_IN_FRAMES) %
-            DURATION_IN_FRAMES;
-          const pulse = interpolate(
-            slotFrame,
-            [0, 16, 32, DURATION_IN_FRAMES],
-            [0.42, 1, 0.42, 0.42],
-            {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            },
-          );
+          const slotFrame = (frame - index * 10 + DURATION_IN_FRAMES) % DURATION_IN_FRAMES;
+          const slotPulse = pulse(slotFrame);
 
           return (
             <div
               key={index}
               style={{
-                background: `rgba(0, 82, 255, ${0.12 + pulse * 0.1})`,
+                background: `rgba(0, 82, 255, ${0.12 + slotPulse * 0.12})`,
                 border: "1px solid rgba(0, 82, 255, 0.22)",
-                borderRadius: 8,
-                height: 20,
-                left: index * 28,
+                borderRadius: compact ? 6 : 8,
+                height: compact ? 14 : 20,
+                left: index * (compact ? 20 : 28),
                 position: "absolute",
-                top: 5,
-                width: 20,
+                top: compact ? 3 : 5,
+                width: compact ? 14 : 20,
               }}
             />
           );
@@ -80,16 +106,16 @@ function QueueRemotionScene() {
             background: "#0052ff",
             borderRadius: 999,
             boxShadow: "0 6px 14px rgba(0, 82, 255, 0.28)",
-            height: 10,
-            left: travel,
-            opacity: runnerOpacity,
+            height: compact ? 6 : 10,
+            left: leftOffset + travel,
+            opacity: clamp(easedProgress(frame % DURATION_IN_FRAMES, [0, 10, 66, 89], [0, 1, 1, 0]), 0, 1),
             position: "absolute",
-            top: 10,
-            width: 10,
+            top: compact ? 7 : 10,
+            width: compact ? 6 : 10,
           }}
         />
       </div>
-    </AbsoluteFill>
+    </span>
   );
 }
 
@@ -119,6 +145,16 @@ export default function QueueRemotionAnimation({
   const reducedMotion = useReducedMotion();
   const width = size === "compact" ? 48 : WIDTH;
   const height = size === "compact" ? 24 : HEIGHT;
+  const [frame, setFrame] = useState(0);
+  const compact = size === "compact";
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setFrame((current) => (current + 1) % DURATION_IN_FRAMES);
+    }, 1000 / FPS);
+
+    return () => clearInterval(timer);
+  }, []);
 
   if (reducedMotion) {
     return (
@@ -137,25 +173,7 @@ export default function QueueRemotionAnimation({
       data-testid="queue-remotion-animation"
       style={{ height, width }}
     >
-      <Player
-        acknowledgeRemotionLicense
-        autoPlay
-        clickToPlay={false}
-        component={QueueRemotionScene}
-        compositionHeight={HEIGHT}
-        compositionWidth={WIDTH}
-        controls={false}
-        durationInFrames={DURATION_IN_FRAMES}
-        fps={FPS}
-        initiallyMuted
-        loop
-        spaceKeyToPlayOrPause={false}
-        style={{
-          height,
-          pointerEvents: "none",
-          width,
-        }}
-      />
+      <QueueRemotionScene frame={frame} compact={compact} />
     </span>
   );
 }

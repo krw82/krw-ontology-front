@@ -8,11 +8,13 @@ import { localizedPath } from "@/i18n/routing";
 const navItems = {
   ko: [
     { href: "/companies", label: "회사 목록" },
+    { href: "/13f", label: "13F 보유" },
     { href: "/questions", label: "질문 그래프" },
     { href: "/pricing", label: "가격" },
   ],
   en: [
     { href: "/companies", label: "Companies" },
+    { href: "/13f", label: "13F holdings" },
     { href: "/questions", label: "Question graphs" },
     { href: "/pricing", label: "Pricing" },
   ],

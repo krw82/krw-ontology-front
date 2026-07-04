@@ -10,6 +10,11 @@ const relatedLinks = {
       description: "분석할 기업을 고릅니다.",
     },
     {
+      href: "/13f",
+      label: "13F 보유",
+      description: "기관투자자 보유 공시를 확인합니다.",
+    },
+    {
       href: "/questions",
       label: "질문 그래프",
       description: "Apple 질문 흐름에서 바로 시작합니다.",
@@ -25,6 +30,11 @@ const relatedLinks = {
       href: "/companies",
       label: "Companies",
       description: "Choose a company to research.",
+    },
+    {
+      href: "/13f",
+      label: "13F holdings",
+      description: "Review institutional holdings filings.",
     },
     {
       href: "/questions",

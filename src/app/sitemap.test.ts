@@ -36,6 +36,10 @@ describe("sitemap", () => {
     expect(paths).toContain("/en");
     expect(paths).toContain("/ko/companies");
     expect(paths).toContain("/en/companies");
+    expect(paths).toContain("/ko/13f");
+    expect(paths).toContain("/en/13f");
+    expect(paths).toContain("/ko/13f/managers/national-pension-service");
+    expect(paths).toContain("/en/13f/managers/national-pension-service");
     expect(paths).toContain("/ko/refund");
     expect(paths).toContain("/en/refund");
     expect(paths).not.toContain("/ko/questions");
@@ -87,5 +91,26 @@ describe("sitemap", () => {
     expect(paths).toContain("/en/companies/AAPL");
     expect(paths).toContain("/ko/companies/MSFT");
     expect(paths).toContain("/en/companies/MSFT");
+  });
+
+  it("includes curated 13F manager pages in the search sitemap", async () => {
+    mocks.listIndexedCompanies.mockResolvedValue([]);
+    mocks.hasCompanyLandingCopyForTicker.mockReturnValue(false);
+    mocks.listCompanyLandingCopyTickers.mockReturnValue([]);
+
+    const urls = await sitemap();
+    const paths = urls.map((item) => new URL(item.url).pathname);
+
+    expect(paths).toContain("/ko/13f/managers/berkshire-hathaway");
+    expect(paths).toContain("/en/13f/managers/berkshire-hathaway");
+    expect(
+      urls.find(
+        (item) =>
+          new URL(item.url).pathname === "/ko/13f/managers/berkshire-hathaway",
+      )?.alternates?.languages,
+    ).toMatchObject({
+      ko: "https://krwontology.com/ko/13f/managers/berkshire-hathaway",
+      en: "https://krwontology.com/en/13f/managers/berkshire-hathaway",
+    });
   });
 });

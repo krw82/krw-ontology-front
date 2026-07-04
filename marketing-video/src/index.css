@@ -1,0 +1,859 @@
+:root {
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif;
+  color: #101114;
+  background: #f7f8fb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.adRoot {
+  background: #f7f8fb;
+}
+
+.scene {
+  overflow: hidden;
+  padding: 76px 84px;
+  background: #f7f8fb;
+}
+
+.scene.vertical {
+  padding: 86px 62px;
+}
+
+.gridBackdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(16, 17, 20, 0.052) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(16, 17, 20, 0.052) 1px, transparent 1px);
+  background-size: 92px 92px;
+}
+
+.gridBackdrop.subtle {
+  background:
+    linear-gradient(90deg, rgba(16, 17, 20, 0.038) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(16, 17, 20, 0.038) 1px, transparent 1px);
+  background-size: 84px 84px;
+}
+
+.gridBackdrop.dark {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.075) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075) 1px, transparent 1px);
+  background-color: #090b10;
+  background-size: 88px 88px;
+}
+
+.heroDim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(247, 248, 251, 0.95), rgba(247, 248, 251, 0.58)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(234, 238, 246, 0.62));
+}
+
+.copyBlock {
+  position: relative;
+  z-index: 4;
+}
+
+.brandLockup {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.brandLockup img {
+  width: 58px;
+  height: 58px;
+  border: 1px solid rgba(121, 134, 156, 0.24);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.brandLockup strong {
+  color: #111827;
+  font-size: 28px;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+.brandLockupDark strong {
+  color: #ffffff;
+}
+
+.kicker {
+  margin: 0 0 20px;
+  color: #0649d7;
+  font-size: 22px;
+  font-weight: 920;
+  line-height: 1.2;
+}
+
+.kickerDark {
+  color: #9fb8ff;
+}
+
+h1,
+h2 {
+  margin: 0;
+  color: #090b10;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: 98px;
+}
+
+h2 {
+  font-size: 78px;
+}
+
+h1 span,
+h2 span {
+  display: block;
+  color: #0649d7;
+}
+
+.lead {
+  margin: 26px 0 0;
+  max-width: 760px;
+  color: #525b6b;
+  font-size: 29px;
+  font-weight: 720;
+  line-height: 1.48;
+  text-wrap: pretty;
+}
+
+.productFrame {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  border: 1px solid rgba(121, 134, 156, 0.24);
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 30px 82px rgba(17, 24, 39, 0.14);
+  transform-origin: 50% 50%;
+}
+
+.browserBar {
+  display: flex;
+  height: 48px;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(121, 134, 156, 0.2);
+  background: rgba(255, 255, 255, 0.96);
+  padding: 0 18px;
+}
+
+.browserBar span {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+}
+
+.browserBar span:nth-child(1) {
+  background: #ff655d;
+}
+
+.browserBar span:nth-child(2) {
+  background: #f3b33d;
+}
+
+.browserBar span:nth-child(3) {
+  background: #20c66b;
+}
+
+.browserBar p {
+  min-width: 0;
+  margin: 0 0 0 10px;
+  overflow: hidden;
+  color: #657084;
+  font-size: 15px;
+  font-weight: 820;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shot {
+  display: block;
+  width: 100%;
+  height: calc(100% - 48px);
+  object-fit: cover;
+}
+
+.tone_blue {
+  border-color: rgba(6, 73, 215, 0.27);
+}
+
+.tone_green {
+  border-color: rgba(18, 165, 104, 0.28);
+}
+
+.tone_amber {
+  border-color: rgba(224, 143, 34, 0.34);
+}
+
+.tone_slate {
+  border-color: rgba(51, 65, 85, 0.22);
+}
+
+.hookScene {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(820px, 1.05fr);
+  gap: 58px;
+  align-items: center;
+}
+
+.hookVisual {
+  position: absolute;
+  z-index: 5;
+  left: 84px;
+  bottom: 74px;
+  display: grid;
+  width: 820px;
+  grid-template-columns: minmax(0, 1fr) 96px 300px;
+  gap: 18px;
+  align-items: center;
+}
+
+.questionCard,
+.structureCore,
+.structureHub,
+.signalCard,
+.journeyQuestion,
+.journeyResult,
+.outputPanel,
+.markdownLine {
+  border: 1px solid rgba(121, 134, 156, 0.24);
+  background: rgba(255, 255, 255, 0.93);
+  box-shadow: 0 24px 70px rgba(17, 24, 39, 0.1);
+}
+
+.questionCard {
+  min-height: 126px;
+  border-radius: 18px;
+  padding: 24px;
+}
+
+.questionCard span,
+.journeyQuestion span,
+.journeyResult span,
+.markdownLine span,
+.structureHub span {
+  display: block;
+  margin-bottom: 10px;
+  color: #0649d7;
+  font-size: 17px;
+  font-weight: 930;
+  line-height: 1.2;
+}
+
+.questionCard strong {
+  display: block;
+  color: #101114;
+  font-size: 27px;
+  font-weight: 950;
+  line-height: 1.24;
+}
+
+.routeArrow {
+  height: 4px;
+  border-radius: 999px;
+  background: #0649d7;
+  transform-origin: 0 50%;
+}
+
+.structureCore {
+  min-height: 126px;
+  border-radius: 18px;
+  padding: 24px;
+}
+
+.structureCore span {
+  display: inline-flex;
+  margin-bottom: 10px;
+  border-radius: 999px;
+  background: rgba(6, 73, 215, 0.1);
+  padding: 6px 12px;
+  color: #0649d7;
+  font-size: 16px;
+  font-weight: 930;
+}
+
+.structureCore strong {
+  display: block;
+  color: #101114;
+  font-size: 26px;
+  font-weight: 950;
+  line-height: 1.16;
+}
+
+.structureCore p {
+  margin: 10px 0 0;
+  color: #687386;
+  font-size: 17px;
+  font-weight: 760;
+  line-height: 1.28;
+}
+
+.hookPreview {
+  position: relative;
+  z-index: 3;
+  height: 790px;
+}
+
+.structureScene {
+  display: grid;
+  grid-template-columns: minmax(0, 0.66fr) minmax(980px, 1.32fr);
+  gap: 54px;
+  align-items: center;
+}
+
+.structureBoard {
+  position: relative;
+  z-index: 4;
+  display: grid;
+  min-height: 560px;
+  grid-template-columns: 220px 60px minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+}
+
+.structureHub {
+  min-height: 216px;
+  border-radius: 20px;
+  padding: 28px;
+}
+
+.structureHub span {
+  color: #0f766e;
+}
+
+.structureHub strong {
+  display: block;
+  color: #101114;
+  font-size: 34px;
+  font-weight: 950;
+  line-height: 1.16;
+}
+
+.structureHub p {
+  margin: 14px 0 0;
+  color: #657084;
+  font-size: 21px;
+  font-weight: 760;
+  line-height: 1.34;
+}
+
+.structureConnector {
+  height: 4px;
+  border-radius: 999px;
+  background: #0f766e;
+  transform-origin: 0 50%;
+}
+
+.signalGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.signalCard {
+  min-height: 196px;
+  border-radius: 20px;
+  padding: 24px;
+}
+
+.signalTopline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.signalTopline span {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #101114;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 930;
+}
+
+.signalTopline code {
+  overflow: hidden;
+  color: #667085;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 820;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signalCard strong {
+  display: block;
+  color: #101114;
+  font-size: 28px;
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.signalCard p {
+  margin: 14px 0 0;
+  color: #5f6a7b;
+  font-size: 19px;
+  font-weight: 720;
+  line-height: 1.38;
+}
+
+.journeysScene {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 42px;
+}
+
+.journeyBoard {
+  position: relative;
+  z-index: 5;
+  display: grid;
+  width: min(1180px, 100%);
+  gap: 20px;
+  align-content: start;
+}
+
+.journeyRow {
+  display: grid;
+  grid-template-columns: minmax(390px, 1fr) 116px 220px minmax(300px, 0.8fr);
+  gap: 16px;
+  align-items: center;
+}
+
+.journeyQuestion,
+.journeyResult {
+  min-height: 120px;
+  border-radius: 18px;
+  padding: 24px;
+}
+
+.journeyQuestion strong,
+.journeyResult strong {
+  display: block;
+  color: #101114;
+  font-size: 26px;
+  font-weight: 950;
+  line-height: 1.24;
+}
+
+.journeyLine {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(6, 73, 215, 0.12);
+}
+
+.journeyLine span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: #0649d7;
+  transform-origin: 0 50%;
+}
+
+.focusBadge {
+  display: flex;
+  min-height: 82px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(121, 134, 156, 0.24);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #101114;
+  font-size: 24px;
+  font-weight: 950;
+  text-align: center;
+  box-shadow: 0 18px 54px rgba(17, 24, 39, 0.08);
+}
+
+.journeyPreview {
+  position: absolute;
+  z-index: 2;
+  right: 84px;
+  bottom: 64px;
+  width: 650px;
+  height: 430px;
+  opacity: 0.72;
+}
+
+.outputScene {
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(760px, 1fr);
+  gap: 58px;
+  align-items: center;
+}
+
+.outputPanel {
+  position: relative;
+  z-index: 5;
+  min-height: 570px;
+  border-radius: 22px;
+  padding: 34px;
+}
+
+.outputHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 26px;
+}
+
+.outputHeader span {
+  border-radius: 999px;
+  background: rgba(6, 73, 215, 0.1);
+  padding: 9px 14px;
+  color: #0649d7;
+  font-size: 18px;
+  font-weight: 930;
+}
+
+.outputHeader strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #101114;
+  font-size: 30px;
+  font-weight: 950;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.typingTrack {
+  height: 5px;
+  margin-bottom: 28px;
+  border-radius: 999px;
+  background: rgba(6, 73, 215, 0.11);
+}
+
+.typingTrack span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: #0649d7;
+  transform-origin: 0 50%;
+}
+
+.markdownLine {
+  margin-top: 18px;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: none;
+}
+
+.markdownLine p {
+  margin: 0;
+  color: #252a34;
+  font-size: 25px;
+  font-weight: 780;
+  line-height: 1.36;
+}
+
+.outputShots {
+  position: absolute;
+  z-index: 2;
+  right: 84px;
+  bottom: 58px;
+  width: 780px;
+  height: 500px;
+  opacity: 0.35;
+}
+
+.outputShots .productFrame {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 640px;
+  height: 410px;
+}
+
+.outputShots .outputNote {
+  left: 230px;
+  top: 160px;
+  width: 520px;
+  height: 330px;
+}
+
+.ctaScene {
+  color: #ffffff;
+  background: #090b10;
+}
+
+.ctaCopy {
+  position: relative;
+  z-index: 6;
+  display: grid;
+  height: 100%;
+  align-content: center;
+}
+
+.ctaCopy h2,
+.ctaCopy .lead {
+  color: #ffffff;
+}
+
+.ctaCopy h2 span {
+  color: #9fb8ff;
+}
+
+.ctaCopy .lead {
+  color: #d5dbe6;
+}
+
+.ctaScreens {
+  position: absolute;
+  z-index: 2;
+  right: -90px;
+  top: 118px;
+  width: 950px;
+  height: 760px;
+  opacity: 0.42;
+}
+
+.ctaScreens .productFrame {
+  position: absolute;
+  width: 820px;
+  height: 500px;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.ctaScreens .ctaScreenOffset {
+  left: 190px;
+  top: 280px;
+  width: 690px;
+  height: 430px;
+}
+
+.ctaButton {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 72px;
+  align-items: center;
+  gap: 18px;
+  margin-top: 40px;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 0 34px;
+  color: #090b10;
+  font-size: 25px;
+  font-weight: 950;
+}
+
+.ctaButton strong {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.vertical .kicker {
+  font-size: 27px;
+}
+
+.vertical h1 {
+  font-size: 86px;
+}
+
+.vertical h2 {
+  font-size: 72px;
+}
+
+.vertical .lead {
+  max-width: 900px;
+  font-size: 31px;
+  line-height: 1.48;
+}
+
+.vertical.hookScene {
+  display: block;
+}
+
+.vertical .heroDim {
+  background: linear-gradient(180deg, rgba(247, 248, 251, 0.98), rgba(236, 240, 248, 0.72));
+}
+
+.vertical .hookVisual {
+  left: 62px;
+  right: 62px;
+  top: 760px;
+  bottom: auto;
+  width: auto;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.vertical .routeArrow {
+  width: 100%;
+}
+
+.vertical .questionCard,
+.vertical .structureCore {
+  min-height: 118px;
+  padding: 24px;
+}
+
+.vertical .hookPreview {
+  position: absolute;
+  left: 62px;
+  right: 62px;
+  bottom: 70px;
+  height: 720px;
+}
+
+.vertical.structureScene {
+  display: block;
+}
+
+.vertical .structureBoard {
+  display: block;
+  min-height: auto;
+  margin-top: 48px;
+}
+
+.vertical .structureHub {
+  min-height: 172px;
+  margin-bottom: 18px;
+}
+
+.vertical .structureConnector {
+  display: none;
+}
+
+.vertical .signalGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.vertical .signalCard {
+  min-height: 218px;
+  padding: 24px;
+}
+
+.vertical .signalCard strong {
+  font-size: 29px;
+}
+
+.vertical .signalCard p {
+  font-size: 20px;
+}
+
+.vertical.journeysScene {
+  display: block;
+}
+
+.vertical .journeyBoard {
+  margin-top: 46px;
+  gap: 18px;
+}
+
+.vertical .journeyRow {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.vertical .journeyQuestion,
+.vertical .journeyResult {
+  min-height: 108px;
+  padding: 24px;
+}
+
+.vertical .journeyLine {
+  display: none;
+}
+
+.vertical .focusBadge {
+  min-height: 70px;
+  border-radius: 16px;
+}
+
+.vertical .journeyPreview {
+  left: 62px;
+  right: 62px;
+  bottom: 64px;
+  width: auto;
+  height: 460px;
+  opacity: 0.54;
+}
+
+.vertical.outputScene {
+  display: block;
+}
+
+.vertical .outputPanel {
+  margin-top: 52px;
+  min-height: 610px;
+}
+
+.vertical .outputShots {
+  left: 62px;
+  right: 62px;
+  bottom: 74px;
+  width: auto;
+  height: 470px;
+  opacity: 0.3;
+}
+
+.vertical .outputShots .productFrame {
+  width: 660px;
+  height: 390px;
+}
+
+.vertical .outputShots .outputNote {
+  left: 300px;
+  top: 170px;
+  width: 610px;
+  height: 340px;
+}
+
+.vertical .ctaScreens {
+  left: 62px;
+  right: 62px;
+  top: 88px;
+  width: auto;
+  height: 680px;
+  opacity: 0.36;
+}
+
+.vertical .ctaScreens .productFrame {
+  width: 700px;
+  height: 430px;
+}
+
+.vertical .ctaScreens .ctaScreenOffset {
+  left: 290px;
+  top: 250px;
+  width: 600px;
+  height: 390px;
+}
+
+.vertical .ctaCopy {
+  align-content: start;
+  padding-top: 790px;
+}

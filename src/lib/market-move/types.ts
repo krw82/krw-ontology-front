@@ -12,8 +12,44 @@ export interface MarketMoveObservation {
   volume: number | null;
   average_volume: number | null;
   volume_signal: "above_average" | "near_average" | "below_average" | "unknown";
+  technical_signal: TechnicalMarketSignal;
   market_time: string | null;
   currency: string | null;
+}
+
+export interface TechnicalMarketSignal {
+  price: {
+    direction: "up" | "down" | "flat" | "unknown";
+    magnitude: "small" | "moderate" | "large" | "unknown";
+  };
+  volume: {
+    ratio: number | null;
+    signal: "high_activity" | "normal_activity" | "thin_activity" | "unknown";
+  };
+  trend: {
+    vs_50d: "above" | "below" | "near" | "unknown";
+    vs_200d: "above" | "below" | "near" | "unknown";
+    signal:
+      | "strong_uptrend"
+      | "short_term_pullback_midterm_intact"
+      | "trend_break_risk"
+      | "neutral_or_mixed"
+      | "unknown";
+  };
+  range_52w: {
+    position: number | null;
+    signal: "upper_range" | "middle_range" | "lower_range" | "unknown";
+  };
+  size: {
+    market_cap: number | null;
+    bucket: "mega_cap" | "large_cap" | "mid_cap" | "small_cap" | "unknown";
+  };
+  overall:
+    | "technically_strong"
+    | "short_term_pressure_but_midterm_trend_intact"
+    | "trend_break_risk"
+    | "neutral_or_mixed"
+    | "insufficient_data";
 }
 
 export interface MarketMoveEventCandidate {

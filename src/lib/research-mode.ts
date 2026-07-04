@@ -2,7 +2,7 @@ import type { KRWOntologyMCPToolName } from "@/types/api-contracts";
 
 export type ResearchMode = "fast" | "standard" | "deep";
 
-export const DEFAULT_RESEARCH_MODE: ResearchMode = "standard";
+export const DEFAULT_RESEARCH_MODE: ResearchMode = "deep";
 
 export const RESEARCH_MODE_LABELS: Record<ResearchMode, string> = {
   fast: "빠른 답변",
@@ -64,9 +64,8 @@ const DEEP_ALLOWED_TOOLS: KRWOntologyMCPToolName[] = [
 ];
 
 export function normalizeResearchMode(value: unknown): ResearchMode {
-  return value === "fast" || value === "standard" || value === "deep"
-    ? value
-    : DEFAULT_RESEARCH_MODE;
+  void value;
+  return DEFAULT_RESEARCH_MODE;
 }
 
 export function getResearchModeToolBudget(

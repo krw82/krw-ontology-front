@@ -33,6 +33,7 @@ interface TopNavProps {
   brandAriaLabel?: string;
   hideAccountMenu?: boolean;
   showSidebarTrigger?: boolean;
+  showSidebarCoachmarkTip?: boolean;
   mobileCollapsed?: boolean;
   mobileOverlay?: boolean;
   preserveInitialUserProfile?: boolean;
@@ -99,6 +100,7 @@ export default function TopNav({
   brandAriaLabel,
   hideAccountMenu = false,
   showSidebarTrigger = false,
+  showSidebarCoachmarkTip = true,
   mobileCollapsed = false,
   mobileOverlay = false,
   preserveInitialUserProfile = false,
@@ -149,6 +151,11 @@ export default function TopNav({
       label: currentLocale === "ko" ? "리서치 노트북" : "Research Notebook",
       active: pathname.startsWith("/watchlist"),
     },
+    {
+      href: "/institutional-holdings",
+      label: currentLocale === "ko" ? "13F 보유" : "13F Holdings",
+      active: pathname.startsWith("/institutional-holdings"),
+    },
   ];
   const sidebarCoachmarkCopy =
     currentLocale === "ko"
@@ -161,7 +168,10 @@ export default function TopNav({
           dismiss: "Dismiss research history tip",
         };
   const shouldShowSidebarCoachmark =
-    showSidebarTrigger && clientReady && showSidebarCoachmark;
+    showSidebarTrigger &&
+    showSidebarCoachmarkTip &&
+    clientReady &&
+    showSidebarCoachmark;
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -172,7 +182,7 @@ export default function TopNav({
   }, []);
 
   useEffect(() => {
-    if (!showSidebarTrigger) return undefined;
+    if (!showSidebarTrigger || !showSidebarCoachmarkTip) return undefined;
     if (forceCoachmarks) {
       const showTimer = window.setTimeout(
         () => setShowSidebarCoachmark(true),
@@ -203,7 +213,7 @@ export default function TopNav({
     return () => {
       window.clearTimeout(showTimer);
     };
-  }, [forceCoachmarks, showSidebarTrigger]);
+  }, [forceCoachmarks, showSidebarCoachmarkTip, showSidebarTrigger]);
 
   // M-08: onAuthStateChange listener
   useEffect(() => {

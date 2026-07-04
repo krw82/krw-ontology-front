@@ -64,7 +64,7 @@ ${responseLanguagePolicy}
 ${runtimeDatePolicy}
 ${chartPolicy}
 Use the runtime context only as scope and history for that active pass.
-Return only the final user-visible answer in Markdown. Do not include tool-use narration, hidden planning notes, or progress phrases such as "I will query", "Let me get", "Let me verify", "Now let me", or "I'll check". Do not expose internal provenance labels such as "verified by trace", "trace", "chain", "query_context", "tool", or "MCP".${contextBlock}`;
+Return only the final user-visible answer in Markdown. Do not include tool-use narration, hidden planning notes, or progress phrases such as "I will query", "Let me get", "Let me verify", "Now let me", or "I'll check". Do not expose internal provenance labels such as "verified by trace", "trace", "chain", "query_context", "tool", or "MCP". When evidence is missing, do not imply that the company failed to disclose something unless the evidence proves that. In Korean answers, prefer phrases like "현재 보유한 공시 데이터 기준으로는 직접 확인되지 않습니다", "현재 확인 가능한 회사 자료만으로는 단정하기 어렵습니다", or "현재 데이터에서 바로 뒷받침되는 단서는 찾지 못했습니다".${contextBlock}`;
 }
 
 function buildRuntimeDatePolicy(now = new Date()): string {
@@ -121,20 +121,22 @@ function buildStockNewsPolicy(features: PromptRuntimeFeatures): string {
     return [
       "Do not use built-in WebSearch or WebFetch.",
       features.yahooFinanceNewsRequired
-        ? "This run requires current ticker market/news context: use the configured read-only Yahoo Finance MCP tools for that current context before the final answer."
-        : "When current ticker-news context is needed, use only the configured read-only Yahoo Finance MCP tools.",
-      "Yahoo Finance news is market reporting, not confirmed company disclosure.",
+        ? "This run requires current ticker market/news context: use the configured read-only current market-news MCP tools for that current context before the final answer."
+        : "When current ticker-news context is needed, use only the configured read-only current market-news MCP tools.",
+      "Provider news is market reporting, not confirmed company disclosure.",
+      "Provider stock_info is safe quote/identity/technical context only. For market/technical interpretation, use only currentPrice, previousClose, regularMarketChangePercent, volume, averageVolume, fiftyDayAverage, twoHundredDayAverage, fiftyTwoWeekLow, fiftyTwoWeekHigh, and marketCap. Do not use provider valuation, analyst consensus, target price, recommendation, forward PE, PEG, or growth-estimate fields in the answer.",
+      "Never mention provider names such as Yahoo Finance, MCP/tool names, API names, or raw provider payloads in the final answer unless the user explicitly asks about data/debug provenance. Use investor-facing phrases like recent market data, price data, or market reporting instead.",
       `Preserve market-news-vs-filing provenance internally, but synthesize the answer into one ${investorInterpretation}.`,
       features.yahooFinanceNewsRequired
-        ? "If the Yahoo Finance MCP call fails, times out, returns no useful results, or the question has no resolvable ticker context, state that current news context could not be confirmed and do not invent a news explanation."
-        : "If the Yahoo Finance MCP call fails, times out, or returns no useful results, continue from available evidence and state that no additional current news context was confirmed.",
+        ? "If the current market-news tool call fails, times out, returns no useful results, or the question has no resolvable ticker context, state that current news context could not be confirmed and do not invent a news explanation."
+        : "If the current market-news tool call fails, times out, or returns no useful results, continue from available evidence and state that no additional current news context was confirmed.",
     ].join("\n");
   }
 
   if (features.yahooFinanceNewsUnavailableForNews) {
     return [
       "Do not use built-in WebSearch or WebFetch.",
-      "The user selected news mode, but the configured Yahoo Finance MCP tools are unavailable in this runtime.",
+      "The user selected news mode, but the configured current market-news tools are unavailable in this runtime.",
       "Do not attempt current-news search. State that current news context could not be checked.",
     ].join("\n");
   }

@@ -67,6 +67,9 @@ export default function AppShell({ children }: AppShellProps) {
 
   const activeSessionId = searchParams.get("sessionId");
   const refreshSignal = `${pathname}?${searchParams.toString()}`;
+  const forceOnboarding =
+    searchParams.get("tour") === "1" || searchParams.get("onboarding") === "1";
+  const onboardingContinuePath = searchParams.get("continue");
 
   if (isBrowse) {
     return (
@@ -86,7 +89,8 @@ export default function AppShell({ children }: AppShellProps) {
         {unlocalizedPathname === "/companies" ? (
           <ProductOnboardingTour
             pathname={pathname}
-            force={searchParams.get("tour") === "1"}
+            force={forceOnboarding}
+            continuePath={onboardingContinuePath}
           />
         ) : null}
       </div>
@@ -113,7 +117,8 @@ export default function AppShell({ children }: AppShellProps) {
           <ProductOnboardingTour
             pathname={pathname}
             tour="chat"
-            force={searchParams.get("tour") === "1"}
+            force={forceOnboarding}
+            continuePath={onboardingContinuePath}
           />
         ) : null}
       </div>

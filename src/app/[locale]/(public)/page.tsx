@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import JsonLdScript from "@/components/JsonLdScript";
 import { KrwBrand } from "@/components/KrwBrand";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import {
@@ -24,7 +25,11 @@ import { isLocale, type Locale } from "@/i18n/config";
 import { localizedPageMetadata } from "@/i18n/metadata";
 import { localizedPath } from "@/i18n/routing";
 import { buildNewChatHref } from "@/lib/chat/history-state";
-import { absoluteUrl, SITE_NAME } from "@/lib/marketing/site";
+import {
+  absoluteUrl,
+  buildSiteOgImagePath,
+  SITE_NAME,
+} from "@/lib/marketing/site";
 import { getCspNonce } from "@/lib/security/csp-nonce";
 
 type HomePageProps = {
@@ -33,26 +38,27 @@ type HomePageProps = {
 
 const homeCopy = {
   ko: {
-    metadataTitle: "AI 에이전트용 기업 리서치 데이터베이스",
+    metadataTitle: "미국주식 질문을 공시 근거로 확인하는 AI 리서치",
     metadataDescription:
-      "흩어진 기업 정보를 질문 중심으로 연결해, AI 에이전트가 답변을 만들고 사용자가 근거까지 확인할 수 있게 합니다.",
+      "미국 상장기업에 대한 투자 질문을 회사 공시, 실적 변화, 리스크, 사업 맥락과 함께 확인하세요.",
     navResearch: "리서치",
     navCompanies: "회사 목록",
     navQuestions: "질문 그래프",
     navPricing: "가격",
-    eyebrow: "AI 에이전트용 데이터베이스",
-    headingLines: ["기업 리서치를"],
-    accentLine: "AI가 바로 쓸 수 있게",
+    eyebrow: "공시 근거 기반 미국주식 리서치",
+    headingLines: ["AI 답변을 믿기 전에"],
+    accentLine: "회사 공시로 확인하세요",
     subtext:
-      "흩어진 기업 정보를 질문 중심으로 연결해, AI 에이전트가 답변을 만들고 사용자가 근거까지 확인할 수 있게 합니다.",
+      "회사 보고서에는 뉴스와 주가만으로는 보이지 않는 단서가 숨어 있습니다. 그 단서가 매출·마진·현금흐름·리스크에 어떤 의미인지 확인하세요.",
     browseLinks: [
       { href: "/questions", label: "질문 예시" },
       { href: "/companies", label: "회사 목록" },
+      { href: "/13f", label: "13F 보유" },
       { href: "/pricing", label: "가격" },
     ],
     previewEyebrow: "답변 미리보기",
-    previewTitle: "기업 질문 분석 예시",
-    footer: "© 2026 KRW Ontology Research. 근거 기반 기업 분석.",
+    previewTitle: "투자 질문 확인 예시",
+    footer: "© 2026 KRW Ontology Research. 공시 근거 기반 기업 리서치.",
     privacy: "개인정보처리방침",
     terms: "서비스 약관",
     refund: "환불정책",
@@ -60,25 +66,26 @@ const homeCopy = {
     browseAria: "공개 페이지 둘러보기",
   },
   en: {
-    metadataTitle: "Evidence-first company analysis AI",
+    metadataTitle: "Filing-grounded AI research for U.S. stock questions",
     metadataDescription:
-      "Ask about U.S. public companies and review earnings changes, risks, and business drivers with filing-grounded evidence.",
+      "Check U.S. stock questions against company filings, earnings changes, risks, and business context.",
     navResearch: "Research",
     navCompanies: "Companies",
     navQuestions: "Question graphs",
     navPricing: "Pricing",
-    eyebrow: "Answer signals from company filings",
-    headingLines: ["Evidence-first"],
-    accentLine: "company analysis AI",
+    eyebrow: "Filing-grounded U.S. stock research",
+    headingLines: ["Before you trust an AI answer,"],
+    accentLine: "check the company filings",
     subtext:
-      "Ask a company question, then KRW Ontology finds signals in company reports and organizes the answer around evidence, performance drivers, risks, and business context.",
+      "Company reports contain signals that news and price moves alone do not show. Check what those signals mean for revenue, margins, cash flow, and risk.",
     browseLinks: [
       { href: "/questions", label: "Question examples" },
       { href: "/companies", label: "Companies" },
+      { href: "/13f", label: "13F holdings" },
       { href: "/pricing", label: "Pricing" },
     ],
     previewEyebrow: "Answer preview",
-    previewTitle: "Company question analysis example",
+    previewTitle: "Investment question check example",
     footer: "© 2026 KRW Ontology Research. Evidence-first company analysis.",
     privacy: "Privacy Policy",
     terms: "Terms of Service",
@@ -237,6 +244,10 @@ export async function generateMetadata({
     title: copy.metadataTitle,
     description: copy.metadataDescription,
     path: "/",
+    image: {
+      url: buildSiteOgImagePath("home", rawLocale),
+      alt: `${copy.metadataTitle} | ${SITE_NAME}`,
+    },
   });
 }
 
@@ -248,48 +259,51 @@ export default async function Home({ params }: HomePageProps) {
   const locale = rawLocale;
   const copy = homeCopy[locale];
   const experience = homeExperienceCopy[locale];
-  const websiteJsonLd = {
+  const siteUrl = absoluteUrl(localizedPath(locale));
+  const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: SITE_NAME,
-    alternateName: "KRW",
-    url: absoluteUrl(localizedPath(locale)),
-  };
-
-  const webApplicationJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    name: SITE_NAME,
-    applicationCategory: "FinanceApplication",
-    operatingSystem: "Web",
-    url: absoluteUrl(localizedPath(locale)),
-    description: copy.metadataDescription,
-    offers: {
-      "@type": "Offer",
-      price: "0",
-      priceCurrency: "KRW",
-      description: copy.offerDescription,
-    },
+    "@graph": [
+      {
+        "@type": "Organization",
+        name: SITE_NAME,
+        url: siteUrl,
+        logo: absoluteUrl("/krw-logo.svg"),
+      },
+      {
+        "@type": "WebSite",
+        name: SITE_NAME,
+        alternateName: "KRW",
+        url: siteUrl,
+        publisher: {
+          "@type": "Organization",
+          name: SITE_NAME,
+        },
+      },
+      {
+        "@type": "SoftwareApplication",
+        name: SITE_NAME,
+        applicationCategory: "FinanceApplication",
+        operatingSystem: "Web",
+        url: siteUrl,
+        description: copy.metadataDescription,
+        publisher: {
+          "@type": "Organization",
+          name: SITE_NAME,
+        },
+        offers: {
+          "@type": "Offer",
+          price: "0",
+          priceCurrency: "KRW",
+          description: copy.offerDescription,
+          availability: "https://schema.org/InStock",
+        },
+      },
+    ],
   };
 
   return (
     <div className="min-h-[100dvh] overflow-x-hidden bg-canvas text-ink">
-      <script
-        nonce={nonce}
-        type="application/ld+json"
-        suppressHydrationWarning
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(websiteJsonLd),
-        }}
-      />
-      <script
-        nonce={nonce}
-        type="application/ld+json"
-        suppressHydrationWarning
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(webApplicationJsonLd),
-        }}
-      />
+      <JsonLdScript nonce={nonce} data={jsonLd} />
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-hairline bg-canvas/95 backdrop-blur-xl">
         <nav className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <KrwBrand

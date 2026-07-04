@@ -13,8 +13,8 @@ const copy = {
     questionLabel: "질문",
     answerAria: "공유된 답변 본문",
     answerLabel: "답변",
-    footer: "다른 기업이나 궁금한 점을 공시 기반으로 직접 확인해보세요.",
-    cta: "다른 질문도 분석 시작",
+    footer: "다른 뉴스나 종목도 투자 판단으로 이어서 확인해보세요.",
+    cta: "새 리서치 시작",
   },
   en: {
     brandAria: "Go to companies",
@@ -22,8 +22,8 @@ const copy = {
     questionLabel: "Question",
     answerAria: "Shared answer",
     answerLabel: "Answer",
-    footer: "Ask another filing-grounded question.",
-    cta: "Start another analysis",
+    footer: "Continue with another stock, news item, or investment question.",
+    cta: "Start new research",
   },
 } satisfies Record<Locale, Record<string, string>>;
 

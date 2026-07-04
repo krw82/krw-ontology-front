@@ -43,6 +43,29 @@ describe("extractFollowUpQuestions", () => {
     ]);
   });
 
+  it("extracts numbered follow-up prompts", () => {
+    const result = extractFollowUpQuestions(
+      [
+        "본문입니다.",
+        "",
+        "### 이어서 볼 질문",
+        "",
+        "1. 이 판단이 유지되는 조건과 깨지는 조건을 나눠줘.",
+        "2. 상승·하락·횡보 시나리오별 체크포인트를 보여줘.",
+        "3. 반대로 봐야 할 리스크 신호만 따로 정리해줘.",
+      ].join("\n"),
+    );
+
+    expect(result).toEqual({
+      body: "본문입니다.",
+      questions: [
+        "이 판단이 유지되는 조건과 깨지는 조건을 나눠줘.",
+        "상승·하락·횡보 시나리오별 체크포인트를 보여줘.",
+        "반대로 봐야 할 리스크 신호만 따로 정리해줘.",
+      ],
+    });
+  });
+
   it("falls back when the section is ambiguous or partial", () => {
     expect(
       extractFollowUpQuestions(
