@@ -9,6 +9,7 @@ export function normalizeRunKind(value: unknown): RunKind {
     value === "news_discovery" ||
     value === "market_move_research" ||
     value === "scenario_sensitivity" ||
+    value === "guru_advisor" ||
     value === "company_research"
     ? value
     : DEFAULT_RUN_KIND;

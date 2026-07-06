@@ -22,6 +22,10 @@ describe("run kind", () => {
     );
   });
 
+  it("accepts guru advisor as a durable run kind", () => {
+    expect(normalizeRunKind("guru_advisor")).toBe("guru_advisor");
+  });
+
   it("keeps existing defaults for company and news analysis", () => {
     expect(normalizeRunKind("unsupported")).toBe(DEFAULT_RUN_KIND);
     expect(defaultRunKindForAnalysisMode("company")).toBe("company_research");

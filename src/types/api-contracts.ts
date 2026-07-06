@@ -48,7 +48,8 @@ export type RunKind =
   | "idea_generation"
   | "news_discovery"
   | "market_move_research"
-  | "scenario_sensitivity";
+  | "scenario_sensitivity"
+  | "guru_advisor";
 
 export type AgentRunExecutorType = "claude_agent";
 
@@ -164,12 +165,26 @@ export type YahooFinanceMCPToolName =
 /** Local presentation MCP tool names */
 export type ChartMCPToolName = "create_chart_v1";
 
+/** Allowed Guru Advisor MCP tool names */
+export type GuruMCPToolName =
+  | "krw_guru_status"
+  | "krw_guru_search"
+  | "krw_guru_query_context"
+  | "krw_guru_select_lenses"
+  | "krw_guru_context"
+  | "krw_guru_trace"
+  | "krw_guru_chain"
+  | "krw_guru_evidence"
+  | "krw_guru_data_needs"
+  | "krw_guru_eval_questions";
+
 /** Allowed MCP tool names */
 export type MCPToolName =
   | KRWOntologyMCPToolName
   | StockNewsMCPToolName
   | YahooFinanceMCPToolName
-  | ChartMCPToolName;
+  | ChartMCPToolName
+  | GuruMCPToolName;
 
 /** Document types in the ontology */
 export type DocumentType =
@@ -1635,7 +1650,7 @@ export interface WebContainerEnv {
   KRW_ONTOLOGY_COMMIT: string;
   GLOBAL_CONCURRENT_RUN_LIMIT: string;  // "5"
   CLAUDE_MODEL: string;                 // "sonnet"
-  CLAUDE_AGENT_MAX_TURNS: string;        // "20"
+  CLAUDE_AGENT_MAX_TURNS: string;        // "40"
   AGENT_MAX_TOOL_CALLS: string;          // "18"
   AGENT_MAX_TOOL_RESULT_CHARS: string;   // "100000"
   LEASE_TIMEOUT_MINUTES: string;        // "10"

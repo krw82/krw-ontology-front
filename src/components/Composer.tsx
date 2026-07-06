@@ -43,6 +43,7 @@ interface ComposerProps {
   researchMode?: ResearchMode;
   onResearchModeChange?: (mode: ResearchMode) => void;
   urlModeAvailable?: boolean;
+  fileModeAvailable?: boolean;
   urlOnlyFallbackMessage?: string;
   attachmentCoachmarkEnabled?: boolean;
   inputSurfaceVisible?: boolean;
@@ -216,6 +217,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
   isGenerating = false,
   placeholder = "기업에 대해 질문하세요...",
   urlModeAvailable = false,
+  fileModeAvailable = true,
   urlOnlyFallbackMessage,
   attachmentCoachmarkEnabled = true,
   inputSurfaceVisible = true,
@@ -1052,6 +1054,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
       }
 
       if (type === "file") {
+        if (!fileModeAvailable) return;
         openFilePicker();
         return;
       }
@@ -1115,32 +1118,34 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
           </button>
         )}
 
-        <button
-          type="button"
-          className={itemBase}
-          onClick={openFilePicker}
-          role="menuitem"
-        >
-          {!isSheet && (
-            <span
-              aria-hidden="true"
-              className="material-symbols-outlined text-[20px] text-muted"
-            >
-              attach_file
+        {fileModeAvailable && (
+          <button
+            type="button"
+            className={itemBase}
+            onClick={openFilePicker}
+            role="menuitem"
+          >
+            {!isSheet && (
+              <span
+                aria-hidden="true"
+                className="material-symbols-outlined text-[20px] text-muted"
+              >
+                attach_file
+              </span>
+            )}
+            <span className="min-w-0">
+              <span className={titleClass || undefined}>파일 첨부</span>
+              <span className={descriptionClass}>
+                PDF, txt, md 문서를 질문에 함께 보냅니다.
+              </span>
             </span>
-          )}
-          <span className="min-w-0">
-            <span className={titleClass || undefined}>파일 첨부</span>
-            <span className={descriptionClass}>
-              PDF, txt, md 문서를 질문에 함께 보냅니다.
-            </span>
-          </span>
-          {!isSheet && (
-            <span className="ml-auto rounded-[6px] border border-hairline bg-surface px-1.5 py-0.5 text-[10px] font-bold leading-none text-muted">
-              PDF
-            </span>
-          )}
-        </button>
+            {!isSheet && (
+              <span className="ml-auto rounded-[6px] border border-hairline bg-surface px-1.5 py-0.5 text-[10px] font-bold leading-none text-muted">
+                PDF
+              </span>
+            )}
+          </button>
+        )}
 
       </div>
     );

@@ -55,6 +55,7 @@ const ROUTER_SCHEMA = {
         "market_move_research",
         "idea_generation",
         "scenario_sensitivity",
+        "guru_advisor",
       ],
     },
   },
@@ -466,7 +467,8 @@ function preserveExplicitRoute(
   if (
     input.currentRunKind === "news_discovery" ||
     input.currentRunKind === "market_move_research" ||
-    input.currentRunKind === "scenario_sensitivity"
+    input.currentRunKind === "scenario_sensitivity" ||
+    input.currentRunKind === "guru_advisor"
   ) {
     return {
       analysisMode: input.currentAnalysisMode,
@@ -670,7 +672,8 @@ function readRunKind(value: unknown): RunKind | null {
     value === "news_discovery" ||
     value === "market_move_research" ||
     value === "idea_generation" ||
-    value === "scenario_sensitivity"
+    value === "scenario_sensitivity" ||
+    value === "guru_advisor"
     ? value
     : null;
 }

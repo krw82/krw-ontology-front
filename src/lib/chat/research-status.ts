@@ -42,6 +42,16 @@ const toolLabels: Partial<Record<MCPToolName, string>> = {
   get_yahoo_finance_news: "최근 뉴스 확인",
   get_stock_info: "가격 움직임 확인",
   create_chart_v1: "차트 정리",
+  krw_guru_status: "구루 온톨로지 상태 확인",
+  krw_guru_search: "구루 렌즈 검색",
+  krw_guru_query_context: "구루 렌즈 근거 확인",
+  krw_guru_select_lenses: "적합한 구루 렌즈 선택",
+  krw_guru_context: "구루 상담 맥락 구성",
+  krw_guru_trace: "구루 근거 연결 확인",
+  krw_guru_chain: "구루 판단 경로 확인",
+  krw_guru_evidence: "구루 원칙 근거 확인",
+  krw_guru_data_needs: "필요한 회사 근거 정리",
+  krw_guru_eval_questions: "구루 평가 질문 확인",
 };
 
 const toolStepMap: Record<MCPToolName, ResearchStepId> = {
@@ -68,6 +78,16 @@ const toolStepMap: Record<MCPToolName, ResearchStepId> = {
   get_yahoo_finance_news: "search",
   get_stock_info: "search",
   create_chart_v1: "compose",
+  krw_guru_status: "scope",
+  krw_guru_select_lenses: "scope",
+  krw_guru_search: "search",
+  krw_guru_query_context: "search",
+  krw_guru_context: "search",
+  krw_guru_trace: "trace",
+  krw_guru_chain: "trace",
+  krw_guru_evidence: "trace",
+  krw_guru_data_needs: "compose",
+  krw_guru_eval_questions: "compose",
 };
 
 const baseSteps: Array<{ id: ResearchStepId; label: string }> = [

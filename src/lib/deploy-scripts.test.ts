@@ -191,7 +191,7 @@ describe("production deploy scripts", () => {
     const workerSection = compose.slice(compose.indexOf("  agent-worker:"));
 
     expect(compose).toContain(
-      "AGENT_RUN_HARD_TIMEOUT_MINUTES=${AGENT_RUN_HARD_TIMEOUT_MINUTES:-6}",
+      "AGENT_RUN_HARD_TIMEOUT_MINUTES=${AGENT_RUN_HARD_TIMEOUT_MINUTES:-10}",
     );
     expect(compose).toContain("LEASE_TIMEOUT_MINUTES=${LEASE_TIMEOUT_MINUTES:-10}");
     expect(workerSection).toContain(

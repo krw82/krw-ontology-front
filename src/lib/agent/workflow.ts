@@ -19,6 +19,27 @@ export const KRW_ONTOLOGY_MARKET_MOVE_RESEARCH_SKILL =
 export const KRW_ONTOLOGY_SCENARIO_SENSITIVITY_SKILL =
   "/krw-ontology:krw-ontology-scenario-sensitivity";
 
+export const KRW_GURU_BUFFETT_ADVISOR_SKILL =
+  "/krw-guru-advisor:krw-guru-buffett-advisor";
+
+export const KRW_GURU_MARKS_ADVISOR_SKILL =
+  "/krw-guru-advisor:krw-guru-marks-advisor";
+
+export const KRW_GURU_ACKMAN_ADVISOR_SKILL =
+  "/krw-guru-advisor:krw-guru-ackman-advisor";
+
+export const KRW_GURU_FLATT_ADVISOR_SKILL =
+  "/krw-guru-advisor:krw-guru-flatt-advisor";
+
+export const KRW_GURU_TERRY_SMITH_ADVISOR_SKILL =
+  "/krw-guru-advisor:krw-guru-terry-smith-advisor";
+
+type GuruLensSelection = {
+  authorKey: string | null;
+  label: string;
+  skillCommand: string | null;
+};
+
 export function getKrwOntologySkillForRunKind(
   runKind: RunKind,
   responseLocale: Locale = DEFAULT_LOCALE,
@@ -46,6 +67,10 @@ export function buildResearchPassPrompt(
     : "company_research",
   responseLocale: Locale = DEFAULT_LOCALE,
 ): string {
+  if (runKind === "guru_advisor") {
+    return buildGuruAdvisorResearchPassPrompt(userMessage, responseLocale);
+  }
+
   const skillCommand = getKrwOntologySkillForRunKind(runKind, responseLocale);
   const runtimeMode =
     runKind === "idea_generation"
@@ -61,6 +86,96 @@ export function buildResearchPassPrompt(
   return `${skillCommand} ${userMessage}
 
 ${runtimeMode}`;
+}
+
+function buildGuruAdvisorResearchPassPrompt(
+  userMessage: string,
+  responseLocale: Locale,
+): string {
+  const lens = parseGuruLensSelection(userMessage);
+  const skillCommand = lens.skillCommand ? `${lens.skillCommand} ` : "";
+
+  return `${skillCommand}${userMessage}
+
+${guruAdvisorRuntimePrompt(responseLocale, lens)}`;
+}
+
+function parseGuruLensSelection(userMessage: string): GuruLensSelection {
+  const text = userMessage.toLowerCase();
+  if (/buffett|버핏|워런|warren/.test(text)) {
+    return {
+      authorKey: "buffett",
+      label: "Warren Buffett",
+      skillCommand: KRW_GURU_BUFFETT_ADVISOR_SKILL,
+    };
+  }
+  if (/marks|하워드\s*막스|막스|howard/.test(text)) {
+    return {
+      authorKey: "marks",
+      label: "Howard Marks",
+      skillCommand: KRW_GURU_MARKS_ADVISOR_SKILL,
+    };
+  }
+  if (/ackman|애크먼|액먼|bill\s+ackman|빌\s*애크먼|빌\s*액먼/.test(text)) {
+    return {
+      authorKey: "ackman",
+      label: "Bill Ackman",
+      skillCommand: KRW_GURU_ACKMAN_ADVISOR_SKILL,
+    };
+  }
+  if (/flatt|플랫|bruce\s+flatt|브루스\s*플랫/.test(text)) {
+    return {
+      authorKey: "flatt",
+      label: "Bruce Flatt",
+      skillCommand: KRW_GURU_FLATT_ADVISOR_SKILL,
+    };
+  }
+  if (/terry\s*smith|테리\s*스미스|terry-smith|smith/.test(text)) {
+    return {
+      authorKey: "terry_smith",
+      label: "Terry Smith",
+      skillCommand: KRW_GURU_TERRY_SMITH_ADVISOR_SKILL,
+    };
+  }
+
+  return {
+    authorKey: null,
+    label: "auto-selected guru lenses",
+    skillCommand: null,
+  };
+}
+
+function guruAdvisorRuntimePrompt(
+  responseLocale: Locale,
+  lens: GuruLensSelection,
+): string {
+  const authorInstruction = lens.authorKey
+    ? `- Selected guru lens: ${lens.label}. Call krw_guru_query_context with author_keys=["${lens.authorKey}"] before answering.`
+    : "- Selected guru lens: auto. First call krw_guru_select_lenses for the user's question, then call krw_guru_query_context using the selected author_keys when the selector returns them. If selection is weak, call krw_guru_query_context without author_keys.";
+
+  if (responseLocale === "en") {
+    return `KRW Guru Advisor web run:
+${authorInstruction}
+- Use Guru ontology only: investing principles, question frames, risk lenses, consultation playbooks, and data needs.
+- Do not call KRW Ontology filing tools, current-news tools, chart tools, WebSearch, or WebFetch.
+- Use krw_guru_trace, krw_guru_chain, or krw_guru_evidence only for selected reviewed_ids when stronger support is needed.
+- Do not expose tool names, raw reviewed_ids, internal ResearchPack field names, or private excerpts.
+- Do not present the guru lens as personal financial advice, a buy/sell/hold recommendation, target price, or valuation conclusion.
+- If the user asks for a company-specific judgment, explain what the guru lens can say now and list the company evidence needed later. Do not invent company facts.
+- End with 2-3 concrete follow-up questions that keep the next step within guru-lens work or explicitly ask to connect company filings later.
+- The final answer must be user-visible English Markdown investor interpretation only.`;
+  }
+
+  return `웹앱 구루 온톨로지 실행:
+${authorInstruction}
+- 구루 온톨로지만 사용합니다. 투자 원칙, 질문 프레임, 리스크 렌즈, 상담 플레이북, 필요한 회사 데이터 항목만 다룹니다.
+- KRW Ontology 공시 도구, 현재 뉴스 도구, 차트 도구, WebSearch, WebFetch를 호출하지 않습니다.
+- 더 강한 근거가 필요할 때만 선택된 reviewed_id에 대해 krw_guru_trace, krw_guru_chain, krw_guru_evidence를 사용합니다.
+- 도구명, raw reviewed_id, 내부 ResearchPack 필드명, private excerpt를 최종 답변에 노출하지 않습니다.
+- 구루 렌즈를 개인 투자자문, 매수/매도/보유 추천, 목표가, 밸류에이션 결론처럼 쓰지 않습니다.
+- 사용자가 회사별 판단을 물으면 지금 구루 렌즈로 말할 수 있는 부분과 나중에 필요한 회사 근거를 분리합니다. 회사 사실은 지어내지 않습니다.
+- 답변 끝에는 구루 렌즈 안에서 이어갈 질문 또는 나중에 공시 연결로 넘어갈 질문 2-3개를 구체적으로 제안합니다.
+- 최종 답변은 사용자에게 바로 보여줄 한국어 Markdown 투자 해석만 작성합니다.`;
 }
 
 function ideaGenerationRuntimePrompt(): string {

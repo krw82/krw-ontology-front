@@ -22,7 +22,7 @@ const LEASE_EXPIRED_MESSAGE =
   "분석 시간이 초과되었습니다. 다시 시도해주세요.";
 const HARD_RUN_TIMEOUT_MINUTES = readIntEnv(
   "AGENT_RUN_HARD_TIMEOUT_MINUTES",
-  6,
+  10,
   { min: 1 },
 );
 

@@ -326,6 +326,24 @@ describe("validateRequest", () => {
     expect(result.data.body.research_mode).toBe("deep");
   });
 
+  it("accepts explicit run kind for guru advisor", async () => {
+    const result = await validateRequest(
+      makeRequest({
+        content: "Buffett 렌즈로 좋은 기업 판단 기준을 알려줘",
+        request_id: REQUEST_ID,
+        research_mode: "standard",
+        analysis_mode: "company",
+        run_kind: "guru_advisor",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.body.analysis_mode).toBe("company");
+    expect(result.data.body.run_kind).toBe("guru_advisor");
+    expect(result.data.body.research_mode).toBe("deep");
+  });
+
   it("forces deep research mode for idea generation", async () => {
     const result = await validateRequest(
       makeRequest({

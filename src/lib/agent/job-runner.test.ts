@@ -364,6 +364,54 @@ describe("agent job runner", () => {
     );
   });
 
+  it("redacts sensitive output before storing and streaming completed answers", async () => {
+    const fake = createRunnerAdmin();
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+    vi.mocked(checkMcpReady).mockResolvedValue(readyMcpHealth());
+    vi.mocked(runAgent).mockResolvedValue({
+      status: "completed",
+      acc: {
+        fullText:
+          "경로는 ~/krw-ontology-front 이고 SUPABASE_SERVICE_ROLE_KEY=secret 입니다.",
+        structuredOutput: null,
+        researchSynthesisOutput: null,
+        researchSynthesisText: null,
+        displayPlanOutput: null,
+        toolCalls: [],
+        citations: [],
+        inputTokens: 10,
+        outputTokens: 20,
+        cacheHitInputTokens: 0,
+        cacheMissInputTokens: 0,
+      },
+    });
+
+    await runAgentJob("run-1", "worker-1");
+
+    const expectedContent =
+      "경로는 [내부 경로 제거됨] 이고 [민감 환경변수 제거됨] 입니다.";
+    expect(fake.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: "messages",
+          payload: expect.objectContaining({
+            content: expectedContent,
+            status: "completed",
+          }),
+          filters: { id: "assistant-message-1" },
+        }),
+      ]),
+    );
+    expect(appendAgentRunEvent).toHaveBeenCalledWith(
+      fake.admin,
+      "run-1",
+      "done",
+      expect.objectContaining({
+        content: expectedContent,
+      }),
+    );
+  });
+
   it("runs auto routing inside the worker before the research SDK pass", async () => {
     const fake = createRunnerAdmin({
       userMessageContent: "AAPL 오늘 왜 떨어져?",
@@ -802,7 +850,7 @@ describe("agent job runner", () => {
     vi.mocked(runAgent).mockReturnValue(new Promise(() => undefined));
 
     const job = runAgentJob("run-1", "worker-1");
-    await vi.advanceTimersByTimeAsync(6 * 60 * 1000 + 1);
+    await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 1);
     await job;
     vi.useRealTimers();
 

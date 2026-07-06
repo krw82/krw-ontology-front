@@ -59,6 +59,16 @@ const toolTitleMap: Partial<Record<MCPToolName, string>> = {
   read_news_sources: "뉴스 원문 확인 중",
   build_news_timeline: "뉴스 흐름 정리 중",
   audit_news_sources: "뉴스 출처 점검 중",
+  krw_guru_status: "구루 온톨로지 상태 확인 중",
+  krw_guru_search: "구루 렌즈 검색 중",
+  krw_guru_query_context: "구루 렌즈 근거 확인 중",
+  krw_guru_select_lenses: "적합한 구루 렌즈 선택 중",
+  krw_guru_context: "구루 상담 맥락 구성 중",
+  krw_guru_trace: "구루 근거 연결 확인 중",
+  krw_guru_chain: "구루 판단 경로 확인 중",
+  krw_guru_evidence: "구루 원칙 근거 확인 중",
+  krw_guru_data_needs: "필요한 회사 근거 정리 중",
+  krw_guru_eval_questions: "구루 평가 질문 확인 중",
 };
 
 const documentLabels: Partial<Record<DocumentType, string>> = {
@@ -351,11 +361,21 @@ function getActiveNodeId({
     case "read_news_sources":
     case "build_news_timeline":
     case "audit_news_sources":
+    case "krw_guru_search":
+    case "krw_guru_query_context":
+    case "krw_guru_select_lenses":
+    case "krw_guru_context":
       return topicNodes.at(-1)?.id ?? evidenceNodeId;
     case "krw_ontology_trace":
     case "krw_ontology_chain":
     case "krw_ontology_quality":
     case "krw_ontology_compare":
+    case "krw_guru_status":
+    case "krw_guru_trace":
+    case "krw_guru_chain":
+    case "krw_guru_evidence":
+    case "krw_guru_data_needs":
+    case "krw_guru_eval_questions":
     default:
       return evidenceNodeId;
   }

@@ -17,6 +17,7 @@ import { getClaudeAgentModel } from "@/lib/agent/model";
 import { runAgent } from "@/lib/agent/runner";
 import { closeOpenToolCallsForRun } from "@/lib/agent/tool-call-cleanup";
 import { markAgentRunTerminal } from "@/lib/agent/run-lifecycle";
+import { persistAgentFailureDiagnostics } from "@/lib/agent/failure-diagnostics";
 import type { SdkDiagnostics } from "@/lib/agent/runner";
 import type {
   AccumulatedRun,
@@ -52,7 +53,7 @@ import { cancelledAssistantContent } from "@/lib/chat/message-status";
 const EXISTING_RUN_POLL_INTERVAL_MS = 800;
 const EXISTING_RUN_MAX_POLL_MS = 120_000;
 const AGENT_RUN_HARD_TIMEOUT_MS =
-  readIntEnv("AGENT_RUN_HARD_TIMEOUT_MINUTES", 6, { min: 1 }) * 60_000;
+  readIntEnv("AGENT_RUN_HARD_TIMEOUT_MINUTES", 10, { min: 1 }) * 60_000;
 const RUN_TIMEOUT_MESSAGE =
   "분석 시간이 초과되었습니다. 다시 시도해주세요.";
 
@@ -1127,7 +1128,12 @@ interface FailedRunParams {
   runId: string;
   assistantMessageId: string;
   finishedAt: string;
-  result: { acc: AccumulatedRun; errorCode?: string; errorMessage?: string };
+  result: {
+    acc: AccumulatedRun;
+    errorCode?: string;
+    errorMessage?: string;
+    internalErrorMessage?: string;
+  };
   session: ResolvedSession;
   researchMode?: ResearchMode;
   userId: string;
@@ -1139,7 +1145,17 @@ async function handleFailedRun(params: FailedRunParams) {
   const { admin, runId, assistantMessageId, finishedAt, result, session, researchMode, userId, requestId, sendEvent } = params;
   const errorCode = toErrorCode(result.errorCode || "claude_api_error");
   const rawErrorMessage = result.errorMessage || publicErrorMessage(errorCode);
+  const internalErrorMessage = result.internalErrorMessage || rawErrorMessage;
   const publicMessage = publicAgentErrorMessage({ code: errorCode });
+
+  persistAgentFailureDiagnostics({
+    runId,
+    errorCode,
+    publicMessage,
+    internalErrorMessage,
+    acc: result.acc,
+    executor: "api",
+  });
 
   await markAgentRunTerminal(admin, runId, {
     status: "failed",

@@ -13,6 +13,7 @@ import {
 } from "@/lib/chat/assistant-content";
 import { parseChatAttachmentContent } from "@/lib/chat/attachments";
 import { normalizeTickers } from "@/lib/ontology/ticker";
+import { redactSensitiveOutput } from "@/lib/security/sensitive-output";
 import type { Locale } from "@/i18n/config";
 import { inferShareLocale } from "./share-locale";
 
@@ -97,9 +98,15 @@ export async function findPublicMessageShare(
 
   if (!data) return null;
 
-  const answerContent = sanitizeAssistantContent(data.answer_content);
-  const titleFallback = sanitizeAssistantPreviewContent(data.title);
-  const questionContent = normalizeShareQuestion(data.question_content);
+  const answerContent = redactSensitiveOutput(
+    sanitizeAssistantContent(data.answer_content),
+  ).content;
+  const titleFallback = redactSensitiveOutput(
+    sanitizeAssistantPreviewContent(data.title),
+  ).content;
+  const questionContent = redactNullableShareText(
+    normalizeShareQuestion(data.question_content),
+  );
   const questionAttachments = await loadPublicQuestionAttachments(
     admin,
     data.source_question_message_id,
@@ -156,7 +163,9 @@ export async function createMessageShare(params: {
 }): Promise<Pick<MessageShareRow, "token">> {
   const admin = getSupabaseAdmin();
   const token = createShareToken();
-  const answerContent = sanitizeAssistantContent(params.message.content);
+  const answerContent = redactSensitiveOutput(
+    sanitizeAssistantContent(params.message.content),
+  ).content;
   const questionSnapshot = await resolveShareQuestionSnapshot(params);
   const payload = {
     token,
@@ -165,7 +174,7 @@ export async function createMessageShare(params: {
     source_message_id: params.message.id,
     source_question_message_id: questionSnapshot.sourceQuestionMessageId,
     title: buildShareTitle(answerContent, params.session.title),
-    question_content: questionSnapshot.questionContent,
+    question_content: redactNullableShareText(questionSnapshot.questionContent),
     question_created_at: questionSnapshot.questionCreatedAt,
     answer_content: answerContent,
     answer_created_at: params.message.created_at,
@@ -192,6 +201,11 @@ function normalizeShareTickers(
 ): string[] | null {
   const normalized = normalizeTickers(tickers ?? []);
   return normalized.length > 0 ? normalized : null;
+}
+
+function redactNullableShareText(content: string | null): string | null {
+  if (!content) return content;
+  return redactSensitiveOutput(content).content;
 }
 
 export async function ensureMessageShareQuestionSnapshot(params: {

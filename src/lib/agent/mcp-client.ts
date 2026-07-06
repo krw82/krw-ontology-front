@@ -3,11 +3,13 @@ import "server-only";
 import { execFile } from "node:child_process";
 import { constants } from "node:fs";
 import { access, readFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { normalizeOntologyEnv, type OntologyEnv } from "@/lib/env";
 import type {
   ChartMCPToolName,
+  GuruMCPToolName,
   KRWOntologyMCPToolName,
   StockNewsMCPToolName,
 } from "@/types/api-contracts";
@@ -22,6 +24,8 @@ const KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX =
   "mcp__plugin_krw-ontology_krw-ontology__";
 const STOCK_NEWS_PLUGIN_TOOL_PREFIX =
   "mcp__plugin_krw-ontology_stock-news__";
+const GURU_ADVISOR_PLUGIN_TOOL_PREFIX =
+  "mcp__plugin_krw-guru-advisor_krw-guru-advisor__";
 const CHART_MCP_TOOL_PREFIX = "mcp__krw_presentation__";
 const YAHOO_FINANCE_MCP_TOOL_PREFIX =
   `mcp__${YAHOO_FINANCE_MCP_SERVER_NAME}__`;
@@ -56,6 +60,19 @@ export const CHART_MCP_TOOLS = [
   "create_chart_v1",
 ] as const satisfies readonly ChartMCPToolName[];
 
+export const GURU_MCP_TOOLS = [
+  "krw_guru_status",
+  "krw_guru_search",
+  "krw_guru_query_context",
+  "krw_guru_select_lenses",
+  "krw_guru_context",
+  "krw_guru_trace",
+  "krw_guru_chain",
+  "krw_guru_evidence",
+  "krw_guru_data_needs",
+  "krw_guru_eval_questions",
+] as const satisfies readonly GuruMCPToolName[];
+
 export {
   YAHOO_FINANCE_MCP_TOOLS,
   YAHOO_FINANCE_SDK_ALLOWED_TOOLS,
@@ -69,12 +86,17 @@ export const STOCK_NEWS_SDK_ALLOWED_TOOLS = STOCK_NEWS_MCP_TOOLS.map(
   (toolName) => `${STOCK_NEWS_PLUGIN_TOOL_PREFIX}${toolName}`,
 );
 
+export const GURU_ADVISOR_SDK_ALLOWED_TOOLS = GURU_MCP_TOOLS.map(
+  (toolName) => `${GURU_ADVISOR_PLUGIN_TOOL_PREFIX}${toolName}`,
+);
+
 export const CHART_SDK_ALLOWED_TOOLS = CHART_MCP_TOOLS.map(
   (toolName) => `${CHART_MCP_TOOL_PREFIX}${toolName}`,
 );
 
 const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const STOCK_NEWS_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_MCP_TOOLS);
+const GURU_MCP_TOOL_SET = new Set<string>(GURU_MCP_TOOLS);
 const YAHOO_FINANCE_MCP_TOOL_SET = new Set<string>(YAHOO_FINANCE_MCP_TOOLS);
 const CHART_MCP_TOOL_SET = new Set<string>(CHART_MCP_TOOLS);
 const execFileAsync = promisify(execFile);
@@ -93,6 +115,13 @@ export function isStockNewsSdkTool(toolName: string): boolean {
   const bareName = toolName.slice(STOCK_NEWS_PLUGIN_TOOL_PREFIX.length);
 
   return Boolean(bareName && STOCK_NEWS_MCP_TOOL_SET.has(bareName));
+}
+
+export function isGuruAdvisorSdkTool(toolName: string): boolean {
+  if (!toolName.startsWith(GURU_ADVISOR_PLUGIN_TOOL_PREFIX)) return false;
+  const bareName = toolName.slice(GURU_ADVISOR_PLUGIN_TOOL_PREFIX.length);
+
+  return Boolean(bareName && GURU_MCP_TOOL_SET.has(bareName));
 }
 
 export function isYahooFinanceSdkTool(toolName: string): boolean {
@@ -189,6 +218,24 @@ async function exists(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export async function resolveGuruAdvisorPluginPath(): Promise<string> {
+  const configured = process.env.KRW_GURU_ADVISOR_PLUGIN_PATH;
+  if (configured) return configured;
+
+  const ontologySourceRoot =
+    process.env.KRW_ONTOLOGY_SOURCE_DIR || path.join(os.homedir(), "krw-ontology");
+  const fallbackPluginPath = path.join(
+    ontologySourceRoot,
+    "plugins",
+    "krw-guru-advisor",
+  );
+  if (await exists(fallbackPluginPath)) return fallbackPluginPath;
+
+  throw new Error(
+    "Missing KRW_GURU_ADVISOR_PLUGIN_PATH and default krw-guru-advisor plugin path was not found",
+  );
 }
 
 async function isExecutable(command: string): Promise<boolean> {

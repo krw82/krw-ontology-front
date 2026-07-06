@@ -30,6 +30,7 @@ import {
 } from "@/lib/agent/job-queue";
 import { closeOpenToolCallsForRun } from "@/lib/agent/tool-call-cleanup";
 import { markAgentRunTerminal } from "@/lib/agent/run-lifecycle";
+import { persistAgentFailureDiagnostics } from "@/lib/agent/failure-diagnostics";
 import {
   getCurrentDailyBillingPeriod,
   getCurrentMonthlyBillingPeriod,
@@ -85,6 +86,7 @@ import { buildSelectedNewsSourcePack } from "@/lib/news-discovery/source-pack";
 import { appendDocumentContextToUserMessage } from "@/lib/document-ingestion/prompt-context";
 import { resolveChatQuestionRoute } from "@/lib/question-router/chat-question-router";
 import { writeLocalDebugLog } from "@/lib/observability/local-debug-log";
+import { redactSensitiveOutput } from "@/lib/security/sensitive-output";
 
 const HEARTBEAT_INTERVAL_MS = readIntEnv("LEASE_HEARTBEAT_INTERVAL_MS", 60_000, {
   min: 1_000,
@@ -95,7 +97,7 @@ const CANCEL_RECONCILE_INTERVAL_MS = readIntEnv(
   { min: 1_000 },
 );
 const AGENT_RUN_HARD_TIMEOUT_MS =
-  readIntEnv("AGENT_RUN_HARD_TIMEOUT_MINUTES", 6, { min: 1 }) * 60_000;
+  readIntEnv("AGENT_RUN_HARD_TIMEOUT_MINUTES", 10, { min: 1 }) * 60_000;
 const RUN_TIMEOUT_MESSAGE =
   "분석 시간이 초과되었습니다. 다시 시도해주세요.";
 
@@ -457,11 +459,11 @@ async function resolveAutoRoutedJob(params: {
     });
   }
 
-  let nextAnalysisMode = routeDecision.analysisMode;
-  let nextRunKind = routeDecision.runKind;
-  let nextExecutorType = executorTypeForRunKind(nextRunKind);
-  let nextSelectedNewsEventContext = job.selectedNewsEventContext;
-  let routingNote: string | null = null;
+  const nextAnalysisMode = routeDecision.analysisMode;
+  const nextRunKind = routeDecision.runKind;
+  const nextExecutorType = executorTypeForRunKind(nextRunKind);
+  const nextSelectedNewsEventContext = job.selectedNewsEventContext;
+  const routingNote: string | null = null;
 
   const runUpdate: Record<string, unknown> = {
     run_kind: nextRunKind,
@@ -982,9 +984,11 @@ async function handleCompletedJob(params: {
   const { admin, job, runStartedAt, result, release, sendEvent } = params;
   const { acc } = result;
   const chartGenerationEnabled = isChartGenerationEnabled();
-  const visibleAnswer = chartGenerationEnabled
+  const rawVisibleAnswer = chartGenerationEnabled
     ? acc.fullText.trim()
     : stripChartTokens(acc.fullText);
+  const redactedAnswer = redactSensitiveOutput(rawVisibleAnswer);
+  const visibleAnswer = redactedAnswer.content;
   const estimatedCost = estimateCost(acc.inputTokens, acc.outputTokens);
   const finishedAt = new Date().toISOString();
   const latencyMs = Date.now() - new Date(runStartedAt).getTime();
@@ -1179,15 +1183,30 @@ async function handleFailedJob(params: {
   admin: SupabaseAdmin;
   job: AgentJob;
   runStartedAt: string;
-  result: { acc: AccumulatedRun; errorCode?: string; errorMessage?: string };
+  result: {
+    acc: AccumulatedRun;
+    errorCode?: string;
+    errorMessage?: string;
+    internalErrorMessage?: string;
+  };
   sendEvent: (event: Parameters<typeof appendAgentRunEvent>[2], payload: unknown) => Promise<void>;
 }) {
   const { admin, job, result, sendEvent } = params;
   const errorCode = toErrorCode(result.errorCode || "claude_api_error");
   const rawErrorMessage = result.errorMessage || publicErrorMessage(errorCode);
+  const internalErrorMessage = result.internalErrorMessage || rawErrorMessage;
   const publicMessage = publicAgentErrorMessage({ code: errorCode });
   const finishedAt = new Date().toISOString();
   const estimatedCost = estimateCost(result.acc.inputTokens, result.acc.outputTokens);
+
+  persistAgentFailureDiagnostics({
+    runId: job.run.id,
+    errorCode,
+    publicMessage,
+    internalErrorMessage,
+    acc: result.acc,
+    executor: "worker",
+  });
 
   await markAgentRunTerminal(admin, job.run.id, {
     status: errorCode === "lease_expired" ? "expired" : "failed",

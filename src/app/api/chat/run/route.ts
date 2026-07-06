@@ -35,6 +35,7 @@ import {
 } from "@/lib/run-kind";
 import { shouldBlockAnalysisCreditReservation } from "@/lib/billing/credit-policy";
 import { parseChatAttachmentContent } from "@/lib/chat/attachments";
+import { createImmediateAssistantResponse } from "@/lib/api/chat/immediate-response";
 import {
   buildIdeaGenerationUserUrlContext,
   buildUserUrlNewsEventContext,
@@ -42,6 +43,10 @@ import {
   UserUrlContextError,
 } from "@/lib/news-discovery/user-url-context";
 import { attachCompletedDocumentsToMessage } from "@/lib/document-ingestion/prompt-context";
+import {
+  assessChatPromptSafety,
+  blockedChatSafetyMessage,
+} from "@/lib/security/chat-safety";
 import type { ChatRunRequest, ErrorCode } from "@/types/api-contracts";
 
 // --- Agent worker readiness cache ---
@@ -127,33 +132,7 @@ export async function POST(request: NextRequest) {
   });
   if (!rateLimitResult.ok) return rateLimitResult.response;
 
-  // 4. Check catalog/worker readiness before reserving execution budget. The
-  // web route only queues durable work; MCP calls run inside the Mac worker.
-  let mcpHealth: McpHealthResult;
-  try {
-    const activeCatalog = await getActiveOntologyCatalogRelease();
-    if (!activeCatalog?.release_id) {
-      throw new Error("No active ontology web catalog release found");
-    }
-    mcpHealth = await getCachedReadyWorkerHealth(activeCatalog.release_id);
-  } catch {
-    return errorResponse(
-      503,
-      "worker_unavailable",
-      "분석 워커가 준비되지 않았습니다. 잠시 후 다시 시도해주세요.",
-      request_id,
-    );
-  }
-  if (!mcpHealth.connected) {
-    return errorResponse(
-      503,
-      "worker_unavailable",
-      "분석 워커가 준비되지 않았습니다. 잠시 후 다시 시도해주세요.",
-      request_id,
-    );
-  }
-
-  // 5. Resolve session (lookup + ownership check) before touching the
+  // 4. Resolve session (lookup + ownership check) before touching the
   // per-session rate-limit bucket.
   const sessionIdResult = await getOrCreateSessionId(body, userId, request_id);
   if (!sessionIdResult.ok) {
@@ -193,6 +172,78 @@ export async function POST(request: NextRequest) {
       : [];
   const userMessageMetadata =
     userUrls.length > 0 ? { user_urls: userUrls } : {};
+
+  const safetyAssessment = assessChatPromptSafety(content);
+  if (safetyAssessment.blocked) {
+    const historyResult = await fetchHistory(
+      session.id,
+      content,
+      request_id,
+      userMessageMetadata,
+    );
+    if (!historyResult.ok) return historyResult.response;
+
+    await recordAnalyticsEventFromRequest(request, {
+      eventName: "question_submitted",
+      userId,
+      sessionId: session.id,
+      messageId: historyResult.result.userMessageId,
+      properties: {
+        scope_type: session.scopeType,
+        ticker: session.defaultTickers[0] ?? null,
+        tickers: session.defaultTickers,
+        question_length: content.length,
+        attachment_count: countAttachedFiles(content),
+        document_attachment_count: 0,
+        research_mode: body.research_mode,
+        analysis_mode: effectiveAnalysisMode,
+        run_kind: effectiveRunKind,
+        routing_mode: routingMode,
+        has_user_url: userUrls.length > 0,
+        user_url_count: userUrls.length,
+        response_locale: responseLocale,
+        question_source: session.scopeType === "company" ? "company_context" : "custom",
+        source_surface: session.scopeType === "company" ? "ticker_chat" : "chat",
+        blocked_by: "chat_safety",
+        block_reason: safetyAssessment.reason,
+      },
+    });
+
+    return withSessionHeader(
+      await createImmediateAssistantResponse({
+        sessionId: session.id,
+        requestId: request_id,
+        content: blockedChatSafetyMessage(responseLocale),
+      }),
+      session.id,
+    );
+  }
+
+  // 5. Check catalog/worker readiness before reserving execution budget. The
+  // web route only queues durable work; MCP calls run inside the Mac worker.
+  let mcpHealth: McpHealthResult;
+  try {
+    const activeCatalog = await getActiveOntologyCatalogRelease();
+    if (!activeCatalog?.release_id) {
+      throw new Error("No active ontology web catalog release found");
+    }
+    mcpHealth = await getCachedReadyWorkerHealth(activeCatalog.release_id);
+  } catch {
+    return errorResponse(
+      503,
+      "worker_unavailable",
+      "분석 워커가 준비되지 않았습니다. 잠시 후 다시 시도해주세요.",
+      request_id,
+    );
+  }
+  if (!mcpHealth.connected) {
+    return errorResponse(
+      503,
+      "worker_unavailable",
+      "분석 워커가 준비되지 않았습니다. 잠시 후 다시 시도해주세요.",
+      request_id,
+    );
+  }
 
   if (userUrls.length > 0 && effectiveRunKind === "idea_generation") {
     try {

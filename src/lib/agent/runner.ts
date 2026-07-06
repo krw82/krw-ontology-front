@@ -9,6 +9,8 @@ import {
   type SDKMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import {
+  GURU_ADVISOR_SDK_ALLOWED_TOOLS,
+  GURU_MCP_TOOLS,
   KRW_ONTOLOGY_MCP_TOOLS,
   KRW_ONTOLOGY_SDK_ALLOWED_TOOLS,
   STOCK_NEWS_MCP_TOOLS,
@@ -19,10 +21,12 @@ import {
   getStockNewsSdkAllowedTools,
   getKrwOntologyPluginPath,
   isChartSdkTool,
+  isGuruAdvisorSdkTool,
   isKrwOntologySdkTool,
   isStockNewsEnabled,
   isStockNewsSdkTool,
   isYahooFinanceSdkTool,
+  resolveGuruAdvisorPluginPath,
 } from "./mcp-client";
 import { buildClaudeAgentEnv } from "./env";
 import { resolveClaudeAgentCwd } from "./claude-agent-cwd";
@@ -78,6 +82,7 @@ import {
 import type {
   DocumentType,
   ChartMCPToolName,
+  GuruMCPToolName,
   KRWOntologyMCPToolName,
   MCPToolName,
   StreamingCitation,
@@ -87,9 +92,10 @@ import type {
 
 const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const STOCK_NEWS_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_MCP_TOOLS);
+const GURU_MCP_TOOL_SET = new Set<string>(GURU_MCP_TOOLS);
 const YAHOO_FINANCE_MCP_TOOL_SET = new Set<string>(YAHOO_FINANCE_MCP_TOOLS);
 const CHART_MCP_TOOL_SET = new Set<string>(CHART_MCP_TOOLS);
-const DEFAULT_MAX_TURNS = 20;
+const DEFAULT_MAX_TURNS = 40;
 const TOOL_BUDGET_EXCEEDED = "tool_budget_exceeded";
 const TOOL_RESULT_MISSING = "tool_result_missing";
 const DEFAULT_STOCK_NEWS_MAX_CALLS = 12;
@@ -134,6 +140,7 @@ export interface AgentRunResult {
   status: "completed" | "cancelled" | "failed";
   errorCode?: string;
   errorMessage?: string;
+  internalErrorMessage?: string;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -179,7 +186,6 @@ export async function runAgent(
 ): Promise<AgentRunResult> {
   const { sendEvent } = createSSEWriter(streamWriter);
   const acc = createAccumulator();
-  const pluginPath = getKrwOntologyPluginPath();
   const cwd = await resolveClaudeAgentCwd();
   const abortController = new AbortController();
   const researchMode = normalizeResearchMode(options.researchMode);
@@ -187,6 +193,10 @@ export async function runAgent(
     options.runKind ??
       defaultRunKindForAnalysisMode(normalizeAnalysisMode(options.analysisMode)),
   );
+  const guruAdvisorRun = runKind === "guru_advisor";
+  const pluginPath = guruAdvisorRun
+    ? await resolveGuruAdvisorPluginPath()
+    : getKrwOntologyPluginPath();
   const analysisMode = analysisModeForRunKind(
     runKind,
     normalizeAnalysisMode(options.analysisMode),
@@ -195,7 +205,7 @@ export async function runAgent(
   const stockNewsRun = isStockNewsRunKind(runKind);
   const stockNewsEnabledForRun = stockNewsRun && isStockNewsEnabled();
   const yahooFinanceRun = isYahooFinanceRunKind(runKind);
-  const chartGenerationEnabled = isChartGenerationEnabled();
+  const chartGenerationEnabled = !guruAdvisorRun && isChartGenerationEnabled();
   const toolBudget = getResearchModeToolBudget(researchMode);
 
   const abortHandler = () => abortController.abort();
@@ -225,6 +235,7 @@ export async function runAgent(
       yahooFinanceNewsEnabled: yahooFinanceRun,
       yahooFinanceNewsRequired: yahooFinanceRun,
       chartGenerationEnabled,
+      guruAdvisorMode: guruAdvisorRun,
       responseLocale,
     },
   );
@@ -312,6 +323,8 @@ export async function runAgent(
         errorCode: "claude_api_error",
         errorMessage:
           "리서치 단계에서 화면에 표시할 답변을 받지 못했습니다.",
+        internalErrorMessage:
+          "Research pass completed without a displayable answer.",
       };
     }
 
@@ -329,6 +342,7 @@ export async function runAgent(
       status: "failed",
       errorCode,
       errorMessage: userFacingErrorMessage(errorCode, rawErrorMessage),
+      internalErrorMessage: rawErrorMessage,
     };
   } finally {
     options.abortSignal?.removeEventListener("abort", abortHandler);
@@ -512,6 +526,7 @@ async function runSdkPass(params: {
               status: "failed",
               errorCode,
               errorMessage: userFacingErrorMessage(errorCode, rawErrorMessage),
+              internalErrorMessage: rawErrorMessage,
             };
           }
         }
@@ -536,6 +551,7 @@ async function runSdkPass(params: {
       status: "failed",
       errorCode,
       errorMessage: userFacingErrorMessage(errorCode, rawErrorMessage),
+      internalErrorMessage: rawErrorMessage,
     };
   }
 }
@@ -653,6 +669,10 @@ export async function canUseTool(
     return { behavior: "allow" };
   }
 
+  if (isGuruAdvisorSdkTool(toolName)) {
+    return { behavior: "allow" };
+  }
+
   if (isYahooFinanceSdkTool(toolName)) {
     return { behavior: "allow" };
   }
@@ -670,6 +690,10 @@ function allowedSdkToolsForResearchMode(
   runKind: RunKind,
   chartGenerationEnabled = isChartGenerationEnabled(),
 ): string[] {
+  if (runKind === "guru_advisor") {
+    return GURU_ADVISOR_SDK_ALLOWED_TOOLS;
+  }
+
   const allowedMcpTools = new Set(getAllowedMcpToolsForResearchMode(mode));
   const allowedOntologyTools = KRW_ONTOLOGY_SDK_ALLOWED_TOOLS.filter((toolName) => {
     const mcpToolName = normalizeKrwOntologyToolName(toolName);
@@ -723,7 +747,34 @@ function createToolPermissionGuard(
         : {
             behavior: "deny",
             message: "Inline chart generation is disabled for this runtime.",
-          };
+      };
+    }
+
+    if (runKind === "guru_advisor") {
+      if (!isGuruAdvisorSdkTool(toolName)) {
+        return {
+          behavior: "deny",
+          message:
+            "This run uses only the configured read-only Guru Advisor MCP tools.",
+        };
+      }
+
+      const guruToolName = normalizeGuruAdvisorToolName(toolName);
+      if (!guruToolName) {
+        return {
+          behavior: "deny",
+          message: "Unknown Guru Advisor MCP tool.",
+        };
+      }
+
+      if (acc.toolCalls.length + 1 > maxToolCalls) {
+        return {
+          behavior: "deny",
+          message: buildGuruBudgetDenyMessage(),
+        };
+      }
+
+      return { behavior: "allow" };
     }
 
     if (
@@ -926,7 +977,8 @@ function analysisModeForRunKind(
   if (
     runKind === "company_research" ||
     runKind === "idea_generation" ||
-    runKind === "scenario_sensitivity"
+    runKind === "scenario_sensitivity" ||
+    runKind === "guru_advisor"
   ) {
     return "company";
   }
@@ -990,6 +1042,9 @@ function prepareToolInputForRun(
     return { input, changed: false };
   }
   if (isYahooFinanceMcpToolName(mcpToolName)) {
+    return { input, changed: false };
+  }
+  if (isGuruMcpToolName(mcpToolName)) {
     return { input, changed: false };
   }
   if (isChartMcpToolName(mcpToolName) || !mcpToolName) {
@@ -1232,6 +1287,14 @@ function buildYahooFinanceBudgetDenyMessage(): string {
     "No more current market-news tools can be called in this run.",
     "Do not call another current-news tool.",
     "Write the final answer from the market-news results already collected.",
+  ].join(" ");
+}
+
+function buildGuruBudgetDenyMessage(): string {
+  return [
+    "No more Guru Advisor MCP tools can be called in this run.",
+    "Do not call another tool.",
+    "Write the final Markdown answer from the guru ontology evidence already collected.",
   ].join(" ");
 }
 
@@ -1497,6 +1560,7 @@ function normalizeMcpToolName(name: unknown): MCPToolName | null {
   return (
     normalizeKrwOntologyToolName(name) ??
     normalizeStockNewsToolName(name) ??
+    normalizeGuruAdvisorToolName(name) ??
     normalizeYahooFinanceToolName(name) ??
     normalizeChartToolName(name)
   );
@@ -1518,6 +1582,13 @@ function normalizeStockNewsToolName(
   const bareName = name.includes("__") ? name.split("__").at(-1) : name;
   if (!bareName || !STOCK_NEWS_MCP_TOOL_SET.has(bareName)) return null;
   return bareName as StockNewsMCPToolName;
+}
+
+function normalizeGuruAdvisorToolName(name: unknown): GuruMCPToolName | null {
+  if (typeof name !== "string") return null;
+  const bareName = name.includes("__") ? name.split("__").at(-1) : name;
+  if (!bareName || !GURU_MCP_TOOL_SET.has(bareName)) return null;
+  return bareName as GuruMCPToolName;
 }
 
 function normalizeYahooFinanceToolName(
@@ -1546,6 +1617,7 @@ function pendingToolResultsFailure(
     status: "failed",
     errorCode: TOOL_RESULT_MISSING,
     errorMessage: `Agent run ended before ${pendingToolIds.length} tool result(s) were received.`,
+    internalErrorMessage: `Agent run ended before ${pendingToolIds.length} tool result(s) were received.`,
   };
 }
 
@@ -1601,6 +1673,12 @@ function isChartMcpToolName(
   toolName: MCPToolName | null,
 ): toolName is ChartMCPToolName {
   return Boolean(toolName && CHART_MCP_TOOL_SET.has(toolName));
+}
+
+function isGuruMcpToolName(
+  toolName: MCPToolName | null,
+): toolName is GuruMCPToolName {
+  return Boolean(toolName && GURU_MCP_TOOL_SET.has(toolName));
 }
 
 function isStockNewsMcpToolName(

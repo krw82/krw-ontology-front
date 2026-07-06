@@ -58,11 +58,24 @@ vi.mock("./mcp-client", () => {
   ];
   const chartTools = ["create_chart_v1"];
   const yahooFinanceTools = ["get_yahoo_finance_news", "get_stock_info"];
+  const guruTools = [
+    "krw_guru_status",
+    "krw_guru_search",
+    "krw_guru_query_context",
+    "krw_guru_select_lenses",
+    "krw_guru_context",
+    "krw_guru_trace",
+    "krw_guru_chain",
+    "krw_guru_evidence",
+    "krw_guru_data_needs",
+    "krw_guru_eval_questions",
+  ];
   return {
     KRW_ONTOLOGY_MCP_TOOLS: tools,
     STOCK_NEWS_MCP_TOOLS: stockNewsTools,
     YAHOO_FINANCE_MCP_TOOLS: yahooFinanceTools,
     CHART_MCP_TOOLS: chartTools,
+    GURU_MCP_TOOLS: guruTools,
     KRW_ONTOLOGY_SDK_ALLOWED_TOOLS: tools.map(
       (toolName) => `mcp__plugin_krw-ontology_krw-ontology__${toolName}`,
     ),
@@ -75,7 +88,12 @@ vi.mock("./mcp-client", () => {
     CHART_SDK_ALLOWED_TOOLS: chartTools.map(
       (toolName) => `mcp__krw_presentation__${toolName}`,
     ),
+    GURU_ADVISOR_SDK_ALLOWED_TOOLS: guruTools.map(
+      (toolName) =>
+        `mcp__plugin_krw-guru-advisor_krw-guru-advisor__${toolName}`,
+    ),
     getKrwOntologyPluginPath: () => "/tmp/krw-ontology-plugin",
+    resolveGuruAdvisorPluginPath: () => "/tmp/krw-guru-advisor-plugin",
     getStockNewsSdkAllowedTools: () =>
       process.env.STOCK_NEWS_ENABLED === "1" &&
       process.env.STOCK_NEWS_FORCE_DISABLED !== "1"
@@ -90,6 +108,10 @@ vi.mock("./mcp-client", () => {
       process.env.STOCK_NEWS_FORCE_DISABLED !== "1",
     isStockNewsSdkTool: (toolName: string) =>
       toolName.startsWith("mcp__plugin_krw-ontology_stock-news__"),
+    isGuruAdvisorSdkTool: (toolName: string) =>
+      toolName.startsWith(
+        "mcp__plugin_krw-guru-advisor_krw-guru-advisor__",
+      ),
     isYahooFinanceSdkTool: (toolName: string) =>
       toolName.startsWith("mcp__yahoo_finance__"),
     isChartSdkTool: (toolName: string) =>

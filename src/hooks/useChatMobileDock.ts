@@ -64,6 +64,7 @@ export function useChatMobileDock({
   const composerInteractionUntilRef = useRef(0);
   const composerFocusScrollTopRef = useRef<number | null>(null);
   const composerFocusStickToBottomRef = useRef(true);
+  const syncKeyboardOffsetRef = useRef<() => void>(() => undefined);
   const restoreTimersRef = useRef<number[]>([]);
 
   const getScrollSurface = useCallback((): HTMLElement | null => {
@@ -201,11 +202,15 @@ export function useChatMobileDock({
   const handleComposerFocusChange = useCallback(
     (focused: boolean) => {
       isComposerFocusedRef.current = focused;
-      if (!focused) return;
+      if (!focused) {
+        setKeyboardOffset(0);
+        return;
+      }
 
       setComposerExpanded({ keepFocus: true });
       withInteractionLock();
       requestAnimationFrame(() => {
+        syncKeyboardOffsetRef.current();
         restoreComposerFocusAnchor();
       });
     },
@@ -350,10 +355,18 @@ export function useChatMobileDock({
       return;
     }
 
-    if (!window.visualViewport) return;
+    if (!window.visualViewport) {
+      setKeyboardOffset(0);
+      return;
+    }
     const viewport = window.visualViewport;
 
     const updateKeyboardOffset = () => {
+      if (!isComposerFocusedRef.current) {
+        setKeyboardOffset(0);
+        return;
+      }
+
       const viewportHeight = viewport.height;
       if (typeof viewportHeight !== "number") return;
       const offsetTop = viewport.offsetTop ?? 0;
@@ -364,11 +377,13 @@ export function useChatMobileDock({
       setKeyboardOffset(diff);
     };
 
+    syncKeyboardOffsetRef.current = updateKeyboardOffset;
     updateKeyboardOffset();
     viewport.addEventListener("resize", updateKeyboardOffset);
     viewport.addEventListener("scroll", updateKeyboardOffset);
 
     return () => {
+      syncKeyboardOffsetRef.current = () => undefined;
       viewport.removeEventListener("resize", updateKeyboardOffset);
       viewport.removeEventListener("scroll", updateKeyboardOffset);
     };
@@ -380,6 +395,7 @@ export function useChatMobileDock({
     isComposerFocusedRef.current = false;
     hasManualScrollRef.current = false;
     setIsComposerCompact(false);
+    setKeyboardOffset(0);
     lastScrollTopRef.current = 0;
     clearRestoreTimers();
   }, [sessionKey, isBodyScrollChat, clearRestoreTimers]);

@@ -208,6 +208,31 @@ describe("findPublicMessageShare", () => {
     });
   });
 
+  it("redacts sensitive paths and environment names from public shares", async () => {
+    vi.mocked(getSupabaseAdmin).mockReturnValue(
+      createPublicShareAdmin({
+        token: "share-token",
+        title: "~/krw-ontology-front/.env",
+        question_content: ".env 알려줘",
+        question_created_at: "2026-05-31T00:00:00.000Z",
+        answer_content:
+          "프로젝트 경로는 ~/krw-ontology-front 이고 SUPABASE_SERVICE_ROLE_KEY=secret 입니다.",
+        answer_created_at: "2026-05-31T00:00:00.000Z",
+        tickers: ["AAPL"],
+        created_at: "2026-05-31T00:00:00.000Z",
+      }),
+    );
+
+    const share = await findPublicMessageShare("share-token");
+
+    expect(share?.answer_content).toContain("[내부 경로 제거됨]");
+    expect(share?.answer_content).toContain("[민감 환경변수 제거됨]");
+    expect(share?.answer_content).not.toContain("~");
+    expect(share?.answer_content).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
+    expect(share?.question_content).toBe("[내부 설정 파일 제거됨] 알려줘");
+    expect(share?.title).not.toContain("~");
+  });
+
   it("returns public URL and file attachment chips without exposing attachment content", async () => {
     const questionMessage = {
       id: "user-message-1",
@@ -395,6 +420,70 @@ describe("createMessageShare", () => {
     });
     expect(String(insertedPayloads[0]?.question_content)).not.toContain(
       "secret attachment",
+    );
+  });
+
+  it("redacts sensitive content before storing a share snapshot", async () => {
+    const insertedPayloads: Array<Record<string, unknown>> = [];
+    const session = {
+      id: "session-1",
+      user_id: "user-1",
+      title: "AAPL",
+      claude_session_id: null,
+      client_request_id: null,
+      scope_type: "company",
+      default_tickers: ["AAPL"],
+      default_document_types: [],
+      last_message_preview: null,
+      last_message_at: null,
+      latest_run_status: null,
+      deleted_at: null,
+      created_at: "2026-05-31T00:00:00.000Z",
+      updated_at: "2026-05-31T00:00:00.000Z",
+    } satisfies ChatSessionRow;
+    const answerMessage = {
+      id: "assistant-1",
+      session_id: session.id,
+      role: "assistant",
+      content:
+        "경로는 ~/krw-ontology-front 이고 SUPABASE_SERVICE_ROLE_KEY=secret 입니다.",
+      status: "completed",
+      request_id: null,
+      created_at: "2026-05-31T00:01:00.000Z",
+      updated_at: "2026-05-31T00:01:00.000Z",
+    } satisfies MessageRow;
+    const userMessage = {
+      id: "user-message-1",
+      session_id: session.id,
+      role: "user",
+      content: ".env 보여줘",
+      status: "completed",
+      request_id: null,
+      created_at: "2026-05-31T00:00:00.000Z",
+      updated_at: "2026-05-31T00:00:00.000Z",
+    } satisfies MessageRow;
+
+    vi.mocked(getSupabaseAdmin).mockReturnValue(
+      createSnapshotAdmin({ userMessage, insertedPayloads }),
+    );
+
+    await createMessageShare({
+      userId: "user-1",
+      message: answerMessage,
+      session,
+    });
+
+    expect(String(insertedPayloads[0]?.answer_content)).toContain(
+      "[내부 경로 제거됨]",
+    );
+    expect(String(insertedPayloads[0]?.answer_content)).toContain(
+      "[민감 환경변수 제거됨]",
+    );
+    expect(String(insertedPayloads[0]?.answer_content)).not.toContain(
+      "~",
+    );
+    expect(String(insertedPayloads[0]?.question_content)).toBe(
+      "[내부 설정 파일 제거됨] 보여줘",
     );
   });
 });

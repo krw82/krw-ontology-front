@@ -142,6 +142,12 @@ export default function TopNav({
       active: pathname.startsWith("/discover"),
     },
     {
+      href: "/guru",
+      label: currentLocale === "ko" ? "구루 상담소" : "Guru office",
+      badge: currentLocale === "ko" ? "출시 예정" : "Soon",
+      active: pathname.startsWith("/guru"),
+    },
+    {
       href: localizedPath(currentLocale, "/companies"),
       label: currentLocale === "ko" ? "회사" : "Companies",
       active: pathname.includes("/companies"),
@@ -389,7 +395,14 @@ export default function TopNav({
                     : "text-muted hover:bg-surface-soft hover:text-primary",
                 ].join(" ")}
               >
-                {link.label}
+                <span className="inline-flex items-center gap-1.5">
+                  <span>{link.label}</span>
+                  {"badge" in link && link.badge ? (
+                    <span className="rounded-[6px] border border-hairline bg-canvas px-1.5 py-[1px] font-mono text-[9px] font-black uppercase tracking-[0.08em] text-primary">
+                      {link.badge}
+                    </span>
+                  ) : null}
+                </span>
               </Link>
             ))}
           </nav>

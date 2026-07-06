@@ -245,6 +245,48 @@ function findNewsEventSelection(
 
 function activityForTool(toolName: MCPToolName): ResearchActivityUpdate {
   if (
+    toolName === "krw_guru_status" ||
+    toolName === "krw_guru_select_lenses"
+  ) {
+    return {
+      stage: "connecting",
+      label: "구루 렌즈 확인 중",
+    };
+  }
+
+  if (
+    toolName === "krw_guru_trace" ||
+    toolName === "krw_guru_chain" ||
+    toolName === "krw_guru_evidence"
+  ) {
+    return {
+      stage: "checking_evidence",
+      label: "구루 근거 연결 중",
+    };
+  }
+
+  if (
+    toolName === "krw_guru_data_needs" ||
+    toolName === "krw_guru_eval_questions"
+  ) {
+    return {
+      stage: "composing",
+      label: "후속 확인 질문 정리 중",
+    };
+  }
+
+  if (
+    toolName === "krw_guru_search" ||
+    toolName === "krw_guru_query_context" ||
+    toolName === "krw_guru_context"
+  ) {
+    return {
+      stage: "researching",
+      label: "구루 온톨로지 근거 확인 중",
+    };
+  }
+
+  if (
     toolName === "route_news_question" ||
     toolName === "resolve_news_entities" ||
     toolName === "search_company_news_events" ||

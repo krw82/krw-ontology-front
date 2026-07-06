@@ -34,6 +34,15 @@ import { findQuestionTopic } from "@/lib/marketing/site";
 import { createClientId } from "@/lib/client-id";
 import { normalizeTicker } from "@/lib/ontology/ticker";
 import { normalizeRunKind, type RunKind } from "@/lib/run-kind";
+import {
+  buildGuruSessionHref,
+  getGuruLens,
+  getGuruLensDisplayName,
+  getGuruLensPromptPrefix,
+  getGuruSuggestedPrompts,
+  normalizeGuruLensKey,
+  type GuruLensOption,
+} from "@/lib/guru-lenses";
 import type { ResearchMode } from "@/lib/research-mode";
 import type {
   CreateSessionRequest,
@@ -228,6 +237,8 @@ type ShareStarter = {
   title?: string | null;
 };
 
+type ChatWorkspace = "chat" | "guru";
+
 type DiscoverGuideStep = "url" | "file" | "idea";
 
 type DiscoverGuideFlowProps = {
@@ -284,14 +295,14 @@ function DiscoverGuideFlow({
   const activeIndex = stepOrder.indexOf(step);
   const examples = isKo
     ? [
-        "백로그 증가가 매출로 연결될 기업",
-        "구독 매출과 갱신율이 안정적인 기업",
-        "CapEx 부담을 현금흐름으로 버틸 기업",
+        "AI 데이터센터 전력 수요 수혜 기업 중 FCF로 CapEx를 버티는 후보 3개만 찾아줘.",
+        "클라우드 소프트웨어 기업 중 RPO와 구독 매출이 함께 늘어나는 후보 3개만 찾아줘.",
+        "반도체 공급망 기업 중 AI 매출 노출은 크고 재고 부담은 낮은 후보 3개만 찾아줘.",
       ]
     : [
-        "Companies converting backlog growth into revenue",
-        "Companies with durable subscription revenue and renewals",
-        "Companies funding capex with resilient cash flow",
+        "Find 3 AI data-center power beneficiaries that can fund CapEx with FCF.",
+        "Find 3 cloud software companies where RPO and subscription revenue are both growing.",
+        "Find 3 semiconductor supply-chain companies with high AI revenue exposure and lower inventory risk.",
       ];
   const copy = {
     url: isKo
@@ -526,7 +537,64 @@ function DiscoverGuideFlow({
   );
 }
 
-function ChatContent() {
+function GuruLensContextHeader({
+  lens,
+  locale,
+  compact = false,
+}: {
+  lens: GuruLensOption;
+  locale: string;
+  compact?: boolean;
+}) {
+  const isKo = locale === "ko";
+  const description = isKo ? lens.descriptionKo : lens.descriptionEn;
+  const detail = isKo ? lens.detailKo : lens.detailEn;
+  const displayName = getGuruLensDisplayName(lens, locale);
+
+  return (
+    <div
+      className={[
+        "mx-auto w-full max-w-4xl border-b border-hairline pb-base",
+        compact ? "mb-base" : "mb-lg",
+      ].join(" ")}
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border border-hairline bg-surface-soft text-primary">
+          <span aria-hidden="true" className="material-symbols-outlined text-[22px]">
+            {lens.icon}
+          </span>
+        </div>
+        <div className="min-w-0">
+          <p className="font-mono text-[11px] font-black uppercase tracking-[0.14em] text-primary">
+            Guru lens
+          </p>
+          <h2 className="mt-1 text-[24px] font-black leading-8 text-ink sm:text-[32px] sm:leading-9">
+            {displayName}
+          </h2>
+          <p className="mt-2 text-[15px] font-bold leading-6 text-body">
+            {description}
+          </p>
+          <p className="mt-1 max-w-2xl text-[13px] font-semibold leading-6 text-muted">
+            {detail}
+          </p>
+        </div>
+      </div>
+      {!compact ? (
+        <Link
+          href={locale === DEFAULT_LOCALE ? "/guru" : `/guru?locale=${locale}`}
+          className="mt-sm inline-flex min-h-10 items-center gap-1 rounded-[8px] border border-hairline bg-canvas px-3 text-[13px] font-extrabold text-body transition-colors hover:border-outline hover:bg-surface-soft hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <span aria-hidden="true" className="material-symbols-outlined text-[17px]">
+            arrow_back
+          </span>
+          {isKo ? "다른 구루 선택" : "Choose another guru"}
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
+function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -537,16 +605,22 @@ function ChatContent() {
   const draftMessageId = searchParams.get("draftMessageId");
   const localeParam = searchParams.get("locale");
   const runKindParam = searchParams.get("runKind");
+  const guruParam = searchParams.get("guru");
   const isDiscoverRoute = pathname === "/discover";
+  const isGuruRoute = pathname === "/guru";
+  const isGuruWorkspace = workspace === "guru" || isGuruRoute;
   const templateTopic = templateId ? findQuestionTopic(templateId) : null;
   const existingSessionId = searchParams.get("sessionId");
   const responseLocale = isLocale(localeParam) ? localeParam : DEFAULT_LOCALE;
-  const requestedRunKind = isDiscoverRoute
+  const requestedRunKind = isGuruWorkspace
+    ? "guru_advisor"
+    : isDiscoverRoute
     ? "idea_generation"
     : runKindParam
       ? normalizeRunKind(runKindParam)
       : undefined;
   const isIdeaGeneration = requestedRunKind === "idea_generation";
+  const isGuruAdvisor = requestedRunKind === "guru_advisor";
 
   const sessionId = existingSessionId;
   const [sessionError, setSessionError] = useState<string | null>(null);
@@ -578,9 +652,18 @@ function ChatContent() {
   const [discoverIdeaError, setDiscoverIdeaError] = useState<string | null>(null);
   const composerRef = useRef<ComposerHandle>(null);
 
-  const isDraftRoute = pathname === "/chat/new" || isDiscoverRoute;
+  const isDraftRoute = pathname === "/chat/new" || isDiscoverRoute || isGuruRoute;
   const shareStarterTicker = normalizeTicker(shareStarter?.tickers[0] ?? "");
-  const activeTicker = normalizeTicker(ticker ?? "") ?? shareStarterTicker;
+  const activeTicker = isGuruAdvisor
+    ? null
+    : normalizeTicker(ticker ?? "") ?? shareStarterTicker;
+  const selectedGuruLensKey = normalizeGuruLensKey(guruParam) ?? "auto";
+  const selectedGuruLens = getGuruLens(selectedGuruLensKey);
+  const withGuruLensPrefix = useCallback(
+    (message: string) =>
+      `${getGuruLensPromptPrefix(selectedGuruLens, responseLocale)}\n${message.trim()}`,
+    [responseLocale, selectedGuruLens],
+  );
 
   // H-07: cleanup on unmount to prevent race condition
   useEffect(() => {
@@ -652,6 +735,17 @@ function ChatContent() {
   const handleSessionCreated = useCallback(
     (createdSessionId: string) => {
       if (!isDraftRoute && existingSessionId) return;
+      if (isGuruAdvisor) {
+        router.replace(
+          buildGuruSessionHref(
+            createdSessionId,
+            responseLocale,
+            selectedGuruLens.key,
+          ),
+          { scroll: false },
+        );
+        return;
+      }
       router.replace(
         buildChatSessionHref(createdSessionId, {
           locale: responseLocale,
@@ -660,7 +754,15 @@ function ChatContent() {
         { scroll: false },
       );
     },
-    [activeTicker, existingSessionId, isDraftRoute, responseLocale, router],
+    [
+      activeTicker,
+      existingSessionId,
+      isDraftRoute,
+      isGuruAdvisor,
+      responseLocale,
+      router,
+      selectedGuruLens.key,
+    ],
   );
 
   const chat = useChat({
@@ -750,19 +852,30 @@ function ChatContent() {
       }).finally(() => {
         if (cancelledRef.current) return;
         removeDraftMessage(draftMessageId);
+        const cleanedSessionHref = isGuruAdvisor
+          ? buildGuruSessionHref(sessionId, responseLocale, selectedGuruLens.key)
+          : buildChatSessionHref(sessionId, {
+              locale: responseLocale,
+              ticker: activeTicker,
+            });
         window.history.replaceState(
           window.history.state,
           "",
-          buildChatSessionHref(sessionId, {
-            locale: responseLocale,
-            ticker: activeTicker,
-          }),
+          cleanedSessionHref,
         );
       });
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [activeTicker, draftMessageId, responseLocale, sendMessage, sessionId]);
+  }, [
+    activeTicker,
+    draftMessageId,
+    isGuruAdvisor,
+    responseLocale,
+    sendMessage,
+    selectedGuruLens.key,
+    sessionId,
+  ]);
 
   useEffect(() => {
     if (!sessionId || hasLoadedRef.current) return;
@@ -909,10 +1022,17 @@ function ChatContent() {
   ).join(" / ");
   const headerActionTicker = contextTickers[0] ?? null;
   const primaryContextCompany = contextCompanies[0] ?? null;
-  const suggestedPrompts = getSuggestedPromptDisplaysForTickers(
+  const guruSuggestedPrompts = getGuruSuggestedPrompts(
+    selectedGuruLens,
     responseLocale,
-    contextTickers,
   );
+  const selectedGuruDisplayName = getGuruLensDisplayName(
+    selectedGuruLens,
+    responseLocale,
+  );
+  const suggestedPrompts = isGuruAdvisor
+    ? guruSuggestedPrompts
+    : getSuggestedPromptDisplaysForTickers(responseLocale, contextTickers);
   const emptyStateCopy = isIdeaGeneration
     ? responseLocale === "ko"
       ? {
@@ -927,6 +1047,20 @@ function ChatContent() {
           descriptionWithoutContext:
             "Enter an idea, industry, risk, or financial condition to explore related companies broadly.",
         }
+    : isGuruAdvisor
+      ? responseLocale === "ko"
+        ? {
+            headingWithContext: selectedGuruDisplayName,
+            headingWithoutContext: selectedGuruDisplayName,
+            descriptionWithoutContext:
+              `${selectedGuruLens.descriptionKo} ${selectedGuruLens.detailKo}`,
+          }
+        : {
+            headingWithContext: selectedGuruDisplayName,
+            headingWithoutContext: selectedGuruDisplayName,
+            descriptionWithoutContext:
+              `${selectedGuruLens.descriptionEn} ${selectedGuruLens.detailEn}`,
+          }
     : responseLocale === "ko"
         ? {
           headingWithContext: `${contextDisplayText}에서 무엇을 확인할까요?`,
@@ -999,7 +1133,9 @@ function ChatContent() {
     nextParams.delete("templateId");
     nextParams.delete("shareToken");
     const nextQuery = nextParams.toString();
-    const basePath = isDiscoverRoute
+    const basePath = isGuruAdvisor
+      ? "/guru"
+      : isDiscoverRoute
       ? "/discover"
       : isDraftRoute
         ? "/chat/new"
@@ -1012,6 +1148,7 @@ function ChatContent() {
     hasComposerPrefillParams,
     isDiscoverRoute,
     isDraftRoute,
+    isGuruAdvisor,
     router,
     serializedSearchParams,
   ]);
@@ -1182,6 +1319,10 @@ function ChatContent() {
         resetManualScroll: true,
       });
 
+      const outboundContent = isGuruAdvisor
+        ? withGuruLensPrefix(trimmed)
+        : trimmed;
+
       if (!sessionId) {
         const createdSessionId = await createSessionForDraft();
 
@@ -1197,9 +1338,10 @@ function ChatContent() {
 
         if (
           !storeDraftMessage(nextDraftMessageId, {
-            content: trimmed,
+            content: outboundContent,
             requestId: nextRequestId,
             ...(isIdeaGeneration ? { runKind: "idea_generation" } : {}),
+            ...(isGuruAdvisor ? { runKind: "guru_advisor" } : {}),
             userUrl: options?.userUrl,
             userUrls: options?.userUrls,
             attachmentIds: options?.attachmentIds,
@@ -1222,10 +1364,16 @@ function ChatContent() {
         if (activeTicker) {
           nextParams.set("ticker", activeTicker);
         }
+        if (isGuruAdvisor && selectedGuruLens.key !== "auto") {
+          nextParams.set("guru", selectedGuruLens.key);
+        }
         if (responseLocale !== DEFAULT_LOCALE) {
           nextParams.set("locale", responseLocale);
         }
-        router.replace(`/chat?${nextParams.toString()}`, {
+        const nextHref = isGuruAdvisor
+          ? `/guru?${nextParams.toString()}`
+          : `/chat?${nextParams.toString()}`;
+        router.replace(nextHref, {
           scroll: false,
         });
         return { ok: true };
@@ -1233,7 +1381,8 @@ function ChatContent() {
 
       clearComposerPrefillParams();
       try {
-        const result = await sendMessage(trimmed, {
+        const result = await sendMessage(outboundContent, {
+          runKind: isGuruAdvisor ? "guru_advisor" : undefined,
           userUrl: options?.userUrl,
           userUrls: options?.userUrls,
           attachmentIds: options?.attachmentIds,
@@ -1258,10 +1407,13 @@ function ChatContent() {
       sendMessage,
       sessionId,
       responseLocale,
+      isGuruAdvisor,
       isIdeaGeneration,
+      selectedGuruLens.key,
       setComposerExpanded,
       setSessionError,
       shouldStickToBottomRef,
+      withGuruLensPrefix,
     ],
   );
 
@@ -1394,6 +1546,13 @@ function ChatContent() {
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
+  const mobileComposerSpacerHeight = isBodyScrollChat
+    ? shouldHideDiscoverComposer
+      ? 0
+      : isComposerCompact
+        ? 88 + keyboardOffset
+        : composerHeight + keyboardOffset + 28
+    : undefined;
 
   return (
     <div className="min-h-[100dvh] bg-canvas pt-[72px] md:flex md:h-full md:min-h-0 md:flex-col md:overflow-hidden md:pt-0">
@@ -1463,6 +1622,16 @@ function ChatContent() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {isGuruAdvisor &&
+            selectedGuruLens.key !== "auto" &&
+            (hasConversationContent || isHydratingSession) && (
+              <GuruLensContextHeader
+                lens={selectedGuruLens}
+                locale={responseLocale}
+                compact
+              />
             )}
 
             {/* L-09: Loading skeleton for session */}
@@ -1729,23 +1898,36 @@ function ChatContent() {
                           />
                         ) : null
                       ) : (
-                        <SuggestedPromptActions
-                          prompts={suggestedPrompts}
-                          groupId="empty-state-prompts"
-                          disabled={isActiveRun || Boolean(effectiveSessionError)}
-                          analytics={{
-                            sourceSurface: "chat_empty_state",
-                            ticker: contextTickers[0] ?? null,
-                            tickers: contextTickers,
-                            promptCategory: "starter",
-                            promptIds: suggestedPrompts.map(
-                              (_, index) => `chat_empty_starter_${index + 1}`,
-                            ),
-                          }}
-                          onSelect={(prompt) => {
-                            void handlePromptSend(prompt);
-                          }}
-                        />
+                        <div className="grid gap-4">
+                          <SuggestedPromptActions
+                            prompts={suggestedPrompts}
+                            groupId={
+                              isGuruAdvisor
+                                ? "guru-empty-state-prompts"
+                                : "empty-state-prompts"
+                            }
+                            disabled={isActiveRun || Boolean(effectiveSessionError)}
+                            analytics={{
+                              sourceSurface: isGuruAdvisor
+                                ? "guru_empty_state"
+                                : "chat_empty_state",
+                              ticker: contextTickers[0] ?? null,
+                              tickers: contextTickers,
+                              promptCategory: isGuruAdvisor
+                                ? selectedGuruLens.key
+                                : "starter",
+                              promptIds: suggestedPrompts.map(
+                                (_, index) =>
+                                  isGuruAdvisor
+                                    ? `guru_${selectedGuruLens.key}_${index + 1}`
+                                    : `chat_empty_starter_${index + 1}`,
+                              ),
+                            }}
+                            onSelect={(prompt) => {
+                              void handlePromptSend(prompt);
+                            }}
+                          />
+                        </div>
                       )}
                     </motion.div>
                   </div>
@@ -1754,15 +1936,7 @@ function ChatContent() {
               {/* Spacer for fixed composer overlay — dynamically measured */}
               <div
                 className="md:hidden"
-                style={{
-                  height: isBodyScrollChat
-                    ? shouldHideDiscoverComposer
-                      ? 0
-                      : isComposerCompact
-                      ? 88
-                      : composerHeight + 28
-                    : undefined,
-                }}
+                style={{ height: mobileComposerSpacerHeight }}
                 aria-hidden="true"
               />
               <div className="hidden h-xl md:block" aria-hidden="true" />
@@ -1800,7 +1974,7 @@ function ChatContent() {
             ref={composerHostRef}
             data-onboarding-target="chat-composer"
             className={[
-              "pointer-events-none fixed inset-x-0 bottom-0 z-30 transform-gpu transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:pointer-events-auto md:static md:z-auto md:translate-y-0 md:opacity-100 md:transition-none",
+              "pointer-events-none fixed inset-x-0 bottom-0 z-30 transform-gpu pb-[calc(env(safe-area-inset-bottom)+10px)] transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:pointer-events-auto md:static md:z-auto md:translate-y-0 md:pb-0 md:opacity-100 md:transition-none",
               isComposerCompact || shouldHideDiscoverComposer
                 ? "opacity-0"
                 : "opacity-100",
@@ -1837,6 +2011,10 @@ function ChatContent() {
                   ? responseLocale === "ko"
                     ? "예: 백로그 증가가 매출로 연결될 기업"
                     : "e.g. Companies converting backlog growth into revenue"
+                  : isGuruAdvisor
+                  ? responseLocale === "ko"
+                    ? "구루 렌즈로 투자 질문을 입력하세요..."
+                    : "Ask through a guru lens..."
                   : "기업에 대해 질문하세요..."
               }
               toolCalls={chat.toolCalls}
@@ -1845,13 +2023,16 @@ function ChatContent() {
               runStartedAt={chat.runStartedAt}
               researchMode={effectiveResearchMode}
               onResearchModeChange={setResearchMode}
-              urlModeAvailable={isIdeaGeneration || contextTickers.length > 0}
+              urlModeAvailable={
+                !isGuruAdvisor && (isIdeaGeneration || contextTickers.length > 0)
+              }
+              fileModeAvailable={!isGuruAdvisor}
               urlOnlyFallbackMessage={
                 isIdeaGeneration
                   ? "이 URL을 바탕으로 관련 종목을 발굴해줘."
                   : undefined
               }
-              attachmentCoachmarkEnabled={!isIdeaGeneration}
+              attachmentCoachmarkEnabled={!isIdeaGeneration && !isGuruAdvisor}
               onUserUrlsChange={
                 isIdeaGeneration ? handleDiscoverUserUrlsChange : undefined
               }
@@ -2120,7 +2301,11 @@ function ChatHeaderMarkButton({
   );
 }
 
-export default function ChatPage() {
+export default function ChatPage({
+  workspace = "chat",
+}: {
+  workspace?: ChatWorkspace;
+}) {
   return (
     <Suspense
       fallback={
@@ -2129,7 +2314,7 @@ export default function ChatPage() {
         </div>
       }
     >
-      <ChatContent />
+      <ChatContent workspace={workspace} />
     </Suspense>
   );
 }
