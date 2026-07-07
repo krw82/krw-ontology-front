@@ -224,6 +224,15 @@ export async function resolveGuruAdvisorPluginPath(): Promise<string> {
   const configured = process.env.KRW_GURU_ADVISOR_PLUGIN_PATH;
   if (configured) return configured;
 
+  const ontologyPluginPath = process.env.KRW_ONTOLOGY_PLUGIN_PATH;
+  if (ontologyPluginPath) {
+    const siblingPluginPath = path.join(
+      path.dirname(path.resolve(ontologyPluginPath)),
+      "krw-guru-advisor",
+    );
+    if (await exists(siblingPluginPath)) return siblingPluginPath;
+  }
+
   const ontologySourceRoot =
     process.env.KRW_ONTOLOGY_SOURCE_DIR || path.join(os.homedir(), "krw-ontology");
   const fallbackPluginPath = path.join(

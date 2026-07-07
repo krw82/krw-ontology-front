@@ -75,9 +75,15 @@ AGENT_WORKER_ID=$AGENT_SUPERVISOR_ID
 if [ -z "${AGENT_SUPERVISOR_CONCURRENCY:-}" ]; then
   AGENT_SUPERVISOR_CONCURRENCY=${MAC_WORKER_COUNT:-1}
 fi
+KRW_GURU_ADVISOR_PLUGIN_PATH=${KRW_GURU_ADVISOR_PLUGIN_PATH:-"$FRONT_DIR/ref/plugins/prod/krw-guru-advisor"}
+KRW_GURU_DATA_ROOT=${KRW_GURU_DATA_ROOT:-"$HOME/krw-ontology-guru-data"}
+KRW_GURU_RELEASE_ROOT=${KRW_GURU_RELEASE_ROOT:-"$KRW_GURU_DATA_ROOT/releases/prod/current"}
 export AGENT_SUPERVISOR_ID
 export AGENT_SUPERVISOR_CONCURRENCY
 export AGENT_WORKER_ID
+export KRW_GURU_ADVISOR_PLUGIN_PATH
+export KRW_GURU_DATA_ROOT
+export KRW_GURU_RELEASE_ROOT
 
 if [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ -f "$CLAUDE_CONFIG_DIR/deepseek.env" ]; then
   set -a
@@ -169,6 +175,7 @@ echo "Release root: ${KRW_ONTOLOGY_RELEASE_ROOT:-${KRW_ONTOLOGY_ROOT:-unset}}"
 echo "Global spine: ${KRW_ONTOLOGY_GLOBAL_SPINE_PATH:-manifest-derived}"
 echo "Shard manifest: ${KRW_ONTOLOGY_SHARD_MANIFEST_PATH:-manifest-derived}"
 echo "Plugin path: ${KRW_ONTOLOGY_PLUGIN_PATH:-unset}"
+echo "Guru plugin path: ${KRW_GURU_ADVISOR_PLUGIN_PATH:-sibling-or-source-fallback}"
 echo "Log file: $LOG_FILE"
 
 (

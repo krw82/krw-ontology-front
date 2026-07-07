@@ -112,6 +112,10 @@ if [ -z "${AGENT_SUPERVISOR_CONCURRENCY:-}" ]; then
 fi
 
 KRW_ONTOLOGY_QUEUE_ROOT=${KRW_ONTOLOGY_QUEUE_ROOT:-"$HOME/krw-ontology-data-running"}
+KRW_GURU_ADVISOR_PLUGIN_SOURCE_PATH=${KRW_GURU_ADVISOR_PLUGIN_SOURCE_PATH:-"${KRW_ONTOLOGY_SOURCE_DIR:-$HOME/krw-ontology}/plugins/krw-guru-advisor"}
+KRW_GURU_ADVISOR_PLUGIN_PATH=${KRW_GURU_ADVISOR_PLUGIN_PATH:-"$FRONT_DIR/ref/plugins/prod/krw-guru-advisor"}
+KRW_GURU_DATA_ROOT=${KRW_GURU_DATA_ROOT:-"$HOME/krw-ontology-guru-data"}
+KRW_GURU_RELEASE_ROOT=${KRW_GURU_RELEASE_ROOT:-"$KRW_GURU_DATA_ROOT/releases/prod/current"}
 
 if [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ -f "$CLAUDE_CONFIG_DIR/deepseek.env" ]; then
   set -a
@@ -223,6 +227,9 @@ require_path "$KRW_ONTOLOGY_MANIFEST_PATH"
 require_path "$KRW_ONTOLOGY_SOURCE_DIR/pyproject.toml"
 require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.mcp.json"
 require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.claude-plugin/plugin.json"
+require_path "$KRW_GURU_ADVISOR_PLUGIN_PATH/.mcp.json"
+require_path "$KRW_GURU_ADVISOR_PLUGIN_PATH/.claude-plugin/plugin.json"
+require_path "$KRW_GURU_RELEASE_ROOT"
 mkdir -p "$CLAUDE_AGENT_CWD" "$CLAUDE_CONFIG_DIR"
 
 if [ ! -L "$KRW_ONTOLOGY_RELEASE_ROOT" ]; then
@@ -326,6 +333,9 @@ export KRW_ONTOLOGY_SOURCE_DIR
 export KRW_ONTOLOGY_PLUGIN_PATH
 export KRW_ONTOLOGY_MCP_URL
 export KRW_ONTOLOGY_MCP_HEALTH_URL
+export KRW_GURU_ADVISOR_PLUGIN_PATH
+export KRW_GURU_DATA_ROOT
+export KRW_GURU_RELEASE_ROOT
 export CLAUDE_AGENT_CWD
 export CLAUDE_CODE_EXECUTABLE
 export CLAUDE_CONFIG_DIR
@@ -400,6 +410,36 @@ function falseyEnv(value) {
   if (!value) return false;
   return ["0", "false", "no", "off"].includes(value.trim().toLowerCase());
 }
+NODE
+
+echo "Checking Guru plugin MCP config..."
+node <<'NODE'
+const fs = require("fs");
+const path = require("path");
+const pluginPath = process.env.KRW_GURU_ADVISOR_PLUGIN_PATH;
+const expectedGuruReleaseRoot = path.resolve(process.env.KRW_GURU_RELEASE_ROOT);
+const expectedCompanyMcpUrl = process.env.KRW_ONTOLOGY_MCP_URL;
+const config = JSON.parse(fs.readFileSync(path.join(pluginPath, ".mcp.json"), "utf8"));
+const guruServer = config.mcpServers && config.mcpServers["krw-guru-advisor"];
+if (!guruServer) throw new Error("Missing mcpServers.krw-guru-advisor");
+if (guruServer.command !== "uv") {
+  throw new Error(`Guru MCP command must be uv, got: ${guruServer.command}`);
+}
+const configuredRoot = guruServer.env && guruServer.env.KRW_GURU_RELEASE_ROOT;
+if (!configuredRoot) throw new Error("Missing Guru MCP KRW_GURU_RELEASE_ROOT env");
+if (path.resolve(configuredRoot) !== expectedGuruReleaseRoot) {
+  throw new Error(`Guru MCP release root mismatch: ${configuredRoot} !== ${expectedGuruReleaseRoot}`);
+}
+const companyServer = config.mcpServers && config.mcpServers["krw-ontology-company"];
+if (!companyServer) throw new Error("Missing mcpServers.krw-ontology-company");
+if (companyServer.type !== "http") {
+  throw new Error(`Guru company bridge MCP must use HTTP, got: ${companyServer.type}`);
+}
+if (companyServer.url !== expectedCompanyMcpUrl) {
+  throw new Error(`Guru company MCP URL mismatch: ${companyServer.url} !== ${expectedCompanyMcpUrl}`);
+}
+console.log(`OK Guru plugin path: ${pluginPath}`);
+console.log(`OK Guru release root: ${configuredRoot}`);
 NODE
 
 if [ "$DEEP_CHECK" = "1" ]; then

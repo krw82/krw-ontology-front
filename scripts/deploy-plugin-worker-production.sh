@@ -96,6 +96,12 @@ require_path "$ONTOLOGY_SOURCE_DIR/pyproject.toml"
 require_path "$ONTOLOGY_SOURCE_DIR/src/krw_ontology"
 PLUGIN_SOURCE_PATH=${KRW_ONTOLOGY_PLUGIN_SOURCE_PATH:-"$ONTOLOGY_SOURCE_DIR/plugins/krw-ontology"}
 require_path "$PLUGIN_SOURCE_PATH/.claude-plugin/plugin.json"
+GURU_PLUGIN_SOURCE_PATH=${KRW_GURU_ADVISOR_PLUGIN_SOURCE_PATH:-"$ONTOLOGY_SOURCE_DIR/plugins/krw-guru-advisor"}
+GURU_PLUGIN_PATH=${KRW_GURU_ADVISOR_PLUGIN_PATH:-"$FRONT_DIR/ref/plugins/prod/krw-guru-advisor"}
+GURU_DATA_ROOT=${KRW_GURU_DATA_ROOT:-"$HOME/krw-ontology-guru-data"}
+GURU_RELEASE_ROOT=${KRW_GURU_RELEASE_ROOT:-"$GURU_DATA_ROOT/releases/prod/current"}
+require_path "$GURU_PLUGIN_SOURCE_PATH/.claude-plugin/plugin.json"
+require_path "$GURU_RELEASE_ROOT"
 
 echo "Checking KRW Ontology prod release startup contract..."
 (cd "$ONTOLOGY_SOURCE_DIR" && uv run krw-ontology release verify \
@@ -111,6 +117,19 @@ node "$SCRIPT_DIR/materialize-ontology-plugin.mjs" \
   --mcp-url "$KRW_ONTOLOGY_MCP_URL" \
   --stock-news-url "${STOCK_NEWS_MCP_URL:-http://127.0.0.1:8775/mcp}" >/dev/null
 
+node "$SCRIPT_DIR/materialize-guru-advisor-plugin.mjs" \
+  --env prod \
+  --source "$GURU_PLUGIN_SOURCE_PATH" \
+  --out "$GURU_PLUGIN_PATH" \
+  --ontology-source-dir "$ONTOLOGY_SOURCE_DIR" \
+  --guru-data-root "$GURU_DATA_ROOT" \
+  --guru-release-root "$GURU_RELEASE_ROOT" \
+  --company-mcp-url "$KRW_ONTOLOGY_MCP_URL" >/dev/null
+
+export KRW_GURU_ADVISOR_PLUGIN_PATH="$GURU_PLUGIN_PATH"
+export KRW_GURU_DATA_ROOT="$GURU_DATA_ROOT"
+export KRW_GURU_RELEASE_ROOT="$GURU_RELEASE_ROOT"
+
 STOCK_NEWS_COVERAGE_PATH=${STOCK_NEWS_COVERAGE_PATH:-"$KRW_ONTOLOGY_PLUGIN_PATH/stock-news/coverage_companies.json"}
 if [ "$STOCK_NEWS_RUNTIME_ENABLED" = "1" ]; then
   node "$SCRIPT_DIR/export-stock-news-coverage.mjs" \
@@ -122,6 +141,8 @@ fi
 
 require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.mcp.json"
 require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.claude-plugin/plugin.json"
+require_path "$GURU_PLUGIN_PATH/.mcp.json"
+require_path "$GURU_PLUGIN_PATH/.claude-plugin/plugin.json"
 if [ "$STOCK_NEWS_RUNTIME_ENABLED" = "1" ]; then
   require_path "$STOCK_NEWS_COVERAGE_PATH"
 fi
@@ -152,6 +173,8 @@ fi
 
 echo "Ontology source: $ONTOLOGY_SOURCE_DIR"
 echo "Plugin path: $KRW_ONTOLOGY_PLUGIN_PATH"
+echo "Guru plugin path: $GURU_PLUGIN_PATH"
+echo "Guru release root: $GURU_RELEASE_ROOT"
 echo "Skill files: $SKILL_COUNT"
 echo "MCP URL: ${KRW_ONTOLOGY_MCP_URL:-unset}"
 if [ "$STOCK_NEWS_RUNTIME_ENABLED" = "1" ]; then

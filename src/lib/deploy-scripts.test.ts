@@ -281,6 +281,8 @@ describe("production deploy scripts", () => {
     expect(preflight).toContain("manifest_valid");
     expect(preflight).toContain("KRW_ONTOLOGY_MCP_URL");
     expect(preflight).toContain("Plugin .mcp.json MCP URL mismatch");
+    expect(preflight).toContain("Checking Guru plugin MCP config");
+    expect(preflight).toContain("Guru company MCP URL mismatch");
     expect(preflight).toContain("MCP HTTP health is not ok");
     expect(preflight).toContain("global_spine_present");
     expect(preflight).toContain("health_payload");
@@ -305,6 +307,9 @@ describe("production deploy scripts", () => {
     expect(initEnv).toContain("$HOME/krw-ontology");
     expect(initEnv).toContain("ref/plugins/prod/krw-ontology");
     expect(initEnv).toContain("KRW_ONTOLOGY_PLUGIN_SOURCE_PATH");
+    expect(initEnv).toContain("KRW_GURU_ADVISOR_PLUGIN_SOURCE_PATH");
+    expect(initEnv).toContain("ref/plugins/prod/krw-guru-advisor");
+    expect(initEnv).toContain("KRW_GURU_RELEASE_ROOT");
     expect(initEnv).toContain("KRW_ONTOLOGY_MCP_URL=http://127.0.0.1:8765/mcp");
     expect(initEnv).toContain("KRW_ONTOLOGY_MCP_HEALTH_URL=http://127.0.0.1:8765/health");
     expect(initEnv).toContain("KRW_ONTOLOGY_MCP_READY_URL=http://127.0.0.1:8765/readyz");
@@ -367,6 +372,8 @@ describe("production deploy scripts", () => {
     );
     expect(read("scripts/materialize-ontology-plugin.mjs")).toContain('"plugins"');
     expect(read("scripts/materialize-ontology-plugin.mjs")).toContain('"krw-ontology"');
+    expect(read("scripts/materialize-guru-advisor-plugin.mjs")).toContain("krw-guru-advisor");
+    expect(read("scripts/materialize-guru-advisor-plugin.mjs")).toContain("krw-ontology-company");
     expect(verifyMcp).toContain("KRW_ONTOLOGY_MCP_HEALTH_URL");
     expect(verifyMcp).toContain("MCP health env is not prod");
     expect(installMcpLaunchd).toContain("com.krwontology.mcp-server");
@@ -401,6 +408,8 @@ describe("production deploy scripts", () => {
 
     expect(deployPluginWorker).toContain("KRW_ONTOLOGY_PLUGIN_PATH mismatch");
     expect(deployPluginWorker).toContain("materialize-ontology-plugin.mjs");
+    expect(deployPluginWorker).toContain("materialize-guru-advisor-plugin.mjs");
+    expect(deployPluginWorker).toContain("Guru plugin path");
     expect(deployPluginWorker).toContain("export-stock-news-coverage.mjs");
     expect(deployPluginWorker).toContain("stock-news/coverage_companies.json");
     expect(deployPluginWorker).toContain("install-mcp-server-launchd.sh");

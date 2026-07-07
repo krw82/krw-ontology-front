@@ -61,6 +61,7 @@ if [ -f "$ENV_FILE" ]; then
   # shellcheck disable=SC1090
   . "$ENV_FILE"
   set +a
+  KRW_GURU_ADVISOR_PLUGIN_PATH=${KRW_GURU_ADVISOR_PLUGIN_PATH:-"$FRONT_DIR/ref/plugins/prod/krw-guru-advisor"}
   echo
   echo "Local config:"
   echo "  AGENT_SUPERVISOR_ID=${AGENT_SUPERVISOR_ID:-unset}"
@@ -76,6 +77,7 @@ if [ -f "$ENV_FILE" ]; then
   echo "  AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS=${AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS:-unset}"
   echo "  KRW_ONTOLOGY_ROOT=${KRW_ONTOLOGY_ROOT:-unset}"
   echo "  KRW_ONTOLOGY_PLUGIN_PATH=${KRW_ONTOLOGY_PLUGIN_PATH:-unset}"
+  echo "  KRW_GURU_ADVISOR_PLUGIN_PATH=${KRW_GURU_ADVISOR_PLUGIN_PATH:-unset}"
 else
   echo
   echo "Local env file not found: $ENV_FILE"

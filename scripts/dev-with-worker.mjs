@@ -50,6 +50,25 @@ function configureDevOntologyEnv() {
     "krw-ontology",
   );
   const pluginPath = join(frontDir, "ref", "plugins", "dev", "krw-ontology");
+  const guruPluginSourcePath = join(
+    homedir(),
+    "krw-ontology",
+    "plugins",
+    "krw-guru-advisor",
+  );
+  const guruPluginPath = join(
+    frontDir,
+    "ref",
+    "plugins",
+    "dev",
+    "krw-guru-advisor",
+  );
+  const guruDataRoot =
+    process.env.KRW_GURU_DATA_ROOT ||
+    join(homedir(), "krw-ontology-guru-data");
+  const guruReleaseRoot =
+    process.env.KRW_GURU_RELEASE_ROOT ||
+    join(guruDataRoot, "releases", "dev", "current");
   const mcpUrl = process.env.KRW_DEV_MCP_URL || "http://127.0.0.1:8766/mcp";
   const stockNewsMcpUrl =
     process.env.STOCK_NEWS_MCP_URL || "http://127.0.0.1:8776/mcp";
@@ -70,9 +89,18 @@ function configureDevOntologyEnv() {
   }
   process.env.KRW_ONTOLOGY_PLUGIN_SOURCE_PATH =
     process.env.KRW_ONTOLOGY_PLUGIN_SOURCE_PATH || pluginSourcePath;
+  process.env.KRW_ONTOLOGY_SOURCE_DIR =
+    process.env.KRW_ONTOLOGY_SOURCE_DIR || join(homedir(), "krw-ontology");
   if (process.env.KRW_DEV_ALLOW_CUSTOM_PLUGIN_PATH !== "1") {
     process.env.KRW_ONTOLOGY_PLUGIN_PATH = pluginPath;
   }
+  process.env.KRW_GURU_ADVISOR_PLUGIN_SOURCE_PATH =
+    process.env.KRW_GURU_ADVISOR_PLUGIN_SOURCE_PATH || guruPluginSourcePath;
+  if (process.env.KRW_DEV_ALLOW_CUSTOM_GURU_PLUGIN_PATH !== "1") {
+    process.env.KRW_GURU_ADVISOR_PLUGIN_PATH = guruPluginPath;
+  }
+  process.env.KRW_GURU_DATA_ROOT = guruDataRoot;
+  process.env.KRW_GURU_RELEASE_ROOT = guruReleaseRoot;
   process.env.KRW_ONTOLOGY_MCP_URL = mcpUrl;
   process.env.KRW_ONTOLOGY_MCP_HEALTH_URL = healthUrlFromMcpUrl(mcpUrl);
   process.env.KRW_ONTOLOGY_MCP_HOST = new URL(mcpUrl).hostname;
@@ -89,6 +117,7 @@ function configureDevOntologyEnv() {
   console.info("[dev] ontology env", {
     releaseRoot: process.env.KRW_ONTOLOGY_RELEASE_ROOT,
     pluginPath: process.env.KRW_ONTOLOGY_PLUGIN_PATH,
+    guruPluginPath: process.env.KRW_GURU_ADVISOR_PLUGIN_PATH,
     mcpUrl: process.env.KRW_ONTOLOGY_MCP_URL,
     stockNewsMcpUrl: process.env.STOCK_NEWS_MCP_URL,
   });
@@ -171,7 +200,7 @@ function isStockNewsEnabled() {
 }
 
 function materializeDevPlugin() {
-  const result = spawnSync(
+  const ontologyResult = spawnSync(
     process.execPath,
     [
       "scripts/materialize-ontology-plugin.mjs",
@@ -191,8 +220,36 @@ function materializeDevPlugin() {
       stdio: "inherit",
     },
   );
-  if (result.status !== 0) {
+  if (ontologyResult.status !== 0) {
     throw new Error("Failed to materialize dev KRW Ontology plugin");
+  }
+
+  const guruResult = spawnSync(
+    process.execPath,
+    [
+      "scripts/materialize-guru-advisor-plugin.mjs",
+      "--env",
+      "dev",
+      "--source",
+      process.env.KRW_GURU_ADVISOR_PLUGIN_SOURCE_PATH,
+      "--out",
+      process.env.KRW_GURU_ADVISOR_PLUGIN_PATH,
+      "--ontology-source-dir",
+      process.env.KRW_ONTOLOGY_SOURCE_DIR || join(homedir(), "krw-ontology"),
+      "--guru-data-root",
+      process.env.KRW_GURU_DATA_ROOT,
+      "--guru-release-root",
+      process.env.KRW_GURU_RELEASE_ROOT,
+      "--company-mcp-url",
+      process.env.KRW_ONTOLOGY_MCP_URL,
+    ],
+    {
+      env: process.env,
+      stdio: "inherit",
+    },
+  );
+  if (guruResult.status !== 0) {
+    throw new Error("Failed to materialize dev KRW Guru Advisor plugin");
   }
 
   if (isStockNewsEnabled()) {

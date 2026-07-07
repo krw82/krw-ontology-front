@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "krw-guru-advisor": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "~/krw-ontology",
+        "run",
+        "krw-guru-advisor-mcp"
+      ],
+      "env": {
+        "KRW_GURU_ENV": "dev",
+        "KRW_GURU_DATA_ROOT": "~/krw-ontology-guru-data",
+        "KRW_GURU_RELEASE_ROOT": "~/krw-ontology-guru-data/releases/dev/current"
+      }
+    },
+    "krw-ontology-company": {
+      "type": "http",
+      "url": "http://127.0.0.1:8766/mcp"
+    }
+  }
+}

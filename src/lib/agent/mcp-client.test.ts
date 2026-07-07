@@ -7,7 +7,11 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 import { access, readFile } from "node:fs/promises";
-import { checkMcpHealth, checkMcpReady } from "@/lib/agent/mcp-client";
+import {
+  checkMcpHealth,
+  checkMcpReady,
+  resolveGuruAdvisorPluginPath,
+} from "@/lib/agent/mcp-client";
 
 const MCP_CONFIG = {
   mcpServers: {
@@ -80,5 +84,14 @@ describe("mcp-client readiness probes", () => {
       headers: { accept: "application/json" },
       signal: expect.any(AbortSignal),
     });
+  });
+
+  it("resolves the guru plugin from the materialized ontology plugin sibling", async () => {
+    vi.stubEnv("KRW_GURU_ADVISOR_PLUGIN_PATH", undefined);
+    vi.stubEnv("KRW_ONTOLOGY_PLUGIN_PATH", "/plugins/prod/krw-ontology");
+
+    await expect(resolveGuruAdvisorPluginPath()).resolves.toBe(
+      "/plugins/prod/krw-guru-advisor",
+    );
   });
 });
