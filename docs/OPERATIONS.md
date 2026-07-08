@@ -39,6 +39,9 @@ npm run test:e2e
 ```
 
 `scripts/deploy-all-production.sh` runs migration drift checks and schema smoke by default. Use `--skip-db-check` only for emergency static asset rollback where no DB-dependent code changed.
+The GCP compose deploy also starts the persistent Redis document queue,
+BullMQ `document-worker`, and `document-outbox-dispatcher`; treat the deploy as
+incomplete if either document service is not running.
 
 ## Data Deploy
 
@@ -95,6 +98,10 @@ For DB migration, ontology release, web, and runtime together:
 ```bash
 npm run prod:deploy:full -- --release-id <release_id>
 ```
+
+This path applies pending Supabase migrations before code deploy, then brings up
+GCP web/API, Redis, `document-worker`, `document-outbox-dispatcher`, billing, and
+the prod runtime.
 
 ## Health Checks
 

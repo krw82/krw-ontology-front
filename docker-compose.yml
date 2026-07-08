@@ -87,11 +87,16 @@ services:
       - MCP_HEALTH_TIMEOUT_MS=${MCP_HEALTH_TIMEOUT_MS:-30000}
       - MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-INFO}
       - DOCUMENT_STORAGE_ROOT=/srv/krw-document-inbox
+      - REDIS_QUEUE_URL=${REDIS_QUEUE_URL:-}
+      - DOCUMENT_QUEUE_REDIS_URL=${DOCUMENT_QUEUE_REDIS_URL:-redis://redis:6379/0}
     volumes:
       - ${CLAUDE_PROD_CONFIG_DIR:-/srv/claude-prod}:/home/nextjs/.claude-prod
       - document_inbox:/srv/krw-document-inbox
     networks:
       - app-network
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/healthz"]
@@ -129,6 +134,29 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
   agent-worker:
     image: krw-ontology-front-web:local
@@ -224,22 +252,76 @@ services:
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - DOCUMENT_WORKER_ID=${DOCUMENT_WORKER_ID:-gcp-document-worker}
       - DOCUMENT_STORAGE_ROOT=/srv/krw-document-inbox
+      - DOCUMENT_INGESTION_BACKEND=${DOCUMENT_INGESTION_BACKEND:-bullmq}
       - DOCUMENT_INGESTION_CONCURRENT_LIMIT=${DOCUMENT_INGESTION_CONCURRENT_LIMIT:-2}
       - DOCUMENT_WORKER_RECONCILE_INTERVAL_MS=${DOCUMENT_WORKER_RECONCILE_INTERVAL_MS:-5000}
       - MAX_DOCUMENT_ATTACHMENT_MB=${MAX_DOCUMENT_ATTACHMENT_MB:-20}
       - MAX_EXTRACTED_MARKDOWN_CHARS=${MAX_EXTRACTED_MARKDOWN_CHARS:-200000}
       - MARKITDOWN_COMMAND=${MARKITDOWN_COMMAND:-markitdown}
       - MARKITDOWN_TIMEOUT_MS=${MARKITDOWN_TIMEOUT_MS:-120000}
+      - REDIS_QUEUE_URL=${REDIS_QUEUE_URL:-}
+      - DOCUMENT_QUEUE_REDIS_URL=${DOCUMENT_QUEUE_REDIS_URL:-redis://redis:6379/0}
     volumes:
       - document_inbox:/srv/krw-document-inbox
     networks:
       - app-network
     depends_on:
+      redis:
+        condition: service_healthy
       web:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "require('fs').accessSync('.worker/document-worker.mjs')"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('fs').accessSync('.worker/document-worker.mjs'); if ((process.env.DOCUMENT_INGESTION_BACKEND || 'legacy_db') === 'bullmq' && !(process.env.REDIS_QUEUE_URL || process.env.DOCUMENT_QUEUE_REDIS_URL)) { console.error('document-worker missing Redis queue URL'); process.exit(1); }",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  document-outbox-dispatcher:
+    image: krw-ontology-front-web:local
+    command: ["node", ".worker/document-outbox-dispatcher.mjs"]
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - DOCUMENT_OUTBOX_DISPATCHER_ID=${DOCUMENT_OUTBOX_DISPATCHER_ID:-gcp-document-outbox-dispatcher}
+      - DOCUMENT_OUTBOX_DISPATCH_INTERVAL_MS=${DOCUMENT_OUTBOX_DISPATCH_INTERVAL_MS:-15000}
+      - DOCUMENT_OUTBOX_DISPATCH_BATCH_SIZE=${DOCUMENT_OUTBOX_DISPATCH_BATCH_SIZE:-25}
+      - REDIS_QUEUE_URL=${REDIS_QUEUE_URL:-}
+      - DOCUMENT_QUEUE_REDIS_URL=${DOCUMENT_QUEUE_REDIS_URL:-redis://redis:6379/0}
+    networks:
+      - app-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('fs').accessSync('.worker/document-outbox-dispatcher.mjs'); if (!(process.env.REDIS_QUEUE_URL || process.env.DOCUMENT_QUEUE_REDIS_URL)) { console.error('document-outbox-dispatcher missing Redis queue URL'); process.exit(1); }",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -294,3 +376,4 @@ volumes:
   caddy_data:
   caddy_config:
   document_inbox:
+  redis_data:

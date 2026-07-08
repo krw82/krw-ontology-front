@@ -9,6 +9,7 @@ describe("production deploy scripts", () => {
   it("routes production code deploys through split web and Mac worker lanes", () => {
     const deployProd = read("scripts/deploy-production.sh");
     const deployAll = read("scripts/deploy-all-production.sh");
+    const deployWeb = read("scripts/deploy-web-production.sh");
     const packageJson = read("package.json");
     const restartCompose = read("scripts/restart-production-compose.sh");
 
@@ -28,6 +29,8 @@ describe("production deploy scripts", () => {
     expect(deployAll.indexOf("npm run supabase:schema:smoke")).toBeLessThan(
       deployAll.indexOf("deploy-web-production.sh"),
     );
+    expect(deployWeb).toContain("redis document-worker document-outbox-dispatcher billing-worker");
+    expect(restartCompose).toContain("document-outbox-dispatcher");
 
     expect(packageJson).toContain('"prod:status": "npm run mcp:prod:status && npm run worker:prod:status"');
     expect(packageJson).toContain('"prod:deploy:web": "scripts/deploy-web-production.sh"');
@@ -120,8 +123,18 @@ describe("production deploy scripts", () => {
 
     expect(script).toContain("ps -q agent-worker");
     expect(script).toContain("agent-worker did not become healthy");
+    expect(script).toContain("ps -q document-worker");
+    expect(script).toContain("document-worker did not become healthy");
+    expect(script).toContain("ps -q document-outbox-dispatcher");
+    expect(script).toContain("document-outbox-dispatcher did not become healthy");
+    expect(script).toContain("document-worker must run BullMQ backend in production");
+    expect(script).toContain("document-outbox-dispatcher missing Redis queue URL");
     expect(script).toContain("exec -T agent-worker node");
+    expect(script).toContain("exec -T document-worker node");
+    expect(script).toContain("exec -T document-outbox-dispatcher node");
     expect(script).toContain(".worker/agent-worker.mjs");
+    expect(script).toContain(".worker/document-worker.mjs");
+    expect(script).toContain(".worker/document-outbox-dispatcher.mjs");
     expect(script).toContain("KRW_ONTOLOGY_PLUGIN_PATH");
     expect(script).toContain("OK web ontology data boundary: Supabase catalog only");
   });
@@ -222,6 +235,28 @@ describe("production deploy scripts", () => {
     expect(workerSection).toContain("shard_manifest.json");
     expect(workerSection).not.toContain("agent_index.sqlite");
     expect(workerSection).toContain(".mcp.json");
+    expect(compose).toContain("  redis:");
+    expect(compose).toContain("redis-server");
+    expect(compose).toContain("redis_data:");
+    const documentWorkerSection = compose.slice(
+      compose.indexOf("  document-worker:"),
+      compose.indexOf("  document-outbox-dispatcher:"),
+    );
+    const documentOutboxSection = compose.slice(
+      compose.indexOf("  document-outbox-dispatcher:"),
+      compose.indexOf("  billing-worker:"),
+    );
+    expect(documentWorkerSection).toContain(
+      "DOCUMENT_INGESTION_BACKEND=${DOCUMENT_INGESTION_BACKEND:-bullmq}",
+    );
+    expect(documentWorkerSection).toContain(
+      "DOCUMENT_QUEUE_REDIS_URL=${DOCUMENT_QUEUE_REDIS_URL:-redis://redis:6379/0}",
+    );
+    expect(documentWorkerSection).toContain(".worker/document-worker.mjs");
+    expect(documentOutboxSection).toContain(".worker/document-outbox-dispatcher.mjs");
+    expect(documentOutboxSection).toContain(
+      "DOCUMENT_QUEUE_REDIS_URL=${DOCUMENT_QUEUE_REDIS_URL:-redis://redis:6379/0}",
+    );
     const billingWorkerSection = compose.slice(compose.indexOf("  billing-worker:"));
     expect(billingWorkerSection).toContain(
       "BILLING_WORKER_REQUIRE_TOSS_PAYMENTS=${BILLING_WORKER_REQUIRE_TOSS_PAYMENTS:-1}",

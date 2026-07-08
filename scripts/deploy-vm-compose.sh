@@ -33,15 +33,25 @@ fi
 
 VALIDATE_AGENT_WORKER=1
 VALIDATE_BILLING_WORKER=1
+VALIDATE_DOCUMENT_WORKER=1
+VALIDATE_DOCUMENT_OUTBOX_DISPATCHER=1
 if [ "$#" -gt 0 ]; then
   VALIDATE_AGENT_WORKER=0
   VALIDATE_BILLING_WORKER=0
+  VALIDATE_DOCUMENT_WORKER=0
+  VALIDATE_DOCUMENT_OUTBOX_DISPATCHER=0
   for compose_arg in "$@"; do
     if [ "$compose_arg" = "agent-worker" ]; then
       VALIDATE_AGENT_WORKER=1
     fi
     if [ "$compose_arg" = "billing-worker" ]; then
       VALIDATE_BILLING_WORKER=1
+    fi
+    if [ "$compose_arg" = "document-worker" ]; then
+      VALIDATE_DOCUMENT_WORKER=1
+    fi
+    if [ "$compose_arg" = "document-outbox-dispatcher" ]; then
+      VALIDATE_DOCUMENT_OUTBOX_DISPATCHER=1
     fi
   done
 fi
@@ -376,6 +386,105 @@ console.log(JSON.stringify({
 NODE
 else
   echo "Skipping agent-worker validation; compose target excludes agent-worker."
+fi
+
+if [ "$VALIDATE_DOCUMENT_WORKER" = "1" ]; then
+  for i in $(seq 1 30); do
+    document_container=$(
+      docker compose \
+        --project-name "$COMPOSE_PROJECT_NAME" \
+        --env-file "$ENV_FILE" \
+        -f "$BUILD_CONTEXT/docker-compose.yml" \
+        ps -q document-worker
+    )
+    if [ -n "$document_container" ] && [ "$(docker inspect --format '{{.State.Status}}' "$document_container")" = "running" ]; then
+      health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$document_container")
+      if [ "$health" = "healthy" ] || [ "$health" = "none" ]; then
+        break
+      fi
+    fi
+    if [ "$i" -eq 30 ]; then
+      echo "document-worker did not become healthy" >&2
+      docker compose \
+        --project-name "$COMPOSE_PROJECT_NAME" \
+        --env-file "$ENV_FILE" \
+        -f "$BUILD_CONTEXT/docker-compose.yml" \
+        ps >&2
+      exit 1
+    fi
+    sleep 2
+  done
+
+  docker compose \
+    --project-name "$COMPOSE_PROJECT_NAME" \
+    --env-file "$ENV_FILE" \
+    -f "$BUILD_CONTEXT/docker-compose.yml" \
+    exec -T document-worker node - <<'NODE'
+const fs = require("fs");
+fs.accessSync(".worker/document-worker.mjs", fs.constants.R_OK);
+const backend = process.env.DOCUMENT_INGESTION_BACKEND || "legacy_db";
+const redisUrl = process.env.REDIS_QUEUE_URL || process.env.DOCUMENT_QUEUE_REDIS_URL;
+if (backend !== "bullmq") {
+  throw new Error(`document-worker must run BullMQ backend in production, got ${backend}`);
+}
+if (!redisUrl) {
+  throw new Error("document-worker missing Redis queue URL");
+}
+console.log(JSON.stringify({
+  worker: "document-worker",
+  backend,
+  queueRedisConfigured: true,
+}));
+NODE
+else
+  echo "Skipping document-worker validation; compose target excludes document-worker."
+fi
+
+if [ "$VALIDATE_DOCUMENT_OUTBOX_DISPATCHER" = "1" ]; then
+  for i in $(seq 1 30); do
+    document_outbox_container=$(
+      docker compose \
+        --project-name "$COMPOSE_PROJECT_NAME" \
+        --env-file "$ENV_FILE" \
+        -f "$BUILD_CONTEXT/docker-compose.yml" \
+        ps -q document-outbox-dispatcher
+    )
+    if [ -n "$document_outbox_container" ] && [ "$(docker inspect --format '{{.State.Status}}' "$document_outbox_container")" = "running" ]; then
+      health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$document_outbox_container")
+      if [ "$health" = "healthy" ] || [ "$health" = "none" ]; then
+        break
+      fi
+    fi
+    if [ "$i" -eq 30 ]; then
+      echo "document-outbox-dispatcher did not become healthy" >&2
+      docker compose \
+        --project-name "$COMPOSE_PROJECT_NAME" \
+        --env-file "$ENV_FILE" \
+        -f "$BUILD_CONTEXT/docker-compose.yml" \
+        ps >&2
+      exit 1
+    fi
+    sleep 2
+  done
+
+  docker compose \
+    --project-name "$COMPOSE_PROJECT_NAME" \
+    --env-file "$ENV_FILE" \
+    -f "$BUILD_CONTEXT/docker-compose.yml" \
+    exec -T document-outbox-dispatcher node - <<'NODE'
+const fs = require("fs");
+fs.accessSync(".worker/document-outbox-dispatcher.mjs", fs.constants.R_OK);
+const redisUrl = process.env.REDIS_QUEUE_URL || process.env.DOCUMENT_QUEUE_REDIS_URL;
+if (!redisUrl) {
+  throw new Error("document-outbox-dispatcher missing Redis queue URL");
+}
+console.log(JSON.stringify({
+  worker: "document-outbox-dispatcher",
+  queueRedisConfigured: true,
+}));
+NODE
+else
+  echo "Skipping document-outbox-dispatcher validation; compose target excludes document-outbox-dispatcher."
 fi
 
 if [ "$VALIDATE_BILLING_WORKER" = "1" ]; then

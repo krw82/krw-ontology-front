@@ -70,7 +70,7 @@ npm run prod:deploy:web      # GCP web/API only
 npm run prod:deploy:runtime  # plugin/skills + MCP sidecar + Mac workers
 npm run prod:deploy:code     # web + runtime, no ontology release switch
 npm run prod:release:publish -- --release-id <release_id>
-npm run prod:deploy:full -- --release-id <release_id>
+npm run prod:deploy:full -- --release-id <release_id>  # includes GCP Redis/document ingestion workers
 ```
 
 Compatibility aliases such as `npm run deploy:runtime`, `npm run deploy:mcp`,

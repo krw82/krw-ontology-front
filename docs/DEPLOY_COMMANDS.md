@@ -138,12 +138,14 @@ npm run prod:deploy:full -- --release-id <release_id>
 ```text
 Supabase migration apply
 -> prod release publish
--> GCP web/API deploy
+-> GCP web/API + Redis document queue deploy
+-> document-worker + document-outbox-dispatcher restart
 -> prod runtime deploy
 ```
 
 DB migration, ontology release, web code, runtime code가 모두 바뀌는 경우에만
-쓴다.
+쓴다. 문서 ingestion은 GCP compose의 persistent Redis service와 BullMQ
+`document-worker`, `document-outbox-dispatcher`를 같이 올린다.
 
 ### Safe production deploy
 
