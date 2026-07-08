@@ -55,7 +55,7 @@ function mockMcpOk() {
       status: "idle",
       last_seen_at: "2026-05-21T00:00:10.000Z",
       heartbeat_expires_at: "2026-05-21T00:02:10.000Z",
-      claude_code_version: "2.1.141",
+      claude_code_version: "2.1.204",
       web_commit: "web-commit",
       krw_ontology_commit: "ontology-commit",
       worker_env: "dev",

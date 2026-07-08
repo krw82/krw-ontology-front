@@ -558,12 +558,7 @@ function GuruLensContextHeader({
         compact ? "mb-base" : "mb-lg",
       ].join(" ")}
     >
-      <div className="flex min-w-0 items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border border-hairline bg-surface-soft text-primary">
-          <span aria-hidden="true" className="material-symbols-outlined text-[22px]">
-            {lens.icon}
-          </span>
-        </div>
+      <div className="flex min-w-0 items-start">
         <div className="min-w-0">
           <p className="font-mono text-[11px] font-black uppercase tracking-[0.14em] text-primary">
             Guru lens

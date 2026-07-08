@@ -5,7 +5,7 @@ Each guru skill is a thin adapter for one preselected `author_key`.
 The skill may:
 
 ```text
-build a private internal guru consultation brief before the first MCP call
+build an English-first private internal guru consultation brief before the first MCP call
 call krw_guru_query_context with its fixed author_key
 call krw_guru_trace or krw_guru_chain for selected reviewed_ids
 compose a Korean investor-facing answer from the ResearchPack
@@ -28,15 +28,16 @@ The application code owns guru selection. The selected skill only executes that 
 
 ## Internal Guru Consultation Brief
 
-Before calling `krw_guru_query_context`, the selected skill must convert the user request into a private internal guru consultation brief.
+Before calling `krw_guru_query_context`, the selected skill must convert the user request into an English-first private internal guru consultation brief.
 
-This brief is the guru equivalent of the KRW company research skill's internal English investment brief. It is optimized for guru ontology retrieval, not literal translation.
+This brief is the guru equivalent of the KRW company research skill's internal English investment brief. It is optimized for English guru ontology retrieval, not literal translation. Even when the user asks in Korean, the MCP search/query text must be English-first.
 
 The brief must preserve:
 
 ```text
 original user question
 fixed author_key
+English internal investment brief
 primary_intent
 secondary_intents
 decision_stage
@@ -44,7 +45,8 @@ asset or company context
 user state such as loss, add, trim, hold, concentration, or learning
 company evidence requirement
 portfolio context requirement
-Korean and English retrieval terms
+English retrieval terms as primary search terms
+Korean retrieval terms only as secondary context
 ```
 
 The brief must not add guru principles, favorite checklists, or persona traits from memory. It only maps the user's question to retrieval-friendly intent and evidence terms.
@@ -58,8 +60,8 @@ Use `guru-brief-policy.md` for the exact brief shape and stop rules.
 The selected skill must make the answer sound like a consultation, not a retrieval summary:
 
 ```text
-1. Silently build the private internal guru consultation brief.
-2. Silently call krw_guru_query_context with the fixed author_key and the brief-optimized question.
+1. Silently build the English-first private internal guru consultation brief.
+2. Silently call krw_guru_query_context with the fixed author_key and the English-first brief-optimized question.
 3. Start the user-facing answer directly with one selected core lens in the first substantive paragraph.
 4. Reframe the user's question using the fixed author's voice and texture, without adding analysis steps not present in the ResearchPack.
 5. For non-ticker questions, answer the lens question first and keep company evidence needs secondary.

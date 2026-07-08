@@ -4,7 +4,7 @@ The Guru MCP returns a bounded `GuruResearchPack` for one selected guru lens and
 
 Skills must not hard-code guru principles, preferred questions, or persona traits. If the pack does not contain a lens or persona trait, the final answer must not invent it.
 
-Before requesting the pack, the skill should build a private internal guru consultation brief. The brief improves retrieval. It does not become evidence and does not override the returned ResearchPack.
+Before requesting the pack, the skill should build an English-first private internal guru consultation brief. The brief improves retrieval. It does not become evidence and does not override the returned ResearchPack.
 
 ## Required Shape
 
@@ -39,11 +39,11 @@ warnings
 For company-specific questions, the Guru ResearchPack is not the final answer payload. Use the serving-layer bridge objects:
 
 ```text
-company ontology orientation from krw_ontology_topic_map or equivalent
+app-provided company context when available
 -> company_context_json
 -> GuruResearchPack
 -> GuruCompanyFilingBrief
--> KRW Ontology company filing evidence from application/orchestrator
+-> KRW Ontology company filing evidence from company_evidence_researcher subagent
 -> GuruCompanyResearchPack
 -> GuruAnswerRenderPlan
 ```
@@ -52,7 +52,7 @@ company ontology orientation from krw_ontology_topic_map or equivalent
 
 `GuruCompanyFilingBrief` converts guru lens/data needs and company_context_json into a company filing research question. It does not contain company facts.
 
-`GuruCompanyResearchPack` combines the Guru ResearchPack, company_context_json, and opaque company filing evidence supplied by the application/orchestrator. It is not a database schema and must not expand the KRW company ontology.
+`GuruCompanyResearchPack` combines the Guru ResearchPack, company_context_json, and opaque company filing evidence supplied by the app-provided company_evidence_researcher subagent. It is not a database schema and must not expand the KRW company ontology.
 
 `GuruAnswerRenderPlan` provides answer structure and author voice posture. It must not introduce new guru principles that were absent from the ResearchPack.
 
@@ -72,7 +72,7 @@ source_anchors
 
 The author adapter may shape tone and question order, but it must not override the ResearchPack. If the pack does not return a supporting lens, the answer should say the current guru ontology has weak support instead of filling from memory.
 
-The private brief may guide which query terms were used. It must not add final-answer content unless the ResearchPack returned supporting lenses, consultation moves, or data needs.
+The private brief may guide which query terms were used. Because guru source materials are English-first, the private brief should lead with English investment language and English retrieval terms. It must not add final-answer content unless the ResearchPack returned supporting lenses, consultation moves, or data needs.
 
 ## Status Handling
 
@@ -90,7 +90,7 @@ needs_clarification
 - Ask the returned clarifying question before giving a strong consultation.
 
 needs_company_evidence
-- Guru lens is available, but company-specific judgment needs filing evidence from KRW Ontology company research. Call krw_guru_company_brief with company_context_json when available; use krw_guru_company_pack after company evidence is supplied.
+- Guru lens is available, but company-specific judgment needs filing evidence from KRW Ontology company research. Call krw_guru_company_brief with company_context_json when available; delegate the resulting brief to the app-provided company_evidence_researcher subagent; must use krw_guru_company_pack after company evidence is supplied before final writing.
 ```
 
 ## Evidence Boundary

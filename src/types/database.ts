@@ -45,16 +45,34 @@ export interface ChatAttachmentRow extends Record<string, unknown> {
   file_name: string;
   mime_type: string;
   file_size: number;
-  storage_kind: "local_fs";
+  storage_kind: "local_fs" | "object_storage";
   original_path: string | null;
+  original_object_path: string | null;
+  extracted_object_path: string | null;
+  chunks_object_path: string | null;
+  content_hash: string | null;
   extracted_md: string | null;
   extracted_char_count: number | null;
   extraction_status:
+    | "uploaded"
     | "queued"
     | "processing"
     | "completed"
     | "failed"
+    | "cancelled"
     | "expired";
+  extraction_stage:
+    | "accepted"
+    | "extracting"
+    | "chunking"
+    | "embedding"
+    | "indexing"
+    | "completed"
+    | "failed";
+  progress_percent: number;
+  last_event_seq: number;
+  error_code: string | null;
+  error_message: string | null;
   extraction_error: string | null;
   expires_at: string;
   created_at: string;
@@ -64,17 +82,52 @@ export interface ChatAttachmentRow extends Record<string, unknown> {
 export interface DocumentIngestionJobRow extends Record<string, unknown> {
   id: string;
   attachment_id: string;
-  status: "queued" | "running" | "completed" | "failed";
+  status: "queued" | "running" | "processing" | "completed" | "failed" | "cancelled";
+  stage:
+    | "accepted"
+    | "extracting"
+    | "chunking"
+    | "embedding"
+    | "indexing"
+    | "completed"
+    | "failed";
+  progress_percent: number;
+  last_event_seq: number;
+  queue_job_id: string | null;
   worker_id: string | null;
   attempts: number;
   max_attempts: number;
   queued_at: string;
   started_at: string | null;
   completed_at: string | null;
+  cancelled_at: string | null;
   lease_expires_at: string | null;
+  error_code: string | null;
   error_message: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface DocumentJobOutboxRow extends Record<string, unknown> {
+  id: string;
+  job_id: string;
+  queue_name: string;
+  queue_job_id: string;
+  payload_json: Json;
+  status: "pending" | "dispatched" | "failed";
+  attempts: number;
+  next_attempt_at: string;
+  dispatched_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateDocumentIngestionJobResult extends Record<string, unknown> {
+  attachment: ChatAttachmentRow;
+  job: DocumentIngestionJobRow;
+  queue_name: string;
+  queue_job_id: string;
 }
 
 export interface AgentRunRow extends Record<string, unknown> {
@@ -1183,16 +1236,34 @@ export interface Database {
           | "id"
           | "created_at"
           | "updated_at"
+          | "original_object_path"
+          | "extracted_object_path"
+          | "chunks_object_path"
+          | "content_hash"
           | "extracted_md"
           | "extracted_char_count"
+          | "extraction_stage"
+          | "progress_percent"
+          | "last_event_seq"
+          | "error_code"
+          | "error_message"
           | "extraction_error"
         > & {
           id?: string;
           session_id?: string | null;
           message_id?: string | null;
           ticker?: string | null;
+          original_object_path?: string | null;
+          extracted_object_path?: string | null;
+          chunks_object_path?: string | null;
+          content_hash?: string | null;
           extracted_md?: string | null;
           extracted_char_count?: number | null;
+          extraction_stage?: ChatAttachmentRow["extraction_stage"];
+          progress_percent?: number;
+          last_event_seq?: number;
+          error_code?: string | null;
+          error_message?: string | null;
           extraction_error?: string | null;
           expires_at?: string;
           created_at?: string;
@@ -1213,29 +1284,72 @@ export interface Database {
           DocumentIngestionJobRow,
           | "id"
           | "status"
+          | "stage"
+          | "progress_percent"
+          | "last_event_seq"
+          | "queue_job_id"
           | "worker_id"
           | "attempts"
           | "queued_at"
           | "started_at"
           | "completed_at"
+          | "cancelled_at"
           | "lease_expires_at"
+          | "error_code"
           | "error_message"
           | "created_at"
           | "updated_at"
         > & {
           id?: string;
           status?: DocumentIngestionJobRow["status"];
+          stage?: DocumentIngestionJobRow["stage"];
+          progress_percent?: number;
+          last_event_seq?: number;
+          queue_job_id?: string | null;
           worker_id?: string | null;
           attempts?: number;
           queued_at?: string;
           started_at?: string | null;
           completed_at?: string | null;
+          cancelled_at?: string | null;
           lease_expires_at?: string | null;
+          error_code?: string | null;
           error_message?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: Partial<Omit<DocumentIngestionJobRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      document_job_outbox: {
+        Row: DocumentJobOutboxRow;
+        Insert: Omit<
+          DocumentJobOutboxRow,
+          | "id"
+          | "status"
+          | "attempts"
+          | "next_attempt_at"
+          | "dispatched_at"
+          | "last_error"
+          | "created_at"
+          | "updated_at"
+        > & {
+          id?: string;
+          status?: DocumentJobOutboxRow["status"];
+          attempts?: number;
+          next_attempt_at?: string;
+          dispatched_at?: string | null;
+          last_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<DocumentJobOutboxRow, "id" | "created_at">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];
@@ -2794,6 +2908,24 @@ export interface Database {
           p_global_limit: number;
         };
         Returns: Array<{ id: string }>;
+      };
+      create_document_ingestion_job: {
+        Args: {
+          p_attachment_id: string;
+          p_user_id: string;
+          p_session_id: string | null;
+          p_ticker: string | null;
+          p_file_name: string;
+          p_mime_type: string;
+          p_file_size: number;
+          p_storage_kind: "local_fs" | "object_storage";
+          p_original_path: string | null;
+          p_original_object_path: string | null;
+          p_content_hash: string | null;
+          p_expires_at: string;
+          p_queue_name?: string;
+        };
+        Returns: CreateDocumentIngestionJobResult;
       };
       get_agent_run_queue_state: {
         Args: {

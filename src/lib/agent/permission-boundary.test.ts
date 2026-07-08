@@ -12,6 +12,7 @@ import { canUseTool } from "./runner";
 import {
   isKrwOntologySdkTool,
   isStockNewsSdkTool,
+  KRW_ONTOLOGY_DIRECT_SDK_ALLOWED_TOOLS,
   KRW_ONTOLOGY_MCP_TOOLS,
   KRW_ONTOLOGY_SDK_ALLOWED_TOOLS,
   STOCK_NEWS_MCP_TOOLS,
@@ -70,16 +71,18 @@ describe("agent permission boundary", () => {
     }
   });
 
-  it("allows only plugin-namespaced KRW Ontology tools", async () => {
-    for (const toolName of KRW_ONTOLOGY_SDK_ALLOWED_TOOLS) {
+  it("allows configured KRW Ontology tools", async () => {
+    for (const toolName of [
+      ...KRW_ONTOLOGY_SDK_ALLOWED_TOOLS,
+      ...KRW_ONTOLOGY_DIRECT_SDK_ALLOWED_TOOLS,
+    ]) {
       await expect(canUseTool(toolName)).resolves.toEqual({ behavior: "allow" });
       expect(isKrwOntologySdkTool(toolName)).toBe(true);
     }
   });
 
-  it("denies legacy direct MCP and arbitrary tool names", async () => {
+  it("denies arbitrary KRW Ontology and unsafe tool names", async () => {
     const deniedToolNames = [
-      "mcp__krw-ontology__krw_ontology_query",
       "mcp__plugin_krw-ontology_krw-ontology__krw_ontology_delete",
       "mcp__plugin_krw-ontology_other__krw_ontology_query",
       "Bash",
@@ -100,10 +103,6 @@ describe("agent permission boundary", () => {
       });
       expect(isKrwOntologySdkTool(toolName)).toBe(false);
     }
-
-    expect(isKrwOntologySdkTool("mcp__krw-ontology__krw_ontology_query")).toBe(
-      false,
-    );
   });
 
   it("keeps the explicit SDK allowedTools list in sync with the bare MCP tools", () => {

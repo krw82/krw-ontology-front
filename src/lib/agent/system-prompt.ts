@@ -82,8 +82,15 @@ function buildWorkflowPolicy(features: PromptRuntimeFeatures): string {
       "This pass is a KRW Guru Advisor run.",
       "The user prompt may begin with an exact KRW Guru Advisor skill command for a selected guru lens. Follow that skill when present.",
       "If no guru skill command is present, use the runtime prompt as the workflow owner.",
-      "Use only the configured read-only Guru Advisor MCP tools. Do not use KRW Ontology filing tools, current-news tools, presentation/chart tools, built-in WebSearch, or WebFetch.",
+      "The main Guru Advisor run may use only configured read-only Guru Advisor MCP tools and the configured company_evidence_researcher subagent through the SDK Agent tool.",
+      "Do not use KRW Ontology filing tools directly from the main Guru Advisor run, even if krw_ontology_* tools appear available. Company filing evidence must come from the subagent tool with subagent_type=\"company_evidence_researcher\".",
+      "When company evidence is needed, call Agent with subagent_type=\"company_evidence_researcher\", a short description, and a prompt containing the ticker, the English company research brief, and latest-10-Q/10-K priority.",
+      "Do not use current-news tools, presentation/chart tools, built-in WebSearch, or WebFetch.",
       "Guru ontology provides investing lenses, questions, risk frames, and data needs only. It does not provide company facts, current financials, valuation, market prices, or latest filings.",
+      "Keep the orchestration bounded: use krw_guru_query_context at most once, krw_guru_company_brief at most once when company evidence is needed, Agent at most once for company_evidence_researcher, krw_guru_company_pack at most once after the Agent result, then write the final answer.",
+      "After the company_evidence_researcher returns a usable CompanyEvidencePack, do not perform more company evidence searches. If krw_guru_company_pack is unavailable or not necessary, write the final answer directly from the Guru lens and the CompanyEvidencePack.",
+      "When the Agent result contains company filing evidence and krw_guru_company_pack is available within the bounded flow, call it once before writing the final answer.",
+      "When company facts are needed, combine Guru lens evidence with the subagent's compact company filing evidence and keep the final answer in the selected guru consultation voice.",
     ].join("\n");
   }
 
@@ -138,7 +145,7 @@ function formatDateInTimeZone(date: Date, timeZone: string): string {
 
 function buildStockNewsPolicy(features: PromptRuntimeFeatures): string {
   if (features.guruAdvisorMode) {
-    return "Do not perform web searches, current-news lookups, filing retrieval, chart generation, or local file mutation.";
+    return "Do not perform web searches, current-news lookups, direct filing retrieval from the main Guru Advisor run, chart generation, or local file mutation. Company filing evidence may be requested only through the configured company_evidence_researcher subagent.";
   }
 
   const responseLocale = features.responseLocale ?? DEFAULT_LOCALE;

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("node:child_process", () => ({
   execFile: vi.fn((_command, _args, _options, callback) => {
-    callback(null, "2.1.111 (Claude Code)\n", "");
+    callback(null, "2.1.204 (Claude Code)\n", "");
   }),
 }));
 vi.mock("@/lib/supabase/admin", () => ({
@@ -151,7 +151,7 @@ describe("agent worker heartbeat", () => {
     expect(fake.upserts[0]).toMatchObject({
       worker_id: "mac-worker-jwc-1",
       status: "idle",
-      claude_code_version: "2.1.111 (Claude Code)",
+      claude_code_version: "2.1.204 (Claude Code)",
       ontology_release_id: "release-1",
       worker_env: "dev",
       ontology_env: "dev",
@@ -183,7 +183,7 @@ describe("agent worker heartbeat", () => {
         status: "idle",
         last_seen_at: "2026-05-27T00:00:00.000Z",
         heartbeat_expires_at: "2026-05-27T00:02:00.000Z",
-        claude_code_version: "2.1.111 (Claude Code)",
+        claude_code_version: "2.1.204 (Claude Code)",
         web_commit: "dev",
         krw_ontology_commit: "dev",
         worker_env: "dev",
@@ -252,7 +252,7 @@ describe("agent worker heartbeat", () => {
         status: "idle",
         last_seen_at: "2026-05-27T00:00:00.000Z",
         heartbeat_expires_at: "2026-05-27T00:02:00.000Z",
-        claude_code_version: "2.1.111 (Claude Code)",
+        claude_code_version: "2.1.204 (Claude Code)",
         web_commit: "dev",
         krw_ontology_commit: "dev",
         worker_env: "dev",

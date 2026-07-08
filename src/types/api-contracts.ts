@@ -176,7 +176,9 @@ export type GuruMCPToolName =
   | "krw_guru_chain"
   | "krw_guru_evidence"
   | "krw_guru_data_needs"
-  | "krw_guru_eval_questions";
+  | "krw_guru_eval_questions"
+  | "krw_guru_company_brief"
+  | "krw_guru_company_pack";
 
 /** Allowed MCP tool names */
 export type MCPToolName =

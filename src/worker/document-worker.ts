@@ -1,11 +1,21 @@
 import { randomUUID } from "node:crypto";
+import { Worker } from "bullmq";
+import {
+  DOCUMENT_INGESTION_QUEUE_NAME,
+  getRedisQueueUrl,
+  redisConnectionOptionsFromUrl,
+  type DocumentIngestionQueuePayload,
+} from "@/lib/document-ingestion/bullmq-queue";
 import {
   DOCUMENT_INGESTION_CONCURRENT_LIMIT,
   DOCUMENT_WORKER_IDLE_LOG_INTERVAL_MS,
   DOCUMENT_WORKER_RECONCILE_INTERVAL_MS,
 } from "@/lib/document-ingestion/config";
 import { claimNextDocumentIngestionJob } from "@/lib/document-ingestion/job-queue";
-import { runDocumentIngestionJob } from "@/lib/document-ingestion/job-runner";
+import {
+  runDocumentIngestionJob,
+  runQueuedDocumentIngestionJob,
+} from "@/lib/document-ingestion/job-runner";
 
 const WORKER_ID =
   process.env.DOCUMENT_WORKER_ID || `document-worker-${randomUUID()}`;
@@ -44,13 +54,82 @@ async function waitForStopSignal(abortController: AbortController) {
   });
 }
 
-async function main() {
+async function runBullMqDocumentWorker() {
+  const redisUrl = getRedisQueueUrl();
+  if (!redisUrl) {
+    throw new Error(
+      "DOCUMENT_INGESTION_BACKEND=bullmq requires REDIS_QUEUE_URL or DOCUMENT_QUEUE_REDIS_URL",
+    );
+  }
+
+  const worker = new Worker<DocumentIngestionQueuePayload>(
+    DOCUMENT_INGESTION_QUEUE_NAME,
+    async (job) => {
+      if (!job.data?.jobId) {
+        throw new Error("Document ingestion queue job is missing jobId");
+      }
+      await runQueuedDocumentIngestionJob(job.data.jobId, WORKER_ID);
+    },
+    {
+      connection: redisConnectionOptionsFromUrl(redisUrl, {
+        maxRetriesPerRequest: null,
+      }),
+      concurrency: DOCUMENT_INGESTION_CONCURRENT_LIMIT,
+    },
+  );
+
+  worker.on("completed", (job) => {
+    console.info("[document-worker] BullMQ job completed", {
+      workerId: WORKER_ID,
+      queueJobId: job.id,
+      jobId: job.data.jobId,
+    });
+  });
+  worker.on("failed", (job, error) => {
+    console.warn("[document-worker] BullMQ job failed", {
+      workerId: WORKER_ID,
+      queueJobId: job?.id,
+      jobId: job?.data.jobId,
+      error: error.message,
+    });
+  });
+  worker.on("error", (error) => {
+    console.warn("[document-worker] BullMQ worker error", {
+      workerId: WORKER_ID,
+      error: error.message,
+    });
+  });
+
+  console.info("[document-worker] started BullMQ backend", {
+    workerId: WORKER_ID,
+    queueName: DOCUMENT_INGESTION_QUEUE_NAME,
+    concurrency: DOCUMENT_INGESTION_CONCURRENT_LIMIT,
+  });
+
+  await new Promise<void>((resolve) => {
+    let resolved = false;
+    const stop = () => {
+      if (resolved) return;
+      resolved = true;
+      resolve();
+    };
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+  });
+
+  await worker.close();
+  console.info("[document-worker] stopped BullMQ backend", {
+    workerId: WORKER_ID,
+  });
+}
+
+async function runLegacyDbDocumentWorker() {
   process.env.DOCUMENT_WORKER_ID = WORKER_ID;
   const abortController = new AbortController();
   const activeJobs = new Set<Promise<void>>();
   let lastIdleLogAt = 0;
 
-  console.info("[document-worker] started", {
+  console.info("[document-worker] started legacy DB backend", {
     workerId: WORKER_ID,
     concurrency: DOCUMENT_INGESTION_CONCURRENT_LIMIT,
   });
@@ -95,7 +174,19 @@ async function main() {
   }
 
   await Promise.allSettled(activeJobs);
-  console.info("[document-worker] stopped", { workerId: WORKER_ID });
+  console.info("[document-worker] stopped legacy DB backend", {
+    workerId: WORKER_ID,
+  });
+}
+
+async function main() {
+  const backend = process.env.DOCUMENT_INGESTION_BACKEND || "legacy_db";
+  if (backend === "bullmq") {
+    await runBullMqDocumentWorker();
+    return;
+  }
+
+  await runLegacyDbDocumentWorker();
 }
 
 main().catch((error) => {

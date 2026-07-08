@@ -24,7 +24,6 @@ export type GuruLensOption = {
   descriptionEn: string;
   detailKo: string;
   detailEn: string;
-  icon: string;
 };
 
 export const GURU_LENSES: readonly GuruLensOption[] = [
@@ -45,7 +44,6 @@ export const GURU_LENSES: readonly GuruLensOption[] = [
     descriptionEn: "Select the relevant guru lenses for the question.",
     detailKo: "특정 구루를 고르기 전 넓게 원칙과 질문 프레임을 찾습니다.",
     detailEn: "Use a broad lens before selecting a specific investor.",
-    icon: "auto_awesome",
   },
   {
     key: "buffett",
@@ -68,7 +66,6 @@ export const GURU_LENSES: readonly GuruLensOption[] = [
       "이해 가능한 사업, 지속 가능한 경쟁우위, 장기 현금창출력을 먼저 묻는 렌즈입니다.",
     detailEn:
       "Start with understandable businesses, durable advantage, and long-term cash generation.",
-    icon: "verified",
   },
   {
     key: "marks",
@@ -91,7 +88,6 @@ export const GURU_LENSES: readonly GuruLensOption[] = [
       "좋은 이야기보다 손실 가능성, 사이클 위치, 군중심리를 먼저 의심하는 렌즈입니다.",
     detailEn:
       "Probe downside, cycle position, and crowd behavior before accepting a good story.",
-    icon: "warning",
   },
   {
     key: "ackman",
@@ -114,7 +110,6 @@ export const GURU_LENSES: readonly GuruLensOption[] = [
       "단순하고 예측 가능한 사업인지, 큰 포지션을 견딜 만큼 가정이 강한지 점검합니다.",
     detailEn:
       "Test simplicity, predictability, and whether assumptions can support concentration.",
-    icon: "center_focus_strong",
   },
   {
     key: "flatt",
@@ -137,7 +132,6 @@ export const GURU_LENSES: readonly GuruLensOption[] = [
       "장기 자산의 질, 운영자 역량, 재투자와 자본 배분의 지속성을 봅니다.",
     detailEn:
       "Focus on long-duration assets, operator quality, reinvestment, and capital allocation.",
-    icon: "domain",
   },
   {
     key: "terry_smith",
@@ -160,7 +154,6 @@ export const GURU_LENSES: readonly GuruLensOption[] = [
       "좋은 기업을 골라 과도한 가격을 피하고 오래 보유할 수 있는지부터 거릅니다.",
     detailEn:
       "Filter for quality, price discipline, and whether the business can be held for years.",
-    icon: "filter_alt",
   },
 ];
 
@@ -202,74 +195,74 @@ export function getGuruSuggestedPrompts(
   const byLens: Record<GuruLensKey, { ko: string[]; en: string[] }> = {
     auto: {
       ko: [
-        "좋은 기업을 판단할 때 먼저 던질 질문을 정리해줘.",
-        "리스크를 볼 때 어떤 함정을 피해야 해?",
-        "밸류에이션을 보기 전에 확인할 원칙을 알려줘.",
+        "내 투자 아이디어에서 먼저 의심해야 할 점을 찾아줘.",
+        "이 기업을 보기 전에 확인할 질문 5개를 뽑아줘.",
+        "좋은 이야기처럼 보이지만 깨질 수 있는 가정을 점검해줘.",
       ],
       en: [
-        "What questions should come first when judging a good company?",
-        "What traps should I avoid when thinking about risk?",
-        "What principles should I check before valuation?",
+        "Find the assumptions I should challenge first in my investment idea.",
+        "Give me 5 questions to ask before researching this company.",
+        "Pressure-test the assumptions that could break this attractive story.",
       ],
     },
     buffett: {
       ko: [
-        "워런 버핏 렌즈로 좋은 기업인지 판단할 체크리스트를 만들어줘.",
-        "해자와 장기 현금창출력을 볼 때 어떤 질문을 해야 해?",
-        "잘 아는 사업인지 판단하는 기준을 정리해줘.",
+        "내가 가진 종목을 버핏식으로 점검해줘.",
+        "이 사업을 장기 보유해도 되는지 질문부터 정리해줘.",
+        "해자와 현금창출력이 오래 갈지 의심할 지점을 찾아줘.",
       ],
       en: [
-        "Build a Buffett-lens checklist for judging whether a business is high quality.",
-        "What should I ask about moat and long-term cash generation?",
-        "How do I test whether a business is understandable enough?",
+        "Pressure-test my stock idea with a Buffett lens.",
+        "List the questions that test whether this business can be held for years.",
+        "Find what I should doubt about its moat and long-term cash generation.",
       ],
     },
     marks: {
       ko: [
-        "하워드 막스 렌즈로 손실 가능성과 사이클 리스크를 점검해줘.",
-        "좋은 스토리처럼 보이지만 위험한 상황을 구분해줘.",
-        "지금 질문에서 2차적 사고로 봐야 할 지점을 정리해줘.",
+        "이 투자 아이디어에서 손실 가능성부터 점검해줘.",
+        "좋은 스토리처럼 보이지만 위험한 부분을 찾아줘.",
+        "사이클과 군중심리 관점에서 조심할 지점을 정리해줘.",
       ],
       en: [
-        "Use a Marks lens to check downside and cycle risk.",
-        "Separate attractive stories from dangerous situations.",
-        "What second-level thinking should I apply to this question?",
+        "Start by checking the downside risk in this investment idea.",
+        "Find the dangerous parts hidden inside this attractive story.",
+        "Review what to watch from a cycle and crowd-psychology lens.",
       ],
     },
     ackman: {
       ko: [
-        "빌 애크먼 렌즈로 집중 투자 전에 확인할 조건을 정리해줘.",
-        "단순하고 예측 가능한 사업인지 확인할 질문을 만들어줘.",
-        "큰 포지션을 잡기 전에 깨져야 할 가정을 정리해줘.",
+        "큰 비중을 실어도 되는 아이디어인지 조건을 점검해줘.",
+        "이 사업이 정말 단순하고 예측 가능한지 질문을 만들어줘.",
+        "집중 투자 전에 깨져야 할 가정을 정리해줘.",
       ],
       en: [
-        "Use an Ackman lens to list conditions before a concentrated investment.",
-        "What questions test whether a business is simple and predictable?",
-        "What assumptions must be breakable before sizing a large position?",
+        "Test whether this idea deserves a concentrated position.",
+        "Create questions that check whether the business is truly simple and predictable.",
+        "List the assumptions that must be breakable before concentrating.",
       ],
     },
     flatt: {
       ko: [
-        "브루스 플랫 렌즈로 장기 자산과 운영 품질을 볼 때 무엇을 확인해야 해?",
-        "자본 배분과 재투자 기회를 점검할 질문을 정리해줘.",
-        "운영자가 장기 가치를 키우는지 보는 기준을 알려줘.",
+        "이 기업의 자산과 운영 품질을 장기 관점에서 점검해줘.",
+        "재투자 기회와 자본 배분이 계속될 수 있는지 질문을 뽑아줘.",
+        "운영자가 장기 가치를 키우는지 볼 기준을 정리해줘.",
       ],
       en: [
-        "Use a Flatt lens to check long-duration assets and operating quality.",
-        "What questions test capital allocation and reinvestment opportunity?",
-        "How do I judge whether operators compound long-term value?",
+        "Check this company's assets and operating quality with a long-duration lens.",
+        "List questions that test whether reinvestment and capital allocation can continue.",
+        "Define how to judge whether operators compound long-term value.",
       ],
     },
     terry_smith: {
       ko: [
-        "Terry Smith 렌즈로 왜 거절할지부터 점검해줘.",
-        "좋은 기업을 비싸게 사는 실수를 피하려면 무엇을 봐야 해?",
-        "오래 보유할 수 없는 기업을 걸러내는 질문을 정리해줘.",
+        "좋은 기업이라도 거절해야 할 이유부터 찾아줘.",
+        "오래 보유할 수 있는 품질인지 점검해줘.",
+        "가격 discipline을 깨뜨릴 위험한 가정을 정리해줘.",
       ],
       en: [
-        "Use a Terry Smith lens to start with reasons to reject.",
-        "What should I check to avoid overpaying for a quality business?",
-        "What questions filter out companies I cannot hold for a long time?",
+        "Start with reasons to reject this idea even if the company looks good.",
+        "Check whether the quality is durable enough to hold for years.",
+        "Find the assumptions that could break price discipline.",
       ],
     },
   };

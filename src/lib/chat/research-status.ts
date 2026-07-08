@@ -52,6 +52,8 @@ const toolLabels: Partial<Record<MCPToolName, string>> = {
   krw_guru_evidence: "구루 원칙 근거 확인",
   krw_guru_data_needs: "필요한 회사 근거 정리",
   krw_guru_eval_questions: "구루 평가 질문 확인",
+  krw_guru_company_brief: "회사 질문 정리",
+  krw_guru_company_pack: "회사 근거와 구루 렌즈 결합",
 };
 
 const toolStepMap: Record<MCPToolName, ResearchStepId> = {
@@ -88,6 +90,8 @@ const toolStepMap: Record<MCPToolName, ResearchStepId> = {
   krw_guru_evidence: "trace",
   krw_guru_data_needs: "compose",
   krw_guru_eval_questions: "compose",
+  krw_guru_company_brief: "scope",
+  krw_guru_company_pack: "compose",
 };
 
 const baseSteps: Array<{ id: ResearchStepId; label: string }> = [

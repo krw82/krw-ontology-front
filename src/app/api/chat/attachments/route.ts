@@ -1,6 +1,11 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
+import {
+  DOCUMENT_INGESTION_QUEUE_NAME,
+  enqueueDocumentIngestionJob,
+  type DocumentIngestionQueuePayload,
+} from "@/lib/document-ingestion/bullmq-queue";
 import {
   MAX_ACTIVE_DOCUMENT_ATTACHMENTS_PER_USER,
   MAX_DOCUMENT_ATTACHMENT_BYTES,
@@ -12,7 +17,11 @@ import {
 } from "@/lib/document-ingestion/storage";
 import { isUuid } from "@/lib/api/validation";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import type { ChatAttachmentRow, ChatSessionRow } from "@/types/database";
+import type {
+  ChatAttachmentRow,
+  ChatSessionRow,
+  CreateDocumentIngestionJobResult,
+} from "@/types/database";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -121,49 +130,28 @@ export async function POST(request: NextRequest) {
   });
 
   const buffer = Buffer.from(await file.arrayBuffer());
+  const contentHash = createHash("sha256").update(buffer).digest("hex");
   await writeDocumentAttachment({ relativePath, content: buffer });
 
-  const { data: attachment, error: attachmentError } = await admin
-    .from("chat_attachments")
-    .insert({
-      id: attachmentId,
-      user_id: user.id,
-      session_id: session?.id ?? null,
-      ticker: session?.default_tickers?.[0] ?? null,
-      file_name: file.name,
-      mime_type: file.type || "application/pdf",
-      file_size: file.size,
-      storage_kind: "local_fs",
-      original_path: relativePath,
-      extraction_status: "queued",
-      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      created_at: now,
-      updated_at: now,
-    })
-    .select("*")
-    .single<ChatAttachmentRow>();
+  const { data: creation, error: creationError } =
+    await admin.rpc("create_document_ingestion_job", {
+      p_attachment_id: attachmentId,
+      p_user_id: user.id,
+      p_session_id: session?.id ?? null,
+      p_ticker: session?.default_tickers?.[0] ?? null,
+      p_file_name: file.name,
+      p_mime_type: file.type || "application/pdf",
+      p_file_size: file.size,
+      p_storage_kind: "local_fs",
+      p_original_path: relativePath,
+      p_original_object_path: relativePath,
+      p_content_hash: contentHash,
+      p_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      p_queue_name: DOCUMENT_INGESTION_QUEUE_NAME,
+    });
 
-  if (attachmentError || !attachment) {
+  if (creationError || !creation) {
     await removeDocumentAttachment(relativePath).catch(() => undefined);
-    return Response.json(
-      {
-        error: {
-          code: "internal_error",
-          message: "첨부 파일을 저장하지 못했습니다.",
-        },
-      },
-      { status: 500 },
-    );
-  }
-
-  const { error: jobError } = await admin.from("document_ingestion_jobs").insert({
-    attachment_id: attachment.id,
-    status: "queued",
-  });
-
-  if (jobError) {
-    await removeDocumentAttachment(relativePath).catch(() => undefined);
-    await admin.from("chat_attachments").delete().eq("id", attachment.id);
     return Response.json(
       {
         error: {
@@ -175,6 +163,63 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const created = creation as CreateDocumentIngestionJobResult;
+  const attachment = created.attachment as ChatAttachmentRow;
+  const job = created.job;
+
+  const queuePayload: DocumentIngestionQueuePayload = {
+    schemaVersion: 1,
+    jobId: job.id,
+    attachmentId: attachment.id,
+    userId: attachment.user_id,
+    storageKind: attachment.storage_kind,
+    originalPath: attachment.original_path,
+    originalObjectPath: attachment.original_object_path,
+    contentHash: attachment.content_hash,
+  };
+
+  try {
+    const enqueueResult = await enqueueDocumentIngestionJob({
+      queueJobId: created.queue_job_id,
+      payload: queuePayload,
+    });
+
+    if (enqueueResult.status === "enqueued") {
+      const dispatchedAt = new Date().toISOString();
+      const { error: outboxError } = await admin
+        .from("document_job_outbox")
+        .update({
+          status: "dispatched",
+          dispatched_at: dispatchedAt,
+          last_error: null,
+          updated_at: dispatchedAt,
+        })
+        .eq("queue_name", created.queue_name)
+        .eq("queue_job_id", created.queue_job_id);
+
+      if (outboxError) {
+        console.warn("[chat-attachments] failed to mark outbox dispatched", {
+          attachmentId: attachment.id,
+          jobId: job.id,
+          code: outboxError.code,
+          message: outboxError.message,
+        });
+      }
+    } else {
+      console.info("[chat-attachments] document queue enqueue skipped", {
+        attachmentId: attachment.id,
+        jobId: job.id,
+        reason: enqueueResult.reason,
+      });
+    }
+  } catch (error) {
+    console.warn("[chat-attachments] document queue enqueue failed", {
+      attachmentId: attachment.id,
+      jobId: job.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   return Response.json(
     {
       attachment: {
@@ -183,6 +228,9 @@ export async function POST(request: NextRequest) {
         file_size: attachment.file_size,
         mime_type: attachment.mime_type,
         status: attachment.extraction_status,
+        stage: attachment.extraction_stage,
+        progress_percent: attachment.progress_percent,
+        job_id: job.id,
       },
     },
     { status: 201 },

@@ -111,4 +111,4 @@ High-risk investment questions must still be answered from selected guru ontolog
 
 For non-ticker questions, do not lead with filing or company-data caveats. Give the guru-lens answer first, then add a short note about data needed only if the user later applies the lens to a company.
 
-The answer must carry the selected author's voice and texture from the skill-local `references/answer-style.md`, including vivid first-person simulated voice when useful, without claiming real identity or inventing principles not returned by the ResearchPack.
+The answer must carry the selected author's voice and texture from the skill-local `references/answer-style.md`, including vivid first-person simulated voice when useful, without claiming real identity or inventing principles not returned by the ResearchPack. The skill-local `references/answer-style.md` is runtime-required for final rendering, not a maintainer-only debug document.

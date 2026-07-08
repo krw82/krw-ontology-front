@@ -123,8 +123,7 @@ node "$SCRIPT_DIR/materialize-guru-advisor-plugin.mjs" \
   --out "$GURU_PLUGIN_PATH" \
   --ontology-source-dir "$ONTOLOGY_SOURCE_DIR" \
   --guru-data-root "$GURU_DATA_ROOT" \
-  --guru-release-root "$GURU_RELEASE_ROOT" \
-  --company-mcp-url "$KRW_ONTOLOGY_MCP_URL" >/dev/null
+  --guru-release-root "$GURU_RELEASE_ROOT" >/dev/null
 
 export KRW_GURU_ADVISOR_PLUGIN_PATH="$GURU_PLUGIN_PATH"
 export KRW_GURU_DATA_ROOT="$GURU_DATA_ROOT"

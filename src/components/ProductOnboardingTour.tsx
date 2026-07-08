@@ -233,13 +233,18 @@ export default function ProductOnboardingTour({
     const timeoutId = window.setTimeout(() => {
       if (!cancelled) setReady(true);
     }, 220);
+    let authTimer: number | null = null;
 
     if (IS_DEV_ENV || force) {
-      setIsAuthenticated(true);
-      setUserStorageKey(`${TOUR_STORAGE_PREFIX}:${tour}:dev`);
+      authTimer = window.setTimeout(() => {
+        if (cancelled) return;
+        setIsAuthenticated(true);
+        setUserStorageKey(`${TOUR_STORAGE_PREFIX}:${tour}:dev`);
+      }, 0);
       return () => {
         cancelled = true;
         window.clearTimeout(timeoutId);
+        if (authTimer !== null) window.clearTimeout(authTimer);
       };
     }
 
@@ -267,15 +272,21 @@ export default function ProductOnboardingTour({
   }, [force, tour]);
 
   useEffect(() => {
-    setStepDirection(1);
-    setStepIndex(0);
+    const timeoutId = window.setTimeout(() => {
+      setStepDirection(1);
+      setStepIndex(0);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [tour]);
 
   useEffect(() => {
     if (!ready || !isAuthenticated) return;
+    let timeoutId: number | null = null;
     if (IS_DEV_ENV || force) {
-      setVisible(true);
-      return;
+      timeoutId = window.setTimeout(() => setVisible(true), 0);
+      return () => {
+        if (timeoutId !== null) window.clearTimeout(timeoutId);
+      };
     }
     if (!userStorageKey) return;
 
@@ -285,7 +296,10 @@ export default function ProductOnboardingTour({
       // If storage is unavailable, still show once for this page view.
     }
 
-    setVisible(true);
+    timeoutId = window.setTimeout(() => setVisible(true), 0);
+    return () => {
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+    };
   }, [force, isAuthenticated, ready, userStorageKey]);
 
   const completeTour = useCallback(() => {
@@ -347,7 +361,7 @@ export default function ProductOnboardingTour({
       dispatchOpenChatSidebar();
     }
 
-    updateSpotlight();
+    const frameId = window.requestAnimationFrame(updateSpotlight);
     const retryTimers = [80, 220, 420].map((delay) =>
       window.setTimeout(updateSpotlight, delay),
     );
@@ -355,6 +369,7 @@ export default function ProductOnboardingTour({
     window.addEventListener("resize", updateSpotlight);
     window.addEventListener("scroll", updateSpotlight, true);
     return () => {
+      window.cancelAnimationFrame(frameId);
       retryTimers.forEach((timer) => window.clearTimeout(timer));
       window.removeEventListener("resize", updateSpotlight);
       window.removeEventListener("scroll", updateSpotlight, true);

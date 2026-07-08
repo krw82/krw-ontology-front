@@ -22,11 +22,10 @@ let ontologySourceDir =
   process.env.KRW_ONTOLOGY_SOURCE_DIR || defaultOntologySourceDir;
 let guruDataRoot = process.env.KRW_GURU_DATA_ROOT || defaultGuruDataRoot;
 let guruReleaseRoot = process.env.KRW_GURU_RELEASE_ROOT || "";
-let companyMcpUrl = process.env.KRW_ONTOLOGY_MCP_URL || "";
 
 function usage() {
   console.error(
-    `Usage: scripts/materialize-guru-advisor-plugin.mjs --env dev|prod [--source DIR] [--out DIR] [--ontology-source-dir DIR] [--guru-data-root DIR] [--guru-release-root DIR] [--company-mcp-url URL]`,
+    `Usage: scripts/materialize-guru-advisor-plugin.mjs --env dev|prod [--source DIR] [--out DIR] [--ontology-source-dir DIR] [--guru-data-root DIR] [--guru-release-root DIR]`,
   );
 }
 
@@ -51,9 +50,6 @@ for (let index = 0; index < args.length; index += 1) {
     case "--guru-release-root":
       guruReleaseRoot = args[++index] || "";
       break;
-    case "--company-mcp-url":
-      companyMcpUrl = args[++index] || "";
-      break;
     case "--help":
     case "-h":
       usage();
@@ -75,10 +71,6 @@ if (!out) {
 }
 if (!guruReleaseRoot) {
   guruReleaseRoot = path.join(guruDataRoot, "releases", env, "current");
-}
-if (!companyMcpUrl) {
-  const port = env === "prod" ? 8765 : 8766;
-  companyMcpUrl = `http://127.0.0.1:${port}/mcp`;
 }
 
 const resolvedSource = path.resolve(source);
@@ -122,10 +114,6 @@ writeFileSync(
             KRW_GURU_RELEASE_ROOT: resolvedGuruReleaseRoot,
           },
         },
-        "krw-ontology-company": {
-          type: "http",
-          url: companyMcpUrl,
-        },
       },
     },
     null,
@@ -135,4 +123,3 @@ writeFileSync(
 
 console.log(`Materialized ${env} KRW Guru Advisor plugin: ${resolvedOut}`);
 console.log(`Guru release root: ${resolvedGuruReleaseRoot}`);
-console.log(`Company MCP URL: ${companyMcpUrl}`);

@@ -229,7 +229,7 @@ trap cleanup EXIT INT TERM
   echo "CLAUDE_AGENT_CWD=~/krw-ontology-front/.agent-workspace"
   echo "CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG"
   echo "CLAUDE_CODE_EXECUTABLE=$CLAUDE_PATH"
-  echo "EXPECTED_CLAUDE_CODE_VERSION=2.1.141"
+  echo "EXPECTED_CLAUDE_CODE_VERSION=2.1.204"
   echo "AGENT_SUPERVISOR_ID=mac-supervisor-jwc"
   echo "AGENT_SUPERVISOR_CONCURRENCY=8"
   echo "AGENT_WORKER_ID_PREFIX=mac-worker-jwc"

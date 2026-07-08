@@ -10,6 +10,7 @@ import { access, readFile } from "node:fs/promises";
 import {
   checkMcpHealth,
   checkMcpReady,
+  isKrwOntologySdkTool,
   resolveGuruAdvisorPluginPath,
 } from "@/lib/agent/mcp-client";
 
@@ -93,5 +94,28 @@ describe("mcp-client readiness probes", () => {
     await expect(resolveGuruAdvisorPluginPath()).resolves.toBe(
       "/plugins/prod/krw-guru-advisor",
     );
+  });
+
+  it("recognizes ontology plugin and direct MCP prefixes as ontology SDK tools", () => {
+    expect(
+      isKrwOntologySdkTool(
+        "mcp__plugin_krw-ontology_krw-ontology__krw_ontology_query_context",
+      ),
+    ).toBe(true);
+    expect(
+      isKrwOntologySdkTool(
+        "mcp__krw-ontology__krw_ontology_query_context",
+      ),
+    ).toBe(true);
+    expect(
+      isKrwOntologySdkTool(
+        "mcp__plugin_krw-guru-advisor_krw-ontology-company__krw_ontology_query_context",
+      ),
+    ).toBe(false);
+    expect(
+      isKrwOntologySdkTool(
+        "mcp__plugin_krw-guru-advisor_krw-guru-advisor__krw_guru_query_context",
+      ),
+    ).toBe(false);
   });
 });

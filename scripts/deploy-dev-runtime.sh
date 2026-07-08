@@ -78,8 +78,7 @@ node "$SCRIPT_DIR/materialize-guru-advisor-plugin.mjs" \
   --out "$GURU_PLUGIN_PATH" \
   --ontology-source-dir "$ONTOLOGY_SOURCE_DIR" \
   --guru-data-root "$GURU_DATA_ROOT" \
-  --guru-release-root "$GURU_RELEASE_ROOT" \
-  --company-mcp-url "$MCP_URL" >/dev/null
+  --guru-release-root "$GURU_RELEASE_ROOT" >/dev/null
 
 require_path "$PLUGIN_PATH/.mcp.json"
 require_path "$PLUGIN_PATH/.claude-plugin/plugin.json"

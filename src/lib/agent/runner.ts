@@ -1,16 +1,23 @@
 import "server-only";
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import {
   getSessionInfo,
   query,
+  type AgentDefinition,
+  type CanUseTool,
+  type McpServerConfigForProcessTransport,
   type Options,
   type PermissionResult,
+  type SdkPluginConfig,
   type SDKMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import {
   GURU_ADVISOR_SDK_ALLOWED_TOOLS,
   GURU_MCP_TOOLS,
+  KRW_ONTOLOGY_DIRECT_SDK_ALLOWED_TOOLS,
   KRW_ONTOLOGY_MCP_TOOLS,
   KRW_ONTOLOGY_SDK_ALLOWED_TOOLS,
   STOCK_NEWS_MCP_TOOLS,
@@ -37,7 +44,14 @@ import {
 } from "./system-prompt";
 import type { IndexedCompanyDocument } from "@/lib/ontology/catalog";
 import { normalizeKrwOntologyToolInput } from "./tool-input-policy";
-import { buildResearchPassPrompt } from "./workflow";
+import {
+  KRW_GURU_ACKMAN_ADVISOR_SKILL,
+  KRW_GURU_BUFFETT_ADVISOR_SKILL,
+  KRW_GURU_FLATT_ADVISOR_SKILL,
+  KRW_GURU_MARKS_ADVISOR_SKILL,
+  KRW_GURU_TERRY_SMITH_ADVISOR_SKILL,
+  buildResearchPassPrompt,
+} from "./workflow";
 import { getClaudeAgentModel } from "./model";
 import { getIndexedCompanies } from "@/lib/ontology/catalog";
 import { readIntEnv } from "@/lib/env";
@@ -100,6 +114,16 @@ const TOOL_BUDGET_EXCEEDED = "tool_budget_exceeded";
 const TOOL_RESULT_MISSING = "tool_result_missing";
 const DEFAULT_STOCK_NEWS_MAX_CALLS = 12;
 const DEFAULT_YAHOO_FINANCE_MAX_CALLS = 4;
+const AGENT_TOOL_NAME = "Agent";
+const SUBAGENT_TOOL_NAMES = [AGENT_TOOL_NAME] as const;
+const COMPANY_EVIDENCE_SUBAGENT_NAME = "company_evidence_researcher";
+const GURU_MAIN_SKILLS = [
+  KRW_GURU_BUFFETT_ADVISOR_SKILL,
+  KRW_GURU_MARKS_ADVISOR_SKILL,
+  KRW_GURU_ACKMAN_ADVISOR_SKILL,
+  KRW_GURU_FLATT_ADVISOR_SKILL,
+  KRW_GURU_TERRY_SMITH_ADVISOR_SKILL,
+] as const;
 const DISALLOWED_SDK_TOOLS = [
   "Bash",
   "Read",
@@ -151,6 +175,21 @@ interface ToolResultRecord {
   json: unknown;
 }
 
+function buildSdkPlugins(params: {
+  guruAdvisorPluginPath: string | null;
+  guruAdvisorRun: boolean;
+  ontologyPluginPath: string;
+}): SdkPluginConfig[] {
+  const { guruAdvisorPluginPath, guruAdvisorRun, ontologyPluginPath } = params;
+  if (!guruAdvisorRun) {
+    return [{ type: "local", path: ontologyPluginPath }];
+  }
+  if (!guruAdvisorPluginPath) {
+    throw new Error("Guru Advisor plugin path is required for guru runs.");
+  }
+  return [{ type: "local", path: guruAdvisorPluginPath }];
+}
+
 export interface SdkDiagnostics {
   passName?: "research";
   requestedModel?: string;
@@ -194,9 +233,16 @@ export async function runAgent(
       defaultRunKindForAnalysisMode(normalizeAnalysisMode(options.analysisMode)),
   );
   const guruAdvisorRun = runKind === "guru_advisor";
-  const pluginPath = guruAdvisorRun
+  const ontologyPluginPath = getKrwOntologyPluginPath();
+  const guruAdvisorPluginPath = guruAdvisorRun
     ? await resolveGuruAdvisorPluginPath()
-    : getKrwOntologyPluginPath();
+    : null;
+  const pluginPath = guruAdvisorPluginPath ?? ontologyPluginPath;
+  const plugins = buildSdkPlugins({
+    guruAdvisorPluginPath,
+    guruAdvisorRun,
+    ontologyPluginPath,
+  });
   const analysisMode = analysisModeForRunKind(
     runKind,
     normalizeAnalysisMode(options.analysisMode),
@@ -267,10 +313,16 @@ export async function runAgent(
       preset: "claude_code",
       append: systemPrompt,
     },
-    plugins: [{ type: "local", path: pluginPath }],
-    tools: [],
+    plugins,
     allowedTools,
-    disallowedTools: DISALLOWED_SDK_TOOLS,
+    ...(guruAdvisorRun
+      ? {
+          hooks: buildGuruAdvisorToolBoundaryHooks(guruAdvisorPluginPath),
+        }
+      : {
+          tools: [],
+          disallowedTools: DISALLOWED_SDK_TOOLS,
+        }),
     permissionMode: "dontAsk",
     allowDangerouslySkipPermissions: false,
     canUseTool,
@@ -278,6 +330,14 @@ export async function runAgent(
     maxTurns: readIntEnv("CLAUDE_AGENT_MAX_TURNS", DEFAULT_MAX_TURNS, {
       min: 1,
     }),
+    ...(guruAdvisorRun
+      ? {
+          agents: buildGuruAdvisorSubagents(ontologyPluginPath),
+          agentProgressSummaries: false,
+          forwardSubagentText: false,
+          skills: GURU_MAIN_SKILLS.map((skill) => skill.replace(/^\//, "")),
+        }
+      : {}),
     includePartialMessages: false,
     abortController,
     env: buildClaudeAgentEnv(),
@@ -640,6 +700,197 @@ async function reportSdkInitialization(params: {
   await options.onSdkDiagnostics(diagnostics);
 }
 
+function buildCompanyEvidenceMcpServers(
+  ontologyPluginPath: string,
+): AgentDefinition["mcpServers"] {
+  const mcpConfigPath = path.join(ontologyPluginPath, ".mcp.json");
+  try {
+    const parsed = JSON.parse(readFileSync(mcpConfigPath, "utf8")) as {
+      mcpServers?: Record<string, unknown>;
+    };
+    const serverConfig = parsed.mcpServers?.["krw-ontology"];
+    if (!serverConfig || typeof serverConfig !== "object") return undefined;
+    return [
+      {
+        "krw-ontology": serverConfig as McpServerConfigForProcessTransport,
+      },
+    ];
+  } catch {
+    return undefined;
+  }
+}
+
+function buildGuruAdvisorSubagents(
+  ontologyPluginPath: string,
+): Record<string, AgentDefinition> {
+  return {
+    [COMPANY_EVIDENCE_SUBAGENT_NAME]: {
+      description:
+        "Use for company-specific filing evidence needed by the KRW Guru Advisor before the final guru-style answer.",
+      prompt: [
+        "You are the KRW Ontology company evidence researcher for a Guru Advisor parent run.",
+        "Your only job is to fetch and synthesize compact company filing evidence. Do not write the final user answer and do not imitate any guru voice.",
+        "Use only the read-only KRW Ontology MCP tools attached to this subagent. Do not use Guru Advisor tools, current-news tools, chart tools, WebSearch, WebFetch, or filesystem tools.",
+        "Work English-first internally when forming retrieval queries. Final payload may be compact English unless the parent explicitly asks for Korean labels.",
+        "Start company judgments from the latest available 10-Q/current driver returned by the company filing anchor. Use the latest 10-K as annual business mix, historical trend, and risk baseline. Do not invent future periods.",
+        "If an older 10-K risk appears resolved or changed in a later 10-Q, make that delta explicit.",
+        "Return a compact CompanyEvidencePack only, using these sections: ticker, company_name, current_driver, annual_baseline, filing_supported_facts, resolved_risks, still_open_risks, current_judgment_delta, missing_evidence.",
+        "Do not include process narration, tool debugging, access-control commentary, or a final user-facing answer. Return the pack content only.",
+        "Do not expose tool names, MCP names, raw ids, internal file paths, or provider/debug labels.",
+      ].join("\n"),
+      tools: [...KRW_ONTOLOGY_DIRECT_SDK_ALLOWED_TOOLS],
+      mcpServers: buildCompanyEvidenceMcpServers(ontologyPluginPath),
+      model: "inherit",
+      maxTurns: 16,
+      permissionMode: "dontAsk",
+    },
+  };
+}
+
+function buildGuruAdvisorToolBoundaryHooks(
+  guruAdvisorPluginPath: string | null,
+): Options["hooks"] {
+  const pluginRoot = guruAdvisorPluginPath
+    ? path.resolve(guruAdvisorPluginPath)
+    : null;
+
+  return {
+    PreToolUse: [
+      {
+        hooks: [
+          async (input) => {
+            const record = input as UnknownRecord;
+            const toolName =
+              typeof record.tool_name === "string" ? record.tool_name : "";
+            const toolInput = isRecord(record.tool_input)
+              ? record.tool_input
+              : {};
+            const agentID =
+              typeof record.agent_id === "string" ? record.agent_id : "";
+            const agentType =
+              typeof record.agent_type === "string" ? record.agent_type : "";
+
+            if (agentID || agentType) {
+              const isCompanyEvidenceAgent = isCompanyEvidenceSubagent(
+                agentType || agentID,
+              );
+              return guruAdvisorHookDecision(
+                isCompanyEvidenceAgent && isDirectKrwOntologySdkTool(toolName)
+                  ? "allow"
+                  : "deny",
+                isCompanyEvidenceAgent
+                  ? "Company evidence subagents may use only direct KRW Ontology filing MCP tools."
+                  : "Unknown Guru Advisor subagent is not allowed to use tools.",
+              );
+            }
+
+            if (toolName === AGENT_TOOL_NAME) {
+              if (toolInput.subagent_type !== COMPANY_EVIDENCE_SUBAGENT_NAME) {
+                return guruAdvisorHookDecision(
+                  "deny",
+                  "Guru Advisor can delegate only to the configured company evidence researcher subagent.",
+                );
+              }
+
+              return guruAdvisorHookDecision(
+                "allow",
+                "Company evidence research must run inline so the Guru Advisor can use the returned evidence pack.",
+                {
+                  ...toolInput,
+                  run_in_background: false,
+                },
+              );
+            }
+
+            if (isGuruAdvisorSdkTool(toolName)) {
+              return guruAdvisorHookDecision(
+                "allow",
+                "Guru Advisor MCP tools are allowed in the main Guru run.",
+              );
+            }
+
+            if (toolName === "Read") {
+              return guruAdvisorHookDecision(
+                pluginRoot && isAllowedGuruAdvisorRead(pluginRoot, toolInput)
+                  ? "allow"
+                  : "deny",
+                "Guru Advisor may read only its bundled skill and reference documents.",
+              );
+            }
+
+            return guruAdvisorHookDecision(
+              "deny",
+              "Guru Advisor main runs may use only Guru Advisor MCP tools, bundled Guru reference reads, and the configured company evidence Agent.",
+            );
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function guruAdvisorHookDecision(
+  permissionDecision: "allow" | "deny",
+  reason: string,
+  updatedInput?: Record<string, unknown>,
+) {
+  if (permissionDecision === "allow") {
+    return {
+      continue: true,
+      ...(updatedInput
+        ? {
+            hookSpecificOutput: {
+              hookEventName: "PreToolUse" as const,
+              updatedInput,
+            },
+          }
+        : {}),
+    };
+  }
+
+  return {
+    continue: true,
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse" as const,
+      permissionDecision,
+      permissionDecisionReason: reason,
+      ...(updatedInput ? { updatedInput } : {}),
+    },
+  };
+}
+
+function isDirectKrwOntologySdkTool(toolName: string): boolean {
+  return KRW_ONTOLOGY_DIRECT_SDK_ALLOWED_TOOLS.includes(toolName);
+}
+
+function isAllowedGuruAdvisorRead(
+  pluginRoot: string,
+  input: Record<string, unknown>,
+): boolean {
+  const rawPath =
+    typeof input.file_path === "string"
+      ? input.file_path
+      : typeof input.path === "string"
+        ? input.path
+        : "";
+  if (!rawPath) return false;
+
+  const resolvedPath = path.resolve(rawPath);
+  return (
+    isPathInside(resolvedPath, path.join(pluginRoot, "skills")) ||
+    isPathInside(resolvedPath, path.join(pluginRoot, "references"))
+  );
+}
+
+function isPathInside(childPath: string, parentPath: string): boolean {
+  const relative = path.relative(parentPath, childPath);
+  return (
+    Boolean(relative) &&
+    !relative.startsWith("..") &&
+    !path.isAbsolute(relative)
+  );
+}
+
 export async function canUseTool(
   toolName: string,
   input: Record<string, unknown> = {},
@@ -684,6 +935,10 @@ export async function canUseTool(
   };
 }
 
+function isSubagentInvocationTool(toolName: string): boolean {
+  return (SUBAGENT_TOOL_NAMES as readonly string[]).includes(toolName);
+}
+
 function allowedSdkToolsForResearchMode(
   mode: ResearchMode,
   analysisMode: AnalysisMode,
@@ -691,7 +946,12 @@ function allowedSdkToolsForResearchMode(
   chartGenerationEnabled = isChartGenerationEnabled(),
 ): string[] {
   if (runKind === "guru_advisor") {
-    return GURU_ADVISOR_SDK_ALLOWED_TOOLS;
+    return [
+      ...GURU_ADVISOR_SDK_ALLOWED_TOOLS,
+      ...SUBAGENT_TOOL_NAMES,
+      "Read",
+      ...KRW_ONTOLOGY_DIRECT_SDK_ALLOWED_TOOLS,
+    ];
   }
 
   const allowedMcpTools = new Set(getAllowedMcpToolsForResearchMode(mode));
@@ -736,10 +996,11 @@ function createToolPermissionGuard(
   maxYahooFinanceCalls: number,
   allowedStockNewsSourceUrls: string[] = [],
   chartGenerationEnabled = isChartGenerationEnabled(),
-) {
+): CanUseTool {
   return async (
     toolName: string,
     input: Record<string, unknown> = {},
+    permissionContext,
   ): Promise<PermissionResult> => {
     if (isChartSdkTool(toolName)) {
       return chartGenerationEnabled
@@ -751,11 +1012,26 @@ function createToolPermissionGuard(
     }
 
     if (runKind === "guru_advisor") {
+      if (permissionContext?.agentID) {
+        return guruSubagentToolPermission({
+          acc,
+          agentID: permissionContext.agentID,
+          input,
+          maxToolCalls,
+          mode,
+          toolName,
+        });
+      }
+
+      if (isSubagentInvocationTool(toolName)) {
+        return guruMainAgentToolPermission(input);
+      }
+
       if (!isGuruAdvisorSdkTool(toolName)) {
         return {
           behavior: "deny",
           message:
-            "This run uses only the configured read-only Guru Advisor MCP tools.",
+            "This Guru Advisor main run can use only Guru Advisor MCP tools and the configured company evidence subagent.",
         };
       }
 
@@ -929,6 +1205,100 @@ function createToolPermissionGuard(
 
     return { behavior: "allow" };
   };
+}
+
+function guruMainAgentToolPermission(
+  input: Record<string, unknown>,
+): PermissionResult {
+  if (input.subagent_type !== COMPANY_EVIDENCE_SUBAGENT_NAME) {
+    return {
+      behavior: "deny",
+      message:
+        "Guru Advisor can delegate only to the configured company evidence researcher subagent.",
+    };
+  }
+  if (input.run_in_background === true) {
+    return {
+      behavior: "deny",
+      message:
+        "Company evidence research must run inline so the Guru Advisor can use its result in the final answer.",
+    };
+  }
+
+  return { behavior: "allow" };
+}
+
+function guruSubagentToolPermission(params: {
+  acc: AccumulatedRun;
+  agentID: string;
+  input: Record<string, unknown>;
+  maxToolCalls: number;
+  mode: ResearchMode;
+  toolName: string;
+}): PermissionResult {
+  const { acc, agentID, input, maxToolCalls, mode, toolName } = params;
+  if (!isCompanyEvidenceSubagent(agentID)) {
+    return {
+      behavior: "deny",
+      message: "Unknown Guru Advisor subagent is not allowed to use tools.",
+    };
+  }
+
+  if (isSubagentInvocationTool(toolName)) {
+    return {
+      behavior: "deny",
+      message: "Company evidence subagents may not spawn recursive subagents.",
+    };
+  }
+
+  if (!isKrwOntologySdkTool(toolName)) {
+    return {
+      behavior: "deny",
+      message:
+        "The company evidence subagent can use only KRW Ontology company filing tools.",
+    };
+  }
+
+  const mcpToolName = normalizeKrwOntologyToolName(toolName);
+  if (!mcpToolName) {
+    return {
+      behavior: "deny",
+      message: "Unknown KRW Ontology MCP tool.",
+    };
+  }
+
+  const allowedMcpTools = new Set(getAllowedMcpToolsForResearchMode(mode));
+  if (!allowedMcpTools.has(mcpToolName)) {
+    return {
+      behavior: "deny",
+      message: `Research mode ${mode} does not allow ${mcpToolName}.`,
+    };
+  }
+
+  if (acc.toolCalls.length + 1 > maxToolCalls) {
+    return {
+      behavior: "deny",
+      message: buildToolBudgetDenyMessage(),
+    };
+  }
+
+  const preparedInput = prepareToolInputForRun(mcpToolName, input, acc);
+  if (preparedInput.changed) {
+    return {
+      behavior: "allow",
+      updatedInput: preparedInput.input,
+    };
+  }
+
+  return { behavior: "allow" };
+}
+
+function isCompanyEvidenceSubagent(agentID: string): boolean {
+  return (
+    agentID === COMPANY_EVIDENCE_SUBAGENT_NAME ||
+    agentID.startsWith(`${COMPANY_EVIDENCE_SUBAGENT_NAME}:`) ||
+    agentID.includes(COMPANY_EVIDENCE_SUBAGENT_NAME)
+  );
 }
 
 function allowWithInputPolicy(

@@ -45,7 +45,7 @@ describe("materialize-guru-advisor-plugin", () => {
     }
   });
 
-  it("writes a guru MCP config that points at the selected release and company MCP", () => {
+  it("writes a guru-only MCP config that points at the selected release", () => {
     const source = makeGuruPluginSource();
     const ontologySource = makeOntologySource();
     const out = mkdtempSync(path.join(tmpdir(), "krw-guru-plugin-out-"));
@@ -67,8 +67,6 @@ describe("materialize-guru-advisor-plugin", () => {
         "/guru-data",
         "--guru-release-root",
         "/guru-data/releases/prod/current",
-        "--company-mcp-url",
-        "http://127.0.0.1:8765/mcp",
       ],
       {
         cwd: process.cwd(),
@@ -106,10 +104,7 @@ describe("materialize-guru-advisor-plugin", () => {
         KRW_GURU_RELEASE_ROOT: "/guru-data/releases/prod/current",
       },
     });
-    expect(mcpConfig.mcpServers["krw-ontology-company"]).toEqual({
-      type: "http",
-      url: "http://127.0.0.1:8765/mcp",
-    });
+    expect(mcpConfig.mcpServers["krw-ontology-company"]).toBeUndefined();
     expect(stdout).toContain("Materialized prod KRW Guru Advisor plugin");
   });
 });

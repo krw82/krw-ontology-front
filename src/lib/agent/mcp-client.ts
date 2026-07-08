@@ -22,6 +22,9 @@ import {
 
 const KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX =
   "mcp__plugin_krw-ontology_krw-ontology__";
+const KRW_ONTOLOGY_MCP_SERVER_NAME = "krw-ontology";
+const KRW_ONTOLOGY_DIRECT_TOOL_PREFIX =
+  `mcp__${KRW_ONTOLOGY_MCP_SERVER_NAME}__`;
 const STOCK_NEWS_PLUGIN_TOOL_PREFIX =
   "mcp__plugin_krw-ontology_stock-news__";
 const GURU_ADVISOR_PLUGIN_TOOL_PREFIX =
@@ -71,6 +74,8 @@ export const GURU_MCP_TOOLS = [
   "krw_guru_evidence",
   "krw_guru_data_needs",
   "krw_guru_eval_questions",
+  "krw_guru_company_brief",
+  "krw_guru_company_pack",
 ] as const satisfies readonly GuruMCPToolName[];
 
 export {
@@ -81,6 +86,11 @@ export {
 export const KRW_ONTOLOGY_SDK_ALLOWED_TOOLS = KRW_ONTOLOGY_MCP_TOOLS.map(
   (toolName) => `${KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX}${toolName}`,
 );
+
+export const KRW_ONTOLOGY_DIRECT_SDK_ALLOWED_TOOLS =
+  KRW_ONTOLOGY_MCP_TOOLS.map(
+    (toolName) => `${KRW_ONTOLOGY_DIRECT_TOOL_PREFIX}${toolName}`,
+  );
 
 export const STOCK_NEWS_SDK_ALLOWED_TOOLS = STOCK_NEWS_MCP_TOOLS.map(
   (toolName) => `${STOCK_NEWS_PLUGIN_TOOL_PREFIX}${toolName}`,
@@ -104,8 +114,13 @@ const DEFAULT_MCP_HEALTH_TIMEOUT_MS = 30_000;
 type McpProbeKind = "health" | "ready";
 
 export function isKrwOntologySdkTool(toolName: string): boolean {
-  if (!toolName.startsWith(KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX)) return false;
-  const bareName = toolName.slice(KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX.length);
+  const prefix = toolName.startsWith(KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX)
+    ? KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX
+    : toolName.startsWith(KRW_ONTOLOGY_DIRECT_TOOL_PREFIX)
+      ? KRW_ONTOLOGY_DIRECT_TOOL_PREFIX
+      : null;
+  if (!prefix) return false;
+  const bareName = toolName.slice(prefix.length);
 
   return Boolean(bareName && KRW_ONTOLOGY_MCP_TOOL_SET.has(bareName));
 }

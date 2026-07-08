@@ -9,13 +9,13 @@ If `research_status=needs_company_evidence` or `research_pack.company_bridge.req
 For company-specific questions:
 
 ```text
-1. Build the private internal guru consultation brief.
-2. If a ticker/company is identified and company MCP tools are available, read company orientation first with krw_ontology_topic_map or an equivalent compact company profile/context call.
-3. Convert that company ontology result into bounded company_context_json. It should contain only runtime context, never hard-coded ticker mappings.
-4. Call krw_guru_query_context with the fixed author_key, the brief-optimized question, and company_context_json when available.
+1. Build the English-first private internal guru consultation brief.
+2. If a ticker/company is identified, use app-provided company context when it already exists. Do not call KRW Ontology company MCP tools directly from the main Guru run.
+3. Convert only that app-provided runtime context into bounded company_context_json. It should contain only runtime context, never hard-coded ticker mappings.
+4. Call krw_guru_query_context with the fixed author_key, the English-first brief-optimized question, and company_context_json when available.
 5. Read research_pack.company_bridge, company_context, and data_needs.
 6. If company evidence is required, call krw_guru_company_brief with the same company_context_json.
-7. Application/orchestrator code passes the returned company_research_question_ko/en and required_filing_topics to the existing KRW Ontology filing research path.
+7. The app-provided company_evidence_researcher subagent passes the returned company_research_question_ko/en and required_filing_topics to the existing KRW Ontology filing research path.
 8. If company filing evidence is returned, call krw_guru_company_pack with that opaque company evidence payload and the same company_context_json.
 9. Compose the final answer from GuruCompanyResearchPack and render_plan by separating:
    - guru ontology lens
@@ -24,16 +24,18 @@ For company-specific questions:
    - practical next question
 ```
 
-This plugin must not call the existing KRW Ontology router skill automatically. Application code owns routing and may explicitly invoke the company research path after the Guru ResearchPack asks for filing evidence.
+This plugin must not call the existing KRW Ontology router skill automatically. The app runtime owns routing and may explicitly invoke the company_evidence_researcher subagent after the Guru ResearchPack asks for filing evidence.
 
 ## Company Context Prepass
 
 `company_context_json` is the bridge between company ontology orientation and guru lens retrieval. It exists so the guru selector can use company-specific vocabulary from the existing KRW Ontology runtime without learning ticker-specific shortcuts.
 
-Preferred source:
+The company orientation may originate from Korean UI context, but Guru MCP retrieval should still be English-first. Convert the company issue and investor question into English investment language before calling `krw_guru_query_context`; keep Korean wording only as secondary context.
+
+Preferred source when the app runtime provides company orientation:
 
 ```text
-krw_ontology_topic_map(ticker=..., limit=...)
+app-provided compact KRW Ontology company context, such as a topic map, company profile, or scoped query_context result
 ```
 
 Acceptable equivalents:
@@ -66,7 +68,7 @@ Rules:
 - Do not use company_context_json as final evidence.
 - Use it to improve guru lens selection and filing brief construction only.
 - Pass the same context to krw_guru_query_context, krw_guru_company_brief, and krw_guru_company_pack.
-- If company context is unavailable, continue without it and let krw_guru_company_brief request the missing filing evidence.
+- If company context is unavailable, continue without it and let krw_guru_company_brief plus the company_evidence_researcher subagent request the missing filing evidence.
 ```
 
 Company evidence may be needed for:

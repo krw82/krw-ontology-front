@@ -282,7 +282,7 @@ describe("production deploy scripts", () => {
     expect(preflight).toContain("KRW_ONTOLOGY_MCP_URL");
     expect(preflight).toContain("Plugin .mcp.json MCP URL mismatch");
     expect(preflight).toContain("Checking Guru plugin MCP config");
-    expect(preflight).toContain("Guru company MCP URL mismatch");
+    expect(preflight).toContain("Guru plugin must not expose mcpServers.krw-ontology-company");
     expect(preflight).toContain("MCP HTTP health is not ok");
     expect(preflight).toContain("global_spine_present");
     expect(preflight).toContain("health_payload");
@@ -302,7 +302,7 @@ describe("production deploy scripts", () => {
 
     const initEnv = read("scripts/init-mac-worker-env.sh");
     expect(initEnv).toContain("~/.local/bin/claude-krw");
-    expect(initEnv).toContain("EXPECTED_CLAUDE_CODE_VERSION=2.1.141");
+    expect(initEnv).toContain("EXPECTED_CLAUDE_CODE_VERSION=2.1.204");
     expect(initEnv).toContain("KRW_ONTOLOGY_QUEUE_ROOT=~/krw-ontology-data-running");
     expect(initEnv).toContain("$HOME/krw-ontology");
     expect(initEnv).toContain("ref/plugins/prod/krw-ontology");
@@ -373,7 +373,9 @@ describe("production deploy scripts", () => {
     expect(read("scripts/materialize-ontology-plugin.mjs")).toContain('"plugins"');
     expect(read("scripts/materialize-ontology-plugin.mjs")).toContain('"krw-ontology"');
     expect(read("scripts/materialize-guru-advisor-plugin.mjs")).toContain("krw-guru-advisor");
-    expect(read("scripts/materialize-guru-advisor-plugin.mjs")).toContain("krw-ontology-company");
+    expect(read("scripts/materialize-guru-advisor-plugin.mjs")).not.toContain(
+      "krw-ontology-company",
+    );
     expect(verifyMcp).toContain("KRW_ONTOLOGY_MCP_HEALTH_URL");
     expect(verifyMcp).toContain("MCP health env is not prod");
     expect(installMcpLaunchd).toContain("com.krwontology.mcp-server");

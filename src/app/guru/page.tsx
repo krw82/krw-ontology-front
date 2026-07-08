@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import GuruComingSoonClient from "@/components/guru/GuruComingSoonClient";
+import ChatPageClient from "@/app/chat/ChatPageClient";
+import GuruDirectoryClient from "@/components/guru/GuruDirectoryClient";
 import TopNav from "@/components/TopNav";
 import { getAuthUser } from "@/lib/auth";
 import {
@@ -8,13 +9,15 @@ import {
   topNavProfileFromUser,
 } from "@/lib/auth/user-profile";
 import { DEFAULT_LOCALE, isLocale } from "@/i18n/config";
+import { normalizeGuruLensKey } from "@/lib/guru-lenses";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "구루 상담소 출시 예정 | KRW Ontology",
-  description: "투자 구루별 원칙과 질문 프레임을 활용한 상담소를 준비 중입니다.",
+  title: "구루 상담소 | KRW Ontology",
+  description:
+    "투자 대가의 질문법으로 내 투자 아이디어를 점검하는 구루 상담소입니다.",
 };
 
 type GuruPageProps = {
@@ -22,6 +25,7 @@ type GuruPageProps = {
     guru?: string | string[];
     sessionId?: string | string[];
     draftMessageId?: string | string[];
+    query?: string | string[];
     locale?: string | string[];
   }>;
 };
@@ -54,6 +58,17 @@ export default async function GuruPage({ searchParams }: GuruPageProps) {
 
   const localeParam = stringParam(query.locale);
   const locale = isLocale(localeParam) ? localeParam : DEFAULT_LOCALE;
+  const guruParam = stringParam(query.guru);
+  const shouldOpenChat = Boolean(
+    stringParam(query.sessionId) ||
+      stringParam(query.draftMessageId) ||
+      stringParam(query.query) ||
+      normalizeGuruLensKey(guruParam),
+  );
+
+  if (shouldOpenChat) {
+    return <ChatPageClient workspace="guru" />;
+  }
 
   return (
     <div className="min-h-[100dvh] bg-canvas text-ink">
@@ -66,7 +81,7 @@ export default async function GuruPage({ searchParams }: GuruPageProps) {
         showSidebarCoachmarkTip={false}
         showLocaleSwitcher
       />
-      <GuruComingSoonClient locale={locale} />
+      <GuruDirectoryClient locale={locale} />
     </div>
   );
 }

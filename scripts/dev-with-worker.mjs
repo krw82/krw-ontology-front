@@ -240,8 +240,6 @@ function materializeDevPlugin() {
       process.env.KRW_GURU_DATA_ROOT,
       "--guru-release-root",
       process.env.KRW_GURU_RELEASE_ROOT,
-      "--company-mcp-url",
-      process.env.KRW_ONTOLOGY_MCP_URL,
     ],
     {
       env: process.env,

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const EXPECTED_NODE_SDK = "0.2.141";
+const EXPECTED_NODE_SDK = "0.3.204";
 const EXPECTED_PYTHON_SDK = "0.2.85";
 const repoRoot = process.cwd();
 

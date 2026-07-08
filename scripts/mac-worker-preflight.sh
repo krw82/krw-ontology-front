@@ -418,7 +418,6 @@ const fs = require("fs");
 const path = require("path");
 const pluginPath = process.env.KRW_GURU_ADVISOR_PLUGIN_PATH;
 const expectedGuruReleaseRoot = path.resolve(process.env.KRW_GURU_RELEASE_ROOT);
-const expectedCompanyMcpUrl = process.env.KRW_ONTOLOGY_MCP_URL;
 const config = JSON.parse(fs.readFileSync(path.join(pluginPath, ".mcp.json"), "utf8"));
 const guruServer = config.mcpServers && config.mcpServers["krw-guru-advisor"];
 if (!guruServer) throw new Error("Missing mcpServers.krw-guru-advisor");
@@ -431,12 +430,8 @@ if (path.resolve(configuredRoot) !== expectedGuruReleaseRoot) {
   throw new Error(`Guru MCP release root mismatch: ${configuredRoot} !== ${expectedGuruReleaseRoot}`);
 }
 const companyServer = config.mcpServers && config.mcpServers["krw-ontology-company"];
-if (!companyServer) throw new Error("Missing mcpServers.krw-ontology-company");
-if (companyServer.type !== "http") {
-  throw new Error(`Guru company bridge MCP must use HTTP, got: ${companyServer.type}`);
-}
-if (companyServer.url !== expectedCompanyMcpUrl) {
-  throw new Error(`Guru company MCP URL mismatch: ${companyServer.url} !== ${expectedCompanyMcpUrl}`);
+if (companyServer) {
+  throw new Error("Guru plugin must not expose mcpServers.krw-ontology-company; company evidence uses the KRW Ontology plugin through the subagent.");
 }
 console.log(`OK Guru plugin path: ${pluginPath}`);
 console.log(`OK Guru release root: ${configuredRoot}`);

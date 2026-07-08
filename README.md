@@ -82,9 +82,9 @@ npm run supabase:schema:smoke
 Claude Agent SDK는 의도적으로 고정합니다.
 
 ```text
-Node @anthropic-ai/claude-agent-sdk: 0.2.141
+Node @anthropic-ai/claude-agent-sdk: 0.3.204
 Python claude-agent-sdk: 0.2.85
-Claude Code native binary: 2.1.141
+Claude Code native binary: 2.1.204
 ```
 
 업데이트는 별도 브랜치에서 SDK 회귀 테스트와 운영 smoke를 통과한 뒤에만 진행합니다. 일반 배포 중 자동 업그레이드는 금지합니다.

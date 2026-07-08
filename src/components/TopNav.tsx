@@ -135,7 +135,12 @@ export default function TopNav({
   const currentPath = normalizeInternalNextPath(
     query ? `${pathname}?${query}` : pathname,
   );
-  const navLinks = [
+  const navLinks: Array<{
+    href: string;
+    label: string;
+    active: boolean;
+    badge?: string;
+  }> = [
     {
       href: "/discover",
       label: currentLocale === "ko" ? "종목 발굴기" : "Stock discovery",
@@ -144,7 +149,6 @@ export default function TopNav({
     {
       href: "/guru",
       label: currentLocale === "ko" ? "구루 상담소" : "Guru office",
-      badge: currentLocale === "ko" ? "출시 예정" : "Soon",
       active: pathname.startsWith("/guru"),
     },
     {

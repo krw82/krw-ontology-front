@@ -33,7 +33,7 @@ processes only when queued work is claimed.
    ```
 
    Preflight requires the pinned local `claude-krw` Claude Code version. The
-   current Mac worker pin is `2.1.111`.
+   current Mac worker pin is `2.1.204`.
 
 4. Stop the GCP worker:
 

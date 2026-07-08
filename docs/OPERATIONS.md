@@ -120,9 +120,9 @@ spine/company shard access, and MCP tool exposure.
 Pinned versions:
 
 ```text
-Node @anthropic-ai/claude-agent-sdk: 0.2.141
+Node @anthropic-ai/claude-agent-sdk: 0.3.204
 Python claude-agent-sdk: 0.2.85
-Claude Code native binary: 2.1.141
+Claude Code native binary: 2.1.204
 ```
 
 Use `npm run verify:sdk-freeze` before deploying. Do not update the SDK as part of routine dependency maintenance.

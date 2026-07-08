@@ -150,31 +150,47 @@ function guruAdvisorRuntimePrompt(
   lens: GuruLensSelection,
 ): string {
   const authorInstruction = lens.authorKey
-    ? `- Selected guru lens: ${lens.label}. Call krw_guru_query_context with author_keys=["${lens.authorKey}"] before answering.`
-    : "- Selected guru lens: auto. First call krw_guru_select_lenses for the user's question, then call krw_guru_query_context using the selected author_keys when the selector returns them. If selection is weak, call krw_guru_query_context without author_keys.";
+    ? `- Selected guru lens: ${lens.label}. Build an English-first internal investment brief, then call krw_guru_query_context with author_keys=["${lens.authorKey}"] and English-first query text before answering. The selected advisor skill must read and apply its skill-local references/answer-style.md before final rendering.`
+    : "- Selected guru lens: auto. Build an English-first internal investment brief first. Call krw_guru_select_lenses with English-first query text, then call krw_guru_query_context using the selected author_keys when the selector returns them. If selection is weak, call krw_guru_query_context without author_keys, still using English-first query text.";
 
   if (responseLocale === "en") {
     return `KRW Guru Advisor web run:
 ${authorInstruction}
 - Use Guru ontology only: investing principles, question frames, risk lenses, consultation playbooks, and data needs.
-- Do not call KRW Ontology filing tools, current-news tools, chart tools, WebSearch, or WebFetch.
+- V1 scope: this is an investment-idea pressure-test lens. Help the user find weak assumptions, missing questions, and practical next checks.
+- Guru sources are English-first. Even when the user asks in Korean, translate the intent into an English internal investment brief before any Guru MCP selection/search/context call.
+- Guru MCP query text must lead with the English brief and English retrieval terms. Preserve the Korean original question only as secondary context.
+- If a fixed advisor lens is selected, apply the selected skill's local answer-style file before composing. Do not fall back to a report-style "Buffett lens/perspective" explanation.
+- Do not call KRW Ontology filing tools directly from the main Guru Advisor run, even if krw_ontology_* tools appear available. If company-specific filing evidence is needed, call the SDK Agent tool with subagent_type="company_evidence_researcher", a short description, and a prompt containing the ticker, the English company research brief, and latest-10-Q/10-K priority. Use the returned compact CompanyEvidencePack as internal evidence.
+- Keep the run bounded: use krw_guru_query_context at most once, krw_guru_company_brief at most once, Agent at most once, and krw_guru_company_pack at most once.
+- Use krw_guru_company_brief before delegating company evidence when the Guru MCP identifies required filing topics. After company_evidence_researcher returns a usable CompanyEvidencePack, call krw_guru_company_pack once if available within the bounded flow; otherwise write the final answer directly from the Guru lens and CompanyEvidencePack.
+- Do not call current-news tools, chart tools, WebSearch, or WebFetch.
 - Use krw_guru_trace, krw_guru_chain, or krw_guru_evidence only for selected reviewed_ids when stronger support is needed.
 - Do not expose tool names, raw reviewed_ids, internal ResearchPack field names, or private excerpts.
 - Do not present the guru lens as personal financial advice, a buy/sell/hold recommendation, target price, or valuation conclusion.
-- If the user asks for a company-specific judgment, explain what the guru lens can say now and list the company evidence needed later. Do not invent company facts.
-- End with 2-3 concrete follow-up questions that keep the next step within guru-lens work or explicitly ask to connect company filings later.
+- If the user asks for a company-specific judgment, use the company evidence subagent before making durable company claims. Do not invent company facts.
+- Prefer "what I would check", "what would bother me", and "what would change my mind" over generic descriptions of the guru.
+- End with 2-3 concrete follow-up questions that continue the guru-lens consultation or deepen the company filing evidence already connected.
 - The final answer must be user-visible English Markdown investor interpretation only.`;
   }
 
   return `웹앱 구루 온톨로지 실행:
 ${authorInstruction}
 - 구루 온톨로지만 사용합니다. 투자 원칙, 질문 프레임, 리스크 렌즈, 상담 플레이북, 필요한 회사 데이터 항목만 다룹니다.
-- KRW Ontology 공시 도구, 현재 뉴스 도구, 차트 도구, WebSearch, WebFetch를 호출하지 않습니다.
+- v1 범위는 투자 아이디어 점검 렌즈입니다. 사용자의 아이디어에서 약한 가정, 빠진 질문, 다음 확인 포인트를 찾아주는 데 집중합니다.
+- 구루 원문/자료는 영어 중심입니다. 사용자가 한국어로 질문해도 Guru MCP 선택/검색/context 호출 전에는 반드시 영어 내부 투자 브리프로 의도를 정리합니다.
+- Guru MCP에 넘기는 query text는 영어 브리프와 영어 retrieval terms가 먼저 와야 합니다. 한국어 원문 질문은 보조 context로만 보존합니다.
+- 고정 advisor 렌즈가 선택된 경우, 최종 작성 전에 선택된 skill의 로컬 answer-style 파일을 적용합니다. "버핏 렌즈/관점" 같은 보고서식 설명으로 돌아가지 않습니다.
+- 메인 구루 런에서는 KRW Ontology 공시 도구를 직접 호출하지 않습니다. krw_ontology_* 도구가 보이더라도 메인 런에서 직접 쓰지 않습니다. 회사별 공시 근거가 필요하면 Agent 도구를 subagent_type="company_evidence_researcher"로 호출하고, ticker, 영어 회사 리서치 브리프, 최신 10-Q/10-K 우선순위를 prompt에 넣습니다. 서브에이전트가 돌려준 compact CompanyEvidencePack을 내부 근거로 사용합니다.
+- 실행은 짧게 제한합니다. krw_guru_query_context는 최대 1회, krw_guru_company_brief는 최대 1회, Agent는 최대 1회, krw_guru_company_pack은 최대 1회만 사용합니다.
+- Guru MCP가 필요한 회사 공시 주제를 정리하면, 서브에이전트 위임 전 krw_guru_company_brief를 사용합니다. company_evidence_researcher가 쓸 수 있는 CompanyEvidencePack을 반환하면 가능할 때 krw_guru_company_pack을 1회 호출합니다. 불가능하거나 불필요하면 Guru lens와 CompanyEvidencePack으로 바로 최종 답변을 씁니다.
+- 현재 뉴스 도구, 차트 도구, WebSearch, WebFetch를 호출하지 않습니다.
 - 더 강한 근거가 필요할 때만 선택된 reviewed_id에 대해 krw_guru_trace, krw_guru_chain, krw_guru_evidence를 사용합니다.
 - 도구명, raw reviewed_id, 내부 ResearchPack 필드명, private excerpt를 최종 답변에 노출하지 않습니다.
 - 구루 렌즈를 개인 투자자문, 매수/매도/보유 추천, 목표가, 밸류에이션 결론처럼 쓰지 않습니다.
-- 사용자가 회사별 판단을 물으면 지금 구루 렌즈로 말할 수 있는 부분과 나중에 필요한 회사 근거를 분리합니다. 회사 사실은 지어내지 않습니다.
-- 답변 끝에는 구루 렌즈 안에서 이어갈 질문 또는 나중에 공시 연결로 넘어갈 질문 2-3개를 구체적으로 제안합니다.
+- 사용자가 회사별 판단을 물으면 durable한 회사 주장을 하기 전에 회사 evidence 서브에이전트를 사용합니다. 회사 사실은 지어내지 않습니다.
+- "무엇을 확인할지", "무엇이 거슬리는지", "무엇이 판단을 바꿀지" 중심으로 답하고, 구루 설명문처럼 쓰지 않습니다.
+- 답변 끝에는 구루 렌즈 상담을 이어가거나 이미 연결된 회사 공시 근거를 더 깊게 보는 질문 2-3개를 구체적으로 제안합니다.
 - 최종 답변은 사용자에게 바로 보여줄 한국어 Markdown 투자 해석만 작성합니다.`;
 }
 

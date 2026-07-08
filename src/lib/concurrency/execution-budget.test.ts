@@ -72,6 +72,13 @@ function entitlement(
   };
 }
 
+function expectedFloatEnv(key: string, fallback: number): number {
+  const raw = process.env[key];
+  if (raw == null || raw.trim() === "") return fallback;
+  const value = Number.parseFloat(raw);
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
 describe("execution budget", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -87,10 +94,15 @@ describe("execution budget", () => {
     expect(result.reserveCostUsd).toBe(0);
   });
 
-  it("defines mode-based reservation floors", () => {
-    expect(getResearchModeReserveCostUsd("fast")).toBe(0.05);
-    expect(getResearchModeReserveCostUsd("standard")).toBe(0.15);
-    expect(getResearchModeReserveCostUsd("deep")).toBe(0.5);
+  it("uses the enforced deep-mode reservation floor", () => {
+    const expectedDeepReserve = expectedFloatEnv(
+      "DEEP_RESEARCH_RESERVE_COST_USD",
+      0.5,
+    );
+
+    expect(getResearchModeReserveCostUsd("fast")).toBe(expectedDeepReserve);
+    expect(getResearchModeReserveCostUsd("standard")).toBe(expectedDeepReserve);
+    expect(getResearchModeReserveCostUsd("deep")).toBe(expectedDeepReserve);
   });
 
   it("allows runs when entitlement credits allow the run", async () => {
