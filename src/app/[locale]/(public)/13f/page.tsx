@@ -25,7 +25,7 @@ const pageCopy = {
     eyebrow: "SEC 13F",
     heading: "유명 기관투자자의 13F 보유 공시를 확인하세요.",
     intro:
-      "13F는 분기 말 기준 기관투자자의 미국 상장주식 보유 스냅샷입니다. 매수 신호로 단정하지 말고, 어떤 종목과 리서치 질문을 더 확인할지 찾는 출발점으로 사용하세요.",
+      "13F는 분기 말 기준 기관투자자의 미국 상장주식 보유 스냅샷입니다. 현재의 투자 판단을 대신하는 자료가 아니라, 어떤 회사와 리서치 질문을 더 확인할지 정하는 출발점으로 사용하세요.",
     managerHeading: "주요 13F filer",
     managerBody:
       "검색 수요가 높은 기관부터 공개 SEO 페이지로 제공합니다. 각 manager 페이지에서 최신 보유, 상위 비중, 분기 리밸런싱을 확인할 수 있습니다.",
@@ -48,9 +48,9 @@ const pageCopy = {
     faqHeading: "13F 자주 묻는 질문",
     faq: [
       {
-        question: "13F는 매수 추천 신호인가요?",
+        question: "13F 보유 공시는 어떻게 해석하나요?",
         answer:
-          "아닙니다. 13F는 기관투자자의 과거 보유 스냅샷입니다. KRW Ontology에서는 이를 종목 리서치 질문을 만드는 참고 자료로 다룹니다.",
+          "13F는 기관투자자의 과거 보유 스냅샷입니다. 현재의 투자 판단이나 향후 결과를 보장하지 않으며, KRW.O에서는 이를 회사 리서치 질문을 만드는 참고 자료로 다룹니다.",
       },
       {
         question: "13F에서 어떤 정보를 볼 수 있나요?",
@@ -68,10 +68,10 @@ const pageCopy = {
     eyebrow: "SEC 13F",
     heading: "Review public 13F holdings from major institutional investors.",
     intro:
-      "Form 13F is a quarter-end snapshot of U.S. listed equity holdings. Treat it as a starting point for research questions, not as a current buy signal.",
+      "Form 13F is a quarter-end snapshot of U.S. listed equity holdings. Treat it as a starting point for research questions, not as a substitute for an investment decision.",
     managerHeading: "Featured 13F filers",
     managerBody:
-      "KRW Ontology starts with high-demand institutional managers and links each public page to holdings, weights, and quarterly rebalancing context.",
+      "KRW.O starts with high-demand institutional managers and links each public page to holdings, weights, and quarterly rebalancing context.",
     openManager: "View 13F",
     factsHeading: "How to read 13F data",
     facts: [
@@ -91,9 +91,9 @@ const pageCopy = {
     faqHeading: "13F FAQ",
     faq: [
       {
-        question: "Is a 13F filing a buy recommendation?",
+        question: "How should I interpret a 13F filing?",
         answer:
-          "No. A 13F filing is a historical holdings snapshot. KRW Ontology treats it as a source for follow-up company research questions.",
+      "A 13F filing is a historical holdings snapshot. It does not make the investment decision or guarantee future results. KRW.O treats it as a source for follow-up company research questions.",
       },
       {
         question: "What can I see in 13F data?",
@@ -202,8 +202,8 @@ export default async function ThirteenFPage({ params }: ThirteenFPageProps) {
           </header>
 
           <section className="border-b border-hairline py-8">
-            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-              <div>
+            <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-end md:justify-between">
+              <div className="min-w-0">
                 <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-primary">
                   13F directory
                 </p>
@@ -211,7 +211,7 @@ export default async function ThirteenFPage({ params }: ThirteenFPageProps) {
                   {copy.managerHeading}
                 </h2>
               </div>
-              <p className="max-w-xl text-[13px] font-medium leading-6 text-muted md:text-right">
+              <p className="w-full max-w-[36rem] text-[13px] font-medium leading-6 text-muted md:w-[520px] md:max-w-none md:shrink-0 md:text-right">
                 {copy.managerBody}
               </p>
             </div>

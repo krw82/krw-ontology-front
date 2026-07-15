@@ -68,6 +68,11 @@ uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology release verify \
   --env dev >/dev/null
 echo "OK KRW Ontology dev v3 startup contract"
 
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/mcp-runtime-fingerprint.sh"
+load_expected_mcp_runtime_fingerprint
+echo "OK dev MCP v2 source/release fingerprint"
+
 echo "Starting KRW Ontology dev MCP HTTP server..."
 echo "Source: $KRW_ONTOLOGY_SOURCE_DIR"
 echo "Release root: $KRW_ONTOLOGY_RELEASE_ROOT"

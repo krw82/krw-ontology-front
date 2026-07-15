@@ -7,7 +7,8 @@ usage() {
   cat <<'EOF'
 Usage: scripts/verify-mcp-server-production.sh [--env-file FILE] [--release-id ID]
 
-Check the long-running local KRW Ontology MCP HTTP server /health endpoint.
+Check the long-running local KRW Ontology MCP HTTP server /readyz endpoint,
+including exact v2 tool parity and build/schema fingerprints.
 EOF
 }
 
@@ -56,78 +57,15 @@ set +a
 if [ -n "$EXPECTED_RELEASE_ID" ]; then
   export EXPECTED_RELEASE_ID
 fi
+export KRW_ONTOLOGY_EXPECTED_ENV=prod
 
-node <<'NODE'
-const fs = require("fs");
-function healthUrlFromMcpUrl(mcpUrl) {
-  const parsed = new URL(mcpUrl);
-  parsed.pathname = "/health";
-  parsed.search = "";
-  parsed.hash = "";
-  return parsed.toString();
-}
+# Compute the desired fingerprint from the current source and immutable release.
+# This catches a stale already-running process even when it reports internally
+# consistent hashes for its older build.
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/mcp-runtime-fingerprint.sh"
+load_expected_mcp_runtime_fingerprint
 
-const mcpUrl = process.env.KRW_ONTOLOGY_MCP_URL || "http://127.0.0.1:8765/mcp";
-const healthUrl = process.env.KRW_ONTOLOGY_MCP_HEALTH_URL || healthUrlFromMcpUrl(mcpUrl);
-const expectedRoot = process.env.KRW_ONTOLOGY_RELEASE_ROOT;
-const expectedReleaseId = process.env.EXPECTED_RELEASE_ID;
+node "$SCRIPT_DIR/verify-mcp-runtime.mjs"
 
-function samePath(left, right) {
-  if (!left || !right) return false;
-  try {
-    return fs.realpathSync(left) === fs.realpathSync(right);
-  } catch {
-    return left === right;
-  }
-}
-
-(async () => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(process.env.MCP_HEALTH_TIMEOUT_MS || 30000));
-  try {
-    const response = await fetch(healthUrl, {
-      headers: { accept: "application/json" },
-      signal: controller.signal,
-    });
-    const payload = await response.json();
-    console.log(JSON.stringify({
-      status: response.status,
-      ok: payload.ok,
-      env: payload.env,
-      release_id: payload.release_id,
-      manifest_valid: payload.manifest_valid,
-      index_layout: payload.index_layout,
-      global_spine_present: payload.global_spine_present,
-      company_shard_count: payload.company_shard_count,
-      root: payload.root,
-      global_spine_path: payload.global_spine_path,
-      documents: payload.documents,
-      objects: payload.objects,
-      tools: Array.isArray(payload.tools) ? payload.tools.length : null,
-    }));
-    if (response.status !== 200 || payload.ok !== true) throw new Error("MCP health is not ok");
-    if (payload.env !== "prod") throw new Error(`MCP health env is not prod: ${payload.env}`);
-    if (!payload.release_id) throw new Error("MCP health is missing release_id");
-    if (expectedReleaseId && payload.release_id !== expectedReleaseId) {
-      throw new Error(`MCP release mismatch: ${payload.release_id} !== ${expectedReleaseId}`);
-    }
-    if (payload.manifest_valid !== true) throw new Error("MCP health manifest_valid is not true");
-    if (payload.index_layout !== "global-spine-and-company-shards") {
-      throw new Error(`MCP health index_layout is not v3: ${payload.index_layout}`);
-    }
-    if (payload.global_spine_present !== true) {
-      throw new Error("MCP health global_spine_present is not true");
-    }
-    if (expectedRoot && !samePath(payload.root, expectedRoot)) {
-      throw new Error(`MCP root mismatch: ${payload.root} !== ${expectedRoot}`);
-    }
-  } finally {
-    clearTimeout(timeout);
-  }
-})().catch((error) => {
-  console.error(error.message || error);
-  process.exit(1);
-});
-NODE
-
-echo "OK MCP HTTP server health"
+echo "OK MCP HTTP server v2 readiness and fingerprint"

@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import AnalyticsBootstrap from "@/components/analytics/AnalyticsBootstrap";
 import AppShell from "@/components/AppShell";
+import PwaBootstrap from "@/components/pwa/PwaBootstrap";
 import {
   DEFAULT_LOCALE,
   isLocale,
@@ -116,6 +117,7 @@ export default async function RootLayout({
     <html lang={localeToHtmlLang(locale)} className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-canvas text-on-surface">
         <AnalyticsBootstrap />
+        <PwaBootstrap />
         {/* L-05: Skip to content link for accessibility */}
         <a
           href="#main-content"

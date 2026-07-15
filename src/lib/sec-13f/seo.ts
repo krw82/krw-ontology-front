@@ -54,11 +54,11 @@ const MANAGER_SEO_COPY_BY_CIK: Record<string, ManagerSeoCopy> = {
     ],
     limitsKo: [
       "국민연금 13F는 전체 운용자산 중 미국 상장주식 일부만 보여줍니다.",
-      "장기 분산 투자 성격이 강하므로 단기 매수 신호로 해석하면 안 됩니다.",
+      "장기 분산 투자 성격이 강하므로 단기 투자 판단의 근거로 단독 사용하면 안 됩니다.",
     ],
     limitsEn: [
       "NPS 13F only shows part of the fund's U.S. listed equity exposure.",
-      "Because the portfolio is broadly diversified, it should not be read as a short-term buy signal.",
+      "Because the portfolio is broadly diversified, it should not be used alone for a short-term investment decision.",
     ],
   },
   "0002012383": {
@@ -267,7 +267,7 @@ const MANAGER_SEO_COPY_BY_CIK: Record<string, ManagerSeoCopy> = {
     ],
     limitsKo: [
       "Fisher 13F는 보유 종목 수가 많아 단일 종목 변화의 의미가 약할 수 있습니다.",
-      "대형주 중심 분산 포트폴리오는 개별 매수 의도보다 포트폴리오 맥락이 중요합니다.",
+      "대형주 중심 분산 포트폴리오는 개별 종목 변화보다 포트폴리오 맥락이 중요합니다.",
     ],
     limitsEn: [
       "Because Fisher holds many names, a single holding change may carry limited signal.",

@@ -2,8 +2,6 @@ import "server-only";
 
 import {
   getActiveOntologyCatalogRelease,
-  getIndexedCompanies,
-  getIndexedCompany,
   searchIndexedCompanies,
   type IndexedCompany,
 } from "@/lib/ontology/catalog";
@@ -20,8 +18,9 @@ import {
   shouldUseDesktopOntologyMcp,
 } from "./ontology-mcp-client";
 
-const DEFAULT_MAX_RESULT_BYTES = 60_000;
-const MAX_RESULT_TEXT_CHARS = 12_000;
+const MAX_BACKEND_RESULT_BYTES = 180_000;
+const DEFAULT_MAX_RESULT_BYTES = MAX_BACKEND_RESULT_BYTES;
+const MAX_RESULT_TEXT_BYTES = 80_000;
 
 export class DesktopOntologyServiceError extends Error {
   code: DesktopErrorCode;
@@ -53,13 +52,21 @@ export async function executeDesktopOntologyTool(
 ): Promise<DesktopOntologyToolCallSuccess> {
   const startedAt = Date.now();
   const release = await getActiveOntologyReleaseOrThrow();
-  const useMcp =
-    shouldUseDesktopOntologyMcp() &&
-    request.tool_name !== "krw_ontology_catalog";
-  if (useMcp) await requireMatchingMcpRelease(release.release_id);
-  const result = useMcp
-    ? await executeMcpBackedTool(request)
-    : await executeCatalogBackedTool(request);
+  const catalogOnly = request.tool_name === "krw_ontology_catalog";
+  if (!catalogOnly && !shouldUseDesktopOntologyMcp()) {
+    throw new DesktopOntologyServiceError(
+      "Ontology HTTP MCP is required for Desktop research tools",
+      {
+        publicMessage: "온톨로지 검색 서비스가 설정되지 않았습니다.",
+        status: 503,
+        retryable: true,
+      },
+    );
+  }
+  if (!catalogOnly) await requireMatchingMcpRelease(release.release_id);
+  const result = catalogOnly
+    ? await executeCatalogBackedTool(request)
+    : await executeMcpBackedTool(request);
   const resultJson = {
     ...result.json,
     citations: result.citations,
@@ -67,9 +74,7 @@ export async function executeDesktopOntologyTool(
     local_run_id: request.local_run_id,
     executor: result.executor,
   };
-  assertResultWithinLimit(resultJson);
-
-  return {
+  const response: DesktopOntologyToolCallSuccess = {
     ok: true,
     tool_call_id: request.tool_call_id,
     tool_name: request.tool_name,
@@ -88,6 +93,8 @@ export async function executeDesktopOntologyTool(
       latency_ms: Date.now() - startedAt,
     },
   };
+  assertResultWithinLimit(response);
+  return response;
 }
 
 async function requireMatchingMcpRelease(expectedReleaseId: string) {
@@ -133,23 +140,13 @@ async function executeCatalogBackedTool(
   citations: Array<Record<string, unknown>>;
   executor: "catalog";
 }> {
-  const result = await (async () => {
-    switch (request.tool_name) {
-    case "krw_ontology_catalog":
-      return catalogResult(request.arguments);
-    case "krw_ontology_company_context":
-      return companyContextResult(request.arguments);
-    case "krw_ontology_compare":
-      return compareResult(request.arguments);
-    case "krw_ontology_query_context":
-      return queryContextResult(request.arguments);
-    case "krw_ontology_query":
-      return queryResult(request.arguments);
-    case "krw_ontology_trace":
-    case "krw_ontology_chain":
-      return graphPlaceholderResult(request.tool_name, request.arguments);
-    }
-  })();
+  if (request.tool_name !== "krw_ontology_catalog") {
+    throw new DesktopOntologyServiceError(
+      `${request.tool_name} must execute through HTTP MCP`,
+      { status: 503, retryable: true },
+    );
+  }
+  const result = await catalogResult(request.arguments);
   return { ...result, executor: "catalog" };
 }
 
@@ -167,7 +164,7 @@ async function executeMcpBackedTool(
       mcpArguments(request),
     );
     return {
-      text: boundText(result.resultText, MAX_RESULT_TEXT_CHARS),
+      text: boundTextBytes(result.resultText, MAX_RESULT_TEXT_BYTES),
       json: result.resultJson,
       citations: extractMcpCitations(result.resultJson),
       executor: "mcp",
@@ -203,9 +200,7 @@ function mcpArguments(
       return { ticker: args.ticker };
     case "krw_ontology_query_context":
       return {
-        question: args.question,
-        ...(Array.isArray(args.tickers) ? { tickers: args.tickers } : {}),
-        limit_results: args.limit_results,
+        search_plan: args.search_plan,
       };
     case "krw_ontology_query":
       return {
@@ -236,9 +231,9 @@ function mcpResponseDetail(value: unknown): "compact" | "ticker_summary" {
   return value === "summary" ? "ticker_summary" : "compact";
 }
 
-function assertResultWithinLimit(result: Record<string, unknown>) {
+function assertResultWithinLimit(result: DesktopOntologyToolCallSuccess) {
   const size = Buffer.byteLength(JSON.stringify(result), "utf8");
-  const limit = readPositiveIntEnv(
+  const limit = readBoundedResultBytesEnv(
     "DESKTOP_ONTOLOGY_MAX_RESULT_BYTES",
     DEFAULT_MAX_RESULT_BYTES,
   );
@@ -284,7 +279,14 @@ function collectCitations(
   const documentType =
     stringArg(value.document_type) ?? stringArg(value.doc_type);
   const period = stringArg(value.period);
-  const objectId = stringArg(value.object_id) ?? stringArg(value.id);
+  const source = isRecord(value.source) ? value.source : null;
+  const sourceObjectIds = Array.isArray(source?.object_ids)
+    ? source.object_ids.filter(
+        (item): item is string => typeof item === "string" && Boolean(item),
+      )
+    : [];
+  const objectId =
+    stringArg(value.object_id) ?? stringArg(value.id) ?? sourceObjectIds[0];
   const quoteText =
     stringArg(value.quote_text) ??
     (isQuoteLike(value) ? stringArg(value.text) : undefined);
@@ -300,7 +302,13 @@ function collectCitations(
         stringArg(value.claim) ??
         stringArg(value.summary) ??
         null,
-      source_quality: stringArg(value.source_quality) ?? "ontology",
+      source_quality:
+        stringArg(value.evidence_grade) ??
+        stringArg(value.directness) ??
+        stringArg(value.source_quality) ??
+        "ontology",
+      evidence_grade: stringArg(value.evidence_grade) ?? null,
+      directness: stringArg(value.directness) ?? null,
       trace_json: objectId ? { object_id: objectId } : {},
     });
   }
@@ -315,17 +323,30 @@ function isQuoteLike(value: Record<string, unknown>): boolean {
   return type.includes("quote") || "quote_type" in value;
 }
 
-function boundText(value: string, maxChars: number): string {
-  return value.length <= maxChars
-    ? value
-    : `${value.slice(0, maxChars)}\n[truncated]`;
+function boundTextBytes(value: string, maxBytes: number): string {
+  if (Buffer.byteLength(value, "utf8") <= maxBytes) return value;
+  const suffix = "\n[truncated]";
+  const suffixBytes = Buffer.byteLength(suffix, "utf8");
+  let low = 0;
+  let high = value.length;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    const bytes = Buffer.byteLength(value.slice(0, middle), "utf8") + suffixBytes;
+    if (bytes <= maxBytes) low = middle;
+    else high = middle - 1;
+  }
+  return `${value.slice(0, low)}${suffix}`;
 }
 
-function readPositiveIntEnv(name: string, fallback: number): number {
+function readBoundedResultBytesEnv(name: string, fallback: number): number {
   const raw = process.env[name];
   if (!raw) return fallback;
   const parsed = Number(raw);
-  return Number.isInteger(parsed) && parsed >= 1_000 ? parsed : fallback;
+  return Number.isInteger(parsed) &&
+    parsed >= 1_000 &&
+    parsed <= MAX_BACKEND_RESULT_BYTES
+    ? parsed
+    : fallback;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -347,101 +368,6 @@ async function catalogResult(args: Record<string, unknown>) {
   };
 }
 
-async function companyContextResult(args: Record<string, unknown>) {
-  const ticker = stringArg(args.ticker);
-  const company = ticker ? await getIndexedCompany(ticker) : null;
-  const summary = company
-    ? `${company.ticker} ${company.name}: ${company.coverage}`
-    : `No indexed company context found for ${ticker ?? "unknown"}.`;
-
-  return {
-    text: summary,
-    json: {
-      summary,
-      company,
-    },
-    citations: company ? companyCitations([company]) : [],
-  };
-}
-
-async function queryContextResult(args: Record<string, unknown>) {
-  const tickers = stringArrayArg(args.tickers);
-  const companies = tickers.length
-    ? await getIndexedCompanies(tickers)
-    : await searchIndexedCompanies({
-        query: stringArg(args.question),
-        limit: numberArg(args.limit_results) ?? 3,
-      });
-  const summary = summarizeCompanies("Compact ontology context", companies);
-
-  return {
-    text: summary,
-    json: {
-      summary,
-      question: stringArg(args.question),
-      evidence: companies.map(companyEvidence),
-      companies,
-    },
-    citations: companyCitations(companies),
-  };
-}
-
-async function queryResult(args: Record<string, unknown>) {
-  const ticker = stringArg(args.ticker);
-  const companies = ticker
-    ? await getIndexedCompanies([ticker])
-    : await searchIndexedCompanies({
-        query: stringArg(args.topic),
-        limit: numberArg(args.limit) ?? 3,
-      });
-  const summary = summarizeCompanies("Ontology query result", companies);
-
-  return {
-    text: summary,
-    json: {
-      summary,
-      topic: stringArg(args.topic),
-      evidence: companies.map(companyEvidence),
-      companies,
-    },
-    citations: companyCitations(companies),
-  };
-}
-
-async function compareResult(args: Record<string, unknown>) {
-  const companies = await getIndexedCompanies(stringArrayArg(args.tickers));
-  const summary = summarizeCompanies("Ontology compare result", companies);
-
-  return {
-    text: summary,
-    json: {
-      summary,
-      question: stringArg(args.question),
-      comparisons: companies.map(companyEvidence),
-      companies,
-    },
-    citations: companyCitations(companies),
-  };
-}
-
-async function graphPlaceholderResult(
-  toolName: string,
-  args: Record<string, unknown>,
-) {
-  const summary =
-    `${toolName} accepted for root ${stringArg(args.root_id) ?? "unknown"}, ` +
-    "but graph expansion is not enabled in the Desktop HTTP bridge yet.";
-  return {
-    text: summary,
-    json: {
-      summary,
-      root_id: stringArg(args.root_id),
-      graph_expansion_available: false,
-    },
-    citations: [],
-  };
-}
-
 function summarizeCompanies(prefix: string, companies: IndexedCompany[]) {
   if (!companies.length) return `${prefix}: no indexed companies found.`;
   const items = companies
@@ -450,48 +376,10 @@ function summarizeCompanies(prefix: string, companies: IndexedCompany[]) {
   return `${prefix}: ${items.join("; ")}`;
 }
 
-function companyEvidence(company: IndexedCompany) {
-  return {
-    ticker: company.ticker,
-    company_name: company.name,
-    latest_period: company.latest_period,
-    coverage: company.coverage,
-    document_types: company.document_types,
-    periods: company.periods,
-    core_strength: company.core_strength,
-    critical_risk: company.critical_risk,
-  };
-}
-
-function companyCitations(companies: IndexedCompany[]) {
-  return companies.flatMap((company) =>
-    company.documents.slice(0, 2).map((document) => ({
-      ticker: company.ticker,
-      company_name: company.name,
-      document_type: document.document_type,
-      period: document.period,
-      section: "ontology_catalog",
-      quote_text: null,
-      claim_text: company.coverage,
-      source_quality: "filing_catalog",
-      trace_json: {
-        doc_type_key: document.doc_type_key,
-        generated_at: document.generated_at,
-      },
-    })),
-  );
-}
-
 function stringArg(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function numberArg(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function stringArrayArg(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-    : [];
 }

@@ -45,6 +45,7 @@ const STANDARD_ALLOWED_TOOLS: KRWOntologyMCPToolName[] = [
   "krw_ontology_query",
   "krw_ontology_trace",
   "krw_ontology_chain",
+  "krw_ontology_verify_evidence",
   "krw_ontology_compare",
 ];
 
@@ -61,6 +62,7 @@ const DEEP_ALLOWED_TOOLS: KRWOntologyMCPToolName[] = [
   "krw_ontology_compare",
   "krw_ontology_plan_query",
   "krw_ontology_chain",
+  "krw_ontology_verify_evidence",
 ];
 
 export function normalizeResearchMode(value: unknown): ResearchMode {
@@ -84,7 +86,7 @@ export function getAllowedMcpToolsForResearchMode(
 
 export function buildResearchModePrompt(mode: ResearchMode): string {
   const responseDetailPolicy =
-    "Never request response_detail: full in web chat. Use compact or ticker_summary follow-up queries; use selected trace/chain for verification instead of full query output.";
+    "Prefer compact or ticker_summary query output for broad exploration. Request response_detail: full only when the exact returned fields are needed to support a material answer; use targeted trace/chain calls for follow-up verification.";
 
   if (mode === "fast") {
     return [

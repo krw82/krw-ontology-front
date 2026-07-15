@@ -505,21 +505,23 @@ const sampleShare: PublicMessageShare = {
   question_attachments: { urls: [], files: [] },
   answer_created_at: sampleNowIso,
   tickers: ["AAPL"],
+  share_context: { run_kind: null, guru_lens: null },
   title: "Apple 매출 성장 리서치 답변",
   created_at: sampleNowIso,
   locale: "ko",
 };
 
 const sampleOgCopy: ShareOgCopy = {
+  locale: "ko",
   title: "Apple 매출 성장 리서치 답변",
   description: "Apple의 매출 성장은 어디서 나왔어?",
   kicker: "공유 리서치 답변",
   footer: "공유 답변 · 공시 기반 리서치",
-  brandName: "KRW Ontology",
+  brandName: "KRW.O",
   primaryTicker: "AAPL",
   companyName: "Apple",
   tickerLine: "AAPL · Apple",
-  alt: "Apple 매출 성장 리서치 답변 | KRW Ontology",
+  alt: "Apple 매출 성장 리서치 답변 | KRW.O",
 };
 
 const watchlistOverview: WatchlistOverviewResponse = {
@@ -597,7 +599,7 @@ const coverageItems: CoverageItem[] = [
   { name: "ChatArtifacts", state: "rendered", section: "채팅", note: "뉴스 선택 아티팩트와 선택 상태" },
   { name: "ChatMessage", state: "rendered", section: "채팅", note: "유저/URL/파일/응답/오류/스트리밍" },
   { name: "ChatSidebar", state: "runtime", section: "채팅", note: "API 기반 기록 패널, 실제 앱에서 확인" },
-  { name: "CompaniesBrowser", state: "rendered", section: "회사", note: "검색, 종목 발굴기 CTA, 리스트" },
+  { name: "CompaniesBrowser", state: "rendered", section: "회사", note: "검색, 조건별 기업 검색 CTA, 리스트" },
   { name: "CompanyCard", state: "rendered", section: "회사", note: "ko/en, 모바일/데스크톱 반응형" },
   { name: "CompanyWatchlistActions", state: "rendered", section: "회사", note: "로그아웃/관심/보유 상태" },
   { name: "Composer", state: "rendered", section: "입력", note: "기본, URL, 파일 메뉴, 전송 샌드박스" },
@@ -838,11 +840,11 @@ export default function DevComponentsGallery() {
                   <MarketingCtaLink
                     href="/discover"
                     ctaId="dev_gallery_cta"
-                    ctaLabel="종목 발굴기"
+                    ctaLabel="조건으로 기업 검색"
                     surface="dev_gallery"
                     className="inline-flex min-h-11 items-center justify-center rounded-[8px] bg-ink px-4 text-[14px] font-black text-canvas"
                   >
-                    종목 발굴기
+                    조건으로 기업 검색
                   </MarketingCtaLink>
                   <ShareStartLink
                     href="/chat/new"

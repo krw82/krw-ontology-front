@@ -4,6 +4,7 @@ import { getAuthUser, forbiddenError, handleAuthError } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
   createMessageShare,
+  ensureMessageShareContextSnapshot,
   ensureMessageShareQuestionSnapshot,
   findExistingActiveShare,
 } from "@/lib/share/message-share";
@@ -71,6 +72,9 @@ export async function POST(
     if (existing && !existing.question_content) {
       await ensureMessageShareQuestionSnapshot({ message, session });
     }
+    if (existing && isMissingShareRunKind(existing.share_context)) {
+      await ensureMessageShareContextSnapshot({ message });
+    }
     const share =
       existing ?? (await createMessageShare({ userId: user.id, message, session }));
     const shareLocale = inferShareLocale({ answerContent: message.content });
@@ -98,4 +102,9 @@ export async function POST(
     console.error("[share] failed to create message share", error);
     return errorResponse(500, "internal_error", "공유 링크를 만들지 못했습니다.");
   }
+}
+
+function isMissingShareRunKind(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return true;
+  return typeof (value as Record<string, unknown>).run_kind !== "string";
 }

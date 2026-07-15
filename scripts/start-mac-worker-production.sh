@@ -140,7 +140,7 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
     exit 1
   fi
 
-  echo "Removing stale Mac worker lock: $LOCK_DIR" >&2
+  echo "No matching worker process found for existing lock; removing stale lock: $LOCK_DIR" >&2
   rmdir "$LOCK_DIR" 2>/dev/null || {
     echo "Could not remove stale lock: $LOCK_DIR" >&2
     exit 1

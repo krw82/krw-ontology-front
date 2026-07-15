@@ -183,6 +183,17 @@ export interface InstitutionalHoldingShareTrend {
   sharesByReportPeriod: Record<string, number | null>;
 }
 
+export interface InstitutionalTickerActivity {
+  cik: string;
+  managerName: string;
+  managerDisplayName: string | null;
+  reportPeriod: string;
+  changeType: PositionChangeType;
+  valueUsd: number;
+  previousValueUsd: number | null;
+  shares: number | null;
+}
+
 export interface InstitutionalHoldingsDashboard {
   managers: Known13FManager[];
   selectedCik: string;

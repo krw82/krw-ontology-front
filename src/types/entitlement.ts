@@ -16,10 +16,18 @@ export interface EntitlementFeature {
     | "share_links"
     | "markdown_answer"
     | "company_compare"
-    | "priority_queue";
+    | "priority_queue"
+    | "company_search"
+    | "guru_advisor"
+    | "recent_chats"
+    | "institutional_holdings"
+    | "stock_discovery"
+    | "wide_research"
+    | "research_notebook";
   label: string;
   description: string;
   enabled: boolean;
+  required_plan?: EntitlementPlanKey;
 }
 
 export interface EntitlementUsage {

@@ -48,7 +48,11 @@
   "$defs": {
     "companySummary": {
       "type": "object",
-      "additionalProperties": false,
+      "$ref": "#/$defs/companySummaryShape",
+      "unevaluatedProperties": false
+    },
+    "companySummaryShape": {
+      "type": "object",
       "required": [
         "ticker",
         "name",

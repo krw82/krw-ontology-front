@@ -31,6 +31,64 @@ import {
   parseDesktopOntologyMcpResult,
   shouldUseDesktopOntologyMcp,
 } from "./ontology-mcp-client";
+import {
+  KRW_ONTOLOGY_MCP_CONTRACT_VERSION,
+  KRW_ONTOLOGY_MCP_TOOLS,
+} from "@/lib/agent/mcp-client";
+
+function searchPlan() {
+  return {
+    question: "AAPL demand",
+    intent: "company_demand",
+    clauses: [
+      {
+        clause_id: "demand",
+        retrieval_query: "AAPL demand",
+        required_concepts: ["demand"],
+        required: true,
+        directness: "direct_preferred",
+        object_types: [],
+        metrics: [],
+        metric_dimensions: [],
+        metric_scope: "company_total",
+      },
+    ],
+    tickers: ["AAPL"],
+    document_types: [],
+    periods: [],
+    universe: null,
+    comparison_axes: [],
+    answer_scope: "direct",
+    uncertainty: "low",
+    limit_results: 12,
+    limit_tickers: 20,
+  };
+}
+
+function researchState() {
+  return {
+    contract_version: "research-state/v2",
+    release_id: "release-1",
+    plan: searchPlan(),
+    resolved_scope: {
+      requested_tickers: ["AAPL"],
+      resolved_tickers: ["AAPL"],
+    },
+    source_anchors: [],
+    answerability: {
+      status: "answerable",
+      strong_claim_allowed: true,
+    },
+    clause_coverage: [],
+    evidence_units: [],
+    computed_values: [],
+    calculation_coverage: [],
+    missing_parts: [],
+    recommended_actions: [],
+    continuation: null,
+    warnings: [],
+  };
+}
 
 describe("Desktop ontology MCP client", () => {
   beforeEach(() => {
@@ -39,6 +97,7 @@ describe("Desktop ontology MCP client", () => {
     sdk.connect.mockResolvedValue(undefined);
     sdk.close.mockResolvedValue(undefined);
     delete process.env.KRW_ONTOLOGY_MCP_URL;
+    delete process.env.KRW_ONTOLOGY_MCP_READY_URL;
     delete process.env.DESKTOP_ONTOLOGY_EXECUTOR;
     delete process.env.DESKTOP_ONTOLOGY_MCP_CONNECT_TIMEOUT_MS;
     delete process.env.DESKTOP_ONTOLOGY_MCP_TOOL_TIMEOUT_MS;
@@ -79,7 +138,11 @@ describe("Desktop ontology MCP client", () => {
         ok: true,
         release_id: "release-1",
         index_generated_at: "2026-06-10T00:00:00.000Z",
-        tools: ["krw_ontology_query_context", "krw_ontology_query"],
+        mcp_contract_version: KRW_ONTOLOGY_MCP_CONTRACT_VERSION,
+        tool_names: KRW_ONTOLOGY_MCP_TOOLS,
+        tool_count: KRW_ONTOLOGY_MCP_TOOLS.length,
+        tool_names_match: true,
+        tool_schema_sha256: "a".repeat(64),
       }),
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -88,9 +151,11 @@ describe("Desktop ontology MCP client", () => {
       ok: true,
       releaseId: "release-1",
       indexGeneratedAt: "2026-06-10T00:00:00.000Z",
-      toolNames: ["krw_ontology_query_context", "krw_ontology_query"],
+      toolNames: [...KRW_ONTOLOGY_MCP_TOOLS],
+      mcpContractVersion: KRW_ONTOLOGY_MCP_CONTRACT_VERSION,
+      toolSchemaSha256: "a".repeat(64),
     });
-    expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8765/health", {
+    expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8765/readyz", {
       headers: { accept: "application/json" },
       signal: expect.any(AbortSignal),
     });
@@ -101,11 +166,13 @@ describe("Desktop ontology MCP client", () => {
       ok: false,
       releaseId: null,
       toolNames: [],
+      mcpContractVersion: null,
+      toolSchemaSha256: null,
       error: "KRW_ONTOLOGY_MCP_URL is not configured",
     });
   });
 
-  it("calls the configured MCP tool with JSON response format and closes the client", async () => {
+  it("calls non-v2 tools with JSON response format and closes the client", async () => {
     process.env.KRW_ONTOLOGY_MCP_URL = "http://127.0.0.1:8765/mcp";
     sdk.callTool.mockResolvedValue({
       content: [
@@ -151,6 +218,34 @@ describe("Desktop ontology MCP client", () => {
     expect(sdk.close).toHaveBeenCalledOnce();
   });
 
+  it("passes query_context SearchPlan v2 without an unsupported response_format", async () => {
+    process.env.KRW_ONTOLOGY_MCP_URL = "http://127.0.0.1:8765/mcp";
+    sdk.callTool.mockResolvedValue({
+      structuredContent: researchState(),
+      content: [{ type: "text", text: JSON.stringify(researchState()) }],
+    });
+    const plan = searchPlan();
+
+    const result = await callKrwOntologyMcpTool(
+      "krw_ontology_query_context",
+      { search_plan: plan },
+    );
+
+    expect(sdk.callTool).toHaveBeenCalledWith(
+      {
+        name: "krw_ontology_query_context",
+        arguments: { search_plan: plan },
+      },
+      undefined,
+      expect.any(Object),
+    );
+    expect(result.resultJson).toMatchObject({
+      contract_version: "research-state/v2",
+      plan: { intent: "company_demand" },
+    });
+    expect(result.resultText).toContain("answerability: answerable");
+  });
+
   it("closes the MCP client when a tool call fails", async () => {
     process.env.KRW_ONTOLOGY_MCP_URL = "http://127.0.0.1:8765/mcp";
     sdk.callTool.mockRejectedValue(new Error("MCP failed"));
@@ -192,48 +287,24 @@ describe("Desktop ontology MCP client", () => {
     });
   });
 
-  it("builds useful compact text from the real query_context response shape", () => {
+  it("builds useful compact text from ResearchState v2", () => {
     const parsed = parseDesktopOntologyMcpResult({
       content: [
         {
           type: "text",
           text: JSON.stringify({
-            research_status: "sufficient_but_trace_recommended",
-            answerability: {
-              recommended_answer_mode: "bounded_answer_with_caveats",
-            },
-            research_pack: {
-              company_topic_pack: {
-                top_candidates: [
-                  {
-                    ticker: "AAPL",
-                    claim: "Greater China revenue declined year over year.",
-                  },
-                ],
-              },
-            },
-            missing_parts: ["channel_inventory_confirmation"],
-            recommended_tools: [
-              {
-                tool_name: "krw_ontology_trace",
-                object_id: "claim:AAPL:china",
-              },
+            ...researchState(),
+            missing_parts: [
+              { code: "missing_direct_evidence", detail: "channel inventory" },
             ],
           }),
         },
       ],
     });
 
-    expect(parsed.resultText).toContain(
-      "research_status: sufficient_but_trace_recommended",
-    );
-    expect(parsed.resultText).toContain(
-      "answer_mode: bounded_answer_with_caveats",
-    );
-    expect(parsed.resultText).toContain(
-      "Greater China revenue declined year over year.",
-    );
-    expect(parsed.resultText).toContain("channel_inventory_confirmation");
-    expect(parsed.resultText).not.toBe("ticker candidates: 0");
+    expect(parsed.resultJson).toMatchObject({
+      contract_version: "research-state/v2",
+      answerability: { status: "answerable" },
+    });
   });
 });

@@ -31,6 +31,7 @@ const toolLabels: Partial<Record<MCPToolName, string>> = {
   krw_ontology_chain: "판단 근거 대조",
   krw_ontology_quality: "답변 근거 점검",
   krw_ontology_compare: "회사·항목 비교",
+  krw_ontology_verify_evidence: "회사 근거 검증",
   route_news_question: "뉴스 질문 분류",
   resolve_news_entities: "뉴스 대상 확인",
   search_company_news_events: "기업 뉴스 이벤트 확인",
@@ -54,6 +55,7 @@ const toolLabels: Partial<Record<MCPToolName, string>> = {
   krw_guru_eval_questions: "구루 평가 질문 확인",
   krw_guru_company_brief: "회사 질문 정리",
   krw_guru_company_pack: "회사 근거와 구루 렌즈 결합",
+  krw_guru_review_company_evidence: "회사 근거를 구루 렌즈로 재검토",
 };
 
 const toolStepMap: Record<MCPToolName, ResearchStepId> = {
@@ -69,6 +71,7 @@ const toolStepMap: Record<MCPToolName, ResearchStepId> = {
   krw_ontology_chain: "trace",
   krw_ontology_quality: "compose",
   krw_ontology_compare: "compose",
+  krw_ontology_verify_evidence: "trace",
   route_news_question: "scope",
   resolve_news_entities: "scope",
   search_company_news_events: "search",
@@ -92,6 +95,7 @@ const toolStepMap: Record<MCPToolName, ResearchStepId> = {
   krw_guru_eval_questions: "compose",
   krw_guru_company_brief: "scope",
   krw_guru_company_pack: "compose",
+  krw_guru_review_company_evidence: "compose",
 };
 
 const baseSteps: Array<{ id: ResearchStepId; label: string }> = [

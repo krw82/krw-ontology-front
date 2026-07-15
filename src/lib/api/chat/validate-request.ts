@@ -13,6 +13,7 @@ import { MAX_DOCUMENT_ATTACHMENT_COUNT } from "@/lib/document-ingestion/config";
 import { normalizeResearchMode } from "@/lib/research-mode";
 import { normalizeAnalysisMode } from "@/lib/analysis-mode";
 import { defaultRunKindForAnalysisMode, normalizeRunKind } from "@/lib/run-kind";
+import { normalizeGuruLensKey } from "@/lib/guru-lenses";
 
 interface ValidatedRequest {
   body: ChatRunRequest;
@@ -62,6 +63,7 @@ export async function validateRequest(
     research_mode,
     analysis_mode,
     run_kind,
+    guru_lens,
     user_url,
     user_urls,
     attachment_ids,
@@ -89,6 +91,7 @@ export async function validateRequest(
     run_kind === undefined
       ? defaultRunKindForAnalysisMode(normalizedAnalysisMode)
       : normalizeRunKind(run_kind);
+  const normalizedGuruLens = normalizeGuruLensKey(guru_lens);
   const normalizedResearchMode = normalizeResearchMode(research_mode);
   if (content.trim().length === 0 || !normalizedRequestId) {
     return {
@@ -284,6 +287,7 @@ export async function validateRequest(
     research_mode: normalizedResearchMode,
     analysis_mode: normalizedAnalysisMode,
     run_kind: normalizedRunKind,
+    ...(normalizedGuruLens ? { guru_lens: normalizedGuruLens } : {}),
     ...(normalizedUserUrls[0]
       ? { user_url: normalizedUserUrls[0], user_urls: normalizedUserUrls }
       : {}),

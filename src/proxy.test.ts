@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase/middleware", () => ({
@@ -6,7 +7,7 @@ vi.mock("@/lib/supabase/middleware", () => ({
 }));
 
 import { updateSession } from "@/lib/supabase/middleware";
-import { proxy } from "./proxy";
+import { config, proxy } from "./proxy";
 
 const ORIGINAL_NEXT_PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
 const ORIGINAL_NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL;
@@ -51,6 +52,80 @@ describe("proxy", () => {
   afterEach(() => {
     restoreEnv("NEXT_PUBLIC_SITE_URL", ORIGINAL_NEXT_PUBLIC_SITE_URL);
     restoreEnv("NEXT_PUBLIC_APP_URL", ORIGINAL_NEXT_PUBLIC_APP_URL);
+    vi.unstubAllEnvs();
+  });
+
+  it("fails closed in production before an invalid client IP reaches a route", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("TRUSTED_CLIENT_IP_HEADER", "x-krw-client-ip");
+
+    const response = await proxy(request("/api/chat/run"));
+
+    expect(response.status).toBe(503);
+    expect(await json(response)).toEqual({
+      error: {
+        code: "service_unavailable",
+        message: "서비스가 일시적으로 응답하지 않습니다. 잠시 후 다시 시도해주세요.",
+      },
+    });
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(updateSession).not.toHaveBeenCalled();
+  });
+
+  it("accepts the Caddy-owned client IP header in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("TRUSTED_CLIENT_IP_HEADER", "x-krw-client-ip");
+
+    const response = await proxy(
+      request("/api/chat/run", { "x-krw-client-ip": "203.0.113.20" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(updateSession).toHaveBeenCalledOnce();
+  });
+
+  it("rejects an alternate trusted-header configuration in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("TRUSTED_CLIENT_IP_HEADER", "x-forwarded-for");
+
+    const response = await proxy(
+      request("/api/chat/run", {
+        "x-forwarded-for": "203.0.113.20",
+        "x-krw-client-ip": "198.51.100.9",
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    expect(updateSession).not.toHaveBeenCalled();
+  });
+
+  it("does not block the Docker web health check in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("TRUSTED_CLIENT_IP_HEADER", "x-krw-client-ip");
+
+    const response = await proxy(request("/api/healthz"));
+
+    expect(response.status).toBe(200);
+    expect(updateSession).toHaveBeenCalledOnce();
+  });
+
+  it("always runs the proxy for API requests carrying a prefetch marker", () => {
+    expect(
+      unstable_doesMiddlewareMatch({
+        config,
+        url: "http://localhost/api/chat/run",
+        headers: { "next-router-prefetch": "1" },
+        nextConfig: {},
+      }),
+    ).toBe(true);
+    expect(
+      unstable_doesMiddlewareMatch({
+        config,
+        url: "http://localhost/chat",
+        headers: { "next-router-prefetch": "1" },
+        nextConfig: {},
+      }),
+    ).toBe(false);
   });
 
   it("redirects document GET requests to the configured canonical origin", async () => {

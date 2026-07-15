@@ -55,7 +55,7 @@ const managerCopy = {
     limits: [
       "13F는 분기 말 이후 공개되므로 현재 보유와 다를 수 있습니다.",
       "공매도, 일부 해외 보유, 비공개 처리 요청 항목은 보이지 않을 수 있습니다.",
-      "KRW Ontology에서는 13F를 매수 신호가 아니라 후속 공시 리서치 질문을 만드는 입력으로 다룹니다.",
+      "KRW.O에서는 13F를 투자 판단이 아니라 후속 공시 리서치 질문을 만드는 입력으로 다룹니다.",
     ],
     faqHeading: "자주 묻는 질문",
     faqQuestion: "이 13F 페이지는 어떤 목적으로 쓰나요?",
@@ -98,7 +98,7 @@ const managerCopy = {
     limits: [
       "13F data is published after quarter end, so holdings may have changed.",
       "Short positions, some non-U.S. holdings, and confidential treatment items may not be visible.",
-      "KRW Ontology treats 13F as input for follow-up filing research, not as a buy signal.",
+      "KRW.O treats 13F as input for follow-up filing research, not as a substitute for an investment decision.",
     ],
     faqHeading: "FAQ",
     faqQuestion: "What is this 13F page for?",
@@ -573,7 +573,7 @@ function changeLabel(
       increased: "증가",
       decreased: "감소",
       unchanged: "유지",
-      sold: "전량매도",
+      sold: "보유 종료",
     },
     en: {
       new: "New",

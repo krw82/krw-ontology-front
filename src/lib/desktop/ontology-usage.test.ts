@@ -32,10 +32,18 @@ const request: DesktopOntologyToolCallRequest = {
   tool_call_id: "tool-1",
   tool_name: "krw_ontology_query_context",
   arguments: {
-    question: "AAPL very sensitive demand question",
-    tickers: ["AAPL"],
-    limit_results: 3,
-    response_detail: "compact",
+    search_plan: {
+      question: "AAPL very sensitive demand question",
+      intent: "company_demand",
+      clauses: [
+        {
+          clause_id: "demand",
+          retrieval_query: "AAPL very sensitive demand question",
+          required_concepts: ["demand"],
+        },
+      ],
+      tickers: ["AAPL"],
+    },
   },
   desktop_context: {
     app_version: "0.1.0",
@@ -54,7 +62,7 @@ const response: DesktopOntologyToolCallSuccess = {
   },
   ontology_release: {
     release_id: "release-1",
-    api_version: "ontology-search/v1",
+    api_version: "ontology-search/v2",
   },
   usage: {
     tool_calls_consumed: 1,
@@ -190,7 +198,9 @@ describe("Desktop ontology usage", () => {
   });
 
   it("marks audit success with release, counts, size, and latency", async () => {
-    const update = vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) }));
+    const update = vi.fn(() => ({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    }));
     mockAdmin({
       from: vi.fn(() => ({ update })),
     });
@@ -221,26 +231,22 @@ describe("Desktop ontology usage", () => {
     expect(payload.result_size_bytes).toEqual(expect.any(Number));
   });
 
-  it("counts actual MCP query_context evidence nested in research_pack", async () => {
-    const update = vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) }));
+  it("counts ResearchState v2 evidence units", async () => {
+    const update = vi.fn(() => ({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    }));
     mockAdmin({
       from: vi.fn(() => ({ update })),
     });
     const mcpResponse: DesktopOntologyToolCallSuccess = {
       ...response,
       result_json: {
-        research_status: "sufficient_for_default_answer",
-        ticker_candidates: [],
-        research_pack: {
-          company_topic_pack: {
-            top_candidates: [
-              { ticker: "AAPL", id: "claim-1" },
-              { ticker: "AAPL", id: "claim-2" },
-              { ticker: "AAPL", id: "claim-3" },
-            ],
-          },
-        },
-        citations: [],
+        contract_version: "research-state/v2",
+        evidence_units: [
+          { ticker: "AAPL", evidence_id: "ev-1" },
+          { ticker: "AAPL", evidence_id: "ev-2" },
+          { ticker: "AAPL", evidence_id: "ev-3" },
+        ],
       },
     };
 
@@ -258,7 +264,9 @@ describe("Desktop ontology usage", () => {
   });
 
   it("sums actual MCP results_by_ticker arrays for comparison audits", async () => {
-    const update = vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) }));
+    const update = vi.fn(() => ({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    }));
     mockAdmin({
       from: vi.fn(() => ({ update })),
     });
@@ -286,7 +294,9 @@ describe("Desktop ontology usage", () => {
   });
 
   it("marks audit failure with a bounded error code", async () => {
-    const update = vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) }));
+    const update = vi.fn(() => ({
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    }));
     mockAdmin({
       from: vi.fn(() => ({ update })),
     });

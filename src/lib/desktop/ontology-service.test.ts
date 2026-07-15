@@ -60,6 +60,35 @@ const auth = {
   authMethod: "desktop_access_token" as const,
 };
 
+function searchPlan() {
+  return {
+    question: "AAPL demand",
+    intent: "company_demand",
+    clauses: [
+      {
+        clause_id: "demand",
+        retrieval_query: "AAPL demand",
+        required_concepts: ["demand"],
+        required: true,
+        directness: "direct_preferred",
+        object_types: [],
+        metrics: [],
+        metric_dimensions: [],
+        metric_scope: "company_total",
+      },
+    ],
+    tickers: ["AAPL"],
+    document_types: [],
+    periods: [],
+    universe: null,
+    comparison_axes: [],
+    answer_scope: "direct",
+    uncertainty: "low",
+    limit_results: 12,
+    limit_tickers: 20,
+  };
+}
+
 describe("Desktop ontology service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -92,52 +121,26 @@ describe("Desktop ontology service", () => {
     });
   });
 
-  it("executes query_context through bounded catalog-backed evidence", async () => {
-    vi.mocked(getIndexedCompanies).mockResolvedValue([company]);
-
-    const response = await executeDesktopOntologyTool(
-      {
-        local_session_id: "session-1",
-        local_run_id: "run-1",
-        tool_call_id: "tool-1",
-        tool_name: "krw_ontology_query_context",
-        arguments: {
-          question: "AAPL demand",
-          tickers: ["AAPL"],
-          limit_results: 3,
-          response_detail: "compact",
+  it("fails closed instead of answering research through the catalog fallback", async () => {
+    await expect(
+      executeDesktopOntologyTool(
+        {
+          local_session_id: "session-1",
+          local_run_id: "run-1",
+          tool_call_id: "tool-1",
+          tool_name: "krw_ontology_query_context",
+          arguments: { search_plan: searchPlan() },
+          desktop_context: { analysis_mode: "company" },
         },
-        desktop_context: {
-          analysis_mode: "company",
-        },
-      },
-      auth,
-    );
-
-    expect(getIndexedCompanies).toHaveBeenCalledWith(["AAPL"]);
-    expect(searchIndexedCompanies).not.toHaveBeenCalled();
-    expect(response).toMatchObject({
-      ok: true,
-      tool_call_id: "tool-1",
-      tool_name: "krw_ontology_query_context",
-      ontology_release: {
-        release_id: "release-2026-06-10",
-        api_version: "ontology-search/v1",
-      },
-      result_json: {
-        local_session_id: "session-1",
-        local_run_id: "run-1",
-      },
+        auth,
+      ),
+    ).rejects.toMatchObject({
+      code: "ontology_unavailable",
+      status: 503,
+      retryable: true,
     });
-    expect(response.result_text).toContain("AAPL");
-    expect(response.result_json.citations).toEqual([
-      expect.objectContaining({
-        ticker: "AAPL",
-        document_type: "10-K",
-        period: "FY2025",
-      }),
-    ]);
-    expect(response.result_json.executor).toBe("catalog");
+    expect(getIndexedCompanies).not.toHaveBeenCalled();
+    expect(searchIndexedCompanies).not.toHaveBeenCalled();
   });
 
   it("keeps searchable catalog calls on the catalog service when MCP is enabled", async () => {
@@ -173,16 +176,28 @@ describe("Desktop ontology service", () => {
     vi.mocked(callKrwOntologyMcpTool).mockResolvedValue({
       resultText: "MCP evidence summary",
       resultJson: {
-        research_status: "sufficient_for_default_answer",
-        ticker_candidates: [
+        contract_version: "research-state/v2",
+        plan: searchPlan(),
+        resolved_scope: { resolved_tickers: ["AAPL"] },
+        source_anchors: [],
+        answerability: { status: "answerable" },
+        clause_coverage: [],
+        evidence_units: [
           {
             ticker: "AAPL",
             document_type: "10-K",
             period: "FY2025",
-            id: "claim:AAPL:FY2025:10K:demand",
+            object_id: "claim:AAPL:FY2025:10K:demand",
+            object_type: "ResearchClaim",
             summary: "Demand evidence",
           },
         ],
+        computed_values: [],
+        calculation_coverage: [],
+        missing_parts: [],
+        recommended_actions: [],
+        continuation: null,
+        warnings: [],
       },
     });
 
@@ -192,12 +207,7 @@ describe("Desktop ontology service", () => {
         local_run_id: "run-1",
         tool_call_id: "tool-1",
         tool_name: "krw_ontology_query_context",
-        arguments: {
-          question: "AAPL demand",
-          tickers: ["AAPL"],
-          limit_results: 3,
-          response_detail: "compact",
-        },
+        arguments: { search_plan: searchPlan() },
         desktop_context: {},
       },
       auth,
@@ -206,16 +216,14 @@ describe("Desktop ontology service", () => {
     expect(callKrwOntologyMcpTool).toHaveBeenCalledWith(
       "krw_ontology_query_context",
       {
-        question: "AAPL demand",
-        tickers: ["AAPL"],
-        limit_results: 3,
+        search_plan: searchPlan(),
       },
     );
     expect(getIndexedCompanies).not.toHaveBeenCalled();
     expect(response.result_text).toBe("MCP evidence summary");
     expect(response.result_json).toMatchObject({
       executor: "mcp",
-      research_status: "sufficient_for_default_answer",
+      contract_version: "research-state/v2",
       citations: [
         {
           ticker: "AAPL",
@@ -303,11 +311,7 @@ describe("Desktop ontology service", () => {
           local_run_id: "run-1",
           tool_call_id: "tool-1",
           tool_name: "krw_ontology_query_context",
-          arguments: {
-            question: "AAPL demand",
-            limit_results: 3,
-            response_detail: "compact",
-          },
+          arguments: { search_plan: searchPlan() },
           desktop_context: {},
         },
         auth,
@@ -337,11 +341,7 @@ describe("Desktop ontology service", () => {
           local_run_id: "run-1",
           tool_call_id: "tool-1",
           tool_name: "krw_ontology_query_context",
-          arguments: {
-            question: "AAPL demand",
-            limit_results: 3,
-            response_detail: "compact",
-          },
+          arguments: { search_plan: searchPlan() },
           desktop_context: {},
         },
         auth,

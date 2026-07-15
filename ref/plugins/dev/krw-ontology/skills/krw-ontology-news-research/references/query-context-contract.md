@@ -1,155 +1,376 @@
 # Query Context Contract
 
-Use `krw_ontology_query_context` as the default research workbench for normal questions.
+Use `krw_ontology_query_context` as the first ontology research call after the
+current event or selected URL narrative is framed. It accepts one public input
+only:
 
-## Field paths
-
-Current MCP builds may return fields like:
-
-```text
-research_context_version
-research_status
-research_pack.metric_series_pack
-research_pack.projection_pack
-research_pack.chain_pack
-research_pack.company_topic_pack
-research_pack.directness_guard
-research_pack.stop_guard
-research_pack.valuation_guard
-agent_autonomy.mode
-agent_autonomy.may_continue_research
-agent_autonomy.allowed_next_tools
-agent_autonomy.disallowed_next_tools
-agent_autonomy.max_additional_tool_calls
-missing_parts
-do_not_call
-recommended_tools
-final_answer_guidance
-answerability
-query_frame
-ticker_candidates
-results_by_ticker
-search_diagnostics
-kernel
-current_document_anchors
-filing_document_roles
+```json
+{
+  "search_plan": {
+    "question": "original user question plus selected event context",
+    "intent": "news_event_impact",
+    "clauses": [
+      {
+        "clause_id": "event_transmission",
+        "retrieval_query": "customer demand supports revenue growth",
+        "required_concepts": ["customer demand", "revenue growth"],
+        "required_predicates": ["supports"],
+        "required": true,
+        "tickers": [],
+        "directness": "direct_preferred",
+        "object_types": [],
+        "metrics": [],
+        "metric_dimensions": [],
+        "metric_scope": "company_total",
+        "calculation_window": null
+      }
+    ],
+    "tickers": [],
+    "document_types": [],
+    "periods": [],
+    "universe": "covered",
+    "comparison_axes": [],
+    "answer_scope": "direct",
+    "uncertainty": "medium",
+    "limit_results": 12,
+    "limit_tickers": 20
+  }
+}
 ```
 
-Do not assume pack fields are top-level. In normal JSON responses they are usually nested under `research_pack`, `agent_autonomy`, or `kernel`.
+Do not call it with `question`, `ticker`, `tickers`, `response_detail`,
+`response_format`, or any other legacy top-level argument. There is no v1
+compatibility path.
 
-## Filing document roles
+## MCP Input Corrections
 
-Current MCP builds may return `filing_document_roles` at the top level, under `research_pack`, or under routing diagnostics.
+An invalid `krw_ontology_query_context` call is not executed. MCP returns one
+English JSON `isError` result directly to the active SDK run. It batches every
+deterministic input problem the server can identify without guessing the user's
+intent. Repair **every** listed violation, then make the next allowed
+`krw_ontology_query_context` call. MCP never rewrites a plan or starts another
+run; the runner does not insert a semantic repair.
 
-Use it as the authoritative document-role map when present:
-
-```text
-filing_document_roles.<TICKER>.current_driver
-  latest available 10-Q when it exists, otherwise latest available 10-K
-  use as the latest reported financial baseline for current/news-event interpretation
-
-filing_document_roles.<TICKER>.annual_baseline
-  latest available 10-K
-  use for business mix, segment structure, annual baseline, historical risk baseline
-
-filing_document_roles.<TICKER>.latest_available
-  latest available 10-Q/10-K filing
+```json
+{
+  "status": "input_correction_required",
+  "code": "search_plan_validation_failed",
+  "message": "The SearchPlan has 2 correctable input error(s). Correct every listed violation before calling krw_ontology_query_context again.",
+  "violations": [
+    {
+      "field": "clauses[0].retrieval_query",
+      "rule": "missing_literal_term",
+      "message": "The metric_dimensions literal(s) 'Home and Accessories' are missing from clauses[0].retrieval_query.",
+      "required_change": "Include every exact phrase in required_literals in clauses[0].retrieval_query, or remove those values from clauses[0].metric_dimensions.",
+      "required_literals": ["Home and Accessories"]
+    },
+    {
+      "field": "clauses[0].calculation_window",
+      "rule": "missing_calculation_window",
+      "message": "A required metric clause needs calculation_window when comparison_axes requests absolute_change or growth_rate.",
+      "required_change": "Set calculation_window to period_over_period or year_over_year for this required metric clause, or remove the temporal comparison axis.",
+      "required_literals": []
+    }
+  ],
+  "allowed_next_tools": ["krw_ontology_query_context"]
+}
 ```
 
-`current_document_anchors` is compatibility shorthand for `filing_document_roles.<TICKER>.current_driver`.
+`code`, every `violations[*].field`, and every
+`violations[*].required_change` are the repair contract. Do not treat a
+correction as evidence, an answer-quality rating, or a user-visible status.
+Do not repeat unchanged input or ask MCP to guess the intended semantics.
 
-When both fields exist, follow `filing_document_roles` and use `current_document_anchors` only as a quick label.
+Before the first call, make a literal ledger for each clause:
 
-The role contract is intentionally limited to 10-Q and 10-K. Do not infer or invent other filing-form roles.
+- List each `required_concepts`, `required_predicates`, and
+  `metric_dimensions` phrase. Copy every one verbatim into that clause's
+  `retrieval_query`, or remove it from the corresponding requirement field.
+- Keep a metric clause pure: use `metrics` and `metric_dimensions` there; move
+  causal, risk, lending, or other qualitative concepts and predicates into a
+  separate qualitative clause.
+- When requesting `absolute_change` or `growth_rate`, set a valid
+  `calculation_window` on every required metric clause before calling MCP.
 
-## Compatibility fallback
+This checklist avoids avoidable correction turns; it does not let the server
+invent missing requirements or silently alter the authored SearchPlan.
 
-Older or partially deployed MCP builds may omit some fields.
+The active DeepSeek agent must author the complete `SearchPlan` before the
+first ontology call. Build it after news discovery so each clause preserves
+the selected event, source timing, company scope, financial channel, and the
+user's original intent. `krw_ontology_plan_query` is validation/debug only: it
+normalizes and validates a plan but performs no retrieval. Do not insert it as
+a mandatory preflight before every normal query.
 
-Use conservative fallback:
+## Runtime routing boundary
 
-```text
-answerability.direct_answerable = true and recommended trace roots exist:
-treat as sufficient_but_trace_recommended
+Author the complete event-aware plan and let `query_context` route it through
+the global index into only the required company shards. Do not manually fan
+out the same event company by company or repeat one query per keyword. Use
+explicit `tickers` for known companies and `universe="covered"` for discovery.
 
-answerability.negative_answer_supported = true:
-treat as sufficient for a negative direct-exposure answer
+Treat router scores, coherence diagnostics, and index locations as retrieval
+control data, never as filing or event evidence. Claims still require
+ResearchState coverage and source-backed evidence units.
 
-ticker_candidates contain traceable direct or related candidates:
-treat as sufficient for a default answer unless exhaustive audit is requested
+## SearchPlan
 
-no candidates returned:
-allow at most one targeted structured follow-up query
-
-target price, fair value, investment recommendation, 12-month price target:
-treat as out of scope for filing-only ontology unless external valuation inputs are supplied
-```
-
-Do not compensate for missing research-pack fields by launching open-ended query, retrieve, compare, trace, or chain loops.
-
-## Research status interpretation
-
-```text
-sufficient_for_default_answer:
-answer without broad follow-up
-
-sufficient_but_trace_recommended:
-trace/chain selected roots only before strong claims
-
-partial_answer_possible:
-answer narrowly; fill explicit missing parts only if cheap and targeted
-
-needs_targeted_followup:
-use allowed_next_tools only
-
-no_direct_evidence_with_related_context:
-separate direct absence from related context
-
-out_of_scope_for_filing_ontology:
-stop searching and explain using filing-supported assumptions only
-
-not_answerable:
-do not force a conclusion
-```
-
-## Internal English investment brief
-
-For normal KRW ontology research, query_context should receive a concise internal English investment brief. Do not send broad Korean topic text directly to query_context.
-
-The brief is not a literal translation. Build it with awareness of the KRW ontology schema, evidence types, research packs, and MCP retrieval surface so it is optimized for ontology evidence retrieval.
-
-In news mode, build the English brief after stock-news event discovery. The brief should combine the user's original intent with the discovered event, source timing, financial channel, and ontology bridge hints. Do not pass a broad Korean news question directly into query_context.
-
-The English investment brief should preserve:
+Set these fields deliberately:
 
 ```text
-user intent
-tickers and company names
-periods
-event date and source timing
-event type
-exact metrics
-comparison axes
-direct-exposure factors
-capital-allocation or cash-flow concepts
+question
+  Preserve the original question and selected event context for synthesis. It
+  is not a substitute for clause retrieval queries.
+
+intent
+  Use a stable lowercase slug selected by the agent.
+
+clauses
+  Split the event-impact question into independently verifiable propositions.
+  At least one clause must be required.
+
+tickers / universe
+  Use explicit uppercase tickers for known-company research. For tickerless
+  discovery after event framing use universe="covered". They are mutually
+  exclusive.
+
+document_types / periods
+  Add only filters requested by the user or required by the research design.
+
+comparison_axes
+  Use value, absolute_change, growth_rate, value_difference, directness, or
+  evidence_grade only when the answer needs that axis.
+
+answer_scope
+  Use direct unless filing evidence is only supporting context for the event.
+
+uncertainty
+  Report planning uncertainty honestly; higher uncertainty preserves a wider
+  retrieval candidate set.
+
+limit_results / limit_tickers
+  Choose adaptive evidence and discovery budgets for this plan.
 ```
 
-Map user intent to ontology-friendly retrieval concepts when useful:
+Do not impose a universal top-5, limit-3, or hard tool-call policy. Set
+`limit_results` high enough to cover every required clause, clause ticker,
+metric period/pair, and potential conflicting observation. Set
+`limit_tickers` high enough for the requested discovery breadth. Reduce these
+budgets only after production logs and quality evaluation show that doing so
+does not lose required coverage.
+
+## QueryClause
+
+Each clause supports:
 
 ```text
-explanatory filing text / notes
-MD&A / management discussion
-segment commentary
-revenue recognition / RPO / backlog
-cost of revenue / gross margin / operating margin
-cash flow / FCF / capex
-business combinations / acquisitions
-share repurchases / dilution management
-SBC / R&D / talent investment
-direct exposure / related pressure channel
-business model / product platform / customer demand
+clause_id
+retrieval_query
+required_concepts
+required_predicates
+required
+tickers
+directness
+object_types
+metrics
+metric_dimensions
+metric_scope
+calculation_window
 ```
 
-For broad sector/global/macro news questions, pair the internal English investment brief with a bounded covered universe when possible.
+Write `retrieval_query` as a self-contained, concise English filing query. For
+a Korean request, translate the event's business and financial channel into
+filing vocabulary such as `management discussion`, `customer demand`,
+`revenue`, `gross margin`, `operating cash flow`, `capital expenditures`,
+`backlog`, `liquidity`, `dilution`, or `direct exposure`. Do not send a broad
+Korean news question as the retrieval query.
 
-For concrete tickerless news events with a specific factor, channel, product, business model, metric, event type, or company type, query_context may receive `tickers=[]` with `limit_tickers <= 5` and `limit_results <= 3` after stock-news event discovery. Treat the v3 global spine result as candidate ticker ranking and evidence routing, not as the final answer.
+Name every required concept, predicate, metric, and dimension in
+`retrieval_query`. Every `required_concepts`, `required_predicates`, and
+`metric_dimensions` value must appear there as its exact literal phrase after
+whitespace normalization. Put canonical metric identifiers in `metrics`; readable
+metric aliases may appear in `retrieval_query` when the metric dictionary maps
+them to the same canonical identity.
+
+Use the clause fields as follows:
+
+```text
+required_concepts
+  The complete non-metric concepts the evidence must establish.
+
+required_predicates
+  Relation/mechanism terms that must co-occur with all required concepts in
+  one traceable span. A qualitative clause with multiple concepts requires at
+  least one predicate.
+
+tickers
+  An optional subset of SearchPlan.tickers for this clause. Empty inherits the
+  plan scope; a subset cannot name a ticker outside the plan.
+
+directness
+  any, direct_preferred, or direct_required.
+
+object_types
+  Optional ontology object filters chosen from known index capabilities.
+
+metrics
+  Canonical metric identifiers required for exact metric lineage.
+
+metric_dimensions
+  Exact segment, geography, product, counterparty, or other dimensions.
+
+metric_scope
+  company_total, dimensioned, or intentionally broad any.
+
+calculation_window
+  period_over_period or year_over_year when a temporal calculation is needed.
+```
+
+Do not mix a metric proposition with a causal, mechanism, risk, or other
+qualitative proposition in one clause. Metric clauses cannot set
+`required_predicates`; split the event mechanism into another clause. For a
+pure metric clause, normally leave `required_concepts` empty and express the
+identity through `metrics` and `metric_dimensions`.
+
+Example qualitative event clause:
+
+```json
+{
+  "clause_id": "capex_to_cash_flow",
+  "retrieval_query": "capital expenditures affect operating cash flow management discussion",
+  "required_concepts": ["capital expenditures", "operating cash flow"],
+  "required_predicates": ["affect"],
+  "required": true,
+  "tickers": ["MSFT"],
+  "directness": "direct_preferred",
+  "object_types": ["ResearchClaim", "EvidenceQuote"],
+  "metrics": [],
+  "metric_dimensions": [],
+  "metric_scope": "company_total"
+}
+```
+
+Example metric clause:
+
+```json
+{
+  "clause_id": "capex_yoy",
+  "retrieval_query": "capital expenditures year over year",
+  "required_concepts": [],
+  "required_predicates": [],
+  "required": true,
+  "tickers": ["MSFT"],
+  "directness": "direct_required",
+  "object_types": ["MetricObservation"],
+  "metrics": ["capital_expenditures"],
+  "metric_dimensions": [],
+  "metric_scope": "company_total",
+  "calculation_window": "year_over_year"
+}
+```
+
+Example dimensioned metric clause:
+
+```json
+{
+  "clause_id": "home_accessories_sales",
+  "retrieval_query": "Home and Accessories net sales",
+  "required": true,
+  "tickers": ["AAPL"],
+  "directness": "direct_required",
+  "object_types": ["MetricObservation"],
+  "metrics": ["revenue"],
+  "metric_dimensions": ["Home and Accessories"],
+  "metric_scope": "dimensioned"
+}
+```
+
+The following is invalid because the dimension is absent from
+`retrieval_query`; the runtime returns a `missing_literal_term` violation
+rather than silently adding it:
+
+```json
+{
+  "retrieval_query": "net sales by product category",
+  "metrics": ["revenue"],
+  "metric_dimensions": ["Home and Accessories"],
+  "metric_scope": "dimensioned"
+}
+```
+
+## Metric and period semantics
+
+`absolute_change` and `growth_rate` require `calculation_window` on every
+required metric clause. Use:
+
+```text
+period_over_period
+  Adjacent annual observations or adjacent quarter observations.
+
+year_over_year
+  The same annual period or same fiscal/calendar quarter one year apart.
+  YTD observations support year_over_year only.
+```
+
+Require exact `metric_scope` and `metric_dimensions` for the requested series.
+Do not mix FY and CY bases, quarter and YTD durations, annual and quarterly
+amounts, different units/currencies, or total-company and dimensioned series.
+Cross-company `value_difference` requires aligned metric identity, scope,
+dimensions, period basis, duration, unit, and currency for every requested
+ticker pair.
+
+## ResearchState v2
+
+`krw_ontology_query_context` returns `research-state/v2`. Read these fields
+directly:
+
+```text
+resolved_scope
+  Requested/resolved/unknown/missing/failed tickers plus document and period
+  scope.
+
+source_anchors
+  Ticker, period, document type, role, and source label for current, annual,
+  latest, or retrieved evidence anchors.
+
+answerability.status / answerability.strong_claim_allowed
+  Overall answer policy: answerable, partial, not_answerable, or
+  supporting_context_only.
+
+clause_coverage
+  covered/partial/missing state, ticker coverage, best directness/evidence
+  grade, and strong_claim_ready for every clause.
+
+evidence_units
+  Deduplicated facts and metrics with clause support and traceable source IDs.
+  Their operational identity is (ticker, object_id); a shared canonical ID may
+  have a distinct occurrence in more than one company.
+
+computed_values / calculation_coverage
+  Deterministic values plus covered/partial/missing calculation support for
+  each requested metric axis.
+
+missing_parts / recommended_actions
+  Precise gaps and bounded next actions tied to a clause and occurrence. When
+  an action supplies tool, ticker, and object_id, preserve all three fields in
+  the follow-up invocation; clause_id is explanatory context.
+
+continuation
+  Whether bounded evidence was omitted and why.
+
+warnings
+  Conflicts, truncation, or other conditions that narrow safe interpretation.
+```
+
+Make a strong qualitative claim only when overall
+`answerability.strong_claim_allowed` and the relevant required clause coverage
+support it. Make a strong numeric or comparative claim only when the relevant
+`calculation_coverage` is covered and its `computed_values` have complete,
+aligned lineage. Related filing context can constrain a news hypothesis but is
+not proof that the event caused a company outcome.
+
+When the state is partial, continue only for specific `missing_parts` or
+`recommended_actions`. Do not obey a fixed one-follow-up cap, and do not repeat
+the same broad plan with cosmetic wording changes. Stop when required clause
+and calculation coverage support the intended answer, or when another call
+would add volume without changing correctness.

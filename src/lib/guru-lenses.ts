@@ -178,106 +178,180 @@ export function getGuruLensDisplayName(
   return locale === "ko" ? lens.labelKo : lens.labelEn;
 }
 
-export function getGuruLensPromptPrefix(
-  lens: GuruLensOption,
-  locale: string = DEFAULT_LOCALE,
-): string {
-  return lens.key === "auto"
-    ? "[구루 렌즈: 전체]"
-    : `[구루 렌즈: ${getGuruLensDisplayName(lens, locale)}]`;
-}
-
 export function getGuruSuggestedPrompts(
   lens: GuruLensOption,
   locale: string,
+  options: { hasCompanyContext?: boolean } = {},
 ): string[] {
   const isKo = locale === "ko";
-  const byLens: Record<GuruLensKey, { ko: string[]; en: string[] }> = {
+  const philosophyByLens: Record<GuruLensKey, { ko: string[]; en: string[] }> = {
     auto: {
       ko: [
-        "내 투자 아이디어에서 먼저 의심해야 할 점을 찾아줘.",
-        "이 기업을 보기 전에 확인할 질문 5개를 뽑아줘.",
-        "좋은 이야기처럼 보이지만 깨질 수 있는 가정을 점검해줘.",
+        "이 투자 아이디어에서 가장 먼저 의심해야 할 가정은 무엇인가요?",
+        "리스크를 관리하려면 어떤 질문부터 해야 할까요?",
+        "집중 투자와 분산 투자 중 어떤 관점으로 봐야 할까요?",
       ],
       en: [
-        "Find the assumptions I should challenge first in my investment idea.",
-        "Give me 5 questions to ask before researching this company.",
-        "Pressure-test the assumptions that could break this attractive story.",
+        "What assumption should I question first in this investment idea?",
+        "Which questions should I ask first to manage the risk?",
+        "Should I think about this through concentration or diversification?",
       ],
     },
     buffett: {
       ko: [
-        "내가 가진 종목을 버핏식으로 점검해줘.",
-        "이 사업을 장기 보유해도 되는지 질문부터 정리해줘.",
-        "해자와 현금창출력이 오래 갈지 의심할 지점을 찾아줘.",
+        "좋은 기업을 고를 때 무엇을 가장 먼저 봐야 하나요?",
+        "오래 보유할 수 있는 사업은 어떻게 구분하나요?",
+        "해자와 현금창출력을 볼 때 초보자가 놓치기 쉬운 점은 무엇인가요?",
       ],
       en: [
-        "Pressure-test my stock idea with a Buffett lens.",
-        "List the questions that test whether this business can be held for years.",
-        "Find what I should doubt about its moat and long-term cash generation.",
+        "What should I look at first when judging a good business?",
+        "How do I tell whether a business can be held for years?",
+        "What do beginners often miss about moats and cash generation?",
       ],
     },
     marks: {
       ko: [
-        "이 투자 아이디어에서 손실 가능성부터 점검해줘.",
-        "좋은 스토리처럼 보이지만 위험한 부분을 찾아줘.",
-        "사이클과 군중심리 관점에서 조심할 지점을 정리해줘.",
+        "리스크를 관리하려면 어떤 질문부터 해야 하나요?",
+        "좋은 이야기처럼 보여도 손실로 이어지는 경우는 언제인가요?",
+        "사이클과 군중심리를 볼 때 공격과 방어를 어떻게 나누나요?",
       ],
       en: [
-        "Start by checking the downside risk in this investment idea.",
-        "Find the dangerous parts hidden inside this attractive story.",
-        "Review what to watch from a cycle and crowd-psychology lens.",
+        "Which questions should I ask first to manage risk?",
+        "When can a good-looking story still lead to loss?",
+        "How should I separate offense and defense through cycles and crowd psychology?",
       ],
     },
     ackman: {
       ko: [
-        "큰 비중을 실어도 되는 아이디어인지 조건을 점검해줘.",
-        "이 사업이 정말 단순하고 예측 가능한지 질문을 만들어줘.",
-        "집중 투자 전에 깨져야 할 가정을 정리해줘.",
+        "집중 투자와 분산 투자는 어떤 기준으로 나눠야 하나요?",
+        "큰 비중을 싣기 전에 반드시 깨봐야 할 가정은 무엇인가요?",
+        "단순하고 강한 투자 아이디어는 어떻게 구분하나요?",
       ],
       en: [
-        "Test whether this idea deserves a concentrated position.",
-        "Create questions that check whether the business is truly simple and predictable.",
-        "List the assumptions that must be breakable before concentrating.",
+        "How should I decide between concentration and diversification?",
+        "What assumptions must I break before taking a large position?",
+        "How do I identify a simple and strong investment idea?",
       ],
     },
     flatt: {
       ko: [
-        "이 기업의 자산과 운영 품질을 장기 관점에서 점검해줘.",
-        "재투자 기회와 자본 배분이 계속될 수 있는지 질문을 뽑아줘.",
-        "운영자가 장기 가치를 키우는지 볼 기준을 정리해줘.",
+        "장기 자산 가치를 볼 때 무엇을 먼저 확인해야 하나요?",
+        "좋은 운영자가 가치를 키우고 있는지는 어떻게 판단하나요?",
+        "재투자와 자본 배분에서 가장 먼저 의심할 점은 무엇인가요?",
       ],
       en: [
-        "Check this company's assets and operating quality with a long-duration lens.",
-        "List questions that test whether reinvestment and capital allocation can continue.",
-        "Define how to judge whether operators compound long-term value.",
+        "What should I check first when judging long-term asset value?",
+        "How can I tell whether a good operator is compounding value?",
+        "What should I question first in reinvestment and capital allocation?",
       ],
     },
     terry_smith: {
       ko: [
-        "좋은 기업이라도 거절해야 할 이유부터 찾아줘.",
-        "오래 보유할 수 있는 품질인지 점검해줘.",
-        "가격 discipline을 깨뜨릴 위험한 가정을 정리해줘.",
+        "오래 보유할 좋은 기업은 어떤 순서로 판단하나요?",
+        "좋은 기업처럼 보여도 거절해야 하는 경우는 언제인가요?",
+        "가격을 너무 낙관적으로 보는 위험은 어떻게 피하나요?",
       ],
       en: [
-        "Start with reasons to reject this idea even if the company looks good.",
-        "Check whether the quality is durable enough to hold for years.",
-        "Find the assumptions that could break price discipline.",
+        "In what order should I judge a quality company for long-term holding?",
+        "When should I reject a company even if it looks good?",
+        "How do I avoid becoming too optimistic on price?",
+      ],
+    },
+  };
+  const companyByLens: Record<GuruLensKey, { ko: string[]; en: string[] }> = {
+    auto: {
+      ko: [
+        "이 투자 아이디어에서 가장 먼저 의심해야 할 가정은 무엇인가요?",
+        "리스크를 관리하려면 어떤 질문부터 해야 할까요?",
+        "집중 투자와 분산 투자 중 어떤 관점으로 봐야 할까요?",
+      ],
+      en: [
+        "What assumption should I question first in this investment idea?",
+        "Which questions should I ask first to manage the risk?",
+        "Should I think about this through concentration or diversification?",
+      ],
+    },
+    buffett: {
+      ko: [
+        "버핏 관점에서 이 기업을 볼 때 무엇을 가장 먼저 봐야 할까요?",
+        "이 사업을 오래 보유해도 되는지 어떻게 판단하면 좋을까요?",
+        "해자와 현금창출력에서 제가 놓치기 쉬운 리스크는 무엇인가요?",
+      ],
+      en: [
+        "From a Buffett lens, what should I look at first in this company?",
+        "How should I judge whether this business can be held for years?",
+        "What risk might I miss in its moat and cash generation?",
+      ],
+    },
+    marks: {
+      ko: [
+        "하워드 막스 관점에서 지금 가장 조심해야 할 리스크는 무엇인가요?",
+        "좋은 이야기처럼 보이지만 손실로 이어질 수 있는 부분은 어디인가요?",
+        "사이클과 군중심리 기준으로 지금은 공격할 때인가요, 방어할 때인가요?",
+      ],
+      en: [
+        "From a Howard Marks lens, what risk should I be most careful about now?",
+        "What part of this attractive story could still lead to loss?",
+        "From cycles and crowd psychology, is this a time to be aggressive or defensive?",
+      ],
+    },
+    ackman: {
+      ko: [
+        "애크먼 관점에서 이 아이디어는 큰 비중을 실어도 될 만큼 단순한가요?",
+        "집중 투자와 분산 투자 중 이 기업은 어느 쪽에 더 가까운가요?",
+        "큰 포지션을 잡기 전에 반드시 깨봐야 할 가정은 무엇인가요?",
+      ],
+      en: [
+        "From an Ackman lens, is this idea simple enough for a large position?",
+        "Is this company closer to a concentration case or a diversification case?",
+        "What assumptions must I break before taking a large position?",
+      ],
+    },
+    flatt: {
+      ko: [
+        "브루스 플랫 관점에서 이 기업의 장기 자산 가치는 어떻게 봐야 할까요?",
+        "운영자가 장기 가치를 키우고 있는지 무엇으로 판단하면 좋을까요?",
+        "재투자 기회와 자본 배분에서 가장 먼저 확인할 리스크는 무엇인가요?",
+      ],
+      en: [
+        "From a Bruce Flatt lens, how should I think about this company's long-term asset value?",
+        "How can I judge whether the operator is compounding long-term value?",
+        "What risk should I check first in reinvestment and capital allocation?",
+      ],
+    },
+    terry_smith: {
+      ko: [
+        "테리 스미스 관점에서 이 기업은 오래 보유할 만큼 좋은 기업인가요?",
+        "좋은 기업처럼 보여도 제가 거절해야 할 이유는 무엇인가요?",
+        "가격을 너무 낙관적으로 보는 위험은 어디에서 생길까요?",
+      ],
+      en: [
+        "From a Terry Smith lens, is this good enough to hold for years?",
+        "Even if it looks like a good company, why might I still reject it?",
+        "Where could I become too optimistic on price?",
       ],
     },
   };
 
-  return isKo ? byLens[lens.key].ko : byLens[lens.key].en;
+  const prompts = options.hasCompanyContext
+    ? companyByLens[lens.key]
+    : philosophyByLens[lens.key];
+  return isKo ? prompts.ko : prompts.en;
 }
 
 export function buildGuruSessionHref(
   sessionId: string,
   locale: string,
   lensKey: GuruLensKey = "auto",
+  ticker?: string | null,
 ): string {
   const params = new URLSearchParams({ sessionId });
   if (lensKey !== "auto") {
     params.set("guru", lensKey);
+  }
+  const normalizedTicker = ticker?.trim().toUpperCase();
+  if (normalizedTicker) {
+    params.set("ticker", normalizedTicker);
   }
   if (locale !== DEFAULT_LOCALE) {
     params.set("locale", locale);
@@ -285,8 +359,16 @@ export function buildGuruSessionHref(
   return `/guru?${params.toString()}`;
 }
 
-export function buildGuruLensHref(lensKey: GuruLensKey, locale: string): string {
+export function buildGuruLensHref(
+  lensKey: GuruLensKey,
+  locale: string,
+  ticker?: string | null,
+): string {
   const params = new URLSearchParams({ guru: lensKey });
+  const normalizedTicker = ticker?.trim().toUpperCase();
+  if (normalizedTicker) {
+    params.set("ticker", normalizedTicker);
+  }
   if (locale !== DEFAULT_LOCALE) {
     params.set("locale", locale);
   }

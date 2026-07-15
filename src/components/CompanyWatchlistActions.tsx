@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { trackClientEventWithTimeout } from "@/lib/analytics/client";
 import { cn } from "@/lib/utils";
+import CompanyFilingSubscriptionControl from "@/components/filings/CompanyFilingSubscriptionControl";
 
 type WatchlistAction = "watchlist" | "holding";
 
@@ -49,6 +50,7 @@ export default function CompanyWatchlistActions({
         <WatchlistLink href={loginHref} icon="inventory_2" emphasis>
           {labels.holding}
         </WatchlistLink>
+        <CompanyFilingSubscriptionControl ticker={ticker} loginHref={loginHref} isAuthenticated={false} />
       </div>
     );
   }
@@ -85,6 +87,12 @@ export default function CompanyWatchlistActions({
         destination: destinationHref,
         ...analyticsProperties,
       });
+      if (!removingCurrentAction && action === "watchlist") {
+        void trackClientEventWithTimeout("company_followed", {
+          ticker,
+          surface: "company_hero",
+        });
+      }
 
       setSavedAction(removingCurrentAction ? null : action);
     } catch (err) {
@@ -125,6 +133,7 @@ export default function CompanyWatchlistActions({
           })}
         </WatchlistButton>
       </div>
+      <CompanyFilingSubscriptionControl ticker={ticker} loginHref={loginHref} isAuthenticated />
       {error ? (
         <p className="mt-2 text-[13px] font-bold leading-5 text-error">
           {error}

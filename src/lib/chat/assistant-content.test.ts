@@ -61,6 +61,72 @@ describe("sanitizeAssistantContent", () => {
     ).toBe("Based on Micron's latest filing, the answer is cautious.");
   });
 
+  it("removes a leading Guru review-completion transition", () => {
+    expect(
+      sanitizeAssistantContent(
+        "Review validated. Now I have all inputs to write the final consultation answer.\n\n## AAPL 투자 판단",
+      ),
+    ).toBe("## AAPL 투자 판단");
+  });
+
+  it("removes leading Guru workflow packet status before the consultation answer", () => {
+    expect(
+      sanitizeAssistantContent(
+        "ResearchPack indicates company evidence is needed. Let me get the company brief and then delegate filing research to the company_evidence_researcher.자, 내가 먼저 묻고 싶은 건 하나입니다.",
+      ),
+    ).toBe("자, 내가 먼저 묻고 싶은 건 하나입니다.");
+  });
+
+  it("removes long leading Guru workflow narration before a Korean consultation answer", () => {
+    expect(
+      sanitizeAssistantContent(
+        "Now I have the ResearchPack and company brief. I need to delegate to the company_evidence_researcher subagent to get actual filing evidence for AAPL. Let me compose the final answer directly based on the comprehensive Guru lens context. The evidence review tool has a parameter encoding issue, but I have sufficient lens context.\n\n---\n\n자, 먼저 가격표를 잠깐 내려놓읍시다.",
+      ),
+    ).toBe("자, 먼저 가격표를 잠깐 내려놓읍시다.");
+  });
+
+  it("preserves Korean guru opening when an answer separator follows it", () => {
+    expect(
+      sanitizeAssistantContent(
+        [
+          "Now I have the ResearchPack and answer-style. Let me proceed with the company brief and then delegate to the company_evidence_researcher.Now I have the CompanyEvidencePack. Let me review it with the Guru evidence review tool.Now I have all the materials needed. Let me compose the final Korean consultation answer applying the answer-style guidance.",
+          "",
+          "먼저 가격표를 잠깐 내려놓읍시다. 내가 지금 보고 싶은 건 이 장사의 계산대가 어떻게 굴러가고 있는지입니다.",
+          "",
+          "---",
+          "",
+          "## 내가 좋아하는 점",
+        ].join("\n"),
+      ),
+    ).toBe(
+      [
+        "먼저 가격표를 잠깐 내려놓읍시다. 내가 지금 보고 싶은 건 이 장사의 계산대가 어떻게 굴러가고 있는지입니다.",
+        "",
+        "## 내가 좋아하는 점",
+      ].join("\n"),
+    );
+  });
+
+  it("removes standalone horizontal rules from rendered answers", () => {
+    expect(
+      sanitizeAssistantContent(
+        [
+          "자, 먼저 가격표를 잠깐 내려놓읍시다.",
+          "",
+          "---",
+          "",
+          "**내가 좋아하는 점**",
+        ].join("\n"),
+      ),
+    ).toBe(
+      [
+        "자, 먼저 가격표를 잠깐 내려놓읍시다.",
+        "",
+        "**내가 좋아하는 점**",
+      ].join("\n"),
+    );
+  });
+
   it("removes internal trace verification labels from user-facing source text", () => {
     expect(
       sanitizeAssistantContent(

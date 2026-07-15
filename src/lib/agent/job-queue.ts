@@ -27,6 +27,7 @@ import {
   normalizeRunKind,
   type RunKind,
 } from "@/lib/run-kind";
+import type { GuruLensKey } from "@/lib/guru-lenses";
 
 const GLOBAL_CONCURRENT_LIMIT = readIntEnv("GLOBAL_CONCURRENT_RUN_LIMIT", 5, {
   min: 1,
@@ -60,6 +61,7 @@ export async function enqueueAgentRun(params: {
   runKind?: RunKind;
   executorType?: AgentRunExecutorType;
   selectedNewsEventContext?: Record<string, unknown> | null;
+  guruLensKey?: GuruLensKey | null;
   responseLocale?: Locale;
   routingMode?: AgentRunRoutingMode;
   sourceArtifactId?: string | null;
@@ -172,6 +174,7 @@ export async function enqueueAgentRun(params: {
     research_mode: researchMode,
     analysis_mode: analysisMode,
     run_kind: runKind,
+    ...(params.guruLensKey ? { guru_lens: params.guruLensKey } : {}),
     routing_mode: routingMode,
     response_locale: responseLocale,
     executor_type: executorType,

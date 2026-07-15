@@ -140,6 +140,7 @@ fi
 
 require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.mcp.json"
 require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.claude-plugin/plugin.json"
+require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.krw-ontology-contract.json"
 require_path "$GURU_PLUGIN_PATH/.mcp.json"
 require_path "$GURU_PLUGIN_PATH/.claude-plugin/plugin.json"
 if [ "$STOCK_NEWS_RUNTIME_ENABLED" = "1" ]; then
@@ -155,7 +156,10 @@ if [ "$SKILL_COUNT" -lt 1 ]; then
   exit 1
 fi
 
-EXPECTED_PLUGIN_PATH="$FRONT_DIR/ref/plugins/prod/krw-ontology"
+ACTIVE_RELEASE_ROOT=$(CDPATH= cd -- "$KRW_ONTOLOGY_RELEASE_ROOT" && pwd -P)
+ACTIVE_RELEASE_ID=$(basename "$ACTIVE_RELEASE_ROOT")
+ONTOLOGY_DATA_ROOT=$(dirname "$(dirname "$(dirname "$ACTIVE_RELEASE_ROOT")")")
+EXPECTED_PLUGIN_PATH="$ONTOLOGY_DATA_ROOT/runtime/plugins/prod/$ACTIVE_RELEASE_ID-canonical/krw-ontology"
 if [ "${KRW_ONTOLOGY_PLUGIN_PATH:-}" != "$EXPECTED_PLUGIN_PATH" ]; then
   echo "KRW_ONTOLOGY_PLUGIN_PATH mismatch." >&2
   echo "  env:      ${KRW_ONTOLOGY_PLUGIN_PATH:-unset}" >&2

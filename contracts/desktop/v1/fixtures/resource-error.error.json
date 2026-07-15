@@ -1,0 +1,9 @@
+{
+  "ok": false,
+  "error": {
+    "code": "not_found",
+    "message": "Desktop company was not found",
+    "public_message": "회사를 찾지 못했습니다.",
+    "retryable": false
+  }
+}

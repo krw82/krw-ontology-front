@@ -4,11 +4,16 @@ import {
   DOCUMENT_INGESTION_LEASE_SECONDS,
 } from "@/lib/document-ingestion/config";
 
+export interface DocumentIngestionJobClaim {
+  jobId: string;
+  claimToken: string;
+}
+
 export async function claimNextDocumentIngestionJob(
   workerId: string,
-): Promise<string | null> {
+): Promise<DocumentIngestionJobClaim | null> {
   const { data, error } = await getSupabaseAdmin().rpc(
-    "claim_document_ingestion_job",
+    "claim_document_ingestion_job_v2",
     {
       p_worker_id: workerId,
       p_lease_seconds: DOCUMENT_INGESTION_LEASE_SECONDS,
@@ -25,5 +30,12 @@ export async function claimNextDocumentIngestionJob(
   }
 
   const row = Array.isArray(data) ? data[0] : data;
-  return typeof row?.id === "string" ? row.id : null;
+  if (typeof row?.id !== "string" || typeof row.claim_token !== "string") {
+    return null;
+  }
+
+  return {
+    jobId: row.id,
+    claimToken: row.claim_token,
+  };
 }

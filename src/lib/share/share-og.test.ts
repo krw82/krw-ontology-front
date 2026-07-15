@@ -8,7 +8,7 @@ import {
 } from "@/lib/share/share-og";
 
 vi.mock("@/lib/marketing/site", () => ({
-  SITE_NAME: "KRW Ontology",
+  SITE_NAME: "KRW.O",
   absoluteUrl: (pathname = "/") => `https://krwontology.test${pathname}`,
 }));
 
@@ -22,6 +22,7 @@ function shareFixture(overrides: Partial<PublicMessageShare> = {}): PublicMessag
     answer_content: "공유된 답변입니다.",
     answer_created_at: "2026-06-21T00:01:00.000Z",
     tickers: ["MU"],
+    share_context: { run_kind: null, guru_lens: null },
     created_at: "2026-06-21T00:02:00.000Z",
     locale: "ko",
     ...overrides,
@@ -40,10 +41,11 @@ describe("share OG helpers", () => {
     const copy = buildShareOgCopy(shareFixture(), "Micron Technology, Inc.");
 
     expect(copy.title).toBe("AI 모멘텀만 따지면 마이크론이 최고지");
+    expect(copy.locale).toBe("ko");
     expect(copy.primaryTicker).toBe("MU");
     expect(copy.companyName).toBe("Micron Technology, Inc.");
     expect(copy.tickerLine).toBe("MU · Micron Technology, Inc.");
-    expect(copy.brandName).toBe("KRW Ontology");
+    expect(copy.brandName).toBe("KRW.O");
     expect(copy.description).toBe("AI 데이터센터 투자에서 MU가 가장 수혜를 받는지 분석해줘.");
   });
 
@@ -57,7 +59,7 @@ describe("share OG helpers", () => {
     );
 
     expect(copy.title).toBe("인텔 리서치 답변");
-    expect(copy.alt).toBe("인텔 리서치 답변 | KRW Ontology");
+    expect(copy.alt).toBe("인텔 리서치 답변 | KRW.O");
   });
 
   it("removes non-parenthesized document-basis text from preview titles", () => {
@@ -94,7 +96,7 @@ describe("share OG helpers", () => {
     );
 
     expect(copy.tickerLine).toBe("공시 기반 리서치");
-    expect(copy.description).toBe("KRW Ontology에서 공유된 공시 기반 리서치 답변입니다.");
+    expect(copy.description).toBe("KRW.O에서 공유된 공시 기반 리서치 답변입니다.");
   });
 
   it("does not duplicate ticker-like company names", () => {
@@ -103,5 +105,21 @@ describe("share OG helpers", () => {
     expect(copy.primaryTicker).toBe("AAPL");
     expect(copy.companyName).toBeNull();
     expect(copy.tickerLine).toBe("AAPL");
+  });
+
+  it("brands guru shares as perspective analysis previews", () => {
+    const copy = buildShareOgCopy(
+      shareFixture({
+        title: "장기 보유해도 될 사업인지 봐야 합니다",
+        tickers: ["AAPL"],
+        share_context: { run_kind: "guru_advisor", guru_lens: "buffett" },
+      }),
+      "Apple Inc.",
+    );
+
+    expect(copy.kicker).toBe("관점별 분석");
+    expect(copy.footer).toBe("공유 리서치 · 공개 원칙 기반 AI 분석");
+    expect(copy.title).toBe("워런 버핏 렌즈 · 장기 보유해도 될 사업인지 봐야 합니다");
+    expect(copy.tickerLine).toBe("워런 버핏 렌즈 · AAPL · Apple Inc.");
   });
 });

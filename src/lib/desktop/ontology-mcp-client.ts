@@ -2,10 +2,19 @@ import "server-only";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { DesktopOntologyToolName } from "./ontology-contracts";
+import {
+  RESEARCH_STATE_CONTRACT_VERSION,
+  validateResearchStateV2,
+  type DesktopOntologyToolName,
+} from "./ontology-contracts";
+import {
+  KRW_ONTOLOGY_MCP_CONTRACT_VERSION,
+  KRW_ONTOLOGY_MCP_TOOLS,
+} from "@/lib/agent/mcp-client";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
-const MAX_COMPACT_RESULT_TEXT_CHARS = 12_000;
+const MAX_RESEARCH_STATE_MODEL_BYTES = 80_000;
+const MAX_MCP_RESULT_WIRE_BYTES = 180_000;
 
 export interface DesktopOntologyMcpResult {
   resultJson: Record<string, unknown>;
@@ -17,6 +26,8 @@ export interface DesktopOntologyMcpHealth {
   releaseId: string | null;
   indexGeneratedAt: string | null;
   toolNames: string[];
+  mcpContractVersion?: string | null;
+  toolSchemaSha256?: string | null;
   error?: string;
 }
 
@@ -49,6 +60,8 @@ export async function checkKrwOntologyMcpHealth(): Promise<DesktopOntologyMcpHea
       releaseId: null,
       indexGeneratedAt: null,
       toolNames: [],
+      mcpContractVersion: null,
+      toolSchemaSha256: null,
       error: "KRW_ONTOLOGY_MCP_URL is not configured",
     };
   }
@@ -59,19 +72,39 @@ export async function checkKrwOntologyMcpHealth(): Promise<DesktopOntologyMcpHea
     readPositiveIntEnv("DESKTOP_ONTOLOGY_MCP_HEALTH_TIMEOUT_MS", 5_000),
   );
   try {
-    const response = await fetch(healthUrlFromMcpUrl(mcpUrl), {
+    const response = await fetch(
+      process.env.KRW_ONTOLOGY_MCP_READY_URL?.trim() ||
+        readyUrlFromMcpUrl(mcpUrl),
+      {
       headers: { accept: "application/json" },
       signal: controller.signal,
-    });
+      },
+    );
     const payload = asRecord(await response.json());
+    const toolNames = stringArray(payload?.tool_names);
+    const contractVersion = stringValue(payload?.mcp_contract_version);
+    const toolSchemaSha256 = stringValue(payload?.tool_schema_sha256);
+    const contractOk =
+      contractVersion === KRW_ONTOLOGY_MCP_CONTRACT_VERSION &&
+      payload?.tool_names_match === true &&
+      payload?.tool_count === KRW_ONTOLOGY_MCP_TOOLS.length &&
+      sameStringSet(toolNames, KRW_ONTOLOGY_MCP_TOOLS) &&
+      Boolean(toolSchemaSha256 && /^[a-f0-9]{64}$/.test(toolSchemaSha256));
+    const ok = response.ok && payload?.ok === true && contractOk;
     return {
-      ok: response.ok && payload?.ok === true,
+      ok,
       releaseId: stringValue(payload?.release_id),
       indexGeneratedAt: stringValue(payload?.index_generated_at),
-      toolNames: stringArray(payload?.tools),
-      ...(response.ok && payload?.ok === true
+      toolNames,
+      mcpContractVersion: contractVersion,
+      toolSchemaSha256,
+      ...(ok
         ? {}
-        : { error: stringValue(payload?.error) ?? `HTTP ${response.status}` }),
+        : {
+            error: contractOk
+              ? stringValue(payload?.error) ?? `HTTP ${response.status}`
+              : "MCP v2 contract or tool-schema readiness mismatch",
+          }),
     };
   } catch (error) {
     return {
@@ -79,6 +112,8 @@ export async function checkKrwOntologyMcpHealth(): Promise<DesktopOntologyMcpHea
       releaseId: null,
       indexGeneratedAt: null,
       toolNames: [],
+      mcpContractVersion: null,
+      toolSchemaSha256: null,
       error: error instanceof Error ? error.message : "Ontology MCP health failed",
     };
   } finally {
@@ -111,10 +146,13 @@ export async function callKrwOntologyMcpTool(
     const result = await client.callTool(
       {
         name: toolName,
-        arguments: {
-          ...args,
-          response_format: "json",
-        },
+        arguments:
+          toolName === "krw_ontology_query_context"
+            ? args
+            : {
+                ...args,
+                response_format: "json",
+              },
       },
       undefined,
       {
@@ -132,7 +170,21 @@ export async function callKrwOntologyMcpTool(
     if (result.isError) {
       throw new Error(readToolText(result) || `${toolName} returned an MCP error`);
     }
-    return parseDesktopOntologyMcpResult(result);
+    assertSerializedBytes(result, MAX_MCP_RESULT_WIRE_BYTES, "MCP tool result");
+    const parsed = parseDesktopOntologyMcpResult(result);
+    if (toolName === "krw_ontology_query_context") {
+      const researchState = validateResearchStateV2(parsed.resultJson);
+      assertSerializedBytes(
+        researchState,
+        MAX_RESEARCH_STATE_MODEL_BYTES,
+        RESEARCH_STATE_CONTRACT_VERSION,
+      );
+      return {
+        resultJson: researchState,
+        resultText: compactResultText(researchState),
+      };
+    }
+    return parsed;
   } finally {
     await client.close().catch(() => undefined);
   }
@@ -195,31 +247,26 @@ function readToolText(result: unknown): string {
 function compactResultText(result: Record<string, unknown>): string {
   const summary = firstString(
     result.summary,
-    asRecord(result.answerability)?.summary,
-    asRecord(result.directness_guard)?.summary,
+    asRecord(result.answerability)?.reason,
   );
   if (summary) return summary;
 
-  const researchStatus = firstString(
-    result.research_status,
-    asRecord(result.kernel)?.status,
-  );
-  if (researchStatus || asRecord(result.research_pack)) {
-    const kernel = asRecord(result.kernel);
+  if (result.contract_version === RESEARCH_STATE_CONTRACT_VERSION) {
     const answerability = asRecord(result.answerability);
-    const researchPack = asRecord(result.research_pack);
+    const evidenceCount = arrayLength(result.evidence_units) ?? 0;
+    const calculationCount = arrayLength(result.computed_values) ?? 0;
     const parts = [
-      researchStatus ? `research_status: ${researchStatus}` : null,
-      firstString(answerability?.recommended_answer_mode, kernel?.answer_mode)
-        ? `answer_mode: ${firstString(answerability?.recommended_answer_mode, kernel?.answer_mode)}`
+      `contract_version: ${RESEARCH_STATE_CONTRACT_VERSION}`,
+      firstString(answerability?.status)
+        ? `answerability: ${firstString(answerability?.status)}`
         : null,
-      researchPack
-        ? `research_pack:\n${JSON.stringify(researchPack, null, 2)}`
-        : null,
+      `evidence_units: ${evidenceCount}`,
+      `computed_values: ${calculationCount}`,
+      arraySummary("calculation_coverage", result.calculation_coverage),
       arraySummary("missing_parts", result.missing_parts),
-      arraySummary("recommended_tools", result.recommended_tools),
+      arraySummary("recommended_actions", result.recommended_actions),
     ].filter((part): part is string => Boolean(part));
-    return boundText(parts.join("\n\n"), MAX_COMPACT_RESULT_TEXT_CHARS);
+    return parts.join("\n\n");
   }
 
   const counts = [
@@ -232,18 +279,12 @@ function compactResultText(result: Record<string, unknown>): string {
     return counts.map(([label, count]) => `${label}: ${count}`).join("; ");
   }
 
-  return boundText(JSON.stringify(result), MAX_COMPACT_RESULT_TEXT_CHARS);
+  return JSON.stringify(result);
 }
 
 function arraySummary(label: string, value: unknown): string | null {
   if (!Array.isArray(value) || value.length === 0) return null;
   return `${label}: ${JSON.stringify(value)}`;
-}
-
-function boundText(value: string, maxChars: number): string {
-  return value.length <= maxChars
-    ? value
-    : `${value.slice(0, maxChars)}\n[truncated]`;
 }
 
 function firstString(...values: unknown[]): string | null {
@@ -270,12 +311,32 @@ function readPositiveIntEnv(name: string, fallback: number): number {
   return Number.isInteger(parsed) && parsed >= 1_000 ? parsed : fallback;
 }
 
-function healthUrlFromMcpUrl(mcpUrl: string): string {
+function assertSerializedBytes(
+  value: unknown,
+  maxBytes: number,
+  label: string,
+): void {
+  const bytes = Buffer.byteLength(JSON.stringify(value), "utf8");
+  if (bytes > maxBytes) {
+    throw new Error(`${label} exceeds the ${maxBytes}-byte contract: ${bytes}`);
+  }
+}
+
+function readyUrlFromMcpUrl(mcpUrl: string): string {
   const url = new URL(mcpUrl);
-  url.pathname = "/health";
+  url.pathname = "/readyz";
   url.search = "";
   url.hash = "";
   return url.toString();
+}
+
+function sameStringSet(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) return false;
+  const leftSet = new Set(left);
+  return (
+    leftSet.size === left.length &&
+    right.every((value) => leftSet.has(value))
+  );
 }
 
 function stringValue(value: unknown): string | null {

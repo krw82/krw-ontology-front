@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "crypto";
 import { getReadyAgentWorker } from "@/lib/agent/worker-heartbeat";
+import { hasTrustedClientIpConfiguration } from "@/lib/http/client-ip";
 import { getActiveOntologyCatalogRelease } from "@/lib/ontology/catalog";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -69,6 +70,42 @@ async function checkCatalog(): Promise<CheckResult> {
   }
 }
 
+function checkTrustedClientIpConfiguration(): CheckResult {
+  if (hasTrustedClientIpConfiguration()) return { ok: true };
+
+  return {
+    ok: false,
+    error: "Trusted client IP configuration is invalid",
+  };
+}
+
+function filingDetectionExpected(): boolean {
+  const explicit = process.env.FILING_DETECTION_ENABLED;
+  return explicit == null || explicit === ""
+    ? process.env.FILING_NOTIFICATIONS_ENABLED === "1"
+    : explicit === "1";
+}
+
+async function checkFilingWorker(): Promise<CheckResult> {
+  if (!filingDetectionExpected()) return { ok: true, enabled: false };
+  try {
+    const { data, error } = await getSupabaseAdmin()
+      .from("filing_notification_worker_heartbeats")
+      .select("worker_id, last_seen_at, last_success_at, last_error")
+      .order("last_seen_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return { ok: false, enabled: true, error: error?.message ?? "No filing notification worker heartbeat" };
+    const ageMs = Date.now() - Date.parse(data.last_seen_at);
+    if (!Number.isFinite(ageMs) || ageMs > 75_000) {
+      return { ok: false, enabled: true, error: "Filing notification worker heartbeat is stale", worker_id: data.worker_id, last_seen_at: data.last_seen_at };
+    }
+    return { ok: true, enabled: true, worker_id: data.worker_id, last_seen_at: data.last_seen_at, last_success_at: data.last_success_at, last_error: data.last_error };
+  } catch (err) {
+    return { ok: false, enabled: true, error: err instanceof Error ? err.message : "Unknown filing worker health error" };
+  }
+}
+
 async function checkWorkerMcp(expectedReleaseId?: string): Promise<CheckResult> {
   try {
     const ready = await getReadyAgentWorker(new Date(), expectedReleaseId);
@@ -121,10 +158,12 @@ export async function GET(request: Request) {
     );
   }
 
-  const [supabase, catalog] = await Promise.all([
+  const [supabase, catalog, filingWorker] = await Promise.all([
     checkSupabase(),
     checkCatalog(),
+    checkFilingWorker(),
   ]);
+  const trustedClientIp = checkTrustedClientIpConfiguration();
   const mcp =
     catalog.ok && typeof catalog.release_id === "string"
       ? await checkWorkerMcp(catalog.release_id)
@@ -132,7 +171,7 @@ export async function GET(request: Request) {
           ok: false,
           error: "Cannot check worker MCP without an active catalog release",
         };
-  const ok = supabase.ok && catalog.ok && mcp.ok;
+  const ok = supabase.ok && catalog.ok && mcp.ok && trustedClientIp.ok && filingWorker.ok;
 
   return Response.json(
     {
@@ -143,6 +182,8 @@ export async function GET(request: Request) {
         supabase,
         catalog,
         mcp,
+        filing_worker: filingWorker,
+        trusted_client_ip: trustedClientIp,
       },
     },
     { status: ok ? 200 : 503 },

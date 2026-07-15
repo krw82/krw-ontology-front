@@ -34,6 +34,7 @@ import { extractFollowUpQuestions } from "@/lib/chat/follow-up-questions";
 interface ChatMessageProps {
   role: "user" | "assistant";
   content: string;
+  presentation?: "default" | "guru";
   metadata?: Record<string, unknown> | null;
   isStreaming?: boolean;
   activity?: ResearchActivityUpdate | null;
@@ -241,7 +242,7 @@ function MessageActions({
     try {
       shareUrl = await createPublicShareUrl(messageId);
       const shareData: ShareData = {
-        title: "KRW Ontology",
+        title: "KRW.O",
         url: shareUrl,
       };
       const useNativeShare =
@@ -301,7 +302,7 @@ function MessageActions({
           : "";
 
   return (
-    <div className="mt-sm flex items-center gap-xs text-[13px] leading-none text-muted">
+    <div className="mt-sm flex flex-wrap items-center gap-xs text-[13px] leading-none text-muted">
       <button
         type="button"
         className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-70"
@@ -367,7 +368,13 @@ function splitStreamingBlocks(content: string): string[] {
     .filter(Boolean);
 }
 
-function StreamingContentBlocks({ content }: { content: string }) {
+function StreamingContentBlocks({
+  content,
+  presentation = "default",
+}: {
+  content: string;
+  presentation?: "default" | "guru";
+}) {
   const verticalOffset = useStreamingMotionOffset();
   const blocks = useMemo(() => splitStreamingBlocks(content), [content]);
 
@@ -388,7 +395,11 @@ function StreamingContentBlocks({ content }: { content: string }) {
               delay: Math.min(index, 6) * 0.02,
             }}
           >
-            <ResearchMarkdown content={section} normalizePlainText={false} />
+            <ResearchMarkdown
+              content={section}
+              normalizePlainText={false}
+              presentation={presentation}
+            />
           </motion.div>
         ))}
       </AnimatePresence>
@@ -399,11 +410,13 @@ function StreamingContentBlocks({ content }: { content: string }) {
 function CompletedAssistantContent({
   content,
   charts,
+  presentation = "default",
   onFollowUpQuestionSelect,
   followUpQuestionDisabled,
 }: {
   content: string;
   charts?: ChatMessageChart[];
+  presentation?: "default" | "guru";
   onFollowUpQuestionSelect?: (question: string) => void;
   followUpQuestionDisabled?: boolean;
 }) {
@@ -413,12 +426,22 @@ function CompletedAssistantContent({
   }, [content, onFollowUpQuestionSelect]);
 
   if (!followUpQuestions || !onFollowUpQuestionSelect) {
-    return <ResearchMarkdown content={content} charts={charts} />;
+    return (
+      <ResearchMarkdown
+        content={content}
+        charts={charts}
+        presentation={presentation}
+      />
+    );
   }
 
   return (
     <>
-      <ResearchMarkdown content={followUpQuestions.body} charts={charts} />
+      <ResearchMarkdown
+        content={followUpQuestions.body}
+        charts={charts}
+        presentation={presentation}
+      />
       <FollowUpQuestionActions
         questions={followUpQuestions.questions}
         disabled={followUpQuestionDisabled}
@@ -437,6 +460,7 @@ function terminalAssistantContent(status: MessageStatus | undefined) {
 export default function ChatMessage({
   role,
   content,
+  presentation = "default",
   isStreaming,
   activity,
   citations,
@@ -490,6 +514,13 @@ export default function ChatMessage({
   }
 
   const assistantContent = sanitizeAssistantContent(content);
+  const isGuruPresentation = presentation === "guru";
+  const progressFrameClass = isGuruPresentation
+    ? "mx-auto w-full max-w-[760px]"
+    : "pl-0 sm:pl-[48px]";
+  const assistantFrameClass = isGuruPresentation
+    ? "mx-auto w-full max-w-[760px] text-body"
+    : "max-w-full pl-0 text-body sm:pl-[48px]";
 
   return (
     <motion.div
@@ -500,7 +531,7 @@ export default function ChatMessage({
       variants={chatMessageAssistant}
     >
       {showHeader && (
-        <div className="pl-0 sm:pl-[48px]">
+        <div className={progressFrameClass}>
           <ResearchProgress
             activity={activity}
             citations={citations}
@@ -512,24 +543,28 @@ export default function ChatMessage({
         </div>
       )}
       {isStreaming ? (
-        <div className="max-w-full pl-0 text-body sm:pl-[48px]">
+        <div className={assistantFrameClass}>
           <EvidenceGraphPreview
             activity={activity}
             citations={citations}
             toolCalls={toolCalls}
           />
           {assistantContent ? (
-            <StreamingContentBlocks content={assistantContent} />
+            <StreamingContentBlocks
+              content={assistantContent}
+              presentation={presentation}
+            />
           ) : !toolCalls?.length && !citations?.length ? (
             <LoadingDots label={activityLabel(activity)} />
           ) : null}
         </div>
       ) : (
-        <div className="max-w-full pl-0 text-body sm:pl-[48px]">
+        <div className={assistantFrameClass}>
           {assistantContent ? (
             <CompletedAssistantContent
               content={assistantContent}
               charts={charts}
+              presentation={presentation}
               onFollowUpQuestionSelect={onFollowUpQuestionSelect}
               followUpQuestionDisabled={followUpQuestionDisabled}
             />

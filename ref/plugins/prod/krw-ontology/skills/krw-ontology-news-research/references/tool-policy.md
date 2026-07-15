@@ -434,35 +434,62 @@ Use these after current-event extraction.
 
 ```text
 krw_ontology_query_context
-Default first ontology call. Use the event-specific internal English investment brief. It returns research state, packs, answerability, and allowed next tools.
+Default first ontology call. The active DeepSeek agent must turn the
+event-specific internal English investment brief into a complete SearchPlan and
+call this tool with `{search_plan}` only. It returns ResearchState v2.
+
+krw_ontology_plan_query
+Optional SearchPlan validation/debug. It performs no retrieval and is not a
+required normal preflight.
 
 krw_ontology_query
-Targeted structured follow-up for a specific metric, object type, ticker, period, filing comment, or missing part.
+Targeted structured follow-up for a specific missing clause, metric, object
+type, ticker, period, dimension, or filing comment identified by ResearchState.
 
 krw_ontology_compare
-Explicit comparison only when query_context does not provide enough comparison state or the user asks for a comparison table.
+Explicit comparison only when ResearchState lacks a required aligned comparison
+or the user asks for a comparison table.
 
 krw_ontology_trace
-Evidence lineage for one selected object. Use only when a strong claim needs verification.
+Evidence lineage for one selected `(ticker, object_id)` occurrence. Use only
+when a strong claim needs verification.
 
 krw_ontology_chain
-Business/semantic/temporal mechanism around one selected object. Use only when the causal path matters.
+Business/semantic/temporal mechanism around one selected `(ticker, object_id)`
+occurrence. Use only when the causal path matters, and inspect
+`response_budget` before treating returned paths as complete.
 
 krw_ontology_retrieve
-Legacy fallback only. Do not use after sufficient query_context.
+Rare bounded evidence expansion for a specific gap. It is not a substitute for
+an explicit SearchPlan and is not the default after query_context.
 
 krw_ontology_company_context
-Company orientation only when query_context lacks company-specific vocabulary or the user asks broad company profile context.
+Company orientation only when SearchPlan authoring needs company-specific
+vocabulary or the user asks broad company profile context.
 
 krw_ontology_index_context / krw_ontology_catalog / krw_ontology_quality
 Debug, audit, or coverage only. Not for normal investor answers.
 ```
 
-## 4. Response Detail
+## 4. SearchPlan and continuation
 
-Do not request `response_detail="full"` in normal web chat. Use compact or ticker-summary output first, then selected trace/chain only when stronger verification is needed.
+For tickerless post-news discovery, use `universe="covered"`; for explicit
+companies, use `tickers`. Never combine both.
 
-`response_detail="compact"` is intentional for broad first-pass ontology work.
+Let `query_context` use the global index to choose candidates and company
+shards. Do not manually repeat the same event plan per keyword or company.
+When `recommended_actions` supplies `tool`, `ticker`, and `object_id`, forward
+that occurrence identity unchanged. Never guess a ticker for an ambiguous
+shared object ID.
+
+Do not impose fixed top-5, limit-3, one-follow-up, or hard tool-call caps.
+Choose adaptive `limit_results` and `limit_tickers` large enough for the
+required clauses, tickers, metric periods/pairs, and conflict detection.
+
+After the first call, read `answerability`, `clause_coverage`,
+`calculation_coverage`, `missing_parts`, `recommended_actions`, `continuation`,
+and `warnings`. Continue only for a material named gap. Do not repeat the same
+broad plan with cosmetic wording changes.
 
 ## 5. Strong Claim Rule
 
@@ -471,8 +498,8 @@ Strong final claims require at least one of:
 ```text
 official/company/SEC evidence
 high-quality major-news evidence verified by source timing
-direct ontology evidence
-metric lineage or selected trace
+ResearchState coverage and direct evidence for every load-bearing clause
+covered calculation lineage or selected trace
 ```
 
 Projection candidates, topic matches, commentary, and source snippets are routes, not final proof.

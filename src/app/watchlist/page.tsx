@@ -4,6 +4,8 @@ import ChatSidebar from "@/components/ChatSidebar";
 import TopNav from "@/components/TopNav";
 import WatchlistHomeClient from "@/components/watchlist/WatchlistHomeClient";
 import { getAuthUser } from "@/lib/auth";
+import { getEntitlementStatus } from "@/lib/billing/entitlement";
+import { isEntitlementFeatureEnabled } from "@/lib/billing/feature-access";
 import {
   shouldPreserveInitialProfile,
   topNavProfileFromUser,
@@ -15,7 +17,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "리서치 노트북 | KRW Ontology",
+  title: "리서치 노트북 | KRW.O",
   description: "보유 종목과 관심 종목의 리서치 이유, 질문, 노트를 관리합니다.",
 };
 
@@ -53,6 +55,11 @@ export default async function WatchlistPage() {
   const user = await getAuthUser().catch(() => null);
   if (!user) {
     redirect("/login?next=/watchlist");
+  }
+
+  const entitlement = await getEntitlementStatus(user.id, user.email ?? null);
+  if (!isEntitlementFeatureEnabled(entitlement, "research_notebook")) {
+    redirect("/settings/billing?feature=research_notebook");
   }
 
   const { overview, loadError } = await loadWatchlistPageData(user.id);

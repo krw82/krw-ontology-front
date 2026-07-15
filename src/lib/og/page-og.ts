@@ -151,10 +151,10 @@ const siteVariantCopy: Record<Locale, Record<string, Omit<PageOgCopy, "alt" | "b
       badge: "Filing-grounded",
     },
     pricing: {
-      kicker: "사용량 기반 플랜",
+      kicker: "기능별 플랜",
       title: "미국 상장기업 리서치를 필요한 만큼 시작하세요",
       description:
-        "무료 베타에서 시작하고, 더 많은 기업 분석이 필요할 때 사용량 기반 플랜으로 확장합니다.",
+        "리서치 범위에 맞는 기능별 플랜을 선택해 기업 분석을 이어가세요.",
       footer: "긴 보고서 대신 질문 중심 리서치 흐름으로 시작합니다.",
       badge: "Plans",
     },
@@ -163,7 +163,7 @@ const siteVariantCopy: Record<Locale, Record<string, Omit<PageOgCopy, "alt" | "b
       title: "분석할 회사를 고르세요",
       description:
         "티커, 회사명, 사업 활동, 리스크 키워드로 공시 기반 리서치가 가능한 회사를 찾습니다.",
-      footer: "회사를 알면 검색하고, 모르면 종목 발굴기로 후보를 좁히세요.",
+      footer: "회사를 알면 검색하고, 조건이 있으면 확인할 회사를 좁히세요.",
       badge: "Company list",
     },
     questions: {
@@ -196,7 +196,7 @@ const siteVariantCopy: Record<Locale, Record<string, Omit<PageOgCopy, "alt" | "b
       kicker: "Usage-based plans",
       title: "Start U.S. company research at your pace",
       description:
-        "Begin with the free beta, then expand with usage-based plans when you need more company analysis.",
+        "Choose a usage-based plan that fits your research scope as your company analysis needs grow.",
       footer: "Move from long filings to question-driven research workflows.",
       badge: "Plans",
     },

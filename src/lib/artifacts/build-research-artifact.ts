@@ -240,59 +240,24 @@ function buildFallbackArtifact(params: {
   const { finalText, defaultTickers, toolCalls, citations } = params;
   const qualityWarnings = collectQualityNotes(toolCalls);
   const tickers = buildTickers(defaultTickers, citations, toolCalls);
-  const evidenceProfile = buildEvidenceProfile(toolCalls, tickers);
-  const hasEvidenceProfile =
-    evidenceProfile.takeaways.length > 0 ||
-    evidenceProfile.segments.length > 0 ||
-    evidenceProfile.metrics.length > 0 ||
-    evidenceProfile.riskDrivers.length > 0;
-  const summary = hasEvidenceProfile ? evidenceProfile.summary : "";
-  const keyPoints = hasEvidenceProfile ? evidenceProfile.takeaways : [];
+  const answer = finalText.trim();
+  const keyPoints = extractKeyPoints(answer);
   const title = extractTitle(finalText) ?? buildTitle(tickers);
+  const evidenceRefs = mergeEvidenceRefs(
+    buildEvidenceRefs(citations),
+    buildResearchStateEvidenceRefs(toolCalls),
+  );
 
-  if (!hasEvidenceProfile) return null;
+  if (!answer) return null;
+  if (isThinArtifactText(answer, keyPoints) && evidenceRefs.length === 0) return null;
 
-  if (!summary && keyPoints.length === 0) return null;
-
-  const blocks: ResearchArtifactBlock[] = [];
-
-  const intro = [
-    summary || null,
-    ...keyPoints.slice(0, 4).map((point) => `- ${point}`),
-  ]
-    .filter((line): line is string => Boolean(line))
-    .join("\n\n");
-
-  if (intro) {
-    blocks.push({
+  const blocks: ResearchArtifactBlock[] = [
+    {
       type: "markdown",
-      content: intro,
-    });
-  }
-
-  if (evidenceProfile.segments.length > 0) {
-    blocks.push({
-      type: "business_segments",
-      title: "사업 구조",
-      segments: evidenceProfile.segments,
-    });
-  }
-
-  if (evidenceProfile.metrics.length > 0) {
-    blocks.push({
-      type: "metric_grid",
-      title: "핵심 숫자",
-      metrics: evidenceProfile.metrics,
-    });
-  }
-
-  if (evidenceProfile.riskDrivers.length > 0) {
-    blocks.push({
-      type: "risk_driver_map",
-      title: "리스크와 성장 동력",
-      items: evidenceProfile.riskDrivers,
-    });
-  }
+      content: answer,
+      evidence_refs: evidenceRefs.map((reference) => reference.id),
+    },
+  ];
 
   if (qualityWarnings.length > 0) {
     blocks.push({
@@ -305,18 +270,17 @@ function buildFallbackArtifact(params: {
     });
   }
 
-  if (blocks.length === 0) return null;
-  const evidenceRefs = buildEvidenceRefs(citations);
+  const summary = summarizeAnswer(answer) || title;
 
   return {
     artifact_version: RESEARCH_ARTIFACT_VERSION,
     artifact_type: "company_overview",
     title,
-    summary: summary || keyPoints[0] || title,
+    summary,
     tickers,
     source_scope: buildSourceScope(citations),
     answer_alignment: {
-      visible_answer_summary: summary || keyPoints[0] || title,
+      visible_answer_summary: summary,
       no_new_thesis: true,
     },
     blocks,
@@ -345,10 +309,6 @@ function isThinStructuredArtifact(artifact: ResearchArtifactEnvelope): boolean {
     artifact.summary,
     ...artifact.blocks.flatMap(blockTextParts),
   ].join(" ");
-
-  if (/궁금한 특정 주제|주요 정보를 정리|말씀해 주세요|specific topic/i.test(text)) {
-    return evidenceRefCount === 0;
-  }
 
   return (
     evidenceRefCount === 0 &&
@@ -392,39 +352,22 @@ function enhanceArtifactWithEvidence(params: {
     citations,
     toolCalls,
   );
-  const evidenceProfile = buildEvidenceProfile(toolCalls, tickers);
-  const existingTypes = new Set(artifact.blocks.map((block) => block.type));
-  const supplementalBlocks: ResearchArtifactBlock[] = [];
-
-  if (!existingTypes.has("business_segments") && evidenceProfile.segments.length > 0) {
-    supplementalBlocks.push({
-      type: "business_segments",
-      title: "사업 구조",
-      segments: evidenceProfile.segments,
-    });
-  }
-
-  if (!existingTypes.has("metric_grid") && evidenceProfile.metrics.length > 0) {
-    supplementalBlocks.push({
-      type: "metric_grid",
-      title: "핵심 숫자",
-      metrics: evidenceProfile.metrics,
-    });
-  }
-
-  if (supplementalBlocks.length === 0 && tickers.length === (artifact.tickers?.length ?? 0)) {
+  const evidenceRefs = mergeEvidenceRefs(
+    artifact.evidence_refs ?? [],
+    buildEvidenceRefs(citations),
+    buildResearchStateEvidenceRefs(toolCalls),
+  );
+  if (
+    tickers.length === (artifact.tickers?.length ?? 0) &&
+    evidenceRefs.length === (artifact.evidence_refs?.length ?? 0)
+  ) {
     return artifact;
   }
-
-  const blocks =
-    artifact.blocks[0]?.type === "markdown"
-      ? [artifact.blocks[0], ...supplementalBlocks, ...artifact.blocks.slice(1)]
-      : [...supplementalBlocks, ...artifact.blocks];
 
   return {
     ...artifact,
     tickers: tickers.length > 0 ? tickers : artifact.tickers,
-    blocks: blocks.slice(0, 12),
+    evidence_refs: evidenceRefs,
   };
 }
 
@@ -470,6 +413,7 @@ function buildTickers(
         ...defaultTickers,
         ...citations.map((citation) => citation.ticker ?? ""),
         ...extractToolArgumentTickers(toolCalls),
+        ...extractResearchStateTickers(toolCalls),
       ]
         .map((ticker) => ticker.trim().toUpperCase())
         .filter(Boolean),
@@ -492,6 +436,14 @@ function extractToolArgumentTickers(
           ...args.tickers.filter((ticker): ticker is string => typeof ticker === "string"),
         );
       }
+      const searchPlan = asRecord(args.search_plan);
+      if (Array.isArray(searchPlan?.tickers)) {
+        tickers.push(
+          ...searchPlan.tickers.filter(
+            (ticker): ticker is string => typeof ticker === "string",
+          ),
+        );
+      }
     } catch {
       // Ignore malformed tool argument snapshots.
     }
@@ -500,599 +452,28 @@ function extractToolArgumentTickers(
   return tickers;
 }
 
+function extractResearchStateTickers(
+  toolCalls: AccumulatedRun["toolCalls"],
+): string[] {
+  const tickers: string[] = [];
+  for (const toolCall of toolCalls) {
+    const result = normalizeToolResult(toolCall.resultJson ?? toolCall.resultText);
+    if (result?.contract_version !== "research-state/v2") continue;
+    const scope = asRecord(result.resolved_scope);
+    for (const value of [scope?.resolved_tickers, scope?.requested_tickers]) {
+      if (!Array.isArray(value)) continue;
+      tickers.push(
+        ...value.filter((ticker): ticker is string => typeof ticker === "string"),
+      );
+    }
+  }
+  return tickers;
+}
+
 function buildTitle(tickers: string[]): string {
   return tickers.length > 0
     ? `${tickers.join(", ")} Research Brief`
     : "Research Brief";
-}
-
-interface EvidenceClaim {
-  text: string;
-  topic: string | null;
-  ticker: string | null;
-  documentType: string | null;
-  period: string | null;
-  type: string | null;
-}
-
-interface EvidenceMetric {
-  label: string;
-  value: string;
-  period?: string;
-  unit?: string;
-  delta?: string;
-  source_label?: string;
-}
-
-interface EvidenceSegment {
-  name: string;
-  role: string;
-  why_it_matters: string;
-}
-
-type EvidenceRiskDriver = Extract<
-  ResearchArtifactBlock,
-  { type: "risk_driver_map" }
->["items"][number];
-
-function buildEvidenceProfile(
-  toolCalls: AccumulatedRun["toolCalls"],
-  tickers: string[],
-): {
-  summary: string;
-  takeaways: string[];
-  metrics: EvidenceMetric[];
-  segments: EvidenceSegment[];
-  riskDrivers: EvidenceRiskDriver[];
-} {
-  const claims = extractEvidenceClaims(toolCalls);
-  const metrics = buildEvidenceMetrics(claims);
-  const takeaways = uniqueStrings(
-    claims.map(claimToKoreanTakeaway).filter((value): value is string => Boolean(value)),
-  ).slice(0, 5);
-  const riskDrivers = buildRiskDrivers(claims);
-  const hasSegmentEvidence = claims.some((claim) =>
-    /segment|operating income/i.test(`${claim.topic ?? ""} ${claim.text}`),
-  );
-  const hasAmazon =
-    tickers.includes("AMZN") || claims.some((claim) => claim.ticker === "AMZN");
-  const segments =
-    hasAmazon && hasSegmentEvidence
-      ? buildAmazonSegments()
-      : buildGenericSegments(claims);
-  const latestSource = latestSourceLabel(claims);
-  const tickerLabel = tickers.length > 0 ? tickers.join(", ") : "회사";
-  const summary =
-    tickers.includes("AMZN") || hasAmazon
-      ? "AMZN FY2025 10-K 기준으로 사업 구조, 매출 성장, 순이익, 세그먼트 수익성과 투자 지출을 정리했습니다."
-      : `${tickerLabel}${latestSource ? ` ${latestSource}` : ""} 기준으로 사업 구조, 핵심 숫자, 성장 동력과 리스크를 정리했습니다.`;
-
-  return { summary, takeaways, metrics, segments, riskDrivers };
-}
-
-function extractEvidenceClaims(
-  toolCalls: AccumulatedRun["toolCalls"],
-): EvidenceClaim[] {
-  const claims: EvidenceClaim[] = [];
-  const seen = new Set<string>();
-
-  for (const toolCall of toolCalls) {
-    if (toolCall.toolName !== "krw_ontology_query") continue;
-
-    const args = parseJsonRecord(toolCall.argumentsJson);
-    const topic = stringValue(args?.topic);
-    const result = normalizeToolResult(toolCall.resultJson ?? toolCall.resultText);
-    if (!result) continue;
-
-    for (const record of resultRecords(result)) {
-      pushEvidenceClaim(claims, seen, {
-        record,
-        topic,
-        fallbackType: stringValue(record.type),
-      });
-
-      const evidence = asRecord(record.evidence);
-      for (const nested of arrayOfRecords(evidence?.claims)) {
-        pushEvidenceClaim(claims, seen, {
-          record: nested,
-          topic,
-          fallbackType: stringValue(record.type) ?? stringValue(nested.type),
-        });
-      }
-
-      for (const nested of arrayOfRecords(evidence?.related_objects)) {
-        pushEvidenceClaim(claims, seen, {
-          record: nested,
-          topic,
-          fallbackType: stringValue(nested.type) ?? stringValue(record.type),
-        });
-      }
-    }
-  }
-
-  return claims.slice(0, 120);
-}
-
-function pushEvidenceClaim(
-  claims: EvidenceClaim[],
-  seen: Set<string>,
-  params: {
-    record: UnknownRecord;
-    topic: string | null;
-    fallbackType: string | null;
-  },
-) {
-  const { record, topic, fallbackType } = params;
-  const text =
-    stringValue(record.text) ??
-    stringValue(record.claim_text) ??
-    stringValue(record.snippet) ??
-    stringValue(record.content);
-  if (!text || !isUsefulPoint(text)) return;
-
-  const key = normalizeComparableText(text);
-  if (seen.has(key)) return;
-  seen.add(key);
-
-  claims.push({
-    text,
-    topic,
-    ticker: stringValue(record.ticker)?.toUpperCase() ?? null,
-    documentType: stringValue(record.document_type),
-    period: stringValue(record.period),
-    type: stringValue(record.type) ?? fallbackType,
-  });
-}
-
-function resultRecords(result: UnknownRecord): UnknownRecord[] {
-  if (Array.isArray(result.results)) {
-    return result.results.filter(asRecord);
-  }
-
-  const groupedResults = asRecord(result.results);
-  if (groupedResults) {
-    return Object.values(groupedResults).flatMap((value) =>
-      Array.isArray(value) ? value.filter(asRecord) : [],
-    );
-  }
-
-  return [];
-}
-
-function buildEvidenceMetrics(claims: EvidenceClaim[]): EvidenceMetric[] {
-  const byLabel = new Map<string, EvidenceMetric & { numericMagnitude?: number }>();
-
-  for (const claim of claims) {
-    const directMetric = parseDirectMetricValue(claim);
-    if (directMetric) {
-      const current = byLabel.get(directMetric.label);
-      if (
-        !current ||
-        (directMetric.numericMagnitude ?? 0) > (current.numericMagnitude ?? 0)
-      ) {
-        byLabel.set(directMetric.label, directMetric);
-      }
-      continue;
-    }
-
-    const label = metricLabelForClaim(claim);
-    const latest = latestCurrencyMention(claim.text, claim.period);
-    if (!label || !latest) continue;
-
-    const metric = {
-      label,
-      value: latest.value,
-      period: latest.year ?? claim.period ?? undefined,
-      unit: "USD",
-      delta: metricDelta(claim.text, claim.period),
-      source_label: sourceLabel(claim),
-      numericMagnitude: latest.amount,
-    };
-
-    const current = byLabel.get(label);
-    if (!current || metric.numericMagnitude > (current.numericMagnitude ?? 0)) {
-      byLabel.set(label, metric);
-    }
-  }
-
-  return Array.from(byLabel.values())
-    .map((metric) => ({
-      label: metric.label,
-      value: metric.value,
-      period: metric.period,
-      unit: metric.unit,
-      delta: metric.delta,
-      source_label: metric.source_label,
-    }))
-    .slice(0, 6);
-}
-
-function parseDirectMetricValue(
-  claim: EvidenceClaim,
-): (EvidenceMetric & { numericMagnitude?: number }) | null {
-  if (claim.type !== "FinancialMetricValue") return null;
-  const match = claim.text.match(
-    /^\s*([a-zA-Z][a-zA-Z0-9_]*)\s*:\s*(-?[0-9]+(?:\.[0-9]+)?)\s*([A-Za-z_/$]+)?\s*$/i,
-  );
-  if (!match) return null;
-
-  const metricKey = match[1]?.toLowerCase();
-  const rawValue = Number(match[2]);
-  const unit = match[3] ?? "";
-  if (!metricKey || !Number.isFinite(rawValue)) return null;
-
-  const label = metricLabelForKey(metricKey);
-  if (!label) return null;
-
-  return {
-    label,
-    value: formatMetricValue(rawValue, unit),
-    period: claim.period ?? undefined,
-    unit: unit || undefined,
-    source_label: sourceLabel(claim),
-    numericMagnitude: Math.abs(rawValue),
-  };
-}
-
-function metricLabelForKey(key: string): string | null {
-  const labels: Record<string, string> = {
-    revenue: "매출",
-    total_revenue: "총매출",
-    operating_income: "영업이익",
-    net_income: "순이익",
-    capital_expenditures: "Capex",
-    capex: "Capex",
-    total_debt: "총부채",
-    total_liabilities: "총부채",
-    operating_cash_flow: "영업현금흐름",
-    free_cash_flow: "FCF",
-    eps: "EPS",
-  };
-  return labels[key] ?? null;
-}
-
-function formatMetricValue(value: number, unit: string): string {
-  const normalizedUnit = unit.toLowerCase();
-  if (normalizedUnit.includes("per_share")) {
-    return `$${new Intl.NumberFormat("en-US", {
-      maximumFractionDigits: 2,
-    }).format(value)}/share`;
-  }
-  if (normalizedUnit.includes("usd")) {
-    return formatAbsoluteCurrency(value);
-  }
-  return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function metricLabelForClaim(claim: EvidenceClaim): string | null {
-  const text = claim.text;
-  if (/aws/i.test(text) && /operating income/i.test(text)) return "AWS 영업이익";
-  if (/north america/i.test(text) && /operating income/i.test(text)) {
-    return "North America 영업이익";
-  }
-  if (/international/i.test(text) && /operating income/i.test(text)) {
-    return "International 영업이익";
-  }
-  if (isCompanyRevenueMetricText(text)) return "총매출";
-  if (isCompanyNetIncomeMetricText(text)) return "순이익";
-  if (/purchases of property and equipment|capital expenditures|capex/i.test(text)) {
-    return "PP&E 구매/Capex";
-  }
-  if (/operating income/i.test(text)) return "영업이익";
-  return null;
-}
-
-function claimToKoreanTakeaway(claim: EvidenceClaim): string | null {
-  const text = claim.text;
-  const range = formatCurrencyRange(text);
-  const lower = text.toLowerCase();
-
-  if (isCompanyRevenueMetricText(text) && isIncreaseStatement(lower) && range) {
-    return `총매출은 ${range}로 증가했습니다.`;
-  }
-  if (isCompanyNetIncomeMetricText(text) && isIncreaseStatement(lower) && range) {
-    return `순이익은 ${range}로 증가했습니다.`;
-  }
-  if (
-    /purchases of property and equipment|capital expenditures/.test(lower) &&
-    isIncreaseStatement(lower) &&
-    range
-  ) {
-    return `PP&E 구매/Capex는 ${range}로 증가했습니다.`;
-  }
-  if (/aws segment operating income increased/.test(lower)) {
-    return "AWS 부문 영업이익은 매출 성장과 비용 구조 개선 영향으로 확대됐습니다.";
-  }
-  if (/north america segment operating income increased/.test(lower)) {
-    return "North America 부문 영업이익은 단위 판매 증가와 운영 효율화로 개선됐습니다.";
-  }
-  if (/international segment operating income increased/.test(lower)) {
-    return "International 부문 영업이익은 단위 판매 증가와 비용 효율화로 개선됐습니다.";
-  }
-  if (/full lng supply chain|lng production, natural gas transport, shipping, and regasification/.test(lower)) {
-    return "Venture Global은 LNG 생산, 천연가스 운송, 해운, 재기화까지 LNG 공급망 전반의 자산을 운영합니다.";
-  }
-  if (/design-one, build-many|modular, scalable/.test(lower)) {
-    return "모듈형 design-one/build-many 방식은 전통 LNG 프로젝트 대비 빠르고 비용 효율적인 건설을 가능하게 하는 핵심 성장 동력입니다.";
-  }
-  if (/permitted capacities may increase|ferc and doe/.test(lower)) {
-    return "FERC와 DOE 승인 여부는 허가 용량 확대와 프로젝트 일정의 핵심 변수입니다.";
-  }
-  if (/project cost|costs to complete|inflationary/.test(lower)) {
-    return "프로젝트 비용은 인플레이션, 거시 환경, 규제 환경에 따라 추가 상승할 수 있습니다.";
-  }
-
-  return null;
-}
-
-function isCompanyRevenueMetricText(text: string): boolean {
-  const lower = text.toLowerCase();
-  if (
-    /unearned revenue|revenue recognition|recognized as revenue|revenue growth|future growth|deferred revenue/.test(
-      lower,
-    )
-  ) {
-    return false;
-  }
-  return /total net sales|consolidated net sales|net sales (?:increased|decreased|were|was|of|for)|total revenues?|consolidated revenues?|revenues? (?:increased|decreased|were|was|of|for)/.test(
-    lower,
-  );
-}
-
-function isCompanyNetIncomeMetricText(text: string): boolean {
-  const lower = text.toLowerCase();
-  if (
-    /reduced net income by|reduction in net income|net income by|income tax provision|foreign income deduction|affects net_income|relevant to net_income/.test(
-      lower,
-    )
-  ) {
-    return false;
-  }
-  return /net income (?:increased|decreased|declined|was|were|of|for|attributable)|reported net income/.test(
-    lower,
-  );
-}
-
-function isIncreaseStatement(lowerText: string): boolean {
-  return /\b(increased|grew|rose|up from|higher)\b/.test(lowerText);
-}
-
-function buildGenericSegments(claims: EvidenceClaim[]): EvidenceSegment[] {
-  const profile = claims.find((claim) => claim.type === "CompanyBusinessProfile");
-  if (!profile) return [];
-
-  const activities = extractProfileList(profile.text, "Primary activities", "Key external factors");
-  const factors = extractProfileList(profile.text, "Key external factors");
-
-  return activities.slice(0, 5).map((activity) => ({
-    name: toTitleCase(activity),
-    role: `${activity} 중심의 사업 활동입니다.`,
-    why_it_matters: factors.length
-      ? `주요 변수: ${factors.slice(0, 3).join(", ")}.`
-      : "사업 모델과 현금흐름 민감도를 판단하는 기본 축입니다.",
-  }));
-}
-
-function buildRiskDrivers(claims: EvidenceClaim[]): EvidenceRiskDriver[] {
-  const items: EvidenceRiskDriver[] = [];
-  const seen = new Set<string>();
-
-  for (const claim of claims) {
-    const lower = claim.text.toLowerCase();
-    const type = claim.type ?? "";
-    const isRisk = /risk/i.test(type) || /uncertain|risk|appeal|approval|costs? to complete|delay|maintenance/.test(lower);
-    const isDriver = /growthdriver/i.test(type) || /enables|advantage|capacity|cost-efficient|owns all|market share/.test(lower);
-
-    if (!isRisk && !isDriver) continue;
-
-    const label = summarizeLabel(claim.text);
-    const key = normalizeComparableText(label);
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    items.push({
-      label,
-      kind: isRisk && !isDriver ? "risk" : "driver",
-      text: truncateAtWord(cleanInlineMarkdown(claim.text), 220),
-      severity: isRisk ? "medium" : "low",
-    });
-  }
-
-  return items.slice(0, 6);
-}
-
-function extractProfileList(
-  text: string,
-  startLabel: string,
-  endLabel?: string,
-): string[] {
-  const start = text.toLowerCase().indexOf(`${startLabel.toLowerCase()}:`);
-  if (start === -1) return [];
-  const afterStart = text.slice(start + startLabel.length + 1);
-  const end = endLabel
-    ? afterStart.toLowerCase().indexOf(`${endLabel.toLowerCase()}:`)
-    : -1;
-  const segment = end === -1 ? afterStart : afterStart.slice(0, end);
-  return segment
-    .replace(/\.$/, "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function summarizeLabel(text: string): string {
-  const cleaned = cleanInlineMarkdown(text);
-  const firstClause = cleaned.split(/[,.;:]/)[0]?.trim();
-  return truncateAtWord(firstClause && firstClause.length >= 12 ? firstClause : cleaned, 72);
-}
-
-function toTitleCase(value: string): string {
-  return value
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function buildAmazonSegments(): EvidenceSegment[] {
-  return [
-    {
-      name: "North America",
-      role: "북미 온라인/오프라인 리테일, 광고, 구독, 물류를 포함한 최대 매출 기반입니다.",
-      why_it_matters: "규모가 가장 크기 때문에 전체 성장률과 물류 효율성에 직접 영향을 줍니다.",
-    },
-    {
-      name: "International",
-      role: "해외 리테일 및 구독 서비스 부문입니다.",
-      why_it_matters: "단위 판매 증가와 비용 관리가 수익성 개선의 핵심 변수입니다.",
-    },
-    {
-      name: "AWS",
-      role: "글로벌 클라우드 컴퓨팅 부문입니다.",
-      why_it_matters: "AMZN의 핵심 이익 엔진으로 영업이익 기여도가 큽니다.",
-    },
-  ];
-}
-
-function sourceLabel(claim: EvidenceClaim): string | undefined {
-  const label = [claim.ticker, claim.period, claim.documentType]
-    .filter(Boolean)
-    .join(" ");
-  return label || undefined;
-}
-
-function metricDelta(text: string, period: string | null): string | undefined {
-  const maxYear = fiscalYear(period);
-  const years = Array.from(text.matchAll(/\b(20\d{2})\b/g), (match) => match[1])
-    .filter((year): year is string => Boolean(year))
-    .filter((year) => !maxYear || Number(year) <= maxYear);
-  if (years.length >= 2) {
-    const first = years[0];
-    const last = years[years.length - 1];
-    if (first && last && first !== last) {
-      return /decreased|declined|lower/i.test(text)
-        ? `${first}→${last} 감소`
-        : `${first}→${last} 증가`;
-    }
-  }
-  return undefined;
-}
-
-function latestCurrencyMention(
-  text: string,
-  period: string | null,
-): { value: string; amount: number; year?: string } | null {
-  const maxYear = fiscalYear(period);
-  const mentions = currencyTimeline(text).filter(
-    (mention) => !maxYear || !mention.year || Number(mention.year) <= maxYear,
-  );
-  const latest = mentions.at(-1);
-  if (!latest) return null;
-  return {
-    value: formatCurrency(latest.amount, latest.unit),
-    amount: Math.abs(latest.amount),
-    year: latest.year,
-  };
-}
-
-function fiscalYear(period: string | null): number | null {
-  const match = period?.match(/FY(20\d{2})/i);
-  return match ? Number(match[1]) : null;
-}
-
-function formatCurrencyRange(text: string): string | null {
-  const mentions = currencyTimeline(text);
-  if (mentions.length < 2) return null;
-
-  const first = mentions[0];
-  const last = mentions[mentions.length - 1];
-  if (!first || !last) return null;
-
-  const firstLabel = first.year
-    ? `${first.year}년 ${formatCurrency(first.amount, first.unit)}`
-    : formatCurrency(first.amount, first.unit);
-  const lastLabel = last.year
-    ? `${last.year}년 ${formatCurrency(last.amount, last.unit)}`
-    : formatCurrency(last.amount, last.unit);
-  return `${firstLabel}에서 ${lastLabel}`;
-}
-
-function currencyTimeline(
-  text: string,
-): Array<{ amount: number; unit: string | null; year?: string }> {
-  const mentions: Array<{ amount: number; unit: string | null; year?: string }> = [];
-  const regex = /\$([0-9,]+(?:\.[0-9]+)?)\s*(million|billion)?/gi;
-  let match: RegExpExecArray | null;
-
-  while ((match = regex.exec(text)) !== null) {
-    const amount = Number((match[1] ?? "").replace(/,/g, ""));
-    if (!Number.isFinite(amount)) continue;
-
-    const after = text.slice(match.index, match.index + 90);
-    if (isPerShareCurrencyMention(text, match.index, match[0].length)) continue;
-    const year = after.match(/\b(20\d{2})\b/)?.[1];
-    mentions.push({
-      amount,
-      unit: match[2]?.toLowerCase() ?? null,
-      year,
-    });
-  }
-
-  return mentions;
-}
-
-function isPerShareCurrencyMention(
-  text: string,
-  index: number,
-  length: number,
-): boolean {
-  const after = text.slice(index + length, index + length + 50);
-  const before = text.slice(Math.max(0, index - 30), index);
-  return /(?:per|basic|diluted)\s+share|\/share/i.test(after) ||
-    /per\s+(?:basic|diluted)?\s*share\s*(?:of|and)?\s*$/i.test(before);
-}
-
-function formatCurrency(amount: number, unit: string | null): string {
-  const billion =
-    unit === "million" || (!unit && amount >= 1000) ? amount / 1000 : amount;
-  const value = new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  }).format(billion);
-  return `$${value}B`;
-}
-
-function formatAbsoluteCurrency(amount: number): string {
-  const abs = Math.abs(amount);
-  const formatter = new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: abs >= 1_000_000 ? 1 : 0,
-    maximumFractionDigits: abs >= 1_000_000 ? 1 : 2,
-  });
-  if (abs >= 1_000_000_000) return `$${formatter.format(amount / 1_000_000_000)}B`;
-  if (abs >= 1_000_000) return `$${formatter.format(amount / 1_000_000)}M`;
-  return `$${formatter.format(amount)}`;
-}
-
-function latestSourceLabel(claims: EvidenceClaim[]): string | null {
-  const scored = claims
-    .map((claim) => ({
-      label: sourceLabel(claim),
-      score: periodScore(claim.period),
-    }))
-    .filter((item): item is { label: string; score: number } => Boolean(item.label));
-
-  scored.sort((a, b) => b.score - a.score);
-  return scored[0]?.label ?? null;
-}
-
-function periodScore(period: string | null): number {
-  const match = period?.match(/^FY(20\d{2})(?:Q([1-4]))?$/i);
-  if (!match) return 0;
-  const year = Number(match[1]);
-  const quarter = match[2] ? Number(match[2]) : 5;
-  return year * 10 + quarter;
 }
 
 function extractTitle(text: string): string | null {
@@ -1219,6 +600,74 @@ function buildEvidenceRefs(
     .map((item) => item.ref);
 }
 
+function buildResearchStateEvidenceRefs(
+  toolCalls: AccumulatedRun["toolCalls"],
+): ResearchArtifactEvidenceRef[] {
+  const refs: ResearchArtifactEvidenceRef[] = [];
+
+  for (const toolCall of toolCalls) {
+    const result = normalizeToolResult(toolCall.resultJson ?? toolCall.resultText);
+    if (result?.contract_version !== "research-state/v2") continue;
+
+    for (const unit of arrayOfRecords(result.evidence_units)) {
+      const source = asRecord(unit.source);
+      const sourceObjectIds = asStringArray(source?.object_ids);
+      const evidenceId = stringValue(unit.evidence_id);
+      const objectId = stringValue(unit.object_id) ?? sourceObjectIds[0] ?? null;
+      if (!evidenceId || !objectId) continue;
+
+      refs.push({
+        id: evidenceId,
+        source_label:
+          stringValue(source?.source_label) ??
+          ([unit.ticker, unit.period, unit.document_type]
+            .filter(
+              (value): value is string =>
+                typeof value === "string" && Boolean(value),
+            )
+            .join(" ") || "Ontology evidence"),
+        object_type: stringValue(unit.object_type) ?? undefined,
+        evidence_grade: mapResearchStateEvidenceGrade(
+          stringValue(unit.evidence_grade),
+        ),
+        trace_id: objectId,
+        quote_text: null,
+        chain_summary: {
+          evidence_id: evidenceId,
+          object_ids: sourceObjectIds,
+          quote_ids: asStringArray(source?.quote_ids),
+          span_ids: asStringArray(source?.span_ids),
+        },
+      });
+    }
+  }
+
+  return mergeEvidenceRefs(refs).slice(0, 24);
+}
+
+function mergeEvidenceRefs(
+  ...groups: ResearchArtifactEvidenceRef[][]
+): ResearchArtifactEvidenceRef[] {
+  const refs: ResearchArtifactEvidenceRef[] = [];
+  const seen = new Set<string>();
+  for (const reference of groups.flat()) {
+    const key = reference.id || reference.trace_id || reference.source_label;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    refs.push(reference);
+  }
+  return refs;
+}
+
+function mapResearchStateEvidenceGrade(
+  value: string | null,
+): ResearchArtifactEvidenceRef["evidence_grade"] {
+  if (value === "strong") return "direct";
+  if (value === "medium") return "indirect";
+  if (value === "weak") return "derived";
+  return "unsupported";
+}
+
 function mapEvidenceGrade(value: StreamingCitation["evidence_grade"]) {
   if (value === "high") return "direct";
   if (value === "medium") return "indirect";
@@ -1317,11 +766,7 @@ function isUsefulPoint(value: string): boolean {
 
 function isThinArtifactText(text: string, keyPoints: string[]): boolean {
   const cleaned = stripMarkdown(text);
-  if (/아티팩트 생성 완료|artifact generated/i.test(cleaned)) return true;
-  return (
-    keyPoints.length <= 2 &&
-    !/[$€₩]|매출|영업이익|순이익|revenue|income|sales|capex/i.test(cleaned)
-  );
+  return cleaned.length < 160 && keyPoints.length <= 2;
 }
 
 function isNearDuplicate(point: string, summary: string): boolean {
@@ -1373,14 +818,6 @@ function normalizeToolResult(value: unknown): Record<string, unknown> | null {
   }
 
   return record;
-}
-
-function parseJsonRecord(value: string): UnknownRecord | null {
-  try {
-    return asRecord(JSON.parse(value));
-  } catch {
-    return null;
-  }
 }
 
 function uniqueStrings(values: Array<string | null | undefined>): string[] {

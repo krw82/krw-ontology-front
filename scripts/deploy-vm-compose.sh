@@ -18,6 +18,8 @@ Environment:
                            live keys are configured and paid checkout is ready.
   ALLOW_TOSS_TEST_KEYS     Defaults to 0. Set to 1 only for staging-like
                            deploys that intentionally use Toss test keys.
+  TRUSTED_CLIENT_IP_HEADER Must be x-krw-client-ip. Caddy overwrites this
+                           ingress-owned header before it reaches Next.js.
 EOF
 }
 
@@ -82,6 +84,8 @@ require_command() {
 
 require_command rsync
 require_command docker
+require_command node
+require_command uv
 require_path "$ENV_FILE"
 require_path "$ONTOLOGY_SOURCE_DIR/pyproject.toml"
 require_path "$ONTOLOGY_SOURCE_DIR/src/krw_ontology"
@@ -183,6 +187,7 @@ do
 done
 
 require_env_exact ANALYSIS_CREDIT_ENFORCEMENT_MODE enforced
+require_env_exact TRUSTED_CLIENT_IP_HEADER x-krw-client-ip
 
 if [ "${ALLOW_MISSING_TOSS_PAYMENTS:-0}" = "1" ]; then
   echo "Warning: skipping Toss Payments key validation because ALLOW_MISSING_TOSS_PAYMENTS=1." >&2
@@ -234,6 +239,19 @@ rsync -a \
 rsync -a \
   --exclude '.DS_Store' \
   "$ONTOLOGY_SOURCE_DIR/plugins/krw-ontology" "$BUILD_CONTEXT/krw-ontology/plugins/"
+
+echo "Materializing Docker HTTP-only ontology plugin..."
+KRW_ONTOLOGY_SOURCE_DIR="$ONTOLOGY_SOURCE_DIR" \
+KRW_ONTOLOGY_RELEASE_ROOT= \
+KRW_ONTOLOGY_ROOT= \
+KRW_MCP_EXPECTED_TOOL_SCHEMA_SHA256= \
+KRW_MCP_EXPECTED_BUILD_FINGERPRINT_SHA256= \
+STOCK_NEWS_FORCE_DISABLED=1 \
+node "$BUILD_CONTEXT/scripts/materialize-ontology-plugin.mjs" \
+  --env prod \
+  --source "$ONTOLOGY_SOURCE_DIR/plugins/krw-ontology" \
+  --out "$BUILD_CONTEXT/ref/plugins/prod/krw-ontology" \
+  --mcp-url "http://ontology-mcp:8000/mcp" >/dev/null
 
 echo "Front source: $FRONT_DIR"
 echo "Ontology source: $ONTOLOGY_SOURCE_DIR"
@@ -304,35 +322,29 @@ docker compose \
   --env-file "$ENV_FILE" \
   -f "$BUILD_CONTEXT/docker-compose.yml" \
   exec -T web python3 - <<'PY'
-import json
 import os
 from pathlib import Path
 
-plugin_path = Path(os.environ["KRW_ONTOLOGY_PLUGIN_PATH"])
 agent_cwd = Path(os.environ["CLAUDE_AGENT_CWD"])
-mcp_config_path = plugin_path / ".mcp.json"
-mcp_config = json.loads(mcp_config_path.read_text())
-server_config = mcp_config["mcpServers"]["krw-ontology"]
-command = Path(server_config["command"])
-server_env = server_config.get("env", {})
 
 if not agent_cwd.is_absolute():
     raise SystemExit(f"CLAUDE_AGENT_CWD must be absolute: {agent_cwd}")
 if not agent_cwd.exists() or not os.access(agent_cwd, os.W_OK | os.X_OK):
     raise SystemExit(f"CLAUDE_AGENT_CWD is not writable: {agent_cwd}")
-if not command.exists() or not os.access(command, os.X_OK):
-    raise SystemExit(f"MCP stdio command is not executable: {command}")
 for key in (
+    "KRW_ONTOLOGY_PLUGIN_PATH",
+    "KRW_ONTOLOGY_MCP_URL",
+    "KRW_ONTOLOGY_MCP_HEALTH_URL",
+    "KRW_ONTOLOGY_MCP_READY_URL",
     "KRW_ONTOLOGY_RELEASE_ROOT",
     "KRW_ONTOLOGY_ROOT",
     "KRW_ONTOLOGY_GLOBAL_SPINE_PATH",
     "KRW_ONTOLOGY_SHARD_MANIFEST_PATH",
 ):
-    if os.environ.get(key) or server_env.get(key):
-        raise SystemExit(f"GCP web must not be configured with local ontology data: {key}")
+    if os.environ.get(key):
+        raise SystemExit(f"GCP web must not be configured with local ontology/MCP state: {key}")
 
 print(f"OK Claude agent cwd: {agent_cwd}")
-print(f"OK plugin MCP command: {command}")
 print("OK web ontology data boundary: Supabase catalog only")
 PY
 
@@ -371,18 +383,27 @@ if [ "$VALIDATE_AGENT_WORKER" = "1" ]; then
 const fs = require("fs");
 const required = [
   ".worker/agent-worker.mjs",
-  `${process.env.KRW_ONTOLOGY_ROOT}/indexes/global_spine.sqlite`,
-  `${process.env.KRW_ONTOLOGY_ROOT}/indexes/shard_manifest.json`,
   `${process.env.KRW_ONTOLOGY_PLUGIN_PATH}/.mcp.json`,
+  `${process.env.KRW_ONTOLOGY_PLUGIN_PATH}/.krw-ontology-contract.json`,
 ];
-for (const path of required) {
-  fs.accessSync(path, fs.constants.R_OK);
+for (const filePath of required) {
+  fs.accessSync(filePath, fs.constants.R_OK);
 }
-console.log(JSON.stringify({
-  worker: "ok",
-  root: process.env.KRW_ONTOLOGY_ROOT,
-  plugin: process.env.KRW_ONTOLOGY_PLUGIN_PATH,
-}));
+(async () => {
+  const response = await fetch(process.env.KRW_ONTOLOGY_MCP_READY_URL);
+  if (!response.ok) throw new Error(`Ontology MCP readiness failed: ${response.status}`);
+  const payload = await response.json();
+  if (payload.ok !== true) throw new Error("Ontology MCP readiness payload is not ok");
+  console.log(JSON.stringify({
+    worker: "ok",
+    release_id: payload.release_id,
+    plugin: process.env.KRW_ONTOLOGY_PLUGIN_PATH,
+    mcp_url: process.env.KRW_ONTOLOGY_MCP_URL,
+  }));
+})().catch((error) => {
+  console.error(error.message || error);
+  process.exit(1);
+});
 NODE
 else
   echo "Skipping agent-worker validation; compose target excludes agent-worker."

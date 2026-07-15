@@ -51,6 +51,19 @@ interface ComposerProps {
   onAttachmentsChange?: (hasAttachments: boolean) => void;
   focusRequestKey?: number;
   onFocusChange?: (focused: boolean) => void;
+  onReadyChange?: (ready: boolean) => void;
+  extraTools?: ComposerExtraToolAction[];
+}
+
+export interface ComposerExtraToolAction {
+  id: string;
+  label: string;
+  description: string;
+  icon: string;
+  badge?: string;
+  onboardingTarget?: string;
+  onClick: () => void;
+  disabled?: boolean;
 }
 
 export type ComposerSendResult =
@@ -66,7 +79,7 @@ export interface ComposerSendOptions {
 export interface ComposerHandle {
   requestAction: (type: "url" | "file" | "focus") => void;
   commitUserUrls: (urls: string[]) => boolean;
-  submitWithValue: (message: string) => void;
+  submitWithValue: (message: string) => boolean;
 }
 
 interface TextAttachment {
@@ -227,6 +240,8 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
   draftResetKey = 0,
   focusRequestKey = 0,
   onFocusChange,
+  onReadyChange,
+  extraTools = [],
 }: ComposerProps, ref) {
   const searchParams = useSearchParams();
   const initialDraftValue = initialValue ?? "";
@@ -344,10 +359,14 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setIsClientReady(true);
+      onReadyChange?.(true);
     }, 0);
 
-    return () => window.clearTimeout(timeoutId);
-  }, []);
+    return () => {
+      window.clearTimeout(timeoutId);
+      onReadyChange?.(false);
+    };
+  }, [onReadyChange]);
 
   useEffect(() => {
     if (!attachmentCoachmarkEnabled) return undefined;
@@ -1066,8 +1085,9 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
       return commitUserUrlValues(urls);
     },
     submitWithValue(message) {
-      if (isInputBusy || isGenerating) return;
+      if (isInputBusy || isGenerating) return false;
       submitWithValue(message);
+      return true;
     },
   }));
 
@@ -1089,6 +1109,39 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
         role="menu"
         aria-label="입력 도구"
       >
+        {extraTools.map((tool) => (
+          <button
+            key={tool.id}
+            type="button"
+            className={itemBase}
+            data-onboarding-target={tool.onboardingTarget}
+            onClick={() => {
+              setIsToolsOpen(false);
+              tool.onClick();
+            }}
+            role="menuitem"
+            disabled={tool.disabled}
+          >
+            {!isSheet && (
+              <span
+                aria-hidden="true"
+                className="material-symbols-outlined text-[20px] text-muted"
+              >
+                {tool.icon}
+              </span>
+            )}
+            <span className="min-w-0">
+              <span className={titleClass || undefined}>{tool.label}</span>
+              <span className={descriptionClass}>{tool.description}</span>
+            </span>
+            {!isSheet && tool.badge ? (
+              <span className="ml-auto rounded-[6px] border border-hairline bg-surface px-1.5 py-0.5 text-[10px] font-bold leading-none text-muted">
+                {tool.badge}
+              </span>
+            ) : null}
+          </button>
+        ))}
+
         {urlModeAvailable && (
           <button
             type="button"

@@ -5,7 +5,7 @@ interface ShareOgImageProps {
 }
 
 export function ShareOgImage({ copy }: ShareOgImageProps) {
-  const isEnglish = copy.kicker.toUpperCase().includes("SHARED");
+  const isEnglish = copy.locale === "en";
   const questionLabel = isEnglish ? "01  QUESTION" : "01  질문";
   const answerLabel = isEnglish ? "02  ANSWER" : "02  답변";
   const questionText = copy.description;

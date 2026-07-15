@@ -95,6 +95,8 @@ export interface DocumentIngestionJobRow extends Record<string, unknown> {
   last_event_seq: number;
   queue_job_id: string | null;
   worker_id: string | null;
+  claim_token: string | null;
+  claim_version: number;
   attempts: number;
   max_attempts: number;
   queued_at: string;
@@ -104,6 +106,26 @@ export interface DocumentIngestionJobRow extends Record<string, unknown> {
   lease_expires_at: string | null;
   error_code: string | null;
   error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DocumentSourceCleanupJobRow extends Record<string, unknown> {
+  id: string;
+  attachment_id: string;
+  ingestion_job_id: string;
+  storage_kind: "local_fs" | "object_storage";
+  source_path: string;
+  status: "pending" | "processing" | "failed" | "completed" | "unsupported";
+  worker_id: string | null;
+  claim_token: string | null;
+  claim_version: number;
+  attempts: number;
+  max_attempts: number;
+  next_attempt_at: string;
+  lease_expires_at: string | null;
+  completed_at: string | null;
+  last_error: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -431,6 +453,245 @@ export interface UserCompanyMarkRow extends Record<string, unknown> {
   interest_reason: string | null;
   tags: string[];
   last_activity_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SecFilingFormType = "8-K" | "8-K/A" | "6-K" | "6-K/A";
+
+export interface SecCompanyIdentifierRow extends Record<string, unknown> {
+  ticker: string;
+  cik: string | null;
+  company_name: string | null;
+  lookup_status: "pending" | "resolved" | "not_found" | "failed";
+  last_checked_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SecFilingEventRow extends Record<string, unknown> {
+  id: string;
+  ticker: string;
+  cik: string;
+  accession_number: string;
+  form_type: SecFilingFormType;
+  is_amendment: boolean;
+  filing_date: string;
+  report_date: string | null;
+  accepted_at: string | null;
+  primary_document_name: string | null;
+  filing_detail_url: string;
+  primary_document_url: string | null;
+  source_metadata: Json;
+  first_seen_at: string;
+  sec_items: string[];
+  event_tags: string[];
+  primary_event_tag: string | null;
+  classification_source: "sec_items" | "metadata" | "unclassified";
+  classification_version: number;
+  alert_priority: "urgent" | "normal" | "digest";
+  enrichment_status: "not_requested" | "queued" | "ready" | "failed";
+  // Reserved for the future 8-K/6-K automatic analysis pipeline.
+  analysis_status: "not_requested" | "queued" | "processing" | "ready" | "failed";
+  analysis_requested_at: string | null;
+  analysis_completed_at: string | null;
+  analysis_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FilingNotificationPreferencesRow extends Record<string, unknown> {
+  user_id: string;
+  enabled: boolean;
+  notify_8k: boolean;
+  notify_6k: boolean;
+  include_amendments: boolean;
+  delivery_mode: "important_immediate" | "all_immediate" | "daily_digest";
+  daily_digest_at: string;
+  last_digest_at: string | null;
+  timezone: string;
+  quiet_hours_start: string | null;
+  quiet_hours_end: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserFilingSubscriptionRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  ticker: string;
+  cik: string;
+  enabled: boolean;
+  alert_preset: "important" | "all";
+  delivery_mode: "inherit" | "important_immediate" | "all_immediate" | "daily_digest";
+  subscribed_at: string;
+  disabled_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SecFilingPollStateRow extends Record<string, unknown> {
+  cik: string;
+  enabled: boolean;
+  baseline_completed_at: string | null;
+  last_polled_at: string | null;
+  last_success_at: string | null;
+  next_poll_at: string;
+  consecutive_errors: number;
+  last_error: string | null;
+  worker_id: string | null;
+  claim_token: string | null;
+  lease_expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SecFilingDocumentRow extends Record<string, unknown> {
+  id: string;
+  filing_event_id: string;
+  sequence: number | null;
+  document_name: string;
+  document_type: string | null;
+  description: string | null;
+  document_url: string;
+  size_bytes: number | null;
+  is_primary: boolean;
+  recommendation_score: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FilingNotificationWorkerHeartbeatRow extends Record<string, unknown> {
+  worker_id: string;
+  detection_enabled: boolean;
+  push_enabled: boolean;
+  last_seen_at: string;
+  last_success_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PushSubscriptionRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  endpoint_hash: string | null;
+  expiration_time: string | null;
+  vapid_key_id: string;
+  status: "active" | "revoked";
+  created_at: string;
+  last_seen_at: string;
+  revoked_at: string | null;
+}
+
+export interface UserFilingNotificationRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  filing_event_id: string;
+  kind: "filing_received" | "analysis_ready" | "filing_digest";
+  title: string;
+  body: string;
+  destination_path: string;
+  read_at: string | null;
+  clicked_at: string | null;
+  pinned_at: string | null;
+  snoozed_until: string | null;
+  archived_at: string | null;
+  digest_bucket: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserPulsePreferencesRow extends Record<string, unknown> {
+  user_id: string;
+  timezone: string;
+  enabled_kinds: Array<"filing" | "checkup" | "question" | "resurface" | "learning">;
+  muted_tickers: string[];
+  daily_checkup_enabled: boolean;
+  daily_checkup_at: string;
+  question_cadence: "daily" | "three_weekly" | "off";
+  resurface_cadence: "weekly" | "biweekly" | "off";
+  learning_cadence: "weekly" | "off";
+  learning_enabled: boolean;
+  resurfacing_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserPulseItemStateRow extends Record<string, unknown> {
+  user_id: string;
+  item_key: string;
+  source_type: "filing" | "checkup" | "question" | "resurface" | "learning";
+  source_id: string;
+  kind: "filing" | "checkup" | "question" | "resurface" | "learning";
+  first_seen_at: string | null;
+  last_seen_at: string | null;
+  view_count: number;
+  read_at: string | null;
+  saved_at: string | null;
+  snoozed_until: string | null;
+  dismissed_at: string | null;
+  last_impression_at: string | null;
+  impression_count: number;
+  feedback: -1 | 1 | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserFilingKeywordRuleRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  ticker: string | null;
+  phrase: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FilingKeywordMatchRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  filing_event_id: string;
+  rule_id: string;
+  document_name: string | null;
+  matched_context: string;
+  created_at: string;
+}
+
+export interface FilingPushReceiptRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  notification_id: string | null;
+  receipt_key: string;
+  receipt_type: "sw_push_received" | "notification_show_called" | "notification_clicked" | "test_push_received";
+  created_at: string;
+}
+
+export interface UserFilingFeedTokenRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  token_hash: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+export interface FilingNotificationDeliveryRow extends Record<string, unknown> {
+  id: string;
+  notification_id: string;
+  subscription_id: string;
+  status: "pending" | "claimed" | "sent" | "retry" | "failed";
+  attempts: number;
+  next_attempt_at: string;
+  worker_id: string | null;
+  claim_token: string | null;
+  lease_expires_at: string | null;
+  provider_status: number | null;
+  last_error: string | null;
+  sent_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1121,6 +1382,7 @@ export interface MessageShareRow extends Record<string, unknown> {
   answer_content: string;
   answer_created_at: string;
   tickers: string[] | null;
+  share_context: Json;
   snapshot_version: number;
   created_at: string;
   revoked_at: string | null;
@@ -1158,7 +1420,22 @@ export interface AnalyticsEventRow extends Record<string, unknown> {
     | "quota_warning_shown"
     | "quota_blocked"
     | "upgrade_clicked"
-    | "subscription_started";
+    | "subscription_started"
+    | "company_followed"
+    | "push_permission_requested"
+    | "push_permission_granted"
+    | "push_permission_denied"
+    | "push_subscribed"
+    | "push_unsubscribed"
+    | "filing_notification_clicked"
+    | "filing_subscription_created"
+    | "filing_subscription_removed"
+    | "filing_history_loaded"
+    | "filing_detail_viewed"
+    | "push_notification_clicked"
+    | "key_exhibit_opened"
+    | "sec_source_opened"
+    | "filing_analysis_started";
   properties: Json;
   path: string | null;
   referrer: string | null;
@@ -1289,6 +1566,8 @@ export interface Database {
           | "last_event_seq"
           | "queue_job_id"
           | "worker_id"
+          | "claim_token"
+          | "claim_version"
           | "attempts"
           | "queued_at"
           | "started_at"
@@ -1307,6 +1586,8 @@ export interface Database {
           last_event_seq?: number;
           queue_job_id?: string | null;
           worker_id?: string | null;
+          claim_token?: string | null;
+          claim_version?: number;
           attempts?: number;
           queued_at?: string;
           started_at?: string | null;
@@ -1319,6 +1600,49 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Omit<DocumentIngestionJobRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      document_source_cleanup_jobs: {
+        Row: DocumentSourceCleanupJobRow;
+        Insert: Omit<
+          DocumentSourceCleanupJobRow,
+          | "id"
+          | "status"
+          | "worker_id"
+          | "claim_token"
+          | "claim_version"
+          | "attempts"
+          | "max_attempts"
+          | "next_attempt_at"
+          | "lease_expires_at"
+          | "completed_at"
+          | "last_error"
+          | "created_at"
+          | "updated_at"
+        > & {
+          id?: string;
+          status?: DocumentSourceCleanupJobRow["status"];
+          worker_id?: string | null;
+          claim_token?: string | null;
+          claim_version?: number;
+          attempts?: number;
+          max_attempts?: number;
+          next_attempt_at?: string;
+          lease_expires_at?: string | null;
+          completed_at?: string | null;
+          last_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<
+          Omit<DocumentSourceCleanupJobRow, "id" | "created_at">
+        >;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];
@@ -1829,6 +2153,328 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Omit<UserCompanyMarkRow, "user_id" | "ticker" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      sec_company_identifiers: {
+        Row: SecCompanyIdentifierRow;
+        Insert: Pick<SecCompanyIdentifierRow, "ticker"> &
+          Partial<Omit<SecCompanyIdentifierRow, "ticker" | "created_at" | "updated_at">> & {
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<SecCompanyIdentifierRow, "ticker" | "created_at">>;
+        Relationships: [];
+      };
+      sec_filing_events: {
+        Row: SecFilingEventRow;
+        Insert: Pick<
+          SecFilingEventRow,
+          | "ticker"
+          | "cik"
+          | "accession_number"
+          | "form_type"
+          | "filing_date"
+          | "filing_detail_url"
+        > &
+          Partial<
+            Omit<
+              SecFilingEventRow,
+              | "id"
+              | "ticker"
+              | "cik"
+              | "accession_number"
+              | "form_type"
+              | "filing_date"
+              | "filing_detail_url"
+              | "created_at"
+              | "updated_at"
+            >
+          > & {
+            id?: string;
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<SecFilingEventRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      filing_notification_preferences: {
+        Row: FilingNotificationPreferencesRow;
+        Insert: Pick<FilingNotificationPreferencesRow, "user_id"> &
+          Partial<Omit<FilingNotificationPreferencesRow, "user_id" | "created_at" | "updated_at">> & {
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<FilingNotificationPreferencesRow, "user_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_filing_subscriptions: {
+        Row: UserFilingSubscriptionRow;
+        Insert: Pick<UserFilingSubscriptionRow, "user_id" | "ticker" | "cik"> &
+          Partial<
+            Omit<
+              UserFilingSubscriptionRow,
+              "id" | "user_id" | "ticker" | "cik" | "subscribed_at" | "created_at" | "updated_at"
+            >
+          > & {
+            id?: string;
+            subscribed_at?: string;
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<UserFilingSubscriptionRow, "id" | "user_id" | "ticker" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      sec_filing_poll_state: {
+        Row: SecFilingPollStateRow;
+        Insert: Pick<SecFilingPollStateRow, "cik"> &
+          Partial<Omit<SecFilingPollStateRow, "cik" | "created_at" | "updated_at">> & {
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<SecFilingPollStateRow, "cik" | "created_at">>;
+        Relationships: [];
+      };
+      sec_filing_documents: {
+        Row: SecFilingDocumentRow;
+        Insert: Pick<SecFilingDocumentRow, "filing_event_id" | "document_name" | "document_url"> &
+          Partial<Omit<SecFilingDocumentRow, "id" | "filing_event_id" | "document_name" | "document_url" | "created_at" | "updated_at">> & {
+            id?: string;
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<SecFilingDocumentRow, "id" | "filing_event_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      filing_notification_worker_heartbeats: {
+        Row: FilingNotificationWorkerHeartbeatRow;
+        Insert: Pick<FilingNotificationWorkerHeartbeatRow, "worker_id" | "detection_enabled" | "push_enabled"> &
+          Partial<Omit<FilingNotificationWorkerHeartbeatRow, "worker_id" | "detection_enabled" | "push_enabled" | "created_at" | "updated_at">> & {
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<FilingNotificationWorkerHeartbeatRow, "worker_id" | "created_at">>;
+        Relationships: [];
+      };
+      push_subscriptions: {
+        Row: PushSubscriptionRow;
+        Insert: Pick<PushSubscriptionRow, "user_id" | "endpoint" | "p256dh" | "auth"> &
+          Partial<
+            Omit<
+              PushSubscriptionRow,
+              "id" | "user_id" | "endpoint" | "p256dh" | "auth" | "created_at" | "last_seen_at"
+            >
+          > & {
+            id?: string;
+            created_at?: string;
+            last_seen_at?: string;
+          };
+        Update: Partial<Omit<PushSubscriptionRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_filing_notifications: {
+        Row: UserFilingNotificationRow;
+        Insert: Pick<
+          UserFilingNotificationRow,
+          "user_id" | "filing_event_id" | "title" | "body" | "destination_path"
+        > &
+          Partial<
+            Omit<
+              UserFilingNotificationRow,
+              | "id"
+              | "user_id"
+              | "filing_event_id"
+              | "title"
+              | "body"
+              | "destination_path"
+              | "created_at"
+            >
+          > & {
+            id?: string;
+            created_at?: string;
+          };
+        Update: Partial<Omit<UserFilingNotificationRow, "id" | "user_id" | "filing_event_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_pulse_preferences: {
+        Row: UserPulsePreferencesRow;
+        Insert: Pick<UserPulsePreferencesRow, "user_id"> &
+          Partial<Omit<UserPulsePreferencesRow, "user_id" | "created_at" | "updated_at">> & {
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<UserPulsePreferencesRow, "user_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_pulse_item_states: {
+        Row: UserPulseItemStateRow;
+        Insert: Pick<UserPulseItemStateRow, "user_id" | "item_key" | "source_type" | "source_id" | "kind"> &
+          Partial<
+            Omit<
+              UserPulseItemStateRow,
+              "user_id" | "item_key" | "source_type" | "source_id" | "kind" | "created_at" | "updated_at"
+            >
+          > & {
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<UserPulseItemStateRow, "user_id" | "item_key" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_filing_keyword_rules: {
+        Row: UserFilingKeywordRuleRow;
+        Insert: Pick<UserFilingKeywordRuleRow, "user_id" | "phrase"> &
+          Partial<Omit<UserFilingKeywordRuleRow, "id" | "user_id" | "phrase" | "created_at" | "updated_at">> & {
+            id?: string;
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<UserFilingKeywordRuleRow, "id" | "user_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      filing_keyword_matches: {
+        Row: FilingKeywordMatchRow;
+        Insert: Pick<FilingKeywordMatchRow, "user_id" | "filing_event_id" | "rule_id" | "matched_context"> &
+          Partial<Omit<FilingKeywordMatchRow, "id" | "user_id" | "filing_event_id" | "rule_id" | "matched_context" | "created_at">> & {
+            id?: string;
+            created_at?: string;
+          };
+        Update: Partial<Omit<FilingKeywordMatchRow, "id" | "user_id" | "filing_event_id" | "rule_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      filing_push_receipts: {
+        Row: FilingPushReceiptRow;
+        Insert: Pick<FilingPushReceiptRow, "user_id" | "receipt_key" | "receipt_type"> &
+          Partial<Omit<FilingPushReceiptRow, "id" | "user_id" | "receipt_key" | "receipt_type" | "created_at">> & {
+            id?: string;
+            created_at?: string;
+          };
+        Update: Partial<Omit<FilingPushReceiptRow, "id" | "user_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_filing_feed_tokens: {
+        Row: UserFilingFeedTokenRow;
+        Insert: Pick<UserFilingFeedTokenRow, "user_id" | "token_hash"> &
+          Partial<Omit<UserFilingFeedTokenRow, "id" | "user_id" | "token_hash" | "created_at">> & {
+            id?: string;
+            created_at?: string;
+          };
+        Update: Partial<Omit<UserFilingFeedTokenRow, "id" | "user_id" | "token_hash" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      filing_notification_deliveries: {
+        Row: FilingNotificationDeliveryRow;
+        Insert: Pick<FilingNotificationDeliveryRow, "notification_id" | "subscription_id"> &
+          Partial<
+            Omit<
+              FilingNotificationDeliveryRow,
+              | "id"
+              | "notification_id"
+              | "subscription_id"
+              | "status"
+              | "attempts"
+              | "next_attempt_at"
+              | "worker_id"
+              | "claim_token"
+              | "lease_expires_at"
+              | "provider_status"
+              | "last_error"
+              | "sent_at"
+              | "created_at"
+              | "updated_at"
+            >
+          > & {
+            id?: string;
+            status?: FilingNotificationDeliveryRow["status"];
+            attempts?: number;
+            next_attempt_at?: string;
+            worker_id?: string | null;
+            claim_token?: string | null;
+            lease_expires_at?: string | null;
+            provider_status?: number | null;
+            last_error?: string | null;
+            sent_at?: string | null;
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<FilingNotificationDeliveryRow, "id" | "created_at">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];
@@ -2632,6 +3278,30 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      claim_sec_filing_poll_targets: {
+        Args: {
+          p_worker_id: string;
+          p_limit?: number;
+          p_lease_seconds?: number;
+        };
+        Returns: Array<{ cik: string; claim_token: string }>;
+      };
+      claim_filing_notification_deliveries: {
+        Args: {
+          p_worker_id: string;
+          p_limit?: number;
+          p_lease_seconds?: number;
+        };
+        Returns: Array<{ id: string; claim_token: string }>;
+      };
+      cleanup_filing_notification_retention: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          deliveries_deleted: number;
+          notifications_deleted: number;
+          filing_events_deleted: number;
+        }>;
+      };
       increment_usage_daily: {
         Args: {
           p_user_id: string;
@@ -2909,6 +3579,97 @@ export interface Database {
         };
         Returns: Array<{ id: string }>;
       };
+      claim_document_ingestion_job_v2: {
+        Args: {
+          p_worker_id: string;
+          p_lease_seconds: number;
+          p_global_limit: number;
+        };
+        Returns: Array<{ id: string; claim_token: string }>;
+      };
+      claim_document_ingestion_job_by_id_v2: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+          p_lease_seconds: number;
+          p_global_limit: number;
+        };
+        Returns: Array<{
+          id: string;
+          claim_token: string | null;
+          lease_expires_at: string | null;
+          claim_state: "claimed" | "active_lease" | "concurrency_limited";
+        }>;
+      };
+      renew_document_ingestion_job_lease: {
+        Args: {
+          p_job_id: string;
+          p_claim_token: string;
+          p_lease_seconds: number;
+        };
+        Returns: boolean;
+      };
+      advance_document_ingestion_job: {
+        Args: {
+          p_job_id: string;
+          p_claim_token: string;
+          p_stage: DocumentIngestionJobRow["stage"];
+          p_progress_percent: number;
+        };
+        Returns: boolean;
+      };
+      complete_document_ingestion_job: {
+        Args: {
+          p_job_id: string;
+          p_claim_token: string;
+          p_extracted_md: string;
+          p_source_path: string;
+        };
+        Returns: boolean;
+      };
+      fail_document_ingestion_job: {
+        Args: {
+          p_job_id: string;
+          p_claim_token: string;
+          p_error_code: string;
+          p_error_message: string;
+        };
+        Returns: boolean;
+      };
+      reconcile_expired_document_attachment_cleanup: {
+        Args: {
+          p_limit?: number;
+        };
+        Returns: number;
+      };
+      claim_document_source_cleanup_job: {
+        Args: {
+          p_worker_id: string;
+          p_lease_seconds: number;
+        };
+        Returns: Array<{
+          id: string;
+          attachment_id: string;
+          storage_kind: DocumentSourceCleanupJobRow["storage_kind"];
+          source_path: string;
+          claim_token: string;
+        }>;
+      };
+      complete_document_source_cleanup_job: {
+        Args: {
+          p_cleanup_job_id: string;
+          p_claim_token: string;
+        };
+        Returns: boolean;
+      };
+      fail_document_source_cleanup_job: {
+        Args: {
+          p_cleanup_job_id: string;
+          p_claim_token: string;
+          p_error_message: string;
+        };
+        Returns: boolean;
+      };
       create_document_ingestion_job: {
         Args: {
           p_attachment_id: string;
@@ -2918,7 +3679,7 @@ export interface Database {
           p_file_name: string;
           p_mime_type: string;
           p_file_size: number;
-          p_storage_kind: "local_fs" | "object_storage";
+          p_storage_kind: "local_fs";
           p_original_path: string | null;
           p_original_object_path: string | null;
           p_content_hash: string | null;

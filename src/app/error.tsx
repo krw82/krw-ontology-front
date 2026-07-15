@@ -1,20 +1,12 @@
 "use client";
 
-function sanitizeError(message: string): string {
-  const cleaned = message.split("\n")[0];
-  const lower = cleaned.toLowerCase();
-  if (lower.includes("rate limit") || lower.includes("429")) {
-    return "현재 KRW-AI 계정/API 요청 한도에 도달했습니다. 잠시 후 다시 시도하거나, 실제 ANTHROPIC_API_KEY를 설정한 뒤 서버를 재시작해주세요.";
-  }
-  if (cleaned.length > 200) return cleaned.slice(0, 200) + "...";
-  return cleaned;
-}
+import { toUserFacingBoundaryError } from "@/lib/chat/user-facing-error";
 
 export default function GlobalError({
   error,
   reset,
 }: {
-  error: Error;
+  error: Error & { digest?: string };
   reset: () => void;
 }) {
   return (
@@ -28,8 +20,13 @@ export default function GlobalError({
         오류가 발생했습니다
       </h2>
       <p className="text-[16px] leading-[1.5] text-muted mb-lg max-w-[440px] text-center">
-        {sanitizeError(error.message)}
+        {toUserFacingBoundaryError(error.message)}
       </p>
+      {error.digest && (
+        <p className="mb-base font-mono text-[12px] font-bold tracking-[0.08em] text-muted">
+          문의 코드: {error.digest}
+        </p>
+      )}
       <button
         onClick={reset}
         className="px-lg py-sm bg-primary-container text-on-primary rounded-full text-[16px] leading-[1.15] font-semibold hover:bg-primary-active transition-colors"

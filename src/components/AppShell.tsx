@@ -20,6 +20,15 @@ function shouldShowGlobalSidebar(pathname: string): boolean {
   );
 }
 
+function shouldShowMobileOnlySidebar(pathname: string): boolean {
+  return (
+    pathname === "/guru" ||
+    pathname.startsWith("/guru/") ||
+    pathname === "/institutional-holdings" ||
+    pathname.startsWith("/institutional-holdings/")
+  );
+}
+
 function isBrowseWorkspace(pathname: string): boolean {
   return (
     pathname === "/companies" ||
@@ -41,8 +50,15 @@ export default function AppShell({ children }: AppShellProps) {
   const reducedMotion = useReducedMotion();
   const unlocalizedPathname = stripLocalePrefix(pathname);
   const showSidebar = shouldShowGlobalSidebar(unlocalizedPathname);
+  const showMobileOnlySidebar = shouldShowMobileOnlySidebar(unlocalizedPathname);
   const isBrowse = isBrowseWorkspace(unlocalizedPathname);
   const isChat = isChatWorkspace(unlocalizedPathname);
+  const activeSessionId = searchParams.get("sessionId");
+  const refreshSignal = `${pathname}?${searchParams.toString()}`;
+  const forceOnboarding =
+    searchParams.get("tour") === "1" || searchParams.get("onboarding") === "1";
+  const forceLegacyTour = searchParams.get("tour") === "1";
+  const onboardingContinuePath = searchParams.get("continue");
   const pageEntrance = {
     opacity: 1,
     y: 0,
@@ -61,15 +77,16 @@ export default function AppShell({ children }: AppShellProps) {
         animate={pageEntrance}
       >
         {children}
+        {showMobileOnlySidebar ? (
+          <ChatSidebar
+            activeSessionId={activeSessionId}
+            refreshSignal={refreshSignal}
+            showDesktopSidebar={false}
+          />
+        ) : null}
       </motion.div>
     );
   }
-
-  const activeSessionId = searchParams.get("sessionId");
-  const refreshSignal = `${pathname}?${searchParams.toString()}`;
-  const forceOnboarding =
-    searchParams.get("tour") === "1" || searchParams.get("onboarding") === "1";
-  const onboardingContinuePath = searchParams.get("continue");
 
   if (isBrowse) {
     return (
@@ -86,10 +103,10 @@ export default function AppShell({ children }: AppShellProps) {
         >
           {children}
         </motion.div>
-        {unlocalizedPathname === "/companies" ? (
+        {unlocalizedPathname === "/companies" && forceLegacyTour ? (
           <ProductOnboardingTour
             pathname={pathname}
-            force={forceOnboarding}
+            force={forceLegacyTour}
             continuePath={onboardingContinuePath}
           />
         ) : null}

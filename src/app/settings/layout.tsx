@@ -3,7 +3,7 @@ import { pageMetadata } from "@/lib/marketing/site";
 
 export const metadata: Metadata = pageMetadata({
   title: "설정",
-  description: "KRW Ontology 계정 설정 화면입니다.",
+  description: "KRW.O 계정 설정 화면입니다.",
   path: "/settings",
   noIndex: true,
 });

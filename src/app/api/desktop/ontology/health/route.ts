@@ -18,13 +18,13 @@ export async function GET(request: NextRequest) {
     const usesMcp = shouldUseDesktopOntologyMcp();
     const mcp = usesMcp ? await checkKrwOntologyMcpHealth() : null;
     const releaseMatches =
-      !usesMcp ||
+      usesMcp &&
       Boolean(
         mcp?.releaseId &&
           release?.release_id &&
           mcp.releaseId === release.release_id,
       );
-    const searchOk = usesMcp ? Boolean(mcp?.ok) : Boolean(release?.release_id);
+    const searchOk = usesMcp && Boolean(mcp?.ok) && releaseMatches;
     const companyCount = release?.company_count ?? null;
     const documentCount = release?.document_count ?? null;
     const objectCount = release?.object_count ?? null;
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       ontology_api_version: DESKTOP_ONTOLOGY_API_VERSION,
       active_ontology_release_id: release?.release_id ?? null,
       index_generated_at: release?.index_generated_at ?? null,
-      executor: usesMcp ? "mcp" : "catalog",
+      executor: usesMcp ? "mcp" : "unconfigured",
       release_matches_executor: releaseMatches,
       service: {
         status: searchOk ? "ready" : "not_ready",
@@ -53,6 +53,8 @@ export async function GET(request: NextRequest) {
             release_id: mcp.releaseId,
             index_generated_at: mcp.indexGeneratedAt,
             tool_count: mcp.toolNames.length,
+            mcp_contract_version: mcp.mcpContractVersion ?? null,
+            tool_schema_sha256: mcp.toolSchemaSha256 ?? null,
             error: mcp.error ?? null,
           }
         : null,

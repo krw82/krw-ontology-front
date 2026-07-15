@@ -85,6 +85,7 @@ if [ "$DB_CHECK" = "1" ]; then
   echo "Checking Supabase migration drift..."
   MIGRATION_DRY_RUN_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/krw-supabase-dry-run.XXXXXX")
   SUPABASE_DB_PUSH_INCLUDE_ALL=0
+  DOCUMENT_INGESTION_V2_MIGRATION_PENDING=0
   if (cd "$FRONT_DIR" && "$SCRIPT_DIR/supabase-cli.sh" db push --dry-run) >"$MIGRATION_DRY_RUN_OUTPUT" 2>&1; then
     cat "$MIGRATION_DRY_RUN_OUTPUT"
   else
@@ -118,16 +119,36 @@ if [ "$DB_CHECK" = "1" ]; then
       fi
     fi
   fi
+
+  if grep -q "20260710002000_document_ingestion_claim_tokens_cleanup" "$MIGRATION_DRY_RUN_OUTPUT"; then
+    DOCUMENT_INGESTION_V2_MIGRATION_PENDING=1
+  fi
+
+  if [ "$APPLY_MIGRATIONS" = "1" ] \
+    && [ "$DOCUMENT_INGESTION_V2_MIGRATION_PENDING" = "1" ] \
+    && [ "$DEPLOY_CODE" = "0" ]; then
+    echo "The document-ingestion claim-token migration requires the v2 compose deployment; do not use --skip-code." >&2
+    rm -f "$MIGRATION_DRY_RUN_OUTPUT"
+    exit 1
+  fi
+
   rm -f "$MIGRATION_DRY_RUN_OUTPUT"
 
   if [ "$APPLY_MIGRATIONS" = "1" ]; then
     if [ "$DRY_RUN" = "1" ]; then
+      if [ "$DOCUMENT_INGESTION_V2_MIGRATION_PENDING" = "1" ]; then
+        "$SCRIPT_DIR/drain-document-workers-for-migration.sh" --dry-run
+      fi
       if [ "$SUPABASE_DB_PUSH_INCLUDE_ALL" = "1" ]; then
         echo "Dry run: would apply Supabase migrations with Supabase CLI db push --include-all."
       else
         echo "Dry run: would apply Supabase migrations with Supabase CLI db push."
       fi
     else
+      if [ "$DOCUMENT_INGESTION_V2_MIGRATION_PENDING" = "1" ]; then
+        echo "Draining remote document workers before applying migrations..."
+        "$SCRIPT_DIR/drain-document-workers-for-migration.sh"
+      fi
       echo "Applying Supabase migrations..."
       if [ "$SUPABASE_DB_PUSH_INCLUDE_ALL" = "1" ]; then
         (cd "$FRONT_DIR" && "$SCRIPT_DIR/supabase-cli.sh" db push --include-all)

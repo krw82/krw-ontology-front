@@ -61,10 +61,10 @@ describe("research mode", () => {
     );
   });
 
-  it("keeps response detail guidance in each mode prompt", () => {
+  it("keeps evidence-first response detail guidance in each mode prompt", () => {
     for (const mode of ["fast", "standard", "deep"] as const) {
       const prompt = buildResearchModePrompt(mode);
-      expect(prompt).toContain("Never request response_detail: full");
+      expect(prompt).toContain("Request response_detail: full only when");
       expect(prompt).toContain(`Research mode: ${mode}.`);
     }
   });

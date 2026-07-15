@@ -334,6 +334,7 @@ describe("validateRequest", () => {
         research_mode: "standard",
         analysis_mode: "company",
         run_kind: "guru_advisor",
+        guru_lens: "buffett",
       }),
     );
 
@@ -341,6 +342,7 @@ describe("validateRequest", () => {
     if (!result.ok) return;
     expect(result.data.body.analysis_mode).toBe("company");
     expect(result.data.body.run_kind).toBe("guru_advisor");
+    expect(result.data.body.guru_lens).toBe("buffett");
     expect(result.data.body.research_mode).toBe("deep");
   });
 

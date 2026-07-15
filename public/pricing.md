@@ -1,6 +1,6 @@
-# KRW Ontology Pricing
+# KRW.O Pricing
 
-KRW Ontology uses simple monthly subscription plans with weekly research capacity. The product is designed for filing-grounded U.S. public company research, source-checkable answers, and repeated follow-up questions.
+KRW.O uses simple monthly subscription plans with weekly research capacity. The product is designed for filing-grounded U.S. public company research, source-checkable answers, and repeated follow-up questions.
 
 Public pricing page:
 https://krwontology.com/ko/pricing
@@ -35,7 +35,7 @@ https://krwontology.com/ko/pricing
 
 ## Product Scope
 
-KRW Ontology is strongest when the user asks company questions that can be checked against 10-K, 10-Q, company context, risk factors, business drivers, cash flow, and 13F holdings context.
+KRW.O is strongest when the user asks company questions that can be checked against 10-K, 10-Q, company context, risk factors, business drivers, cash flow, and 13F holdings context.
 
 Examples:
 
@@ -46,9 +46,8 @@ Examples:
 
 ## Important Limits
 
-- KRW Ontology is not an automated investment advisor.
+- KRW.O is not an automated investment advisor.
 - It does not guarantee investment outcomes.
 - It does not replace user judgment.
 - Coverage depends on supported companies and indexed filing data.
 - 13F holdings are delayed public disclosures and should not be treated as current buy or sell instructions.
-

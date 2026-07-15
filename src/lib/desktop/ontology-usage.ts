@@ -138,12 +138,15 @@ export async function createDesktopOntologyToolAuditStart(
     .single<Pick<DesktopOntologyToolCallRow, "id" | "created_at">>();
 
   if (error || !data) {
-    throw new DesktopContractError("Failed to create Desktop ontology audit row", {
-      code: "ontology_unavailable",
-      publicMessage: "Desktop 온톨로지 감사 기록을 만들지 못했습니다.",
-      status: 503,
-      retryable: true,
-    });
+    throw new DesktopContractError(
+      "Failed to create Desktop ontology audit row",
+      {
+        code: "ontology_unavailable",
+        publicMessage: "Desktop 온톨로지 감사 기록을 만들지 못했습니다.",
+        status: 503,
+        retryable: true,
+      },
+    );
   }
 
   return {
@@ -171,12 +174,15 @@ export async function finishDesktopOntologyToolAuditSuccess(
     .eq("id", audit.id);
 
   if (error) {
-    throw new DesktopContractError("Failed to finish Desktop ontology audit row", {
-      code: "ontology_unavailable",
-      publicMessage: "Desktop 온톨로지 감사 기록을 저장하지 못했습니다.",
-      status: 503,
-      retryable: true,
-    });
+    throw new DesktopContractError(
+      "Failed to finish Desktop ontology audit row",
+      {
+        code: "ontology_unavailable",
+        publicMessage: "Desktop 온톨로지 감사 기록을 저장하지 못했습니다.",
+        status: 503,
+        retryable: true,
+      },
+    );
   }
 
   return latencyMs;
@@ -230,10 +236,7 @@ export function withDesktopOntologyUsage(
   };
 }
 
-function buildLimitChecks(
-  auth: DesktopAuthContext,
-  now: Date,
-): LimitCheck[] {
+function buildLimitChecks(auth: DesktopAuthContext, now: Date): LimitCheck[] {
   const minuteWindowStart = windowStart(now, WINDOW_SECONDS);
   const dayWindowStart = dayStart(now);
   const checks: LimitCheck[] = [
@@ -316,15 +319,25 @@ function stableStringify(value: unknown): string {
 
 function summarizeArguments(request: DesktopOntologyToolCallRequest): Json {
   const args = request.arguments;
+  const searchPlan =
+    args.search_plan &&
+    typeof args.search_plan === "object" &&
+    !Array.isArray(args.search_plan)
+      ? (args.search_plan as Record<string, unknown>)
+      : null;
+  const isPlannedContext = request.tool_name === "krw_ontology_query_context";
+  const tickers = isPlannedContext ? searchPlan?.tickers : args.tickers;
+  const question = isPlannedContext ? searchPlan?.question : args.question;
+  const limitResults = isPlannedContext ? searchPlan?.limit_results : undefined;
   return {
     tool_name: request.tool_name,
-    tickers: Array.isArray(args.tickers)
-      ? args.tickers.filter((ticker): ticker is string => typeof ticker === "string")
+    tickers: Array.isArray(tickers)
+      ? tickers.filter((ticker): ticker is string => typeof ticker === "string")
       : typeof args.ticker === "string"
         ? [args.ticker]
         : [],
-    has_question: typeof args.question === "string" && Boolean(args.question.trim()),
-    question_chars: typeof args.question === "string" ? args.question.length : 0,
+    has_question: typeof question === "string" && Boolean(question.trim()),
+    question_chars: typeof question === "string" ? question.length : 0,
     has_topic: typeof args.topic === "string" && Boolean(args.topic.trim()),
     topic_chars: typeof args.topic === "string" ? args.topic.length : 0,
     response_detail:
@@ -332,14 +345,15 @@ function summarizeArguments(request: DesktopOntologyToolCallRequest): Json {
     limit:
       typeof args.limit === "number"
         ? args.limit
-        : typeof args.limit_results === "number"
-          ? args.limit_results
+        : typeof limitResults === "number"
+          ? limitResults
           : null,
   };
 }
 
 function countResultItems(response: DesktopOntologyToolCallSuccess): number {
   const candidates = [
+    response.result_json.evidence_units,
     response.result_json.evidence,
     response.result_json.companies,
     response.result_json.comparisons,
@@ -349,13 +363,16 @@ function countResultItems(response: DesktopOntologyToolCallSuccess): number {
     response.result_json.citations,
   ];
   for (const candidate of candidates) {
-    if (Array.isArray(candidate) && candidate.length > 0) return candidate.length;
+    if (Array.isArray(candidate) && candidate.length > 0)
+      return candidate.length;
   }
 
-  const resultsByTicker = resultMapCount(response.result_json.results_by_ticker);
+  const resultsByTicker = resultMapCount(
+    response.result_json.results_by_ticker,
+  );
   if (resultsByTicker > 0) return resultsByTicker;
 
-  return maxNestedArrayLength(response.result_json.research_pack);
+  return 0;
 }
 
 function resultMapCount(value: unknown): number {
@@ -363,23 +380,6 @@ function resultMapCount(value: unknown): number {
   return Object.values(value as Record<string, unknown>).reduce<number>(
     (total, entry) => total + (Array.isArray(entry) ? entry.length : 0),
     0,
-  );
-}
-
-function maxNestedArrayLength(value: unknown, depth = 0): number {
-  if (depth > 8) return 0;
-  if (Array.isArray(value)) {
-    return Math.max(
-      value.length,
-      ...value.map((entry) => maxNestedArrayLength(entry, depth + 1)),
-    );
-  }
-  if (!value || typeof value !== "object") return 0;
-  return Math.max(
-    0,
-    ...Object.values(value as Record<string, unknown>).map((entry) =>
-      maxNestedArrayLength(entry, depth + 1),
-    ),
   );
 }
 

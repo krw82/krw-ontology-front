@@ -80,7 +80,7 @@ describe("GET /api/companies", () => {
     });
     expect(searchIndexedCompanies).toHaveBeenCalledWith({
       query: "apple",
-      limit: 100,
+      limit: 200,
     });
   });
 

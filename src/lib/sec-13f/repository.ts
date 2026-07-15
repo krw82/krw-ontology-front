@@ -242,3 +242,53 @@ export async function listPositionChangesForFiling(
 
   return data ?? [];
 }
+
+export async function listPositionChangesForTicker(
+  ticker: string,
+  limit = 50,
+): Promise<Sec13FPositionChangeRow[]> {
+  const normalizedTicker = ticker.trim().toUpperCase();
+  if (!normalizedTicker) return [];
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("sec_13f_position_changes")
+    .select(POSITION_CHANGE_SELECT)
+    .eq("ticker", normalizedTicker)
+    .neq("change_type", "unchanged")
+    .order("report_period", { ascending: false })
+    .order("current_value_usd", { ascending: false })
+    .limit(limit)
+    .returns<Sec13FPositionChangeRow[]>();
+
+  if (error) {
+    throw new Error(`Failed to list 13F ticker changes: ${error.message}`);
+  }
+
+  return data ?? [];
+}
+
+export async function listPositionChangesForCusips(
+  cusips: string[],
+  limit = 50,
+): Promise<Sec13FPositionChangeRow[]> {
+  const normalizedCusips = Array.from(
+    new Set(cusips.map((cusip) => cusip.trim().toUpperCase()).filter(Boolean)),
+  );
+  if (normalizedCusips.length === 0) return [];
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("sec_13f_position_changes")
+    .select(POSITION_CHANGE_SELECT)
+    .in("cusip", normalizedCusips)
+    .neq("change_type", "unchanged")
+    .order("report_period", { ascending: false })
+    .order("current_value_usd", { ascending: false })
+    .limit(limit)
+    .returns<Sec13FPositionChangeRow[]>();
+
+  if (error) {
+    throw new Error(`Failed to list 13F CUSIP changes: ${error.message}`);
+  }
+
+  return data ?? [];
+}

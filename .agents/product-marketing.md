@@ -4,9 +4,9 @@
 
 ## Product Overview
 
-**One-liner:** KRW Ontology is a company-analysis agent and AI-agent-ready filing database that helps Korean investors ask questions about US companies and trace each answer back to the evidence behind it.
+**One-liner:** KRW.O is a company-analysis agent and AI-agent-ready filing database that helps Korean investors ask questions about US companies and trace each answer back to the evidence behind it.
 
-**What it does:** KRW Ontology turns long US public company filings into a structured research database that AI agents can query, connect, and cite. Users ask a company or investment question, then receive a readable answer with a trail back to the original filing context so they can inspect where the answer came from.
+**What it does:** KRW.O turns long US public company filings into a structured research database that AI agents can query, connect, and cite. Users ask a company or investment question, then receive a readable answer with a trail back to the original filing context so they can inspect where the answer came from.
 
 **Product category:** Company-analysis agent, AI-agent database for company filings, AI equity research, SEC filing analysis, evidence-backed company intelligence, public company research assistant.
 
@@ -16,15 +16,15 @@
 
 ## Messaging Positioning
 
-**Core public promise:** AI can answer quickly. KRW Ontology helps users check whether the answer is actually grounded in the company's own disclosures.
+**Core public promise:** AI can answer quickly. KRW.O helps users check whether the answer is actually grounded in the company's own disclosures.
 
 **Primary tension to lead with:** The user does not simply want more AI output. They want to avoid trusting a polished answer they cannot verify.
 
-**Strategic positioning to emphasize:** The product is not just another chat UI over filings. KRW Ontology is building a dedicated database for AI agents: company disclosures are structured into reusable, connected research units so agents can answer with evidence instead of loose text recall.
+**Strategic positioning to emphasize:** The product is not just another chat UI over filings. KRW.O is building a dedicated database for AI agents: company disclosures are structured into reusable, connected research units so agents can answer with evidence instead of loose text recall.
 
-**Agent positioning to emphasize:** KRW Ontology should feel like an agent optimized for company analysis, not a general-purpose GPT wrapper. It starts from the company, filing, period, business segment, risk, and driver context; then it searches, connects, cites, and preserves the research trail.
+**Agent positioning to emphasize:** KRW.O should feel like an agent optimized for company analysis, not a general-purpose GPT wrapper. It starts from the company, filing, period, business segment, risk, and driver context; then it searches, connects, cites, and preserves the research trail.
 
-**Core difference from general GPT:** General GPT is flexible but user-operated: the user has to upload sources, specify context, check citations, and rebuild the workflow each time. KRW Ontology is purpose-built for company research: supported companies, filing evidence, ontology links, saved sessions, and source-path review are part of the default workflow.
+**Core difference from general GPT:** General GPT is flexible but user-operated: the user has to upload sources, specify context, check citations, and rebuild the workflow each time. KRW.O is purpose-built for company research: supported companies, filing evidence, ontology links, saved sessions, and source-path review are part of the default workflow.
 
 **Best plain-language positioning lines:**
 
@@ -141,7 +141,7 @@
 
 **Messaging contrast vs general GPT:**
 
-| General GPT | KRW Ontology |
+| General GPT | KRW.O |
 |-------------|--------------|
 | 범용 대화 도구 | 기업 분석에 최적화된 리서치 에이전트 |
 | 사용자가 공시 파일, 기간, 맥락을 매번 준비해야 함 | 지원 기업과 공시 컨텍스트에서 바로 질문 시작 |
@@ -152,7 +152,7 @@
 
 | Objection | Response |
 |-----------|----------|
-| I can ask a general chatbot for this. | General chatbots can help, but KRW Ontology is built around filing evidence paths, ontology links, saved sessions, and repeatable company research workflows. |
+| I can ask a general chatbot for this. | General chatbots can help, but KRW.O is built around filing evidence paths, ontology links, saved sessions, and repeatable company research workflows. |
 | I still need to verify the answer manually. | Yes. The product is designed to make verification faster, not to remove investor judgment. The evidence path is the point. |
 | The indexed company universe may be limited. | Start with supported US public companies and make coverage visible before the user spends analysis credits. |
 | I do not know what to ask. | Provide prompt templates by company, segment, risk, margin, growth, and thesis-check workflows. |

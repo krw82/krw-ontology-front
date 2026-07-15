@@ -92,7 +92,7 @@ const checks = [
   },
   {
     table: "message_shares",
-    select: "id,token,revoked_at",
+    select: "id,token,share_context,revoked_at",
   },
   {
     table: "concurrency_leases",
@@ -225,6 +225,34 @@ const checks = [
     select:
       "id,note_id,user_id,ticker,citation_id,run_id,message_id,ontology_object_id,document_type,filing_period,created_at",
   },
+  {
+    table: "sec_company_identifiers",
+    select: "ticker,cik,lookup_status,last_checked_at",
+  },
+  {
+    table: "sec_filing_events",
+    select:
+      "id,ticker,cik,accession_number,form_type,is_amendment,analysis_status,filing_detail_url",
+  },
+  {
+    table: "filing_notification_preferences",
+    select:
+      "user_id,enabled,notify_8k,notify_6k,include_amendments,timezone",
+  },
+  {
+    table: "push_subscriptions",
+    select: "id,user_id,endpoint,status,last_seen_at,revoked_at",
+  },
+  {
+    table: "user_filing_notifications",
+    select:
+      "id,user_id,filing_event_id,kind,title,destination_path,read_at,clicked_at",
+  },
+  {
+    table: "filing_notification_deliveries",
+    select:
+      "id,notification_id,subscription_id,status,attempts,next_attempt_at,claim_token",
+  },
 ];
 
 for (const check of checks) {
@@ -259,6 +287,22 @@ if (rpcError) {
 
 await supabase.from("rate_limit_counters").delete().eq("key", smokeKey);
 console.log("OK schema: increment_rate_limit RPC");
+
+const { error: filingClaimError } = await supabase.rpc(
+  "claim_filing_notification_deliveries",
+  {
+    p_worker_id: "schema-smoke",
+    p_limit: 1,
+    p_lease_seconds: 30,
+  },
+);
+if (filingClaimError) {
+  console.error(
+    `Schema smoke failed for claim_filing_notification_deliveries RPC: ${filingClaimError.message}`,
+  );
+  process.exit(1);
+}
+console.log("OK schema: claim_filing_notification_deliveries RPC");
 
 const zeroUuid = "00000000-0000-0000-0000-000000000000";
 const { error: reserveRpcError } = await supabase.rpc("reserve_execution_budget", {

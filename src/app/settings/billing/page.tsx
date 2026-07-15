@@ -3,6 +3,7 @@ import BillingPlanAction from "@/components/BillingPlanAction";
 import TopNav from "@/components/TopNav";
 import { getAuthUser } from "@/lib/auth";
 import { getEntitlementStatus } from "@/lib/billing/entitlement";
+import { MENU_FEATURE_DEFINITIONS } from "@/lib/billing/feature-access";
 import { listPublicBillingPlansFromStore } from "@/lib/billing/plan-store";
 import { isTossPaymentsConfigured } from "@/lib/billing/toss";
 import { getCurrentTossSubscriptionSummary } from "@/lib/billing/toss-subscriptions";
@@ -26,12 +27,25 @@ function firstParam(value: string | string[] | undefined): string | null {
 function billingNotice(
   searchParams: Awaited<BillingSettingsPageProps["searchParams"]>,
 ): { tone: "success" | "error"; message: string } | null {
+  const featureKey = firstParam(searchParams.feature);
+  const lockedFeature = MENU_FEATURE_DEFINITIONS.find(
+    (feature) => feature.key === featureKey,
+  );
+  if (lockedFeature) {
+    const requiredPlan =
+      lockedFeature.required_plan.charAt(0).toUpperCase() +
+      lockedFeature.required_plan.slice(1);
+    return {
+      tone: "error",
+      message: `${lockedFeature.label}은 현재 플랜에서 사용할 수 없습니다. ${requiredPlan} 플랜부터 이용할 수 있습니다.`,
+    };
+  }
+
   const billing = firstParam(searchParams.billing);
   if (billing === "success") {
     return {
       tone: "success",
-      message:
-        "구독 결제가 완료되었습니다. 결제 시각 기준으로 주간 사용량이 계산됩니다.",
+      message: "구독 결제가 완료되었습니다. 새 플랜이 적용되었습니다.",
     };
   }
   if (billing === "cancel_scheduled") {
@@ -45,7 +59,7 @@ function billingNotice(
     return {
       tone: "success",
       message:
-        "업그레이드가 즉시 반영되었습니다. 현재 주간 한도도 새 플랜 기준으로 늘어납니다.",
+        "업그레이드가 즉시 반영되었습니다. 새 플랜의 기능을 이용할 수 있습니다.",
     };
   }
   if (billing === "downgrade_scheduled") {
@@ -71,63 +85,28 @@ function billingNotice(
   };
 }
 
-function formatResetTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "다음 충전 시점";
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-}
-
 function monthlyPriceLabel(value: number): string {
   return value === 0 ? "무료" : `월 ${value.toLocaleString()}원`;
 }
 
-function weeklyUsageStatusLabel(params: {
-  unlimited: boolean;
-  percent: number;
-  blocked: boolean;
-}): string {
-  if (params.unlimited) return "한도 없음";
-  if (params.blocked || params.percent >= 100) return "모두 사용";
-  if (params.percent >= 90) return "거의 다 사용";
-  if (params.percent >= 50) return "절반 이상 사용";
-  if (params.percent > 0) return "여유 있음";
-  return "아직 사용 전";
-}
-
-function weeklyUsageDescription(params: {
-  unlimited: boolean;
-  blocked: boolean;
-}): string {
-  if (params.unlimited) return "제한 없이 새 분석을 시작할 수 있습니다.";
-  if (params.blocked) {
-    return "다음 충전 전까지 새 분석은 시작할 수 없습니다.";
-  }
-  return "새 분석을 실행하면 이번 주 사용량에 반영됩니다.";
-}
-
-function planUsageLabel(planKey: string): string {
-  if (planKey === "free") return "체험 사용량";
-  if (planKey === "standard") return "기본 사용량";
-  if (planKey === "pro") return "넉넉한 주간 사용량";
-  return "사용량 기반";
+function planFeatureLabel(planKey: string): string {
+  if (planKey === "free") return "핵심 탐색 기능";
+  if (planKey === "standard") return "와이드 리서치 포함";
+  if (planKey === "pro") return "전체 메뉴 + 노트북";
+  return "기능 기반";
 }
 
 function planDescription(planKey: string): string {
   if (planKey === "free") {
-    return "첫 리서치 흐름을 확인하는 체험용 플랜입니다.";
+    return "회사 검색, 공시 기반 분석, 기관 보유 공시 확인을 시작할 수 있습니다.";
   }
   if (planKey === "standard") {
-    return "보통의 개인 투자자에게 맞습니다.";
+    return "Free 기능에 와이드 리서치를 더합니다.";
   }
   if (planKey === "pro") {
-    return "여러 기업을 자주 비교하고 반복적으로 리서치하는 사용자에게 맞습니다.";
+    return "모든 기능과 리서치 노트북을 제공합니다.";
   }
-  return "사용량 기반으로 리서치를 이어갈 수 있는 플랜입니다.";
+  return "기능별로 리서치 메뉴를 확장할 수 있는 플랜입니다.";
 }
 
 export default async function BillingSettingsPage({
@@ -166,12 +145,6 @@ export default async function BillingSettingsPage({
     plans.find((plan) => plan.key === "free");
   const billingProviderReady = isTossPaymentsConfigured();
   const notice = billingNotice(resolvedSearchParams);
-  const usagePercent = Math.max(
-    0,
-    Math.min(100, entitlement.usage.percent_used),
-  );
-  const isBlocked = entitlement.usage.alert_level === "blocked";
-
   return (
     <div className="min-h-[100dvh] bg-canvas">
       <TopNav
@@ -185,14 +158,18 @@ export default async function BillingSettingsPage({
         <div className="mx-auto w-full max-w-6xl">
           <header className="mx-auto max-w-3xl text-center">
             <p className="font-mono text-[12px] font-black uppercase tracking-[0.18em] text-primary">
-              PLAN & USAGE
+              PLAN & FEATURES
             </p>
             <h1 className="mt-4 text-balance text-[36px] font-black leading-[1.04] tracking-normal text-ink sm:text-[52px]">
-              필요한 만큼 리서치하세요.
+              내 리서치에 맞는 플랜을 선택하세요.
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-[16px] font-medium leading-7 text-body sm:text-[18px]">
-              모든 플랜에서 공시 기반 리서치와 노트북을 사용할 수 있습니다.
-              차이는 매주 다시 채워지는 사용량입니다.
+              Free는 핵심 탐색 기능을, Standard는 와이드 리서치를,
+              Pro는 리서치 노트북을 제공합니다.
+            </p>
+            <p className="mx-auto mt-3 max-w-2xl text-[12px] font-medium leading-5 text-muted">
+              공시와 시장 자료를 확인하는 리서치 소프트웨어입니다. 투자자문이나
+              매수·매도 추천을 제공하지 않으며, 투자 판단은 이용자에게 있습니다.
             </p>
           </header>
 
@@ -208,7 +185,7 @@ export default async function BillingSettingsPage({
             </section>
           )}
 
-          <section className="mt-8 grid gap-sm md:grid-cols-3">
+          <section className="mt-8">
             <div className="rounded-[8px] border border-hairline bg-canvas p-base">
               <p className="font-mono text-[11px] font-black uppercase tracking-[0.14em] text-muted">
                 CURRENT PLAN
@@ -219,52 +196,8 @@ export default async function BillingSettingsPage({
               <p className="mt-1 text-[13px] font-semibold leading-5 text-muted">
                 {entitlement.plan.status_label}
               </p>
-            </div>
-            <div className="rounded-[8px] border border-hairline bg-canvas p-base">
-              <div className="flex items-start justify-between gap-sm">
-                <div>
-                  <p className="font-mono text-[11px] font-black uppercase tracking-[0.14em] text-muted">
-                    THIS WEEK
-                  </p>
-                  <p
-                    className={`mt-2 text-[22px] font-black leading-7 ${
-                      isBlocked ? "text-error" : "text-ink"
-                    }`}
-                  >
-                    {weeklyUsageStatusLabel({
-                      unlimited: entitlement.usage.unlimited,
-                      percent: usagePercent,
-                      blocked: isBlocked,
-                    })}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-sm h-2 overflow-hidden rounded-full bg-surface-dim">
-                <div
-                  className={`h-full rounded-full ${
-                    isBlocked ? "bg-error" : "bg-primary"
-                  }`}
-                  style={{ width: `${usagePercent}%` }}
-                />
-              </div>
-              <p className="mt-xs text-[12px] font-semibold leading-5 text-muted">
-                {weeklyUsageDescription({
-                  unlimited: entitlement.usage.unlimited,
-                  blocked: isBlocked,
-                })}
-              </p>
-            </div>
-            <div className="rounded-[8px] border border-hairline bg-canvas p-base">
-              <p className="font-mono text-[11px] font-black uppercase tracking-[0.14em] text-muted">
-                NEXT RESET
-              </p>
-              <p className="mt-2 text-[22px] font-black leading-7 text-ink">
-                {entitlement.usage.unlimited
-                  ? "한도 없음"
-                  : formatResetTime(entitlement.usage.resets_at)}
-              </p>
-              <p className="mt-1 text-[13px] font-semibold leading-5 text-muted">
-                구독 시작 시각 기준 7일마다 다시 충전됩니다.
+              <p className="mt-3 text-[14px] font-semibold leading-6 text-body">
+                {planDescription(entitlement.plan.key)}
               </p>
             </div>
           </section>
@@ -276,31 +209,26 @@ export default async function BillingSettingsPage({
                   PLANS
                 </p>
                 <h2 className="mt-2 text-[28px] font-black leading-8 text-ink">
-                  사용량 기반 플랜
+                  기능별 플랜
                 </h2>
               </div>
             </div>
             <div className="mt-base grid gap-sm lg:grid-cols-3">
               {plans.map((plan) => {
                 const isCurrent = plan.key === entitlement.plan.key;
-                const isRecommended = plan.key === "standard";
+                const isFeatured = plan.key === "standard";
 
                 return (
                   <div
                     key={plan.key}
                     className={`relative flex min-h-[360px] flex-col rounded-[8px] border p-base sm:p-lg ${
-                      isRecommended
+                      isFeatured
                         ? "border-primary bg-primary-fixed/35 shadow-[0_18px_48px_rgba(0,82,255,0.10)]"
                         : isCurrent
                           ? "border-primary/45 bg-canvas"
                           : "border-hairline bg-canvas"
                     }`}
                   >
-                    {isRecommended && (
-                      <div className="absolute right-sm top-sm rounded-full bg-primary px-xs py-xxs text-[11px] font-black leading-4 text-on-primary">
-                        개인 투자자 추천
-                      </div>
-                    )}
                     <div className="flex items-start justify-between gap-sm">
                       <div>
                         <p className="text-[22px] font-black leading-7 text-ink">
@@ -320,7 +248,7 @@ export default async function BillingSettingsPage({
                       {monthlyPriceLabel(plan.monthlyPriceKrw)}
                     </p>
                     <p className="mt-xs text-[34px] font-black leading-9 text-ink">
-                      {planUsageLabel(plan.key)}
+                      {planFeatureLabel(plan.key)}
                     </p>
                     <p className="mt-sm min-h-[40px] text-[13px] font-semibold leading-5 text-body">
                       {planDescription(plan.key)}
@@ -354,16 +282,13 @@ export default async function BillingSettingsPage({
                   FEATURES
                 </p>
                 <h2 className="text-[16px] font-black leading-6 text-ink">
-                  모든 플랜에서 열려 있는 기능
+                  플랜별 기능 및 메뉴
                 </h2>
                 <p className="mt-1 text-[13px] font-medium leading-5 text-muted">
-                  플랜 차이는 기능 잠금이 아니라 매주 사용할 수 있는
-                  분석량입니다.
+                  Free는 핵심 메뉴를, Standard와 Pro는 확장 리서치 메뉴를
+                  제공합니다.
                 </p>
               </div>
-              <p className="px-base pb-base text-[12px] font-bold leading-5 text-muted sm:p-lg sm:pt-0">
-                사용량 기반
-              </p>
             </div>
             <div className="border-t border-hairline">
               {entitlement.features.map((feature) => (
@@ -378,12 +303,22 @@ export default async function BillingSettingsPage({
                     <p className="mt-0.5 text-[13px] font-medium leading-5 text-muted">
                       {feature.description}
                     </p>
+                    {!feature.enabled && feature.required_plan ? (
+                      <p className="mt-1 text-[12px] font-bold leading-5 text-error">
+                        {feature.required_plan === "standard"
+                          ? "Standard"
+                          : "Pro"}
+                        플랜부터 사용 가능
+                      </p>
+                    ) : null}
                   </div>
                   <span
                     aria-hidden="true"
-                    className="material-symbols-outlined text-[20px] text-primary"
+                    className={`material-symbols-outlined text-[20px] ${
+                      feature.enabled ? "text-primary" : "text-muted"
+                    }`}
                   >
-                    check
+                    {feature.enabled ? "check" : "lock"}
                   </span>
                 </div>
               ))}

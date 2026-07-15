@@ -4,9 +4,11 @@ import type { Metadata } from "next";
 import TopNav from "@/components/TopNav";
 import CompanyLogo from "@/components/CompanyLogo";
 import CompanyWatchlistActions from "@/components/CompanyWatchlistActions";
+import InstitutionalTickerActivity from "@/components/InstitutionalTickerActivity";
 import JsonLdScript from "@/components/JsonLdScript";
 import MarketingCtaLink from "@/components/MarketingCtaLink";
 import SuggestedPromptActions from "@/components/SuggestedPromptActions";
+import CompanyGuruLensPicker from "@/components/guru/CompanyGuruLensPicker";
 import {
   getCompanyDisplayCopyForTicker,
   getSuggestedPromptDisplaysForTickers,
@@ -24,6 +26,7 @@ import {
 } from "@/lib/marketing/site";
 import { getCspNonce } from "@/lib/security/csp-nonce";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { getInstitutionalTickerActivity } from "@/lib/sec-13f/service";
 import type { UserCompanyMarkRow } from "@/types/database";
 
 export const runtime = "nodejs";
@@ -59,8 +62,8 @@ export async function generateMetadata({
       title: locale === "ko" ? "회사를 찾지 못했습니다" : "Company not found",
       description:
         locale === "ko"
-          ? "현재 KRW Ontology 인덱스에서 찾을 수 없는 회사입니다."
-          : "This company is not currently available in the KRW Ontology index.",
+          ? "현재 KRW.O 인덱스에서 찾을 수 없는 회사입니다."
+          : "This company is not currently available in the KRW.O index.",
       path: `/companies/${rawTicker}`,
       noIndex: true,
     });
@@ -89,9 +92,7 @@ export async function generateMetadata({
   });
 }
 
-export default async function CompanyLandingPage({
-  params,
-}: CompanyPageProps) {
+export default async function CompanyLandingPage({ params }: CompanyPageProps) {
   const nonce = await getCspNonce();
   const { locale, ticker: rawTicker } = await params;
   if (!isLocale(locale)) notFound();
@@ -104,8 +105,14 @@ export default async function CompanyLandingPage({
 
   if (!company) notFound();
 
-  let savedMark: Pick<UserCompanyMarkRow, "is_watchlisted" | "is_holding"> | null =
-    null;
+  const institutionalActivity = await getInstitutionalTickerActivity(
+    company.ticker,
+  ).catch(() => []);
+
+  let savedMark: Pick<
+    UserCompanyMarkRow,
+    "is_watchlisted" | "is_holding"
+  > | null = null;
   if (user) {
     const { data } = await getSupabaseAdmin()
       .from("user_company_marks")
@@ -133,7 +140,9 @@ export default async function CompanyLandingPage({
   const preserveInitialUserProfile =
     user?.app_metadata?.provider === "dev-auth-bypass";
 
-  const prompts = getSuggestedPromptDisplaysForTickers(locale, [company.ticker]);
+  const prompts = getSuggestedPromptDisplaysForTickers(locale, [
+    company.ticker,
+  ]);
   const promptHrefs = prompts.map((prompt) =>
     chatHref(company.ticker, prompt, locale),
   );
@@ -147,7 +156,8 @@ export default async function CompanyLandingPage({
           jsonLdName: `${companyTitleName} 공시 기반 기업 분석`,
           breadcrumbCompanies: "회사 목록",
           heroHeading: `${companyTitleName} 공시 기반 리서치`,
-          startCta: `${displayCompany.ticker} 무료 분석 시작`,
+          startCta: `${displayCompany.ticker} 분석 시작`,
+          guruCta: "구루 관점으로 보기",
           watchlistInterestCta: "관심",
           watchlistHoldingCta: "보유",
           watchlistInterestSaved: "관심 저장됨",
@@ -166,6 +176,7 @@ export default async function CompanyLandingPage({
           breadcrumbCompanies: "Companies",
           heroHeading: `${displayCompany.name} filing-grounded research`,
           startCta: `Start ${displayCompany.ticker} analysis`,
+          guruCta: "View through a Guru lens",
           watchlistInterestCta: "Watch",
           watchlistHoldingCta: "Holding",
           watchlistInterestSaved: "Watch saved",
@@ -186,7 +197,9 @@ export default async function CompanyLandingPage({
       {
         "@type": "WebPage",
         name: pageCopy.jsonLdName,
-        url: absoluteUrl(localizedPath(locale, `/companies/${displayCompany.ticker}`)),
+        url: absoluteUrl(
+          localizedPath(locale, `/companies/${displayCompany.ticker}`),
+        ),
         isPartOf: {
           "@type": "WebSite",
           name: SITE_NAME,
@@ -246,7 +259,9 @@ export default async function CompanyLandingPage({
         initialUserProfile={initialUserProfile}
         preserveInitialUserProfile={preserveInitialUserProfile}
         brandHref="/companies"
-        brandAriaLabel={locale === "ko" ? "회사 목록으로 이동" : "Go to companies"}
+        brandAriaLabel={
+          locale === "ko" ? "회사 목록으로 이동" : "Go to companies"
+        }
         showSidebarTrigger
         showLocaleSwitcher
       />
@@ -256,7 +271,10 @@ export default async function CompanyLandingPage({
       >
         <div className="mx-auto w-full max-w-5xl">
           <nav className="mb-6 text-[13px] font-bold leading-5 text-muted">
-            <Link href={localizedPath(locale, "/companies")} className="hover:text-primary">
+            <Link
+              href={localizedPath(locale, "/companies")}
+              className="hover:text-primary"
+            >
               {pageCopy.breadcrumbCompanies}
             </Link>
             <span className="mx-2 text-outline-variant">/</span>
@@ -280,10 +298,7 @@ export default async function CompanyLandingPage({
                 </h1>
               </div>
             </div>
-            <p className="mt-4 max-w-3xl text-[16px] leading-7 text-body sm:text-[18px]">
-              {displayCompany.description}
-            </p>
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-[auto_auto_1fr] lg:items-start">
               <MarketingCtaLink
                 href={chatHref(displayCompany.ticker, undefined, locale)}
                 ctaId="company_start_analysis"
@@ -297,31 +312,39 @@ export default async function CompanyLandingPage({
               >
                 {pageCopy.startCta}
               </MarketingCtaLink>
-              <CompanyWatchlistActions
+              <CompanyGuruLensPicker
                 ticker={displayCompany.ticker}
-                isAuthenticated={Boolean(user)}
-                loginHref={watchlistLoginHref}
-                destinationHref={watchlistPath}
-                initialSavedAction={
-                  savedMark?.is_holding
-                    ? "holding"
-                    : savedMark?.is_watchlisted
-                      ? "watchlist"
-                      : null
-                }
-                labels={{
-                  watchlist: pageCopy.watchlistInterestCta,
-                  holding: pageCopy.watchlistHoldingCta,
-                  savedWatchlist: pageCopy.watchlistInterestSaved,
-                  savedHolding: pageCopy.watchlistHoldingSaved,
-                  saving: pageCopy.watchlistSaving,
-                  error: pageCopy.watchlistError,
-                }}
-                analyticsProperties={{
-                  company_name: displayCompany.name,
-                  source_surface: "company_hero",
-                }}
+                companyName={companyTitleName}
+                locale={locale}
+                ctaLabel={pageCopy.guruCta}
               />
+              <div className="min-w-0 sm:col-span-2 lg:col-span-1">
+                <CompanyWatchlistActions
+                  ticker={displayCompany.ticker}
+                  isAuthenticated={Boolean(user)}
+                  loginHref={watchlistLoginHref}
+                  destinationHref={watchlistPath}
+                  initialSavedAction={
+                    savedMark?.is_holding
+                      ? "holding"
+                      : savedMark?.is_watchlisted
+                        ? "watchlist"
+                        : null
+                  }
+                  labels={{
+                    watchlist: pageCopy.watchlistInterestCta,
+                    holding: pageCopy.watchlistHoldingCta,
+                    savedWatchlist: pageCopy.watchlistInterestSaved,
+                    savedHolding: pageCopy.watchlistHoldingSaved,
+                    saving: pageCopy.watchlistSaving,
+                    error: pageCopy.watchlistError,
+                  }}
+                  analyticsProperties={{
+                    company_name: displayCompany.name,
+                    source_surface: "company_hero",
+                  }}
+                />
+              </div>
             </div>
             <SuggestedPromptActions
               prompts={prompts}
@@ -340,6 +363,11 @@ export default async function CompanyLandingPage({
               }}
             />
           </header>
+
+          <InstitutionalTickerActivity
+            locale={locale}
+            items={institutionalActivity}
+          />
 
           <section className="border-b border-hairline py-7">
             <div className="grid gap-5 md:grid-cols-[176px_minmax(0,1fr)] md:items-start">
@@ -375,7 +403,6 @@ export default async function CompanyLandingPage({
               </div>
             </div>
           </section>
-
         </div>
       </main>
     </div>

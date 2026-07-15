@@ -70,8 +70,8 @@ export const BILLING_PLANS: Record<EntitlementPlanKey, BillingPlan> = {
   standard: {
     key: "standard",
     label: "Standard",
-    statusLabel: "개인 분석",
-    description: "보통의 개인 투자자를 위한 기본 사용량 플랜",
+    statusLabel: "확장 분석",
+    description: "확장 리서치를 위한 기본 플랜",
     planVersion: "standard-2026-06-credit-v1",
     monthlyPriceKrw: 7_900,
     weeklyAnalysisCreditsRaw: 2_000_000,

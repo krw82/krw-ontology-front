@@ -147,6 +147,13 @@ DB migration, ontology release, web code, runtime code가 모두 바뀌는 경�
 쓴다. 문서 ingestion은 GCP compose의 persistent Redis service와 BullMQ
 `document-worker`, `document-outbox-dispatcher`를 같이 올린다.
 
+document-ingestion claim-token migration이 pending이면 배포 스크립트는 먼저
+`scripts/drain-document-workers-for-migration.sh`로 원격
+`document-worker`와 `document-outbox-dispatcher`를 중지·검증한 뒤 DB migration을
+적용한다. 이 구간에는 이전 worker를 수동으로 다시 시작하지 않는다. migration
+직후 compose 배포가 v2 worker를 다시 시작한다. 이 migration은 `--skip-code`와
+함께 적용할 수 없다.
+
 ### Safe production deploy
 
 ```bash

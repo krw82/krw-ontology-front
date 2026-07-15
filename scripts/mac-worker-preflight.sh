@@ -226,6 +226,7 @@ require_path "$KRW_ONTOLOGY_RELEASE_ROOT"
 require_path "$KRW_ONTOLOGY_MANIFEST_PATH"
 require_path "$KRW_ONTOLOGY_SOURCE_DIR/pyproject.toml"
 require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.mcp.json"
+require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.krw-ontology-contract.json"
 require_path "$KRW_ONTOLOGY_PLUGIN_PATH/.claude-plugin/plugin.json"
 require_path "$KRW_GURU_ADVISOR_PLUGIN_PATH/.mcp.json"
 require_path "$KRW_GURU_ADVISOR_PLUGIN_PATH/.claude-plugin/plugin.json"
@@ -345,52 +346,37 @@ export AGENT_SUPERVISOR_CONCURRENCY
 echo "Checking plugin MCP config..."
 node <<'NODE'
 const fs = require("fs");
-const path = require("path");
 const pluginPath = process.env.KRW_ONTOLOGY_PLUGIN_PATH;
-const expectedRoot = path.resolve(process.env.KRW_ONTOLOGY_RELEASE_ROOT);
 const expectedUrl = process.env.KRW_ONTOLOGY_MCP_URL;
-const config = JSON.parse(fs.readFileSync(path.join(pluginPath, ".mcp.json"), "utf8"));
+const config = JSON.parse(fs.readFileSync(`${pluginPath}/.mcp.json`, "utf8"));
 const server = config.mcpServers && config.mcpServers["krw-ontology"];
 if (!server) throw new Error("Missing mcpServers.krw-ontology");
-if (server.type === "http" || server.type === "sse") {
-  if (!expectedUrl) throw new Error("Missing KRW_ONTOLOGY_MCP_URL for HTTP MCP plugin config");
-  if (server.type !== "http") {
-    throw new Error(`Production plugin must use streamable HTTP MCP, got: ${server.type}`);
+if (!expectedUrl) throw new Error("Missing KRW_ONTOLOGY_MCP_URL for HTTP MCP plugin config");
+if (server.type !== "http") {
+  throw new Error(`Production plugin must use streamable HTTP MCP, got: ${server.type}`);
+}
+if (server.url !== expectedUrl) {
+  throw new Error(`Plugin .mcp.json MCP URL mismatch: ${server.url} !== ${expectedUrl}`);
+}
+console.log(`OK plugin MCP URL: ${server.url}`);
+const stockNewsServer = config.mcpServers && config.mcpServers["stock-news"];
+const expectedStockNewsUrl = process.env.STOCK_NEWS_MCP_URL || "http://127.0.0.1:8775/mcp";
+const stockNewsEnabled = isStockNewsEnabled();
+if (!stockNewsEnabled) {
+  if (stockNewsServer) {
+    throw new Error("Stock News MCP is disabled, but plugin .mcp.json still includes mcpServers.stock-news");
   }
-  if (server.url !== expectedUrl) {
-    throw new Error(`Plugin .mcp.json MCP URL mismatch: ${server.url} !== ${expectedUrl}`);
-  }
-  console.log(`OK plugin MCP URL: ${server.url}`);
-  const stockNewsServer = config.mcpServers && config.mcpServers["stock-news"];
-  const expectedStockNewsUrl = process.env.STOCK_NEWS_MCP_URL || "http://127.0.0.1:8775/mcp";
-  const stockNewsEnabled = isStockNewsEnabled();
-  if (!stockNewsEnabled) {
-    if (stockNewsServer) {
-      throw new Error("Stock News MCP is disabled, but plugin .mcp.json still includes mcpServers.stock-news");
-    }
-    console.log("OK plugin Stock News MCP disabled");
-    process.exit(0);
-  }
-  if (!stockNewsServer) throw new Error("Missing mcpServers.stock-news");
-  if (stockNewsServer.type !== "http") {
-    throw new Error(`Stock News MCP must use streamable HTTP MCP, got: ${stockNewsServer.type}`);
-  }
-  if (stockNewsServer.url !== expectedStockNewsUrl) {
-    throw new Error(`Plugin .mcp.json Stock News MCP URL mismatch: ${stockNewsServer.url} !== ${expectedStockNewsUrl}`);
-  }
-  console.log(`OK plugin Stock News MCP URL: ${stockNewsServer.url}`);
+  console.log("OK plugin Stock News MCP disabled");
   process.exit(0);
 }
-const configuredRoot = server.env && (
-  server.env.KRW_ONTOLOGY_RELEASE_ROOT || server.env.KRW_ONTOLOGY_ROOT
-);
-const actualRoot = configuredRoot
-  ? path.resolve(configuredRoot)
-  : null;
-if (actualRoot && actualRoot !== expectedRoot) {
-  throw new Error(`Plugin .mcp.json ontology root mismatch: ${actualRoot} !== ${expectedRoot}`);
+if (!stockNewsServer) throw new Error("Missing mcpServers.stock-news");
+if (stockNewsServer.type !== "http") {
+  throw new Error(`Stock News MCP must use streamable HTTP MCP, got: ${stockNewsServer.type}`);
 }
-console.log(`OK plugin MCP root: ${actualRoot || expectedRoot}`);
+if (stockNewsServer.url !== expectedStockNewsUrl) {
+  throw new Error(`Plugin .mcp.json Stock News MCP URL mismatch: ${stockNewsServer.url} !== ${expectedStockNewsUrl}`);
+}
+console.log(`OK plugin Stock News MCP URL: ${stockNewsServer.url}`);
 
 function isStockNewsEnabled() {
   if (truthyEnv(process.env.STOCK_NEWS_FORCE_DISABLED)) return false;
@@ -590,6 +576,9 @@ if payload.get("global_spine_present") is not True:
     raise SystemExit("MCP health global_spine_present is not true")
 PY
 fi
+
+echo "Checking MCP v2 tool/schema/build fingerprint..."
+"$SCRIPT_DIR/verify-mcp-server-production.sh" --env-file "$ENV_FILE"
 
 echo "Checking Supabase service-role read access..."
 (cd "$FRONT_DIR" && node <<'NODE')

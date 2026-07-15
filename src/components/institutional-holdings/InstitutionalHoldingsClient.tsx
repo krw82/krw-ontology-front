@@ -246,7 +246,7 @@ function SummaryDisclosure({
           <ChangeTile label="증가" value={dashboard.stats.increasedPositions} />
           <ChangeTile label="감소" value={dashboard.stats.decreasedPositions} />
           <ChangeTile label="유지" value={dashboard.stats.unchangedPositions} />
-          <ChangeTile label="전량매도" value={dashboard.stats.soldPositions} />
+          <ChangeTile label="보유 종료" value={dashboard.stats.soldPositions} />
         </section>
       </div>
     </details>
@@ -491,9 +491,9 @@ function RebalancingSection({
         </h2>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <RebalancingList title="집중 매수 리스트" holdings={dashboard.rebalancing.buys} />
+        <RebalancingList title="보유 비중 증가" holdings={dashboard.rebalancing.buys} />
         <RebalancingList
-          title="집중 매도 리스트"
+          title="보유 비중 감소"
           holdings={dashboard.rebalancing.sells}
         />
       </div>

@@ -58,11 +58,7 @@ const homeCopy = {
     ],
     previewEyebrow: "답변 미리보기",
     previewTitle: "투자 질문 확인 예시",
-    footer: "© 2026 KRW Ontology Research. 공시 근거 기반 기업 리서치.",
-    privacy: "개인정보처리방침",
-    terms: "서비스 약관",
-    refund: "환불정책",
-    offerDescription: "무료 베타 플랜",
+    offerDescription: "무료 플랜",
     browseAria: "공개 페이지 둘러보기",
   },
   en: {
@@ -86,11 +82,7 @@ const homeCopy = {
     ],
     previewEyebrow: "Answer preview",
     previewTitle: "Investment question check example",
-    footer: "© 2026 KRW Ontology Research. Evidence-first company analysis.",
-    privacy: "Privacy Policy",
-    terms: "Terms of Service",
-    refund: "Refund Policy",
-    offerDescription: "Free beta plan",
+    offerDescription: "Free plan",
     browseAria: "Browse public pages",
   },
 } satisfies Record<Locale, {
@@ -107,10 +99,6 @@ const homeCopy = {
   browseLinks: Array<{ href: string; label: string }>;
   previewEyebrow: string;
   previewTitle: string;
-  footer: string;
-  privacy: string;
-  terms: string;
-  refund: string;
   offerDescription: string;
   browseAria: string;
 }>;
@@ -200,7 +188,7 @@ const homeExperienceCopy = {
         eyebrow: "Signal check",
         title: "Find signals in company reports",
         detail:
-          "KRW Ontology anchors the answer by first finding report sentences related to the question.",
+          "KRW.O anchors the answer by first finding report sentences related to the question.",
         quote: "The answer starts from report evidence.",
       },
       {
@@ -416,32 +404,6 @@ export default async function Home({ params }: HomePageProps) {
         </section>
       </main>
 
-      <footer className="relative z-10 border-t border-hairline bg-canvas px-4 py-6 text-center text-xs font-bold uppercase leading-5 tracking-[0.14em] text-muted sm:px-6">
-        <div className="flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
-          <span>
-            {copy.footer}
-          </span>
-          <span className="hidden h-1 w-1 rounded-full bg-outline-variant sm:block" />
-          <Link
-            href={localizedPath(locale, "/privacy")}
-            className="transition-colors hover:text-ink"
-          >
-            {copy.privacy}
-          </Link>
-          <Link
-            href={localizedPath(locale, "/terms")}
-            className="transition-colors hover:text-ink"
-          >
-            {copy.terms}
-          </Link>
-          <Link
-            href={localizedPath(locale, "/refund")}
-            className="transition-colors hover:text-ink"
-          >
-            {copy.refund}
-          </Link>
-        </div>
-      </footer>
     </div>
   );
 }

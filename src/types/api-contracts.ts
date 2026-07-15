@@ -30,11 +30,7 @@ export type MessageRole = "user" | "assistant" | "system";
 
 /** Chat message persistence state */
 export type MessageStatus =
-  | "pending"
-  | "streaming"
-  | "completed"
-  | "failed"
-  | "cancelled";
+  "pending" | "streaming" | "completed" | "failed" | "cancelled";
 
 /** Chat session scope */
 export type SessionScopeType = "global" | "company";
@@ -141,6 +137,7 @@ export type KRWOntologyMCPToolName =
   | "krw_ontology_query_context"
   | "krw_ontology_retrieve"
   | "krw_ontology_trace"
+  | "krw_ontology_verify_evidence"
   | "krw_ontology_quality"
   | "krw_ontology_compare"
   | "krw_ontology_plan_query"
@@ -159,8 +156,7 @@ export type StockNewsMCPToolName =
 
 /** Allowed Yahoo Finance MCP tool names */
 export type YahooFinanceMCPToolName =
-  | "get_yahoo_finance_news"
-  | "get_stock_info";
+  "get_yahoo_finance_news" | "get_stock_info";
 
 /** Local presentation MCP tool names */
 export type ChartMCPToolName = "create_chart_v1";
@@ -178,7 +174,8 @@ export type GuruMCPToolName =
   | "krw_guru_data_needs"
   | "krw_guru_eval_questions"
   | "krw_guru_company_brief"
-  | "krw_guru_company_pack";
+  | "krw_guru_company_pack"
+  | "krw_guru_review_company_evidence";
 
 /** Allowed MCP tool names */
 export type MCPToolName =
@@ -241,17 +238,9 @@ export type UserCompanyQuestionSource =
   | "generated_from_thesis_check"
   | "saved_from_chat";
 export type UserCompanyThesisStatus =
-  | "active"
-  | "needs_review"
-  | "weakened"
-  | "mixed"
-  | "archived";
+  "active" | "needs_review" | "weakened" | "mixed" | "archived";
 export type UserThesisCheckResultStatus =
-  | "strengthened"
-  | "weakened"
-  | "mixed"
-  | "insufficient"
-  | "needs_review";
+  "strengthened" | "weakened" | "mixed" | "insufficient" | "needs_review";
 export type UserResearchNoteType =
   | "manual"
   | "chat_summary"
@@ -322,11 +311,7 @@ export interface UserCompanyNotebook {
 }
 
 export type UserCompanyNotebookRefreshJobStatus =
-  | "queued"
-  | "running"
-  | "succeeded"
-  | "failed"
-  | "cancelled";
+  "queued" | "running" | "succeeded" | "failed" | "cancelled";
 
 export interface UserCompanyNotebookRefreshJob {
   id: string;
@@ -394,16 +379,10 @@ export interface UserResearchNote {
   updated_at: string;
 }
 
-export type ResearchStatus =
-  | "ready"
-  | "empty"
-  | "has_open_questions"
-  | "stale";
+export type ResearchStatus = "ready" | "empty" | "has_open_questions" | "stale";
 
 export type ResearchInboxReason =
-  | "empty_notebook"
-  | "open_questions"
-  | "stale_notebook";
+  "empty_notebook" | "open_questions" | "stale_notebook";
 
 export interface ResearchInboxItem {
   ticker: string;
@@ -572,7 +551,8 @@ export interface ToolCall {
   run_id: string;
   tool_use_id: string | null;
   tool_name: MCPToolName;
-  arguments_json: Record<string, unknown> | unknown[] | string | number | boolean | null;
+  arguments_json:
+    Record<string, unknown> | unknown[] | string | number | boolean | null;
   result_summary: string | null;
   result_json: Record<string, unknown> | unknown[] | null;
   result_text: string | null;
@@ -684,16 +664,10 @@ export type ResearchArtifactType =
 export type ResearchArtifactVersion = "krw-artifact/v1";
 
 export type ArtifactConfidence =
-  | "direct"
-  | "indirect"
-  | "inferred"
-  | "unsupported";
+  "direct" | "indirect" | "inferred" | "unsupported";
 
 export type ArtifactEvidenceGrade =
-  | "direct"
-  | "indirect"
-  | "derived"
-  | "unsupported";
+  "direct" | "indirect" | "derived" | "unsupported";
 
 export interface ResearchArtifactSourceScope {
   document_types?: string[];
@@ -770,7 +744,8 @@ export type AnswerBlock =
       type: "premise_card";
       title: string;
       evidence_refs?: string[];
-      source_kind?: "filing" | "external_report" | "user_provided" | "web" | "mixed";
+      source_kind?:
+        "filing" | "external_report" | "user_provided" | "web" | "mixed";
       premises: Array<{
         label: string;
         text: string;
@@ -811,7 +786,13 @@ export type AnswerBlock =
         label: string;
         date_or_period: string;
         text: string;
-        status?: "reported" | "targeted" | "expected" | "completed" | "delayed" | "unknown";
+        status?:
+          | "reported"
+          | "targeted"
+          | "expected"
+          | "completed"
+          | "delayed"
+          | "unknown";
         evidence_refs?: string[];
       }>;
     }
@@ -956,8 +937,7 @@ export interface ResearchArtifact extends ResearchArtifactEnvelope {
 }
 
 export type ChatArtifactType =
-  | "news_event_selection"
-  | "verified_source_summary";
+  "news_event_selection" | "verified_source_summary";
 
 export interface SourcePreview {
   title?: string;
@@ -1068,9 +1048,7 @@ export interface ChatArtifact {
   message_id: string;
   run_id: string;
   type: ChatArtifactType;
-  payload_json:
-    | NewsEventSelectionArtifactPayload
-    | Record<string, unknown>;
+  payload_json: NewsEventSelectionArtifactPayload | Record<string, unknown>;
   readonly created_at: string;
 }
 
@@ -1177,7 +1155,7 @@ export interface ReleaseMetadata {
 /** Daily usage tracking record */
 export interface UsageDaily {
   user_id: string;
-  date: string;             // YYYY-MM-DD
+  date: string; // YYYY-MM-DD
   question_count: number;
   estimated_cost_usd: number;
 }
@@ -1299,13 +1277,13 @@ export interface StreamingChartEvent extends StreamingEventBase {
 export interface StreamingStateSyncEvent extends StreamingEventBase {
   event: "state_sync";
   data: {
-	    session_id: string;
-	    run_id?: string | null;
-	    status: RunStatus | "idle";
-	    reason?: "stale_run" | "poll_timeout" | "session_synced";
-	    queue?: QueueStatus | null;
-	  };
-	}
+    session_id: string;
+    run_id?: string | null;
+    status: RunStatus | "idle";
+    reason?: "stale_run" | "poll_timeout" | "session_synced";
+    queue?: QueueStatus | null;
+  };
+}
 
 /** Run completed successfully */
 export interface StreamingDoneEvent extends StreamingEventBase {
@@ -1371,11 +1349,12 @@ export type StreamingEvent =
 /** POST /api/chat/run request body */
 export interface ChatRunRequest {
   session_id?: string;
-  content: string;            // 1-20000 chars, or 120000 when text attachments are included
-  request_id: string;         // client-generated UUID
+  content: string; // 1-20000 chars, or 120000 when text attachments are included
+  request_id: string; // client-generated UUID
   research_mode?: "fast" | "standard" | "deep";
   analysis_mode?: AnalysisMode;
   run_kind?: RunKind;
+  guru_lens?: string;
   user_url?: string;
   user_urls?: string[];
   attachment_ids?: string[];
@@ -1397,15 +1376,15 @@ export interface NewsEventSelectionRequest {
 
 /** GET /api/sessions query parameters */
 export interface SessionsListParams {
-  page?: number;              // default 1
-  limit?: number;             // default 20, max 50
+  page?: number; // default 1
+  limit?: number; // default 20, max 50
 }
 
 /** POST /api/sessions request body */
 export interface CreateSessionRequest {
-  title?: string;             // auto-generated if omitted
+  title?: string; // auto-generated if omitted
   scope_type: SessionScopeType;
-  default_tickers?: string[];           // required when scope_type is "company"
+  default_tickers?: string[]; // required when scope_type is "company"
   default_document_types?: string[];
 }
 
@@ -1650,15 +1629,159 @@ export interface WebContainerEnv {
   KRW_CHAT_ROUTER_MODE?: "claude" | "1" | "true";
   WEB_COMMIT: string;
   KRW_ONTOLOGY_COMMIT: string;
-  GLOBAL_CONCURRENT_RUN_LIMIT: string;  // "5"
-  CLAUDE_MODEL: string;                 // "sonnet"
-  CLAUDE_AGENT_MAX_TURNS: string;        // "40"
-  AGENT_MAX_TOOL_CALLS: string;          // "18"
-  AGENT_MAX_TOOL_RESULT_CHARS: string;   // "100000"
-  LEASE_TIMEOUT_MINUTES: string;        // "10"
+  GLOBAL_CONCURRENT_RUN_LIMIT: string; // "5"
+  CLAUDE_MODEL: string; // "sonnet"
+  CLAUDE_AGENT_MAX_TURNS: string; // "40"
+  AGENT_MAX_TOOL_CALLS: string; // "18"
+  AGENT_MAX_TOOL_RESULT_CHARS: string; // "100000"
+  RESEARCH_ANSWER_ENVELOPE_ENABLED?: "0" | "1" | "true" | "false";
+  LEASE_TIMEOUT_MINUTES: string; // "10"
 }
 
 /** Environment variables required by optional standalone MCP container */
 export interface McpContainerEnv {
-  KRW_ONTOLOGY_ROOT: string;            // "/data"
+  KRW_ONTOLOGY_ROOT: string; // "/data"
+}
+
+// ============================================================
+// Research Pulse Feed
+// ============================================================
+
+export type PulseItemKind =
+  | "filing"
+  | "checkup"
+  | "question"
+  | "resurface"
+  | "learning";
+
+export type PulseFilter = "all" | PulseItemKind;
+
+export type PulseTrigger = "event" | "schedule" | "state" | "editorial";
+
+export type PulseItemPriority = "urgent" | "high" | "normal" | "low";
+
+export type PulseMutationAction =
+  | "read"
+  | "unread"
+  | "save"
+  | "unsave"
+  | "snooze"
+  | "dismiss";
+
+export type PulseStateMutationAction = PulseMutationAction | "impression";
+
+export interface PulseLinkAction {
+  type: "link";
+  label: string;
+  href: string;
+  analytics_name?: string;
+}
+
+export interface PulseMutationItemAction {
+  type: "mutation";
+  label: string;
+  action: PulseMutationAction;
+  analytics_name?: string;
+}
+
+export type PulseItemAction = PulseLinkAction | PulseMutationItemAction;
+
+export interface PulseItemBase<K extends PulseItemKind> {
+  /** Opaque, server-issued identifier. Clients must not derive source ownership from it. */
+  id: string;
+  kind: K;
+  trigger: PulseTrigger;
+  source_type: K;
+  source_id: string;
+  ticker: string | null;
+  eyebrow: string;
+  title: string;
+  body: string;
+  reason_code: string;
+  reason_label: string;
+  priority: PulseItemPriority;
+  score: number;
+  occurred_at: string;
+  available_at: string;
+  expires_at: string | null;
+  read_at: string | null;
+  saved_at: string | null;
+  snoozed_until: string | null;
+  group_key: string | null;
+  primary_action: PulseItemAction;
+  secondary_actions: PulseItemAction[];
+  metadata: Record<string, string | number | boolean | null>;
+}
+
+export type PulseFilingItem = PulseItemBase<"filing">;
+export type PulseCheckupItem = PulseItemBase<"checkup">;
+export type PulseQuestionItem = PulseItemBase<"question">;
+export type PulseResurfaceItem = PulseItemBase<"resurface">;
+export type PulseLearningItem = PulseItemBase<"learning">;
+
+export type PulseItem =
+  | PulseFilingItem
+  | PulseCheckupItem
+  | PulseQuestionItem
+  | PulseResurfaceItem
+  | PulseLearningItem;
+
+export interface PulseSourceStatus {
+  source: PulseItemKind;
+  status: "ready" | "empty" | "degraded" | "unavailable";
+  item_count: number;
+  latency_ms?: number;
+}
+
+export interface PulseFeedResponse {
+  generated_at: string;
+  timezone: string;
+  date_label: string;
+  filter: PulseFilter;
+  items: PulseItem[];
+  next_cursor: string | null;
+  has_more: boolean;
+  new_item_count: number;
+  source_statuses: PulseSourceStatus[];
+}
+
+export interface PulsePreferences {
+  timezone: string;
+  enabled_kinds: PulseItemKind[];
+  muted_tickers: string[];
+  daily_checkup_enabled: boolean;
+  daily_checkup_at: string;
+  question_cadence: "daily" | "three_weekly" | "off";
+  resurface_cadence: "weekly" | "biweekly" | "off";
+  learning_cadence: "weekly" | "off";
+  learning_enabled: boolean;
+  resurfacing_enabled: boolean;
+  updated_at: string | null;
+}
+
+export interface PulsePreferencesPatch {
+  timezone?: string;
+  enabled_kinds?: PulseItemKind[];
+  muted_tickers?: string[];
+  daily_checkup_enabled?: boolean;
+  daily_checkup_at?: string;
+  question_cadence?: "daily" | "three_weekly" | "off";
+  resurface_cadence?: "weekly" | "biweekly" | "off";
+  learning_cadence?: "weekly" | "off";
+  learning_enabled?: boolean;
+  resurfacing_enabled?: boolean;
+}
+
+export interface PulseItemMutationRequest {
+  action: PulseStateMutationAction;
+  snoozed_until?: string;
+}
+
+export interface PulseItemMutationResponse {
+  item_id: string;
+  action: PulseStateMutationAction;
+  read_at: string | null;
+  saved_at: string | null;
+  snoozed_until: string | null;
+  dismissed_at: string | null;
 }

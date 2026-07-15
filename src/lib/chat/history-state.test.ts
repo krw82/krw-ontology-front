@@ -62,6 +62,12 @@ describe("chat history state", () => {
     );
   });
 
+  it("preserves a specialized run kind after a session is created", () => {
+    expect(
+      buildChatSessionHref("session-1", { runKind: "idea_generation" }),
+    ).toBe("/chat?sessionId=session-1&runKind=idea_generation");
+  });
+
   it("prefers persisted session tickers over URL fallback", () => {
     expect(
       getSessionTickers(

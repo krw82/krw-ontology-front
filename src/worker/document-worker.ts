@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Worker } from "bullmq";
+import { DelayedError, Worker } from "bullmq";
 import {
   DOCUMENT_INGESTION_QUEUE_NAME,
   getRedisQueueUrl,
@@ -7,15 +7,23 @@ import {
   type DocumentIngestionQueuePayload,
 } from "@/lib/document-ingestion/bullmq-queue";
 import {
+  DOCUMENT_ATTACHMENT_EXPIRY_RECONCILE_BATCH_SIZE,
   DOCUMENT_INGESTION_CONCURRENT_LIMIT,
+  DOCUMENT_SOURCE_CLEANUP_BATCH_SIZE,
   DOCUMENT_WORKER_IDLE_LOG_INTERVAL_MS,
   DOCUMENT_WORKER_RECONCILE_INTERVAL_MS,
 } from "@/lib/document-ingestion/config";
 import { claimNextDocumentIngestionJob } from "@/lib/document-ingestion/job-queue";
 import {
+  DocumentIngestionClaimLostError,
+  DocumentIngestionLeaseActiveError,
   runDocumentIngestionJob,
   runQueuedDocumentIngestionJob,
 } from "@/lib/document-ingestion/job-runner";
+import {
+  reconcileDocumentSourceCleanupJobs,
+  reconcileExpiredDocumentAttachmentCleanup,
+} from "@/lib/document-ingestion/source-cleanup";
 
 const WORKER_ID =
   process.env.DOCUMENT_WORKER_ID || `document-worker-${randomUUID()}`;
@@ -54,6 +62,42 @@ async function waitForStopSignal(abortController: AbortController) {
   });
 }
 
+async function runDocumentSourceCleanupLoop(
+  abortController: AbortController,
+): Promise<void> {
+  while (!abortController.signal.aborted) {
+    try {
+      const expired = await reconcileExpiredDocumentAttachmentCleanup(
+        DOCUMENT_ATTACHMENT_EXPIRY_RECONCILE_BATCH_SIZE,
+      );
+      const cleaned = await reconcileDocumentSourceCleanupJobs(
+        WORKER_ID,
+        DOCUMENT_SOURCE_CLEANUP_BATCH_SIZE,
+      );
+      const processed = expired + cleaned;
+      if (processed > 0) {
+        console.info("[document-worker] reconciled source cleanup jobs", {
+          workerId: WORKER_ID,
+          processed,
+          expired,
+          cleaned,
+        });
+      }
+
+      await sleep(
+        processed > 0 ? 0 : DOCUMENT_WORKER_RECONCILE_INTERVAL_MS,
+        abortController.signal,
+      );
+    } catch (error) {
+      console.warn("[document-worker] source cleanup reconciliation failed", {
+        workerId: WORKER_ID,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      await sleep(DOCUMENT_WORKER_RECONCILE_INTERVAL_MS, abortController.signal);
+    }
+  }
+}
+
 async function runBullMqDocumentWorker() {
   const redisUrl = getRedisQueueUrl();
   if (!redisUrl) {
@@ -64,11 +108,27 @@ async function runBullMqDocumentWorker() {
 
   const worker = new Worker<DocumentIngestionQueuePayload>(
     DOCUMENT_INGESTION_QUEUE_NAME,
-    async (job) => {
+    async (job, token) => {
       if (!job.data?.jobId) {
         throw new Error("Document ingestion queue job is missing jobId");
       }
-      await runQueuedDocumentIngestionJob(job.data.jobId, WORKER_ID);
+      try {
+        await runQueuedDocumentIngestionJob(job.data.jobId, WORKER_ID);
+      } catch (error) {
+        if (
+          error instanceof DocumentIngestionLeaseActiveError ||
+          error instanceof DocumentIngestionClaimLostError
+        ) {
+          await job.moveToDelayed(
+            error instanceof DocumentIngestionLeaseActiveError
+              ? error.retryAt
+              : Date.now() + 1_000,
+            token,
+          );
+          throw new DelayedError();
+        }
+        throw error;
+      }
     },
     {
       connection: redisConnectionOptionsFromUrl(redisUrl, {
@@ -106,17 +166,11 @@ async function runBullMqDocumentWorker() {
     concurrency: DOCUMENT_INGESTION_CONCURRENT_LIMIT,
   });
 
-  await new Promise<void>((resolve) => {
-    let resolved = false;
-    const stop = () => {
-      if (resolved) return;
-      resolved = true;
-      resolve();
-    };
-    process.once("SIGINT", stop);
-    process.once("SIGTERM", stop);
-  });
+  const abortController = new AbortController();
+  const cleanupLoop = runDocumentSourceCleanupLoop(abortController);
+  await waitForStopSignal(abortController);
 
+  await cleanupLoop;
   await worker.close();
   console.info("[document-worker] stopped BullMQ backend", {
     workerId: WORKER_ID,
@@ -135,19 +189,24 @@ async function runLegacyDbDocumentWorker() {
   });
 
   void waitForStopSignal(abortController);
+  const cleanupLoop = runDocumentSourceCleanupLoop(abortController);
 
   while (!abortController.signal.aborted) {
     while (
       activeJobs.size < DOCUMENT_INGESTION_CONCURRENT_LIMIT &&
       !abortController.signal.aborted
     ) {
-      const jobId = await claimNextDocumentIngestionJob(WORKER_ID);
-      if (!jobId) break;
+      const claim = await claimNextDocumentIngestionJob(WORKER_ID);
+      if (!claim) break;
 
-      const jobPromise = runDocumentIngestionJob(jobId, WORKER_ID).catch(
+      const jobPromise = runDocumentIngestionJob(
+        claim.jobId,
+        WORKER_ID,
+        claim.claimToken,
+      ).catch(
         (error) => {
           console.warn("[document-worker] job crashed", {
-            jobId,
+            jobId: claim.jobId,
             error:
               error instanceof Error ? error.stack ?? error.message : String(error),
           });
@@ -173,7 +232,7 @@ async function runLegacyDbDocumentWorker() {
     ]);
   }
 
-  await Promise.allSettled(activeJobs);
+  await Promise.allSettled([...activeJobs, cleanupLoop]);
   console.info("[document-worker] stopped legacy DB backend", {
     workerId: WORKER_ID,
   });

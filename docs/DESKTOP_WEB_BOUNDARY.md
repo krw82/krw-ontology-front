@@ -234,7 +234,7 @@ src/lib/desktop/auth.ts
 The auth context is intentionally narrow:
 
 ```ts
-authMethod: "desktop_access_token" | "dev_token"
+authMethod: "desktop_access_token" | "dev_token";
 ```
 
 There is no `"supabase_bearer"` Desktop auth method. If a user has a valid Web
@@ -329,9 +329,35 @@ Example request:
   "tool_call_id": "tool-call-789",
   "tool_name": "krw_ontology_query_context",
   "arguments": {
-    "question": "AAPL demand weakness and China exposure",
-    "tickers": ["AAPL"],
-    "response_detail": "compact"
+    "search_plan": {
+      "question": "AAPL demand weakness and China exposure",
+      "intent": "company_demand_exposure",
+      "clauses": [
+        {
+          "clause_id": "demand_exposure",
+          "retrieval_query": "AAPL China demand weakness affects revenue",
+          "required_concepts": ["China demand weakness", "revenue"],
+          "required_predicates": ["affects"],
+          "required": true,
+          "tickers": ["AAPL"],
+          "directness": "direct_preferred",
+          "object_types": ["ResearchClaim", "EvidenceQuote"],
+          "metrics": [],
+          "metric_dimensions": [],
+          "metric_scope": "company_total",
+          "calculation_window": null
+        }
+      ],
+      "tickers": ["AAPL"],
+      "document_types": [],
+      "periods": [],
+      "universe": null,
+      "comparison_axes": [],
+      "answer_scope": "direct",
+      "uncertainty": "low",
+      "limit_results": 12,
+      "limit_tickers": 20
+    }
   },
   "desktop_context": {
     "analysis_mode": "company"
@@ -346,16 +372,56 @@ Example response:
   "ok": true,
   "tool_call_id": "tool-call-789",
   "tool_name": "krw_ontology_query_context",
-  "result_text": "Compact evidence pack...",
+  "result_text": "contract_version: research-state/v2\n\nanswerability: answerable\n\nevidence_units: 1",
   "result_json": {
-    "summary": "...",
-    "evidence": []
+    "contract_version": "research-state/v2",
+    "plan": {
+      "question": "AAPL demand weakness and China exposure",
+      "intent": "company_demand_exposure",
+      "clauses": [
+        {
+          "clause_id": "demand_exposure",
+          "retrieval_query": "AAPL China demand weakness affects revenue",
+          "required_concepts": ["China demand weakness", "revenue"],
+          "required_predicates": ["affects"],
+          "required": true,
+          "tickers": ["AAPL"],
+          "directness": "direct_preferred",
+          "object_types": ["ResearchClaim", "EvidenceQuote"],
+          "metrics": [],
+          "metric_dimensions": [],
+          "metric_scope": "company_total",
+          "calculation_window": null
+        }
+      ],
+      "tickers": ["AAPL"],
+      "document_types": [],
+      "periods": [],
+      "universe": null,
+      "comparison_axes": [],
+      "answer_scope": "direct",
+      "uncertainty": "low",
+      "limit_results": 12,
+      "limit_tickers": 20
+    },
+    "resolved_scope": { "resolved_tickers": ["AAPL"] },
+    "source_anchors": [],
+    "answerability": { "status": "answerable" },
+    "clause_coverage": [],
+    "evidence_units": [],
+    "computed_values": [],
+    "calculation_coverage": [],
+    "missing_parts": [],
+    "recommended_actions": [],
+    "continuation": null,
+    "warnings": [],
+    "executor": "mcp",
+    "citations": []
   },
   "ontology_release": {
     "release_id": "release-2026-06-10",
-    "api_version": "ontology-search/v1"
+    "api_version": "ontology-search/v2"
   },
-  "citations": [],
   "usage": {
     "remaining_today": 499
   },
@@ -447,7 +513,7 @@ Correct Desktop health dimensions:
   "remote_services": {
     "ontology_search_api_ok": true,
     "active_ontology_release_id": "release-2026-06-10",
-    "ontology_api_version": "ontology-search/v1",
+    "ontology_api_version": "ontology-search/v2",
     "news_discovery_api_ok": true,
     "indicator_snapshot_api_ok": true
   }

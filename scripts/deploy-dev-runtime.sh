@@ -82,6 +82,7 @@ node "$SCRIPT_DIR/materialize-guru-advisor-plugin.mjs" \
 
 require_path "$PLUGIN_PATH/.mcp.json"
 require_path "$PLUGIN_PATH/.claude-plugin/plugin.json"
+require_path "$PLUGIN_PATH/.krw-ontology-contract.json"
 require_path "$GURU_PLUGIN_PATH/.mcp.json"
 require_path "$GURU_PLUGIN_PATH/.claude-plugin/plugin.json"
 

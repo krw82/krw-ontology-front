@@ -33,7 +33,15 @@ import {
   defaultRunKindForAnalysisMode,
   normalizeRunKind,
 } from "@/lib/run-kind";
+import { normalizeGuruLensKey } from "@/lib/guru-lenses";
 import { shouldBlockAnalysisCreditReservation } from "@/lib/billing/credit-policy";
+import { getEntitlementStatus } from "@/lib/billing/entitlement";
+import {
+  getFeatureSplitMode,
+  getMenuFeatureDefinition,
+  isEntitlementFeatureEnabled,
+  type MenuFeatureKey,
+} from "@/lib/billing/feature-access";
 import { parseChatAttachmentContent } from "@/lib/chat/attachments";
 import { createImmediateAssistantResponse } from "@/lib/api/chat/immediate-response";
 import {
@@ -47,7 +55,7 @@ import {
   assessChatPromptSafety,
   blockedChatSafetyMessage,
 } from "@/lib/security/chat-safety";
-import type { ChatRunRequest, ErrorCode } from "@/types/api-contracts";
+import type { ChatRunRequest, ErrorCode, RunKind } from "@/types/api-contracts";
 
 // --- Agent worker readiness cache ---
 
@@ -97,6 +105,45 @@ function getRequestResponseLocale(request: NextRequest): Locale {
   return isLocale(locale) ? locale : DEFAULT_LOCALE;
 }
 
+function menuFeatureForChatRun(params: {
+  runKind: RunKind;
+  scopeType: "global" | "company";
+  defaultTickers: string[];
+}): MenuFeatureKey {
+  if (params.runKind === "guru_advisor") return "guru_advisor";
+  if (params.runKind === "idea_generation") return "stock_discovery";
+  if (params.scopeType === "company" || params.defaultTickers.length > 0) {
+    return "company_search";
+  }
+  return "wide_research";
+}
+
+async function enforceChatFeatureAccess(params: {
+  userId: string;
+  userEmail: string | null;
+  featureKey: MenuFeatureKey;
+  requestId: string;
+}): Promise<Response | null> {
+  if (getFeatureSplitMode() === "off") return null;
+
+  const entitlement = await getEntitlementStatus(
+    params.userId,
+    params.userEmail,
+  );
+  if (isEntitlementFeatureEnabled(entitlement, params.featureKey)) return null;
+
+  const feature = getMenuFeatureDefinition(params.featureKey);
+  const requiredPlan =
+    feature.required_plan.charAt(0).toUpperCase() +
+    feature.required_plan.slice(1);
+  return errorResponse(
+    403,
+    "forbidden",
+    `${feature.label}은 ${requiredPlan} 플랜부터 사용할 수 있습니다.`,
+    params.requestId,
+  );
+}
+
 // --- POST handler ---
 
 export async function POST(request: NextRequest) {
@@ -118,6 +165,27 @@ export async function POST(request: NextRequest) {
       runId: existingRun.id,
       requestId: request_id,
     }), existingRun.session_id);
+  }
+
+  const preliminaryRunKind = normalizeRunKind(
+    body.run_kind ?? defaultRunKindForAnalysisMode(normalizeAnalysisMode(body.analysis_mode)),
+  );
+  let featureChecked = false;
+  if (!body.session_id) {
+    const preliminaryScopeType =
+      body.scope_type ?? (body.default_tickers?.length ? "company" : "global");
+    const featureResponse = await enforceChatFeatureAccess({
+      userId,
+      userEmail,
+      featureKey: menuFeatureForChatRun({
+        runKind: preliminaryRunKind,
+        scopeType: preliminaryScopeType,
+        defaultTickers: body.default_tickers ?? [],
+      }),
+      requestId: request_id,
+    });
+    if (featureResponse) return featureResponse;
+    featureChecked = true;
   }
 
   const clientIp = getClientIp(request.headers);
@@ -162,8 +230,27 @@ export async function POST(request: NextRequest) {
   let effectiveRunKind = normalizeRunKind(
     body.run_kind ?? defaultRunKindForAnalysisMode(effectiveAnalysisMode),
   );
+  const guruLensKey =
+    effectiveRunKind === "guru_advisor"
+      ? normalizeGuruLensKey(body.guru_lens)
+      : null;
   let routingMode: "auto" | "preserve" =
     effectiveRunKind === "company_research" ? "auto" : "preserve";
+
+  if (!featureChecked) {
+    const featureResponse = await enforceChatFeatureAccess({
+      userId,
+      userEmail,
+      featureKey: menuFeatureForChatRun({
+        runKind: effectiveRunKind,
+        scopeType: session.scopeType,
+        defaultTickers: session.defaultTickers,
+      }),
+      requestId: request_id,
+    });
+    if (featureResponse) return featureResponse;
+  }
+
   let selectedNewsEventContext: Record<string, unknown> | null = null;
   const userUrls = body.user_urls?.length
     ? body.user_urls
@@ -198,6 +285,7 @@ export async function POST(request: NextRequest) {
         research_mode: body.research_mode,
         analysis_mode: effectiveAnalysisMode,
         run_kind: effectiveRunKind,
+        guru_lens: guruLensKey,
         routing_mode: routingMode,
         has_user_url: userUrls.length > 0,
         user_url_count: userUrls.length,
@@ -402,6 +490,9 @@ export async function POST(request: NextRequest) {
     }), existingRunAfterMessage.session_id);
   }
 
+  const effectiveGuruLensKey =
+    effectiveRunKind === "guru_advisor" ? guruLensKey : null;
+
   await recordAnalyticsEventFromRequest(request, {
     eventName: "question_submitted",
     userId,
@@ -417,6 +508,7 @@ export async function POST(request: NextRequest) {
       research_mode: body.research_mode,
       analysis_mode: effectiveAnalysisMode,
       run_kind: effectiveRunKind,
+      guru_lens: effectiveGuruLensKey,
       routing_mode: routingMode,
       has_user_url: userUrls.length > 0,
       user_url_count: userUrls.length,
@@ -438,6 +530,7 @@ export async function POST(request: NextRequest) {
     researchMode: body.research_mode,
     analysisMode: effectiveAnalysisMode,
     runKind: effectiveRunKind,
+    guruLensKey: effectiveGuruLensKey,
     responseLocale,
     executorType: "claude_agent",
     selectedNewsEventContext,

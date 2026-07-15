@@ -8,7 +8,12 @@ import { AnimatePresence, motion } from "motion/react";
 import { KrwBrand } from "@/components/KrwBrand";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import UsageStatus from "@/components/UsageStatus";
-import { getPathLocale, localizedPath } from "@/i18n/routing";
+import {
+  localeSwitchHref,
+  localizedPath,
+  queryLocalizedPath,
+  resolveRouteLocale,
+} from "@/i18n/routing";
 import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
 import { dispatchOpenChatSidebar } from "@/lib/chat/sidebar-events";
 import { createClient } from "@/lib/supabase/client";
@@ -110,7 +115,13 @@ export default function TopNav({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const currentLocale = getPathLocale(pathname) ?? "ko";
+  const currentLocale = resolveRouteLocale(
+    pathname,
+    searchParams.get("locale"),
+  );
+  const localizedBrandHref = brandHref.startsWith("/")
+    ? localeSwitchHref(currentLocale, brandHref)
+    : brandHref;
   const [userProfile, setUserProfile] = useState<TopNavUserProfile | null>(() =>
     initialUserProfile ?? null,
   );
@@ -141,14 +152,19 @@ export default function TopNav({
     active: boolean;
     badge?: string;
   }> = [
+    ...(process.env.NEXT_PUBLIC_PULSE_FEED_ENABLED === "1" || process.env.NODE_ENV !== "production" ? [{
+      href: queryLocalizedPath(currentLocale, "/pulse"),
+      label: currentLocale === "ko" ? "오늘" : "Today",
+      active: pathname.startsWith("/pulse"),
+    }] : []),
     {
-      href: "/discover",
-      label: currentLocale === "ko" ? "종목 발굴기" : "Stock discovery",
+      href: queryLocalizedPath(currentLocale, "/discover"),
+      label: currentLocale === "ko" ? "조건으로 기업 검색" : "Company search by criteria",
       active: pathname.startsWith("/discover"),
     },
     {
-      href: "/guru",
-      label: currentLocale === "ko" ? "구루 상담소" : "Guru office",
+      href: queryLocalizedPath(currentLocale, "/guru"),
+      label: currentLocale === "ko" ? "관점별 분석" : "Perspective analysis",
       active: pathname.startsWith("/guru"),
     },
     {
@@ -157,12 +173,17 @@ export default function TopNav({
       active: pathname.includes("/companies"),
     },
     {
-      href: "/watchlist",
+      href: queryLocalizedPath(currentLocale, "/watchlist"),
       label: currentLocale === "ko" ? "리서치 노트북" : "Research Notebook",
       active: pathname.startsWith("/watchlist"),
     },
     {
-      href: "/institutional-holdings",
+      href: queryLocalizedPath(currentLocale, "/filings"),
+      label: currentLocale === "ko" ? "공시 알림" : "Filing alerts",
+      active: pathname.startsWith("/filings"),
+    },
+    {
+      href: queryLocalizedPath(currentLocale, "/institutional-holdings"),
       label: currentLocale === "ko" ? "13F 보유" : "13F Holdings",
       active: pathname.startsWith("/institutional-holdings"),
     },
@@ -376,7 +397,7 @@ export default function TopNav({
             </div>
           )}
           <KrwBrand
-            href={brandHref}
+            href={localizedBrandHref}
             compact
             ariaLabel={brandAriaLabel}
           />
@@ -386,11 +407,21 @@ export default function TopNav({
                 key={link.href}
                 href={link.href}
                 data-onboarding-target={
-                  link.href === "/discover"
+                  link.href.startsWith("/pulse")
+                    ? "research-pulse-nav"
+                    : link.href.startsWith("/discover")
                     ? "stock-discovery-nav"
-                    : link.href === "/watchlist"
-                      ? "research-notebook-nav"
-                      : undefined
+                    : link.href.startsWith("/guru")
+                      ? "guru-advisor-nav"
+                      : link.href.startsWith("/watchlist")
+                        ? "research-notebook-nav"
+                        : link.href.startsWith("/filings")
+                          ? "filing-alerts-nav"
+                        : link.href.startsWith("/institutional-holdings")
+                        ? "institutional-holdings-nav"
+                        : link.href.includes("/companies")
+                          ? "company-search-nav"
+                          : undefined
                 }
                 className={[
                   "rounded-[8px] px-sm py-xs text-[13px] font-extrabold leading-5 transition-colors",
@@ -477,6 +508,35 @@ export default function TopNav({
                       onClick={() => setAccountMenuOpen(false)}
                     >
                       <UsageStatus entitlement={entitlement} variant="menu" />
+                    </Link>
+                    {process.env.NEXT_PUBLIC_PULSE_FEED_ENABLED === "1" || process.env.NODE_ENV !== "production" ? (
+                      <Link
+                        href={queryLocalizedPath(currentLocale, "/pulse")}
+                        className="mt-xs flex w-full items-center justify-between rounded-[8px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-surface-soft hover:text-primary"
+                        role="menuitem"
+                        onClick={() => setAccountMenuOpen(false)}
+                      >
+                        <span>{currentLocale === "ko" ? "오늘의 Pulse" : "Today's Pulse"}</span>
+                        <span aria-hidden="true" className="material-symbols-outlined text-[18px]">dynamic_feed</span>
+                      </Link>
+                    ) : null}
+                    <Link
+                      href="/filings"
+                      className="mt-xs flex w-full items-center justify-between rounded-[8px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-surface-soft hover:text-primary"
+                      role="menuitem"
+                      onClick={() => setAccountMenuOpen(false)}
+                    >
+                      <span>{currentLocale === "ko" ? "새 공시" : "New filings"}</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[18px]">notifications</span>
+                    </Link>
+                    <Link
+                      href="/settings/notifications"
+                      className="mt-xs flex w-full items-center justify-between rounded-[8px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-surface-soft hover:text-primary"
+                      role="menuitem"
+                      onClick={() => setAccountMenuOpen(false)}
+                    >
+                      <span>{currentLocale === "ko" ? "공시 알림 설정" : "Filing alerts"}</span>
+                      <span aria-hidden="true" className="material-symbols-outlined text-[18px]">settings</span>
                     </Link>
                     <button
                       type="button"

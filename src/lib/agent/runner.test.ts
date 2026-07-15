@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import type {
   AnalysisMode,
   MCPToolName,
@@ -30,12 +32,34 @@ vi.mock("server-only", () => ({}));
 vi.mock("@anthropic-ai/claude-agent-sdk", () => sdkMocks);
 vi.mock("@/lib/ontology/catalog", () => ({
   getIndexedCompanies: vi.fn().mockResolvedValue([]),
+  buildGuruLightCompanyContext: vi.fn(
+    (company: { ticker: string; name: string }) => ({
+      format: "krw-guru-light-company-context/v1",
+      ticker: company.ticker,
+      companyName: company.name,
+      businessDescription: company.name,
+      primaryActivities: [],
+      productsOrSegments: [],
+      contextAnchors: [
+        {
+          anchorId: "business_description",
+          kind: "business_description",
+          text: company.name,
+        },
+      ],
+      filingAvailability: {
+        hasCurrentFiling: false,
+        hasAnnualBaseline: false,
+      },
+    }),
+  ),
 }));
 vi.mock("./mcp-client", () => {
   const tools = [
     "krw_ontology_query_context",
     "krw_ontology_query",
     "krw_ontology_trace",
+    "krw_ontology_verify_evidence",
     "krw_ontology_chain",
     "krw_ontology_compare",
     "krw_ontology_retrieve",
@@ -71,6 +95,7 @@ vi.mock("./mcp-client", () => {
     "krw_guru_eval_questions",
     "krw_guru_company_brief",
     "krw_guru_company_pack",
+    "krw_guru_review_company_evidence",
   ];
   return {
     KRW_ONTOLOGY_MCP_TOOLS: tools,
@@ -79,13 +104,13 @@ vi.mock("./mcp-client", () => {
     CHART_MCP_TOOLS: chartTools,
     GURU_MCP_TOOLS: guruTools,
     KRW_ONTOLOGY_SDK_ALLOWED_TOOLS: tools.map(
-      (toolName) => `mcp__plugin_krw-ontology_krw-ontology__${toolName}`,
+      (toolName) => `mcp__krw-ontology__${toolName}`,
     ),
     KRW_ONTOLOGY_DIRECT_SDK_ALLOWED_TOOLS: tools.map(
       (toolName) => `mcp__krw-ontology__${toolName}`,
     ),
     STOCK_NEWS_SDK_ALLOWED_TOOLS: stockNewsTools.map(
-      (toolName) => `mcp__plugin_krw-ontology_stock-news__${toolName}`,
+      (toolName) => `mcp__stock-news__${toolName}`,
     ),
     YAHOO_FINANCE_SDK_ALLOWED_TOOLS: yahooFinanceTools.map(
       (toolName) => `mcp__yahoo_finance__${toolName}`,
@@ -102,22 +127,17 @@ vi.mock("./mcp-client", () => {
     getStockNewsSdkAllowedTools: () =>
       process.env.STOCK_NEWS_ENABLED === "1" &&
       process.env.STOCK_NEWS_FORCE_DISABLED !== "1"
-        ? stockNewsTools.map(
-            (toolName) => `mcp__plugin_krw-ontology_stock-news__${toolName}`,
-          )
+        ? stockNewsTools.map((toolName) => `mcp__stock-news__${toolName}`)
         : [],
     isKrwOntologySdkTool: (toolName: string) =>
-      toolName.startsWith("mcp__plugin_krw-ontology_krw-ontology__krw_ontology_") ||
       toolName.startsWith("mcp__krw-ontology__krw_ontology_"),
     isStockNewsEnabled: () =>
       process.env.STOCK_NEWS_ENABLED === "1" &&
       process.env.STOCK_NEWS_FORCE_DISABLED !== "1",
     isStockNewsSdkTool: (toolName: string) =>
-      toolName.startsWith("mcp__plugin_krw-ontology_stock-news__"),
+      toolName.startsWith("mcp__stock-news__"),
     isGuruAdvisorSdkTool: (toolName: string) =>
-      toolName.startsWith(
-        "mcp__plugin_krw-guru-advisor_krw-guru-advisor__",
-      ),
+      toolName.startsWith("mcp__plugin_krw-guru-advisor_krw-guru-advisor__"),
     isYahooFinanceSdkTool: (toolName: string) =>
       toolName.startsWith("mcp__yahoo_finance__"),
     isChartSdkTool: (toolName: string) =>
@@ -150,6 +170,20 @@ function makeSdkQuery(messages: unknown[]) {
     supportedModels: vi.fn().mockResolvedValue(["claude-sonnet-4-6"]),
     supportedCommands: vi.fn().mockResolvedValue([]),
     mcpServerStatus: vi.fn().mockResolvedValue([]),
+    getContextUsage: vi.fn().mockResolvedValue({
+      categories: [],
+      totalTokens: 0,
+      maxTokens: 0,
+      rawMaxTokens: 0,
+      percentage: 0,
+      gridRows: [],
+      model: "test-model",
+      memoryFiles: [],
+      mcpTools: [],
+      agents: [],
+      isAutoCompactEnabled: false,
+      apiUsage: null,
+    }),
   };
   return sdkQuery;
 }
@@ -166,18 +200,39 @@ function makeSdkQueryFromGenerator(generator: () => AsyncGenerator<unknown>) {
     supportedModels: vi.fn().mockResolvedValue(["claude-sonnet-4-6"]),
     supportedCommands: vi.fn().mockResolvedValue([]),
     mcpServerStatus: vi.fn().mockResolvedValue([]),
+    getContextUsage: vi.fn().mockResolvedValue({
+      categories: [],
+      totalTokens: 0,
+      maxTokens: 0,
+      rawMaxTokens: 0,
+      percentage: 0,
+      gridRows: [],
+      model: "test-model",
+      memoryFiles: [],
+      mcpTools: [],
+      agents: [],
+      isAutoCompactEnabled: false,
+      apiUsage: null,
+    }),
   };
   return sdkQuery;
 }
 
 function sdkToolName(toolName: MCPToolName): string {
   if (isStockNewsToolName(toolName)) return stockNewsSdkToolName(toolName);
-  if (isYahooFinanceToolName(toolName)) return yahooFinanceSdkToolName(toolName);
-  return `mcp__plugin_krw-ontology_krw-ontology__${toolName}`;
+  if (isYahooFinanceToolName(toolName))
+    return yahooFinanceSdkToolName(toolName);
+  return `mcp__krw-ontology__${toolName}`;
+}
+
+function toolsForSystemInit(): string[] {
+  return getAllowedMcpToolsForResearchMode("deep").map((toolName) =>
+    sdkToolName(toolName),
+  );
 }
 
 function stockNewsSdkToolName(toolName: StockNewsMCPToolName): string {
-  return `mcp__plugin_krw-ontology_stock-news__${toolName}`;
+  return `mcp__stock-news__${toolName}`;
 }
 
 function yahooFinanceSdkToolName(toolName: YahooFinanceMCPToolName): string {
@@ -192,15 +247,38 @@ function directOntologySdkToolName(toolName: string): string {
   return `mcp__krw-ontology__${toolName}`;
 }
 
+function ontologySearchPlanInput(options: {
+  question: string;
+  ticker?: string;
+}): Record<string, unknown> {
+  const ticker = options.ticker?.toUpperCase();
+  return {
+    search_plan: {
+      question: options.question,
+      intent: "filing_research",
+      clauses: [
+        {
+          clause_id: "filing_evidence",
+          retrieval_query: ticker
+            ? `${ticker} filing evidence`
+            : "covered company filing evidence",
+          required_concepts: ["filing evidence"],
+        },
+      ],
+      tickers: ticker ? [ticker] : [],
+      universe: ticker ? null : "covered",
+      limit_results: 12,
+      limit_tickers: 20,
+    },
+  };
+}
+
 function hookDecision(value: unknown): string | undefined {
   if (!value || typeof value !== "object") return undefined;
   const output = value as {
     continue?: boolean;
     hookSpecificOutput?: { permissionDecision?: string };
   };
-  if (output.continue === true && !output.hookSpecificOutput?.permissionDecision) {
-    return "allow";
-  }
   return output.hookSpecificOutput?.permissionDecision;
 }
 
@@ -212,7 +290,9 @@ function hookUpdatedInput(value: unknown): Record<string, unknown> | undefined {
   return output.hookSpecificOutput?.updatedInput;
 }
 
-function isStockNewsToolName(toolName: MCPToolName): toolName is StockNewsMCPToolName {
+function isStockNewsToolName(
+  toolName: MCPToolName,
+): toolName is StockNewsMCPToolName {
   return [
     "route_news_question",
     "resolve_news_entities",
@@ -240,6 +320,14 @@ function toolUseMessageWithInput(
   index: number,
   input: Record<string, unknown>,
 ) {
+  return sdkToolUseMessage(sdkToolName(toolName), index, input);
+}
+
+function sdkToolUseMessage(
+  toolName: string,
+  index: number,
+  input: Record<string, unknown> = {},
+) {
   return {
     type: "assistant",
     message: {
@@ -247,7 +335,7 @@ function toolUseMessageWithInput(
         {
           type: "tool_use",
           id: `tool-${index}`,
-          name: sdkToolName(toolName),
+          name: toolName,
           input,
         },
       ],
@@ -256,6 +344,13 @@ function toolUseMessageWithInput(
 }
 
 function toolResultMessage(index: number) {
+  return sdkToolResultMessage(index);
+}
+
+function sdkToolResultMessage(
+  index: number,
+  content: unknown = { ok: true, index },
+) {
   return {
     type: "user",
     message: {
@@ -263,11 +358,98 @@ function toolResultMessage(index: number) {
         {
           type: "tool_result",
           tool_use_id: `tool-${index}`,
-          content: JSON.stringify({ ok: true, index }),
+          content: JSON.stringify(content),
         },
       ],
     },
   };
+}
+
+function verifiedCompanyEvidencePack(params: {
+  ticker: string;
+  questionIds?: string[];
+  excerpt?: string;
+  briefHash?: string;
+}) {
+  const questionIds = params.questionIds ?? ["q_business_quality"];
+  const payload: Record<string, unknown> = {
+    format: "krw-verified-company-evidence/v1",
+    release_id: "test-release",
+    ticker: params.ticker,
+    ...(params.briefHash ? { brief_hash: params.briefHash } : {}),
+    current_driver: {
+      ticker: params.ticker,
+      period: "CY2026Q1",
+      document_type: "10-Q",
+      role: "current_driver",
+    },
+    annual_baseline: {
+      ticker: params.ticker,
+      period: "CY2025",
+      document_type: "10-K",
+      role: "annual_baseline",
+    },
+    evidence_by_question: questionIds.map((questionId) => ({
+      question_id: questionId,
+      evidence: [
+        {
+          source_object_id: `claim:${params.ticker}:${questionId}`,
+          object_type: "ResearchClaim",
+          trace_status: "traceable_direct",
+          evidence_grade: "direct",
+          usable_for_strong_claim: true,
+          usable_for_interpretation: true,
+          document: {
+            ticker: params.ticker,
+            document_type: "10-Q",
+            period: "CY2026Q1",
+            section: "MD&A",
+            anchor_roles: ["current_driver"],
+          },
+          claim_ids: [`claim:${params.ticker}:${questionId}`],
+          quote_ids: [`quote:${params.ticker}:${questionId}`],
+          span_ids: [`span:${params.ticker}:${questionId}`],
+          verified_excerpt:
+            params.excerpt ?? "Services improve recurring economics.",
+          metric_lineage: null,
+        },
+      ],
+      verified_count: 1,
+      answerability: "verified",
+    })),
+    rejected_refs: [],
+    verification_summary: {
+      question_count: questionIds.length,
+      requested_object_count: questionIds.length,
+      verified_object_count: questionIds.length,
+      strong_claim_evidence_count: questionIds.length,
+      interpretation_evidence_count: questionIds.length,
+      all_questions_have_verified_evidence: true,
+    },
+    usage_policy: {
+      strong_company_claims: "Use only verified entries.",
+    },
+  };
+  payload.pack_hash = createHash("sha256")
+    .update(canonicalTestJson(payload))
+    .digest("hex");
+  return payload;
+}
+
+function canonicalTestJson(value: unknown): string {
+  return JSON.stringify(sortTestJsonValue(value));
+}
+
+function sortTestJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortTestJsonValue);
+  if (!value || typeof value !== "object") return value;
+  const record = value as Record<string, unknown>;
+  return Object.fromEntries(
+    Object.keys(record)
+      .filter((key) => key !== "pack_hash")
+      .sort()
+      .map((key) => [key, sortTestJsonValue(record[key])]),
+  );
 }
 
 async function probeToolPermission(params: {
@@ -283,35 +465,36 @@ async function probeToolPermission(params: {
   result: Awaited<ReturnType<typeof runAgent>>;
 }> {
   let permission: Awaited<ReturnType<typeof canUseTool>> | null = null;
-  sdkMocks.query.mockImplementationOnce((call: {
-    options: {
-      canUseTool?: typeof canUseTool;
-    };
-  }) =>
-    makeSdkQueryFromGenerator(async function* () {
-      for (const [index, toolName] of params.existingTools.entries()) {
-        yield toolUseMessage(toolName, index);
-        yield toolResultMessage(index);
-      }
-
-      permission = await call.options.canUseTool?.(
-        sdkToolName(params.attemptedTool),
-        params.input ?? {},
-      ) ?? {
-        behavior: "deny",
-        message: "Permission guard was not installed.",
+  sdkMocks.query.mockImplementationOnce(
+    (call: {
+      options: {
+        canUseTool?: typeof canUseTool;
       };
+    }) =>
+      makeSdkQueryFromGenerator(async function* () {
+        for (const [index, toolName] of params.existingTools.entries()) {
+          yield toolUseMessage(toolName, index);
+          yield toolResultMessage(index);
+        }
 
-      yield {
-        type: "result",
-        subtype: "success",
-        result: "테스트 답변입니다.",
-        usage: {
-          input_tokens: 10,
-          output_tokens: 12,
-        },
-      };
-    }),
+        permission = (await call.options.canUseTool?.(
+          sdkToolName(params.attemptedTool),
+          params.input ?? {},
+        )) ?? {
+          behavior: "deny",
+          message: "Permission guard was not installed.",
+        };
+
+        yield {
+          type: "result",
+          subtype: "success",
+          result: "테스트 답변입니다.",
+          usage: {
+            input_tokens: 10,
+            output_tokens: 12,
+          },
+        };
+      }),
   );
 
   const result = await runAgent(
@@ -339,6 +522,25 @@ async function probeToolPermission(params: {
 describe("agent runner research budget recovery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // A research request now owns exactly one SDK execution. Clear any
+    // intentionally unused legacy mock responses so they cannot leak into a
+    // subsequent one-run test.
+    sdkMocks.query.mockReset();
+    sdkMocks.getSessionInfo.mockReset();
+    rmSync("/tmp/krw-ontology-plugin", { recursive: true, force: true });
+    mkdirSync("/tmp/krw-ontology-plugin", { recursive: true });
+    writeFileSync(
+      "/tmp/krw-ontology-plugin/.mcp.json",
+      JSON.stringify({
+        mcpServers: {
+          "krw-ontology": {
+            type: "http",
+            url: "http://127.0.0.1:8765/mcp",
+            alwaysLoad: true,
+          },
+        },
+      }),
+    );
     sdkMocks.getSessionInfo.mockResolvedValue(undefined);
     delete process.env.STOCK_NEWS_FORCE_DISABLED;
     delete process.env.STOCK_NEWS_ENABLED;
@@ -346,12 +548,241 @@ describe("agent runner research budget recovery", () => {
     delete process.env.YAHOO_FINANCE_MAX_CALLS;
     delete process.env.KRW_CHARTS_ENABLED;
     delete process.env.ZAI_API_KEY;
+    delete process.env.CLAUDE_SDK_CONTEXT_USAGE_SAMPLE_RATE;
+    delete process.env.CLAUDE_SDK_DIAGNOSTIC_TIMEOUT_MS;
+    delete process.env.GURU_AGENT_GENERATED_BRIEF_ENABLED;
+    delete process.env.RESEARCH_ANSWER_ENVELOPE_ENABLED;
   });
 
   it("keeps the deep mode total tool budget unchanged", () => {
     expect(getResearchModeToolBudget("deep")).toEqual({
       maxToolCalls: 32,
     });
+  });
+
+  it("captures system init and samples context only after the SDK result", async () => {
+    vi.stubEnv("CLAUDE_SDK_CONTEXT_USAGE_SAMPLE_RATE", "1");
+    const sdkQuery = makeSdkQuery([
+      {
+        type: "system",
+        subtype: "init",
+        session_id: "sdk-session-1",
+        uuid: "init-1",
+        model: "deepseek-flash-v4",
+        claude_code_version: "2.1.0",
+        cwd: "/tmp",
+        tools: toolsForSystemInit(),
+        mcp_servers: [{ name: "krw-ontology", status: "connected" }],
+        permissionMode: "dontAsk",
+        slash_commands: ["krw-ontology:krw-ontology-research"],
+        apiKeySource: "none",
+        output_style: "default",
+        skills: ["krw-ontology:krw-ontology-research"],
+        plugins: [{ name: "krw-ontology", path: "/private/plugin" }],
+      },
+      {
+        type: "result",
+        subtype: "success",
+        result: "진단과 무관하게 완료된 답변입니다.",
+        usage: { input_tokens: 10, output_tokens: 12 },
+      },
+    ]);
+    sdkMocks.query.mockReturnValueOnce(sdkQuery);
+    const diagnostics: Array<Record<string, unknown>> = [];
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111121",
+        userMessage: "AAPL을 분석해줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        onSdkDiagnostics: async (value) => {
+          diagnostics.push(value as unknown as Record<string, unknown>);
+        },
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    await vi.waitFor(() => {
+      expect(diagnostics).toHaveLength(1);
+    });
+    expect(sdkQuery.initializationResult).not.toHaveBeenCalled();
+    expect(sdkQuery.mcpServerStatus).toHaveBeenCalledOnce();
+    expect(sdkQuery.getContextUsage).toHaveBeenCalledOnce();
+    expect(diagnostics[0]).toMatchObject({
+      observedModels: ["deepseek-flash-v4"],
+      contextUsageSampled: true,
+      systemInit: {
+        sessionId: "sdk-session-1",
+        model: "deepseek-flash-v4",
+        claudeCodeVersion: "2.1.0",
+        mcpServers: [{ name: "krw-ontology", status: "connected" }],
+        plugins: ["krw-ontology"],
+      },
+      contextUsage: {
+        totalTokens: 0,
+        model: "test-model",
+      },
+    });
+  });
+
+  it("bounds post-result SDK diagnostics without delaying the final result", async () => {
+    vi.stubEnv("CLAUDE_SDK_CONTEXT_USAGE_SAMPLE_RATE", "1");
+    vi.stubEnv("CLAUDE_SDK_DIAGNOSTIC_TIMEOUT_MS", "10");
+    const sdkQuery = makeSdkQuery([
+      {
+        type: "system",
+        subtype: "init",
+        session_id: "sdk-session-timeout",
+        uuid: "init-timeout",
+        model: "deepseek-flash-v4",
+        claude_code_version: "2.1.0",
+        cwd: "/tmp",
+        tools: toolsForSystemInit(),
+        mcp_servers: [{ name: "krw-ontology", status: "connected" }],
+        permissionMode: "dontAsk",
+        slash_commands: [],
+        apiKeySource: "none",
+        output_style: "default",
+        skills: [],
+        plugins: [{ name: "krw-ontology", path: "/private/plugin" }],
+      },
+      {
+        type: "result",
+        subtype: "success",
+        result: "진단 대기 없이 완료되는 답변입니다.",
+        usage: { input_tokens: 10, output_tokens: 12 },
+      },
+    ]);
+    sdkQuery.mcpServerStatus.mockImplementation(
+      () => new Promise<never>(() => undefined),
+    );
+    sdkQuery.getContextUsage.mockImplementation(
+      () => new Promise<never>(() => undefined),
+    );
+    sdkMocks.query.mockReturnValueOnce(sdkQuery);
+    let resolveDiagnostics: ((value: Record<string, unknown>) => void) | null =
+      null;
+    let diagnosticsDelivered = false;
+    const diagnosticsResult = new Promise<Record<string, unknown>>(
+      (resolve) => {
+        resolveDiagnostics = resolve;
+      },
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111124",
+        userMessage: "AAPL을 분석해줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        onSdkDiagnostics: async (value) => {
+          diagnosticsDelivered = true;
+          resolveDiagnostics?.(value as unknown as Record<string, unknown>);
+        },
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(diagnosticsDelivered).toBe(false);
+    await expect(diagnosticsResult).resolves.toMatchObject({
+      contextUsageSampled: true,
+      mcpStatusError: "mcpServerStatus timed out after 10ms",
+      contextUsageError: "getContextUsage timed out after 10ms",
+    });
+  });
+
+  it("bounds a stalled diagnostics persistence callback", async () => {
+    vi.stubEnv("CLAUDE_SDK_CONTEXT_USAGE_SAMPLE_RATE", "0");
+    vi.stubEnv("CLAUDE_SDK_DIAGNOSTIC_TIMEOUT_MS", "10");
+    const sdkQuery = makeSdkQuery([
+      {
+        type: "result",
+        subtype: "success",
+        result: "진단 저장과 무관하게 완료되는 답변입니다.",
+        usage: { input_tokens: 10, output_tokens: 12 },
+      },
+    ]);
+    sdkMocks.query.mockReturnValueOnce(sdkQuery);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    try {
+      const result = await runAgent(
+        {
+          sessionId: "11111111-1111-4111-8111-111111111125",
+          userMessage: "AAPL을 분석해줘",
+          scopeType: "company",
+          defaultTickers: ["AAPL"],
+          defaultDocumentTypes: [],
+          researchMode: "deep",
+          onSdkDiagnostics: () => new Promise<never>(() => undefined),
+        },
+        { write: vi.fn().mockResolvedValue(undefined) },
+      );
+
+      expect(result.status).toBe("completed");
+      await vi.waitFor(() => {
+        expect(warn).toHaveBeenCalledWith(
+          "[claude-agent-sdk:diagnostics-write-failed]",
+          { error: "onSdkDiagnostics timed out after 10ms" },
+        );
+      });
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("fails closed when system init does not expose the exact 13-tool set", async () => {
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        {
+          type: "system",
+          subtype: "init",
+          session_id: "sdk-session-stale",
+          uuid: "init-stale",
+          model: "deepseek-flash-v4",
+          claude_code_version: "2.1.0",
+          cwd: "/tmp",
+          tools: [sdkToolName("krw_ontology_query_context")],
+          mcp_servers: [{ name: "krw-ontology", status: "connected" }],
+          permissionMode: "dontAsk",
+          slash_commands: [],
+          apiKeySource: "none",
+          output_style: "default",
+          skills: [],
+          plugins: [{ name: "krw-ontology", path: "/private/plugin" }],
+        },
+        {
+          type: "result",
+          subtype: "success",
+          result: "이 답변은 사용되면 안 됩니다.",
+          usage: { input_tokens: 10, output_tokens: 12 },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111123",
+        userMessage: "AAPL을 분석해줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("failed");
+    expect(result.internalErrorMessage).toContain(
+      "MCP tool parity mismatch in system/init",
+    );
   });
 
   it("uses the English KRW ontology research skill when responseLocale is English", async () => {
@@ -393,22 +824,26 @@ describe("agent runner research budget recovery", () => {
     expect(call.options.systemPrompt.append).toContain(
       "do not answer in Korean",
     );
+    expect(call.prompt).toContain("Research mode: deep.");
+    expect(call.options.allowedTools).toContain(
+      sdkToolName("krw_ontology_retrieve"),
+    );
   });
 
-  it("keeps retrieve available in the current deep web-chat tool set", () => {
+  it("keeps retrieve and an evidence-first response-detail policy in the deep tool set", () => {
     expect(getAllowedMcpToolsForResearchMode("deep")).toContain(
       "krw_ontology_retrieve",
     );
     expect(buildResearchModePrompt("deep")).toContain(
-      "Never request response_detail: full",
+      "Request response_detail: full only when",
     );
   });
 
-  it("forbids full response detail in every research mode prompt", () => {
+  it("keeps the same response-detail guidance in every research mode prompt", () => {
     const modes: ResearchMode[] = ["fast", "standard", "deep"];
     for (const mode of modes) {
       expect(buildResearchModePrompt(mode)).toContain(
-        "Never request response_detail: full",
+        "Request response_detail: full only when",
       );
     }
   });
@@ -470,20 +905,467 @@ describe("agent runner research budget recovery", () => {
     expect(call.options.allowedTools).not.toContain(
       "mcp__krw_presentation__create_chart_v1",
     );
-    expect(call.options.mcpServers).toBeUndefined();
+    expect(call.options.strictMcpConfig).toBe(true);
+    expect(call.options.mcpServers).toEqual({
+      "krw-ontology": {
+        type: "http",
+        url: "http://127.0.0.1:8765/mcp",
+        alwaysLoad: true,
+      },
+    });
     expect(call.options.systemPrompt.append).toContain(
       "Do not perform web searches",
     );
-    expect(call.options.systemPrompt.append).not.toContain("Inline chart policy");
+    expect(call.options.systemPrompt.append).not.toContain(
+      "Inline chart policy",
+    );
   });
 
-  it("runs Guru Advisor with the guru plugin plus a scoped Agent company evidence subagent", async () => {
+  it("continues with ticker scope when the web catalog lookup times out", async () => {
+    vi.mocked(getIndexedCompanies).mockRejectedValueOnce(
+      new Error("canceling statement due to statement timeout"),
+    );
     sdkMocks.query.mockReturnValueOnce(
       makeSdkQuery([
         {
           type: "result",
           subtype: "success",
+          result: "티커 범위를 유지한 답변입니다.",
+          usage: { input_tokens: 10, output_tokens: 12 },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111119",
+        userMessage: "AAPL 사업의 질을 봐줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(result.acc.fullText).toContain("티커 범위를 유지한 답변");
+    expect(
+      sdkMocks.query.mock.calls[0]?.[0].options.systemPrompt.append,
+    ).toContain("The user is researching specific companies: AAPL");
+  });
+
+  it("runs Guru Advisor with the guru plugin plus a scoped Agent company evidence subagent", async () => {
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        sdkToolUseMessage(
+          guruSdkToolName("krw_guru_review_company_evidence"),
+          1,
+          { ticker: "AAPL", company_payload_json: "{}" },
+        ),
+        sdkToolResultMessage(1, { ok: true, reviewed: true }),
+        {
+          type: "result",
+          subtype: "success",
           result: "자, 이 질문은 먼저 사업의 질을 봐야 합니다.",
+          usage: {
+            input_tokens: 10,
+            output_tokens: 12,
+          },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "이 기업을 오래 보유해도 될까?",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        runKind: "guru_advisor",
+        guruLensKey: "buffett",
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
+    expect(result.status).toBe("completed");
+    const call = sdkMocks.query.mock.calls[0]?.[0];
+    expect(call.options.plugins).toEqual([
+      { type: "local", path: "/tmp/krw-guru-advisor-plugin" },
+    ]);
+    expect(call.options.allowedTools).toEqual(call.options.tools);
+    expect(call.options.tools).not.toContain(guruSdkToolName("krw_guru_trace"));
+    expect(call.options.tools).toEqual(
+      expect.arrayContaining([
+        "Agent",
+        "Read",
+        guruSdkToolName("krw_guru_query_context"),
+        guruSdkToolName("krw_guru_company_brief"),
+        guruSdkToolName("krw_guru_review_company_evidence"),
+      ]),
+    );
+    expect(call.options.tools).not.toContain(
+      guruSdkToolName("krw_guru_company_pack"),
+    );
+    expect(call.options.tools).not.toContain(guruSdkToolName("krw_guru_trace"));
+    expect(call.options.tools).not.toContain(guruSdkToolName("krw_guru_chain"));
+    expect(call.options.tools).not.toContain(
+      guruSdkToolName("krw_guru_evidence"),
+    );
+    expect(call.options.tools).not.toContain("Task");
+    expect(call.options.disallowedTools).toEqual(
+      expect.arrayContaining([
+        guruSdkToolName("krw_guru_company_pack"),
+        guruSdkToolName("krw_guru_trace"),
+        guruSdkToolName("krw_guru_chain"),
+        guruSdkToolName("krw_guru_evidence"),
+      ]),
+    );
+    expect(call.options.tools).not.toContain(
+      sdkToolName("krw_ontology_query_context"),
+    );
+    expect(call.options.tools).not.toContain(
+      directOntologySdkToolName("krw_ontology_query_context"),
+    );
+    expect(call.options.mcpServers).toBeUndefined();
+    expect(call.options.strictMcpConfig).toBeUndefined();
+    expect(call.options.hooks?.PreToolUse?.[0]?.hooks?.[0]).toEqual(
+      expect.any(Function),
+    );
+    expect(call.options.skills).toEqual(
+      expect.arrayContaining(["krw-guru-advisor:krw-guru-buffett-advisor"]),
+    );
+    expect(call.options.skills).not.toContain(
+      "krw-ontology:krw-ontology-research",
+    );
+    expect(call.options.agents).toHaveProperty("company_evidence_researcher");
+    expect(
+      call.options.agents.company_evidence_researcher.skills,
+    ).toBeUndefined();
+    expect(call.options.agents.company_evidence_researcher.prompt).toContain(
+      "sealed krw-guru-investigation-brief/v1",
+    );
+    expect(
+      call.options.agents.company_evidence_researcher.prompt,
+    ).not.toContain("dynamic_question_plan");
+    expect(call.options.agents.company_evidence_researcher.prompt).toContain(
+      "complete SearchPlan v2",
+    );
+    expect(call.options.agents.company_evidence_researcher.prompt).toContain(
+      "only {search_plan}",
+    );
+    expect(call.options.agents.company_evidence_researcher.prompt).toContain(
+      "ResearchState v2 answerability",
+    );
+    expect(call.options.agents.company_evidence_researcher.prompt).toContain(
+      "Never call verify_evidence, company_context, catalog, topic_map",
+    );
+    expect(call.options.agents.company_evidence_researcher.maxTurns).toBe(18);
+    expect(call.options.agents.company_evidence_researcher.prompt).toContain(
+      "Do not create, verify, or return an evidence pack",
+    );
+    expect(call.options.agents.company_evidence_researcher.mcpServers).toEqual([
+      expect.objectContaining({
+        "krw-ontology": expect.objectContaining({
+          type: "http",
+          url: "http://127.0.0.1:8765/mcp",
+          alwaysLoad: true,
+        }),
+      }),
+    ]);
+    expect(call.options.agents.company_evidence_researcher.tools).toEqual(
+      expect.arrayContaining([
+        "mcp__krw-ontology__krw_ontology_query_context",
+        "mcp__krw-ontology__krw_ontology_query",
+        "mcp__krw-ontology__krw_ontology_trace",
+      ]),
+    );
+    expect(call.options.agents.company_evidence_researcher.tools).not.toContain(
+      "mcp__krw-ontology__krw_ontology_verify_evidence",
+    );
+    expect(
+      call.options.agents.company_evidence_researcher.disallowedTools,
+    ).toBeUndefined();
+    expect(call.options.agentProgressSummaries).toBe(false);
+    expect(call.options.forwardSubagentText).toBe(false);
+    expect(call.options.systemPrompt.append).toContain(
+      "company_evidence_researcher subagent",
+    );
+    expect(call.prompt).toContain("/krw-guru-advisor:krw-guru-buffett-advisor");
+    expect(call.prompt).not.toContain("[구루 렌즈:");
+    expect(call.prompt).toContain("company_evidence_researcher");
+  });
+
+  it("uses the default sealed brief workflow and validates matching evidence analysis", async () => {
+    const decisions: Record<
+      string,
+      Awaited<ReturnType<typeof canUseTool>>
+    > = {};
+    const briefHash = "a".repeat(64);
+    const brief = {
+      format: "krw-guru-investigation-brief/v1",
+      brief_hash: briefHash,
+      research_pack_id: "guru-pack-aapl",
+      author_key: "buffett",
+      ticker: "AAPL",
+      company_context_hash: "b".repeat(64),
+      questions: [
+        {
+          question_id: "q_services_durability",
+          decision_role: "main_tension",
+          question:
+            "Does Services stand independently from device replacement demand?",
+        },
+      ],
+    };
+    const researchState = {
+      contract_version: "research-state/v2",
+      evidence_units: [
+        {
+          evidence_id: "ev-services",
+          object_id: "claim:AAPL:q_services_durability",
+          object_type: "ResearchClaim",
+          ticker: "AAPL",
+          period: "CY2026Q1",
+          document_type: "10-Q",
+          title: "Services demand",
+          summary: "Services activity remains linked to the installed device base.",
+          directness: "direct",
+          evidence_grade: "strong",
+          source: {
+            object_ids: ["claim:AAPL:q_services_durability"],
+          },
+        },
+      ],
+    };
+    const analysis = {
+      assessments: [
+        {
+          question_id: "q_services_durability",
+          evidence_object_ids: ["claim:AAPL:q_services_durability"],
+          verdict: "mixed",
+          reasoning:
+            "The cited evidence supports recurring activity but does not establish independence.",
+        },
+      ],
+      overall_judgment: "Services independence remains only partly verified.",
+    };
+    const guruQueryContext = {
+      research_pack: {
+        format: "krw-guru-research-pack/v1",
+        selected_lenses: [{ reviewed_id: "guru:buffett:services" }],
+      },
+    };
+    const investigationDraft = {
+      question:
+        "Does Services stand independently from device replacement demand?",
+      guru_principle_ids: ["guru:buffett:services"],
+      company_context_anchor_ids: ["segment_services"],
+      hypothesis: "Services becomes more independent.",
+      counter_hypothesis: "Services remains device-dependent.",
+      evidence_needed: ["segment disclosure"],
+      strengthens_if: "Filings show standalone demand.",
+      weakens_if: "Filings tie demand to devices.",
+      why_material: "The durable earnings judgment depends on it.",
+    };
+
+    sdkMocks.query.mockImplementationOnce(
+      (call: { options: { canUseTool?: typeof canUseTool } }) =>
+        makeSdkQueryFromGenerator(async function* () {
+          const guard = call.options.canUseTool;
+          if (!guard) throw new Error("missing Guru permission guard");
+          yield sdkToolUseMessage(
+            guruSdkToolName("krw_guru_query_context"),
+            0,
+            { author_keys: ["buffett"], ticker: "AAPL" },
+          );
+          yield sdkToolResultMessage(0, guruQueryContext);
+          decisions.companyBrief = await guard(
+            guruSdkToolName("krw_guru_company_brief"),
+            {
+              ticker: "AAPL",
+              investigation_questions: [investigationDraft],
+            },
+          );
+          decisions.invalidCompanyBrief = await guard(
+            guruSdkToolName("krw_guru_company_brief"),
+            {
+              ticker: "AAPL",
+              investigation_questions: [investigationDraft, investigationDraft],
+            },
+          );
+          yield sdkToolUseMessage(
+            guruSdkToolName("krw_guru_company_brief"),
+            1,
+            {
+              ticker: "AAPL",
+              investigation_questions: [investigationDraft],
+            },
+          );
+          yield sdkToolResultMessage(1, { investigation_brief: brief });
+
+          decisions.agent = await guard("Agent", {
+            description: "Retrieve sealed filing evidence",
+            subagent_type: "company_evidence_researcher",
+            prompt: `Use this exact sealed brief: ${JSON.stringify(brief)}`,
+          });
+          const subagentGuard = guard as unknown as (
+            toolName: string,
+            input: Record<string, unknown>,
+            permissionContext: {
+              agentID: string;
+              agentType: string;
+            },
+          ) => Promise<Awaited<ReturnType<typeof canUseTool>>>;
+          decisions.verify = await subagentGuard(
+            directOntologySdkToolName("krw_ontology_verify_evidence"),
+            {
+              ticker: "AAPL",
+              brief_hash: briefHash,
+              questions: [
+                {
+                  question_id: "q_services_durability",
+                  object_ids: ["claim:AAPL:q_services_durability"],
+                },
+              ],
+            },
+            {
+              agentID: "company_evidence_researcher:run",
+              agentType: "company_evidence_researcher",
+            },
+          );
+          decisions.filingContext = await subagentGuard(
+            directOntologySdkToolName("krw_ontology_query_context"),
+            ontologySearchPlanInput({
+              question: "AAPL Services durability",
+              ticker: "AAPL",
+            }),
+            {
+              agentID: "company_evidence_researcher:run",
+              agentType: "company_evidence_researcher",
+            },
+          );
+          yield sdkToolUseMessage(
+            directOntologySdkToolName("krw_ontology_query_context"),
+            2,
+            ontologySearchPlanInput({
+              question: "AAPL Services durability",
+              ticker: "AAPL",
+            }),
+          );
+          yield sdkToolResultMessage(2, researchState);
+
+          decisions.review = await guard(
+            guruSdkToolName("krw_guru_review_company_evidence"),
+            {
+              question: "Assess AAPL Services durability.",
+              agent_analysis: analysis,
+            },
+          );
+          yield sdkToolUseMessage(
+            guruSdkToolName("krw_guru_review_company_evidence"),
+            3,
+            {
+              question: "Assess AAPL Services durability.",
+              agent_analysis: analysis,
+            },
+          );
+          yield sdkToolResultMessage(3, {
+            validated_evidence_analysis: {
+              format: "krw-guru-validated-evidence-analysis/v1",
+              ticker: "AAPL",
+              brief_hash: briefHash,
+              agent_analysis: analysis,
+            },
+          });
+          yield {
+            type: "result",
+            subtype: "success",
+            result:
+              "서비스의 내구성은 개선 신호가 있지만 기기 생태계 의존은 더 확인해야 합니다.",
+            usage: { input_tokens: 10, output_tokens: 12 },
+          };
+        }),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111120",
+        userMessage: "버핏 관점에서 AAPL을 봐줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        runKind: "guru_advisor",
+        guruLensKey: "buffett",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(result.acc.fullText).toBe(
+      "서비스의 내구성은 개선 신호가 있지만 기기 생태계 의존은 더 확인해야 합니다.",
+    );
+    expect(decisions.companyBrief.behavior).toBe("allow");
+    if (decisions.companyBrief.behavior !== "allow") {
+      throw new Error("company brief permission was unexpectedly denied");
+    }
+    expect(decisions.companyBrief.updatedInput).toMatchObject({
+      guru_query_context: guruQueryContext,
+    });
+    expect(decisions.invalidCompanyBrief.behavior).toBe("allow");
+    expect(decisions.agent.behavior).toBe("allow");
+    expect(decisions.verify.behavior).toBe("deny");
+    expect(decisions.filingContext.behavior).toBe("allow");
+    expect(decisions.review.behavior).toBe("allow");
+    if (decisions.review.behavior === "allow") {
+      expect(decisions.review.updatedInput).toMatchObject({
+        ticker: "AAPL",
+        author_keys: ["buffett"],
+        company_research_context: {
+          format: "krw-guru-company-research-context/v1",
+          ticker: "AAPL",
+          brief_hash: briefHash,
+          question_ids: ["q_services_durability"],
+          source_object_ids: ["claim:AAPL:q_services_durability"],
+        },
+        investigation_brief: brief,
+        agent_analysis: analysis,
+      });
+    }
+    const call = sdkMocks.query.mock.calls[0]?.[0];
+    expect(call.options.agents.company_evidence_researcher.prompt).toContain(
+      "one philosophy-shaped key question",
+    );
+    expect(call.options.agents.company_evidence_researcher.prompt).toContain(
+      "one to three complementary atomic filing tests",
+    );
+    expect(call.options.agents.company_evidence_researcher.prompt).toContain(
+      "exact plural field metrics",
+    );
+    expect(call.options.agents.company_evidence_researcher.prompt).toContain(
+      "at most eight unique object ids",
+    );
+    expect(
+      call.options.agents.company_evidence_researcher.prompt,
+    ).not.toContain("dynamic_question_plan");
+    expect(call.options.systemPrompt.append).toContain(
+      "investigation_questions",
+    );
+    expect(call.options.systemPrompt.append).not.toContain("0-3 exact figures");
+  });
+
+  it("renders a bounded company answer when a company-scoped Guru run skips research", async () => {
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        {
+          type: "result",
+          subtype: "success",
+          result: "회사 리서치 내용을 바탕으로 바로 이어간 상담 답변입니다.",
           usage: {
             input_tokens: 10,
             output_tokens: 12,
@@ -508,167 +1390,594 @@ describe("agent runner research budget recovery", () => {
     );
 
     expect(result.status).toBe("completed");
-    const call = sdkMocks.query.mock.calls[0]?.[0];
-    expect(call.options.plugins).toEqual([
-      { type: "local", path: "/tmp/krw-guru-advisor-plugin" },
-    ]);
-    expect(call.options.tools).toBeUndefined();
-    expect(call.options.allowedTools).toEqual(
-      expect.arrayContaining([
-        "Agent",
-        "Read",
-        guruSdkToolName("krw_guru_query_context"),
-        guruSdkToolName("krw_guru_company_brief"),
-        guruSdkToolName("krw_guru_company_pack"),
-        directOntologySdkToolName("krw_ontology_query_context"),
+    expect(sdkMocks.query).toHaveBeenCalledTimes(1);
+    expect(result.acc.fullText).toContain("AAPL");
+    expect(result.acc.fullText).toContain("일반 시장 분위기");
+    expect(result.acc.fullText).not.toContain(
+      "회사 리서치 내용을 바탕으로 바로 이어간 상담 답변입니다.",
+    );
+    expect(result.acc.inputTokens).toBe(10);
+    expect(result.acc.outputTokens).toBe(12);
+  });
+
+  it("renders an evidence-limited company answer when a sealed question has no verified pack", async () => {
+    const brief = {
+      format: "krw-guru-investigation-brief/v1",
+      brief_hash: "a".repeat(64),
+      ticker: "AAPL",
+      questions: [
+        {
+          question_id: "q_durability",
+          question: "Can Services stand independently from device demand?",
+        },
+      ],
+    };
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        sdkToolUseMessage(guruSdkToolName("krw_guru_company_brief"), 1, {
+          ticker: "AAPL",
+        }),
+        sdkToolResultMessage(1, { investigation_brief: brief }),
+        {
+          type: "result",
+          subtype: "success",
+          result: "일반론을 AAPL의 결론처럼 말한 답변입니다.",
+          usage: { input_tokens: 10, output_tokens: 12 },
+        },
       ]),
     );
-    expect(call.options.allowedTools).not.toContain("Task");
-    expect(call.options.disallowedTools).toBeUndefined();
-    expect(call.options.allowedTools).not.toContain(
-      sdkToolName("krw_ontology_query_context"),
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111118",
+        userMessage: "AAPL은 지금 공격할 때인가요?",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        runKind: "guru_advisor",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
     );
-    expect(call.options.hooks?.PreToolUse?.[0]?.hooks?.[0]).toEqual(
-      expect.any(Function),
+
+    expect(result.status).toBe("completed");
+    expect(result.acc.fullText).toContain("AAPL의 핵심 쟁점은 분명하지만");
+    expect(result.acc.fullText).not.toContain(
+      "일반론을 AAPL의 결론처럼 말한 답변입니다.",
     );
-    expect(call.options.skills).toEqual(
-      expect.arrayContaining([
-        "krw-guru-advisor:krw-guru-buffett-advisor",
-      ]),
+  });
+
+  it("returns material Guru Advisor figures from the single SDK run", async () => {
+    sdkMocks.query
+      .mockReturnValueOnce(
+        makeSdkQuery([
+          sdkToolUseMessage(
+            guruSdkToolName("krw_guru_review_company_evidence"),
+            1,
+            { ticker: "AAPL", company_payload_json: '{"ticker":"AAPL"}' },
+          ),
+          sdkToolResultMessage(1, { ok: true, reviewed: true }),
+          {
+            type: "result",
+            subtype: "success",
+            result:
+              "서비스 15.4%, 22.3%, 23.3%, 마진 75.8%, 제품 37.1%, ROIC 58.6%, 영업이익률 32.4%, 아이폰 52%입니다.",
+            usage: {
+              input_tokens: 10,
+              output_tokens: 12,
+            },
+          },
+        ]),
+      )
+      .mockReturnValueOnce(
+        makeSdkQuery([
+          {
+            type: "result",
+            subtype: "success",
+            result:
+              "애플 서비스는 좋아지고 있지만, 버핏식으로 보면 아이폰이라는 관문에 아직 많이 기대고 있습니다. 서비스는 더 반복적이고 높은 마진의 장사로 회사를 좋게 만들지만, 이 장사가 독립적인 해자인지는 아이폰 사용자 기반이 흔들릴 때 드러납니다.\n\n이 판단이 바뀌려면 서비스 성장이 아이폰 교체 주기와 덜 묶여도 계속 강해야 합니다.",
+            usage: {
+              input_tokens: 20,
+              output_tokens: 24,
+            },
+          },
+        ]),
+      );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "버핏 관점에서 AAPL을 봐줘",
+        scopeType: "global",
+        defaultTickers: [],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        runKind: "guru_advisor",
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
     );
-    expect(call.options.skills).not.toContain(
-      "krw-ontology:krw-ontology-research",
+
+    expect(result.status).toBe("completed");
+    expect(sdkMocks.query).toHaveBeenCalledTimes(1);
+    expect(result.acc.fullText).toContain("15.4%");
+    expect(result.acc.inputTokens).toBe(10);
+    expect(result.acc.outputTokens).toBe(12);
+  });
+
+  it("keeps a material Guru Advisor number without a second SDK run", async () => {
+    sdkMocks.query
+      .mockReturnValueOnce(
+        makeSdkQuery([
+          {
+            type: "result",
+            subtype: "success",
+            result:
+              "현금창출력은 15% 개선됐지만 내구성은 아직 더 확인해야 합니다.",
+            usage: { input_tokens: 10, output_tokens: 12 },
+          },
+        ]),
+      )
+      .mockReturnValueOnce(
+        makeSdkQuery([
+          {
+            type: "result",
+            subtype: "success",
+            result:
+              "현금창출력은 개선됐지만 그 흐름만으로 사업의 내구성이 입증되지는 않습니다.",
+            usage: { input_tokens: 10, output_tokens: 12 },
+          },
+        ]),
+      );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111121",
+        userMessage: "AAPL 현금창출력을 봐줘",
+        scopeType: "global",
+        defaultTickers: [],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        runKind: "guru_advisor",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
     );
-    expect(call.options.agents).toHaveProperty("company_evidence_researcher");
-    expect(call.options.agents.company_evidence_researcher.skills).toBeUndefined();
-    expect(call.options.agents.company_evidence_researcher.mcpServers).toBeUndefined();
-    expect(call.options.agents.company_evidence_researcher.tools).toEqual(
-      expect.arrayContaining([
-        "mcp__krw-ontology__krw_ontology_query_context",
-      ]),
+
+    expect(result.status).toBe("completed");
+    expect(sdkMocks.query).toHaveBeenCalledTimes(1);
+    expect(result.acc.fullText).toContain("15%");
+  });
+
+  it("does not fail or restart when a Guru Advisor answer includes a quantity", async () => {
+    sdkMocks.query
+      .mockReturnValueOnce(
+        makeSdkQuery([
+          {
+            type: "result",
+            subtype: "success",
+            result: "마진은 15% 개선됐습니다.",
+            usage: { input_tokens: 10, output_tokens: 12 },
+          },
+        ]),
+      )
+      .mockReturnValueOnce(
+        makeSdkQuery([
+          {
+            type: "result",
+            subtype: "success",
+            result: "마진은 두 배로 좋아졌습니다.",
+            usage: { input_tokens: 10, output_tokens: 12 },
+          },
+        ]),
+      );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111122",
+        userMessage: "AAPL 마진을 봐줘",
+        scopeType: "global",
+        defaultTickers: [],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        runKind: "guru_advisor",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
     );
-    expect(call.options.agents.company_evidence_researcher.tools).not.toContain(
-      sdkToolName("krw_ontology_query_context"),
+
+    expect(result.status).toBe("completed");
+    expect(sdkMocks.query).toHaveBeenCalledTimes(1);
+    expect(result.acc.fullText).toContain("15%");
+  });
+
+  it("does not start a second Guru Advisor run for stylistic deviations", async () => {
+    sdkMocks.query
+      .mockReturnValueOnce(
+        makeSdkQuery([
+          sdkToolUseMessage(
+            guruSdkToolName("krw_guru_review_company_evidence"),
+            1,
+            { ticker: "AAPL", company_payload_json: '{"ticker":"AAPL"}' },
+          ),
+          sdkToolResultMessage(1, { ok: true, reviewed: true }),
+          {
+            type: "result",
+            subtype: "success",
+            result:
+              "Now I have all the materials. Let me compose the final answer.\n\n**내가 좋아하는 점**\n애플 서비스는 좋아지고 있습니다.\n\n**내가 불편한 점**\n아이폰 의존은 남아 있습니다.",
+            usage: {
+              input_tokens: 10,
+              output_tokens: 12,
+            },
+          },
+        ]),
+      )
+      .mockReturnValueOnce(
+        makeSdkQuery([
+          {
+            type: "result",
+            subtype: "success",
+            result:
+              "애플 서비스는 좋아지고 있지만 아이폰이라는 관문에 아직 기대고 있습니다.\n\n### 이어서 볼 질문\n- 서비스가 아이폰 의존 없이 커지는지 확인해줘.\n- 규제 리스크가 서비스 마진을 흔드는 조건을 봐줘.\n- 판단이 바뀌는 조건을 정리해줘.",
+            usage: {
+              input_tokens: 20,
+              output_tokens: 24,
+            },
+          },
+        ]),
+      );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "버핏 관점에서 AAPL을 봐줘",
+        scopeType: "global",
+        defaultTickers: [],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        runKind: "guru_advisor",
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
     );
-    expect(
-      call.options.agents.company_evidence_researcher.disallowedTools,
-    ).toBeUndefined();
-    expect(call.options.agentProgressSummaries).toBe(false);
-    expect(call.options.forwardSubagentText).toBe(false);
-    expect(call.options.systemPrompt.append).toContain(
-      "company_evidence_researcher subagent",
+
+    expect(result.status).toBe("completed");
+    expect(sdkMocks.query).toHaveBeenCalledTimes(1);
+    expect(result.acc.fullText).toContain("Now I have");
+    expect(result.acc.fullText).toContain("**내가 좋아하는 점**\n");
+  });
+
+  it("does not start a second Guru Advisor run for first-person wording", async () => {
+    sdkMocks.query
+      .mockReturnValueOnce(
+        makeSdkQuery([
+          sdkToolUseMessage(
+            guruSdkToolName("krw_guru_review_company_evidence"),
+            1,
+            { ticker: "AAPL", company_payload_json: '{"ticker":"AAPL"}' },
+          ),
+          sdkToolResultMessage(1, { ok: true, reviewed: true }),
+          {
+            type: "result",
+            subtype: "success",
+            result:
+              "서비스 반복매출은 강해지고 있습니다. 이건 내가 좋아하는 장사의 핵심 특성입니다.\n\n### 이어서 볼 질문\n1. 서비스 의존도를 봐줘.\n2. 아이폰 의존을 봐줘.\n3. 판단 조건을 봐줘.",
+            usage: {
+              input_tokens: 10,
+              output_tokens: 12,
+            },
+          },
+        ]),
+      )
+      .mockReturnValueOnce(
+        makeSdkQuery([
+          {
+            type: "result",
+            subtype: "success",
+            result:
+              "서비스 반복매출은 애플의 사업을 더 견고하게 만들지만, 아직 아이폰 생태계라는 관문 위에서 움직입니다.\n\n### 이어서 볼 질문\n- 서비스가 아이폰 의존 없이 커지는지 확인해줘.\n- 규제 리스크가 서비스 마진을 흔드는 조건을 봐줘.\n- 판단이 바뀌는 조건을 정리해줘.",
+            usage: {
+              input_tokens: 20,
+              output_tokens: 24,
+            },
+          },
+        ]),
+      );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111112",
+        userMessage: "버핏 관점에서 AAPL을 봐줘",
+        scopeType: "global",
+        defaultTickers: [],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        runKind: "guru_advisor",
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
     );
-    expect(call.prompt).toContain("/krw-guru-advisor:krw-guru-buffett-advisor");
-    expect(call.prompt).toContain("company_evidence_researcher");
+
+    expect(result.status).toBe("completed");
+    expect(sdkMocks.query).toHaveBeenCalledTimes(1);
+    expect(result.acc.fullText).toContain("내가 좋아하는");
+    expect(result.acc.fullText).toContain("### 이어서 볼 질문");
+  });
+
+  it("does not start a second Guru Advisor run for Markdown emphasis", async () => {
+    sdkMocks.query
+      .mockReturnValueOnce(
+        makeSdkQuery([
+          sdkToolUseMessage(
+            guruSdkToolName("krw_guru_review_company_evidence"),
+            1,
+            { ticker: "AAPL", company_payload_json: '{"ticker":"AAPL"}' },
+          ),
+          sdkToolResultMessage(1, { ok: true, reviewed: true }),
+          {
+            type: "result",
+            subtype: "success",
+            result:
+              "**서비스 매출은 사업 구조를 바꾸고 있습니다.** 다만 아이폰 의존은 남아 있습니다.\n\n### 이어서 볼 질문\n1. 서비스 의존도를 봐줘.\n2. 아이폰 의존을 봐줘.\n3. 판단 조건을 봐줘.",
+            usage: {
+              input_tokens: 10,
+              output_tokens: 12,
+            },
+          },
+        ]),
+      )
+      .mockReturnValueOnce(
+        makeSdkQuery([
+          {
+            type: "result",
+            subtype: "success",
+            result:
+              "서비스 매출은 애플의 사업 구조를 바꾸고 있지만, 아이폰 의존은 아직 남아 있습니다.\n\n### 이어서 볼 질문\n- 서비스가 아이폰 의존 없이 커지는지 확인해줘.\n- 규제 리스크가 서비스 마진을 흔드는 조건을 봐줘.\n- 판단이 바뀌는 조건을 정리해줘.",
+            usage: {
+              input_tokens: 20,
+              output_tokens: 24,
+            },
+          },
+        ]),
+      );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111113",
+        userMessage: "버핏 관점에서 AAPL을 봐줘",
+        scopeType: "global",
+        defaultTickers: [],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        runKind: "guru_advisor",
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(sdkMocks.query).toHaveBeenCalledTimes(1);
+    expect(result.acc.fullText).toContain("**서비스 매출은");
+    expect(result.acc.fullText).toContain("### 이어서 볼 질문");
   });
 
   it("separates Guru main and company evidence subagent tool permissions", async () => {
+    process.env.GURU_AGENT_GENERATED_BRIEF_ENABLED = "0";
     const decisions: Record<string, unknown> = {};
+    const verifiedPack = verifiedCompanyEvidencePack({ ticker: "AAPL" });
 
-    sdkMocks.query.mockImplementationOnce((call: {
-      options: {
-        hooks?: {
-          PreToolUse?: Array<{
-            hooks: Array<
-              (
-                input: Record<string, unknown>,
-                toolUseID: string,
-                options: { signal: AbortSignal },
-              ) => Promise<unknown>
-            >;
-          }>;
+    sdkMocks.query.mockImplementationOnce(
+      (call: {
+        options: {
+          hooks?: {
+            PreToolUse?: Array<{
+              hooks: Array<
+                (
+                  input: Record<string, unknown>,
+                  toolUseID: string,
+                  options: { signal: AbortSignal },
+                ) => Promise<unknown>
+              >;
+            }>;
+          };
         };
-      };
-    }) =>
-      makeSdkQueryFromGenerator(async function* () {
-        const hook = call.options.hooks?.PreToolUse?.[0]?.hooks?.[0];
-        if (!hook) throw new Error("missing Guru Advisor PreToolUse hook");
-        const invokeHook = (
-          toolName: string,
-          toolInput: Record<string, unknown>,
-          extra: Record<string, unknown> = {},
-        ) =>
-          hook(
-            {
-              hook_event_name: "PreToolUse",
-              session_id: "11111111-1111-4111-8111-111111111111",
-              transcript_path: "/tmp/transcript.jsonl",
-              cwd: "/tmp",
-              tool_use_id: "permission-tool",
-              tool_name: toolName,
-              tool_input: toolInput,
-              ...extra,
-            },
-            "permission-tool",
-            { signal: new AbortController().signal },
-          );
+      }) =>
+        makeSdkQueryFromGenerator(async function* () {
+          const hook = call.options.hooks?.PreToolUse?.[0]?.hooks?.[0];
+          if (!hook) throw new Error("missing Guru Advisor PreToolUse hook");
+          const invokeHook = (
+            toolName: string,
+            toolInput: Record<string, unknown>,
+            extra: Record<string, unknown> = {},
+          ) =>
+            hook(
+              {
+                hook_event_name: "PreToolUse",
+                session_id: "11111111-1111-4111-8111-111111111111",
+                transcript_path: "/tmp/transcript.jsonl",
+                cwd: "/tmp",
+                tool_use_id: "permission-tool",
+                tool_name: toolName,
+                tool_input: toolInput,
+                ...extra,
+              },
+              "permission-tool",
+              { signal: new AbortController().signal },
+            );
 
-        decisions.mainAgent = await invokeHook("Agent", {
-          description: "Fetch company filing evidence",
-          prompt: "Fetch AAPL company evidence.",
-          subagent_type: "company_evidence_researcher",
-        });
-        decisions.wrongAgent = await invokeHook("Agent", {
-          description: "Fetch other evidence",
-          prompt: "Fetch other evidence.",
-          subagent_type: "other_agent",
-        });
-        decisions.mainDirectCompanyTool = await invokeHook(
-          directOntologySdkToolName("krw_ontology_query_context"),
-          { question: "AAPL filing evidence" },
-        );
-        decisions.mainGuruTool = await invokeHook(
-          guruSdkToolName("krw_guru_query_context"),
-          { question: "AAPL business quality" },
-        );
-        decisions.mainSafeRead = await invokeHook("Read", {
-          file_path:
-            "/tmp/krw-guru-advisor-plugin/references/answer-style-adapters.md",
-        });
-        decisions.mainUnsafeRead = await invokeHook("Read", {
-          file_path: "~/krw-ontology-front/.env",
-        });
-        decisions.mainBash = await invokeHook("Bash", {
-          command: "env",
-        });
-        decisions.subagentCompanyTool = await invokeHook(
-          directOntologySdkToolName("krw_ontology_query_context"),
-          { question: "AAPL filing evidence" },
-          {
-            agent_id: "agent-run-123",
-            agent_type: "company_evidence_researcher",
-          },
-        );
-        decisions.subagentGuruTool = await invokeHook(
-          guruSdkToolName("krw_guru_query_context"),
-          { question: "AAPL business quality" },
-          {
-            agent_id: "agent-run-123",
-            agent_type: "company_evidence_researcher",
-          },
-        );
-        decisions.subagentRecursiveAgent = await invokeHook(
-          "Agent",
-          {
-            description: "Spawn",
-            prompt: "Spawn again",
+          decisions.mainAgentBeforeBrief = await invokeHook("Agent", {
+            description: "Fetch company filing evidence",
+            prompt:
+              "Fetch AAPL company evidence with dynamic_question_plan and return evidence_by_question.",
             subagent_type: "company_evidence_researcher",
-          },
-          {
-            agent_id: "agent-run-123",
-            agent_type: "company_evidence_researcher",
-          },
-        );
-        yield {
-          type: "result",
-          subtype: "success",
-          result: "구루 답변입니다.",
-          usage: {
-            input_tokens: 10,
-            output_tokens: 12,
-          },
-        };
-      }),
+          });
+          decisions.mainBackgroundAgent = await invokeHook("Agent", {
+            description: "Fetch company filing evidence",
+            prompt:
+              "Fetch AAPL company evidence with dynamic_question_plan and return evidence_by_question.",
+            subagent_type: "company_evidence_researcher",
+            run_in_background: true,
+          });
+          decisions.wrongAgent = await invokeHook("Agent", {
+            description: "Fetch other evidence",
+            prompt: "Fetch other evidence.",
+            subagent_type: "other_agent",
+          });
+          decisions.mainDirectCompanyTool = await invokeHook(
+            directOntologySdkToolName("krw_ontology_query_context"),
+            { question: "AAPL filing evidence" },
+          );
+          decisions.mainLensSelection = await invokeHook(
+            guruSdkToolName("krw_guru_select_lenses"),
+            { question: "AAPL business quality" },
+          );
+          decisions.mainGuruTool = await invokeHook(
+            guruSdkToolName("krw_guru_query_context"),
+            { question: "AAPL business quality" },
+          );
+          decisions.mainCompanyBrief = await invokeHook(
+            guruSdkToolName("krw_guru_company_brief"),
+            { ticker: "AAPL", question: "AAPL business quality" },
+          );
+          decisions.mainDuplicateCompanyBrief = await invokeHook(
+            guruSdkToolName("krw_guru_company_brief"),
+            { ticker: "AAPL", question: "AAPL business quality" },
+          );
+          decisions.mainTraceBeforeReview = await invokeHook(
+            guruSdkToolName("krw_guru_trace"),
+            { reviewed_id: "buffett:test" },
+          );
+          decisions.mainAgent = await invokeHook("Agent", {
+            description: "Fetch company filing evidence",
+            prompt:
+              "Fetch AAPL company evidence with dynamic_question_plan and return evidence_by_question.",
+            subagent_type: "company_evidence_researcher",
+          });
+          yield sdkToolUseMessage(
+            directOntologySdkToolName("krw_ontology_verify_evidence"),
+            90,
+            {
+              ticker: "AAPL",
+              questions: [
+                {
+                  question_id: "q_business_quality",
+                  object_ids: ["claim:AAPL:q_business_quality"],
+                },
+              ],
+            },
+          );
+          yield sdkToolResultMessage(90, {
+            result: JSON.stringify(verifiedPack),
+          });
+          decisions.mainGuruAfterEvidence = await invokeHook(
+            guruSdkToolName("krw_guru_query_context"),
+            { question: "AAPL business quality" },
+          );
+          decisions.mainReviewAfterEvidence = await invokeHook(
+            guruSdkToolName("krw_guru_review_company_evidence"),
+            {
+              ticker: "AAPL",
+              question: "AAPL business quality",
+              company_payload: verifiedPack,
+            },
+          );
+          decisions.mainTraceAfterReview = await invokeHook(
+            guruSdkToolName("krw_guru_trace"),
+            { reviewed_id: "buffett:test" },
+          );
+          decisions.mainCompanyPack = await invokeHook(
+            guruSdkToolName("krw_guru_company_pack"),
+            { ticker: "AAPL", question: "AAPL business quality" },
+          );
+          decisions.mainSafeRead = await invokeHook("Read", {
+            file_path:
+              "/tmp/krw-guru-advisor-plugin/references/answer-style-adapters.md",
+          });
+          decisions.mainUnsafeRead = await invokeHook("Read", {
+            file_path: "~/krw-ontology-front/.env",
+          });
+          decisions.mainBash = await invokeHook("Bash", {
+            command: "env",
+          });
+          decisions.subagentCompanyTool = await invokeHook(
+            directOntologySdkToolName("krw_ontology_query_context"),
+            ontologySearchPlanInput({
+              question: "AAPL filing evidence",
+              ticker: "AAPL",
+            }),
+            {
+              agent_id: "agent-run-123",
+              agent_type: "company_evidence_researcher",
+            },
+          );
+          for (let attempt = 2; attempt <= 4; attempt += 1) {
+            decisions[`subagentCompanyTool${attempt}`] = await invokeHook(
+              directOntologySdkToolName("krw_ontology_query_context"),
+              ontologySearchPlanInput({
+                question: `AAPL filing evidence attempt ${attempt}`,
+                ticker: "AAPL",
+              }),
+              {
+                agent_id: "agent-run-123",
+                agent_type: "company_evidence_researcher",
+              },
+            );
+          }
+          decisions.subagentVerifyLarge = await invokeHook(
+            directOntologySdkToolName("krw_ontology_verify_evidence"),
+            {
+              ticker: "AAPL",
+              questions: [
+                {
+                  question_id: "q_business_quality",
+                  object_ids: ["a", "b", "b", "c", "d", "e"],
+                },
+              ],
+            },
+            {
+              agent_id: "agent-run-123",
+              agent_type: "company_evidence_researcher",
+            },
+          );
+          decisions.subagentGuruTool = await invokeHook(
+            guruSdkToolName("krw_guru_query_context"),
+            { question: "AAPL business quality" },
+            {
+              agent_id: "agent-run-123",
+              agent_type: "company_evidence_researcher",
+            },
+          );
+          decisions.subagentRecursiveAgent = await invokeHook(
+            "Agent",
+            {
+              description: "Spawn",
+              prompt: "Spawn again",
+              subagent_type: "company_evidence_researcher",
+            },
+            {
+              agent_id: "agent-run-123",
+              agent_type: "company_evidence_researcher",
+            },
+          );
+          yield sdkToolUseMessage(
+            guruSdkToolName("krw_guru_review_company_evidence"),
+            1,
+            { ticker: "AAPL", company_payload: verifiedPack },
+          );
+          yield sdkToolResultMessage(1, { ok: true, reviewed: true });
+          yield {
+            type: "result",
+            subtype: "success",
+            result: "구루 답변입니다.",
+            usage: {
+              input_tokens: 10,
+              output_tokens: 12,
+            },
+          };
+        }),
     );
 
     const result = await runAgent(
@@ -687,19 +1996,400 @@ describe("agent runner research budget recovery", () => {
     );
 
     expect(result.status).toBe("completed");
+    expect(hookDecision(decisions.mainAgentBeforeBrief)).toBe("deny");
+    expect(hookDecision(decisions.mainBackgroundAgent)).toBe("deny");
+    expect(hookDecision(decisions.mainLensSelection)).toBe("allow");
+    expect(hookDecision(decisions.mainGuruTool)).toBe("allow");
+    expect(hookDecision(decisions.mainCompanyBrief)).toBe("allow");
+    expect(hookDecision(decisions.mainDuplicateCompanyBrief)).toBe("allow");
+    expect(hookDecision(decisions.mainTraceBeforeReview)).toBe("deny");
     expect(hookDecision(decisions.mainAgent)).toBe("allow");
     expect(hookUpdatedInput(decisions.mainAgent)).toMatchObject({
       run_in_background: false,
     });
-    expect(hookDecision(decisions.mainGuruTool)).toBe("allow");
+    expect(hookDecision(decisions.mainGuruAfterEvidence)).toBe("allow");
+    expect(hookDecision(decisions.mainReviewAfterEvidence)).toBe("deny");
+    expect(hookDecision(decisions.mainTraceAfterReview)).toBe("deny");
+    expect(hookDecision(decisions.mainCompanyPack)).toBe("deny");
     expect(hookDecision(decisions.mainSafeRead)).toBe("allow");
     expect(hookDecision(decisions.wrongAgent)).toBe("deny");
     expect(hookDecision(decisions.mainDirectCompanyTool)).toBe("deny");
     expect(hookDecision(decisions.mainUnsafeRead)).toBe("deny");
     expect(hookDecision(decisions.mainBash)).toBe("deny");
     expect(hookDecision(decisions.subagentCompanyTool)).toBe("allow");
+    expect(hookDecision(decisions.subagentCompanyTool2)).toBe("allow");
+    expect(hookDecision(decisions.subagentCompanyTool3)).toBe("deny");
+    expect(hookDecision(decisions.subagentCompanyTool4)).toBe("deny");
+    expect(hookDecision(decisions.subagentVerifyLarge)).toBe("deny");
+    expect(hookUpdatedInput(decisions.subagentVerifyLarge)).toBeUndefined();
     expect(hookDecision(decisions.subagentGuruTool)).toBe("deny");
     expect(hookDecision(decisions.subagentRecursiveAgent)).toBe("deny");
+  });
+
+  it("attaches the verified runtime evidence pack and caps Guru review corrections in canUseTool", async () => {
+    process.env.GURU_AGENT_GENERATED_BRIEF_ENABLED = "0";
+    const decisions: Record<
+      string,
+      Awaited<ReturnType<typeof canUseTool>>
+    > = {};
+    const verifiedPack = verifiedCompanyEvidencePack({
+      ticker: "SLB",
+      excerpt:
+        "Data Center Solutions diversifies directionally but does not remove upstream cycle exposure.",
+    });
+    const analysis = {
+      assessments: [
+        {
+          question_id: "q_business_quality",
+          evidence_object_ids: ["claim:SLB:q_business_quality"],
+        },
+      ],
+      overall_judgment:
+        "Data Center Solutions is directionally useful but does not establish cycle independence.",
+    };
+
+    sdkMocks.query.mockImplementationOnce(
+      (call: {
+        options: {
+          canUseTool?: typeof canUseTool;
+        };
+      }) =>
+        makeSdkQueryFromGenerator(async function* () {
+          const guard = call.options.canUseTool;
+          if (!guard) throw new Error("missing canUseTool guard");
+
+          decisions.companyBrief = await guard(
+            guruSdkToolName("krw_guru_company_brief"),
+            { ticker: "SLB", question: "SLB durable business quality" },
+          );
+          decisions.reviewBeforeAgent = await guard(
+            guruSdkToolName("krw_guru_review_company_evidence"),
+            {
+              ticker: "SLB",
+              question: "SLB durable business quality",
+              company_payload: {
+                evidence_by_question: [{ finding: "DCS remains mixed." }],
+                current_driver: { document_type: "10-Q" },
+              },
+            },
+          );
+          decisions.agent = await guard("Agent", {
+            description: "Fetch question-driven company filing evidence",
+            prompt: "Answer dynamic_question_plan for SLB.",
+            subagent_type: "company_evidence_researcher",
+          });
+          yield sdkToolUseMessage(
+            directOntologySdkToolName("krw_ontology_verify_evidence"),
+            90,
+            {
+              ticker: "SLB",
+              questions: [
+                {
+                  question_id: "q_business_quality",
+                  object_ids: ["claim:SLB:q_business_quality"],
+                },
+              ],
+            },
+          );
+          yield sdkToolResultMessage(90, verifiedPack);
+          decisions.reviewWithoutQuestionEvidence = await guard(
+            guruSdkToolName("krw_guru_review_company_evidence"),
+            {
+              ticker: "SLB",
+              question: "SLB durable business quality",
+              company_payload: {
+                filing_supported_facts: ["SLB has global oilfield exposure."],
+                current_driver: { document_type: "10-Q" },
+              },
+            },
+          );
+          decisions.reviewCoverageGuess = await guard(
+            guruSdkToolName("krw_guru_review_company_evidence"),
+            {
+              ticker: "SLB",
+              question: "SLB durable business quality",
+              company_payload: {
+                evidence_status: "no_filing_data_available",
+                reason:
+                  "KRW Ontology covers Korean-listed (KRX) securities only.",
+                filing_supported_facts: [],
+              },
+            },
+          );
+          decisions.reviewGoodQuestionEvidence = await guard(
+            guruSdkToolName("krw_guru_review_company_evidence"),
+            {
+              question: "SLB durable business quality",
+              agent_analysis: analysis,
+            },
+          );
+          decisions.reviewWithUntrustedPayload = await guard(
+            guruSdkToolName("krw_guru_review_company_evidence"),
+            {
+              question: "SLB durable business quality",
+              agent_analysis: analysis,
+              company_payload: {
+                ...verifiedPack,
+                ticker: "AAPL",
+              },
+            },
+          );
+
+          yield {
+            type: "result",
+            subtype: "success",
+            result: "구루 답변입니다.",
+            usage: {
+              input_tokens: 10,
+              output_tokens: 12,
+            },
+          };
+        }),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "버핏 관점에서 SLB를 봐줘",
+        scopeType: "company",
+        defaultTickers: ["SLB"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        runKind: "guru_advisor",
+        guruLensKey: "buffett",
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(decisions.companyBrief.behavior).toBe("allow");
+    expect(decisions.reviewBeforeAgent.behavior).toBe("deny");
+    expect(decisions.agent.behavior).toBe("allow");
+    expect(decisions.reviewWithoutQuestionEvidence.behavior).toBe("deny");
+    expect(decisions.reviewCoverageGuess.behavior).toBe("deny");
+    expect(decisions.reviewGoodQuestionEvidence.behavior).toBe("deny");
+    expect(decisions.reviewWithUntrustedPayload.behavior).toBe("deny");
+  });
+
+  it("continues the same Guru Advisor run when an evidence review is skipped", async () => {
+    const verifiedPack = verifiedCompanyEvidencePack({
+      ticker: "SLB",
+      questionIds: ["q_cyclicality"],
+      excerpt:
+        "The filings support diversification direction but not proof that SLB is non-cyclical.",
+    });
+    sdkMocks.query
+      .mockReturnValueOnce(
+        makeSdkQuery([
+          sdkToolUseMessage(guruSdkToolName("krw_guru_company_brief"), 1, {
+            ticker: "SLB",
+            question: "SLB durable business quality",
+          }),
+          sdkToolResultMessage(1, {
+            company_filing_brief: {
+              dynamic_question_plan: {
+                questions: [
+                  {
+                    question_id: "q_cyclicality",
+                    question_en:
+                      "Does Data Center Solutions reduce SLB cyclicality?",
+                  },
+                ],
+              },
+            },
+          }),
+          sdkToolUseMessage(
+            guruSdkToolName("krw_guru_review_company_evidence"),
+            2,
+            {
+              ticker: "SLB",
+              question: "SLB durable business quality",
+              company_payload: {
+                note: "Company evidence subagent did not return usable filing excerpts.",
+                evidence_status: "limited_subagent_return",
+                structural_context: {
+                  core_business: "Oilfield services",
+                },
+              },
+            },
+          ),
+          sdkToolResultMessage(2, {
+            message:
+              "The review payload must include evidence_by_question answered from the dynamic_question_plan.",
+          }),
+          {
+            type: "result",
+            subtype: "success",
+            result: "첫 번째 일반 구루 답변입니다.",
+            usage: {
+              input_tokens: 10,
+              output_tokens: 12,
+            },
+          },
+        ]),
+      )
+      .mockReturnValueOnce(
+        makeSdkQuery([
+          sdkToolUseMessage(guruSdkToolName("krw_guru_company_brief"), 1, {
+            ticker: "SLB",
+            question: "SLB durable business quality",
+          }),
+          sdkToolResultMessage(1, {
+            company_filing_brief: {
+              dynamic_question_plan: {
+                questions: [
+                  {
+                    question_id: "q_cyclicality",
+                    question_en:
+                      "Does Data Center Solutions reduce SLB cyclicality?",
+                  },
+                ],
+              },
+            },
+          }),
+          sdkToolUseMessage("Agent", 2, {
+            description: "Fetch question-driven company filing evidence",
+            subagent_type: "company_evidence_researcher",
+            prompt:
+              "Use dynamic_question_plan and return evidence_by_question.",
+          }),
+          sdkToolResultMessage(2, verifiedPack),
+          sdkToolUseMessage(
+            directOntologySdkToolName("krw_ontology_verify_evidence"),
+            20,
+            {
+              ticker: "SLB",
+              questions: [
+                {
+                  question_id: "q_cyclicality",
+                  object_ids: ["claim:SLB:q_cyclicality"],
+                },
+              ],
+            },
+          ),
+          sdkToolResultMessage(20, verifiedPack),
+          sdkToolUseMessage(
+            guruSdkToolName("krw_guru_review_company_evidence"),
+            3,
+            {
+              ticker: "SLB",
+              question: "SLB durable business quality",
+              company_payload: verifiedPack,
+            },
+          ),
+          sdkToolResultMessage(3, {
+            what_to_emphasize: ["DCS is promising but not yet cycle-breaking."],
+          }),
+          {
+            type: "result",
+            subtype: "success",
+            result: "질문별 근거를 반영한 구루 답변입니다.",
+            usage: {
+              input_tokens: 10,
+              output_tokens: 12,
+            },
+          },
+        ]),
+      );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "SLB를 버핏 관점에서 봐줘",
+        scopeType: "company",
+        defaultTickers: ["SLB"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        runKind: "guru_advisor",
+        guruLensKey: "buffett",
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(sdkMocks.query).toHaveBeenCalledTimes(1);
+    expect(result.acc.fullText).toContain("SLB");
+    expect(result.acc.fullText).toContain("일반 시장 분위기");
+    expect(result.acc.fullText).not.toContain("첫 번째 일반 구루 답변입니다.");
+    expect(
+      result.acc.toolCalls.some((toolCall) =>
+        toolCall.argumentsJson.includes("limited_subagent_return"),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not fail or restart a Guru Advisor run when evidence review is skipped", async () => {
+    const badMessages = [
+      sdkToolUseMessage(guruSdkToolName("krw_guru_company_brief"), 1, {
+        ticker: "SLB",
+        question: "SLB durable business quality",
+      }),
+      sdkToolResultMessage(1, {
+        company_filing_brief: {
+          dynamic_question_plan: {
+            questions: [
+              {
+                question_en: "Does Data Center Solutions reduce cyclicality?",
+              },
+            ],
+          },
+        },
+      }),
+      sdkToolUseMessage(
+        guruSdkToolName("krw_guru_review_company_evidence"),
+        2,
+        {
+          ticker: "SLB",
+          question: "SLB durable business quality",
+          company_payload: {
+            note: "No usable subagent evidence.",
+            evidence_status: "limited_subagent_return",
+          },
+        },
+      ),
+      sdkToolResultMessage(2, {
+        message:
+          "The review payload must include evidence_by_question answered from the dynamic_question_plan.",
+      }),
+      {
+        type: "result",
+        subtype: "success",
+        result: "근거 없이 완성된 답변입니다.",
+        usage: {
+          input_tokens: 10,
+          output_tokens: 12,
+        },
+      },
+    ];
+    sdkMocks.query
+      .mockReturnValueOnce(makeSdkQuery(badMessages))
+      .mockReturnValueOnce(makeSdkQuery(badMessages));
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "SLB를 버핏 관점에서 봐줘",
+        scopeType: "company",
+        defaultTickers: ["SLB"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        runKind: "guru_advisor",
+        guruLensKey: "buffett",
+      },
+      {
+        write: vi.fn().mockResolvedValue(undefined),
+      },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(result.acc.fullText).toContain("SLB");
+    expect(result.acc.fullText).toContain("일반 시장 분위기");
+    expect(result.acc.fullText).not.toContain("근거 없이 완성된 답변입니다.");
+    expect(sdkMocks.query).toHaveBeenCalledTimes(1);
   });
 
   it("enables chart tools only when the chart feature flag is on", async () => {
@@ -955,7 +2645,9 @@ describe("agent runner research budget recovery", () => {
     expect(call.options.disallowedTools).toEqual(
       expect.arrayContaining(["WebFetch", "WebSearch"]),
     );
-    expect(call.options.systemPrompt.append).toContain("current market-news MCP");
+    expect(call.options.systemPrompt.append).toContain(
+      "current market-news MCP",
+    );
     expect(call.options.systemPrompt.append).toContain(
       "Never mention provider names such as Yahoo Finance",
     );
@@ -963,11 +2655,13 @@ describe("agent runner research budget recovery", () => {
       "current ticker market/news context",
     );
     expect(call.prompt).toContain("웹앱 뉴스 discovery 실행");
-    expect(call.prompt).toContain("현재 시장/뉴스 MCP 도구를 런타임에서 직접 호출");
-    expect(call.prompt).toContain("최종 답변에는 Yahoo Finance 같은 provider 이름을 절대 쓰지 말고");
     expect(call.prompt).toContain(
-      "/krw-ontology:krw-ontology-news-discovery",
+      "현재 시장/뉴스 MCP 도구를 런타임에서 직접 호출",
     );
+    expect(call.prompt).toContain(
+      "최종 답변에는 Yahoo Finance 같은 provider 이름을 절대 쓰지 말고",
+    );
+    expect(call.prompt).toContain("/krw-ontology:krw-ontology-news-discovery");
   });
 
   it("passes user URL context into idea generation without switching to news mode", async () => {
@@ -998,7 +2692,8 @@ describe("agent runner research budget recovery", () => {
         selectedNewsEventContext: {
           version: "idea-generation-user-url-context/v1",
           source_pack: {
-            ontology_search_brief_en: "Find covered companies related to this URL.",
+            ontology_search_brief_en:
+              "Find covered companies related to this URL.",
             original_text_for_ontology: "Mechanically extracted page text.",
           },
         },
@@ -1013,8 +2708,12 @@ describe("agent runner research budget recovery", () => {
     expect(call.prompt).toContain("/krw-ontology:krw-ontology-idea-generation");
     expect(call.prompt).toContain("<idea_generation_url_context>");
     expect(call.prompt).toContain("Do not switch to news mode");
-    expect(call.prompt).toContain("Follow the idea-generation skill's URL workflow");
-    expect(call.prompt).not.toContain("at most 3 tickerless query_context calls");
+    expect(call.prompt).toContain(
+      "Follow the idea-generation skill's URL workflow",
+    );
+    expect(call.prompt).not.toContain(
+      "at most 3 tickerless query_context calls",
+    );
     expect(call.prompt).not.toContain("<selected_news_event_context>");
     expect(call.options.allowedTools).not.toContain(
       stockNewsSdkToolName("search_company_news_events"),
@@ -1062,16 +2761,12 @@ describe("agent runner research budget recovery", () => {
     expect(result.status).toBe("completed");
     const call = sdkMocks.query.mock.calls[0]?.[0];
     expect(call.options.allowedTools).toEqual(
-      expect.arrayContaining([
-        sdkToolName("krw_ontology_query_context"),
-      ]),
+      expect.arrayContaining([sdkToolName("krw_ontology_query_context")]),
     );
     expect(call.options.allowedTools).not.toContain(
       stockNewsSdkToolName("search_company_news_events"),
     );
-    expect(call.prompt).toContain(
-      "/krw-ontology:krw-ontology-research",
-    );
+    expect(call.prompt).toContain("/krw-ontology:krw-ontology-research");
     expect(call.prompt).toContain("<selected_news_event_context>");
   });
 
@@ -1129,8 +2824,12 @@ describe("agent runner research budget recovery", () => {
       "/krw-ontology:krw-ontology-market-move-research",
     );
     expect(call.prompt).toContain("웹앱 주가 변동 research 실행");
-    expect(call.prompt).toContain("현재 시장/뉴스 MCP 도구를 런타임에서 직접 호출");
-    expect(call.prompt).toContain("최종 답변에는 Yahoo Finance 같은 provider 이름을 절대 쓰지 말고");
+    expect(call.prompt).toContain(
+      "현재 시장/뉴스 MCP 도구를 런타임에서 직접 호출",
+    );
+    expect(call.prompt).toContain(
+      "최종 답변에는 Yahoo Finance 같은 provider 이름을 절대 쓰지 말고",
+    );
     expect(call.prompt).toContain("헤드라인 요약이 아니라");
     expect(call.prompt).toContain("무엇을 추가로 확인해야 하는지");
     expect(call.prompt).not.toContain("<selected_news_event_context>");
@@ -1144,9 +2843,12 @@ describe("agent runner research budget recovery", () => {
   });
 
   it("passes Yahoo Finance MCP inputs unchanged before execution", async () => {
-    const permission = await canUseTool(yahooFinanceSdkToolName("get_yahoo_finance_news"), {
-      ticker: "AAPL",
-    });
+    const permission = await canUseTool(
+      yahooFinanceSdkToolName("get_yahoo_finance_news"),
+      {
+        ticker: "AAPL",
+      },
+    );
 
     expect(permission).toEqual({ behavior: "allow" });
   });
@@ -1217,7 +2919,7 @@ describe("agent runner research budget recovery", () => {
     }
   });
 
-  it("downgrades full response detail before KRW ontology tool execution", async () => {
+  it("bounds full response detail before KRW ontology tool execution", async () => {
     const permission = await canUseTool(sdkToolName("krw_ontology_query"), {
       topic: "AAPL revenue breakdown",
       response_detail: "full",
@@ -1232,19 +2934,25 @@ describe("agent runner research budget recovery", () => {
     }
   });
 
-  it("passes Korean research inputs unchanged before execution", async () => {
-    const permission = await canUseTool(sdkToolName("krw_ontology_query_context"), {
-      question: "소비재 기업들을 보고 소비 매크로 환경이 어떤지 찾아봐줘",
-    });
+  it("forwards legacy query_context arguments to the MCP contract boundary", async () => {
+    const permission = await canUseTool(
+      sdkToolName("krw_ontology_query_context"),
+      {
+        question: "소비재 기업들을 보고 소비 매크로 환경이 어떤지 찾아봐줘",
+      },
+    );
 
     expect(permission).toEqual({ behavior: "allow" });
   });
 
-  it("allows Korean company questions", async () => {
-    const permission = await canUseTool(sdkToolName("krw_ontology_query_context"), {
-      question: "Apple 매출 구조를 정리해줘",
-      ticker: "AAPL",
-    });
+  it("allows Korean questions carried by SearchPlan v2", async () => {
+    const permission = await canUseTool(
+      sdkToolName("krw_ontology_query_context"),
+      ontologySearchPlanInput({
+        question: "Apple 매출 구조를 정리해줘",
+        ticker: "AAPL",
+      }),
+    );
 
     expect(permission.behavior).toBe("allow");
   });
@@ -1252,11 +2960,13 @@ describe("agent runner research budget recovery", () => {
   it("records original Korean tool arguments in the accumulated run", async () => {
     sdkMocks.query.mockReturnValueOnce(
       makeSdkQuery([
-        toolUseMessageWithInput("krw_ontology_query_context", 1, {
-          question: "소비재 기업들을 보고 소비 매크로 환경이 어떤지 찾아봐줘",
-          limit_results: 10,
-          limit_tickers: 20,
-        }),
+        toolUseMessageWithInput(
+          "krw_ontology_query_context",
+          1,
+          ontologySearchPlanInput({
+            question: "소비재 기업들을 보고 소비 매크로 환경이 어떤지 찾아봐줘",
+          }),
+        ),
         toolResultMessage(1),
         {
           type: "result",
@@ -1286,11 +2996,11 @@ describe("agent runner research budget recovery", () => {
 
     expect(result.status).toBe("completed");
     const args = JSON.parse(result.acc.toolCalls[0]?.argumentsJson ?? "{}");
-    expect(args).toEqual({
-      question: "소비재 기업들을 보고 소비 매크로 환경이 어떤지 찾아봐줘",
-      limit_results: 10,
-      limit_tickers: 20,
-    });
+    expect(args).toEqual(
+      ontologySearchPlanInput({
+        question: "소비재 기업들을 보고 소비 매크로 환경이 어떤지 찾아봐줘",
+      }),
+    );
   });
 
   it("fails instead of completing when the SDK result arrives with an open tool call", async () => {
@@ -1329,6 +3039,137 @@ describe("agent runner research budget recovery", () => {
     expect(result.errorCode).toBe("tool_result_missing");
     expect(onToolCallEnd).not.toHaveBeenCalled();
     expect(result.acc.toolCalls[0]?.finishedAt).toBeNull();
+  });
+
+  it("prefers query_context ResearchState v2 structuredContent over duplicate text", async () => {
+    const researchState = {
+      contract_version: "research-state/v2",
+      release_id: "release-1",
+      answerability: { status: "answerable" },
+      evidence_units: [
+        {
+          evidence_id: "ev-direct",
+          object_id: null,
+          object_type: "ResearchClaim",
+          ticker: "AAPL",
+          period: "CY2026Q1",
+          document_type: "10-Q",
+          title: "Services are growing",
+          summary: "Services revenue continued to grow in the latest quarter.",
+          directness: "direct",
+          evidence_grade: "strong",
+          source: {
+            object_ids: ["claim:AAPL:services"],
+            quote_ids: ["quote:AAPL:services"],
+            span_ids: ["span:AAPL:services"],
+          },
+        },
+        {
+          evidence_id: "ev-metric",
+          object_id: "metric:AAPL:margin",
+          object_type: "MetricObservation",
+          ticker: "AAPL",
+          period: "CY2026Q1",
+          document_type: "10-Q",
+          title: "Margin observation",
+          summary: "The metric lineage supports the reported margin direction.",
+          directness: "metric_lineage",
+          evidence_grade: "medium",
+          source: {
+            object_ids: ["metric:AAPL:margin"],
+            quote_ids: [],
+            span_ids: ["span:AAPL:margin"],
+          },
+        },
+        {
+          evidence_id: "ev-related",
+          object_id: "factor:AAPL:risk",
+          object_type: "BusinessFactor",
+          ticker: "AAPL",
+          period: "CY2025",
+          document_type: "10-K",
+          title: "Related risk",
+          summary: "A related risk factor remains relevant to interpretation.",
+          directness: "related",
+          evidence_grade: "weak",
+          source: {
+            object_ids: ["factor:AAPL:risk"],
+            quote_ids: [],
+            span_ids: [],
+          },
+        },
+      ],
+    };
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        toolUseMessage("krw_ontology_query_context", 1),
+        {
+          type: "user",
+          tool_use_result: {
+            content: [{ type: "text", text: "duplicate serialized content" }],
+            structuredContent: researchState,
+          },
+          message: {
+            content: [
+              {
+                type: "tool_result",
+                tool_use_id: "tool-1",
+                content: "fallback text JSON",
+              },
+            ],
+          },
+        },
+        {
+          type: "result",
+          subtype: "success",
+          result: "구조화 근거를 사용한 최종 답변입니다.",
+          usage: { input_tokens: 10, output_tokens: 12 },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111122",
+        userMessage: "AAPL 사업 구조를 설명해줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(result.acc.toolCalls[0]?.resultJson).toEqual(researchState);
+    expect(result.acc.toolCalls[0]?.resultText).toBe(
+      JSON.stringify(researchState),
+    );
+    expect(result.acc.toolCalls[0]?.resultText).not.toContain(
+      "duplicate serialized content",
+    );
+    expect(result.acc.citations).toEqual([
+      expect.objectContaining({
+        object_id: "claim:AAPL:services",
+        ticker: "AAPL",
+        document_type: "10-Q",
+        period: "CY2026Q1",
+        claim_text: "Services revenue continued to grow in the latest quarter.",
+        quote_text: null,
+        evidence_grade: "high",
+        source_quality: "filing_direct",
+      }),
+      expect.objectContaining({
+        object_id: "metric:AAPL:margin",
+        evidence_grade: "medium",
+        source_quality: "derived",
+      }),
+      expect.objectContaining({
+        object_id: "factor:AAPL:risk",
+        evidence_grade: "low",
+        source_quality: "derived",
+      }),
+    ]);
   });
 
   it("does not run a compose-only pass when the SDK errors before answer text", async () => {
@@ -1375,7 +3216,7 @@ describe("agent runner research budget recovery", () => {
     );
   });
 
-  it("keeps the research pass answer when the SDK reports tool budget exhaustion after text", async () => {
+  it("does not expose interim assistant text when the SDK ends with tool budget exhaustion", async () => {
     sdkMocks.query.mockReturnValueOnce(
       makeSdkQuery([
         {
@@ -1415,10 +3256,50 @@ describe("agent runner research budget recovery", () => {
       },
     );
 
-    expect(result.status).toBe("completed");
-    expect(result.errorCode).toBeUndefined();
-    expect(result.acc.fullText).toContain("최종 답변");
+    expect(result.status).toBe("failed");
+    expect(result.errorCode).toBe("tool_budget_exceeded");
+    expect(result.acc.fullText).toBe("");
     expect(sdkMocks.query).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders only the terminal SDK result, never interim assistant narration", async () => {
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        {
+          type: "assistant",
+          message: {
+            content: [
+              {
+                type: "text",
+                text: "Now let me correct the SearchPlan before answering.",
+              },
+            ],
+          },
+        },
+        {
+          type: "result",
+          subtype: "success",
+          result: "최종 사용자 답변입니다.",
+          usage: { input_tokens: 10, output_tokens: 12 },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "Apple 매출 구조를 정리해줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(result.acc.fullText).toBe("최종 사용자 답변입니다.");
+    expect(result.acc.fullText).not.toContain("SearchPlan");
   });
 
   it("allows deep retrieve calls beyond the previous per-tool retrieve limit", async () => {
@@ -1480,13 +3361,267 @@ describe("agent runner research budget recovery", () => {
     );
 
     expect(result.status).toBe("completed");
-    const thirdArgs = JSON.parse(result.acc.toolCalls[2]?.argumentsJson ?? "{}");
+    const thirdArgs = JSON.parse(
+      result.acc.toolCalls[2]?.argumentsJson ?? "{}",
+    );
     expect(thirdArgs.agent_context).toEqual({
       tool_usage: {
         total: 2,
         krw_ontology_retrieve: 2,
       },
     });
+  });
+
+  it("forwards SearchPlan semantics to the MCP contract boundary", async () => {
+    const decisions: Record<string, unknown> = {};
+    sdkMocks.query.mockImplementationOnce(
+      (call: {
+        options: {
+          hooks?: {
+            PreToolUse?: Array<{
+              hooks: Array<
+                (
+                  input: Record<string, unknown>,
+                  toolUseID: string,
+                  options: { signal: AbortSignal },
+                ) => Promise<unknown>
+              >;
+            }>;
+          };
+        };
+      }) =>
+        makeSdkQueryFromGenerator(async function* () {
+          const hook = call.options.hooks?.PreToolUse?.[0]?.hooks?.[0];
+          if (!hook) throw new Error("missing normal research PreToolUse hook");
+          const invoke = (toolInput: Record<string, unknown>) =>
+            hook(
+              {
+                hook_event_name: "PreToolUse",
+                session_id: "11111111-1111-4111-8111-111111111111",
+                transcript_path: "/tmp/transcript.jsonl",
+                cwd: "/tmp",
+                tool_use_id: "normal-hook-tool",
+                tool_name: sdkToolName("krw_ontology_query_context"),
+                tool_input: toolInput,
+              },
+              "normal-hook-tool",
+              { signal: new AbortController().signal },
+            );
+
+          decisions.legacy = await invoke({ question: "AAPL revenue" });
+          decisions.invalidPlan = await invoke({ search_plan: {} });
+          decisions.validPlan = await invoke(
+            ontologySearchPlanInput({
+              question: "AAPL revenue structure",
+              ticker: "AAPL",
+            }),
+          );
+          decisions.normalizedPlan = await invoke({
+            ...ontologySearchPlanInput({
+              question: " AAPL revenue structure ",
+              ticker: "AAPL",
+            }),
+            question: "legacy root field",
+          });
+          yield {
+            type: "result",
+            subtype: "success",
+            result: "공시 근거로 매출 구조를 정리했습니다.",
+            usage: { input_tokens: 10, output_tokens: 12 },
+          };
+        }),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111128",
+        userMessage: "AAPL 매출 구조를 정리해줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(hookDecision(decisions.legacy)).toBe("allow");
+    expect(hookDecision(decisions.invalidPlan)).toBe("allow");
+    expect(hookDecision(decisions.validPlan)).toBe("allow");
+    expect(hookDecision(decisions.normalizedPlan)).toBe("allow");
+    expect(hookUpdatedInput(decisions.normalizedPlan)).toBeUndefined();
+    expect(sdkMocks.query).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not request an answer envelope or a second SDK pass", async () => {
+    process.env.RESEARCH_ANSWER_ENVELOPE_ENABLED = "1";
+    const researchState = {
+      contract_version: "research-state/v2",
+      answerability: { status: "answerable", strong_claim_allowed: true },
+      evidence_units: [
+        {
+          directness: "direct",
+          evidence_grade: "strong",
+          source: { object_ids: ["claim:AAPL:services"] },
+        },
+      ],
+    };
+    const envelope = {
+      format: "krw-research-answer-envelope/v1",
+      final_answer: "서비스 관련 근거가 최신 공시에서 직접 확인됩니다.",
+      claims: [
+        {
+          claim_id: "services-fact",
+          kind: "fact",
+          statement: "서비스 관련 근거가 최신 공시에서 직접 확인됩니다.",
+          premise_object_ids: ["claim:AAPL:services"],
+          assumptions: [],
+          counter_signals: [],
+        },
+      ],
+      gaps: [],
+    };
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        toolUseMessageWithInput(
+          "krw_ontology_query_context",
+          1,
+          ontologySearchPlanInput({
+            question: "AAPL 서비스 구조",
+            ticker: "AAPL",
+          }),
+        ),
+        {
+          type: "user",
+          tool_use_result: { structuredContent: researchState },
+          message: {
+            content: [
+              {
+                type: "tool_result",
+                tool_use_id: "tool-1",
+                content: JSON.stringify(researchState),
+              },
+            ],
+          },
+        },
+        {
+          type: "result",
+          subtype: "success",
+          result: JSON.stringify(envelope),
+          structured_output: envelope,
+          usage: { input_tokens: 10, output_tokens: 12 },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111129",
+        userMessage: "AAPL 서비스 구조를 정리해줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(result.acc.fullText).toBe(JSON.stringify(envelope));
+    expect(sdkMocks.query).toHaveBeenCalledTimes(1);
+    expect(
+      sdkMocks.query.mock.calls[0]?.[0]?.options.outputFormat,
+    ).toBeUndefined();
+  });
+
+  it("does not start a rewrite run for a partial answer result", async () => {
+    process.env.RESEARCH_ANSWER_ENVELOPE_ENABLED = "1";
+    process.env.KRW_CHARTS_ENABLED = "1";
+    const researchState = {
+      contract_version: "research-state/v2",
+      answerability: { status: "partial", strong_claim_allowed: false },
+      evidence_units: [
+        {
+          directness: "direct",
+          evidence_grade: "strong",
+          source: { object_ids: ["claim:AAPL:services"] },
+        },
+      ],
+      missing_parts: ["지역별 수요"],
+      continuation: { omitted_evidence_count: 2, has_more: true },
+      warnings: ["planned evidence truncated"],
+    };
+    const unsafeEnvelope = {
+      format: "krw-research-answer-envelope/v1",
+      final_answer: "서비스가 성장했으니 수익성 개선은 확정입니다.",
+      claims: [
+        {
+          claim_id: "unsupported-certainty",
+          kind: "inference",
+          statement: "서비스가 성장했으니 수익성 개선은 확정입니다.",
+          premise_object_ids: ["claim:AAPL:services"],
+          assumptions: [],
+          counter_signals: [],
+        },
+      ],
+      gaps: [],
+    };
+    sdkMocks.query
+      .mockReturnValueOnce(
+        makeSdkQuery([
+          toolUseMessage("krw_ontology_query_context", 1),
+          {
+            type: "user",
+            tool_use_result: { structuredContent: researchState },
+            message: {
+              content: [
+                {
+                  type: "tool_result",
+                  tool_use_id: "tool-1",
+                  content: JSON.stringify(researchState),
+                },
+              ],
+            },
+          },
+          {
+            type: "result",
+            subtype: "success",
+            result: JSON.stringify(unsafeEnvelope),
+            structured_output: unsafeEnvelope,
+            usage: { input_tokens: 10, output_tokens: 12 },
+          },
+        ]),
+      )
+      .mockReturnValueOnce(
+        makeSdkQuery([
+          {
+            type: "result",
+            subtype: "success",
+            result:
+              "서비스 관련 근거는 수익성 방어 가능성을 시사합니다. 다만 지역별 수요는 다음 실적의 제품 믹스와 지역 매출을 함께 확인해야 합니다.",
+            usage: { input_tokens: 4, output_tokens: 8 },
+          },
+        ]),
+      );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111130",
+        userMessage: "AAPL 수익성 전망을 봐줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(result.acc.fullText).toBe(JSON.stringify(unsafeEnvelope));
+    expect(sdkMocks.query).toHaveBeenCalledTimes(1);
+    expect(
+      sdkMocks.query.mock.calls[0]?.[0]?.options.outputFormat,
+    ).toBeUndefined();
   });
 
   it("allows repeated deep query, trace, and compare calls while total cap remains", async () => {
@@ -1511,7 +3646,9 @@ describe("agent runner research budget recovery", () => {
       {
         existingTools: [
           "krw_ontology_query_context",
-          ...Array.from<MCPToolName>({ length: 6 }).fill("krw_ontology_compare"),
+          ...Array.from<MCPToolName>({ length: 6 }).fill(
+            "krw_ontology_compare",
+          ),
         ],
         attemptedTool: "krw_ontology_compare",
       },
@@ -1539,7 +3676,9 @@ describe("agent runner research budget recovery", () => {
       expect(permission.message).toContain("Do not call another tool");
       expect(permission.message).toContain("final Korean Markdown answer");
       expect(permission.message).not.toContain("krw_ontology_retrieve");
-      expect(permission.message).not.toContain("one targeted krw_ontology_query");
+      expect(permission.message).not.toContain(
+        "one targeted krw_ontology_query",
+      );
     }
   });
 

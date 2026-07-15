@@ -19,6 +19,7 @@
 /.services/
 /.next-e2e/
 /.next-cua/
+/.next-billing-debug/
 /out/
 
 # production
@@ -60,3 +61,4 @@ home-trace-console-demo*.png
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.gstack/

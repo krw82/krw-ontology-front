@@ -1,0 +1,10 @@
+export function isPulseFeedEnabled(): boolean {
+  const explicit = process.env.PULSE_FEED_ENABLED ?? process.env.NEXT_PUBLIC_PULSE_FEED_ENABLED;
+  if (explicit !== undefined) return explicit === "1" || explicit === "true";
+  return process.env.NODE_ENV !== "production";
+}
+
+export function isPulseSourceEnabled(source: "resurface" | "learning"): boolean {
+  const value = process.env[`PULSE_${source.toUpperCase()}_ENABLED`];
+  return value === undefined || value === "1" || value === "true";
+}

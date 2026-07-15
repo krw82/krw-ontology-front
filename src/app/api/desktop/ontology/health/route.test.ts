@@ -72,21 +72,21 @@ describe("GET /api/desktop/ontology/health", () => {
     });
   });
 
-  it("returns active release metadata for authorized Desktop clients", async () => {
+  it("fails closed when HTTP MCP execution is not configured", async () => {
     const response = await GET(request());
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body).toMatchObject({
-      ok: true,
-      ontology_search_api_ok: true,
-      ontology_api_version: "ontology-search/v1",
+      ok: false,
+      ontology_search_api_ok: false,
+      ontology_api_version: "ontology-search/v2",
       active_ontology_release_id: "release-1",
-      executor: "catalog",
-      release_matches_executor: true,
+      executor: "unconfigured",
+      release_matches_executor: false,
       service: {
-        status: "ready",
-        api_version: "ontology-search/v1",
+        status: "not_ready",
+        api_version: "ontology-search/v2",
         active_release_id: "release-1",
         company_count: 12,
         document_count: 30,
@@ -155,7 +155,7 @@ describe("GET /api/desktop/ontology/health", () => {
     });
   });
 
-  it("keeps MCP ready when catalog and MCP releases disagree", async () => {
+  it("fails closed when catalog and MCP releases disagree", async () => {
     vi.mocked(shouldUseDesktopOntologyMcp).mockReturnValue(true);
     vi.mocked(checkKrwOntologyMcpHealth).mockResolvedValue({
       ok: true,
@@ -168,12 +168,12 @@ describe("GET /api/desktop/ontology/health", () => {
     const body = await response.json();
 
     expect(body).toMatchObject({
-      ok: true,
-      ontology_search_api_ok: true,
+      ok: false,
+      ontology_search_api_ok: false,
       release_matches_executor: false,
       active_ontology_release_id: "release-1",
       service: {
-        status: "ready",
+        status: "not_ready",
         active_release_id: "different-release",
       },
       mcp: {
@@ -182,7 +182,7 @@ describe("GET /api/desktop/ontology/health", () => {
     });
   });
 
-  it("keeps MCP ready when an otherwise healthy MCP omits its release id", async () => {
+  it("fails closed when an otherwise healthy MCP omits its release id", async () => {
     vi.mocked(shouldUseDesktopOntologyMcp).mockReturnValue(true);
     vi.mocked(checkKrwOntologyMcpHealth).mockResolvedValue({
       ok: true,
@@ -195,12 +195,12 @@ describe("GET /api/desktop/ontology/health", () => {
     const body = await response.json();
 
     expect(body).toMatchObject({
-      ok: true,
-      ontology_search_api_ok: true,
+      ok: false,
+      ontology_search_api_ok: false,
       release_matches_executor: false,
       active_ontology_release_id: "release-1",
       service: {
-        status: "ready",
+        status: "not_ready",
         active_release_id: "release-1",
       },
       mcp: {

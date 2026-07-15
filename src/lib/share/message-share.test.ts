@@ -95,6 +95,8 @@ function createPublicShareAdminWithQuestionAttachments(params: {
 function createSnapshotAdmin(params: {
   userMessage: MessageRow;
   insertedPayloads: Array<Record<string, unknown>>;
+  run?: { id: string; run_kind: string; user_message_id: string };
+  runQueuedPayload?: Record<string, unknown>;
 }) {
   return {
     from(table: string) {
@@ -116,7 +118,15 @@ function createSnapshotAdmin(params: {
             maybeSingle() {
               if (table === "agent_runs") {
                 return Promise.resolve({
-                  data: { user_message_id: params.userMessage.id },
+                  data: params.run ?? { user_message_id: params.userMessage.id },
+                  error: null,
+                });
+              }
+              if (table === "agent_run_events") {
+                return Promise.resolve({
+                  data: params.runQueuedPayload
+                    ? { payload: params.runQueuedPayload }
+                    : null,
                   error: null,
                 });
               }
@@ -179,6 +189,7 @@ describe("findPublicMessageShare", () => {
       title: "최종 답변입니다.",
       question_content: "AAPL 서비스 매출 리스크를 정리해줘.",
       answer_content: "최종 답변입니다.",
+      share_context: { run_kind: null, guru_lens: null },
       locale: "ko",
     });
   });
@@ -205,6 +216,26 @@ describe("findPublicMessageShare", () => {
       answer_content:
         "Based on Micron's latest filing, cutting losses now looks premature. *(Source: CY2025 10-K, Item 7 MD&A)*",
       locale: "en",
+    });
+  });
+
+  it("normalizes public guru share context", async () => {
+    vi.mocked(getSupabaseAdmin).mockReturnValue(
+      createPublicShareAdmin({
+        token: "share-token",
+        title: "버핏식으로 보면",
+        question_content: "AAPL을 버핏 관점으로 봐줘.",
+        question_created_at: "2026-05-31T00:00:00.000Z",
+        answer_content: "버핏 렌즈로 보면 사업 품질을 먼저 봐야 합니다.",
+        answer_created_at: "2026-05-31T00:00:00.000Z",
+        tickers: ["AAPL"],
+        share_context: { run_kind: "guru_advisor", guru_lens: "buffett" },
+        created_at: "2026-05-31T00:00:00.000Z",
+      }),
+    );
+
+    await expect(findPublicMessageShare("share-token")).resolves.toMatchObject({
+      share_context: { run_kind: "guru_advisor", guru_lens: "buffett" },
     });
   });
 
@@ -416,6 +447,7 @@ describe("createMessageShare", () => {
       question_created_at: "2026-05-31T00:00:00.000Z",
       answer_content: "AAPL 답변",
       tickers: ["AAPL"],
+      share_context: { run_kind: null, guru_lens: null },
       snapshot_version: 2,
     });
     expect(String(insertedPayloads[0]?.question_content)).not.toContain(
@@ -485,5 +517,68 @@ describe("createMessageShare", () => {
     expect(String(insertedPayloads[0]?.question_content)).toBe(
       "[내부 설정 파일 제거됨] 보여줘",
     );
+  });
+
+  it("stores guru run context in the share snapshot", async () => {
+    const insertedPayloads: Array<Record<string, unknown>> = [];
+    const session = {
+      id: "session-1",
+      user_id: "user-1",
+      title: "AAPL",
+      claude_session_id: null,
+      client_request_id: null,
+      scope_type: "company",
+      default_tickers: ["AAPL"],
+      default_document_types: [],
+      last_message_preview: null,
+      last_message_at: null,
+      latest_run_status: null,
+      deleted_at: null,
+      created_at: "2026-05-31T00:00:00.000Z",
+      updated_at: "2026-05-31T00:00:00.000Z",
+    } satisfies ChatSessionRow;
+    const answerMessage = {
+      id: "assistant-1",
+      session_id: session.id,
+      role: "assistant",
+      content: "버핏 렌즈 답변",
+      status: "completed",
+      request_id: null,
+      created_at: "2026-05-31T00:01:00.000Z",
+      updated_at: "2026-05-31T00:01:00.000Z",
+    } satisfies MessageRow;
+    const userMessage = {
+      id: "user-message-1",
+      session_id: session.id,
+      role: "user",
+      content: "AAPL을 버핏 관점으로 봐줘.",
+      status: "completed",
+      request_id: null,
+      created_at: "2026-05-31T00:00:00.000Z",
+      updated_at: "2026-05-31T00:00:00.000Z",
+    } satisfies MessageRow;
+
+    vi.mocked(getSupabaseAdmin).mockReturnValue(
+      createSnapshotAdmin({
+        userMessage,
+        insertedPayloads,
+        run: {
+          id: "run-1",
+          run_kind: "guru_advisor",
+          user_message_id: userMessage.id,
+        },
+        runQueuedPayload: { guru_lens: "buffett" },
+      }),
+    );
+
+    await createMessageShare({
+      userId: "user-1",
+      message: answerMessage,
+      session,
+    });
+
+    expect(insertedPayloads[0]).toMatchObject({
+      share_context: { run_kind: "guru_advisor", guru_lens: "buffett" },
+    });
   });
 });

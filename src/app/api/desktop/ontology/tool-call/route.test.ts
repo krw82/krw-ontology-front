@@ -72,6 +72,21 @@ async function json(response: Response) {
   }>;
 }
 
+function searchPlan() {
+  return {
+    question: "AAPL demand",
+    intent: "company_demand",
+    clauses: [
+      {
+        clause_id: "demand",
+        retrieval_query: "AAPL demand",
+        required_concepts: ["demand"],
+      },
+    ],
+    tickers: ["aapl"],
+  };
+}
+
 describe("POST /api/desktop/ontology/tool-call", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -100,7 +115,7 @@ describe("POST /api/desktop/ontology/tool-call", () => {
       result_json: { summary: "Evidence" },
       ontology_release: {
         release_id: "release-1",
-        api_version: "ontology-search/v1",
+        api_version: "ontology-search/v2",
       },
     });
   });
@@ -113,8 +128,7 @@ describe("POST /api/desktop/ontology/tool-call", () => {
         tool_call_id: "tool-1",
         tool_name: "krw_ontology_query_context",
         arguments: {
-          question: "AAPL demand",
-          tickers: ["aapl"],
+          search_plan: searchPlan(),
         },
         desktop_context: {
           analysis_mode: "company",
@@ -142,8 +156,12 @@ describe("POST /api/desktop/ontology/tool-call", () => {
       expect.objectContaining({
         tool_name: "krw_ontology_query_context",
         arguments: expect.objectContaining({
-          tickers: ["AAPL"],
-          response_detail: "compact",
+          search_plan: expect.objectContaining({
+            tickers: ["AAPL"],
+            clauses: [
+              expect.objectContaining({ required_concepts: ["demand"] }),
+            ],
+          }),
         }),
       }),
       expect.objectContaining({ userId: "user-1" }),
@@ -232,7 +250,7 @@ describe("POST /api/desktop/ontology/tool-call", () => {
         tool_call_id: "tool-1",
         tool_name: "krw_ontology_query_context",
         arguments: {
-          question: "AAPL demand",
+          search_plan: searchPlan(),
         },
       }),
     );
@@ -260,7 +278,7 @@ describe("POST /api/desktop/ontology/tool-call", () => {
         tool_call_id: "tool-1",
         tool_name: "krw_ontology_query_context",
         arguments: {
-          question: "AAPL demand",
+          search_plan: searchPlan(),
         },
       }),
     );

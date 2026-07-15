@@ -13,6 +13,7 @@ const productionConnectSources = [
   "'self'",
   "https://*.supabase.co",
   "wss://*.supabase.co",
+  "https://*.tosspayments.com",
 ];
 
 const developmentConnectSources = [

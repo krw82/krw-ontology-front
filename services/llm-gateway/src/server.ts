@@ -81,7 +81,9 @@ async function handleRequest(
     }
 
     const body = await readJsonBody(request, context.maxBodyBytes);
-    const upstreamBody = enforceJobRequest(body, job);
+    const upstreamBody = enforceJobRequest(body, job, {
+      enforceOutputLimit: url.pathname === "/anthropic/v1/messages",
+    });
     const upstreamPath = url.pathname.replace(/^\/anthropic/, "");
     const upstreamUrl = `${context.upstreamBaseUrl}${upstreamPath}`;
     const controller = new AbortController();
@@ -241,9 +243,16 @@ async function loadAndClaimJob(
 export function enforceJobRequest(
   body: Record<string, unknown>,
   job: DesktopLlmJobRow,
+  options: { enforceOutputLimit?: boolean } = {},
 ): Record<string, unknown> {
+  const enforceOutputLimit = options.enforceOutputLimit ?? true;
   const maxTokens = numberValue(body.max_tokens);
+  const shouldInjectMaxTokens =
+    enforceOutputLimit &&
+    body.max_tokens === undefined &&
+    job.max_output_tokens !== null;
   if (
+    enforceOutputLimit &&
     job.max_output_tokens !== null &&
     maxTokens !== null &&
     maxTokens > job.max_output_tokens
@@ -255,6 +264,9 @@ export function enforceJobRequest(
 
   return {
     ...body,
+    ...(shouldInjectMaxTokens
+      ? { max_tokens: job.max_output_tokens }
+      : {}),
     model: job.upstream_model,
     metadata: {
       ...plainObjectOrEmpty(body.metadata),

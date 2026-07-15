@@ -1,0 +1,10 @@
+{
+  "contract_version": "krw-ontology-plugin-contract/v1",
+  "environment": "prod",
+  "mcp_contract_version": "krw-ontology-mcp/v2",
+  "source_content_sha256": "67851c2478bd9efc11e9310c27d538e8eb4380cb7f54e37b4c406655e1b132f7",
+  "materialized_content_sha256": "67851c2478bd9efc11e9310c27d538e8eb4380cb7f54e37b4c406655e1b132f7",
+  "mcp_config_sha256": "58542d4b17b165f8ad9ee55d7b14030ae413ee4d38008d97612e2b735a1d806d",
+  "mcp_tool_schema_sha256": "05030386493d80ce5cb7d39cfaf6518ae597b4923b81eaa32ea39e93263dcef1",
+  "mcp_build_fingerprint_sha256": "f6db3501b348ad0234560f2022da047d9208d41d932c4f10dddb2c6828e8e03b"
+}

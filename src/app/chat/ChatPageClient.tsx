@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -16,578 +15,68 @@ import Composer, {
 import QueueRemotionAnimation from "@/components/QueueRemotionAnimation";
 import SuggestedPromptActions from "@/components/SuggestedPromptActions";
 import RunStatusDock from "@/components/RunStatusDock";
+import CreditLimitErrorCard from "@/components/chat/CreditLimitErrorCard";
+import RecoverableChatErrorCard from "@/components/chat/RecoverableChatErrorCard";
+import ChatWatchlistHeaderActions from "@/components/chat/ChatWatchlistHeaderActions";
+import DiscoverGuideFlow from "@/components/chat/DiscoverGuideFlow";
+import GuruCompanyPicker from "@/components/chat/GuruCompanyPicker";
+import GuruLensContextHeader from "@/components/chat/GuruLensContextHeader";
 import { useChat } from "@/hooks/useChat";
 import { useChatMobileDock } from "@/hooks/useChatMobileDock";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { useResearchModePreference } from "@/hooks/useResearchModePreference";
+import { useGuruCompanyPicker } from "@/hooks/useGuruCompanyPicker";
+import { useChatSessionLifecycle } from "@/hooks/useChatSessionLifecycle";
+import { useShareStarter } from "@/hooks/useShareStarter";
+import { useChatCompanyMeta } from "@/hooks/useChatCompanyMeta";
+import { useChatAnalytics } from "@/hooks/useChatAnalytics";
+import { useChatScrollEffects } from "@/hooks/useChatScrollEffects";
+import { useDiscoverGuide } from "@/hooks/useDiscoverGuide";
 import {
   getSessionTickers,
   buildChatSessionHref,
 } from "@/lib/chat/history-state";
 import { DEFAULT_LOCALE, isLocale } from "@/i18n/config";
-import {
-  getCompanyDisplayCopyForTicker,
-  getSuggestedPromptDisplaysForTickers,
-} from "@/content/companies/display";
-import { trackClientEventSilently } from "@/lib/analytics/client";
 import { findQuestionTopic } from "@/lib/marketing/site";
+import { deriveChatPresentationContext } from "@/lib/chat/presentation-context";
 import { createClientId } from "@/lib/client-id";
+import {
+  storeDraftMessage,
+} from "@/lib/chat/draft-message";
+import {
+  isChatInputError,
+  isWeeklyAnalysisLimitError,
+  toUserFacingChatError,
+} from "@/lib/chat/user-facing-error";
+import type { CompanyMeta } from "@/lib/chat/company-meta";
 import { normalizeTicker } from "@/lib/ontology/ticker";
-import { normalizeRunKind, type RunKind } from "@/lib/run-kind";
+import { normalizeRunKind } from "@/lib/run-kind";
 import {
   buildGuruSessionHref,
   getGuruLens,
-  getGuruLensDisplayName,
-  getGuruLensPromptPrefix,
-  getGuruSuggestedPrompts,
   normalizeGuruLensKey,
-  type GuruLensOption,
 } from "@/lib/guru-lenses";
 import type { ResearchMode } from "@/lib/research-mode";
 import type {
   CreateSessionRequest,
   CreateSessionResponse,
-  UserCompanyNotebook,
-  UserCompanyMark,
 } from "@/types/api-contracts";
-import type { EntitlementStatus } from "@/types/entitlement";
 
-const DRAFT_MESSAGE_STORAGE_PREFIX = "krw:chat-draft-message:";
 const ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV =
   process.env.NODE_ENV === "development";
 const ALWAYS_SHOW_CREDIT_LIMIT_CARD_IN_DEV =
   process.env.NODE_ENV === "development";
 
-type DraftMessagePayload = {
-  content: string;
-  requestId: string;
-  runKind?: RunKind;
-  userUrl?: string;
-  userUrls?: string[];
-  attachmentIds?: string[];
-};
-
-function draftMessageStorageKey(draftMessageId: string): string {
-  return `${DRAFT_MESSAGE_STORAGE_PREFIX}${draftMessageId}`;
-}
-
-function storeDraftMessage(
-  draftMessageId: string,
-  payload: DraftMessagePayload,
-): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    window.sessionStorage.setItem(
-      draftMessageStorageKey(draftMessageId),
-      JSON.stringify(payload),
-    );
-    return true;
-  } catch {
-    return false;
+function supportCodeFor(runId: string | null, sessionId: string | null): string {
+  const raw = runId ?? sessionId ?? "chat";
+  let hash = 0;
+  for (const character of raw) {
+    hash = (hash * 31 + character.charCodeAt(0)) | 0;
   }
+  return `R-${(hash >>> 0).toString(36).toUpperCase().padStart(6, "0").slice(-6)}`;
 }
-
-function readDraftMessage(draftMessageId: string): DraftMessagePayload | null {
-  if (typeof window === "undefined") return null;
-  const key = draftMessageStorageKey(draftMessageId);
-  const rawPayload = window.sessionStorage.getItem(key);
-  if (!rawPayload) return null;
-
-  try {
-    const payload = JSON.parse(rawPayload) as Partial<DraftMessagePayload>;
-    const content = payload.content?.trim();
-    const requestId = payload.requestId?.trim();
-    const rawRunKind =
-      typeof payload.runKind === "string" ? payload.runKind : undefined;
-    const runKind = rawRunKind ? normalizeRunKind(rawRunKind) : undefined;
-    const userUrls = Array.isArray(payload.userUrls)
-      ? payload.userUrls
-          .map((url) => (typeof url === "string" ? url.trim() : ""))
-          .filter(Boolean)
-      : [];
-    const userUrl = payload.userUrl?.trim() || userUrls[0];
-    const attachmentIds = Array.isArray(payload.attachmentIds)
-      ? payload.attachmentIds
-          .map((id) => (typeof id === "string" ? id.trim() : ""))
-          .filter(Boolean)
-      : [];
-    if (!content || !requestId) return null;
-    return {
-      content,
-      requestId,
-      ...(runKind ? { runKind } : {}),
-      ...(userUrl ? { userUrl } : {}),
-      ...(userUrls.length > 0 ? { userUrls } : {}),
-      ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
-    };
-  } catch {
-    const content = rawPayload.trim();
-    return content ? { content, requestId: createClientId() } : null;
-  }
-}
-
-function removeDraftMessage(draftMessageId: string): void {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.removeItem(draftMessageStorageKey(draftMessageId));
-}
-
-function sanitizeError(message: string): string {
-  // Strip stack traces and internal details
-  const cleaned = message.split("\n")[0];
-  const lower = cleaned.toLowerCase();
-  if (lower.includes("rate limit") || lower.includes("429")) {
-    return "현재 KRW-AI 계정/API 요청 한도에 도달했습니다. 잠시 후 다시 시도하거나, 실제 ANTHROPIC_API_KEY를 설정한 뒤 서버를 재시작해주세요.";
-  }
-  if (cleaned.length > 200) return cleaned.slice(0, 200) + "...";
-  return cleaned;
-}
-
-function isCreditLimitErrorMessage(message: string | null | undefined): boolean {
-  if (!message) return false;
-  return /크레딧|credit|한도|quota/i.test(message);
-}
-
-function formatCreditResetTime(entitlement: EntitlementStatus | null): string {
-  const rawResetTime =
-    entitlement?.usage.resets_at || entitlement?.usage.period_end || "";
-  const resetTime = new Date(rawResetTime);
-  if (Number.isNaN(resetTime.getTime())) return "다음 주간 충전 시점";
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(resetTime);
-}
-
-function CreditLimitErrorCard({
-  entitlement,
-}: {
-  entitlement: EntitlementStatus | null;
-}) {
-  const resetLabel = formatCreditResetTime(entitlement);
-  const billingHref = entitlement?.upgrade.href || "/settings/billing";
-
-  return (
-    <div
-      className="overflow-hidden rounded-[8px] border border-hairline bg-canvas shadow-[0_18px_48px_rgba(10,11,13,0.08)]"
-      role="alert"
-    >
-      <div className="h-1 bg-primary" aria-hidden="true" />
-      <div className="p-base sm:p-lg">
-        <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="w-full min-w-0 flex-1 [overflow-wrap:normal]">
-            <p className="font-mono text-[11px] font-black uppercase tracking-[0.16em] text-primary">
-              WEEKLY LIMIT
-            </p>
-            <h3 className="mt-2 text-[20px] font-black leading-7 text-ink sm:text-[22px]">
-              주간 분석 한도를 모두 사용했습니다.
-            </h3>
-            <p className="mt-2 w-full max-w-[36rem] break-normal text-[14px] font-semibold leading-6 text-body [overflow-wrap:normal] [word-break:keep-all] sm:text-[15px]">
-              다음 충전 전까지 새 분석은 시작할 수 없습니다. 기존 리서치와
-              노트북은 계속 볼 수 있습니다.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-base grid gap-2 border-t border-hairline pt-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-          <div>
-            <p className="font-mono text-[11px] font-black uppercase tracking-[0.14em] text-muted">
-              다음 충전
-            </p>
-            <p className="mt-1 text-[15px] font-black leading-5 text-ink">
-              {resetLabel}
-            </p>
-          </div>
-          <Link
-            href={billingHref}
-            className="inline-flex h-11 items-center justify-center gap-1 rounded-[8px] bg-surface-dark px-sm text-[14px] font-extrabold text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-          >
-            업그레이드 플랜 보기
-            <span
-              aria-hidden="true"
-              className="material-symbols-outlined text-[18px]"
-            >
-              arrow_forward
-            </span>
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-type CompaniesResponse = {
-  companies?: Array<{
-    ticker: string;
-    name?: string | null;
-    sector?: string | null;
-  }>;
-};
-
-type CompanyMeta = {
-  ticker: string;
-  name: string | null;
-  sector: string | null;
-};
-
-type ShareStarter = {
-  question_content: string;
-  tickers: string[];
-  title?: string | null;
-};
 
 type ChatWorkspace = "chat" | "guru";
-
-type DiscoverGuideStep = "url" | "file" | "idea";
-
-type DiscoverGuideFlowProps = {
-  locale: string;
-  step: DiscoverGuideStep;
-  disabled?: boolean;
-  urlValue: string;
-  urlError?: string | null;
-  ideaValue: string;
-  ideaError?: string | null;
-  onUrlValueChange: (value: string) => void;
-  onCommitUrl: () => void;
-  onSkipUrl: () => void;
-  onAddFile: () => void;
-  onSkipFile: () => void;
-  onIdeaValueChange: (value: string) => void;
-  onSubmitIdea: () => void;
-  onSelectExample: (prompt: string) => void;
-};
-
-function normalizeDiscoverUrl(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-
-  try {
-    const url = new URL(candidate);
-    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
-
-function DiscoverGuideFlow({
-  locale,
-  step,
-  disabled = false,
-  urlValue,
-  urlError,
-  ideaValue,
-  ideaError,
-  onUrlValueChange,
-  onCommitUrl,
-  onSkipUrl,
-  onAddFile,
-  onSkipFile,
-  onIdeaValueChange,
-  onSubmitIdea,
-  onSelectExample,
-}: DiscoverGuideFlowProps) {
-  const isKo = locale === "ko";
-  const stepOrder: DiscoverGuideStep[] = ["url", "file", "idea"];
-  const activeIndex = stepOrder.indexOf(step);
-  const examples = isKo
-    ? [
-        "AI 데이터센터 전력 수요 수혜 기업 중 FCF로 CapEx를 버티는 후보 3개만 찾아줘.",
-        "클라우드 소프트웨어 기업 중 RPO와 구독 매출이 함께 늘어나는 후보 3개만 찾아줘.",
-        "반도체 공급망 기업 중 AI 매출 노출은 크고 재고 부담은 낮은 후보 3개만 찾아줘.",
-      ]
-    : [
-        "Find 3 AI data-center power beneficiaries that can fund CapEx with FCF.",
-        "Find 3 cloud software companies where RPO and subscription revenue are both growing.",
-        "Find 3 semiconductor supply-chain companies with high AI revenue exposure and lower inventory risk.",
-      ];
-  const copy = {
-    url: isKo
-      ? {
-          eyebrow: "선택사항",
-          title: "참고할 URL이 있나요?",
-          description:
-            "뉴스나 리포트 링크가 있으면 먼저 시장 맥락을 잡습니다. 없어도 바로 넘어갈 수 있습니다.",
-          primary: "다음",
-          secondary: "건너뛰기",
-          urlPlaceholder: "https://example.com/report",
-        }
-      : {
-          eyebrow: "Optional",
-          title: "Do you have a URL to reference?",
-          description:
-            "Add a news or report link to set market context first. You can skip this.",
-          primary: "Next",
-          secondary: "Skip",
-          urlPlaceholder: "https://example.com/report",
-        },
-    file: isKo
-      ? {
-          eyebrow: "선택사항",
-          title: "첨부할 파일이 있나요?",
-          description:
-            "PDF, txt, md 문서를 질문과 함께 보낼 수 있습니다. 없으면 다음으로 넘어가세요.",
-          primary: "파일 선택하기",
-          secondary: "건너뛰기",
-          fileHint: "선택이 완료되면 다음 단계로 이동합니다.",
-        }
-      : {
-          eyebrow: "Optional",
-          title: "Do you have a file to attach?",
-          description:
-            "Attach PDF, txt, or md documents with the question, or skip this step.",
-          primary: "Choose file",
-          secondary: "Skip",
-          fileHint: "The flow continues after a file is selected.",
-        },
-    idea: isKo
-      ? {
-          eyebrow: "시작",
-          title: "어떤 아이디어로 종목을 발굴할까요?",
-          description:
-            "산업, 변화, 리스크, 재무 조건을 한 문장으로 적으면 관련 회사를 넓게 찾아봅니다.",
-          primary: "종목 발굴 시작",
-          secondary: "예시",
-          ideaPlaceholder: "예: AI 데이터센터 수혜지만 부채 부담이 낮은 기업",
-        }
-      : {
-          eyebrow: "Start",
-          title: "What idea should we use to discover stocks?",
-          description:
-            "Describe an industry, shift, risk, or financial condition and we will explore related companies.",
-          primary: "Start discovery",
-          secondary: "Examples",
-          ideaPlaceholder: "e.g. AI data-center beneficiaries with lower debt burden",
-        },
-  }[step];
-
-  const handlePrimary = () => {
-    if (step === "url") {
-      onCommitUrl();
-      return;
-    }
-    if (step === "file") {
-      onAddFile();
-      return;
-    }
-    onSubmitIdea();
-  };
-  const handleSecondary = () => {
-    if (step === "url") {
-      onSkipUrl();
-      return;
-    }
-    if (step === "file") {
-      onSkipFile();
-      return;
-    }
-    onSubmitIdea();
-  };
-
-  return (
-    <div className="mx-auto w-full max-w-[38rem] text-left">
-      <div
-        className="mb-2 grid grid-cols-3 gap-1.5"
-        aria-label={isKo ? "종목 발굴 단계" : "Discovery steps"}
-      >
-        {stepOrder.map((item, index) => (
-          <span
-            key={item}
-            className={[
-              "h-1.5 rounded-full transition-colors",
-              index <= activeIndex ? "bg-primary" : "bg-surface-dim",
-            ].join(" ")}
-            aria-hidden="true"
-          />
-        ))}
-      </div>
-
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.section
-          key={step}
-          className="overflow-hidden rounded-[8px] border border-hairline bg-canvas shadow-[0_18px_48px_rgba(10,11,13,0.08)]"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.22, ease: "easeOut" }}
-        >
-          <div className="flex items-center justify-between border-b border-hairline px-sm py-2 sm:px-base sm:py-sm">
-            <p className="font-mono text-[11px] font-black uppercase tracking-[0.16em] text-primary">
-              {copy.eyebrow}
-            </p>
-            <p className="font-mono text-[11px] font-black tracking-[0.14em] text-muted">
-              {String(activeIndex + 1).padStart(2, "0")} / 03
-            </p>
-          </div>
-
-          <div className="p-sm sm:p-lg">
-            <div className="min-w-0">
-              <h3 className="text-[19px] font-black leading-7 text-ink sm:text-[24px] sm:leading-8">
-                {copy.title}
-              </h3>
-              <p className="mt-1.5 text-[14px] font-semibold leading-6 text-body sm:mt-2 sm:text-[15px]">
-                {copy.description}
-              </p>
-            </div>
-
-            {step === "url" ? (
-              <div className="mt-sm">
-                <label className="sr-only" htmlFor="discover-url-input">
-                  {copy.title}
-                </label>
-                <input
-                  id="discover-url-input"
-                  type="url"
-                  inputMode="url"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  className="h-12 w-full rounded-[8px] border border-hairline bg-surface-soft px-sm text-[15px] font-bold leading-6 text-ink shadow-sm transition-colors placeholder:text-muted focus:border-primary focus:bg-canvas focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim/25"
-                  placeholder={copy.urlPlaceholder}
-                  value={urlValue}
-                  onChange={(event) => onUrlValueChange(event.currentTarget.value)}
-                  disabled={disabled}
-                />
-                {urlError ? (
-                  <p className="mt-2 text-[12px] font-bold leading-5 text-error">
-                    {urlError}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-
-            {step === "file" ? (
-              <div className="mt-sm rounded-[8px] border border-hairline bg-surface-soft px-sm py-xs text-[13px] font-bold leading-5 text-muted">
-                {copy.fileHint}
-              </div>
-            ) : null}
-
-            {step === "idea" ? (
-              <div className="mt-sm grid gap-3">
-                <label className="sr-only" htmlFor="discover-idea-input">
-                  {copy.title}
-                </label>
-                <textarea
-                  id="discover-idea-input"
-                  className="min-h-[112px] w-full resize-none rounded-[8px] border border-hairline bg-surface-soft px-sm py-sm text-[16px] font-bold leading-7 text-ink shadow-sm transition-colors placeholder:text-muted focus:border-primary focus:bg-canvas focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim/25"
-                  placeholder={copy.ideaPlaceholder}
-                  value={ideaValue}
-                  onChange={(event) => onIdeaValueChange(event.currentTarget.value)}
-                  disabled={disabled}
-                />
-                {ideaError ? (
-                  <p className="text-[12px] font-bold leading-5 text-error">
-                    {ideaError}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-
-            {step === "idea" ? (
-              <div className="mt-sm grid gap-2">
-                <p className="font-mono text-[10px] font-black uppercase tracking-[0.14em] text-muted">
-                  {copy.secondary}
-                </p>
-                {examples.map((example) => (
-                  <button
-                    key={example}
-                    type="button"
-                    className="group flex min-h-12 w-full items-center justify-between gap-3 rounded-[8px] border border-hairline bg-surface px-sm py-xs text-left text-[14px] font-bold leading-5 text-ink transition-colors hover:border-outline hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-55"
-                    onClick={() => onSelectExample(example)}
-                    disabled={disabled}
-                  >
-                    <span className="min-w-0">{example}</span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
-            <div
-              className={[
-                "mt-sm grid gap-2",
-                step === "idea" ? "" : "sm:grid-cols-[minmax(0,1fr)_auto]",
-              ].join(" ")}
-            >
-              <button
-                type="button"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[8px] bg-surface-dark px-5 py-3 text-[15px] font-extrabold leading-5 text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55"
-                onClick={handlePrimary}
-                disabled={disabled}
-              >
-                {copy.primary}
-              </button>
-              {step !== "idea" ? (
-                <button
-                  type="button"
-                  className="inline-flex min-h-12 items-center justify-center rounded-[8px] border border-hairline bg-canvas px-5 py-3 text-[15px] font-extrabold leading-5 text-body transition-colors hover:bg-surface-soft hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55"
-                  onClick={handleSecondary}
-                  disabled={disabled}
-                >
-                  {copy.secondary}
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </motion.section>
-      </AnimatePresence>
-    </div>
-  );
-}
-
-function GuruLensContextHeader({
-  lens,
-  locale,
-  compact = false,
-}: {
-  lens: GuruLensOption;
-  locale: string;
-  compact?: boolean;
-}) {
-  const isKo = locale === "ko";
-  const description = isKo ? lens.descriptionKo : lens.descriptionEn;
-  const detail = isKo ? lens.detailKo : lens.detailEn;
-  const displayName = getGuruLensDisplayName(lens, locale);
-
-  return (
-    <div
-      className={[
-        "mx-auto w-full max-w-4xl border-b border-hairline pb-base",
-        compact ? "mb-base" : "mb-lg",
-      ].join(" ")}
-    >
-      <div className="flex min-w-0 items-start">
-        <div className="min-w-0">
-          <p className="font-mono text-[11px] font-black uppercase tracking-[0.14em] text-primary">
-            Guru lens
-          </p>
-          <h2 className="mt-1 text-[24px] font-black leading-8 text-ink sm:text-[32px] sm:leading-9">
-            {displayName}
-          </h2>
-          <p className="mt-2 text-[15px] font-bold leading-6 text-body">
-            {description}
-          </p>
-          <p className="mt-1 max-w-2xl text-[13px] font-semibold leading-6 text-muted">
-            {detail}
-          </p>
-        </div>
-      </div>
-      {!compact ? (
-        <Link
-          href={locale === DEFAULT_LOCALE ? "/guru" : `/guru?locale=${locale}`}
-          className="mt-sm inline-flex min-h-10 items-center gap-1 rounded-[8px] border border-hairline bg-canvas px-3 text-[13px] font-extrabold text-body transition-colors hover:border-outline hover:bg-surface-soft hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          <span aria-hidden="true" className="material-symbols-outlined text-[17px]">
-            arrow_back
-          </span>
-          {isKo ? "다른 구루 선택" : "Choose another guru"}
-        </Link>
-      ) : null}
-    </div>
-  );
-}
 
 function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
   const router = useRouter();
@@ -601,6 +90,7 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
   const localeParam = searchParams.get("locale");
   const runKindParam = searchParams.get("runKind");
   const guruParam = searchParams.get("guru");
+  const entryParam = searchParams.get("entry");
   const isDiscoverRoute = pathname === "/discover";
   const isGuruRoute = pathname === "/guru";
   const isGuruWorkspace = workspace === "guru" || isGuruRoute;
@@ -619,46 +109,16 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
 
   const sessionId = existingSessionId;
   const [sessionError, setSessionError] = useState<string | null>(null);
-  const [shareStarter, setShareStarter] = useState<ShareStarter | null>(null);
-  const [companyMetaByTicker, setCompanyMetaByTicker] = useState<
-    Record<string, CompanyMeta>
-  >({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const composerHostRef = useRef<HTMLDivElement>(null);
-  const hasLoadedRef = useRef(false);
   const cancelledRef = useRef(false);
-  const lastRefreshedRunIdRef = useRef<string | null>(null);
-  const budgetAlertTrackedRef = useRef<string | null>(null);
-  const prefilledQuestionTrackedRef = useRef<string | null>(null);
-  const loadedShareTokenRef = useRef<string | null>(null);
-  const startedDraftMessageIdsRef = useRef<Set<string>>(new Set());
-  const prevMessagesCountRef = useRef(0);
   const { entitlement, refresh: refreshEntitlement } = useEntitlement();
   const [researchMode, setResearchMode] = useResearchModePreference(sessionId);
-  const effectiveResearchMode: ResearchMode = isIdeaGeneration
+  const effectiveResearchMode: ResearchMode = isIdeaGeneration || isGuruAdvisor
     ? "deep"
     : researchMode;
   const [composerDraftResetKey, setComposerDraftResetKey] = useState(0);
-  const [discoverGuideStep, setDiscoverGuideStep] =
-    useState<DiscoverGuideStep>("url");
-  const [discoverUrlDraft, setDiscoverUrlDraft] = useState("");
-  const [discoverUrlError, setDiscoverUrlError] = useState<string | null>(null);
-  const [discoverIdeaDraft, setDiscoverIdeaDraft] = useState("");
-  const [discoverIdeaError, setDiscoverIdeaError] = useState<string | null>(null);
   const composerRef = useRef<ComposerHandle>(null);
-
-  const isDraftRoute = pathname === "/chat/new" || isDiscoverRoute || isGuruRoute;
-  const shareStarterTicker = normalizeTicker(shareStarter?.tickers[0] ?? "");
-  const activeTicker = isGuruAdvisor
-    ? null
-    : normalizeTicker(ticker ?? "") ?? shareStarterTicker;
-  const selectedGuruLensKey = normalizeGuruLensKey(guruParam) ?? "auto";
-  const selectedGuruLens = getGuruLens(selectedGuruLensKey);
-  const withGuruLensPrefix = useCallback(
-    (message: string) =>
-      `${getGuruLensPromptPrefix(selectedGuruLens, responseLocale)}\n${message.trim()}`,
-    [responseLocale, selectedGuruLens],
-  );
 
   // H-07: cleanup on unmount to prevent race condition
   useEffect(() => {
@@ -668,61 +128,22 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
     };
   }, []);
 
-  useEffect(() => {
-    if (existingSessionId || !activeTicker) return;
+  const { shareStarter, clearShareStarter } = useShareStarter({
+    shareToken,
+    cancelledRef,
+    onSessionError: setSessionError,
+  });
 
-    let stale = false;
-    const tickerToValidate = activeTicker;
+  const isDraftRoute = pathname === "/chat/new" || isDiscoverRoute || isGuruRoute;
+  const shareStarterTicker = normalizeTicker(shareStarter?.tickers[0] ?? "");
+  const activeTicker = normalizeTicker(ticker ?? "") ?? shareStarterTicker;
+  const selectedGuruLensKey = normalizeGuruLensKey(guruParam) ?? "auto";
+  const selectedGuruLens = getGuruLens(selectedGuruLensKey);
 
-    async function validateTicker() {
-      const normalizedTicker = tickerToValidate.trim().toUpperCase();
-      try {
-        const res = await fetch(
-          `/api/companies?ticker=${encodeURIComponent(normalizedTicker)}`,
-          { cache: "no-store" },
-        );
-        const data = (await res.json()) as CompaniesResponse;
-        const isIndexed =
-          res.ok &&
-          data.companies?.some(
-            (company) => company.ticker === normalizedTicker,
-          );
-        const matchedCompany = data.companies?.find(
-          (company) => company.ticker === normalizedTicker,
-        );
-
-        if (matchedCompany && !stale && !cancelledRef.current) {
-          setCompanyMetaByTicker((current) => ({
-            ...current,
-            [normalizedTicker]: {
-              ticker: normalizedTicker,
-              name:
-                matchedCompany.name && matchedCompany.name !== normalizedTicker
-                  ? matchedCompany.name
-                  : null,
-              sector: matchedCompany.sector ?? null,
-            },
-          }));
-        }
-
-        if (!isIndexed && !stale && !cancelledRef.current) {
-          setSessionError(
-            `현재 온톨로지 인덱스에 없는 회사입니다: ${normalizedTicker}`,
-          );
-        }
-      } catch {
-        if (!stale && !cancelledRef.current) {
-          setSessionError("회사 인덱스를 확인하지 못했습니다.");
-        }
-      }
-    }
-
-    validateTicker();
-
-    return () => {
-      stale = true;
-    };
-  }, [activeTicker, existingSessionId]);
+  const guruCompanyPicker = useGuruCompanyPicker({
+    enabled: isGuruAdvisor,
+    locale: responseLocale,
+  });
 
   const effectiveSessionError =
     existingSessionId || !activeTicker ? null : sessionError;
@@ -736,6 +157,7 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
             createdSessionId,
             responseLocale,
             selectedGuruLens.key,
+            activeTicker,
           ),
           { scroll: false },
         );
@@ -745,6 +167,7 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
         buildChatSessionHref(createdSessionId, {
           locale: responseLocale,
           ticker: activeTicker,
+          runKind: requestedRunKind,
         }),
         { scroll: false },
       );
@@ -754,6 +177,7 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
       existingSessionId,
       isDraftRoute,
       isGuruAdvisor,
+      requestedRunKind,
       responseLocale,
       router,
       selectedGuruLens.key,
@@ -775,6 +199,17 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
   const isQueued = chat.status === "queued" || chat.activity?.stage === "queued";
   const isRunning = chat.status === "running";
   const isActiveRun = isQueued || isRunning;
+
+  const contextTickers = getSessionTickers(chat.session, activeTicker);
+  const contextTickersKey = contextTickers.join(",");
+  const { companyMetaByTicker, setCompanyMetaByTicker } = useChatCompanyMeta({
+    activeTicker,
+    existingSessionId,
+    contextTickers,
+    contextTickersKey,
+    cancelledRef,
+    onSessionError: setSessionError,
+  });
 
   // ---------------------------------------------------------------------------
   // Mobile dock state machine
@@ -804,79 +239,21 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
     isStreaming: isActiveRun,
   });
 
-  // ---------------------------------------------------------------------------
-  // Session hydration & lifecycle
-  // ---------------------------------------------------------------------------
-
-  useEffect(() => {
-    if (chat.status !== "completed" && chat.status !== "failed") return;
-    if (!chat.runId || lastRefreshedRunIdRef.current === chat.runId) return;
-
-    lastRefreshedRunIdRef.current = chat.runId;
-    void refreshEntitlement();
-  }, [chat.runId, chat.status, refreshEntitlement]);
-
-  // H-08: stable loadSession via ref-based guard
-  const loadSessionRef = useRef(chat.loadSession);
-
-  useEffect(() => {
-    loadSessionRef.current = chat.loadSession;
-  }, [chat.loadSession]);
-
-  useEffect(() => {
-    hasLoadedRef.current = false;
-  }, [sessionId]);
-
-  useEffect(() => {
-    if (!sessionId || !draftMessageId) return;
-
-    const draftMessage = readDraftMessage(draftMessageId);
-    if (!draftMessage) return;
-    if (startedDraftMessageIdsRef.current.has(draftMessageId)) return;
-
-    hasLoadedRef.current = true;
-    const timeoutId = window.setTimeout(() => {
-      if (startedDraftMessageIdsRef.current.has(draftMessageId)) return;
-      startedDraftMessageIdsRef.current.add(draftMessageId);
-      void sendMessage(draftMessage.content, {
-        requestId: draftMessage.requestId,
-        runKind: draftMessage.runKind,
-        userUrl: draftMessage.userUrl,
-        userUrls: draftMessage.userUrls,
-        attachmentIds: draftMessage.attachmentIds,
-      }).finally(() => {
-        if (cancelledRef.current) return;
-        removeDraftMessage(draftMessageId);
-        const cleanedSessionHref = isGuruAdvisor
-          ? buildGuruSessionHref(sessionId, responseLocale, selectedGuruLens.key)
-          : buildChatSessionHref(sessionId, {
-              locale: responseLocale,
-              ticker: activeTicker,
-            });
-        window.history.replaceState(
-          window.history.state,
-          "",
-          cleanedSessionHref,
-        );
-      });
-    }, 0);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [
-    activeTicker,
-    draftMessageId,
-    isGuruAdvisor,
-    responseLocale,
-    sendMessage,
-    selectedGuruLens.key,
+  useChatSessionLifecycle({
     sessionId,
-  ]);
-
-  useEffect(() => {
-    if (!sessionId || hasLoadedRef.current) return;
-    hasLoadedRef.current = true;
-    loadSessionRef.current();
-  }, [sessionId]);
+    draftMessageId,
+    activeTicker,
+    isGuruAdvisor,
+    requestedRunKind,
+    responseLocale,
+    guruLensKey: selectedGuruLens.key,
+    chatStatus: chat.status,
+    chatRunId: chat.runId,
+    sendMessage,
+    loadSession: chat.loadSession,
+    refreshEntitlement,
+    cancelledRef,
+  });
 
   // ---------------------------------------------------------------------------
   // Derived state
@@ -884,7 +261,9 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
 
   const isHydratingSession = Boolean(sessionId && chat.isHydratingSession);
   const isBudgetBlocked = entitlement?.usage.can_run === false;
-  const isCreditLimitError = isCreditLimitErrorMessage(chat.error);
+  const userFacingChatError = toUserFacingChatError(chat.error);
+  const isInputError = isChatInputError(userFacingChatError);
+  const isCreditLimitError = isWeeklyAnalysisLimitError(userFacingChatError);
   const shouldPreviewCreditLimitCard =
     ALWAYS_SHOW_CREDIT_LIMIT_CARD_IN_DEV && !chat.error;
   const shouldShowCreditLimitCard =
@@ -901,6 +280,21 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
       message.status === "completed" &&
       message.content.trim().length > 0,
   );
+  const latestCompletedAssistantMessage = [...chat.messages]
+    .reverse()
+    .find(
+      (message) =>
+        message.role === "assistant" &&
+        message.status === "completed" &&
+        message.content.trim().length > 0,
+    );
+  const retryPrompt =
+    chat.lastAttemptedContent ??
+    [...chat.messages]
+      .reverse()
+      .find((message) => message.role === "user" && message.content.trim())
+      ?.content ??
+    null;
   const shouldShowDiscoverGuide =
     isIdeaGeneration &&
     chat.messages.length === 0 &&
@@ -914,177 +308,50 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
     y: 4,
   };
 
-  // ---------------------------------------------------------------------------
-  // Auto-scroll to bottom
-  // ---------------------------------------------------------------------------
-
-  useEffect(() => {
-    if (!hasConversationContent) return;
-    if (!shouldStickToBottomRef.current) return;
-    if (!isActiveRun && chat.messages.length === prevMessagesCountRef.current) {
-      return;
-    }
-
-    const frameId = window.requestAnimationFrame(scrollToBottom);
-    return () => window.cancelAnimationFrame(frameId);
-  }, [
-    chat.messages.length,
-    chat.streamingContent,
+  useChatScrollEffects({
+    sessionId,
+    messageCount: chat.messages.length,
+    streamingContent: chat.streamingContent,
     hasConversationContent,
     isActiveRun,
-    scrollToBottom,
     shouldStickToBottomRef,
-  ]);
-
-  useEffect(() => {
-    prevMessagesCountRef.current = chat.messages.length;
-  }, [chat.messages.length]);
-
-  // ---------------------------------------------------------------------------
-  // Hash-based message scrolling
-  // ---------------------------------------------------------------------------
-
-  useEffect(() => {
-    if (!sessionId || chat.messages.length === 0) return;
-    const hash = window.location.hash.slice(1);
-    if (!hash.startsWith("message-")) return;
-
-    const frameId = window.requestAnimationFrame(() => {
-      const target = document.getElementById(hash);
-      const surface = getScrollSurface();
-      if (!target || !surface) return;
-
-      const surfaceTop = isBodyScrollChat
-        ? 0
-        : surface.getBoundingClientRect().top;
-      const targetTop =
-        target.getBoundingClientRect().top - surfaceTop + surface.scrollTop;
-      surface.scrollTop = Math.max(
-        0,
-        targetTop - getScrollViewportHeight(surface) / 2,
-      );
-    });
-
-    return () => window.cancelAnimationFrame(frameId);
-  }, [
-    chat.messages.length,
+    scrollToBottom,
     getScrollSurface,
     getScrollViewportHeight,
     isBodyScrollChat,
-    sessionId,
-  ]);
+  });
 
   // ---------------------------------------------------------------------------
   // Context tickers & suggested prompts
   // ---------------------------------------------------------------------------
 
-  const contextTickers = getSessionTickers(chat.session, activeTicker);
-  const contextTickersKey = contextTickers.join(",");
-  const contextCompanies = contextTickers.map((contextTicker) => {
-    const normalizedTicker = contextTicker.trim().toUpperCase();
-    return (
-      companyMetaByTicker[normalizedTicker] ?? {
-        ticker: normalizedTicker,
-        name: null,
-        sector: null,
-      }
-    );
+  const {
+    contextLabel,
+    contextTickerText,
+    contextDisplayText,
+    contextNameText,
+    contextSectorText,
+    headerActionTicker,
+    primaryContextCompany,
+    guruContextCompany,
+    suggestedPrompts,
+    emptyStateCopy,
+    initialComposerValue,
+    prefillSource,
+  } = deriveChatPresentationContext({
+    contextTickers,
+    companyMetaByTicker,
+    responseLocale,
+    isGuruAdvisor,
+    isIdeaGeneration,
+    selectedGuruLens,
+    queryParam,
+    templateId,
+    shareToken,
+    shareStarter,
+    templateTopic,
+    activeTicker,
   });
-  const contextLabel = contextCompanies
-    .map((company) =>
-      company.name ? `${company.name} (${company.ticker})` : company.ticker,
-    )
-    .join(", ");
-  const contextTickerText = contextCompanies
-    .map((company) => company.ticker)
-    .join(" / ");
-  const contextDisplayText = contextCompanies
-    .map((company) => {
-      const copy = getCompanyDisplayCopyForTicker(responseLocale, company.ticker);
-      return copy.companyNameKo || copy.name || company.name || company.ticker;
-    })
-    .join(" / ");
-  const contextNameText = contextCompanies
-    .map((company) => company.name)
-    .filter((name): name is string => Boolean(name))
-    .join(", ");
-  const contextSectorText = Array.from(
-    new Set(
-      contextCompanies
-        .map((company) => company.sector)
-        .filter((sector): sector is string => Boolean(sector)),
-    ),
-  ).join(" / ");
-  const headerActionTicker = contextTickers[0] ?? null;
-  const primaryContextCompany = contextCompanies[0] ?? null;
-  const guruSuggestedPrompts = getGuruSuggestedPrompts(
-    selectedGuruLens,
-    responseLocale,
-  );
-  const selectedGuruDisplayName = getGuruLensDisplayName(
-    selectedGuruLens,
-    responseLocale,
-  );
-  const suggestedPrompts = isGuruAdvisor
-    ? guruSuggestedPrompts
-    : getSuggestedPromptDisplaysForTickers(responseLocale, contextTickers);
-  const emptyStateCopy = isIdeaGeneration
-    ? responseLocale === "ko"
-      ? {
-          headingWithContext: "어떤 종목을 발굴할까요?",
-          headingWithoutContext: "어떤 종목을 발굴할까요?",
-          descriptionWithoutContext:
-            "아이디어, 산업, 리스크, 재무 조건을 넣으면 관련 회사를 넓게 찾아봅니다.",
-        }
-      : {
-          headingWithContext: "What stocks should we discover?",
-          headingWithoutContext: "What stocks should we discover?",
-          descriptionWithoutContext:
-            "Enter an idea, industry, risk, or financial condition to explore related companies broadly.",
-        }
-    : isGuruAdvisor
-      ? responseLocale === "ko"
-        ? {
-            headingWithContext: selectedGuruDisplayName,
-            headingWithoutContext: selectedGuruDisplayName,
-            descriptionWithoutContext:
-              `${selectedGuruLens.descriptionKo} ${selectedGuruLens.detailKo}`,
-          }
-        : {
-            headingWithContext: selectedGuruDisplayName,
-            headingWithoutContext: selectedGuruDisplayName,
-            descriptionWithoutContext:
-              `${selectedGuruLens.descriptionEn} ${selectedGuruLens.detailEn}`,
-          }
-    : responseLocale === "ko"
-        ? {
-          headingWithContext: `${contextDisplayText}에서 무엇을 확인할까요?`,
-          headingWithoutContext: "와이드 리서치",
-          descriptionWithoutContext:
-            "회사를 모를 때는 아이디어·산업·리스크 조건으로 연관 기업을 넓게 찾아봅니다.",
-        }
-      : {
-          headingWithContext: `What should we check for ${contextDisplayText}?`,
-          headingWithoutContext: "Wide research",
-          descriptionWithoutContext:
-            "When you do not know the company yet, use idea, industry, and risk conditions to expand the candidate set.",
-        };
-  const queryValue = queryParam?.trim() || null;
-  const shareQuestionValue = shareStarter?.question_content.trim() || null;
-  const templateQuestion =
-    templateTopic &&
-    activeTicker?.trim().toUpperCase() === templateTopic.questionChain.ticker
-      ? templateTopic.questionChain.primaryQuestion
-      : (templateTopic?.question ?? null);
-  const initialComposerValue =
-    queryValue ?? shareQuestionValue ?? templateQuestion ?? undefined;
-  const prefillSource = queryValue
-    ? "url_query"
-    : shareQuestionValue
-      ? "share_cta"
-      : templateTopic
-      ? "template_id"
-      : null;
   const hasComposerPrefillParams = Boolean(
     queryParam || templateId || shareToken || shareStarter,
   );
@@ -1135,11 +402,12 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
       : isDraftRoute
         ? "/chat/new"
         : "/chat";
-    setShareStarter(null);
+    clearShareStarter();
     router.replace(`${basePath}${nextQuery ? `?${nextQuery}` : ""}`, {
       scroll: false,
     });
   }, [
+    clearShareStarter,
     hasComposerPrefillParams,
     isDiscoverRoute,
     isDraftRoute,
@@ -1148,148 +416,13 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
     serializedSearchParams,
   ]);
 
-  useEffect(() => {
-    const token = shareToken?.trim();
-    if (!token) {
-      loadedShareTokenRef.current = null;
-      return;
-    }
-
-    if (loadedShareTokenRef.current === token) return;
-    loadedShareTokenRef.current = token;
-    const shareTokenValue = token;
-    setShareStarter(null);
-
-    let stale = false;
-
-    async function loadShareStarter() {
-      try {
-        const response = await fetch(
-          `/api/share/${encodeURIComponent(shareTokenValue)}/starter`,
-          { cache: "no-store" },
-        );
-        const data = (await response.json().catch(() => null)) as
-          | Partial<ShareStarter>
-          | { error?: { message?: string } }
-          | null;
-
-        if (stale || cancelledRef.current) return;
-
-        if (!response.ok || !data || !("question_content" in data)) {
-          setSessionError("공유된 질문을 불러오지 못했습니다.");
-          return;
-        }
-
-        const question = data.question_content?.trim();
-        if (!question) {
-          setSessionError("공유된 질문을 불러오지 못했습니다.");
-          return;
-        }
-
-        setSessionError(null);
-        setShareStarter({
-          question_content: question,
-          tickers: Array.isArray(data.tickers)
-            ? data.tickers.filter(
-                (value): value is string => typeof value === "string",
-              )
-            : [],
-          title: typeof data.title === "string" ? data.title : null,
-        });
-      } catch {
-        if (!stale && !cancelledRef.current) {
-          setSessionError("공유된 질문을 불러오지 못했습니다.");
-        }
-      }
-    }
-
-    loadShareStarter();
-
-    return () => {
-      stale = true;
-    };
-  }, [shareToken]);
-
-  // ---------------------------------------------------------------------------
-  // Analytics
-  // ---------------------------------------------------------------------------
-
-  useEffect(() => {
-    const trimmedQuestion = initialComposerValue?.trim();
-    if (!trimmedQuestion || !prefillSource) return;
-
-    const eventKey = `${prefillSource}:${templateTopic?.slug ?? "custom"}:${trimmedQuestion}:${contextTickersKey || "global"}`;
-    if (prefilledQuestionTrackedRef.current === eventKey) return;
-    prefilledQuestionTrackedRef.current = eventKey;
-
-    const analyticsTickers = contextTickersKey
-      ? contextTickersKey.split(",").filter(Boolean)
-      : [];
-
-    trackClientEventSilently("question_prefilled", {
-      source: prefillSource,
-      template_id: templateTopic?.slug ?? null,
-      ticker: analyticsTickers[0] ?? null,
-      tickers: analyticsTickers,
-      question_length: trimmedQuestion.length,
-    });
-  }, [contextTickersKey, initialComposerValue, prefillSource, templateTopic?.slug]);
-
-  useEffect(() => {
-    if (contextTickers.length === 0) return;
-
-    let stale = false;
-    const missingTickers = contextTickers
-      .map((contextTicker) => contextTicker.trim().toUpperCase())
-      .filter((contextTicker) => !companyMetaByTicker[contextTicker]);
-
-    if (missingTickers.length === 0) return;
-
-    async function loadCompanyMeta() {
-      const entries = await Promise.all(
-        missingTickers.map(async (missingTicker) => {
-          try {
-            const res = await fetch(
-              `/api/companies?ticker=${encodeURIComponent(missingTicker)}`,
-              { cache: "no-store" },
-            );
-            const data = (await res.json()) as CompaniesResponse;
-            const company = data.companies?.find(
-              (item) => item.ticker === missingTicker,
-            );
-            return [
-              missingTicker,
-              {
-                ticker: missingTicker,
-                name:
-                  company?.name && company.name !== missingTicker
-                    ? company.name
-                    : null,
-                sector: company?.sector ?? null,
-              },
-            ] as const;
-          } catch {
-            return [
-              missingTicker,
-              { ticker: missingTicker, name: null, sector: null },
-            ] as const;
-          }
-        }),
-      );
-
-      if (stale || cancelledRef.current) return;
-      setCompanyMetaByTicker((current) => ({
-        ...current,
-        ...Object.fromEntries(entries),
-      }));
-    }
-
-    loadCompanyMeta();
-
-    return () => {
-      stale = true;
-    };
-  }, [companyMetaByTicker, contextTickers, contextTickersKey]);
+  useChatAnalytics({
+    initialComposerValue,
+    prefillSource,
+    templateSlug: templateTopic?.slug,
+    contextTickersKey,
+    entitlement,
+  });
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -1314,9 +447,7 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
         resetManualScroll: true,
       });
 
-      const outboundContent = isGuruAdvisor
-        ? withGuruLensPrefix(trimmed)
-        : trimmed;
+      const outboundContent = trimmed;
 
       if (!sessionId) {
         const createdSessionId = await createSessionForDraft();
@@ -1335,8 +466,8 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
           !storeDraftMessage(nextDraftMessageId, {
             content: outboundContent,
             requestId: nextRequestId,
-            ...(isIdeaGeneration ? { runKind: "idea_generation" } : {}),
-            ...(isGuruAdvisor ? { runKind: "guru_advisor" } : {}),
+            ...(requestedRunKind ? { runKind: requestedRunKind } : {}),
+            ...(isGuruAdvisor ? { guruLensKey: selectedGuruLens.key } : {}),
             userUrl: options?.userUrl,
             userUrls: options?.userUrls,
             attachmentIds: options?.attachmentIds,
@@ -1350,7 +481,7 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
         }
 
         setComposerDraftResetKey((value) => value + 1);
-        setShareStarter(null);
+        clearShareStarter();
 
         const nextParams = new URLSearchParams({
           sessionId: createdSessionId,
@@ -1358,6 +489,9 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
         });
         if (activeTicker) {
           nextParams.set("ticker", activeTicker);
+        }
+        if (requestedRunKind && !isGuruAdvisor) {
+          nextParams.set("runKind", requestedRunKind);
         }
         if (isGuruAdvisor && selectedGuruLens.key !== "auto") {
           nextParams.set("guru", selectedGuruLens.key);
@@ -1377,7 +511,8 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
       clearComposerPrefillParams();
       try {
         const result = await sendMessage(outboundContent, {
-          runKind: isGuruAdvisor ? "guru_advisor" : undefined,
+          runKind: requestedRunKind,
+          guruLensKey: isGuruAdvisor ? selectedGuruLens.key : undefined,
           userUrl: options?.userUrl,
           userUrls: options?.userUrls,
           attachmentIds: options?.attachmentIds,
@@ -1397,18 +532,18 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
     [
       activeTicker,
       clearComposerPrefillParams,
+      clearShareStarter,
       createSessionForDraft,
       router,
       sendMessage,
       sessionId,
       responseLocale,
       isGuruAdvisor,
-      isIdeaGeneration,
+      requestedRunKind,
       selectedGuruLens.key,
       setComposerExpanded,
       setSessionError,
       shouldStickToBottomRef,
-      withGuruLensPrefix,
     ],
   );
 
@@ -1417,88 +552,54 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
     await handleSend(prompt);
   }
 
-  const requestComposerAction = useCallback(
-    (type: Parameters<ComposerHandle["requestAction"]>[0]) => {
-      composerRef.current?.requestAction(type);
-    },
-    [],
-  );
+  const discoverGuide = useDiscoverGuide({
+    composerRef,
+    responseLocale,
+    onSend: handleSend,
+    initialStep: entryParam === "onboarding" ? "idea" : "url",
+  });
 
-  const handleDiscoverCommitUrl = useCallback(() => {
-    const normalizedUrl = normalizeDiscoverUrl(discoverUrlDraft);
-    if (!normalizedUrl) {
-      setDiscoverUrlError(
-        responseLocale === "ko"
-          ? "확인할 URL을 입력하거나 건너뛰기를 눌러주세요."
-          : "Enter a URL to continue, or skip this step.",
-      );
-      return;
+  function openGuruCompanyPicker() {
+    guruCompanyPicker.open(activeTicker ?? "");
+  }
+
+  function handleGuruCompanySelect(company: CompanyMeta) {
+    const normalizedTicker = company.ticker.trim().toUpperCase();
+    if (!normalizedTicker) return;
+
+    setCompanyMetaByTicker((current) => ({
+      ...current,
+      [normalizedTicker]: { ...company, ticker: normalizedTicker },
+    }));
+    guruCompanyPicker.close();
+
+    const params = new URLSearchParams();
+    params.set("ticker", normalizedTicker);
+    if (selectedGuruLens.key !== "auto") {
+      params.set("guru", selectedGuruLens.key);
+    }
+    if (responseLocale !== DEFAULT_LOCALE) {
+      params.set("locale", responseLocale);
     }
 
-    const committed = composerRef.current?.commitUserUrls([normalizedUrl]);
-    if (!committed) {
-      setDiscoverUrlError(
-        responseLocale === "ko"
-          ? "http 또는 https URL만 입력할 수 있습니다."
-          : "Only http or https URLs can be attached.",
-      );
-      return;
-    }
-
-    setDiscoverUrlDraft(normalizedUrl);
-    setDiscoverUrlError(null);
-    setDiscoverGuideStep("file");
-  }, [discoverUrlDraft, responseLocale]);
-
-  const handleDiscoverSkipUrl = useCallback(() => {
-    setDiscoverUrlError(null);
-    setDiscoverGuideStep("file");
-  }, []);
-
-  const handleDiscoverAddFile = useCallback(() => {
-    requestComposerAction("file");
-  }, [requestComposerAction]);
-
-  const handleDiscoverSkipFile = useCallback(() => {
-    setDiscoverGuideStep("idea");
-  }, []);
-
-  const handleDiscoverSubmitIdea = useCallback(() => {
-    const trimmedIdea = discoverIdeaDraft.trim();
-    if (!trimmedIdea) {
-      setDiscoverIdeaError(
-        responseLocale === "ko"
-          ? "발굴할 아이디어나 산업, 리스크 키워드를 입력해주세요."
-          : "Enter an idea, industry, or risk keyword to start discovery.",
-      );
-      return;
-    }
-
-    setDiscoverIdeaError(null);
-    composerRef.current?.submitWithValue(trimmedIdea);
-  }, [discoverIdeaDraft, responseLocale]);
-
-  const handleDiscoverUserUrlsChange = useCallback((hasUserUrls: boolean) => {
-    if (hasUserUrls) {
-      setDiscoverUrlError(null);
-      setDiscoverGuideStep((current) => (current === "url" ? "file" : current));
-    }
-  }, []);
-
-  const handleDiscoverAttachmentsChange = useCallback(
-    (hasAttachments: boolean) => {
-      if (hasAttachments) {
-        setDiscoverGuideStep((current) =>
-          current === "file" ? "idea" : current,
-        );
-      }
-    },
-    [],
-  );
+    router.push(`/guru?${params.toString()}`);
+  }
 
   const handleCancel = useCallback(async () => {
     await cancelRun();
   }, [cancelRun]);
+
+  const handleRetry = useCallback(() => {
+    if (!retryPrompt || isBudgetBlocked || isActiveRun) return;
+    void handleSend(retryPrompt);
+  }, [handleSend, isActiveRun, isBudgetBlocked, retryPrompt]);
+
+  const handleShowPriorEvidence = useCallback(() => {
+    if (!latestCompletedAssistantMessage) return;
+    document
+      .getElementById(`chat-message-${latestCompletedAssistantMessage.id}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [latestCompletedAssistantMessage]);
 
   const handleNewsEventSelection = useCallback(
     async (params: { artifactId: string; eventId: string }) => {
@@ -1518,35 +619,17 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
     return () => window.removeEventListener("keydown", handler);
   }, [handleCancel, isActiveRun]);
 
-  useEffect(() => {
-    const alertLevel = entitlement?.usage.alert_level;
-    if (!alertLevel || alertLevel === "ok") return;
-
-    const eventKey = `${entitlement.plan.key}:${entitlement.usage.period_start}:${alertLevel}:${entitlement.usage.budget_used_usd}:${entitlement.usage.budget_reserved_usd}`;
-    if (budgetAlertTrackedRef.current === eventKey) return;
-    budgetAlertTrackedRef.current = eventKey;
-
-    trackClientEventSilently(
-      alertLevel === "blocked" ? "usage_limit_reached" : "usage_warning_shown",
-      {
-        plan: entitlement.plan.key,
-        budget_used_usd: entitlement.usage.budget_used_usd,
-        budget_reserved_usd: entitlement.usage.budget_reserved_usd,
-        budget_limit_usd: entitlement.usage.budget_limit_usd,
-        percent_used: entitlement.usage.percent_used,
-      },
-    );
-  }, [entitlement]);
-
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
+  const mobileComposerBottomBuffer = isGuruAdvisor ? 72 : 28;
+  const mobileCompactComposerHeight = isGuruAdvisor ? 116 : 88;
   const mobileComposerSpacerHeight = isBodyScrollChat
     ? shouldHideDiscoverComposer
       ? 0
       : isComposerCompact
-        ? 88 + keyboardOffset
-        : composerHeight + keyboardOffset + 28
+        ? mobileCompactComposerHeight + keyboardOffset
+        : composerHeight + keyboardOffset + mobileComposerBottomBuffer
     : undefined;
 
   return (
@@ -1566,6 +649,9 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
               showNotebookOnboarding={
                 ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV ||
                 hasCompletedAssistantAnswer
+              }
+              forceShowNotebookOnboarding={
+                ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV
               }
             />
           ) : null
@@ -1679,50 +765,63 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
                     chat.status === "completed";
 
                   return (
-                    <ChatMessage
+                    <div
                       key={msg.id}
-                      role={msg.role}
-                      content={msg.content}
-                      metadata={msg.metadata}
-                      status={msg.status}
-                      messageId={msg.role === "assistant" ? msg.id : undefined}
-                      createdAt={
-                        msg.role === "assistant" ? msg.created_at : undefined
-                      }
-                      citations={
-                        isLatestAssistantMessage ? chat.citations : undefined
-                      }
-                      artifacts={
+                      id={
                         msg.role === "assistant"
-                          ? chat.artifactsByMessageId[msg.id]
+                          ? `chat-message-${msg.id}`
                           : undefined
                       }
-                      charts={
-                        msg.role === "assistant"
-                          ? chat.chartsByMessageId[msg.id]
-                          : undefined
-                      }
-                      artifactSelections={chat.artifactSelections}
-                      onSelectNewsEvent={handleNewsEventSelection}
-                      onFollowUpQuestionSelect={(question) => {
-                        void handlePromptSend(question);
-                      }}
-                      followUpQuestionDisabled={isActiveRun || isBudgetBlocked}
-                      newsEventSelectionDisabled={isActiveRun || isBudgetBlocked}
-                      showHeader={idx === 0 || arr[idx - 1]?.role !== "assistant"}
-                      toolCalls={
-                        isLatestAssistantMessage ? chat.toolCalls : undefined
-                      }
-                      workDurationMs={
-                        isLatestAssistantMessage && msg.role === "assistant"
-                          ? chat.runDurationsByMessageId[msg.id]
-                          : null
-                      }
-                    />
+                    >
+                      <ChatMessage
+                        role={msg.role}
+                        content={msg.content}
+                        presentation={
+                          isGuruAdvisor && msg.role === "assistant"
+                            ? "guru"
+                            : "default"
+                        }
+                        metadata={msg.metadata}
+                        status={msg.status}
+                        messageId={msg.role === "assistant" ? msg.id : undefined}
+                        createdAt={
+                          msg.role === "assistant" ? msg.created_at : undefined
+                        }
+                        citations={
+                          isLatestAssistantMessage ? chat.citations : undefined
+                        }
+                        artifacts={
+                          msg.role === "assistant"
+                            ? chat.artifactsByMessageId[msg.id]
+                            : undefined
+                        }
+                        charts={
+                          msg.role === "assistant"
+                            ? chat.chartsByMessageId[msg.id]
+                            : undefined
+                        }
+                        artifactSelections={chat.artifactSelections}
+                        onSelectNewsEvent={handleNewsEventSelection}
+                        onFollowUpQuestionSelect={(question) => {
+                          void handlePromptSend(question);
+                        }}
+                        followUpQuestionDisabled={isActiveRun || isBudgetBlocked}
+                        newsEventSelectionDisabled={isActiveRun || isBudgetBlocked}
+                        showHeader={idx === 0 || arr[idx - 1]?.role !== "assistant"}
+                        toolCalls={
+                          isLatestAssistantMessage ? chat.toolCalls : undefined
+                        }
+                        workDurationMs={
+                          isLatestAssistantMessage && msg.role === "assistant"
+                            ? chat.runDurationsByMessageId[msg.id]
+                            : null
+                        }
+                      />
+                    </div>
                   );
                 })}
 
-              <AnimatePresence mode="wait" initial={false}>
+              <AnimatePresence initial={false}>
                 {isActiveRun && chat.streamingContent && (
                   <motion.div
                     key="streaming-content"
@@ -1737,6 +836,7 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
                     <ChatMessage
                       role="assistant"
                       content={chat.streamingContent}
+                      presentation={isGuruAdvisor ? "guru" : "default"}
                       isStreaming={true}
                       activity={chat.activity}
                       citations={chat.citations}
@@ -1763,6 +863,7 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
                     <ChatMessage
                       role="assistant"
                       content=""
+                      presentation={isGuruAdvisor ? "guru" : "default"}
                       isStreaming={true}
                       activity={chat.activity}
                       citations={chat.citations}
@@ -1795,19 +896,22 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
                       <div className="pl-0 sm:pl-[48px]">
                         {shouldShowCreditLimitCard ? (
                           <CreditLimitErrorCard entitlement={entitlement} />
-                        ) : (
+                        ) : isInputError ? (
                           <div
-                            className="rounded-[8px] border border-error/20 bg-error-container/10 p-base text-[15px] leading-[1.5] text-error sm:p-lg sm:text-[16px]"
+                            className="rounded-[8px] border border-error/20 bg-error-container/10 p-base text-[15px] font-medium leading-6 text-error sm:p-lg sm:text-[16px]"
                             role="alert"
                           >
-                            <span
-                              aria-hidden="true"
-                              className="material-symbols-outlined mr-xs text-[18px] align-middle"
-                            >
-                              error
-                            </span>
-                            {sanitizeError(chat.error ?? "")}
+                            {userFacingChatError}
                           </div>
+                        ) : (
+                          <RecoverableChatErrorCard
+                            message={userFacingChatError}
+                            supportCode={supportCodeFor(chat.runId, sessionId)}
+                            canRetry={Boolean(retryPrompt) && !isBudgetBlocked}
+                            hasPriorEvidence={Boolean(latestCompletedAssistantMessage)}
+                            onRetry={handleRetry}
+                            onShowPriorEvidence={handleShowPriorEvidence}
+                          />
                         )}
                       </div>
                     </div>
@@ -1865,35 +969,34 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
                         shouldShowDiscoverGuide ? (
                           <DiscoverGuideFlow
                             locale={responseLocale}
-                            step={discoverGuideStep}
+                            step={discoverGuide.step}
                             disabled={
-                              isBudgetBlocked || Boolean(effectiveSessionError)
+                              !discoverGuide.isClientReady ||
+                              !discoverGuide.isComposerReady ||
+                              isBudgetBlocked ||
+                              Boolean(effectiveSessionError)
                             }
-                            urlValue={discoverUrlDraft}
-                            urlError={discoverUrlError}
-                            ideaValue={discoverIdeaDraft}
-                            ideaError={discoverIdeaError}
-                            onUrlValueChange={(value) => {
-                              setDiscoverUrlDraft(value);
-                              setDiscoverUrlError(null);
-                            }}
-                            onCommitUrl={handleDiscoverCommitUrl}
-                            onSkipUrl={handleDiscoverSkipUrl}
-                            onAddFile={handleDiscoverAddFile}
-                            onSkipFile={handleDiscoverSkipFile}
-                            onIdeaValueChange={(value) => {
-                              setDiscoverIdeaDraft(value);
-                              setDiscoverIdeaError(null);
-                            }}
-                            onSubmitIdea={handleDiscoverSubmitIdea}
-                            onSelectExample={(prompt) => {
-                              setDiscoverIdeaDraft(prompt);
-                              setDiscoverIdeaError(null);
-                            }}
+                            urlValue={discoverGuide.urlValue}
+                            urlError={discoverGuide.urlError}
+                            ideaValue={discoverGuide.ideaValue}
+                            ideaError={discoverGuide.ideaError}
+                            onUrlValueChange={discoverGuide.onUrlValueChange}
+                            onCommitUrl={discoverGuide.onCommitUrl}
+                            onSkipUrl={discoverGuide.onSkipUrl}
+                            onAddFile={discoverGuide.onAddFile}
+                            onSkipFile={discoverGuide.onSkipFile}
+                            onIdeaValueChange={discoverGuide.onIdeaValueChange}
+                            onSubmitIdea={discoverGuide.onSubmitIdea}
+                            onSelectExample={discoverGuide.onSelectExample}
                           />
                         ) : null
                       ) : (
-                        <div className="grid gap-4">
+                        <div
+                          className="grid gap-4"
+                          data-onboarding-target={
+                            isGuruAdvisor ? "guru-suggested-prompts" : undefined
+                          }
+                        >
                           <SuggestedPromptActions
                             prompts={suggestedPrompts}
                             groupId={
@@ -2008,8 +1111,12 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
                     : "e.g. Companies converting backlog growth into revenue"
                   : isGuruAdvisor
                   ? responseLocale === "ko"
-                    ? "구루 렌즈로 투자 질문을 입력하세요..."
-                    : "Ask through a guru lens..."
+                    ? guruContextCompany
+                      ? "예: 이 기업을 오래 보유해도 될까요?"
+                      : "회사 선택 후 상담 질문을 입력하세요..."
+                    : guruContextCompany
+                      ? "e.g. Is this a business I can hold for years?"
+                      : "Choose a company, then ask your consultation question..."
                   : "기업에 대해 질문하세요..."
               }
               toolCalls={chat.toolCalls}
@@ -2029,14 +1136,41 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
               }
               attachmentCoachmarkEnabled={!isIdeaGeneration && !isGuruAdvisor}
               onUserUrlsChange={
-                isIdeaGeneration ? handleDiscoverUserUrlsChange : undefined
+                isIdeaGeneration ? discoverGuide.onUserUrlsChange : undefined
               }
               onAttachmentsChange={
-                isIdeaGeneration ? handleDiscoverAttachmentsChange : undefined
+                isIdeaGeneration ? discoverGuide.onAttachmentsChange : undefined
               }
               inputSurfaceVisible={!shouldHideDiscoverComposer}
               focusRequestKey={composerFocusRequestKey}
               onFocusChange={handleComposerFocusChange}
+              onReadyChange={discoverGuide.onComposerReadyChange}
+              extraTools={
+                isGuruAdvisor
+                  ? [
+                      {
+                        id: "guru-company",
+                        label:
+                          responseLocale === "ko"
+                            ? guruContextCompany
+                              ? "회사 변경"
+                              : "회사 선택"
+                            : guruContextCompany
+                              ? "Change company"
+                              : "Choose company",
+                        description:
+                          responseLocale === "ko"
+                            ? "상담할 커버리지 회사를 고릅니다."
+                            : "Choose a covered company for this consultation.",
+                        icon: "domain",
+                        badge: guruContextCompany?.ticker ?? "회사",
+                        onboardingTarget: "guru-company-tool",
+                        onClick: openGuruCompanyPicker,
+                        disabled: isActiveRun || isBudgetBlocked,
+                      },
+                    ]
+                  : []
+              }
             />
           </div>
 
@@ -2098,201 +1232,21 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
           </AnimatePresence>
         </div>
       </main>
-    </div>
-  );
-}
-
-function ChatWatchlistHeaderActions({
-  ticker,
-  showNotebookOnboarding,
-}: {
-  ticker: string;
-  showNotebookOnboarding: boolean;
-}) {
-  const normalizedTicker = normalizeTicker(ticker);
-  const [mark, setMark] = useState<UserCompanyMark | null>(null);
-  const [notebookUsage, setNotebookUsage] = useState<{
-    ticker: string;
-    hasBeenUsed: boolean;
-  } | null>(null);
-  const [pendingAction, setPendingAction] = useState<"watchlist" | "holding" | null>(
-    null,
-  );
-
-  useEffect(() => {
-    if (!normalizedTicker) return;
-
-    let stale = false;
-    const tickerForRequest = normalizedTicker;
-    async function loadMark() {
-      try {
-        const response = await fetch(
-          `/api/watchlist/${encodeURIComponent(tickerForRequest)}`,
-          { cache: "no-store" },
-        );
-        if (!response.ok) return;
-        const payload = (await response.json()) as {
-          company?: { mark?: UserCompanyMark };
-        };
-        if (!stale) setMark(payload.company?.mark ?? null);
-      } catch {
-        if (!stale) setMark(null);
-      }
-    }
-
-    void loadMark();
-    return () => {
-      stale = true;
-    };
-  }, [normalizedTicker]);
-
-  useEffect(() => {
-    if (
-      !normalizedTicker ||
-      !showNotebookOnboarding ||
-      ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV
-    ) {
-      return;
-    }
-
-    let stale = false;
-    const tickerForRequest = normalizedTicker;
-
-    async function loadNotebookUsage() {
-      try {
-        const response = await fetch(
-          `/api/watchlist/${encodeURIComponent(tickerForRequest)}/notebook`,
-          { cache: "no-store" },
-        );
-        if (!response.ok) return;
-        const payload = (await response.json()) as {
-          notebook?: UserCompanyNotebook;
-        };
-        if (!stale) {
-          setNotebookUsage({
-            ticker: tickerForRequest,
-            hasBeenUsed: Boolean(payload.notebook?.updated_at),
-          });
-        }
-      } catch {
-        if (!stale) {
-          setNotebookUsage({
-            ticker: tickerForRequest,
-            hasBeenUsed: false,
-          });
-        }
-      }
-    }
-
-    void loadNotebookUsage();
-    return () => {
-      stale = true;
-    };
-  }, [normalizedTicker, showNotebookOnboarding]);
-
-  if (!normalizedTicker) return null;
-
-  async function saveMark(action: "watchlist" | "holding") {
-    if (!normalizedTicker || pendingAction) return;
-
-    setPendingAction(action);
-    try {
-      const response = await fetch(
-        `/api/watchlist/${encodeURIComponent(normalizedTicker)}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            action === "holding"
-              ? { is_watchlisted: true, is_holding: true }
-              : { is_watchlisted: true },
-          ),
-        },
-      );
-      if (!response.ok) throw new Error("Failed to save watchlist mark");
-      const payload = (await response.json()) as { mark?: UserCompanyMark };
-      if (payload.mark) setMark(payload.mark);
-    } finally {
-      setPendingAction(null);
-    }
-  }
-
-  const notebookHasBeenUsed =
-    notebookUsage?.ticker === normalizedTicker ? notebookUsage.hasBeenUsed : null;
-  const shouldShowNotebookHint =
-    showNotebookOnboarding &&
-    (ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV || notebookHasBeenUsed === false);
-  const hasSavedMark = Boolean(mark?.is_watchlisted || mark?.is_holding);
-
-  return (
-    <div
-      className="relative flex items-center gap-1"
-      data-onboarding-target="chat-notebook-actions"
-    >
-      <ChatHeaderMarkButton
-        active={Boolean(mark?.is_watchlisted)}
-        disabled={pendingAction !== null}
-        icon="bookmark"
-        label={pendingAction === "watchlist" ? "저장" : "관심"}
-        onClick={() => void saveMark("watchlist")}
+      <GuruCompanyPicker
+        open={guruCompanyPicker.isOpen}
+        locale={responseLocale}
+        query={guruCompanyPicker.query}
+        results={guruCompanyPicker.results}
+        loading={guruCompanyPicker.loading}
+        error={guruCompanyPicker.error}
+        totalCount={guruCompanyPicker.totalCount}
+        hasMore={guruCompanyPicker.hasMore}
+        onQueryChange={guruCompanyPicker.onQueryChange}
+        onLoadMore={guruCompanyPicker.loadMore}
+        onSelect={handleGuruCompanySelect}
+        onClose={guruCompanyPicker.close}
       />
-      <ChatHeaderMarkButton
-        active={Boolean(mark?.is_holding)}
-        disabled={pendingAction !== null}
-        icon="inventory_2"
-        label={pendingAction === "holding" ? "저장" : "보유"}
-        onClick={() => void saveMark("holding")}
-      />
-      {shouldShowNotebookHint ? (
-        <div
-          className="absolute right-0 top-[calc(100%+8px)] z-30 inline-flex max-w-[calc(100vw-32px)] items-center rounded-[8px] border border-primary/25 bg-canvas px-3 py-2 text-left shadow-[0_12px_28px_rgba(15,23,42,0.16)]"
-          role="status"
-        >
-          <span
-            aria-hidden="true"
-            className="absolute right-9 top-[-5px] h-2.5 w-2.5 rotate-45 border-l border-t border-primary/25 bg-canvas"
-          />
-          <p className="min-w-0 whitespace-nowrap text-[12px] font-extrabold leading-5 text-ink">
-            {hasSavedMark
-              ? "이 리서치를 노트북에 남기세요"
-              : "저장하고 노트북에서 이어가세요"}
-          </p>
-        </div>
-      ) : null}
     </div>
-  );
-}
-
-function ChatHeaderMarkButton({
-  active,
-  disabled,
-  icon,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  disabled: boolean;
-  icon: string;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={[
-        "inline-flex h-9 items-center justify-center gap-1 rounded-[8px] border px-2 text-[12px] font-extrabold leading-4 transition-colors disabled:cursor-not-allowed disabled:opacity-55 sm:h-10 sm:px-3 sm:text-[13px]",
-        active
-          ? "border-primary bg-primary-fixed text-on-primary-fixed"
-          : "border-hairline bg-canvas text-ink hover:border-primary hover:text-primary",
-      ].join(" ")}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <span aria-hidden="true" className="material-symbols-outlined text-[17px]">
-        {icon}
-      </span>
-      <span>{label}</span>
-    </button>
   );
 }
 

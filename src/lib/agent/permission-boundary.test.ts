@@ -76,7 +76,26 @@ describe("agent permission boundary", () => {
       ...KRW_ONTOLOGY_SDK_ALLOWED_TOOLS,
       ...KRW_ONTOLOGY_DIRECT_SDK_ALLOWED_TOOLS,
     ]) {
-      await expect(canUseTool(toolName)).resolves.toEqual({ behavior: "allow" });
+      const input = toolName.endsWith("krw_ontology_query_context")
+        ? {
+            search_plan: {
+              question: "How is customer demand supporting revenue growth?",
+              intent: "demand_support",
+              clauses: [
+                {
+                  clause_id: "demand_support",
+                  retrieval_query: "customer demand supports revenue growth",
+                  required_concepts: ["customer demand", "revenue growth"],
+                  required_predicates: ["supports"],
+                },
+              ],
+              tickers: ["AAPL"],
+            },
+          }
+        : {};
+      await expect(canUseTool(toolName, input)).resolves.toEqual({
+        behavior: "allow",
+      });
       expect(isKrwOntologySdkTool(toolName)).toBe(true);
     }
   });
@@ -111,13 +130,11 @@ describe("agent permission boundary", () => {
     );
     expect(KRW_ONTOLOGY_SDK_ALLOWED_TOOLS).toEqual(
       KRW_ONTOLOGY_MCP_TOOLS.map(
-        (toolName) => `mcp__plugin_krw-ontology_krw-ontology__${toolName}`,
+        (toolName) => `mcp__krw-ontology__${toolName}`,
       ),
     );
     expect(STOCK_NEWS_SDK_ALLOWED_TOOLS).toEqual(
-      STOCK_NEWS_MCP_TOOLS.map(
-        (toolName) => `mcp__plugin_krw-ontology_stock-news__${toolName}`,
-      ),
+      STOCK_NEWS_MCP_TOOLS.map((toolName) => `mcp__stock-news__${toolName}`),
     );
   });
 });

@@ -55,6 +55,7 @@ interface SendMessageOptions {
   sessionId?: string;
   requestId?: string;
   runKind?: RunKind;
+  guruLensKey?: string | null;
   userUrl?: string;
   userUrls?: string[];
   attachmentIds?: string[];
@@ -96,6 +97,7 @@ export interface ChatState {
   chartsByMessageId: Record<string, ChatMessageChart[]>;
   artifactSelections: ChatArtifactSelection[];
   runDurationsByMessageId: Record<string, number>;
+  lastAttemptedContent: string | null;
   runId: string | null;
   runStartedAt: string | null;
   usage: {
@@ -123,6 +125,7 @@ function createInitialChatState(): ChatState {
     chartsByMessageId: {},
     artifactSelections: [],
     runDurationsByMessageId: {},
+    lastAttemptedContent: null,
     runId: null,
     runStartedAt: null,
     usage: null,
@@ -355,6 +358,63 @@ function activeStatusFromRunStatus(status: RunStatus | "idle"): ChatState["statu
   return status;
 }
 
+export function isCurrentRunResponseContext({
+  generation,
+  currentGeneration,
+  targetSessionId,
+  activeSessionId,
+}: {
+  generation: number;
+  currentGeneration: number;
+  targetSessionId?: string | null;
+  activeSessionId: string | null;
+}): boolean {
+  if (generation !== currentGeneration) return false;
+  return !targetSessionId || targetSessionId === activeSessionId;
+}
+
+export function finalizeRunResponseContext({
+  generation,
+  currentGeneration,
+  targetSessionId,
+  activeSessionId,
+  requestId,
+  abortController,
+  abortRef,
+  activeRequestIdRef,
+  sendInFlightRef,
+}: {
+  generation: number;
+  currentGeneration: number;
+  targetSessionId?: string | null;
+  activeSessionId: string | null;
+  requestId: string;
+  abortController: AbortController;
+  abortRef: { current: AbortController | null };
+  activeRequestIdRef: { current: string | null };
+  sendInFlightRef: { current: boolean };
+}): void {
+  if (abortRef.current === abortController) {
+    abortRef.current = null;
+  }
+
+  if (
+    !isCurrentRunResponseContext({
+      generation,
+      currentGeneration,
+      targetSessionId,
+      activeSessionId,
+    })
+  ) {
+    return;
+  }
+
+  if (activeRequestIdRef.current === requestId) {
+    activeRequestIdRef.current = null;
+  }
+  sendInFlightRef.current = false;
+}
+
 export function useChat({
   sessionId,
   scopeType = "global",
@@ -400,8 +460,13 @@ export function useChat({
   useEffect(() => {
     if (sessionId) {
       const previousSessionId = activeSessionIdRef.current;
-      if (previousSessionId && previousSessionId !== sessionId) {
-        abortRef.current?.abort();
+      if (previousSessionId !== sessionId) {
+        const abortController = abortRef.current;
+        abortController?.abort();
+        if (abortRef.current === abortController) {
+          abortRef.current = null;
+        }
+        sendInFlightRef.current = false;
         streamGenerationRef.current += 1;
         activeRunIdRef.current = null;
         activeRequestIdRef.current = null;
@@ -419,7 +484,12 @@ export function useChat({
       return;
     }
 
-    abortRef.current?.abort();
+    const abortController = abortRef.current;
+    abortController?.abort();
+    if (abortRef.current === abortController) {
+      abortRef.current = null;
+    }
+    sendInFlightRef.current = false;
     streamGenerationRef.current += 1;
     activeSessionIdRef.current = null;
     activeRunIdRef.current = null;
@@ -668,6 +738,7 @@ export function useChat({
               addChartToState,
               prev.chartsByMessageId,
             ),
+            lastAttemptedContent: null,
             status: "completed",
             isHydratingSession: false,
           };
@@ -768,6 +839,8 @@ export function useChat({
   }, [onSessionCreated, sessionId]);
 
   const syncSessionFromServer = useCallback(async (targetSessionId: string) => {
+    if (activeSessionIdRef.current !== targetSessionId) return false;
+
     setState((prev) => ({
       ...prev,
       isHydratingSession: true,
@@ -1080,6 +1153,13 @@ export function useChat({
     ) => {
       const { targetSessionId, requestId, generation, abortController } =
         context;
+      const isCurrentResponseContext = () =>
+        isCurrentRunResponseContext({
+          generation,
+          currentGeneration: streamGenerationRef.current,
+          targetSessionId,
+          activeSessionId: activeSessionIdRef.current,
+        });
 
       try {
         const responseSessionId = response.headers.get("x-chat-session-id");
@@ -1140,6 +1220,8 @@ export function useChat({
           }
         }
       } catch (err) {
+        if (!isCurrentResponseContext()) return;
+
         if ((err as Error).name === "AbortError") {
           setState((prev) => ({
             ...prev,
@@ -1173,11 +1255,14 @@ export function useChat({
               generation,
             );
             if (recovered) return;
+            if (!isCurrentResponseContext()) return;
 
             const synced = await syncSessionFromServer(reconnectSessionId);
             if (synced) return;
+            if (!isCurrentResponseContext()) return;
           }
 
+          if (!isCurrentResponseContext()) return;
           setState((prev) => ({
             ...prev,
             status: "failed",
@@ -1188,11 +1273,17 @@ export function useChat({
           }));
         }
       } finally {
-        abortRef.current = null;
-        if (activeRequestIdRef.current === requestId) {
-          activeRequestIdRef.current = null;
-        }
-        sendInFlightRef.current = false;
+        finalizeRunResponseContext({
+          generation,
+          currentGeneration: streamGenerationRef.current,
+          targetSessionId,
+          activeSessionId: activeSessionIdRef.current,
+          requestId,
+          abortController,
+          abortRef,
+          activeRequestIdRef,
+          sendInFlightRef,
+        });
       }
     },
     [onSessionCreated, readStream, reconnectUntilFinalized, syncSessionFromServer],
@@ -1267,6 +1358,7 @@ export function useChat({
       setState((prev) => ({
         ...prev,
         messages: [...prev.messages, userMessage],
+        lastAttemptedContent: content.trim(),
         status: "running",
         isHydratingSession: false,
         streamingContent: "",
@@ -1303,6 +1395,7 @@ export function useChat({
             research_mode: researchMode,
             analysis_mode: analysisMode,
             ...(effectiveRunKind ? { run_kind: effectiveRunKind } : {}),
+            ...(options.guruLensKey ? { guru_lens: options.guruLensKey } : {}),
             scope_type: scopeType,
             default_tickers: defaultTickers,
             default_document_types: defaultDocumentTypes,
@@ -1604,11 +1697,16 @@ export function useChat({
     const requestId = activeRequestIdRef.current;
     const targetSessionId = activeSessionIdRef.current || sessionId;
 
-    if (abortRef.current) {
-      abortRef.current.abort();
+    const abortController = abortRef.current;
+    if (abortController) {
+      abortController.abort();
+    }
+    if (abortRef.current === abortController) {
+      abortRef.current = null;
     }
 
     streamGenerationRef.current += 1;
+    sendInFlightRef.current = false;
     finalizedRef.current = true;
     activeRunIdRef.current = null;
     activeRequestIdRef.current = null;

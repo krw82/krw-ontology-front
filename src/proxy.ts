@@ -1,5 +1,6 @@
 import { updateSession } from "@/lib/supabase/middleware";
 import { getConfiguredAppOrigin } from "@/lib/auth/origin";
+import { hasTrustedClientIp } from "@/lib/http/client-ip";
 import { buildContentSecurityPolicy } from "@/lib/security/headers";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
 import {
@@ -13,6 +14,32 @@ import type { NextRequest } from "next/server";
 
 const isDevelopment = process.env.NODE_ENV === "development";
 const SAFE_INTERNAL_ORIGIN = "https://krw-ontology.local";
+
+function isDockerHealthCheck(pathname: string) {
+  return pathname === "/api/healthz";
+}
+
+function requiresTrustedClientIp(request: NextRequest) {
+  return (
+    process.env.NODE_ENV === "production" &&
+    !isDockerHealthCheck(request.nextUrl.pathname)
+  );
+}
+
+function clientIpUnavailableResponse() {
+  return NextResponse.json(
+    {
+      error: {
+        code: "service_unavailable",
+        message: "서비스가 일시적으로 응답하지 않습니다. 잠시 후 다시 시도해주세요.",
+      },
+    },
+    {
+      status: 503,
+      headers: { "Cache-Control": "no-store" },
+    },
+  );
+}
 
 function shouldApplyContentSecurityPolicy(pathname: string) {
   return !pathname.startsWith("/api/");
@@ -137,6 +164,13 @@ function createRequestHeaderOverrides({
 }
 
 export async function proxy(request: NextRequest) {
+  // Only Caddy can set this header for publicly reachable traffic. Rejecting
+  // a missing or malformed value here prevents rate-limit routes from sharing
+  // the fallback `ip:unknown` bucket when that deployment boundary breaks.
+  if (requiresTrustedClientIp(request) && !hasTrustedClientIp(request.headers)) {
+    return clientIpUnavailableResponse();
+  }
+
   const canonicalRedirectUrl = getCanonicalRedirectUrl(request);
   if (canonicalRedirectUrl) {
     return NextResponse.redirect(canonicalRedirectUrl, 308);
@@ -167,9 +201,12 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    // API routes own rate-limit buckets and must not be bypassed by a
+    // browser-controlled prefetch marker.
+    "/api/:path*",
     {
       source:
-        "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+        "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

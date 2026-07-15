@@ -19,6 +19,17 @@ const LEADING_KOREAN_PROGRESS_PATTERNS = [
   /^\s*답변을\s+작성하겠습니다\.?/,
   /^\s*최종\s+답변을\s+작성하겠습니다\.?/,
   /^\s*이제\s+답변을\s+작성하겠습니다\.?/,
+  /^\s*서브에이전트에\s+위임하겠습니다\.?/,
+  /^\s*(?:ResearchPack|CompanyEvidencePack|Guru\s+ResearchPack|GuruCompanyResearchPack)\s+수신\s+완료\.?/i,
+];
+
+const LEADING_WORKFLOW_STATUS_PATTERNS = [
+  // The SDK can occasionally emit this transition after the final Guru review.
+  // It is a completion marker for the assistant, not consultation prose.
+  /^\s*(?:evidence\s+)?review\s+(?:has\s+been\s+)?validated\.\s*(?:(?:now\s+)?i\s+have|let\s+me)[^.!?\n]*(?:[.!?]\s*)/i,
+  /^\s*[^.!?\n]*(?:ResearchPack|CompanyEvidencePack|Guru\s+ResearchPack|GuruCompanyResearchPack|GuruCompanyEvidenceReview|company_evidence_researcher|subagent|parameter\s+encoding|tool\s+call|MCP)\b[^.!?\n]*(?:[.!?]\s*)/i,
+  /^\s*(?:ResearchPack|CompanyEvidencePack|Guru\s+ResearchPack|GuruCompanyResearchPack)\b[^.!?\n]*(?:[.!?]\s*)/i,
+  /^\s*(?:company\s+evidence|filing\s+evidence)\s+(?:is\s+needed|received|supplied)\b[^.!?\n]*(?:[.!?]\s*)/i,
 ];
 
 const LEADING_SEPARATOR_PATTERN = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*/;
@@ -37,8 +48,10 @@ function isLikelyFollowupBoundary(value: string): boolean {
 }
 
 function isLikelyAnswerSentenceStart(value: string): boolean {
-  return /^\s*(?:Based|Overall|In|For|The|This|These|Those|My|I|At|From|Against|Compared|However|Therefore|So)\b/.test(
-    value,
+  return (
+    /^\s*(?:Based|Overall|In|For|The|This|These|Those|My|I|At|From|Against|Compared|However|Therefore|So)\b/.test(
+      value,
+    ) || /^\s*[가-힣]/.test(value)
   );
 }
 
@@ -60,6 +73,48 @@ function stripLeadingKoreanProgress(value: string): string {
   for (const pattern of LEADING_KOREAN_PROGRESS_PATTERNS) {
     const match = value.match(pattern);
     if (match) return value.slice(match[0].length);
+  }
+
+  return value;
+}
+
+function stripLeadingWorkflowStatus(value: string): string {
+  for (const pattern of LEADING_WORKFLOW_STATUS_PATTERNS) {
+    const match = value.match(pattern);
+    if (match) return value.slice(match[0].length);
+  }
+
+  return value;
+}
+
+function stripLeadingInternalWorkflowBlock(value: string): string {
+  const probe = value.slice(0, 1800);
+  if (
+    !/\b(?:ResearchPack|CompanyEvidencePack|GuruCompanyEvidenceReview|company_evidence_researcher|subagent|parameter\s+encoding|MCP|tool)\b|서브에이전트|도구|수신 완료/i.test(
+      probe,
+    )
+  ) {
+    return value;
+  }
+
+  const koreanAnswerStart = probe.match(
+    /(?:^|[.!?]\s*)(자,|먼저|결론|내가|제가|이\s+회사는|버핏|막스|애크먼|플랫|테리|[가-힣]{2,}[^.!?\n]{0,40}(?:은|는|이|가)\s)/,
+  );
+  const separator = probe.match(/(?:^|\n)\s*-{3,}\s*\n+/);
+  if (koreanAnswerStart?.index !== undefined && koreanAnswerStart.index > 0) {
+    const marker = koreanAnswerStart[1] ?? "";
+    const start = probe.indexOf(marker, koreanAnswerStart.index);
+    if (
+      start > 0 &&
+      (separator?.index === undefined || start < separator.index)
+    ) {
+      return value.slice(start);
+    }
+  }
+
+  if (separator?.index !== undefined) {
+    const start = separator.index + separator[0].length;
+    if (start > 0) return value.slice(start);
   }
 
   return value;
@@ -89,6 +144,13 @@ function stripInternalEvidencePhrases(value: string): string {
     .replace(/\bverified\s+(?:by|from)\s+trace\b/gi, "supported by filing evidence");
 }
 
+function stripStandaloneHorizontalRules(value: string): string {
+  return value
+    .replace(/\n{2,}\s*(?:-{3,}|\*{3,}|_{3,})\s*\n{2,}/g, "\n\n")
+    .replace(/^\s*(?:-{3,}|\*{3,}|_{3,})\s*\n+/, "")
+    .replace(/\n+\s*(?:-{3,}|\*{3,}|_{3,})\s*$/g, "\n");
+}
+
 /**
  * Removes assistant-only internal progress text from user-facing surfaces and
  * prompt history. It intentionally does not change the stored message row.
@@ -100,6 +162,13 @@ export function sanitizeAssistantContent(content: string): string {
   for (let index = 0; index < MAX_STRIP_ITERATIONS; index += 1) {
     const before = output;
 
+    const withoutInternalBlock = stripLeadingInternalWorkflowBlock(output);
+    if (withoutInternalBlock !== output) {
+      output = withoutInternalBlock;
+      strippedInternalContent = true;
+      continue;
+    }
+
     output = stripLeadingToolXml(output);
     if (output !== before) {
       strippedInternalContent = true;
@@ -109,6 +178,13 @@ export function sanitizeAssistantContent(content: string): string {
     const withoutEnglishProgress = stripLeadingEnglishProgress(output);
     if (withoutEnglishProgress !== output) {
       output = withoutEnglishProgress;
+      strippedInternalContent = true;
+      continue;
+    }
+
+    const withoutWorkflowStatus = stripLeadingWorkflowStatus(output);
+    if (withoutWorkflowStatus !== output) {
+      output = withoutWorkflowStatus;
       strippedInternalContent = true;
       continue;
     }
@@ -131,7 +207,7 @@ export function sanitizeAssistantContent(content: string): string {
     break;
   }
 
-  return stripInternalEvidencePhrases(output).trimStart();
+  return stripStandaloneHorizontalRules(stripInternalEvidencePhrases(output)).trimStart();
 }
 
 export function sanitizeAssistantPreviewContent(content: string): string {

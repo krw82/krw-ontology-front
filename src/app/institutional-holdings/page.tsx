@@ -17,7 +17,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "기관 13F 보유 공시 | KRW Ontology",
+  title: "기관 13F 보유 공시 | KRW.O",
   description: "SEC EDGAR 원본 13F information table 기준 기관 보유 공시를 확인합니다.",
 };
 

@@ -8,11 +8,14 @@ import {
   query,
   type AgentDefinition,
   type CanUseTool,
-  type McpServerConfigForProcessTransport,
+  type McpHttpServerConfig,
+  type McpServerStatus,
   type Options,
   type PermissionResult,
+  type SDKControlGetContextUsageResponse,
   type SdkPluginConfig,
   type SDKMessage,
+  type SDKSystemMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import {
   GURU_ADVISOR_SDK_ALLOWED_TOOLS,
@@ -42,7 +45,11 @@ import {
   type FilingAnchorContext,
   type CompanyPromptContext,
 } from "./system-prompt";
-import type { IndexedCompanyDocument } from "@/lib/ontology/catalog";
+import {
+  buildGuruLightCompanyContext,
+  getIndexedCompanies,
+  type IndexedCompanyDocument,
+} from "@/lib/ontology/catalog";
 import { normalizeKrwOntologyToolInput } from "./tool-input-policy";
 import {
   KRW_GURU_ACKMAN_ADVISOR_SKILL,
@@ -53,13 +60,11 @@ import {
   buildResearchPassPrompt,
 } from "./workflow";
 import { getClaudeAgentModel } from "./model";
-import { getIndexedCompanies } from "@/lib/ontology/catalog";
 import { readIntEnv } from "@/lib/env";
 import {
   buildResearchModePrompt,
   getAllowedMcpToolsForResearchMode,
   getResearchModeToolBudget,
-  normalizeResearchMode,
   type ResearchMode,
   type ResearchModeToolBudget,
 } from "@/lib/research-mode";
@@ -70,17 +75,15 @@ import {
   normalizeRunKind,
   type RunKind,
 } from "@/lib/run-kind";
+import type { GuruLensKey } from "@/lib/guru-lenses";
 import {
   CHART_MCP_SERVER_NAME,
   createChartMcpServer,
 } from "@/lib/charts/create-chart-tool";
 import { isChartGenerationEnabled } from "@/lib/features/charts";
-import {
-  createYahooFinanceNewsMcpServer,
-} from "@/lib/news-discovery/yahoo-finance-mcp-tool";
-import {
-  YAHOO_FINANCE_MCP_SERVER_NAME,
-} from "@/lib/news-discovery/yahoo-finance-mcp-constants";
+import { publicAgentErrorMessage } from "@/lib/api/chat/error-messages";
+import { createYahooFinanceNewsMcpServer } from "@/lib/news-discovery/yahoo-finance-mcp-tool";
+import { YAHOO_FINANCE_MCP_SERVER_NAME } from "@/lib/news-discovery/yahoo-finance-mcp-constants";
 import {
   createAccumulator,
   createSSEWriter,
@@ -117,6 +120,50 @@ const DEFAULT_YAHOO_FINANCE_MAX_CALLS = 4;
 const AGENT_TOOL_NAME = "Agent";
 const SUBAGENT_TOOL_NAMES = [AGENT_TOOL_NAME] as const;
 const COMPANY_EVIDENCE_SUBAGENT_NAME = "company_evidence_researcher";
+const GURU_COMPANY_BRIEF_TOOL_NAME = "krw_guru_company_brief";
+const GURU_COMPANY_PACK_TOOL_NAME = "krw_guru_company_pack";
+const GURU_REVIEW_COMPANY_EVIDENCE_TOOL_NAME =
+  "krw_guru_review_company_evidence";
+const RESEARCH_STATE_CONTRACT_VERSION = "research-state/v2";
+const DEFAULT_SDK_DIAGNOSTIC_TIMEOUT_MS = 750;
+const GURU_INVESTIGATION_BRIEF_FORMAT = "krw-guru-investigation-brief/v1";
+const GURU_RESEARCH_PACK_FORMAT = "krw-guru-research-pack/v1";
+const GURU_COMPANY_RESEARCH_CONTEXT_FORMAT =
+  "krw-guru-company-research-context/v1";
+const GURU_COMPANY_EVIDENCE_MCP_TOOLS = new Set<KRWOntologyMCPToolName>([
+  "krw_ontology_query_context",
+  "krw_ontology_query",
+  "krw_ontology_trace",
+]);
+const GURU_COMPANY_EVIDENCE_SDK_TOOLS =
+  KRW_ONTOLOGY_DIRECT_SDK_ALLOWED_TOOLS.filter((toolName) => {
+    const normalized = normalizeKrwOntologyToolName(toolName);
+    return Boolean(
+      normalized && GURU_COMPANY_EVIDENCE_MCP_TOOLS.has(normalized),
+    );
+  });
+const GURU_SOURCE_SUPPORT_TOOL_NAMES = new Set<GuruMCPToolName>([
+  "krw_guru_trace",
+  "krw_guru_chain",
+  "krw_guru_evidence",
+]);
+const GURU_ADVISOR_DEFAULT_BLOCKED_TOOL_SUFFIXES = [
+  GURU_COMPANY_PACK_TOOL_NAME,
+  ...GURU_SOURCE_SUPPORT_TOOL_NAMES,
+].map((toolName) => `__${toolName}`);
+const GURU_ADVISOR_DEFAULT_DISALLOWED_TOOLS =
+  GURU_ADVISOR_SDK_ALLOWED_TOOLS.filter((toolName) =>
+    GURU_ADVISOR_DEFAULT_BLOCKED_TOOL_SUFFIXES.some((suffix) =>
+      toolName.endsWith(suffix),
+    ),
+  );
+const GURU_ADVISOR_DEFAULT_SDK_ALLOWED_TOOLS =
+  GURU_ADVISOR_SDK_ALLOWED_TOOLS.filter(
+    (toolName) =>
+      !GURU_ADVISOR_DEFAULT_BLOCKED_TOOL_SUFFIXES.some((suffix) =>
+        toolName.endsWith(suffix),
+      ),
+  );
 const GURU_MAIN_SKILLS = [
   KRW_GURU_BUFFETT_ADVISOR_SKILL,
   KRW_GURU_MARKS_ADVISOR_SKILL,
@@ -140,6 +187,7 @@ const DISALLOWED_SDK_TOOLS = [
   "LS",
   "Skill",
 ];
+
 export interface AgentRunOptions {
   sessionId: string;
   userMessage: string;
@@ -149,6 +197,7 @@ export interface AgentRunOptions {
   researchMode?: ResearchMode;
   analysisMode?: AnalysisMode;
   runKind?: RunKind;
+  guruLensKey?: GuruLensKey | null;
   responseLocale?: Locale;
   selectedNewsEventContext?: Record<string, unknown> | null;
   history?: Array<{ role: string; content: string }>;
@@ -168,6 +217,21 @@ export interface AgentRunResult {
 }
 
 type UnknownRecord = Record<string, unknown>;
+type GuruInvestigationBriefRecord = UnknownRecord & {
+  format: typeof GURU_INVESTIGATION_BRIEF_FORMAT;
+  brief_hash: string;
+  ticker: string;
+  questions: readonly UnknownRecord[];
+};
+type GuruCompanyResearchContextRecord = UnknownRecord & {
+  format: typeof GURU_COMPANY_RESEARCH_CONTEXT_FORMAT;
+  ticker: string;
+  brief_hash: string;
+  question_ids: readonly string[];
+  evidence_units: readonly UnknownRecord[];
+  source_object_ids: readonly string[];
+  research_status: "evidence_found" | "partial";
+};
 
 interface ToolResultRecord {
   toolUseId: string | null;
@@ -213,8 +277,27 @@ export interface SdkDiagnostics {
   plugins?: unknown;
   mcpServers?: unknown;
   slashCommands?: Array<{ name: string; description?: string }>;
-  mcpServerStatus?: unknown;
-  initError?: string;
+  systemInit?: {
+    sessionId: string;
+    model: string;
+    claudeCodeVersion: string;
+    permissionMode: string;
+    tools: string[];
+    mcpServers: Array<{ name: string; status: string }>;
+    skills: string[];
+    plugins: string[];
+  };
+  mcpServerStatus?: Array<{
+    name: string;
+    status: string;
+    serverInfo?: { name: string; version: string };
+    scope?: string;
+    tools?: string[];
+    error?: string;
+  }>;
+  contextUsageSampled?: boolean;
+  contextUsage?: ReturnType<typeof summarizeContextUsage>;
+  contextUsageError?: string;
   mcpStatusError?: string;
   observedAt: string;
 }
@@ -227,12 +310,22 @@ export async function runAgent(
   const acc = createAccumulator();
   const cwd = await resolveClaudeAgentCwd();
   const abortController = new AbortController();
-  const researchMode = normalizeResearchMode(options.researchMode);
+  // Research requests always receive the deep research contract.  The UI's
+  // generic selection must not weaken the evidence-gathering workflow.
+  const researchMode: ResearchMode = "deep";
   const runKind = normalizeRunKind(
     options.runKind ??
-      defaultRunKindForAnalysisMode(normalizeAnalysisMode(options.analysisMode)),
+      defaultRunKindForAnalysisMode(
+        normalizeAnalysisMode(options.analysisMode),
+      ),
   );
   const guruAdvisorRun = runKind === "guru_advisor";
+  const guruAgentGeneratedBriefEnabled =
+    guruAdvisorRun && isGuruAgentGeneratedBriefEnabled();
+  const requiredGuruCompanyTicker = selectedGuruCompanyTicker(
+    options,
+    runKind,
+  );
   const ontologyPluginPath = getKrwOntologyPluginPath();
   const guruAdvisorPluginPath = guruAdvisorRun
     ? await resolveGuruAdvisorPluginPath()
@@ -253,7 +346,6 @@ export async function runAgent(
   const yahooFinanceRun = isYahooFinanceRunKind(runKind);
   const chartGenerationEnabled = !guruAdvisorRun && isChartGenerationEnabled();
   const toolBudget = getResearchModeToolBudget(researchMode);
-
   const abortHandler = () => abortController.abort();
   options.abortSignal?.addEventListener("abort", abortHandler, { once: true });
   if (options.abortSignal?.aborted) {
@@ -267,9 +359,9 @@ export async function runAgent(
     defaultDocumentTypes: options.defaultDocumentTypes,
     companies: await getCompanyPromptContexts(options.defaultTickers),
   };
-  const sdkSession = await getSessionInfo(options.sessionId, { dir: cwd }).catch(
-    () => undefined,
-  );
+  const sdkSession = await getSessionInfo(options.sessionId, {
+    dir: cwd,
+  }).catch(() => undefined);
   const shouldResume = Boolean(sdkSession);
   const systemPrompt = buildSystemPrompt(
     promptContext,
@@ -282,6 +374,7 @@ export async function runAgent(
       yahooFinanceNewsRequired: yahooFinanceRun,
       chartGenerationEnabled,
       guruAdvisorMode: guruAdvisorRun,
+      guruAgentGeneratedBriefEnabled,
       responseLocale,
     },
   );
@@ -291,9 +384,13 @@ export async function runAgent(
       analysisMode,
       runKind,
       responseLocale,
+      options.guruLensKey,
     ),
     buildResearchModePrompt(researchMode),
-    buildSelectedNewsEventContextPrompt(runKind, options.selectedNewsEventContext),
+    buildSelectedNewsEventContextPrompt(
+      runKind,
+      options.selectedNewsEventContext,
+    ),
   ].join("\n\n");
   const allowedTools = allowedSdkToolsForResearchMode(
     researchMode,
@@ -303,21 +400,45 @@ export async function runAgent(
   );
 
   const requestedModel = getClaudeAgentModel();
+  let strictHttpMcpServers: Record<string, McpHttpServerConfig> | undefined;
+  try {
+    strictHttpMcpServers = guruAdvisorRun
+      ? undefined
+      : readStrictHttpMcpServerConfigs(ontologyPluginPath);
+  } catch (error) {
+    options.abortSignal?.removeEventListener("abort", abortHandler);
+    const rawErrorMessage =
+      error instanceof Error ? error.message : "Invalid MCP HTTP configuration";
+    return {
+      acc,
+      status: "failed",
+      errorCode: "mcp_unavailable",
+      errorMessage:
+        "온톨로지 검색 서비스 설정을 확인할 수 없습니다. 잠시 후 다시 시도해주세요.",
+      internalErrorMessage: rawErrorMessage,
+    };
+  }
   const baseSdkOptions: Options = {
     cwd,
     model: requestedModel,
-    pathToClaudeCodeExecutable:
-      process.env.CLAUDE_CODE_EXECUTABLE || undefined,
+    pathToClaudeCodeExecutable: process.env.CLAUDE_CODE_EXECUTABLE || undefined,
     systemPrompt: {
       type: "preset",
       preset: "claude_code",
       append: systemPrompt,
     },
     plugins,
+    ...(strictHttpMcpServers
+      ? {
+          mcpServers: strictHttpMcpServers,
+          strictMcpConfig: true,
+        }
+      : {}),
     allowedTools,
     ...(guruAdvisorRun
       ? {
-          hooks: buildGuruAdvisorToolBoundaryHooks(guruAdvisorPluginPath),
+          disallowedTools: GURU_ADVISOR_DEFAULT_DISALLOWED_TOOLS,
+          tools: allowedTools,
         }
       : {
           tools: [],
@@ -332,7 +453,10 @@ export async function runAgent(
     }),
     ...(guruAdvisorRun
       ? {
-          agents: buildGuruAdvisorSubagents(ontologyPluginPath),
+          agents: buildGuruAdvisorSubagents(
+            ontologyPluginPath,
+            guruAgentGeneratedBriefEnabled,
+          ),
           agentProgressSummaries: false,
           forwardSubagentText: false,
           skills: GURU_MAIN_SKILLS.map((skill) => skill.replace(/^\//, "")),
@@ -364,12 +488,13 @@ export async function runAgent(
       pluginPath,
       sendEvent,
       observedModels,
-      suppressTextDeltas: false,
       researchMode,
       analysisMode,
       runKind,
       responseLocale,
       toolBudget,
+      guruAgentGeneratedBriefEnabled,
+      requiredGuruCompanyTicker,
     });
 
     if (researchResult.status !== "completed") {
@@ -381,8 +506,7 @@ export async function runAgent(
         acc: researchResult.acc,
         status: "failed",
         errorCode: "claude_api_error",
-        errorMessage:
-          "리서치 단계에서 화면에 표시할 답변을 받지 못했습니다.",
+        errorMessage: "리서치 단계에서 화면에 표시할 답변을 받지 못했습니다.",
         internalErrorMessage:
           "Research pass completed without a displayable answer.",
       };
@@ -409,6 +533,41 @@ export async function runAgent(
   }
 }
 
+function isGuruAgentGeneratedBriefEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  // This is the standard Guru Advisor workflow, not a user-selectable mode.
+  // Keep an explicit false value only as an operational rollback switch.
+  return !["0", "false", "no", "off"].includes(
+    env.GURU_AGENT_GENERATED_BRIEF_ENABLED?.trim().toLowerCase() ?? "",
+  );
+}
+
+/**
+ * A selected single-company web session is an explicit company request even
+ * when a short follow-up question does not repeat the ticker.  This keeps the
+ * route flexible for global and multi-company research while preventing a
+ * company Guru session from silently falling back to market generalities.
+ */
+function selectedGuruCompanyTicker(
+  options: AgentRunOptions,
+  runKind: RunKind,
+): string | null {
+  if (runKind !== "guru_advisor" || options.scopeType !== "company") {
+    return null;
+  }
+
+  const tickers = Array.from(
+    new Set(
+      options.defaultTickers
+        .map((ticker) => ticker.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  );
+
+  return tickers.length === 1 ? tickers[0] ?? null : null;
+}
+
 async function runSdkPass(params: {
   passName: "research";
   prompt: string;
@@ -419,12 +578,13 @@ async function runSdkPass(params: {
   pluginPath: string;
   sendEvent: ReturnType<typeof createSSEWriter>["sendEvent"];
   observedModels: Set<string>;
-  suppressTextDeltas: boolean;
   researchMode: ResearchMode;
   analysisMode: AnalysisMode;
   runKind: RunKind;
   responseLocale: Locale;
   toolBudget: ResearchModeToolBudget;
+  guruAgentGeneratedBriefEnabled: boolean;
+  requiredGuruCompanyTicker: string | null;
 }): Promise<AgentRunResult> {
   const {
     passName,
@@ -436,16 +596,19 @@ async function runSdkPass(params: {
     pluginPath,
     sendEvent,
     observedModels,
-    suppressTextDeltas,
     researchMode,
     analysisMode,
     runKind,
     responseLocale,
     toolBudget,
+    guruAgentGeneratedBriefEnabled,
+    requiredGuruCompanyTicker,
   } = params;
   const acc = createAccumulator();
   const openToolCalls = new Set<string>();
   let finalResult: AgentRunResult | null = null;
+  let systemInit: SDKSystemMessage | null = null;
+  let postResultDiagnosticsStarted = false;
   const maxToolCalls = Math.min(
     readIntEnv("AGENT_MAX_TOOL_CALLS", toolBudget.maxToolCalls, { min: 1 }),
     toolBudget.maxToolCalls,
@@ -476,13 +639,14 @@ async function runSdkPass(params: {
       maxYahooFinanceCalls,
       allowedStockNewsSourceUrls,
       chartGenerationEnabled,
+      guruAgentGeneratedBriefEnabled,
+      requiredGuruCompanyTicker,
     );
     const mcpServers = {
       ...(sdkOptions.mcpServers ?? {}),
       ...(isYahooFinanceRunKind(runKind)
         ? {
-            [YAHOO_FINANCE_MCP_SERVER_NAME]:
-              createYahooFinanceNewsMcpServer(),
+            [YAHOO_FINANCE_MCP_SERVER_NAME]: createYahooFinanceNewsMcpServer(),
           }
         : {}),
       ...(chartGenerationEnabled
@@ -493,6 +657,15 @@ async function runSdkPass(params: {
     };
     const passSdkOptions: Options = {
       ...sdkOptions,
+      hooks:
+        runKind === "guru_advisor"
+          ? buildGuruAdvisorToolBoundaryHooks(
+              pluginPath,
+              acc,
+              guruAgentGeneratedBriefEnabled,
+              requiredGuruCompanyTicker,
+            )
+          : buildResearchToolBoundaryHooks(passCanUseTool),
       canUseTool: passCanUseTool,
       ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
     };
@@ -500,35 +673,20 @@ async function runSdkPass(params: {
       prompt,
       options: passSdkOptions,
     });
-    await reportSdkInitialization({
-      passName,
-      sdkQuery,
-      options,
-      requestedModel,
-      cwd,
-      pluginPath,
-      prompt,
-      sdkOptions: passSdkOptions,
-      researchMode,
-      analysisMode,
-      runKind,
-      responseLocale,
-      toolBudget,
-    });
 
     for await (const message of sdkQuery) {
       if (options.abortSignal?.aborted) {
         return { acc, status: "cancelled" };
       }
 
+      if (message.type === "system" && message.subtype === "init") {
+        systemInit = message;
+        assertKrwOntologySystemInit(message, runKind);
+      }
+
       const observedModel = modelFromSdkMessage(message);
       if (observedModel && !observedModels.has(observedModel)) {
         observedModels.add(observedModel);
-        await options.onSdkDiagnostics?.({
-          passName,
-          observedModels: Array.from(observedModels),
-          observedAt: new Date().toISOString(),
-        });
       }
 
       await consumeSdkMessage({
@@ -540,18 +698,43 @@ async function runSdkPass(params: {
         onToolCallEnd: options.onToolCallEnd,
         onCitation: options.onCitation,
         passName,
-        suppressTextDeltas,
       });
 
       if (message.type === "result") {
+        if (!postResultDiagnosticsStarted) {
+          postResultDiagnosticsStarted = true;
+          void reportSdkDiagnosticsAfterResult({
+            passName,
+            sdkQuery,
+            options,
+            requestedModel,
+            cwd,
+            pluginPath,
+            prompt,
+            sdkOptions: passSdkOptions,
+            researchMode,
+            analysisMode,
+            runKind,
+            responseLocale,
+            toolBudget,
+            observedModels,
+            systemInit,
+          }).catch((error) => {
+            console.warn("[claude-agent-sdk:diagnostics-failed]", {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          });
+        }
+
         if (openToolCalls.size > 0) {
           finalResult = pendingToolResultsFailure(acc, openToolCalls);
           break;
         }
 
         if (message.subtype === "success") {
+          const resultText =
+            typeof message.result === "string" ? message.result : "";
           acc.structuredOutput = message.structured_output ?? null;
-          const resultText = typeof message.result === "string" ? message.result : "";
           if (!acc.fullText.trim() && resultText.trim()) {
             addToken(acc, resultText);
           }
@@ -563,7 +746,13 @@ async function runSdkPass(params: {
             usage.cacheHitInputTokens,
             usage.cacheMissInputTokens,
           );
-          finalResult = { acc, status: "completed" };
+          finalResult = guruAdvisorCompletionResult(
+            acc,
+            runKind,
+            guruAgentGeneratedBriefEnabled,
+            requiredGuruCompanyTicker,
+            responseLocale,
+          );
         } else {
           const rawErrorMessage =
             Array.isArray(message.errors) && message.errors.length > 0
@@ -579,7 +768,13 @@ async function runSdkPass(params: {
               usage.cacheHitInputTokens,
               usage.cacheMissInputTokens,
             );
-            finalResult = { acc, status: "completed" };
+            finalResult = guruAdvisorCompletionResult(
+              acc,
+              runKind,
+              guruAgentGeneratedBriefEnabled,
+              requiredGuruCompanyTicker,
+              responseLocale,
+            );
           } else {
             finalResult = {
               acc,
@@ -616,7 +811,7 @@ async function runSdkPass(params: {
   }
 }
 
-async function reportSdkInitialization(params: {
+async function reportSdkDiagnosticsAfterResult(params: {
   passName: "research";
   sdkQuery: ReturnType<typeof query>;
   options: AgentRunOptions;
@@ -630,6 +825,8 @@ async function reportSdkInitialization(params: {
   runKind: RunKind;
   responseLocale: Locale;
   toolBudget: ResearchModeToolBudget;
+  observedModels: Set<string>;
+  systemInit: SDKSystemMessage | null;
 }) {
   const {
     passName,
@@ -645,6 +842,8 @@ async function reportSdkInitialization(params: {
     runKind,
     responseLocale,
     toolBudget,
+    observedModels,
+    systemInit,
   } = params;
 
   if (!options.onSdkDiagnostics) return;
@@ -652,6 +851,7 @@ async function reportSdkInitialization(params: {
   const diagnostics: SdkDiagnostics = {
     passName,
     requestedModel,
+    observedModels: Array.from(observedModels),
     cwd,
     defaultTickers: options.defaultTickers,
     pluginPath,
@@ -668,60 +868,300 @@ async function reportSdkInitialization(params: {
     runKind,
     responseLocale,
     toolBudget,
-    plugins: sdkOptions.plugins,
-    mcpServers: sdkOptions.mcpServers,
+    plugins: summarizeConfiguredPlugins(sdkOptions.plugins),
+    mcpServers: summarizeConfiguredMcpServers(sdkOptions.mcpServers),
+    ...(systemInit
+      ? {
+          slashCommands: systemInit.slash_commands.map((name) => ({ name })),
+          systemInit: summarizeSystemInit(systemInit),
+        }
+      : {}),
     observedAt: new Date().toISOString(),
   };
 
-  const [initResult, mcpStatusResult] = await Promise.allSettled([
-    sdkQuery.initializationResult(),
-    sdkQuery.mcpServerStatus(),
+  const sampleContextUsage = shouldSampleContextUsage(
+    systemInit?.session_id ?? options.sessionId,
+  );
+  diagnostics.contextUsageSampled = sampleContextUsage;
+  const diagnosticTimeoutMs = readIntEnv(
+    "CLAUDE_SDK_DIAGNOSTIC_TIMEOUT_MS",
+    DEFAULT_SDK_DIAGNOSTIC_TIMEOUT_MS,
+    { min: 10, max: 5_000 },
+  );
+  const [mcpStatusResult, contextUsageResult] = await Promise.allSettled([
+    withSdkDiagnosticTimeout(
+      () => sdkQuery.mcpServerStatus(),
+      "mcpServerStatus",
+      diagnosticTimeoutMs,
+    ),
+    sampleContextUsage
+      ? withSdkDiagnosticTimeout(
+          () => sdkQuery.getContextUsage(),
+          "getContextUsage",
+          diagnosticTimeoutMs,
+        )
+      : Promise.resolve<SDKControlGetContextUsageResponse | null>(null),
   ]);
 
-  if (initResult.status === "fulfilled") {
-    diagnostics.slashCommands = initResult.value.commands.map((command) => ({
-      name: command.name,
-      description: command.description,
-    }));
-  } else {
-    diagnostics.initError = initResult.reason instanceof Error
-      ? initResult.reason.message
-      : String(initResult.reason);
-  }
-
   if (mcpStatusResult.status === "fulfilled") {
-    diagnostics.mcpServerStatus = mcpStatusResult.value;
+    diagnostics.mcpServerStatus = summarizeMcpServerStatus(
+      mcpStatusResult.value,
+    );
   } else {
-    diagnostics.mcpStatusError = mcpStatusResult.reason instanceof Error
-      ? mcpStatusResult.reason.message
-      : String(mcpStatusResult.reason);
+    diagnostics.mcpStatusError =
+      mcpStatusResult.reason instanceof Error
+        ? mcpStatusResult.reason.message
+        : String(mcpStatusResult.reason);
   }
 
-  await options.onSdkDiagnostics(diagnostics);
+  if (contextUsageResult.status === "fulfilled" && contextUsageResult.value) {
+    diagnostics.contextUsage = summarizeContextUsage(contextUsageResult.value);
+  } else if (contextUsageResult.status === "rejected") {
+    diagnostics.contextUsageError =
+      contextUsageResult.reason instanceof Error
+        ? contextUsageResult.reason.message
+        : String(contextUsageResult.reason);
+  }
+
+  try {
+    await withSdkDiagnosticTimeout(
+      () => options.onSdkDiagnostics!(diagnostics),
+      "onSdkDiagnostics",
+      diagnosticTimeoutMs,
+    );
+  } catch (error) {
+    console.warn("[claude-agent-sdk:diagnostics-write-failed]", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+async function withSdkDiagnosticTimeout<T>(
+  operation: () => Promise<T>,
+  label: string,
+  timeoutMs: number,
+): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    (timeout as { unref?: () => void }).unref?.();
+  });
+
+  try {
+    return await Promise.race([
+      Promise.resolve().then(operation),
+      timeoutPromise,
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+function summarizeSystemInit(message: SDKSystemMessage) {
+  return {
+    sessionId: message.session_id,
+    model: message.model,
+    claudeCodeVersion: message.claude_code_version,
+    permissionMode: message.permissionMode,
+    tools: [...message.tools],
+    mcpServers: message.mcp_servers.map((server) => ({
+      name: server.name,
+      status: server.status,
+    })),
+    skills: [...message.skills],
+    plugins: message.plugins.map((plugin) => plugin.name),
+  };
+}
+
+function assertKrwOntologySystemInit(
+  message: SDKSystemMessage,
+  runKind: RunKind,
+): void {
+  if (runKind === "guru_advisor" || runKind === "news_discovery") return;
+  const ontologyTools = message.tools
+    .map(normalizeKrwOntologyToolName)
+    .filter(
+      (toolName): toolName is KRWOntologyMCPToolName => toolName !== null,
+    );
+  const ontologyToolSet = new Set(ontologyTools);
+  const hasExactTools =
+    ontologyToolSet.size === KRW_ONTOLOGY_MCP_TOOLS.length &&
+    KRW_ONTOLOGY_MCP_TOOLS.every((toolName) => ontologyToolSet.has(toolName));
+  const ontologyServer = message.mcp_servers.find(
+    (server) => server.name === "krw-ontology",
+  );
+  if (!hasExactTools || ontologyServer?.status !== "connected") {
+    throw new Error(
+      `MCP tool parity mismatch in system/init: expected ${KRW_ONTOLOGY_MCP_TOOLS.length} exact ontology tools from a connected krw-ontology server`,
+    );
+  }
+}
+
+function summarizeConfiguredPlugins(plugins: Options["plugins"]) {
+  return plugins?.map((plugin) => ({
+    type: plugin.type,
+    name: path.basename(plugin.path),
+  }));
+}
+
+function summarizeConfiguredMcpServers(mcpServers: Options["mcpServers"]) {
+  if (!mcpServers) return undefined;
+  return Object.fromEntries(
+    Object.entries(mcpServers).map(([name, config]) => [
+      name,
+      {
+        type: "type" in config ? config.type : "stdio",
+      },
+    ]),
+  );
+}
+
+function summarizeMcpServerStatus(statuses: McpServerStatus[]) {
+  return statuses.map((status) => ({
+    name: status.name,
+    status: status.status,
+    ...(status.serverInfo ? { serverInfo: status.serverInfo } : {}),
+    ...(status.scope ? { scope: status.scope } : {}),
+    ...(status.tools ? { tools: status.tools.map((tool) => tool.name) } : {}),
+    ...(status.error ? { error: status.error.slice(0, 500) } : {}),
+  }));
+}
+
+function summarizeContextUsage(usage: SDKControlGetContextUsageResponse) {
+  return {
+    totalTokens: usage.totalTokens,
+    maxTokens: usage.maxTokens,
+    percentage: usage.percentage,
+    model: usage.model,
+    categories: usage.categories.map((category) => ({
+      name: category.name,
+      tokens: category.tokens,
+      ...(category.isDeferred !== undefined
+        ? { isDeferred: category.isDeferred }
+        : {}),
+    })),
+    mcpTools: usage.mcpTools.map((tool) => ({
+      name: tool.name,
+      serverName: tool.serverName,
+      tokens: tool.tokens,
+      ...(tool.isLoaded !== undefined ? { isLoaded: tool.isLoaded } : {}),
+    })),
+    systemPromptSections: usage.systemPromptSections?.map((section) => ({
+      name: section.name,
+      tokens: section.tokens,
+    })),
+    skills: usage.skills
+      ? {
+          totalSkills: usage.skills.totalSkills,
+          includedSkills: usage.skills.includedSkills,
+          tokens: usage.skills.tokens,
+        }
+      : undefined,
+    messageBreakdown: usage.messageBreakdown,
+    apiUsage: usage.apiUsage,
+  };
+}
+
+function shouldSampleContextUsage(seed: string): boolean {
+  const configured = Number(
+    process.env.CLAUDE_SDK_CONTEXT_USAGE_SAMPLE_RATE ?? "0.1",
+  );
+  const sampleRate = Number.isFinite(configured)
+    ? Math.min(1, Math.max(0, configured))
+    : 0.1;
+  if (sampleRate <= 0) return false;
+  if (sampleRate >= 1) return true;
+
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 0x1_0000_0000 < sampleRate;
+}
+
+function validateHttpMcpServerConfig(
+  serverName: string,
+  value: unknown,
+): McpHttpServerConfig {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`MCP server ${serverName} must be an HTTP object config`);
+  }
+  const config = value as Record<string, unknown>;
+  if (config.type !== "http" || typeof config.url !== "string") {
+    throw new Error(
+      `MCP server ${serverName} must use an explicit type=http URL config`,
+    );
+  }
+  const url = new URL(config.url);
+  if (!["http:", "https:"].includes(url.protocol)) {
+    throw new Error(`MCP server ${serverName} URL must use http or https`);
+  }
+  if (url.username || url.password) {
+    throw new Error(
+      `MCP server ${serverName} URL must not contain credentials`,
+    );
+  }
+  if (url.pathname.replace(/\/+$/, "") !== "/mcp") {
+    throw new Error(`MCP server ${serverName} URL must end at /mcp`);
+  }
+  return value as McpHttpServerConfig;
+}
+
+function readStrictHttpMcpServerConfigs(
+  pluginPath: string,
+): Record<string, McpHttpServerConfig> {
+  const mcpConfigPath = path.join(pluginPath, ".mcp.json");
+  const parsed = JSON.parse(readFileSync(mcpConfigPath, "utf8")) as {
+    mcpServers?: Record<string, unknown>;
+  };
+  const rawServers = parsed.mcpServers;
+  if (!rawServers || !rawServers["krw-ontology"]) {
+    throw new Error("KRW Ontology plugin is missing mcpServers.krw-ontology");
+  }
+
+  const serverConfigs = Object.fromEntries(
+    Object.entries(rawServers).map(([serverName, rawConfig]) => {
+      const config = validateHttpMcpServerConfig(serverName, rawConfig);
+      const overriddenUrl =
+        serverName === "krw-ontology"
+          ? process.env.KRW_ONTOLOGY_MCP_URL
+          : serverName === "stock-news"
+            ? process.env.STOCK_NEWS_MCP_URL
+            : undefined;
+      return [
+        serverName,
+        overriddenUrl
+          ? validateHttpMcpServerConfig(serverName, {
+              ...config,
+              url: overriddenUrl,
+            })
+          : config,
+      ];
+    }),
+  );
+
+  return serverConfigs;
+}
+
+function readKrwOntologyMcpServerConfig(
+  ontologyPluginPath: string,
+): McpHttpServerConfig {
+  return readStrictHttpMcpServerConfigs(ontologyPluginPath)["krw-ontology"];
 }
 
 function buildCompanyEvidenceMcpServers(
   ontologyPluginPath: string,
 ): AgentDefinition["mcpServers"] {
-  const mcpConfigPath = path.join(ontologyPluginPath, ".mcp.json");
-  try {
-    const parsed = JSON.parse(readFileSync(mcpConfigPath, "utf8")) as {
-      mcpServers?: Record<string, unknown>;
-    };
-    const serverConfig = parsed.mcpServers?.["krw-ontology"];
-    if (!serverConfig || typeof serverConfig !== "object") return undefined;
-    return [
-      {
-        "krw-ontology": serverConfig as McpServerConfigForProcessTransport,
-      },
-    ];
-  } catch {
-    return undefined;
-  }
+  const serverConfig = readKrwOntologyMcpServerConfig(ontologyPluginPath);
+  return [{ "krw-ontology": serverConfig }];
 }
 
 function buildGuruAdvisorSubagents(
   ontologyPluginPath: string,
+  agentGeneratedBriefEnabled: boolean,
 ): Record<string, AgentDefinition> {
   return {
     [COMPANY_EVIDENCE_SUBAGENT_NAME]: {
@@ -729,19 +1169,47 @@ function buildGuruAdvisorSubagents(
         "Use for company-specific filing evidence needed by the KRW Guru Advisor before the final guru-style answer.",
       prompt: [
         "You are the KRW Ontology company evidence researcher for a Guru Advisor parent run.",
-        "Your only job is to fetch and synthesize compact company filing evidence. Do not write the final user answer and do not imitate any guru voice.",
+        "Your only job is to answer the parent Guru run's company-specific evidence questions from filings. Do not write the final user answer and do not imitate any guru voice.",
         "Use only the read-only KRW Ontology MCP tools attached to this subagent. Do not use Guru Advisor tools, current-news tools, chart tools, WebSearch, WebFetch, or filesystem tools.",
         "Work English-first internally when forming retrieval queries. Final payload may be compact English unless the parent explicitly asks for Korean labels.",
+        agentGeneratedBriefEnabled
+          ? "The parent provides an exact sealed krw-guru-investigation-brief/v1 with one philosophy-shaped key question. Treat it as the highest-priority evidence contract. Answer only its question_id; do not replace it with a general company report, new thesis, or Guru interpretation."
+          : "The parent may provide dynamic_question_plan from krw_guru_company_brief. Treat that plan as the highest-priority evidence contract. Answer the listed questions first; do not replace them with a general company research summary.",
+        agentGeneratedBriefEnabled
+          ? "Do not return a retrieval plan as the answer. Before the first filing call, compile a complete SearchPlan v2 from the requested ticker and the one sealed key question, then call krw_ontology_query_context with only {search_plan}. Never send legacy question, ticker, tickers, limit, or response-detail arguments directly to query_context."
+          : "Do not return a retrieval plan as the answer. Before the first filing call, author a complete SearchPlan v2 from the requested ticker and every dynamic question, then call krw_ontology_query_context with only {search_plan}. Never send legacy question, ticker, tickers, limit, or response-detail arguments directly to query_context.",
+        agentGeneratedBriefEnabled
+          ? "Expand the one sealed key question into one to three complementary atomic filing tests, not extra investigation questions or a generic checklist. Each test must be independently verifiable and collectively answer the same central tension. A metric clause uses the exact plural field metrics, for example {retrieval_query:'revenue iPhone', required_concepts:[], required_predicates:[], metrics:['revenue'], metric_dimensions:['iPhone'], metric_scope:'dimensioned', object_types:['MetricObservation']}; never use metric, and never mix a metric clause with qualitative concepts or predicates. A qualitative clause uses metrics:[] and metric_dimensions:[], with at most two exact required_concepts plus one required_predicate. Omit calculation_window unless the clause declares metrics."
+          : "Use one independently verifiable clause per qualitative proposition or exact metric need. Write concise English filing-language retrieval_query values; use required_concepts plus required_predicates for multi-concept relations; split metric and qualitative propositions; set metric scope, dimensions, comparison axes, and calculation_window when the question requires exact arithmetic.",
+        "In SearchPlan metrics, use canonical metric names such as revenue, gross_margin, operating_margin, or operating_cash_flow in the metrics array. Put Services, iPhone, Products, or other business labels in metric_dimensions, not in metric names. Every required concept, predicate, and metric dimension must appear literally in retrieval_query.",
+        "If krw_ontology_query_context returns JSON with status=input_correction_required, read code, invalid_fields, and required_change. Correct only those fields and make the next allowed filing call in this same subagent run. Do not retry unchanged input, switch to a legacy envelope, or invent a semantic repair from the error message.",
+        "Read ResearchState v2 answerability, clause_coverage, evidence_units, calculation_coverage, missing_parts, and recommended_actions. Use targeted query or trace only when that state identifies a material unresolved part; do not mistake related evidence or incomplete calculation coverage for direct proof.",
+        agentGeneratedBriefEnabled
+          ? "Keep the sealed key question's exact question_id and select only exact ontology object ids returned by the filing tools. The key question may remain unresolved when filings do not support it. Use at most eight unique object ids across the whole run."
+          : "For each dynamic question, keep its exact question_id and select only exact ontology object ids returned by the filing tools. Use one to three narrow atomic SearchPlan clauses per question and no more than twelve clauses overall. Use no more than eight unique object ids across the whole run.",
+        "The only allowed filing tools are krw_ontology_query_context, krw_ontology_query, and krw_ontology_trace. Never call verify_evidence, company_context, catalog, topic_map, retrieve, chain, compare, quality, or index_context. After one valid query_context result, use at most two targeted compact query calls and one trace call only for material gaps, then return. If a call-limit denial occurs, do not retry that tool. A broad company report is a workflow failure.",
+        "Prefer ResearchClaim, EvidenceQuote, SourceSpan, or MetricObservation object ids when a direct company fact or exact figure matters. Use semantic objects such as BusinessFactor only for qualitative interpretation, not as support for an exact number.",
+        "Do not create, verify, or return an evidence pack. The runtime derives the immutable company research context only from actual ResearchState v2 filing-tool results. Your final return may be a compact factual summary of what those results establish, what they leave open, and the exact object ids you used; it is not the final investor opinion.",
         "Start company judgments from the latest available 10-Q/current driver returned by the company filing anchor. Use the latest 10-K as annual business mix, historical trend, and risk baseline. Do not invent future periods.",
         "If an older 10-K risk appears resolved or changed in a later 10-Q, make that delta explicit.",
-        "Return a compact CompanyEvidencePack only, using these sections: ticker, company_name, current_driver, annual_baseline, filing_supported_facts, resolved_risks, still_open_risks, current_judgment_delta, missing_evidence.",
-        "Do not include process narration, tool debugging, access-control commentary, or a final user-facing answer. Return the pack content only.",
+        "This pack is for a Guru consultation, not a normal analyst report. Do not dump tables, period-by-period numeric series, or every metric you find.",
+        "Return exact figures, dates, and periods only when they materially change the investor judgment and are supported by the selected filing evidence. Do not invent or infer missing numbers.",
+        "Prefer concise business facts over raw numbers: what strengthened the parent question, what weakened it, what remains mixed, and what condition would change the judgment.",
+        "Do not upgrade directness or evidence grade in your return. Keep a distinction between filing facts, interpretation, and unresolved questions.",
+        agentGeneratedBriefEnabled
+          ? "Do not add a new thesis outside the sealed investigation brief. A filing result that weakens or leaves a question unresolved is still a valid result."
+          : "Do not add a new thesis outside the dynamic_question_plan unless the filing evidence directly contradicts the plan or reveals a material current-driver change.",
+        "Never mention tool budgets, failed retrieval attempts, MCP access, session limitations, or process limitations in the returned research summary. Return investor-usable filing facts only.",
+        "If the filing tools return no useful evidence, return a short unresolved note to the parent. Do not substitute a process note, access-control request, or next-step plan.",
+        agentGeneratedBriefEnabled
+          ? "If no sealed investigation brief is present, do not invent one. Return a short unresolved status to the parent so it can request a valid sealed brief."
+          : "If no dynamic_question_plan is present, do not invent one. Return a short unresolved status to the parent so it can request a proper Guru company brief.",
         "Do not expose tool names, MCP names, raw ids, internal file paths, or provider/debug labels.",
       ].join("\n"),
-      tools: [...KRW_ONTOLOGY_DIRECT_SDK_ALLOWED_TOOLS],
+      tools: [...GURU_COMPANY_EVIDENCE_SDK_TOOLS],
       mcpServers: buildCompanyEvidenceMcpServers(ontologyPluginPath),
       model: "inherit",
-      maxTurns: 16,
+      maxTurns: 18,
       permissionMode: "dontAsk",
     },
   };
@@ -749,10 +1217,25 @@ function buildGuruAdvisorSubagents(
 
 function buildGuruAdvisorToolBoundaryHooks(
   guruAdvisorPluginPath: string | null,
+  acc: AccumulatedRun,
+  agentGeneratedBriefEnabled: boolean,
+  requiredGuruCompanyTicker: string | null,
 ): Options["hooks"] {
   const pluginRoot = guruAdvisorPluginPath
     ? path.resolve(guruAdvisorPluginPath)
     : null;
+  let sawCompanyBrief = false;
+  let sawCompanyEvidenceAgent = false;
+  let sawCompanyEvidenceReview = false;
+  let guruEvidenceReviewAttempts = 0;
+  const companyEvidenceCallCounts = new Map<string, number>();
+  const companyEvidenceCallLimits: Partial<
+    Record<KRWOntologyMCPToolName, number>
+  > = {
+    krw_ontology_query_context: 2,
+    krw_ontology_query: 2,
+    krw_ontology_trace: 1,
+  };
 
   return {
     PreToolUse: [
@@ -774,13 +1257,41 @@ function buildGuruAdvisorToolBoundaryHooks(
               const isCompanyEvidenceAgent = isCompanyEvidenceSubagent(
                 agentType || agentID,
               );
+              const ontologyToolName = normalizeKrwOntologyToolName(toolName);
+              // Guru uses its own PreToolUse boundary because allowedTools can
+              // shadow canUseTool. Keep this path on the same mechanical
+              // input-normalization contract as ordinary research calls.
+              const preparedInput = isCompanyEvidenceAgent
+                ? prepareToolInputForRun(ontologyToolName, toolInput, acc)
+                : { input: toolInput, changed: false };
+              const callLimit = ontologyToolName
+                ? companyEvidenceCallLimits[ontologyToolName]
+                : undefined;
+              const callCount = ontologyToolName
+                ? (companyEvidenceCallCounts.get(ontologyToolName) ?? 0)
+                : 0;
+              const callLimitExceeded =
+                typeof callLimit === "number" && callCount >= callLimit;
+              if (
+                isCompanyEvidenceAgent &&
+                ontologyToolName &&
+                !callLimitExceeded
+              ) {
+                companyEvidenceCallCounts.set(ontologyToolName, callCount + 1);
+              }
               return guruAdvisorHookDecision(
-                isCompanyEvidenceAgent && isDirectKrwOntologySdkTool(toolName)
+                isCompanyEvidenceAgent &&
+                  isGuruCompanyEvidenceSdkTool(toolName) &&
+                  !callLimitExceeded
                   ? "allow"
                   : "deny",
-                isCompanyEvidenceAgent
-                  ? "Company evidence subagents may use only direct KRW Ontology filing MCP tools."
-                  : "Unknown Guru Advisor subagent is not allowed to use tools.",
+                (callLimitExceeded
+                  ? `Company evidence call limit reached for ${ontologyToolName}. Use the filing evidence already collected and return a compact evidence summary.`
+                  : null) ??
+                  (isCompanyEvidenceAgent
+                    ? "Company evidence subagents may use only query_context, query, and trace filing MCP tools."
+                    : "Unknown Guru Advisor subagent is not allowed to use tools."),
+                preparedInput.changed ? preparedInput.input : undefined,
               );
             }
 
@@ -791,10 +1302,34 @@ function buildGuruAdvisorToolBoundaryHooks(
                   "Guru Advisor can delegate only to the configured company evidence researcher subagent.",
                 );
               }
+              if (!sawCompanyBrief) {
+                return guruAdvisorHookDecision(
+                  "deny",
+                  agentGeneratedBriefEnabled
+                    ? "Call krw_guru_company_brief first, then pass its sealed investigation brief to the company_evidence_researcher Agent."
+                    : "Call krw_guru_company_brief first, then pass its dynamic_question_plan to the company_evidence_researcher Agent.",
+                );
+              }
+              const agentPrompt =
+                typeof toolInput.prompt === "string" ? toolInput.prompt : "";
+              if (
+                agentGeneratedBriefEnabled
+                  ? !hasSealedInvestigationBriefPrompt(agentPrompt, acc)
+                  : !agentPrompt.includes("dynamic_question_plan") ||
+                    !agentPrompt.includes("evidence_by_question")
+              ) {
+                return guruAdvisorHookDecision(
+                  "deny",
+                  agentGeneratedBriefEnabled
+                    ? "The company_evidence_researcher Agent prompt must include the exact sealed krw-guru-investigation-brief/v1 JSON, its brief_hash, and every question_id."
+                    : "The company_evidence_researcher Agent prompt must include the exact dynamic_question_plan JSON and request evidence_by_question answers.",
+                );
+              }
 
+              sawCompanyEvidenceAgent = true;
               return guruAdvisorHookDecision(
                 "allow",
-                "Company evidence research must run inline so the Guru Advisor can use the returned evidence pack.",
+                "Company evidence research must run inline so the Guru Advisor can use the runtime-built filing research context.",
                 {
                   ...toolInput,
                   run_in_background: false,
@@ -803,10 +1338,90 @@ function buildGuruAdvisorToolBoundaryHooks(
             }
 
             if (isGuruAdvisorSdkTool(toolName)) {
-              return guruAdvisorHookDecision(
-                "allow",
-                "Guru Advisor MCP tools are allowed in the main Guru run.",
-              );
+              const guruToolName = normalizeGuruAdvisorToolName(toolName);
+              let briefInputDecision: PermissionResult | null = null;
+              if (guruToolName === GURU_COMPANY_BRIEF_TOOL_NAME) {
+                briefInputDecision = guruCompanyBriefInputPermission(
+                  toolInput,
+                  acc,
+                  agentGeneratedBriefEnabled,
+                  requiredGuruCompanyTicker,
+                );
+                if (briefInputDecision?.behavior === "deny") {
+                  return guruAdvisorHookDecision(
+                    "deny",
+                    briefInputDecision.message,
+                  );
+                }
+                sawCompanyBrief = true;
+              }
+              if (
+                sawCompanyBrief &&
+                !sawCompanyEvidenceReview &&
+                guruToolName &&
+                GURU_SOURCE_SUPPORT_TOOL_NAMES.has(guruToolName)
+              ) {
+                return guruAdvisorHookDecision(
+                  "deny",
+                  "After a Guru company brief, source-support Guru tools cannot replace company filing evidence. Use the company_evidence_researcher Agent and krw_guru_review_company_evidence first.",
+                );
+              }
+              if (
+                guruToolName === GURU_REVIEW_COMPANY_EVIDENCE_TOOL_NAME &&
+                sawCompanyBrief &&
+                !sawCompanyEvidenceAgent
+              ) {
+                return guruAdvisorHookDecision(
+                  "deny",
+                  "Review company evidence only after the company_evidence_researcher Agent has returned company filing evidence.",
+                );
+              }
+              if (guruToolName === GURU_REVIEW_COMPANY_EVIDENCE_TOOL_NAME) {
+                if (guruEvidenceReviewAttempts >= 2) {
+                  return guruAdvisorHookDecision(
+                    "deny",
+                    "The sealed evidence review allows one initial call and one correction only. Write the final answer only from a validated review result.",
+                  );
+                }
+                const preparedReviewInput =
+                  prepareGuruReviewCompanyEvidenceInput(
+                    toolInput,
+                    acc,
+                    agentGeneratedBriefEnabled,
+                  );
+                const evidenceDecision =
+                  guruReviewCompanyEvidencePayloadPermission(
+                    preparedReviewInput.input,
+                    {
+                      requireQuestionEvidence: sawCompanyBrief,
+                      researchContext: latestGuruCompanyResearchContext(acc),
+                      investigationBrief: latestGuruInvestigationBrief(acc),
+                      requireInvestigationBrief: agentGeneratedBriefEnabled,
+                    },
+                  );
+                if (evidenceDecision?.behavior === "deny") {
+                  return guruAdvisorHookDecision(
+                    "deny",
+                    evidenceDecision.message ??
+                      "Review requires question-driven company filing evidence.",
+                  );
+                }
+                guruEvidenceReviewAttempts += 1;
+                sawCompanyEvidenceReview = true;
+                return guruAdvisorHookDecision(
+                  "allow",
+                  "The runtime attached the immutable company research context and sealed investigation brief for validation.",
+                  preparedReviewInput.input,
+                );
+              }
+              if (briefInputDecision?.behavior === "allow") {
+                return guruAdvisorHookDecision(
+                  "allow",
+                  "The runtime attached the immutable Guru research pack for company-brief sealing.",
+                  briefInputDecision.updatedInput,
+                );
+              }
+              return guruAdvisorMainMcpToolHookDecision(guruToolName);
             }
 
             if (toolName === "Read") {
@@ -829,6 +1444,72 @@ function buildGuruAdvisorToolBoundaryHooks(
   };
 }
 
+/**
+ * allowedTools makes MCP tools discoverable and may auto-approve them before
+ * canUseTool. PreToolUse remains the execution boundary for every normal
+ * research call, so contract validation cannot be skipped by that shortcut.
+ */
+function buildResearchToolBoundaryHooks(
+  passCanUseTool: CanUseTool,
+): Options["hooks"] {
+  return {
+    PreToolUse: [
+      {
+        hooks: [
+          async (input, toolUseID, hookOptions) => {
+            const record = input as UnknownRecord;
+            const toolName =
+              typeof record.tool_name === "string" ? record.tool_name : "";
+            const toolInput = isRecord(record.tool_input)
+              ? record.tool_input
+              : {};
+            const decision = await passCanUseTool(toolName, toolInput, {
+              signal: hookOptions.signal,
+              toolUseID:
+                toolUseID ??
+                (typeof record.tool_use_id === "string"
+                  ? record.tool_use_id
+                  : crypto.randomUUID()),
+              requestId: crypto.randomUUID(),
+            });
+            if (!decision) {
+              return {
+                continue: true,
+                hookSpecificOutput: {
+                  hookEventName: "PreToolUse" as const,
+                  permissionDecision: "deny" as const,
+                  permissionDecisionReason:
+                    "Tool boundary could not determine whether this call is permitted.",
+                },
+              };
+            }
+            if (decision.behavior === "allow") {
+              return {
+                continue: true,
+                hookSpecificOutput: {
+                  hookEventName: "PreToolUse" as const,
+                  permissionDecision: "allow" as const,
+                  ...(decision.updatedInput
+                    ? { updatedInput: decision.updatedInput }
+                    : {}),
+                },
+              };
+            }
+            return {
+              continue: true,
+              hookSpecificOutput: {
+                hookEventName: "PreToolUse" as const,
+                permissionDecision: "deny" as const,
+                permissionDecisionReason: decision.message,
+              },
+            };
+          },
+        ],
+      },
+    ],
+  };
+}
+
 function guruAdvisorHookDecision(
   permissionDecision: "allow" | "deny",
   reason: string,
@@ -837,14 +1518,12 @@ function guruAdvisorHookDecision(
   if (permissionDecision === "allow") {
     return {
       continue: true,
-      ...(updatedInput
-        ? {
-            hookSpecificOutput: {
-              hookEventName: "PreToolUse" as const,
-              updatedInput,
-            },
-          }
-        : {}),
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse" as const,
+        permissionDecision,
+        permissionDecisionReason: reason,
+        ...(updatedInput ? { updatedInput } : {}),
+      },
     };
   }
 
@@ -859,8 +1538,28 @@ function guruAdvisorHookDecision(
   };
 }
 
-function isDirectKrwOntologySdkTool(toolName: string): boolean {
-  return KRW_ONTOLOGY_DIRECT_SDK_ALLOWED_TOOLS.includes(toolName);
+function guruAdvisorMainMcpToolHookDecision(
+  guruToolName: GuruMCPToolName | null,
+) {
+  if (!guruToolName) {
+    return guruAdvisorHookDecision("deny", "Unknown Guru Advisor MCP tool.");
+  }
+
+  if (guruToolName === GURU_COMPANY_PACK_TOOL_NAME) {
+    return guruAdvisorHookDecision(
+      "deny",
+      "The default Guru Advisor workflow uses krw_guru_review_company_evidence after the runtime builds company research context; krw_guru_company_pack is legacy/debug only.",
+    );
+  }
+
+  return guruAdvisorHookDecision(
+    "allow",
+    "Guru Advisor MCP tools are allowed in the main Guru run; product quality is controlled by prompt and logs rather than hard call-count limits.",
+  );
+}
+
+function isGuruCompanyEvidenceSdkTool(toolName: string): boolean {
+  return GURU_COMPANY_EVIDENCE_SDK_TOOLS.includes(toolName);
 }
 
 function isAllowedGuruAdvisorRead(
@@ -947,31 +1646,34 @@ function allowedSdkToolsForResearchMode(
 ): string[] {
   if (runKind === "guru_advisor") {
     return [
-      ...GURU_ADVISOR_SDK_ALLOWED_TOOLS,
+      ...GURU_ADVISOR_DEFAULT_SDK_ALLOWED_TOOLS,
       ...SUBAGENT_TOOL_NAMES,
       "Read",
-      ...KRW_ONTOLOGY_DIRECT_SDK_ALLOWED_TOOLS,
     ];
   }
 
   const allowedMcpTools = new Set(getAllowedMcpToolsForResearchMode(mode));
-  const allowedOntologyTools = KRW_ONTOLOGY_SDK_ALLOWED_TOOLS.filter((toolName) => {
-    const mcpToolName = normalizeKrwOntologyToolName(toolName);
-    return Boolean(mcpToolName && allowedMcpTools.has(mcpToolName));
-  });
-  const allowedStockNewsTools = getStockNewsSdkAllowedTools().filter((toolName) => {
-    const stockNewsToolName = normalizeStockNewsToolName(toolName);
-    return Boolean(
-      stockNewsToolName &&
+  const allowedOntologyTools = KRW_ONTOLOGY_SDK_ALLOWED_TOOLS.filter(
+    (toolName) => {
+      const mcpToolName = normalizeKrwOntologyToolName(toolName);
+      return Boolean(mcpToolName && allowedMcpTools.has(mcpToolName));
+    },
+  );
+  const allowedStockNewsTools = getStockNewsSdkAllowedTools().filter(
+    (toolName) => {
+      const stockNewsToolName = normalizeStockNewsToolName(toolName);
+      return Boolean(
+        stockNewsToolName &&
         isStockNewsToolAllowedForRunKind(stockNewsToolName, runKind),
-    );
-  });
+      );
+    },
+  );
   const allowedYahooFinanceTools = YAHOO_FINANCE_SDK_ALLOWED_TOOLS.filter(
     (toolName) => {
       const yahooFinanceToolName = normalizeYahooFinanceToolName(toolName);
       return Boolean(
         yahooFinanceToolName &&
-          isYahooFinanceToolAllowedForRunKind(yahooFinanceToolName, runKind),
+        isYahooFinanceToolAllowedForRunKind(yahooFinanceToolName, runKind),
       );
     },
   );
@@ -996,7 +1698,14 @@ function createToolPermissionGuard(
   maxYahooFinanceCalls: number,
   allowedStockNewsSourceUrls: string[] = [],
   chartGenerationEnabled = isChartGenerationEnabled(),
+  guruAgentGeneratedBriefEnabled = false,
+  requiredGuruCompanyTicker: string | null = null,
 ): CanUseTool {
+  let guruSawCompanyBrief = false;
+  let guruSawCompanyEvidenceAgent = false;
+  let guruSawCompanyEvidenceReview = false;
+  let guruEvidenceReviewAttempts = 0;
+
   return async (
     toolName: string,
     input: Record<string, unknown> = {},
@@ -1008,10 +1717,11 @@ function createToolPermissionGuard(
         : {
             behavior: "deny",
             message: "Inline chart generation is disabled for this runtime.",
-      };
+          };
     }
 
     if (runKind === "guru_advisor") {
+      let updatedGuruReviewInput: Record<string, unknown> | undefined;
       if (permissionContext?.agentID) {
         return guruSubagentToolPermission({
           acc,
@@ -1024,7 +1734,15 @@ function createToolPermissionGuard(
       }
 
       if (isSubagentInvocationTool(toolName)) {
-        return guruMainAgentToolPermission(input);
+        const decision = guruMainAgentToolPermission(
+          input,
+          acc,
+          guruAgentGeneratedBriefEnabled,
+        );
+        if (decision.behavior === "allow") {
+          guruSawCompanyEvidenceAgent = true;
+        }
+        return decision;
       }
 
       if (!isGuruAdvisorSdkTool(toolName)) {
@@ -1042,6 +1760,79 @@ function createToolPermissionGuard(
           message: "Unknown Guru Advisor MCP tool.",
         };
       }
+      if (guruToolName === GURU_COMPANY_PACK_TOOL_NAME) {
+        return {
+          behavior: "deny",
+          message:
+            "The default Guru Advisor workflow reviews the runtime-built company research context after filing retrieval; krw_guru_company_pack is legacy/debug only.",
+        };
+      }
+      if (guruToolName === GURU_COMPANY_BRIEF_TOOL_NAME) {
+        const briefInputDecision = guruCompanyBriefInputPermission(
+          input,
+          acc,
+          guruAgentGeneratedBriefEnabled,
+          requiredGuruCompanyTicker,
+        );
+        if (briefInputDecision) {
+          if (briefInputDecision.behavior === "allow") {
+            guruSawCompanyBrief = true;
+          }
+          return briefInputDecision;
+        }
+        guruSawCompanyBrief = true;
+      }
+      if (
+        guruSawCompanyBrief &&
+        !guruSawCompanyEvidenceReview &&
+        GURU_SOURCE_SUPPORT_TOOL_NAMES.has(guruToolName)
+      ) {
+        return {
+          behavior: "deny",
+          message:
+            "After a Guru company brief, source-support Guru tools cannot replace company filing evidence. Call the company_evidence_researcher Agent and then review the returned evidence first.",
+        };
+      }
+      if (
+        guruToolName === GURU_REVIEW_COMPANY_EVIDENCE_TOOL_NAME &&
+        guruSawCompanyBrief &&
+        !guruSawCompanyEvidenceAgent
+      ) {
+        return {
+          behavior: "deny",
+          message:
+            "Review company evidence only after calling the company_evidence_researcher Agent. Pass the Agent's question-driven company evidence, not a self-authored coverage/status payload.",
+        };
+      }
+      if (guruToolName === GURU_REVIEW_COMPANY_EVIDENCE_TOOL_NAME) {
+        if (guruEvidenceReviewAttempts >= 2) {
+          return {
+            behavior: "deny",
+            message:
+              "The sealed evidence review allows one initial call and one correction only. Write the final answer only from a validated review result.",
+          };
+        }
+        const preparedReviewInput = prepareGuruReviewCompanyEvidenceInput(
+          input,
+          acc,
+          guruAgentGeneratedBriefEnabled,
+        );
+        const evidenceDecision = guruReviewCompanyEvidencePayloadPermission(
+          preparedReviewInput.input,
+          {
+            requireQuestionEvidence: guruSawCompanyBrief,
+            researchContext: latestGuruCompanyResearchContext(acc),
+            investigationBrief: latestGuruInvestigationBrief(acc),
+            requireInvestigationBrief: guruAgentGeneratedBriefEnabled,
+          },
+        );
+        if (evidenceDecision) return evidenceDecision;
+        guruEvidenceReviewAttempts += 1;
+        guruSawCompanyEvidenceReview = true;
+        if (preparedReviewInput.changed) {
+          updatedGuruReviewInput = preparedReviewInput.input;
+        }
+      }
 
       if (acc.toolCalls.length + 1 > maxToolCalls) {
         return {
@@ -1050,7 +1841,9 @@ function createToolPermissionGuard(
         };
       }
 
-      return { behavior: "allow" };
+      return updatedGuruReviewInput
+        ? { behavior: "allow", updatedInput: updatedGuruReviewInput }
+        : { behavior: "allow" };
     }
 
     if (
@@ -1121,8 +1914,7 @@ function createToolPermissionGuard(
         };
       }
 
-      const nextStockNewsCalls =
-        countStockNewsToolCalls(acc.toolCalls) + 1;
+      const nextStockNewsCalls = countStockNewsToolCalls(acc.toolCalls) + 1;
       if (nextStockNewsCalls > maxStockNewsCalls) {
         return {
           behavior: "deny",
@@ -1209,6 +2001,8 @@ function createToolPermissionGuard(
 
 function guruMainAgentToolPermission(
   input: Record<string, unknown>,
+  acc: AccumulatedRun,
+  agentGeneratedBriefEnabled: boolean,
 ): PermissionResult {
   if (input.subagent_type !== COMPANY_EVIDENCE_SUBAGENT_NAME) {
     return {
@@ -1225,8 +2019,540 @@ function guruMainAgentToolPermission(
     };
   }
 
+  if (
+    agentGeneratedBriefEnabled &&
+    !hasSealedInvestigationBriefPrompt(
+      typeof input.prompt === "string" ? input.prompt : "",
+      acc,
+    )
+  ) {
+    return {
+      behavior: "deny",
+      message:
+        "The company evidence Agent prompt must include the exact sealed investigation brief, brief_hash, and every question_id.",
+    };
+  }
+
   return { behavior: "allow" };
 }
+
+function guruCompanyBriefInputPermission(
+  input: Record<string, unknown>,
+  acc: AccumulatedRun,
+  agentGeneratedBriefEnabled: boolean,
+  requiredGuruCompanyTicker: string | null,
+): PermissionResult | null {
+  const inputTicker =
+    typeof input.ticker === "string" ? input.ticker.trim().toUpperCase() : "";
+  if (
+    requiredGuruCompanyTicker &&
+    inputTicker &&
+    inputTicker !== requiredGuruCompanyTicker
+  ) {
+    return {
+      behavior: "deny",
+      message: `This company-scoped Guru run is locked to ${requiredGuruCompanyTicker}. Use ticker ${requiredGuruCompanyTicker} for krw_guru_company_brief.`,
+    };
+  }
+  const normalizedInput =
+    requiredGuruCompanyTicker && !inputTicker
+      ? { ...input, ticker: requiredGuruCompanyTicker }
+      : input;
+
+  if (!agentGeneratedBriefEnabled) {
+    return normalizedInput === input
+      ? null
+      : { behavior: "allow", updatedInput: normalizedInput };
+  }
+
+  const researchPack = latestGuruResearchPack(acc);
+  if (!researchPack || researchPack.format !== GURU_RESEARCH_PACK_FORMAT) {
+    return {
+      behavior: "deny",
+      message:
+        "Call krw_guru_query_context first. The runtime will attach its immutable selected research pack when krw_guru_company_brief seals the investigation questions.",
+    };
+  }
+
+  return {
+    behavior: "allow",
+    updatedInput: {
+      ...normalizedInput,
+      guru_query_context: { research_pack: researchPack },
+    },
+  };
+}
+
+function guruReviewCompanyEvidencePayloadPermission(
+  input: Record<string, unknown>,
+  options: {
+    requireQuestionEvidence: boolean;
+    researchContext: GuruCompanyResearchContextRecord | null;
+    investigationBrief: GuruInvestigationBriefRecord | null;
+    requireInvestigationBrief: boolean;
+  },
+): PermissionResult | null {
+  const researchContext = isGuruCompanyResearchContext(
+    input.company_research_context,
+  )
+    ? input.company_research_context
+    : null;
+  if (!researchContext) {
+    return {
+      behavior: "deny",
+      message:
+        "Company review requires the runtime-built krw-guru-company-research-context/v1 from the company_evidence_researcher Agent's filing results.",
+    };
+  }
+  if (!options.researchContext) {
+    return {
+      behavior: "deny",
+      message:
+        "No usable company filing research context was observed in this run. Do not construct one in the model; retrieve filing evidence first.",
+    };
+  }
+  if (canonicalJson(researchContext) !== canonicalJson(options.researchContext)) {
+    return {
+      behavior: "deny",
+      message:
+        "The company research context was changed after retrieval. Pass the exact runtime-built context without rewriting or adding facts.",
+    };
+  }
+  if (options.requireInvestigationBrief) {
+    const brief = isGuruInvestigationBrief(input.investigation_brief)
+      ? input.investigation_brief
+      : null;
+    if (!brief || !options.investigationBrief) {
+      return {
+        behavior: "deny",
+        message:
+          "No sealed investigation brief was observed in this run. Call krw_guru_company_brief before review.",
+      };
+    }
+    if (canonicalJson(brief) !== canonicalJson(options.investigationBrief)) {
+      return {
+        behavior: "deny",
+        message:
+          "The investigation brief was changed after the server sealed it. Pass the exact brief unchanged.",
+      };
+    }
+    if (researchContext.brief_hash !== brief.brief_hash) {
+      return {
+        behavior: "deny",
+        message:
+          "The company research context brief_hash does not match the sealed investigation brief.",
+      };
+    }
+  }
+  const requestedTicker =
+    typeof input.ticker === "string" ? input.ticker.trim().toUpperCase() : "";
+  const contextTicker = researchContext.ticker.trim().toUpperCase();
+  if (requestedTicker && requestedTicker !== contextTicker) {
+    return {
+      behavior: "deny",
+      message:
+        "The company research context ticker does not match the review ticker.",
+    };
+  }
+  if (
+    options.requireQuestionEvidence &&
+    researchContext.source_object_ids.length === 0
+  ) {
+    return {
+      behavior: "deny",
+      message:
+        "The company research context contains no filing object ids for the sealed question. Retrieve evidence before review.",
+    };
+  }
+
+  return null;
+}
+
+function latestGuruCompanyResearchContext(
+  acc: AccumulatedRun,
+): GuruCompanyResearchContextRecord | null {
+  const brief = latestGuruInvestigationBrief(acc);
+  if (!brief) return null;
+
+  const ticker = brief.ticker.trim().toUpperCase();
+  const questionIds = brief.questions
+    .map((question) => question.question_id)
+    .filter((questionId): questionId is string => typeof questionId === "string");
+  if (!ticker || questionIds.length === 0) return null;
+
+  const evidenceUnits: UnknownRecord[] = [];
+  const sourceObjectIds = new Set<string>();
+  const seenEvidence = new Set<string>();
+  for (let index = acc.toolCalls.length - 1; index >= 0; index -= 1) {
+    const toolCall = acc.toolCalls[index];
+    const toolName = normalizeKrwOntologyToolName(toolCall.toolName);
+    if (!toolName || !GURU_COMPANY_EVIDENCE_MCP_TOOLS.has(toolName)) {
+      continue;
+    }
+    const result =
+      unwrapMcpJsonResult(toolCall.resultJson) ??
+      (isRecord(toolCall.resultJson) ? toolCall.resultJson : null);
+    const researchState =
+      result?.contract_version === RESEARCH_STATE_CONTRACT_VERSION
+        ? result
+        : isRecord(result?.research_state)
+          ? result.research_state
+          : null;
+    if (!Array.isArray(researchState?.evidence_units)) continue;
+    for (const evidenceUnit of researchState.evidence_units) {
+      if (!isRecord(evidenceUnit)) continue;
+      const evidenceTicker =
+        typeof evidenceUnit.ticker === "string"
+          ? evidenceUnit.ticker.trim().toUpperCase()
+          : "";
+      if (evidenceTicker !== ticker) continue;
+      const source = isRecord(evidenceUnit.source) ? evidenceUnit.source : {};
+      const objectIds = [
+        ...(typeof evidenceUnit.object_id === "string"
+          ? [evidenceUnit.object_id]
+          : []),
+        ...readStringArray(source.object_ids),
+      ].filter((objectId, position, values) => values.indexOf(objectId) === position);
+      if (objectIds.length === 0) continue;
+      const evidenceKey =
+        typeof evidenceUnit.evidence_id === "string"
+          ? evidenceUnit.evidence_id
+          : objectIds.join("|");
+      if (seenEvidence.has(evidenceKey)) continue;
+      seenEvidence.add(evidenceKey);
+      for (const objectId of objectIds) {
+        if (sourceObjectIds.size < 24) sourceObjectIds.add(objectId);
+      }
+      if (evidenceUnits.length < 12) {
+        evidenceUnits.push({
+          evidence_id: evidenceUnit.evidence_id,
+          object_id: evidenceUnit.object_id,
+          object_type: evidenceUnit.object_type,
+          ticker: evidenceTicker,
+          period: evidenceUnit.period,
+          document_type: evidenceUnit.document_type,
+          title: evidenceUnit.title,
+          summary: evidenceUnit.summary,
+          directness: evidenceUnit.directness,
+          evidence_grade: evidenceUnit.evidence_grade,
+          source: { object_ids: objectIds },
+        });
+      }
+    }
+  }
+  if (evidenceUnits.length === 0 || sourceObjectIds.size === 0) return null;
+  return {
+    format: GURU_COMPANY_RESEARCH_CONTEXT_FORMAT,
+    ticker,
+    brief_hash: brief.brief_hash,
+    question_ids: questionIds,
+    evidence_units: evidenceUnits,
+    source_object_ids: [...sourceObjectIds],
+    research_status: evidenceUnits.length >= 3 ? "evidence_found" : "partial",
+  };
+}
+
+function latestGuruResearchPack(acc: AccumulatedRun): UnknownRecord | null {
+  for (let index = acc.toolCalls.length - 1; index >= 0; index -= 1) {
+    const toolCall = acc.toolCalls[index];
+    if (
+      normalizeGuruAdvisorToolName(toolCall.toolName) !==
+      "krw_guru_query_context"
+    ) {
+      continue;
+    }
+    const result =
+      unwrapMcpJsonResult(toolCall.resultJson) ??
+      (isRecord(toolCall.resultJson) ? toolCall.resultJson : null);
+    const researchPack = isRecord(result?.research_pack)
+      ? result.research_pack
+      : null;
+    if (researchPack?.format === GURU_RESEARCH_PACK_FORMAT) {
+      return researchPack;
+    }
+  }
+  return null;
+}
+
+function latestGuruInvestigationBrief(
+  acc: AccumulatedRun,
+): GuruInvestigationBriefRecord | null {
+  for (let index = acc.toolCalls.length - 1; index >= 0; index -= 1) {
+    const toolCall = acc.toolCalls[index];
+    if (
+      normalizeGuruAdvisorToolName(toolCall.toolName) !==
+      GURU_COMPANY_BRIEF_TOOL_NAME
+    ) {
+      continue;
+    }
+    const result =
+      unwrapMcpJsonResult(toolCall.resultJson) ??
+      (isRecord(toolCall.resultJson) ? toolCall.resultJson : null);
+    if (isGuruInvestigationBrief(result?.investigation_brief)) {
+      return result.investigation_brief;
+    }
+    const filingBrief = isRecord(result?.company_filing_brief)
+      ? result.company_filing_brief
+      : null;
+    const nestedBrief = filingBrief?.investigation_brief;
+    if (isGuruInvestigationBrief(nestedBrief)) {
+      return nestedBrief;
+    }
+  }
+  return null;
+}
+
+function hasSuccessfulGuruEvidenceReview(
+  acc: AccumulatedRun,
+  expected?: { ticker?: string; briefHash?: string },
+): boolean {
+  return acc.toolCalls.some((toolCall) => {
+    if (
+      normalizeGuruAdvisorToolName(toolCall.toolName) !==
+      GURU_REVIEW_COMPANY_EVIDENCE_TOOL_NAME
+    ) {
+      return false;
+    }
+    const result =
+      unwrapMcpJsonResult(toolCall.resultJson) ??
+      (isRecord(toolCall.resultJson) ? toolCall.resultJson : null);
+    const validated = isRecord(result?.validated_evidence_analysis)
+      ? result.validated_evidence_analysis
+      : null;
+    if (
+      isRecord(validated) &&
+      validated.format === "krw-guru-validated-evidence-analysis/v1"
+    ) {
+      const expectedTicker = expected?.ticker?.trim().toUpperCase();
+      if (
+        expectedTicker &&
+        (typeof validated.ticker !== "string" ||
+          validated.ticker.trim().toUpperCase() !== expectedTicker)
+      ) {
+        return false;
+      }
+      if (
+        expected?.briefHash &&
+        validated.brief_hash !== expected.briefHash
+      ) {
+        return false;
+      }
+      return true;
+    }
+    return false;
+  });
+}
+
+function guruAdvisorCompletionResult(
+  acc: AccumulatedRun,
+  runKind: RunKind,
+  agentGeneratedBriefEnabled: boolean,
+  requiredGuruCompanyTicker: string | null,
+  responseLocale: Locale,
+): AgentRunResult {
+  if (runKind === "guru_advisor" && requiredGuruCompanyTicker) {
+    if (
+      hasCompletedGuruCompanyContract(
+        acc,
+        requiredGuruCompanyTicker,
+        agentGeneratedBriefEnabled,
+      )
+    ) {
+      return { acc, status: "completed" };
+    }
+
+    // This is a render boundary, not a second model pass or a rewritten model
+    // answer. A short question in a selected-company session must not surface
+    // an otherwise fluent market-general answer as a conclusion about that
+    // company when the company evidence contract was not completed.
+    acc.fullText = boundedGuruCompanyAnswer(
+      acc,
+      requiredGuruCompanyTicker,
+      responseLocale,
+    );
+    return { acc, status: "completed" };
+  }
+
+  return guruEvidenceReviewCompletionResult(
+    acc,
+    runKind,
+    agentGeneratedBriefEnabled,
+  );
+}
+
+function hasCompletedGuruCompanyContract(
+  acc: AccumulatedRun,
+  ticker: string,
+  agentGeneratedBriefEnabled: boolean,
+): boolean {
+  const brief = latestGuruInvestigationBrief(acc);
+  if (!brief || brief.ticker.trim().toUpperCase() !== ticker) return false;
+
+  const researchContext = latestGuruCompanyResearchContext(acc);
+  if (
+    !researchContext ||
+    researchContext.ticker.trim().toUpperCase() !== ticker
+  ) {
+    return false;
+  }
+  if (
+    agentGeneratedBriefEnabled &&
+    researchContext.brief_hash !== brief.brief_hash
+  ) {
+    return false;
+  }
+
+  return hasSuccessfulGuruEvidenceReview(acc, {
+    ticker,
+    briefHash: brief.brief_hash,
+  });
+}
+
+function boundedGuruCompanyAnswer(
+  acc: AccumulatedRun,
+  ticker: string,
+  responseLocale: Locale,
+): string {
+  const brief = latestGuruInvestigationBrief(acc);
+  const hasBrief = brief?.ticker.trim().toUpperCase() === ticker;
+  const researchContext = hasBrief ? latestGuruCompanyResearchContext(acc) : null;
+  const hasEvidence = researchContext?.ticker.trim().toUpperCase() === ticker;
+  const hasReview = hasBrief
+    ? hasSuccessfulGuruEvidenceReview(acc, {
+        ticker,
+        briefHash: brief.brief_hash,
+      })
+    : false;
+
+  if (responseLocale === "en") {
+    if (!hasBrief) {
+      return `${ticker} should not inherit an attack-or-defend conclusion from general market mood alone. The decision has to rest on how its current business driver, capital allocation, and financial risk connect in company filings. Until that connection is established, turning a general observation into a ${ticker} judgment would be the larger mistake.`;
+    }
+    if (!hasEvidence) {
+      return `The central question for ${ticker} is clear, but company evidence that could support or weaken it is not yet connected. That makes a confident conclusion premature: the next useful judgment comes from the specific filing facts that would change the underlying business case, not from a more forceful market narrative.`;
+    }
+    if (!hasReview) {
+      return `The relevant ${ticker} company material is available, but it has not yet been brought together into a single conclusion through the selected investment lens. The disciplined stance is to keep the key tension open until the evidence can show what truly strengthens the case and what would break it.`;
+    }
+  }
+
+  if (!hasBrief) {
+    return `${ticker}에 대해서는 일반 시장 분위기만으로 공격·방어 결론을 내리지 않겠습니다. 이 회사의 판단은 현재 사업 동력, 자본배치, 재무 위험이 실제 공시에서 어떻게 연결되는지를 봐야 합니다. 그 연결이 확인되기 전에는 일반론을 ${ticker}의 투자 판단으로 바꾸는 쪽이 더 큰 실수입니다.`;
+  }
+  if (!hasEvidence) {
+    return `${ticker}의 핵심 쟁점은 분명하지만, 이를 지지하거나 꺾을 회사 공시 근거가 아직 연결되지 않았습니다. 이 단계에서 확신을 키우기보다, 어떤 사업 사실이 판단을 바꿀지를 확인하는 것이 더 중요합니다. 일반 시장 서사를 ${ticker}의 결론으로 바꾸지는 않겠습니다.`;
+  }
+  return `${ticker}의 관련 회사 자료는 확인됐지만, 그것을 선택된 투자 원칙의 하나의 결론으로 묶을 만큼 해석이 아직 완성되지는 않았습니다. 따라서 지금은 결론을 서두르기보다, 무엇이 사례를 강화하고 무엇이 무너뜨리는지를 가르는 핵심 긴장을 열어두는 편이 더 신중합니다.`;
+}
+
+function guruEvidenceReviewCompletionResult(
+  acc: AccumulatedRun,
+  runKind: RunKind,
+  agentGeneratedBriefEnabled: boolean,
+): AgentRunResult {
+  const requiresValidatedReview =
+    runKind === "guru_advisor" &&
+    agentGeneratedBriefEnabled &&
+    latestGuruInvestigationBrief(acc) !== null;
+  if (!requiresValidatedReview || hasSuccessfulGuruEvidenceReview(acc)) {
+    return { acc, status: "completed" };
+  }
+  return {
+    acc,
+    status: "failed",
+    errorCode: "GURU_EVIDENCE_REVIEW_REQUIRED",
+    errorMessage:
+      "근거 검토가 완료되지 않아 답변을 표시하지 않았습니다. 같은 요청을 다시 실행해 주세요.",
+    internalErrorMessage:
+      "A sealed Guru investigation brief was returned, but krw_guru_review_company_evidence did not return krw-guru-validated-evidence-analysis/v1 in this SDK run.",
+  };
+}
+
+function hasSealedInvestigationBriefPrompt(
+  prompt: string,
+  acc: AccumulatedRun,
+): boolean {
+  const brief = latestGuruInvestigationBrief(acc);
+  if (!brief || !prompt.includes(GURU_INVESTIGATION_BRIEF_FORMAT)) {
+    return false;
+  }
+  if (!prompt.includes(brief.brief_hash)) return false;
+  return brief.questions.every(
+    (question) =>
+      typeof question.question_id === "string" &&
+      prompt.includes(question.question_id),
+  );
+}
+
+function isGuruInvestigationBrief(
+  value: unknown,
+): value is GuruInvestigationBriefRecord {
+  if (!isRecord(value)) return false;
+  return (
+    value.format === GURU_INVESTIGATION_BRIEF_FORMAT &&
+    typeof value.brief_hash === "string" &&
+    /^[a-f0-9]{64}$/.test(value.brief_hash) &&
+    typeof value.ticker === "string" &&
+    Array.isArray(value.questions) &&
+    value.questions.length > 0 &&
+    value.questions.every(
+      (question) =>
+        isRecord(question) &&
+        typeof question.question_id === "string" &&
+        typeof question.question === "string",
+    )
+  );
+}
+
+function isGuruCompanyResearchContext(
+  value: unknown,
+): value is GuruCompanyResearchContextRecord {
+  if (!isRecord(value)) return false;
+  return (
+    value.format === GURU_COMPANY_RESEARCH_CONTEXT_FORMAT &&
+    typeof value.ticker === "string" &&
+    typeof value.brief_hash === "string" &&
+    Array.isArray(value.question_ids) &&
+    value.question_ids.length > 0 &&
+    value.question_ids.every((questionId) => typeof questionId === "string") &&
+    Array.isArray(value.evidence_units) &&
+    value.evidence_units.length > 0 &&
+    value.evidence_units.every(isRecord) &&
+    Array.isArray(value.source_object_ids) &&
+    value.source_object_ids.length > 0 &&
+    value.source_object_ids.every((objectId) => typeof objectId === "string") &&
+    (value.research_status === "evidence_found" ||
+      value.research_status === "partial")
+  );
+}
+
+function unwrapMcpJsonResult(value: unknown): UnknownRecord | null {
+  if (!isRecord(value)) return null;
+  if (typeof value.result === "string") {
+    try {
+      const parsed: unknown = JSON.parse(value.result);
+      return isRecord(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  return isRecord(value.result) ? value.result : null;
+}
+
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(sortJsonValue(value));
+}
+
+function sortJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortJsonValue);
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(
+    Object.keys(value)
+      .sort()
+      .map((key) => [key, sortJsonValue(value[key])]),
+  );
+}
+
 
 function guruSubagentToolPermission(params: {
   acc: AccumulatedRun;
@@ -1236,7 +2562,14 @@ function guruSubagentToolPermission(params: {
   mode: ResearchMode;
   toolName: string;
 }): PermissionResult {
-  const { acc, agentID, input, maxToolCalls, mode, toolName } = params;
+  const {
+    acc,
+    agentID,
+    input,
+    maxToolCalls,
+    mode,
+    toolName,
+  } = params;
   if (!isCompanyEvidenceSubagent(agentID)) {
     return {
       behavior: "deny",
@@ -1267,6 +2600,16 @@ function guruSubagentToolPermission(params: {
     };
   }
 
+  if (!GURU_COMPANY_EVIDENCE_MCP_TOOLS.has(mcpToolName)) {
+    return {
+      behavior: "deny",
+      message:
+        "Company evidence research is limited to query_context, query, and trace so it can return compact filing evidence promptly.",
+    };
+  }
+
+  const preparedInput = prepareToolInputForRun(mcpToolName, input, acc);
+
   const allowedMcpTools = new Set(getAllowedMcpToolsForResearchMode(mode));
   if (!allowedMcpTools.has(mcpToolName)) {
     return {
@@ -1282,7 +2625,6 @@ function guruSubagentToolPermission(params: {
     };
   }
 
-  const preparedInput = prepareToolInputForRun(mcpToolName, input, acc);
   if (preparedInput.changed) {
     return {
       behavior: "allow",
@@ -1403,6 +2745,53 @@ interface PreparedToolInput {
   changed: boolean;
 }
 
+/**
+ * The model writes only its evidence analysis. The sealed brief and the
+ * research context derived from actual filing-tool results are run-local
+ * state, so copying or reconstructing them through model tokens is fragile.
+ */
+function prepareGuruReviewCompanyEvidenceInput(
+  input: Record<string, unknown>,
+  acc: AccumulatedRun,
+  requireInvestigationBrief: boolean,
+): PreparedToolInput {
+  const researchContext = latestGuruCompanyResearchContext(acc);
+  if (!researchContext) return { input, changed: false };
+
+  const {
+    company_payload: _companyPayload,
+    company_payload_json: _companyPayloadJson,
+    company_research_context: _companyResearchContext,
+    company_research_context_json: _companyResearchContextJson,
+    investigation_brief: _investigationBrief,
+    investigation_brief_json: _investigationBriefJson,
+    agent_analysis: suppliedAnalysis,
+    agent_analysis_json: _agentAnalysisJson,
+    ...publicInput
+  } = input;
+  const next: Record<string, unknown> = {
+    ...publicInput,
+    company_research_context: researchContext,
+  };
+
+  const brief = latestGuruInvestigationBrief(acc);
+  if (requireInvestigationBrief && brief) {
+    next.investigation_brief = brief;
+    next.ticker = brief.ticker.toUpperCase();
+    if (typeof brief.author_key === "string") {
+      next.author_keys = [brief.author_key];
+    }
+    if (suppliedAnalysis !== undefined) next.agent_analysis = suppliedAnalysis;
+  } else if (suppliedAnalysis !== undefined) {
+    next.agent_analysis = suppliedAnalysis;
+  }
+
+  return {
+    input: next,
+    changed: canonicalJson(next) !== canonicalJson(input),
+  };
+}
+
 function prepareToolInputForRun(
   mcpToolName: MCPToolName | null,
   input: Record<string, unknown>,
@@ -1422,7 +2811,10 @@ function prepareToolInputForRun(
   }
 
   const inputWithContext = attachAgentContextInput(mcpToolName, input, acc);
-  const policy = normalizeKrwOntologyToolInput(mcpToolName, inputWithContext.input);
+  const policy = normalizeKrwOntologyToolInput(
+    mcpToolName,
+    inputWithContext.input,
+  );
   return {
     input: policy.input,
     changed: inputWithContext.changed || policy.changed,
@@ -1526,7 +2918,11 @@ function extractAllowedStockNewsSourceUrls(
     for (const key of ["source_urls", "reader_urls", "major_news_urls"]) {
       for (const value of readStringArray(record[key])) add(value);
     }
-    for (const key of ["source_previews", "primary_sources", "secondary_sources"]) {
+    for (const key of [
+      "source_previews",
+      "primary_sources",
+      "secondary_sources",
+    ]) {
       for (const source of readRecordArray(record[key])) addRecord(source);
     }
     if (isRecord(record.primary_source)) addRecord(record.primary_source);
@@ -1672,20 +3068,35 @@ async function getCompanyPromptContexts(
   tickers: string[],
 ): Promise<CompanyPromptContext[]> {
   const uniqueTickers = Array.from(
-    new Set(tickers.map((ticker) => ticker.trim().toUpperCase()).filter(Boolean)),
+    new Set(
+      tickers.map((ticker) => ticker.trim().toUpperCase()).filter(Boolean),
+    ),
   );
 
-  const companies = await getIndexedCompanies(uniqueTickers);
+  let companies: Awaited<ReturnType<typeof getIndexedCompanies>>;
+  try {
+    companies = await getIndexedCompanies(uniqueTickers);
+  } catch (error) {
+    console.warn("[krw-ontology:company-prompt-context-fallback]", {
+      tickerCount: uniqueTickers.length,
+      error:
+        error instanceof Error
+          ? error.message.slice(0, 300)
+          : "unknown catalog read error",
+    });
+    return [];
+  }
 
-  return companies
-    .map((company) => ({
-      ticker: company.ticker,
-      documentTypes: company.document_types,
-      latestPeriod: company.latest_period,
-      latestPeriods: company.periods.slice(0, 6),
-      indexedFilingCount: company.document_count,
-      filingAnchor: buildFilingAnchor(company.documents),
-    }));
+  return companies.map((company) => ({
+    ticker: company.ticker,
+    companyName: company.name,
+    documentTypes: company.document_types,
+    latestPeriod: company.latest_period,
+    latestPeriods: company.periods.slice(0, 6),
+    indexedFilingCount: company.document_count,
+    filingAnchor: buildFilingAnchor(company.documents),
+    guruLightCompanyContext: buildGuruLightCompanyContext(company),
+  }));
 }
 
 function buildFilingAnchor(
@@ -1728,12 +3139,14 @@ async function consumeSdkMessage(params: {
   message: SDKMessage;
   acc: AccumulatedRun;
   openToolCalls: Set<string>;
-  sendEvent: (event: Parameters<ReturnType<typeof createSSEWriter>["sendEvent"]>[0], data: unknown) => Promise<void>;
+  sendEvent: (
+    event: Parameters<ReturnType<typeof createSSEWriter>["sendEvent"]>[0],
+    data: unknown,
+  ) => Promise<void>;
   onToolCallStart?: (toolCall: AccumulatedToolCall) => Promise<void>;
   onToolCallEnd?: (toolCall: AccumulatedToolCall) => Promise<void>;
   onCitation?: (citation: StreamingCitation) => Promise<void>;
   passName: "research";
-  suppressTextDeltas?: boolean;
 }) {
   const {
     message,
@@ -1744,19 +3157,15 @@ async function consumeSdkMessage(params: {
     onToolCallEnd,
     onCitation,
     passName,
-    suppressTextDeltas,
   } = params;
 
   if (message.type === "assistant") {
     const blocks = getContentBlocks(message.message);
-    const containsToolUse = blocks.some((block) => block.type === "tool_use");
 
     for (const block of blocks) {
-      if (block.type === "text" && typeof block.text === "string") {
-        if (containsToolUse || suppressTextDeltas) continue;
-        addToken(acc, block.text);
-      }
-
+      // Assistant events can contain the model's transient tool-planning text.
+      // They are execution state, never user-visible content. The terminal SDK
+      // result below is the sole source of the persisted/rendered answer.
       if (block.type === "tool_use") {
         const toolName = normalizeMcpToolName(block.name);
         if (!toolName) continue;
@@ -1784,7 +3193,8 @@ async function consumeSdkMessage(params: {
   if (message.type === "user") {
     for (const toolResult of extractToolResults(message)) {
       const wasOpen =
-        toolResult.toolUseId !== null && openToolCalls.has(toolResult.toolUseId);
+        toolResult.toolUseId !== null &&
+        openToolCalls.has(toolResult.toolUseId);
 
       if (toolResult.toolUseId) {
         const toolCall = endToolCall(
@@ -1873,27 +3283,52 @@ function extractToolResults(message: SDKMessage): ToolResultRecord[] {
 
   const results: ToolResultRecord[] = [];
   const toolUseResult = message.tool_use_result;
+  const toolResultBlocks = getContentBlocks(message.message).filter(
+    (block) => block.type === "tool_result",
+  );
+  const topLevelResearchState = extractResearchStateV2(toolUseResult);
 
-  if (toolUseResult) {
-    const text = stringifyToolResult(toolUseResult);
+  for (const block of toolResultBlocks) {
+    const researchState =
+      extractResearchStateV2(block) ??
+      (toolResultBlocks.length === 1 ? topLevelResearchState : null);
+    const text = researchState
+      ? JSON.stringify(researchState)
+      : stringifyToolResult(block.content);
     results.push({
-      toolUseId: null,
+      toolUseId:
+        typeof block.tool_use_id === "string" ? block.tool_use_id : null,
       text,
-      json: parseToolJson(text),
+      json: researchState ?? parseToolJson(text),
     });
   }
 
-  for (const block of getContentBlocks(message.message)) {
-    if (block.type !== "tool_result") continue;
-    const text = stringifyToolResult(block.content);
+  if (toolResultBlocks.length === 0 && toolUseResult) {
+    const text = topLevelResearchState
+      ? JSON.stringify(topLevelResearchState)
+      : stringifyToolResult(toolUseResult);
     results.push({
-      toolUseId: typeof block.tool_use_id === "string" ? block.tool_use_id : null,
+      toolUseId: null,
       text,
-      json: parseToolJson(text),
+      json: topLevelResearchState ?? parseToolJson(text),
     });
   }
 
   return results.filter((result) => result.text.trim().length > 0);
+}
+
+function extractResearchStateV2(value: unknown): UnknownRecord | null {
+  if (!isRecord(value)) return null;
+  const structuredContent = isRecord(value.structuredContent)
+    ? value.structuredContent
+    : null;
+  if (
+    !structuredContent ||
+    structuredContent.contract_version !== RESEARCH_STATE_CONTRACT_VERSION
+  ) {
+    return null;
+  }
+  return structuredContent;
 }
 
 function stringifyToolResult(value: unknown): string {
@@ -2028,7 +3463,9 @@ function countToolCalls(
 function countStockNewsToolCalls(
   toolCalls: Array<Pick<AccumulatedToolCall, "toolName">>,
 ): number {
-  return toolCalls.filter((toolCall) => isStockNewsMcpToolName(toolCall.toolName)).length;
+  return toolCalls.filter((toolCall) =>
+    isStockNewsMcpToolName(toolCall.toolName),
+  ).length;
 }
 
 function countYahooFinanceToolCalls(
@@ -2172,8 +3609,14 @@ function usageFromSdkMessage(message: SDKMessage): {
 }
 
 function modelFromSdkMessage(message: SDKMessage): string | null {
+  if (message.type === "system" && message.subtype === "init") {
+    return message.model;
+  }
+
   if (message.type === "assistant" && isRecord(message.message)) {
-    return typeof message.message.model === "string" ? message.message.model : null;
+    return typeof message.message.model === "string"
+      ? message.message.model
+      : null;
   }
 
   if (message.type === "result") {
@@ -2238,11 +3681,8 @@ function userFacingErrorMessage(
   code: AgentRunResult["errorCode"],
   rawMessage: string,
 ): string {
-  if (code === "claude_rate_limited") {
-    return "현재 KRW-AI 계정/API 요청 한도에 도달했습니다. 잠시 후 다시 시도하거나, 실제 ANTHROPIC_API_KEY를 설정한 뒤 서버를 재시작해주세요.";
-  }
   if (code === "auth_required") {
-    return "KRW-AI 인증 정보가 서버 실행 환경에 없거나 유효하지 않습니다. 서버에서 KRW-AI 인증을 마친 뒤 앱 컨테이너가 그 실행 파일과 설정을 볼 수 있게 재시작해주세요.";
+    return "분석 서비스를 준비하지 못했습니다. 잠시 후 다시 시도해주세요.";
   }
   if (code === "mcp_unavailable") {
     return "온톨로지 도구 연결을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.";
@@ -2254,7 +3694,7 @@ function userFacingErrorMessage(
   if (process.env.NODE_ENV !== "production") {
     console.warn("[krw-ai-agent-sdk] execution failed", rawMessage);
   }
-  return "에이전트 실행 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+  return publicAgentErrorMessage({ code });
 }
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -2322,6 +3762,65 @@ function addCitationFromBundle(acc: AccumulatedRun, bundle: UnknownRecord) {
   });
 }
 
+function addCitationFromResearchStateEvidenceUnit(
+  acc: AccumulatedRun,
+  unit: UnknownRecord,
+) {
+  const source = isRecord(unit.source) ? unit.source : {};
+  const sourceObjectIds = Array.isArray(source.object_ids)
+    ? source.object_ids.filter(
+        (value): value is string => typeof value === "string" && Boolean(value),
+      )
+    : [];
+  const objectId =
+    typeof unit.object_id === "string" && unit.object_id
+      ? unit.object_id
+      : (sourceObjectIds[0] ?? null);
+  const ticker = typeof unit.ticker === "string" ? unit.ticker : null;
+
+  if (!objectId && !ticker) return;
+
+  const summary =
+    typeof unit.summary === "string" && unit.summary.trim()
+      ? unit.summary.slice(0, 500)
+      : typeof unit.title === "string" && unit.title.trim()
+        ? unit.title.slice(0, 500)
+        : null;
+
+  addCitation(acc, {
+    object_id: objectId,
+    ticker,
+    document_type:
+      typeof unit.document_type === "string"
+        ? (unit.document_type as DocumentType)
+        : null,
+    period: typeof unit.period === "string" ? unit.period : null,
+    section: null,
+    quote_text: null,
+    claim_text: summary,
+    evidence_grade: researchStateCitationGrade(unit.evidence_grade),
+    source_quality: researchStateSourceQuality(unit.directness),
+    trace_json: unit,
+  });
+}
+
+function researchStateCitationGrade(
+  value: unknown,
+): StreamingCitation["evidence_grade"] {
+  if (value === "strong") return "high";
+  if (value === "medium") return "medium";
+  if (value === "weak") return "low";
+  return null;
+}
+
+function researchStateSourceQuality(
+  value: unknown,
+): StreamingCitation["source_quality"] {
+  if (value === "direct") return "filing_direct";
+  if (value === "metric_lineage" || value === "related") return "derived";
+  return null;
+}
+
 function extractCitations(
   acc: AccumulatedRun,
   resultContent: string,
@@ -2330,6 +3829,15 @@ function extractCitations(
   try {
     const data = normalizeCitationPayload(parsedResult ?? resultContent);
     if (!isRecord(data)) return;
+
+    if (
+      data.contract_version === RESEARCH_STATE_CONTRACT_VERSION &&
+      Array.isArray(data.evidence_units)
+    ) {
+      for (const unit of asRecordArray(data.evidence_units)) {
+        addCitationFromResearchStateEvidenceUnit(acc, unit);
+      }
+    }
 
     if (Array.isArray(data.results)) {
       for (const result of asRecordArray(data.results)) {

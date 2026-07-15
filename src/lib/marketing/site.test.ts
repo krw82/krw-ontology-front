@@ -130,7 +130,7 @@ describe("marketing site content model", () => {
           url: expect.stringContaining("/api/og/site/default?locale=ko"),
           width: PAGE_OG_IMAGE_SIZE.width,
           height: PAGE_OG_IMAGE_SIZE.height,
-          alt: "분석 가능한 회사 목록 | KRW Ontology",
+          alt: "분석 가능한 회사 목록 | KRW.O",
         },
       ],
     });

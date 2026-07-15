@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  type FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { motion } from "motion/react";
 import { KrwBrand } from "@/components/KrwBrand";
 import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
@@ -43,12 +50,21 @@ function GoogleMark() {
 }
 
 const SAFE_INTERNAL_ORIGIN = "https://krw-ontology.local";
+const EMAIL_LOGIN_ENABLED = process.env.NEXT_PUBLIC_ENABLE_EMAIL_LOGIN === "1";
 
 const loginCopy: Record<
   Locale,
   {
     oauthError: string;
     googleError: string;
+    emailError: string;
+    emailLabel: string;
+    passwordLabel: string;
+    emailPlaceholder: string;
+    passwordPlaceholder: string;
+    emailSignIn: string;
+    emailSigningIn: string;
+    emailDivider: string;
     desktopApproveFailed: string;
     desktopApproved: string;
     headline: string;
@@ -74,52 +90,68 @@ const loginCopy: Record<
   ko: {
     oauthError: "Google 인증을 완료하지 못했습니다. 다시 시도해주세요.",
     googleError: "Google 로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+    emailError: "이메일 또는 비밀번호가 올바르지 않습니다. 다시 확인해주세요.",
+    emailLabel: "이메일",
+    passwordLabel: "비밀번호",
+    emailPlaceholder: "심사용 이메일 입력",
+    passwordPlaceholder: "비밀번호 입력",
+    emailSignIn: "이메일로 로그인",
+    emailSigningIn: "로그인 중...",
+    emailDivider: "또는",
     desktopApproveFailed: "Desktop 연결을 승인하지 못했습니다.",
     desktopApproved: "승인 완료. KRW Desktop 앱으로 이동 중입니다.",
-    headline: "무료 베타로 기업 분석 시작",
+    headline: "기업 리서치 시작",
     intro:
-      "카드 등록 없이 Google 계정으로 시작합니다. 선택한 회사, 질문 기록, 무료 베타 사용량을 안전하게 이어서 확인할 수 있습니다.",
+      "Google 또는 이메일로 시작합니다. 선택한 회사와 질문 기록을 안전하게 이어서 확인할 수 있습니다.",
     desktopApprovalTitle: "KRW Desktop 연결 승인",
     approvalCodeLabel: "승인 코드",
     desktopChecking: "로그인 상태 확인 중...",
-    desktopSignedOut: "Google 로그인 후 이 Desktop 연결을 승인할 수 있습니다.",
+    desktopSignedOut: "Google 또는 이메일 로그인 후 이 Desktop 연결을 승인할 수 있습니다.",
     desktopApproving: "승인 중...",
     desktopApprove: "Desktop 연결 승인",
     desktopOpen: "KRW Desktop 열기",
     googleMoving: "Google로 이동 중...",
     googleContinue: "Google로 로그인하고 계속",
-    googleStart: "Google로 무료 시작",
-    footnote: "무료 베타 · 카드 불필요 · 로그인 후 이전 화면으로 돌아갑니다.",
-    copyright: "© 2026 KRW Ontology. 모든 권리 보유.",
+    googleStart: "Google로 계속",
+    footnote: "로그인 후 이전 화면으로 돌아갑니다.",
+    copyright: "© 2026 KRW.O. 모든 권리 보유.",
     privacy: "개인정보처리방침",
     terms: "서비스 약관",
     refund: "환불정책",
-    pageTitle: "무료 베타 로그인 | KRW Ontology",
+    pageTitle: "로그인 | KRW.O",
   },
   en: {
     oauthError: "Google authentication could not be completed. Please try again.",
     googleError: "Something went wrong while signing in with Google. Please try again shortly.",
+    emailError: "The email or password is incorrect. Please try again.",
+    emailLabel: "Email",
+    passwordLabel: "Password",
+    emailPlaceholder: "Enter review email",
+    passwordPlaceholder: "Enter password",
+    emailSignIn: "Sign in with email",
+    emailSigningIn: "Signing in...",
+    emailDivider: "or",
     desktopApproveFailed: "Could not approve the Desktop connection.",
     desktopApproved: "Approved. Opening the KRW Desktop app.",
-    headline: "Start company analysis for free",
+    headline: "Start company research",
     intro:
-      "Continue with your Google account. Your selected companies, question history, and free beta usage stay connected safely.",
+      "Continue with Google or email. Your selected companies and question history stay connected safely.",
     desktopApprovalTitle: "Approve KRW Desktop connection",
     approvalCodeLabel: "Approval code",
     desktopChecking: "Checking sign-in status...",
-    desktopSignedOut: "Sign in with Google to approve this Desktop connection.",
+    desktopSignedOut: "Sign in with Google or email to approve this Desktop connection.",
     desktopApproving: "Approving...",
     desktopApprove: "Approve Desktop connection",
     desktopOpen: "Open KRW Desktop",
     googleMoving: "Opening Google...",
     googleContinue: "Sign in with Google and continue",
-    googleStart: "Start free with Google",
-    footnote: "Free beta · no card required · returns to the previous screen after sign-in.",
-    copyright: "© 2026 KRW Ontology. All rights reserved.",
+    googleStart: "Continue with Google",
+    footnote: "Returns to the previous screen after sign-in.",
+    copyright: "© 2026 KRW.O. All rights reserved.",
     privacy: "Privacy Policy",
     terms: "Terms of Service",
     refund: "Refund Policy",
-    pageTitle: "Free beta login | KRW Ontology",
+    pageTitle: "Sign in | KRW.O",
   },
 };
 
@@ -164,6 +196,10 @@ function LoginContent() {
       }`
     : nextPath;
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(
     initialError ? copy.oauthError : null,
   );
@@ -181,6 +217,10 @@ function LoginContent() {
     duration: reducedMotion ? 0 : 0.22,
     ease: easeOutExpo,
   };
+  const canUseSignInMethods =
+    !desktopCode ||
+    desktopApprovalStatus === "checking" ||
+    desktopApprovalStatus === "signed_out";
 
   useEffect(() => {
     document.title = copy.pageTitle;
@@ -260,8 +300,40 @@ function LoginContent() {
     }
   };
 
+  const handleEmailSignIn = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (emailLoading || loading) return;
+
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail || !password) {
+      setError(copy.emailError);
+      setErrorVisible(false);
+      return;
+    }
+
+    setEmailLoading(true);
+    setError(null);
+    setErrorVisible(false);
+
+    try {
+      await trackClientEventWithTimeout("signup_started", {
+        provider: "email",
+        next_path: desktopNextPath,
+      });
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      });
+      if (authError) throw authError;
+      window.location.assign(desktopNextPath);
+    } catch {
+      setError(copy.emailError);
+      setEmailLoading(false);
+    }
+  };
+
   const handleGoogleSignIn = async () => {
-    if (oauthInFlightRef.current) return;
+    if (oauthInFlightRef.current || emailLoading) return;
     oauthInFlightRef.current = true;
     setLoading(true);
     setError(null);
@@ -456,15 +528,104 @@ function LoginContent() {
               </div>
             )}
 
-            {(!desktopCode ||
-              desktopApprovalStatus === "checking" ||
-              desktopApprovalStatus === "signed_out") && (
+            {canUseSignInMethods && EMAIL_LOGIN_ENABLED && (
+              <>
+                <form onSubmit={handleEmailSignIn} className="space-y-3">
+                  <div>
+                    <label
+                      htmlFor="login-email"
+                      className="text-[13px] font-extrabold text-ink"
+                    >
+                      {copy.emailLabel}
+                    </label>
+                    <input
+                      id="login-email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      inputMode="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder={copy.emailPlaceholder}
+                      disabled={loading || emailLoading}
+                      required
+                      className="mt-1 h-[48px] w-full rounded-[8px] border border-hairline bg-canvas px-sm text-[15px] font-semibold text-ink outline-none transition-colors placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-70"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="login-password"
+                      className="text-[13px] font-extrabold text-ink"
+                    >
+                      {copy.passwordLabel}
+                    </label>
+                    <div className="relative mt-1">
+                      <input
+                        id="login-password"
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="current-password"
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        placeholder={copy.passwordPlaceholder}
+                        disabled={loading || emailLoading}
+                        required
+                        className="h-[48px] w-full rounded-[8px] border border-hairline bg-canvas px-sm pr-16 text-[15px] font-semibold text-ink outline-none transition-colors placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-70"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((visible) => !visible)}
+                        className="absolute inset-y-0 right-0 px-sm text-[12px] font-extrabold text-muted transition-colors hover:text-ink"
+                        aria-label={
+                          showPassword
+                            ? loginLocale === "ko"
+                              ? "비밀번호 숨기기"
+                              : "Hide password"
+                            : loginLocale === "ko"
+                              ? "비밀번호 보기"
+                              : "Show password"
+                        }
+                        aria-pressed={showPassword}
+                      >
+                        {showPassword
+                          ? loginLocale === "ko"
+                            ? "숨기기"
+                            : "Hide"
+                          : loginLocale === "ko"
+                            ? "보기"
+                            : "Show"}
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={loading || emailLoading || desktopApprovalStatus === "checking"}
+                    aria-busy={emailLoading}
+                    className="flex h-[52px] w-full items-center justify-center rounded-[8px] bg-surface-dark px-base text-[16px] font-extrabold leading-[1.15] text-on-dark transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {emailLoading ? copy.emailSigningIn : copy.emailSignIn}
+                  </button>
+                </form>
+
+                <div className="flex items-center gap-sm py-1 text-[12px] font-bold text-muted">
+                  <span className="h-px flex-1 bg-hairline" />
+                  <span>{copy.emailDivider}</span>
+                  <span className="h-px flex-1 bg-hairline" />
+                </div>
+              </>
+            )}
+
+            {canUseSignInMethods && (
               <motion.button
                 type="button"
                 onClick={handleGoogleSignIn}
-                disabled={loading || desktopApprovalStatus === "checking"}
+                disabled={loading || emailLoading || desktopApprovalStatus === "checking"}
                 aria-busy={loading}
-                whileTap={reducedMotion || loading ? undefined : { scale: 0.985 }}
+                whileTap={
+                  reducedMotion || loading || emailLoading
+                    ? undefined
+                    : { scale: 0.985 }
+                }
                 className={`relative flex h-[52px] w-full items-center justify-center gap-sm rounded-[8px] border px-base text-[16px] font-extrabold leading-[1.15] text-ink shadow-[0_8px_20px_rgba(10,11,13,0.08)] transition-all duration-150 ease-out hover:border-primary hover:bg-primary-fixed disabled:cursor-not-allowed disabled:opacity-70 ${
                   loading ? "border-primary bg-primary-fixed" : "border-hairline bg-canvas"
                 }`}

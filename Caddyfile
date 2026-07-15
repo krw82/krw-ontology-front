@@ -1,6 +1,8 @@
 {$DOMAIN:localhost} {
     handle_path /llm/* {
         reverse_proxy llm-gateway:8787 {
+            # Set (rather than append) the ingress-owned header. This replaces
+            # any browser-supplied value before it reaches an upstream.
             header_up X-KRW-Client-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
             header_up -CF-Connecting-IP
@@ -10,6 +12,8 @@
 
     handle {
         reverse_proxy web:3000 {
+            # Set (rather than append) the ingress-owned header. This replaces
+            # any browser-supplied value before it reaches an upstream.
             header_up X-KRW-Client-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
             header_up -CF-Connecting-IP
@@ -26,6 +30,8 @@
 
 dalim.krwontology.com {
     reverse_proxy host.docker.internal:3100 {
+        # Set (rather than append) the ingress-owned header. This replaces
+        # any browser-supplied value before it reaches an upstream.
         header_up X-KRW-Client-IP {remote_host}
         header_up X-Forwarded-For {remote_host}
         header_up -CF-Connecting-IP

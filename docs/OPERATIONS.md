@@ -43,6 +43,20 @@ The GCP compose deploy also starts the persistent Redis document queue,
 BullMQ `document-worker`, and `document-outbox-dispatcher`; treat the deploy as
 incomplete if either document service is not running.
 
+When `--apply-migrations` finds the document-ingestion claim-token migration,
+the production deploy first stops and verifies the remote document worker and
+outbox dispatcher through `scripts/drain-document-workers-for-migration.sh`.
+Apply the migration only after that gate passes; the following compose deploy
+starts the new worker binary. Do not manually restart the old document worker
+between the drain and the migration. This migration rejects `--skip-code`,
+because the worker must restart with the v2 binary immediately afterwards.
+
+The repository currently verifies this migration with focused unit/static tests;
+it does not bundle a disposable local Supabase integration harness. Before the
+production cutover, run the migration on staging, verify the duplicate-job
+preflight, complete one document, force one cleanup retry, and confirm an
+expired failed attachment is cleaned by the reconciliation loop.
+
 ## Data Deploy
 
 Production ontology data is deployed as an immutable local release. Do not
@@ -100,8 +114,8 @@ npm run prod:deploy:full -- --release-id <release_id>
 ```
 
 This path applies pending Supabase migrations before code deploy, then brings up
-GCP web/API, Redis, `document-worker`, `document-outbox-dispatcher`, billing, and
-the prod runtime.
+GCP web/API, Redis, `document-worker`, `document-outbox-dispatcher`, billing,
+the filing-notification worker, and the prod runtime.
 
 ## Health Checks
 
@@ -121,6 +135,36 @@ curl -fsS \
 
 Deep health must verify Supabase, plugin files, MCP command execution, v3 global
 spine/company shard access, and MCP tool exposure.
+
+## SEC Filing Notification Rollout
+
+The filing worker reads only the official per-issuer
+`data.sec.gov/submissions/CIK##########.json` endpoint. It should be deployed
+with all three switches off, then enabled in this order:
+
+```text
+FILING_DETECTION_ENABLED=1
+FILING_NOTIFICATION_CREATION_ENABLED=0
+FILING_PUSH_ENABLED=0
+```
+
+Run that shadow state for one trading day. Inspect recent events, duplicate
+accessions, `sec_filing_poll_state`, and the `filing_notification_worker_heartbeats`
+row. Then enable in-app notification creation; enable browser push only after
+a real internal-device test succeeds.
+
+The worker tick is 15 seconds and each active CIK is due every five minutes.
+Keep `SEC_FILING_REQUEST_DELAY_MS` at or above 650ms. A stale filing worker
+heartbeat (older than 75 seconds) makes the deep health endpoint fail only
+when `FILING_DETECTION_ENABLED=1`.
+
+Emergency rollback is independent by stage:
+
+```text
+FILING_PUSH_ENABLED=0                         # stop device push
+FILING_NOTIFICATION_CREATION_ENABLED=0        # stop new inbox entries
+FILING_DETECTION_ENABLED=0                    # stop SEC polling
+```
 
 ## SDK Freeze
 

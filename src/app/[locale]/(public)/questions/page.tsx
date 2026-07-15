@@ -50,7 +50,7 @@ const questionsCopy = {
     eyebrow: "AAPL question graphs",
     heading: "Choose an Apple question graph.",
     intro:
-      "Instead of a flat prompt list, KRW Ontology shows how questions connect around Apple's business structure. Pick a graph and start from the first filing-grounded question.",
+      "Instead of a flat prompt list, KRW.O shows how questions connect around Apple's business structure. Pick a graph and start from the first filing-grounded question.",
     primaryCta: "Start Apple revenue graph",
     companyCta: "Choose another company",
     libraryEyebrow: "Graph library",

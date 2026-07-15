@@ -22,6 +22,9 @@ describe("security headers", () => {
     expect(contentSecurityPolicy).toContain("frame-ancestors 'none'");
     expect(contentSecurityPolicy).toContain("object-src 'none'");
     expect(contentSecurityPolicy).toContain("https://*.supabase.co");
+    expect(cspDirective(contentSecurityPolicy, "connect-src")).toContain(
+      "https://*.tosspayments.com",
+    );
     expect(contentSecurityPolicy).toContain("media-src 'self' data: blob:");
     expect(cspDirective(contentSecurityPolicy, "img-src")).toContain(
       "https://cdn.brandfetch.io",
@@ -38,6 +41,15 @@ describe("security headers", () => {
     const headers = await nextConfig.headers?.();
 
     expect(headers).toEqual([
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
+        ],
+      },
       {
         source: "/:path*",
         headers: [
@@ -73,6 +85,9 @@ describe("security headers", () => {
     expect(developmentCsp).toContain("http://localhost:*");
     expect(developmentCsp).toContain("http://127.0.0.1:*");
     expect(developmentCsp).toContain("ws://localhost:*");
+    expect(cspDirective(developmentCsp, "connect-src")).toContain(
+      "https://*.tosspayments.com",
+    );
     expect(cspDirective(developmentCsp, "script-src")).toContain(
       "'unsafe-inline'",
     );

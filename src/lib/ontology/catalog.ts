@@ -13,7 +13,11 @@ export interface IndexedCompany {
   ticker: string;
   name: string;
   sector: string | null;
+  industry?: string | null;
   description: string;
+  primary_activities?: string[];
+  products_or_segments?: string[];
+  revenue_logic?: string | null;
   latest_period: string | null;
   coverage: string;
   core_strength?: string;
@@ -33,6 +37,40 @@ export interface IndexedCompanyDocument {
   generated_at: string | null;
 }
 
+export interface GuruCompanyContextAnchor {
+  anchorId: string;
+  kind:
+    | "business_description"
+    | "primary_activity"
+    | "product"
+    | "segment"
+    | "revenue_logic"
+    | "sector";
+  text: string;
+}
+
+/**
+ * Neutral, catalog-backed company context available before a Guru asks the
+ * company evidence subagent for filings. It intentionally excludes the
+ * catalogue's evaluative strength/risk summaries and all performance figures.
+ */
+export interface GuruLightCompanyContext {
+  format: "krw-guru-light-company-context/v1";
+  ticker: string;
+  companyName: string;
+  sector?: string;
+  industry?: string;
+  businessDescription: string;
+  primaryActivities: string[];
+  productsOrSegments: string[];
+  revenueLogic?: string;
+  contextAnchors: GuruCompanyContextAnchor[];
+  filingAvailability: {
+    hasCurrentFiling: boolean;
+    hasAnnualBaseline: boolean;
+  };
+}
+
 interface SearchIndexedCompaniesOptions {
   query?: string | null;
   limit?: number;
@@ -43,7 +81,7 @@ type UnknownRecord = Record<string, unknown>;
 const COMPANY_SELECT_COLUMNS =
   "env, release_id, ticker, name, sector, description, latest_period, document_count, document_types, periods, coverage_json, documents_json, company_json, generated_at, created_at, updated_at";
 const DEFAULT_COMPANY_SEARCH_LIMIT = 50;
-const MAX_COMPANY_SEARCH_LIMIT = 100;
+const MAX_COMPANY_SEARCH_LIMIT = 500;
 const STATIC_E2E_COMPANIES: IndexedCompany[] = [
   {
     ticker: "AMZN",
@@ -287,7 +325,18 @@ function companyFromRow(row: OntologyCompanyRow): IndexedCompany {
     ticker: row.ticker,
     name,
     sector: formatLabel(row.sector),
+    industry: stringValue(company.industry),
     description: trimSentence(description),
+    primary_activities: stringArrayValue(company.primary_business_activities),
+    products_or_segments: uniqueStrings([
+      ...stringArrayValue(company.products),
+      ...stringArrayValue(company.product_lines),
+      ...stringArrayValue(company.segments),
+      ...stringArrayValue(company.business_segments),
+    ]).slice(0, 8),
+    revenue_logic:
+      stringValue(company.revenue_logic) ??
+      stringValue(company.revenue_model),
     latest_period: row.latest_period,
     coverage: buildCoverage(row),
     core_strength:
@@ -303,6 +352,92 @@ function companyFromRow(row: OntologyCompanyRow): IndexedCompany {
     documents: documentArrayValue(row.documents_json),
     generated_at: row.generated_at,
   };
+}
+
+export function buildGuruLightCompanyContext(
+  company: IndexedCompany,
+): GuruLightCompanyContext {
+  const primaryActivities = company.primary_activities ?? [];
+  const productsOrSegments = company.products_or_segments ?? [];
+  const anchors: GuruCompanyContextAnchor[] = [
+    {
+      anchorId: "business_description",
+      kind: "business_description",
+      text: company.description,
+    },
+    ...primaryActivities.slice(0, 6).map((text, index) => ({
+      anchorId: `primary_activity_${index + 1}`,
+      kind: "primary_activity" as const,
+      text,
+    })),
+    ...productsOrSegments.slice(0, 8).map((text, index) => ({
+      anchorId: `product_or_segment_${index + 1}`,
+      kind: "product" as const,
+      text,
+    })),
+    ...(company.revenue_logic
+      ? [
+          {
+            anchorId: "revenue_logic",
+            kind: "revenue_logic" as const,
+            text: company.revenue_logic,
+          },
+        ]
+      : []),
+    ...(company.sector
+      ? [
+          {
+            anchorId: "sector",
+            kind: "sector" as const,
+            text: company.sector,
+          },
+        ]
+      : []),
+  ];
+
+  return {
+    format: "krw-guru-light-company-context/v1",
+    ticker: company.ticker,
+    companyName: company.name,
+    ...(company.sector ? { sector: company.sector } : {}),
+    ...(company.industry ? { industry: company.industry } : {}),
+    businessDescription: company.description,
+    primaryActivities: primaryActivities.slice(0, 6),
+    productsOrSegments: productsOrSegments.slice(0, 8),
+    ...(company.revenue_logic ? { revenueLogic: company.revenue_logic } : {}),
+    contextAnchors: uniqueAnchors(anchors),
+    filingAvailability: {
+      hasCurrentFiling: company.documents.length > 0,
+      hasAnnualBaseline: company.documents.some(
+        (document) =>
+          document.document_type.toUpperCase() === "10-K" ||
+          document.doc_type_key?.toUpperCase() === "10K",
+      ),
+    },
+  };
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  return Array.from(
+    new Map(
+      values
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .map((value) => [value.toLocaleLowerCase(), value]),
+    ).values(),
+  );
+}
+
+function uniqueAnchors(
+  anchors: readonly GuruCompanyContextAnchor[],
+): GuruCompanyContextAnchor[] {
+  const seenTexts = new Set<string>();
+  return anchors.filter((anchor) => {
+    const normalized = anchor.text.trim().toLocaleLowerCase();
+    if (!normalized || seenTexts.has(normalized)) return false;
+    seenTexts.add(normalized);
+    return true;
+  });
 }
 
 function companiesFromRows(rows: OntologyCompanyRow[]): IndexedCompany[] {

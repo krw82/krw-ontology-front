@@ -14,9 +14,10 @@
       "required": ["company"],
       "properties": {
         "company": {
+          "type": "object",
           "allOf": [
             {
-              "$ref": "company-catalog.schema.json#/$defs/companySummary"
+              "$ref": "company-catalog.schema.json#/$defs/companySummaryShape"
             },
             {
               "type": "object",
@@ -51,7 +52,8 @@
                 }
               }
             }
-          ]
+          ],
+          "unevaluatedProperties": false
         }
       }
     },

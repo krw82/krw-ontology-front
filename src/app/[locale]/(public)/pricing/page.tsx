@@ -8,7 +8,6 @@ import { isLocale, type Locale } from "@/i18n/config";
 import { localizedPageMetadata } from "@/i18n/metadata";
 import { localizedPath } from "@/i18n/routing";
 import { listPublicBillingPlansFromStore } from "@/lib/billing/plan-store";
-import { getBillingPlanAnalysisCredits } from "@/lib/billing/plans";
 import {
   absoluteUrl,
   buildSiteOgImagePath,
@@ -22,110 +21,148 @@ type PricingPageProps = {
 
 const pricingCopy = {
   ko: {
-    title: "가격과 사용량 기반 플랜",
+    title: "가격과 기능별 플랜",
     description:
-      "KRW Ontology의 Free, Standard, Pro 사용량 기반 플랜을 확인하세요.",
+      "KRW.O의 Free, Standard, Pro 기능별 플랜을 확인하세요.",
     eyebrow: "가격",
-    heading: "필요한 만큼 리서치하세요.",
+    heading: "내 리서치에 맞는 플랜을 선택하세요.",
     intro:
-      "결제는 월 단위로 받고, 주간 분석량은 구독 시작 시각 기준 7일마다 다시 충전됩니다. 사용량은 질문 수가 아니라 분석 범위와 답변 생성량에 따라 달라집니다.",
-    primaryCta: "무료로 첫 분석 시작",
-    cardCta: "분석 시작",
-    recommended: "추천",
+      "유료 플랜은 매월 정기 결제됩니다. Free에서 핵심 탐색 기능을 시작하고, Standard와 Pro에서 더 넓은 리서치 메뉴를 이용할 수 있습니다.",
+    serviceNote:
+      "공시와 시장 자료를 확인하는 리서치 소프트웨어입니다. 투자자문이나 매수·매도 추천을 제공하지 않으며, 투자 판단은 이용자에게 있습니다.",
+    primaryCta: "첫 분석 시작",
+    cardCta: "플랜 시작",
     comparisonHeading: "플랜 비교",
     comparisonRows: [
       {
-        label: "적합한 사용",
-        free: "첫 분석 체험",
-        standard: "개인 반복 분석",
-        pro: "여러 회사 비교",
+        label: "회사 찾기",
+        free: "포함",
+        standard: "포함",
+        pro: "포함",
+      },
+      {
+        label: "관점별 분석",
+        free: "포함",
+        standard: "포함",
+        pro: "포함",
+      },
+      {
+        label: "최근 채팅",
+        free: "포함",
+        standard: "포함",
+        pro: "포함",
+      },
+      {
+        label: "13F 기관 보유",
+        free: "포함",
+        standard: "포함",
+        pro: "포함",
+      },
+      {
+        label: "조건으로 기업 검색",
+        free: "포함",
+        standard: "포함",
+        pro: "포함",
       },
       {
         label: "와이드 리서치",
         free: "제한",
         standard: "포함",
-        pro: "넉넉함",
-      },
-      {
-        label: "리서치 노트북",
-        free: "기본",
-        standard: "포함",
         pro: "포함",
       },
       {
-        label: "주간 사용량",
-        free: "체험",
-        standard: "기본",
-        pro: "높음",
+        label: "리서치 노트북",
+        free: "제한",
+        standard: "제한",
+        pro: "포함",
       },
     ],
     principlesHeading: "플랜을 나누는 기준",
     principles: [
       {
-        title: "사용량 기반 플랜",
-        body: "기능은 모든 플랜에서 열어두고, 분석 범위와 답변 생성량에 따라 이번 주 사용량에 반영합니다.",
+        title: "메뉴별 기능 분리",
+        body: "Free는 핵심 탐색 기능, Standard는 와이드 리서치, Pro는 리서치 노트북까지 제공합니다.",
       },
       {
         title: "먼저 가치를 확인",
         body: "Free 플랜으로 첫 답변 성공, 근거 확인, 재질문 경험을 먼저 확인한 뒤 필요한 만큼 플랜을 올릴 수 있습니다.",
       },
       {
-        title: "무리한 차단 없음",
-        body: "사용량이 남아 있으면 기능을 막지 않습니다. 한도에 도달하면 다음 충전 시각과 업그레이드 선택지만 안내합니다.",
+        title: "필요한 기능만 확장",
+        body: "Standard에서 와이드 리서치를, Pro에서 리서치 노트북을 추가로 이용할 수 있습니다.",
       },
     ],
   },
   en: {
-    title: "Usage-based pricing",
+    title: "Feature-based pricing",
     description:
-      "Review KRW Ontology Free, Standard, and Pro usage-based plans.",
+      "Review KRW.O Free, Standard, and Pro feature-based plans.",
     eyebrow: "Pricing",
-    heading: "Choose the research capacity that fits your workflow.",
+    heading: "Choose the plan that fits your workflow.",
     intro:
-      "Billing is monthly, while weekly usage capacity refills every seven days from your subscription anchor. Usage depends on research scope and answer length, not a fixed question count.",
+      "Paid plans renew monthly. Start with core discovery on Free, then unlock wider research menus with Standard and Pro.",
+    serviceNote:
+      "This is research software for reviewing filings and market materials. It does not provide investment advice or buy/sell recommendations; users make their own decisions.",
     primaryCta: "Start your first analysis",
-    cardCta: "Start analysis",
-    recommended: "Recommended",
+    cardCta: "Start plan",
     comparisonHeading: "Plan comparison",
     comparisonRows: [
       {
-        label: "Best for",
-        free: "First analysis",
-        standard: "Repeated individual research",
-        pro: "Multi-company comparison",
+        label: "Find companies",
+        free: "Included",
+        standard: "Included",
+        pro: "Included",
+      },
+      {
+        label: "Perspective analysis",
+        free: "Included",
+        standard: "Included",
+        pro: "Included",
+      },
+      {
+        label: "Recent chats",
+        free: "Included",
+        standard: "Included",
+        pro: "Included",
+      },
+      {
+        label: "13F institutional holdings",
+        free: "Included",
+        standard: "Included",
+        pro: "Included",
+      },
+      {
+        label: "Company search by criteria",
+        free: "Included",
+        standard: "Included",
+        pro: "Included",
       },
       {
         label: "Wide research",
         free: "Limited",
         standard: "Included",
-        pro: "Generous",
-      },
-      {
-        label: "Research notebook",
-        free: "Basic",
-        standard: "Included",
         pro: "Included",
       },
       {
-        label: "Weekly usage",
-        free: "Trial",
-        standard: "Standard",
-        pro: "High",
+        label: "Research notebook",
+        free: "Limited",
+        standard: "Limited",
+        pro: "Included",
       },
     ],
     principlesHeading: "How plans are separated",
     principles: [
       {
-        title: "Usage-based plans",
-        body: "Features stay open across plans. Usage reflects research scope and answer size.",
+        title: "Menu-based access",
+        body: "Free covers core discovery, Standard adds wide research, and Pro adds the research notebook.",
       },
       {
         title: "Prove value before payment",
         body: "The Free plan keeps the focus on a successful first answer, visible evidence, and follow-up questions before upgrading.",
       },
       {
-        title: "No abrupt blocking",
-        body: "If usage remains, features stay usable. When the weekly limit is reached, the product shows the next refill time and upgrade options.",
+        title: "Expand by workflow",
+        body: "Standard adds wide research, while Pro adds the research notebook.",
       },
     ],
   },
@@ -137,9 +174,9 @@ const pricingCopy = {
     eyebrow: string;
     heading: string;
     intro: string;
+    serviceNote: string;
     primaryCta: string;
     cardCta: string;
-    recommended: string;
     comparisonHeading: string;
     comparisonRows: Array<{
       label: string;
@@ -160,28 +197,28 @@ type BillingPlanDisplay = {
   label: string;
   statusLabel: string;
   description: string;
-  usageLabel: string;
+  featureSummary: string;
 };
 
 const englishPlanCopy: Record<string, BillingPlanDisplay> = {
   free: {
     label: "Free",
     statusLabel: "Free",
-    description: "For individual testing and lightweight company research.",
-    usageLabel: "Basic weekly usage",
+    description:
+      "Start with company search, filing-based analysis, and institutional holdings research.",
+    featureSummary: "Core discovery features",
   },
   pro: {
     label: "Pro",
     statusLabel: "Advanced analysis",
-    description:
-      "For higher-volume comparison and repeated research workflows.",
-    usageLabel: "5x Standard usage",
+    description: "Unlock every menu, including the research notebook.",
+    featureSummary: "All features + notebook",
   },
   standard: {
     label: "Standard",
-    statusLabel: "Individual analysis",
-    description: "For users who regularly perform company research.",
-    usageLabel: "Individual research",
+    statusLabel: "Extended analysis",
+    description: "Add wide research to the Free feature set.",
+    featureSummary: "Wide research included",
   },
 };
 
@@ -198,32 +235,32 @@ function getPlanDisplay(
   if (locale === "ko") {
     const koPlanCopy: Record<
       string,
-      Pick<BillingPlanDisplay, "description" | "usageLabel">
+      Pick<BillingPlanDisplay, "description" | "featureSummary">
     > = {
       free: {
-        description: "첫 리서치 흐름을 확인하는 체험용 플랜입니다.",
-        usageLabel: "체험 사용량",
+        description:
+          "회사 검색, 공시 기반 분석, 기관 보유 공시 확인을 시작할 수 있습니다.",
+        featureSummary: "핵심 탐색 기능",
       },
       standard: {
-        description: "보통의 개인 투자자에게 맞습니다.",
-        usageLabel: "기본 사용량",
+        description: "Free 기능에 와이드 리서치를 더합니다.",
+        featureSummary: "와이드 리서치 포함",
       },
       pro: {
-        description:
-          "여러 기업을 자주 비교하고 반복적으로 리서치하는 사용자에게 맞습니다.",
-        usageLabel: "넉넉한 주간 사용량",
+        description: "모든 기능과 리서치 노트북을 제공합니다.",
+        featureSummary: "전체 메뉴 + 노트북",
       },
     };
     const copy = koPlanCopy[plan.key] ?? {
-      description: "사용량 기반으로 리서치를 이어갈 수 있는 플랜입니다.",
-      usageLabel: "사용량 기반",
+      description: "기능별로 리서치 메뉴를 확장할 수 있는 플랜입니다.",
+      featureSummary: "기능 기반",
     };
 
     return {
       label: plan.label,
       statusLabel: plan.statusLabel,
       description: copy.description,
-      usageLabel: copy.usageLabel,
+      featureSummary: copy.featureSummary,
     };
   }
 
@@ -232,7 +269,7 @@ function getPlanDisplay(
       label: fallbackEnglishPlanLabel(plan.key),
       statusLabel: "Beta",
       description: "Usage-based access for company research.",
-      usageLabel: "Usage-based",
+      featureSummary: "Feature-based",
     }
   );
 }
@@ -273,11 +310,6 @@ export default async function PricingPage({ params }: PricingPageProps) {
       price: plan.monthlyPriceKrw,
       priceCurrency: "KRW",
       availability: "https://schema.org/InStock",
-      eligibleQuantity: {
-        "@type": "QuantitativeValue",
-        value: getBillingPlanAnalysisCredits(plan),
-        unitText: "weekly analysis capacity",
-      },
     };
   });
   const jsonLd = {
@@ -345,14 +377,14 @@ export default async function PricingPage({ params }: PricingPageProps) {
 
           <section className="grid gap-4 py-8 md:grid-cols-3">
             {plans.map((plan) => {
-              const recommended = plan.key === "standard";
+              const isFeatured = plan.key === "standard";
               const planDisplay = getPlanDisplay(plan, locale);
 
               return (
                 <article
                   key={plan.key}
                   className={`rounded-[8px] border p-base ${
-                    recommended
+                    isFeatured
                       ? "border-primary bg-surface"
                       : "border-hairline bg-canvas"
                   }`}
@@ -366,11 +398,6 @@ export default async function PricingPage({ params }: PricingPageProps) {
                         {planDisplay.statusLabel}
                       </p>
                     </div>
-                    {recommended && (
-                      <span className="rounded-full bg-primary-container px-xs py-xxs text-[11px] font-bold leading-4 text-on-primary">
-                        {copy.recommended}
-                      </span>
-                    )}
                   </div>
                   <p className="mt-5 text-[32px] font-black leading-[1.05] text-ink">
                     {plan.monthlyPriceKrw === 0
@@ -382,19 +409,23 @@ export default async function PricingPage({ params }: PricingPageProps) {
                         : `KRW ${plan.monthlyPriceKrw.toLocaleString()}/mo`}
                   </p>
                   <p className="mt-3 text-[22px] font-black leading-[1.05] text-ink">
-                    {planDisplay.usageLabel}
+                    {planDisplay.featureSummary}
                   </p>
                   <p className="mt-4 text-[14px] font-medium leading-6 text-body">
                     {planDisplay.description}
                   </p>
                   <MarketingCtaLink
-                    href={localizedPath(locale, "/companies")}
+                    href={
+                      plan.key === "free"
+                        ? localizedPath(locale, "/companies")
+                        : `/login?next=${encodeURIComponent("/settings/billing")}`
+                    }
                     ctaId={`pricing_${plan.key}_start`}
                     ctaLabel={copy.cardCta}
                     surface="pricing_plan_card"
                     trackUpgrade={plan.key !== "free"}
                     className={`mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-[8px] px-sm py-xs text-[14px] font-extrabold leading-5 transition-colors ${
-                      recommended
+                      isFeatured
                         ? "bg-surface-dark text-on-dark hover:bg-primary-active"
                         : "border border-hairline bg-canvas text-ink hover:border-primary hover:text-primary"
                     }`}
@@ -405,6 +436,10 @@ export default async function PricingPage({ params }: PricingPageProps) {
               );
             })}
           </section>
+
+          <p className="-mt-4 max-w-3xl text-[12px] font-medium leading-5 text-muted">
+            {copy.serviceNote}
+          </p>
 
           <section className="border-t border-hairline py-8">
             <h2 className="text-[22px] font-black leading-7 text-ink">

@@ -50,3 +50,15 @@ export const DOCUMENT_WORKER_IDLE_LOG_INTERVAL_MS = readIntEnv(
   60_000,
   { min: 5_000 },
 );
+
+export const DOCUMENT_SOURCE_CLEANUP_BATCH_SIZE = readIntEnv(
+  "DOCUMENT_SOURCE_CLEANUP_BATCH_SIZE",
+  10,
+  { min: 1 },
+);
+
+export const DOCUMENT_ATTACHMENT_EXPIRY_RECONCILE_BATCH_SIZE = readIntEnv(
+  "DOCUMENT_ATTACHMENT_EXPIRY_RECONCILE_BATCH_SIZE",
+  100,
+  { min: 1 },
+);

@@ -1,0 +1,51 @@
+alter table public.analytics_events
+  drop constraint if exists analytics_events_event_name_check;
+
+alter table public.analytics_events
+  add constraint analytics_events_event_name_check check (
+    event_name in (
+      'page_viewed',
+      'cta_clicked',
+      'home_cta_clicked',
+      'signup_started',
+      'login_completed',
+      'company_selected',
+      'question_prefilled',
+      'suggested_question_clicked',
+      'starter_question_clicked',
+      'question_submitted',
+      'answer_completed',
+      'answer_failed',
+      'citation_opened',
+      'share_created',
+      'share_viewed',
+      'share_answer_read',
+      'share_cta_clicked',
+      'share_starter_loaded',
+      'session_renamed',
+      'session_deleted',
+      'attachment_added',
+      'attachment_rejected',
+      'usage_warning_shown',
+      'usage_limit_reached',
+      'quota_warning_shown',
+      'quota_blocked',
+      'upgrade_clicked',
+      'subscription_started',
+      'company_followed',
+      'push_permission_requested',
+      'push_permission_granted',
+      'push_permission_denied',
+      'push_subscribed',
+      'push_unsubscribed',
+      'filing_notification_clicked',
+      'filing_subscription_created',
+      'filing_subscription_removed',
+      'filing_history_loaded',
+      'filing_detail_viewed',
+      'push_notification_clicked',
+      'key_exhibit_opened',
+      'sec_source_opened',
+      'filing_analysis_started'
+    )
+  );

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import ChatPageClient from "@/app/chat/ChatPageClient";
+import ProductOnboardingTour from "@/components/ProductOnboardingTour";
 import GuruDirectoryClient from "@/components/guru/GuruDirectoryClient";
 import TopNav from "@/components/TopNav";
 import { getAuthUser } from "@/lib/auth";
@@ -10,14 +11,17 @@ import {
 } from "@/lib/auth/user-profile";
 import { DEFAULT_LOCALE, isLocale } from "@/i18n/config";
 import { normalizeGuruLensKey } from "@/lib/guru-lenses";
+import { normalizeTicker } from "@/lib/ontology/ticker";
+import { getIndexedCompany } from "@/lib/ontology/catalog";
+import { getCompanyDisplayCopyForTicker } from "@/content/companies/display";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "구루 상담소 | KRW Ontology",
+  title: "관점별 분석 | KRW.O",
   description:
-    "투자 대가의 질문법으로 내 투자 아이디어를 점검하는 구루 상담소입니다.",
+    "공개된 질문 원칙으로 회사와 아이디어의 근거를 점검하는 분석 공간입니다.",
 };
 
 type GuruPageProps = {
@@ -27,6 +31,10 @@ type GuruPageProps = {
     draftMessageId?: string | string[];
     query?: string | string[];
     locale?: string | string[];
+    ticker?: string | string[];
+    tour?: string | string[];
+    onboarding?: string | string[];
+    continue?: string | string[];
   }>;
 };
 
@@ -59,15 +67,46 @@ export default async function GuruPage({ searchParams }: GuruPageProps) {
   const localeParam = stringParam(query.locale);
   const locale = isLocale(localeParam) ? localeParam : DEFAULT_LOCALE;
   const guruParam = stringParam(query.guru);
+  const selectedGuruLens = normalizeGuruLensKey(guruParam);
+  const companyTicker = normalizeTicker(stringParam(query.ticker) ?? "");
+  const company = companyTicker
+    ? await getIndexedCompany(companyTicker)
+    : null;
+  const displayCopy = company
+    ? getCompanyDisplayCopyForTicker(locale, company.ticker)
+    : null;
+  const companyContext = company
+    ? {
+        ticker: company.ticker,
+        name:
+          locale === "ko" && displayCopy?.companyNameKo
+            ? displayCopy.companyNameKo
+            : company.name,
+      }
+    : null;
+  const forceOnboarding =
+    stringParam(query.tour) === "1" || stringParam(query.onboarding) === "1";
+  const onboardingContinuePath = stringParam(query.continue);
+  const onboardingPathname = locale === DEFAULT_LOCALE ? "/guru" : `/${locale}/guru`;
   const shouldOpenChat = Boolean(
     stringParam(query.sessionId) ||
       stringParam(query.draftMessageId) ||
       stringParam(query.query) ||
-      normalizeGuruLensKey(guruParam),
+      (selectedGuruLens && selectedGuruLens !== "auto"),
   );
 
   if (shouldOpenChat) {
-    return <ChatPageClient workspace="guru" />;
+    return (
+      <>
+        <ChatPageClient workspace="guru" />
+        <ProductOnboardingTour
+          pathname={onboardingPathname}
+          tour="guru-chat"
+          force={forceOnboarding}
+          continuePath={onboardingContinuePath}
+        />
+      </>
+    );
   }
 
   return (
@@ -81,7 +120,13 @@ export default async function GuruPage({ searchParams }: GuruPageProps) {
         showSidebarCoachmarkTip={false}
         showLocaleSwitcher
       />
-      <GuruDirectoryClient locale={locale} />
+      <GuruDirectoryClient locale={locale} company={companyContext} />
+      <ProductOnboardingTour
+        pathname={onboardingPathname}
+        tour="guru-directory"
+        force={forceOnboarding}
+        continuePath={onboardingContinuePath}
+      />
     </div>
   );
 }

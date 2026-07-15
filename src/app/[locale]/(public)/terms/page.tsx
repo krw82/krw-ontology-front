@@ -6,6 +6,7 @@ import LocaleSwitcher from "@/components/LocaleSwitcher";
 import { isLocale, type Locale } from "@/i18n/config";
 import { localizedPageMetadata } from "@/i18n/metadata";
 import { localizedPath } from "@/i18n/routing";
+import { BUSINESS_CONTACT_EMAIL } from "@/lib/marketing/business";
 
 type TermsPageProps = {
   params: Promise<{ locale: string }>;
@@ -14,24 +15,24 @@ type TermsPageProps = {
 const termsCopy = {
   ko: {
     metadataTitle: "서비스 약관",
-    metadataDescription: "KRW Ontology 서비스 약관",
+    metadataDescription: "KRW.O 서비스 약관",
     home: "홈",
     eyebrow: "Terms of Service",
     heading: "서비스 약관",
-    intro: "KRW Ontology를 이용하기 전에 아래 서비스 약관을 확인해 주세요.",
+    intro: "KRW.O를 이용하기 전에 아래 서비스 약관을 확인해 주세요.",
     effectiveDate: "시행일: 2026년 5월 17일",
     sections: [
       {
         title: "1. 서비스 개요",
         body: [
-          "KRW Ontology는 기업 공시, 사업 활동, 리스크 요인, 사용자가 제공한 자료를 바탕으로 리서치 답변과 근거 기록을 제공하는 서비스입니다.",
+          "KRW.O는 기업 공시, 사업 활동, 리스크 요인, 사용자가 제공한 자료를 바탕으로 리서치 답변과 근거 기록을 제공하는 서비스입니다.",
           "서비스의 결과는 정보 제공 및 리서치 보조 목적이며, 투자 자문, 법률 자문, 회계 자문 또는 기타 전문 자문으로 간주되지 않습니다.",
         ],
       },
       {
         title: "2. 계정 및 인증",
         body: [
-          "사용자는 Google 계정으로 로그인하여 개인 워크스페이스, 채팅 기록, 리서치 결과를 사용할 수 있습니다.",
+          "사용자는 Google 계정 또는 이메일 계정으로 로그인하여 개인 워크스페이스, 채팅 기록, 리서치 결과를 사용할 수 있습니다.",
           "사용자는 본인 계정의 접근 권한을 안전하게 관리해야 하며, 계정의 무단 사용이 의심되는 경우 즉시 문의해야 합니다.",
         ],
       },
@@ -53,7 +54,7 @@ const termsCopy = {
       {
         title: "5. 결과의 정확성",
         body: [
-          "KRW Ontology는 근거 기반 답변을 제공하기 위해 노력하지만, 생성된 요약과 분석에는 오류나 누락이 있을 수 있습니다.",
+          "KRW.O는 근거 기반 답변을 제공하기 위해 노력하지만, 생성된 요약과 분석에는 오류나 누락이 있을 수 있습니다.",
           "중요한 의사결정에는 원문 자료와 전문적인 검토를 함께 사용해야 합니다.",
         ],
       },
@@ -67,39 +68,39 @@ const termsCopy = {
       {
         title: "7. 책임 제한",
         body: [
-          "관련 법령이 허용하는 범위 내에서 KRW Ontology는 서비스 이용 또는 이용 불가로 인해 발생한 간접 손해, 특별 손해, 결과적 손해에 대해 책임을 지지 않습니다.",
+          "관련 법령이 허용하는 범위 내에서 KRW.O는 서비스 이용 또는 이용 불가로 인해 발생한 간접 손해, 특별 손해, 결과적 손해에 대해 책임을 지지 않습니다.",
           "사용자는 서비스 결과를 독립적으로 검토하고, 본인의 판단과 책임으로 활용해야 합니다.",
         ],
       },
       {
         title: "8. 문의",
         body: [
-          "서비스 약관과 관련한 문의는 business@example.com 으로 연락해 주세요.",
+          `서비스 약관과 관련한 문의는 ${BUSINESS_CONTACT_EMAIL} 으로 연락해 주세요.`,
         ],
       },
     ],
   },
   en: {
     metadataTitle: "Terms of Service",
-    metadataDescription: "KRW Ontology Terms of Service",
+    metadataDescription: "KRW.O Terms of Service",
     home: "Home",
     eyebrow: "Terms of Service",
     heading: "Terms of Service",
-    intro: "Please review these terms before using KRW Ontology.",
+    intro: "Please review these terms before using KRW.O.",
     effectiveDate: "Effective date: May 17, 2026",
     sections: [
       {
         title: "1. Service overview",
         body: [
-          "KRW Ontology provides research answers and evidence records based on company filings, business activity, risk factors, and user-provided materials.",
+          "KRW.O provides research answers and evidence records based on company filings, business activity, risk factors, and user-provided materials.",
           "Service outputs are for informational and research support purposes and are not investment, legal, accounting, or other professional advice.",
         ],
       },
       {
         title: "2. Accounts and authentication",
         body: [
-          "Users can sign in with a Google account to use personal workspaces, chat history, and research results.",
-          "Users are responsible for keeping account access secure and should contact KRW Ontology immediately if unauthorized use is suspected.",
+          "Users can sign in with a Google account or email account to use personal workspaces, chat history, and research results.",
+          "Users are responsible for keeping account access secure and should contact KRW.O immediately if unauthorized use is suspected.",
         ],
       },
       {
@@ -120,7 +121,7 @@ const termsCopy = {
       {
         title: "5. Accuracy of results",
         body: [
-          "KRW Ontology aims to provide evidence-first answers, but generated summaries and analyses may contain errors or omissions.",
+          "KRW.O aims to provide evidence-first answers, but generated summaries and analyses may contain errors or omissions.",
           "Important decisions should be made with original source materials and professional review.",
         ],
       },
@@ -134,14 +135,14 @@ const termsCopy = {
       {
         title: "7. Limitation of liability",
         body: [
-          "To the extent permitted by law, KRW Ontology is not liable for indirect, special, or consequential damages from use or inability to use the service.",
+          "To the extent permitted by law, KRW.O is not liable for indirect, special, or consequential damages from use or inability to use the service.",
           "Users must independently review service outputs and use them under their own judgment and responsibility.",
         ],
       },
       {
         title: "8. Contact",
         body: [
-          "For questions about these terms, contact business@example.com.",
+          `For questions about these terms, contact ${BUSINESS_CONTACT_EMAIL}.`,
         ],
       },
     ],

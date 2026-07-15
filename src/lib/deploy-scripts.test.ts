@@ -1,4 +1,16 @@
-import { readFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 function read(path: string) {
@@ -6,12 +18,157 @@ function read(path: string) {
 }
 
 describe("production deploy scripts", () => {
+  it("keeps candidate MCP runtimes isolated and rolls failed installs back", () => {
+    const startCandidate = read("scripts/start-mcp-server-candidate.sh");
+    const verifyCandidate = read("scripts/verify-mcp-server-candidate.sh");
+    const installCandidate = read(
+      "scripts/install-mcp-server-candidate-launchd.sh",
+    );
+
+    expect(startCandidate).toContain("EXPECTED_RUNTIME_ROOT");
+    expect(verifyCandidate).toContain("EXPECTED_RUNTIME_ROOT");
+    expect(installCandidate).toContain(
+      "com.krwontology.mcp-server-candidate",
+    );
+    expect(installCandidate).toContain("cleanup_failed_install");
+    expect(installCandidate).toContain(
+      '"$KRW_LAUNCHCTL_BIN" bootout "$DOMAIN/$LABEL"',
+    );
+    expect(installCandidate).toContain('rm -f "$RUNTIME_ROOT"');
+    expect(installCandidate).toContain('rm -f "$PLIST"');
+
+    const root = mkdtempSync(join(tmpdir(), "krw-mcp-candidate-test-"));
+    try {
+      const release = join(root, "data", "releases", "prod", "20260712_021509");
+      const canonicalCurrent = join(root, "data", "releases", "prod", "current");
+      const plugin = join(root, "plugin");
+      const source = join(root, "ontology-source");
+      const home = join(root, "home");
+      const fakeBin = join(home, ".local", "bin");
+      const launchctlLog = join(root, "launchctl.log");
+      mkdirSync(release, { recursive: true });
+      symlinkSync(release, canonicalCurrent);
+      mkdirSync(plugin, { recursive: true });
+      writeFileSync(join(plugin, ".krw-ontology-contract.json"), "{}\n");
+      mkdirSync(source, { recursive: true });
+      writeFileSync(join(source, "pyproject.toml"), "[project]\nname='fake'\n");
+      mkdirSync(fakeBin, { recursive: true });
+
+      const rejected = spawnSync(
+        "/bin/sh",
+        [
+          "scripts/start-mcp-server-candidate.sh",
+          "--release-root",
+          release,
+          "--runtime-root",
+          canonicalCurrent,
+        ],
+        { encoding: "utf8" },
+      );
+      expect(rejected.status).not.toBe(0);
+      expect(rejected.stderr).toContain(
+        "must use the isolated candidate runtime path",
+      );
+
+      for (const [name, body] of [
+        ["uv", "#!/bin/sh\nexit 0\n"],
+        ["plutil", "#!/bin/sh\nexit 0\n"],
+        ["lsof", "#!/bin/sh\nexit 1\n"],
+        ["node", "#!/bin/sh\nexit 1\n"],
+        [
+          "launchctl",
+          `#!/bin/sh\nprintf '%s\\n' "$*" >> ${JSON.stringify(launchctlLog)}\nexit 0\n`,
+        ],
+      ] as const) {
+        const path = join(fakeBin, name);
+        writeFileSync(path, body);
+        chmodSync(path, 0o755);
+      }
+
+      const envFile = join(root, "candidate.env");
+      writeFileSync(
+        envFile,
+        [
+          `KRW_ONTOLOGY_SOURCE_DIR=${source}`,
+          `KRW_ONTOLOGY_UV_BIN=${join(fakeBin, "uv")}`,
+          `KRW_LAUNCHCTL_BIN=${join(fakeBin, "launchctl")}`,
+          `KRW_PLUTIL_BIN=${join(fakeBin, "plutil")}`,
+          `KRW_LSOF_BIN=${join(fakeBin, "lsof")}`,
+          "",
+        ].join("\n"),
+      );
+      const failedInstall = spawnSync(
+        "/bin/sh",
+        [
+          "scripts/install-mcp-server-candidate-launchd.sh",
+          "--release-root",
+          release,
+          "--plugin-path",
+          plugin,
+          "--env-file",
+          envFile,
+          "--port",
+          "18865",
+          "--load",
+        ],
+        {
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            HOME: home,
+            MCP_CANDIDATE_VERIFY_ATTEMPTS: "1",
+            MCP_CANDIDATE_VERIFY_INTERVAL_SECONDS: "0",
+          },
+        },
+      );
+      expect(failedInstall.status).not.toBe(0);
+      expect(failedInstall.stderr).toContain(
+        "Rolled back failed candidate install",
+      );
+      expect(
+        existsSync(
+          join(
+            root,
+            "data",
+            "runtime",
+            "mcp-candidates",
+            "20260712_021509",
+            "current",
+          ),
+        ),
+      ).toBe(false);
+      expect(
+        existsSync(
+          join(
+            home,
+            "Library",
+            "LaunchAgents",
+            "com.krwontology.mcp-server-candidate.plist",
+          ),
+        ),
+      ).toBe(false);
+      const launchctlCalls = readFileSync(launchctlLog, "utf8");
+      expect(launchctlCalls).toContain(
+        "bootstrap gui/",
+      );
+      expect(launchctlCalls.match(/bootout gui\//g)?.length).toBeGreaterThanOrEqual(
+        2,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("routes production code deploys through split web and Mac worker lanes", () => {
     const deployProd = read("scripts/deploy-production.sh");
     const deployAll = read("scripts/deploy-all-production.sh");
     const deployWeb = read("scripts/deploy-web-production.sh");
+    const compose = read("docker-compose.yml");
     const packageJson = read("package.json");
     const restartCompose = read("scripts/restart-production-compose.sh");
+    const verifyMcp = read("scripts/verify-mcp-server-production.sh");
+    const verifyMcpRuntime = read("scripts/verify-mcp-runtime.mjs");
+    const fingerprintMcpRuntime = read("scripts/mcp-runtime-fingerprint.sh");
 
     expect(deployProd).toContain("deploy-web-production.sh");
     expect(deployProd).toContain("deploy-plugin-worker-production.sh");
@@ -30,7 +187,20 @@ describe("production deploy scripts", () => {
       deployAll.indexOf("deploy-web-production.sh"),
     );
     expect(deployWeb).toContain("redis document-worker document-outbox-dispatcher billing-worker");
+    expect(compose).toContain('profiles: ["legacy-gcp-agent"]');
+    expect(compose).not.toContain(
+      "- DESKTOP_ONTOLOGY_EXECUTOR=mcp",
+    );
+    expect(
+      compose.slice(
+        compose.indexOf("  web:"),
+        compose.indexOf("  llm-gateway:"),
+      ),
+    ).not.toContain("ontology-mcp:");
     expect(restartCompose).toContain("document-outbox-dispatcher");
+    expect(read("scripts/deploy-plugin-worker-production.sh")).toContain(
+      'runtime/plugins/prod/$ACTIVE_RELEASE_ID-canonical/krw-ontology',
+    );
 
     expect(packageJson).toContain('"prod:status": "npm run mcp:prod:status && npm run worker:prod:status"');
     expect(packageJson).toContain('"prod:deploy:web": "scripts/deploy-web-production.sh"');
@@ -58,11 +228,63 @@ describe("production deploy scripts", () => {
     expect(packageJson).toContain('"mcp:dev:verify": "scripts/verify-mcp-server-dev.sh"');
     expect(packageJson).toContain('"mcp:dev:logs": "scripts/tail-mcp-logs.sh dev"');
     expect(packageJson).toContain('"mcp:dev:launchd:install": "scripts/install-mcp-server-dev-launchd.sh"');
+    expect(verifyMcp).toContain("verify-mcp-runtime.mjs");
+    expect(verifyMcp).toContain("KRW_ONTOLOGY_EXPECTED_ENV=prod");
+    expect(verifyMcpRuntime).toContain('"krw-ontology-mcp/v2"');
+    expect(verifyMcpRuntime).toContain('"krw_ontology_verify_evidence"');
+    expect(verifyMcpRuntime).toContain("tool_names_match");
+    expect(verifyMcpRuntime).toContain("tool_schema_sha256");
+    expect(verifyMcpRuntime).toContain("build_fingerprint_sha256");
+    expect(verifyMcpRuntime).toContain("service_fingerprint_sha256");
+    expect(verifyMcpRuntime).toContain(
+      "backend_git_sha is missing and build_fingerprint_sha256 is unavailable",
+    );
+    expect(verifyMcpRuntime).toContain(
+      '["KRW_MCP_EXPECTED_BACKEND_GIT_SHA", "backend_git_sha"]',
+    );
+    expect(verifyMcp).toContain("load_expected_mcp_runtime_fingerprint");
+    expect(fingerprintMcpRuntime).toContain("runtime_fingerprint_payload");
+    expect(fingerprintMcpRuntime).toContain(
+      "KRW_MCP_EXPECTED_TOOL_SCHEMA_SHA256",
+    );
+    expect(fingerprintMcpRuntime).toContain(
+      "KRW_MCP_EXPECTED_SERVICE_FINGERPRINT_SHA256",
+    );
+    expect(read("scripts/start-mcp-server-production.sh")).toContain(
+      "load_expected_mcp_runtime_fingerprint",
+    );
+    expect(read("scripts/start-mcp-server-dev.sh")).toContain(
+      "load_expected_mcp_runtime_fingerprint",
+    );
     expect(packageJson).toContain('"stock-news:coverage:export": "node scripts/export-stock-news-coverage.mjs"');
     expect(packageJson).toContain('"@modelcontextprotocol/sdk"');
 
     expect(restartCompose).toContain("restart reverse-proxy web");
     expect(restartCompose).not.toContain("restart reverse-proxy web agent-worker");
+  });
+
+  it("drains remote document workers before applying pending migrations", () => {
+    const deployAll = read("scripts/deploy-all-production.sh");
+    const drain = read("scripts/drain-document-workers-for-migration.sh");
+    const operations = read("docs/OPERATIONS.md");
+    const commandDocs = read("docs/DEPLOY_COMMANDS.md");
+
+    expect(deployAll).toContain("DOCUMENT_INGESTION_V2_MIGRATION_PENDING=1");
+    expect(deployAll).toContain(
+      "20260710002000_document_ingestion_claim_tokens_cleanup",
+    );
+    expect(deployAll).toContain("do not use --skip-code");
+    expect(deployAll).toContain("drain-document-workers-for-migration.sh");
+    expect(
+      deployAll.indexOf("drain-document-workers-for-migration.sh"),
+    ).toBeLessThan(deployAll.indexOf('echo "Applying Supabase migrations..."'));
+    expect(drain).toContain("docker compose");
+    expect(drain).toContain(
+      "stop --timeout '$DOCUMENT_WORKER_DRAIN_TIMEOUT_SECONDS' document-worker document-outbox-dispatcher",
+    );
+    expect(drain).toContain("document workers are stopped");
+    expect(operations).toContain("drain-document-workers-for-migration.sh");
+    expect(commandDocs).toContain("이전 worker를 수동으로 다시 시작하지 않는다");
   });
 
   it("keeps dev data publish local and catalog-only", () => {
@@ -104,6 +326,7 @@ describe("production deploy scripts", () => {
     expect(script).toContain("publish-web-catalog.mjs");
     expect(script).toContain("verify-web-catalog-release.mjs");
     expect(script).toContain("deploy-worker-production.sh");
+    expect(script).toContain('Release is already prod/current; skipping promote.');
     expect(script).toContain("--release-id \"$ACTIVE_RELEASE_ID\"");
     expect(script).toContain("This script does not upload full ontology data to GCP");
     expect(script).not.toContain("gcloud");
@@ -137,6 +360,27 @@ describe("production deploy scripts", () => {
     expect(script).toContain(".worker/document-outbox-dispatcher.mjs");
     expect(script).toContain("KRW_ONTOLOGY_PLUGIN_PATH");
     expect(script).toContain("OK web ontology data boundary: Supabase catalog only");
+    expect(script).toContain('"KRW_ONTOLOGY_MCP_URL"');
+    expect(script).not.toContain("OK plugin HTTP MCP URL");
+  });
+
+  it("keeps the production client IP boundary owned by Caddy", () => {
+    const caddy = read("Caddyfile");
+    const compose = read("docker-compose.yml");
+    const deployVm = read("scripts/deploy-vm-compose.sh");
+    const envExample = read(".env.example");
+
+    expect(caddy).toContain("header_up X-KRW-Client-IP {remote_host}");
+    expect(caddy).not.toContain("header_up +X-KRW-Client-IP");
+    expect(compose).toContain(
+      "TRUSTED_CLIENT_IP_HEADER=${TRUSTED_CLIENT_IP_HEADER:-x-krw-client-ip}",
+    );
+    expect(deployVm).toContain(
+      "require_env_exact TRUSTED_CLIENT_IP_HEADER x-krw-client-ip",
+    );
+    expect(envExample).toContain(
+      "TRUSTED_CLIENT_IP_HEADER=x-krw-client-ip",
+    );
   });
 
   it("requires live Toss keys for paid production readiness", () => {
@@ -195,11 +439,61 @@ describe("production deploy scripts", () => {
     expect(script).not.toContain("agent_index.sqlite");
   });
 
+  it("fails the safe deploy when its stopped queue cannot be restarted", () => {
+    const script = read("scripts/deploy-with-queue-pause.sh");
+    const functionStart = script.indexOf("restart_queue_on_exit() {");
+    const functionEnd = script.indexOf("\n}\ntrap restart_queue_on_exit EXIT", functionStart);
+
+    expect(functionStart).toBeGreaterThanOrEqual(0);
+    expect(functionEnd).toBeGreaterThan(functionStart);
+
+    const restartFunction = script.slice(functionStart, functionEnd + 2);
+    const runRestartTrap = (restartExit: number, priorExit: number) =>
+      spawnSync(
+        "sh",
+        [
+          "-c",
+          `
+RESTART_QUEUE=1
+QUEUE_WAS_RUNNING=1
+QUEUE_STOPPED_BY_SCRIPT=1
+DEPLOY_SUCCEEDED=1
+ONTOLOGY_SOURCE_DIR=/tmp/ontology
+QUEUE_ROOT=/tmp/queue
+QUEUE_POLL_INTERVAL=1
+start_queue() { return ${restartExit}; }
+queue_status() { return 0; }
+${restartFunction}
+(exit ${priorExit})
+restart_queue_on_exit
+`,
+        ],
+        { encoding: "utf8" },
+      );
+
+    const failedRestart = runRestartTrap(1, 0);
+    expect(failedRestart.status).toBe(1);
+    expect(failedRestart.stderr).toContain("Failed to restart queue worker");
+
+    const priorFailure = runRestartTrap(1, 42);
+    expect(priorFailure.status).toBe(42);
+
+    const successfulRestart = runRestartTrap(0, 0);
+    expect(successfulRestart.status).toBe(0);
+
+    expect(script).toContain("trap restart_queue_on_exit EXIT");
+    expect(script).toContain("trap 'exit 130' INT");
+    expect(script).toContain("trap 'exit 143' TERM");
+    expect(script).not.toContain("trap restart_queue_on_exit EXIT INT TERM");
+  });
+
   it("defines a compose healthcheck for agent-worker", () => {
     const compose = read("docker-compose.yml");
+    const webStart = compose.indexOf("\n  web:\n");
+    const llmGatewayStart = compose.indexOf("\n  llm-gateway:\n");
     const webSection = compose.slice(
-      compose.indexOf("  web:"),
-      compose.indexOf("  agent-worker:"),
+      webStart,
+      llmGatewayStart,
     );
     const workerSection = compose.slice(compose.indexOf("  agent-worker:"));
 
@@ -231,10 +525,14 @@ describe("production deploy scripts", () => {
     expect(workerSection).not.toContain("AGENT_WORKER_POLL_INTERVAL_MS");
     expect(workerSection).toContain("healthcheck:");
     expect(workerSection).toContain(".worker/agent-worker.mjs");
-    expect(workerSection).toContain("global_spine.sqlite");
-    expect(workerSection).toContain("shard_manifest.json");
+    expect(workerSection).not.toContain("global_spine.sqlite");
+    expect(workerSection).not.toContain("shard_manifest.json");
     expect(workerSection).not.toContain("agent_index.sqlite");
     expect(workerSection).toContain(".mcp.json");
+    expect(workerSection).toContain(".krw-ontology-contract.json");
+    expect(workerSection).toContain("http://ontology-mcp:8000/mcp");
+    expect(compose).toContain("  ontology-mcp:");
+    expect(compose).toContain("Dockerfile.mcp");
     expect(compose).toContain("  redis:");
     expect(compose).toContain("redis-server");
     expect(compose).toContain("redis_data:");
@@ -267,9 +565,9 @@ describe("production deploy scripts", () => {
     expect(webSection).not.toContain("agent_index.sqlite");
     expect(webSection).not.toContain("/srv/krw-ontology-data:/srv/krw-ontology-data");
     const dockerfileWeb = read("Dockerfile.web");
-    expect(dockerfileWeb).toContain(
-      '"/opt/krw-ontology-venv/bin/krw-ontology-mcp"',
-    );
+    expect(dockerfileWeb).toContain("http://ontology-mcp:8000/mcp");
+    expect(dockerfileWeb).toContain(".krw-ontology-contract.json");
+    expect(dockerfileWeb).not.toContain('"command": "/opt/krw-ontology-venv/bin/krw-ontology-mcp"');
     expect(dockerfileWeb).not.toContain('"stock-news"');
     expect(dockerfileWeb).not.toContain('"http://127.0.0.1:8775/mcp"');
     expect(dockerfileWeb).not.toContain("krw-ontology-mcp-stdio");
@@ -324,7 +622,9 @@ describe("production deploy scripts", () => {
     expect(preflight).toContain("agent_runs");
 
     expect(start).toContain("MAC_WORKER_LOCK_DIR");
-    expect(start).toContain("Removing stale Mac worker lock");
+    expect(start).toContain(
+      "No matching worker process found for existing lock; removing stale lock",
+    );
     expect(start).toContain("safe_worker_id");
     expect(start).toContain("--worker-id");
     expect(start).toContain("--log-file");
@@ -398,7 +698,9 @@ describe("production deploy scripts", () => {
     expect(read("scripts/start-mcp-server-dev.sh")).toContain("KRW_ONTOLOGY_MCP_PORT=${KRW_ONTOLOGY_MCP_PORT:-8766}");
     expect(read("scripts/start-mcp-server-dev.sh")).toContain("--env dev");
     expect(read("scripts/start-mcp-server-dev.sh")).toContain("mcp-dev.log");
-    expect(read("scripts/verify-mcp-server-dev.sh")).toContain("MCP dev health env is not dev");
+    expect(read("scripts/verify-mcp-server-dev.sh")).toContain(
+      "KRW_ONTOLOGY_EXPECTED_ENV=dev",
+    );
     expect(read("scripts/install-mcp-server-dev-launchd.sh")).toContain(
       "com.krwontology.mcp-server-dev",
     );
@@ -411,8 +713,8 @@ describe("production deploy scripts", () => {
     expect(read("scripts/materialize-guru-advisor-plugin.mjs")).not.toContain(
       "krw-ontology-company",
     );
-    expect(verifyMcp).toContain("KRW_ONTOLOGY_MCP_HEALTH_URL");
-    expect(verifyMcp).toContain("MCP health env is not prod");
+    expect(verifyMcp).toContain("verify-mcp-runtime.mjs");
+    expect(verifyMcp).toContain("KRW_ONTOLOGY_EXPECTED_ENV=prod");
     expect(installMcpLaunchd).toContain("com.krwontology.mcp-server");
     expect(installMcpLaunchd).toContain("verify-mcp-server-production.sh");
     expect(installMcpLaunchd).toContain("MCP_SERVER_NICE");
@@ -507,12 +809,10 @@ describe("production deploy scripts", () => {
     expect(devScript).toContain('["-n", String(devWorkerNice), process.execPath, workerOutfile]');
     expect(devScript).toContain('stdio: ["pipe", "inherit", "inherit"]');
 
-    const serverConfigSpread = mcpClient.indexOf("...(serverConfig.env ?? {})");
-    const processEnvSpread = mcpClient.indexOf("...process.env", serverConfigSpread);
-    expect(serverConfigSpread).toBeGreaterThan(-1);
-    expect(processEnvSpread).toBeGreaterThan(serverConfigSpread);
-    expect(mcpClient).toContain('path.join(root, "manifest.json")');
-    expect(mcpClient).toContain('path.join(root, "indexes", "global_spine.sqlite")');
-    expect(mcpClient).toContain('path.join(root, "indexes", "shard_manifest.json")');
+    expect(mcpClient).toContain(
+      "KRW Ontology MCP must use explicit streamable HTTP transport",
+    );
+    expect(mcpClient).toContain("verifyMaterializedOntologyPluginContract");
+    expect(mcpClient).not.toContain("runStdioMcpHealth");
   });
 });

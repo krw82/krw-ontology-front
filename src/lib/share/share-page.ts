@@ -19,12 +19,12 @@ export async function getPublicShareForPage(token: string) {
 export function sharePageMetadataCopy(locale: Locale) {
   return locale === "en"
     ? {
-        notFoundTitle: "Shared answer not found | KRW Ontology",
-        description: "A shared research answer from KRW Ontology.",
+        notFoundTitle: "Shared answer not found | KRW.O",
+        description: "A shared research answer from KRW.O.",
       }
     : {
-        notFoundTitle: "공유 답변을 찾지 못했습니다 | KRW Ontology",
-        description: "KRW Ontology에서 공유된 리서치 답변입니다.",
+        notFoundTitle: "공유 답변을 찾지 못했습니다 | KRW.O",
+        description: "KRW.O에서 공유된 리서치 답변입니다.",
       };
 }
 

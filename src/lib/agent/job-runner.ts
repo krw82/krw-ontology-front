@@ -77,6 +77,7 @@ import {
   normalizeRunKind,
   type RunKind,
 } from "@/lib/run-kind";
+import { normalizeGuruLensKey, type GuruLensKey } from "@/lib/guru-lenses";
 import { persistCreatedCharts } from "@/lib/charts/db";
 import {
   isChartGenerationEnabled,
@@ -122,10 +123,6 @@ class AgentRunHardTimeoutError extends Error {
   }
 }
 
-function isHardTimeoutAbort(signal: AbortSignal) {
-  return signal.reason instanceof AgentRunHardTimeoutError;
-}
-
 class AgentJobLoadError extends Error {
   readonly runId?: string;
   readonly assistantMessageId?: string;
@@ -161,6 +158,7 @@ interface AgentJob {
   researchMode: ResearchMode;
   analysisMode: AnalysisMode;
   runKind: RunKind;
+  guruLensKey: GuruLensKey | null;
   routingMode: AgentRunRoutingMode;
   responseLocale: Locale;
   executorType: AgentRunExecutorType;
@@ -308,6 +306,7 @@ export async function runAgentJob(runId: string, workerId: string) {
           researchMode: job.researchMode,
           analysisMode: job.analysisMode,
           runKind: job.runKind,
+          guruLensKey: job.guruLensKey,
           responseLocale: job.responseLocale,
           selectedNewsEventContext,
           abortSignal: abortController.signal,
@@ -498,6 +497,7 @@ async function resolveAutoRoutedJob(params: {
     ...job,
     analysisMode: nextAnalysisMode,
     runKind: nextRunKind,
+    guruLensKey: job.guruLensKey,
     routingMode: "preserve",
     executorType: nextExecutorType,
     selectedNewsEventContext: nextSelectedNewsEventContext,
@@ -659,6 +659,7 @@ async function loadAgentJob(
           normalizeAnalysisMode(queuedPayload.analysis_mode),
         ),
     ),
+    guruLensKey: normalizeGuruLensKey(queuedPayload.guru_lens),
     routingMode: normalizeRoutingMode(queuedPayload.routing_mode),
     responseLocale: normalizeResponseLocale(queuedPayload.response_locale),
     executorType: normalizeExecutorType(
@@ -956,21 +957,6 @@ async function prepareSelectedNewsEventContext(params: {
     .eq("research_run_id", job.run.id);
 
   return enriched;
-}
-
-function publicReleaseInputFromMcpHealth(
-  mcpHealth: McpHealthResult,
-): PublicReleaseInput {
-  return {
-    ontology_release_id: mcpHealth.releaseId ?? "",
-    ontology_env: mcpHealth.env ?? getOntologyEnv(),
-    index_generated_at: mcpHealth.indexGeneratedAt ?? "",
-    company_count: mcpHealth.companyCount ?? 0,
-    document_count: mcpHealth.documentCount ?? 0,
-    object_count: mcpHealth.objectCount ?? 0,
-    manifest_valid: mcpHealth.manifestValid,
-    agent_index_schema_version: mcpHealth.agentIndexSchemaVersion ?? "",
-  };
 }
 
 async function handleCompletedJob(params: {

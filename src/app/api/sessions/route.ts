@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { CreateSessionRequest } from "@/types/api-contracts";
 import type { ChatSessionRow } from "@/types/database";
 import { sanitizeAssistantPreviewContent } from "@/lib/chat/assistant-content";
+import { canAccessMenuFeature } from "@/lib/billing/feature-access-server";
 import {
   isOptionalStringArray,
   isPlainObject,
@@ -150,6 +151,21 @@ export async function POST(request: NextRequest) {
     default_tickers: normalizedTickers,
     default_document_types: normalizedDocumentTypes,
   };
+
+  if (
+    body.scope_type === "global" &&
+    !(await canAccessMenuFeature(user.id, user.email ?? null, "wide_research"))
+  ) {
+    return Response.json(
+      {
+        error: {
+          code: "forbidden" as const,
+          message: "와이드 리서치는 Standard 플랜부터 사용할 수 있습니다.",
+        },
+      },
+      { status: 403 },
+    );
+  }
 
   if (
     body.scope_type === "company" &&

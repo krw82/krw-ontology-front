@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   const ticker = url.searchParams.get("ticker");
   const query = url.searchParams.get("q")?.trim();
   const limit = parsePositiveIntParam(url.searchParams.get("limit"), 50, {
-    max: 100,
+    max: 500,
   });
 
   try {

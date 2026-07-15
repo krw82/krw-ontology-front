@@ -3,7 +3,7 @@ import { pageMetadata } from "@/lib/marketing/site";
 
 export const metadata: Metadata = pageMetadata({
   title: "공유 답변",
-  description: "KRW Ontology에서 공유된 답변입니다.",
+  description: "KRW.O에서 공유된 답변입니다.",
   path: "/share",
   noIndex: true,
 });

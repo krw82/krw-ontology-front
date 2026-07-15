@@ -65,7 +65,7 @@ function mockMcpOk() {
       company_count: 10,
       document_count: 20,
       object_count: 30,
-      tool_count: 12,
+      tool_count: 13,
       root: "/srv/private-ontology-root",
       index_path: "/srv/private-ontology-root/indexes/global_spine.sqlite",
       manifest_path: "/srv/private-ontology-root/manifest.json",
@@ -83,6 +83,17 @@ function mockMcpOk() {
       commandOk: true,
       liveOk: true,
       sqliteOk: true,
+      contractOk: true,
+      toolParityOk: true,
+      fingerprintOk: true,
+      fingerprintErrors: [],
+      mcpContractVersion: "krw-ontology-mcp/v2",
+      buildId: "build-1",
+      backendGitSha: "backend-sha-1",
+      toolSchemaSha256: "a".repeat(64),
+      buildFingerprintSha256: "a".repeat(64),
+      releaseManifestSha256: "a".repeat(64),
+      serviceFingerprintSha256: "a".repeat(64),
       env: "dev",
       releaseId: "rel-20260521",
       manifestPath: "/srv/private-ontology-root/manifest.json",
@@ -92,7 +103,7 @@ function mockMcpOk() {
       companyCount: 10,
       documentCount: 20,
       objectCount: 30,
-      toolCount: 12,
+      toolCount: 13,
       tools: ["krw_ontology_query"],
       root: "/srv/private-ontology-root",
       indexPath: "/srv/private-ontology-root/indexes/global_spine.sqlite",
@@ -116,6 +127,7 @@ describe("GET /api/healthz/deep", () => {
 
   afterEach(() => {
     process.env.INTERNAL_API_KEY = ORIGINAL_INTERNAL_API_KEY;
+    vi.unstubAllEnvs();
   });
 
   it("rejects unauthenticated requests before running deep checks", async () => {
@@ -163,10 +175,30 @@ describe("GET /api/healthz/deep", () => {
     expect(body.checks.mcp.manifest_valid).toBe(true);
     expect(body.checks.mcp.live_ok).toBe(true);
     expect(body.checks.mcp.sqlite_ok).toBe(true);
-    expect(body.checks.mcp.tool_count).toBe(12);
+    expect(body.checks.mcp.tool_count).toBe(13);
     expect(body.checks.mcp.worker_id).toBe("mac-worker-1");
+    expect(body.checks.trusted_client_ip.ok).toBe(true);
     expect(getSupabaseAdmin).toHaveBeenCalledOnce();
     expect(getActiveOntologyCatalogRelease).toHaveBeenCalledOnce();
     expect(getReadyAgentWorker).toHaveBeenCalledOnce();
+  });
+
+  it("reports an invalid production trusted client IP configuration", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("TRUSTED_CLIENT_IP_HEADER", "");
+
+    const response = await GET(
+      new Request("http://localhost/api/healthz/deep", {
+        headers: { "x-internal-key": "test-internal-key" },
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.status).toBe("error");
+    expect(body.checks.trusted_client_ip).toEqual({
+      ok: false,
+      error: "Trusted client IP configuration is invalid",
+    });
   });
 });

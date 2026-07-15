@@ -8,10 +8,68 @@ function cspDirective(csp: string, name: string) {
 }
 
 test.describe("dev auth bypass", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route("**/api/me/entitlement", async (route) => {
+      const periodStart = "2026-07-06T00:00:00.000Z";
+      const periodEnd = "2026-07-13T00:00:00.000Z";
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          entitlement: {
+            status: "beta",
+            plan: {
+              key: "beta",
+              label: "Beta",
+              status_label: "Beta",
+              description: "E2E fixture",
+            },
+            usage: {
+              period: "weekly",
+              period_label: "주간",
+              period_start: periodStart,
+              period_end: periodEnd,
+              budget_used_usd: 0,
+              budget_reserved_usd: 0,
+              budget_limit_usd: 10,
+              remaining_budget_usd: 10,
+              daily_budget_used_usd: 0,
+              daily_budget_reserved_usd: 0,
+              daily_budget_limit_usd: 10,
+              per_run_reserve_usd: 0,
+              analysis_credits_used: 0,
+              analysis_credits_reserved: 0,
+              analysis_credits_limit: 10,
+              remaining_analysis_credits: 10,
+              daily_analysis_credits_used: 0,
+              daily_analysis_credits_reserved: 0,
+              daily_analysis_credits_limit: 10,
+              per_run_analysis_credits: 1,
+              run_count: 0,
+              percent_used: 0,
+              alert_level: "ok",
+              can_run: true,
+              unlimited: false,
+              resets_at: periodEnd,
+            },
+            features: [],
+            upgrade: {
+              label: "",
+              href: "/settings/billing",
+              enabled: false,
+              title: "",
+              message: "",
+            },
+          },
+        }),
+      });
+    });
+  });
+
   test("opens protected companies page with stable account nav", async ({
     page,
   }, testInfo) => {
-    await page.goto("/companies");
+    await page.goto("/companies", { waitUntil: "domcontentloaded" });
 
     await expect(page).toHaveURL(/\/companies$/);
     await expect(
@@ -24,11 +82,11 @@ test.describe("dev auth bypass", () => {
       .getByRole("button", { name: "Dev User 계정 메뉴" })
       .first();
     await expect(accountButton).toBeVisible();
+    await expect(accountButton).toBeEnabled();
 
     const accountBox = await accountButton.boundingBox();
     expect(accountBox).not.toBeNull();
-    const maxAccountSize =
-      testInfo.project.name === "mobile-chrome" ? 38 : 42;
+    const maxAccountSize = testInfo.project.name === "mobile-chrome" ? 38 : 42;
     expect(accountBox?.width).toBeLessThanOrEqual(maxAccountSize);
     expect(accountBox?.height).toBeLessThanOrEqual(maxAccountSize);
 
@@ -39,7 +97,27 @@ test.describe("dev auth bypass", () => {
     ).toBeVisible();
   });
 
-  test("redirects login away when dev auth bypass is enabled", async ({ page }) => {
+  test("offers distinct analysis and Guru paths on a company page", async ({
+    page,
+  }) => {
+    await page.goto("/ko/companies/AMZN", { waitUntil: "domcontentloaded" });
+
+    const analysisLink = page.getByRole("link", {
+      name: "AMZN 분석 시작",
+    });
+    const guruLink = page.getByRole("link", {
+      name: "구루 관점으로 보기",
+    });
+
+    await expect(analysisLink).toBeVisible();
+    await expect(guruLink).toBeVisible();
+    await expect(guruLink).toHaveAttribute("href", "/guru?ticker=AMZN");
+    await expect(page.locator("main header > p.mt-4")).toHaveCount(0);
+  });
+
+  test("redirects login away when dev auth bypass is enabled", async ({
+    page,
+  }) => {
     await page.goto("/login");
 
     await expect(page).toHaveURL(/\/companies$/);
@@ -57,31 +135,171 @@ test.describe("dev auth bypass", () => {
     page,
   }) => {
     const examplePrompt =
-      "AI 데이터센터 전력 수요의 직접 수혜 기업을 찾아줘.";
+      "AI 데이터센터 전력 수요 수혜 기업 중 FCF로 CapEx를 버티는 후보 3개만 찾아줘.";
+    const sessionId = "11111111-1111-4111-8111-111111111113";
+    const runId = "22222222-2222-4222-8222-222222222224";
+    const assistantMessageId = "44444444-4444-4444-8444-444444444446";
+    const createdAt = new Date().toISOString();
+
+    await page.route("**/api/sessions", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          session: {
+            id: sessionId,
+            title: "종목 발굴 테스트",
+            scope_type: "global",
+            default_tickers: [],
+            default_document_types: [],
+            created_at: createdAt,
+            updated_at: createdAt,
+          },
+        }),
+      });
+    });
+
+    await page.route(`**/api/chat/${sessionId}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          session: {
+            id: sessionId,
+            title: "종목 발굴 테스트",
+            scope_type: "global",
+            default_tickers: [],
+            default_document_types: [],
+            created_at: createdAt,
+            updated_at: createdAt,
+          },
+          messages: [],
+          runs: [],
+          tool_calls: [],
+          citations: [],
+          rich_answers: [],
+          research_artifacts: [],
+        }),
+      });
+    });
+
+    await page.route("**/api/chat/run", async (route) => {
+      const body = route.request().postDataJSON() as {
+        content?: string;
+        run_kind?: string;
+        session_id?: string;
+      };
+      expect(body.content).toBe(examplePrompt);
+      expect(body.run_kind).toBe("idea_generation");
+      expect(body.session_id).toBe(sessionId);
+
+      const event = (type: string, data: unknown) =>
+        `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
+      await route.fulfill({
+        status: 200,
+        headers: {
+          "content-type": "text/event-stream",
+          "x-chat-session-id": sessionId,
+        },
+        body: [
+          event("run_started", {
+            run_id: runId,
+            message_id: assistantMessageId,
+            session_id: sessionId,
+            started_at: createdAt,
+          }),
+          event("done", {
+            run_id: runId,
+            message_id: assistantMessageId,
+            content: "종목 발굴 테스트 답변입니다.",
+            release: {
+              ontology_release_id: "test",
+              index_generated_at: createdAt,
+              company_count: 1,
+              document_count: 1,
+              krw_ontology_commit: "test",
+              web_commit: "test",
+            },
+            usage: {
+              input_tokens: 1,
+              output_tokens: 1,
+              estimated_cost_usd: 0,
+              latency_ms: 10,
+            },
+            execution_budget: {
+              budget_used_usd: 0,
+              budget_reserved_usd: 0,
+              budget_limit_usd: 10,
+              remaining_budget_usd: 10,
+              daily_budget_used_usd: 0,
+              daily_budget_reserved_usd: 0,
+              daily_budget_limit_usd: 10,
+              per_run_reserve_usd: 0,
+              analysis_credits_used: 0,
+              analysis_credits_reserved: 0,
+              analysis_credits_limit: 10,
+              remaining_analysis_credits: 10,
+              daily_analysis_credits_used: 0,
+              daily_analysis_credits_reserved: 0,
+              daily_analysis_credits_limit: 10,
+              per_run_analysis_credits: 1,
+              run_count: 0,
+              percent_used: 0,
+              can_run: true,
+            },
+          }),
+        ].join(""),
+      });
+    });
 
     await page.goto("/discover", { waitUntil: "domcontentloaded" });
 
     await expect(
-      page.getByRole("heading", { name: "종목 발굴기", level: 1 }),
+      page.getByRole("heading", { name: "어떤 종목을 발굴할까요?", level: 2 }),
     ).toBeVisible();
     await expect(
-      page.getByRole("main").getByText("깊은 리서치"),
+      page.getByRole("heading", { name: "참고할 URL이 있나요?", level: 3 }),
     ).toBeVisible();
+    const skipButton = page.getByRole("button", { name: "건너뛰기" });
+    await expect(skipButton).toBeEnabled();
+    await skipButton.click();
     await expect(
-      page.getByRole("button", { name: "Dev User 계정 메뉴" }),
-    ).toBeEnabled();
+      page.getByRole("heading", { name: "첨부할 파일이 있나요?", level: 3 }),
+    ).toBeVisible();
+    await expect(skipButton).toBeEnabled();
+    await skipButton.click();
+    await expect(
+      page.getByRole("heading", {
+        name: "어떤 아이디어로 종목을 발굴할까요?",
+        level: 3,
+      }),
+    ).toBeVisible();
 
     await page.getByRole("button", { name: examplePrompt }).click();
     await expect(page.getByRole("textbox")).toHaveValue(examplePrompt);
 
-    await page.getByRole("button", { name: "후보 발굴 시작" }).click();
+    await page.getByRole("button", { name: "종목 발굴 시작" }).click();
     await expect(page).toHaveURL(
-      /\/chat\/new\?.*runKind=idea_generation/,
+      new RegExp(`/chat\\?sessionId=${sessionId}.*runKind=idea_generation`),
     );
-    await expect(page.getByLabel("메시지 입력")).toHaveValue(examplePrompt);
-    await expect(
-      page.getByRole("heading", { name: "종목 발굴기", level: 2 }),
-    ).toBeVisible();
+    await expect(page.getByText(examplePrompt, { exact: true })).toBeVisible();
+    await expect(page.getByText("종목 발굴 테스트 답변입니다.")).toBeVisible();
+  });
+
+  test("keeps app locale in the query instead of linking to a missing locale route", async ({
+    page,
+  }) => {
+    await page.goto("/guru?locale=en", { waitUntil: "domcontentloaded" });
+
+    const englishLink = page.getByRole("link", { name: "EN", exact: true });
+    const koreanLink = page.getByRole("link", { name: "KO", exact: true });
+    await expect(englishLink).toHaveAttribute("aria-current", "page");
+    await expect(koreanLink).toHaveAttribute("href", "/guru");
+    await expect(koreanLink).not.toHaveAttribute("href", /\/ko\/guru/);
   });
 
   test("starts a new chat by creating a session before running the agent", async ({
@@ -588,17 +806,15 @@ test.describe("dev auth bypass", () => {
       });
     });
 
-    await page.goto("/companies/AXP");
-    await expect(page).toHaveURL(/\/companies\/AXP$/);
-    await page.getByRole("button", { name: "채팅 기록 열기" }).click();
+    await page.goto("/companies", { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(/\/companies$/);
+    const historyButton = page.getByRole("button", { name: "채팅 기록 열기" });
+    await expect(historyButton).toBeEnabled();
+    await historyButton.click();
 
-    await expect(
-      page.getByRole("dialog", { name: "채팅 기록" }),
-    ).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "채팅 기록" })).toBeVisible();
 
-    await page
-      .getByRole("link", { name: /모바일 전환 회귀 테스트/ })
-      .click();
+    await page.getByRole("link", { name: /모바일 전환 회귀 테스트/ }).click();
 
     await expect(page).toHaveURL(new RegExp(`/chat\\?sessionId=${sessionId}`));
     await expect(
@@ -608,7 +824,7 @@ test.describe("dev auth bypass", () => {
       page.getByRole("heading", { name: "무엇을 확인할까요?" }),
     ).toHaveCount(0);
     await expect(
-      page.getByRole("heading", { name: /AXP에서 무엇을 확인할까요/ }),
+      page.getByRole("heading", { name: "분석할 회사를 고르세요." }),
     ).toHaveCount(0);
 
     releaseChatResponse();
@@ -616,9 +832,9 @@ test.describe("dev auth bypass", () => {
     await expect(
       page.getByText("모바일 전환 회귀 테스트 답변입니다."),
     ).toBeVisible();
-    await expect(
-      page.getByRole("dialog", { name: "채팅 기록" }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: "채팅 기록" })).toHaveCount(
+      0,
+    );
   });
 });
 
@@ -642,19 +858,21 @@ test.describe("public pages", () => {
     expect(jsonLdNonces.every((nonce) => nonce === cspNonce)).toBe(true);
 
     await expect(
-      page.getByRole("main").getByText("근거가 보이는").first(),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("main").getByText("기업 분석 AI").first(),
+      page.getByRole("heading", {
+        name: "AI 답변을 믿기 전에 회사 공시로 확인하세요",
+        level: 1,
+      }),
     ).toBeVisible();
 
-    await page.goto("/privacy");
+    await page.goto("/privacy", { waitUntil: "domcontentloaded" });
     await expect(
       page.getByRole("heading", { name: "개인정보처리방침" }),
     ).toBeVisible();
 
-    await page.goto("/terms");
-    await expect(page.getByRole("heading", { name: "서비스 약관" })).toBeVisible();
+    await page.goto("/terms", { waitUntil: "domcontentloaded" });
+    await expect(
+      page.getByRole("heading", { name: "서비스 약관" }),
+    ).toBeVisible();
   });
 });
 

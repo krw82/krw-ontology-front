@@ -4,54 +4,19 @@ PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.loca
 export PATH
 
 KRW_ONTOLOGY_MCP_URL=${KRW_ONTOLOGY_MCP_URL:-http://127.0.0.1:8766/mcp}
-KRW_ONTOLOGY_MCP_HEALTH_URL=${KRW_ONTOLOGY_MCP_HEALTH_URL:-http://127.0.0.1:8766/health}
+KRW_ONTOLOGY_SOURCE_DIR=${KRW_ONTOLOGY_SOURCE_DIR:-"$HOME/krw-ontology"}
+KRW_ONTOLOGY_RELEASE_ROOT=${KRW_ONTOLOGY_RELEASE_ROOT:-"$HOME/krw-ontology-data/releases/dev/current"}
 EXPECTED_RELEASE_ID=${EXPECTED_RELEASE_ID:-}
 export KRW_ONTOLOGY_MCP_URL
-export KRW_ONTOLOGY_MCP_HEALTH_URL
+export KRW_ONTOLOGY_SOURCE_DIR
+export KRW_ONTOLOGY_RELEASE_ROOT
 export EXPECTED_RELEASE_ID
+export KRW_ONTOLOGY_EXPECTED_ENV=dev
 
-node <<'NODE'
-const expectedReleaseId = process.env.EXPECTED_RELEASE_ID;
-const healthUrl = process.env.KRW_ONTOLOGY_MCP_HEALTH_URL;
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/mcp-runtime-fingerprint.sh"
+load_expected_mcp_runtime_fingerprint
+node "$SCRIPT_DIR/verify-mcp-runtime.mjs"
 
-(async () => {
-  const response = await fetch(healthUrl, {
-    headers: { accept: "application/json" },
-    signal: AbortSignal.timeout(30_000),
-  });
-  const payload = await response.json();
-  console.log(JSON.stringify({
-    status: response.status,
-    ok: payload.ok,
-    env: payload.env,
-    release_id: payload.release_id,
-    manifest_valid: payload.manifest_valid,
-    index_layout: payload.index_layout,
-    global_spine_present: payload.global_spine_present,
-    company_shard_count: payload.company_shard_count,
-    root: payload.root,
-    global_spine_path: payload.global_spine_path,
-    documents: payload.documents,
-    objects: payload.objects,
-    tools: Array.isArray(payload.tools) ? payload.tools.length : null,
-  }));
-  if (response.status !== 200 || payload.ok !== true) throw new Error("MCP dev health is not ok");
-  if (payload.env !== "dev") throw new Error(`MCP dev health env is not dev: ${payload.env}`);
-  if (!payload.release_id) throw new Error("MCP dev health is missing release_id");
-  if (expectedReleaseId && payload.release_id !== expectedReleaseId) {
-    throw new Error(`MCP dev release mismatch: ${payload.release_id} !== ${expectedReleaseId}`);
-  }
-  if (payload.manifest_valid !== true) throw new Error("MCP dev health manifest_valid is not true");
-  if (payload.index_layout !== "global-spine-and-company-shards") {
-    throw new Error(`MCP dev health index_layout is not v3: ${payload.index_layout}`);
-  }
-  if (payload.global_spine_present !== true) {
-    throw new Error("MCP dev health global_spine_present is not true");
-  }
-})().catch((error) => {
-  console.error(error.message || error);
-  process.exit(1);
-});
-NODE
-
-echo "OK dev MCP HTTP server health"
+echo "OK dev MCP HTTP server v2 readiness and fingerprint"

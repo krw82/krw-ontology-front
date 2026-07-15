@@ -160,17 +160,31 @@ if [ -n "$RELEASE_ID" ]; then
     --env prod
 fi
 
+CURRENT_RELEASE_ID=""
+if [ -f "$RELEASE_ROOT/manifest.json" ]; then
+  CURRENT_RELEASE_ID=$(read_manifest_release_id "$RELEASE_ROOT/manifest.json")
+fi
+
 if [ "$DRY_RUN" = "1" ]; then
-  echo "Dry run: would promote release, export web catalog, publish to Supabase, restart prod MCP, and restart Mac workers."
+  if [ -n "$RELEASE_ID" ] && [ "$CURRENT_RELEASE_ID" = "$RELEASE_ID" ]; then
+    echo "Dry run: release is already prod/current; would skip promote."
+  else
+    echo "Dry run: would promote release."
+  fi
+  echo "Dry run: would export web catalog, publish to Supabase, restart prod MCP, and restart Mac workers."
   echo "Dry run target current: $RELEASE_ROOT"
   exit 0
 fi
 
 if [ -n "$RELEASE_ID" ]; then
-  echo "Promoting prod release..."
-  run_krw_ontology release promote "$RELEASE_ID" \
-    --releases-root "$RELEASES_ROOT" \
-    --env prod
+  if [ "$CURRENT_RELEASE_ID" = "$RELEASE_ID" ]; then
+    echo "Release is already prod/current; skipping promote."
+  else
+    echo "Promoting prod release..."
+    run_krw_ontology release promote "$RELEASE_ID" \
+      --releases-root "$RELEASES_ROOT" \
+      --env prod
+  fi
 fi
 
 echo "Verifying prod/current release..."

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>__LABEL__</string>
+
+  <key>WorkingDirectory</key>
+  <string>__FRONT_DIR__</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>__FRONT_DIR__/scripts/start-mcp-server-candidate.sh</string>
+    <string>--env-file</string>
+    <string>__ENV_FILE__</string>
+    <string>--release-root</string>
+    <string>__RELEASE_ROOT__</string>
+    <string>--runtime-root</string>
+    <string>__RUNTIME_ROOT__</string>
+    <string>--port</string>
+    <string>__PORT__</string>
+  </array>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>Nice</key>
+  <integer>__NICE__</integer>
+
+  <key>SoftResourceLimits</key>
+  <dict>
+    <key>NumberOfFiles</key>
+    <integer>__MAXFILES__</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>__LOG_DIR__/launchd.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>__LOG_DIR__/launchd.err.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>NODE_ENV</key>
+    <string>production</string>
+  </dict>
+</dict>
+</plist>

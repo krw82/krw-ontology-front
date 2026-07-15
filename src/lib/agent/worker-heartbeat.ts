@@ -1,7 +1,11 @@
 import "server-only";
 
 import { execFile } from "node:child_process";
-import { checkMcpReady, type McpHealthResult } from "@/lib/agent/mcp-client";
+import {
+  KRW_ONTOLOGY_MCP_TOOLS,
+  checkMcpReady,
+  type McpHealthResult,
+} from "@/lib/agent/mcp-client";
 import { getOntologyEnv, readIntEnv } from "@/lib/env";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { AgentWorkerHeartbeatRow, Json } from "@/types/database";
@@ -71,6 +75,24 @@ export async function heartbeatAgentWorker(params: {
       commandOk: params.mcpHealth.commandOk,
       liveOk: params.mcpHealth.liveOk,
       sqliteOk: params.mcpHealth.sqliteOk,
+      contractOk: params.mcpHealth.contractOk ?? false,
+      toolParityOk: params.mcpHealth.toolParityOk ?? false,
+      fingerprintOk: params.mcpHealth.fingerprintOk ?? false,
+      fingerprintErrors: params.mcpHealth.fingerprintErrors ?? [],
+      pluginContractOk: params.mcpHealth.pluginContractOk ?? false,
+      pluginContractErrors: params.mcpHealth.pluginContractErrors ?? [],
+      pluginContentSha256: params.mcpHealth.pluginContentSha256 ?? null,
+      pluginMcpConfigSha256: params.mcpHealth.pluginMcpConfigSha256 ?? null,
+      mcpContractVersion: params.mcpHealth.mcpContractVersion ?? null,
+      buildId: params.mcpHealth.buildId ?? null,
+      backendGitSha: params.mcpHealth.backendGitSha ?? null,
+      toolSchemaSha256: params.mcpHealth.toolSchemaSha256 ?? null,
+      buildFingerprintSha256:
+        params.mcpHealth.buildFingerprintSha256 ?? null,
+      releaseManifestSha256:
+        params.mcpHealth.releaseManifestSha256 ?? null,
+      serviceFingerprintSha256:
+        params.mcpHealth.serviceFingerprintSha256 ?? null,
       env: params.mcpHealth.env,
       manifestPath: params.mcpHealth.manifestPath,
       manifestValid: params.mcpHealth.manifestValid,
@@ -205,10 +227,19 @@ export async function getReadyAgentWorker(
     };
   }
 
+  const mcpHealth = mcpHealthFromWorkerHeartbeat(data);
+  if (!isReadyMcpHealth(mcpHealth)) {
+    return {
+      ok: false,
+      reason: "worker_unavailable",
+      message: readinessErrorMessage(mcpHealth) ?? "Worker MCP is not ready",
+    };
+  }
+
   return {
     ok: true,
     worker: data,
-    mcpHealth: mcpHealthFromWorkerHeartbeat(data),
+    mcpHealth,
   };
 }
 
@@ -217,13 +248,58 @@ function mcpHealthFromWorkerHeartbeat(row: AgentWorkerHeartbeatRow): McpHealthRe
   const tools = Array.isArray(metadata.tools)
     ? metadata.tools.filter((tool): tool is string => typeof tool === "string")
     : [];
+  const fingerprintErrors = Array.isArray(metadata.fingerprintErrors)
+    ? metadata.fingerprintErrors.filter(
+        (error): error is string => typeof error === "string",
+      )
+    : [];
+  const contractOk = asBoolean(metadata.contractOk, false);
+  const toolSet = new Set(tools);
+  const toolParityOk =
+    asBoolean(metadata.toolParityOk, false) &&
+    row.tool_count === KRW_ONTOLOGY_MCP_TOOLS.length &&
+    toolSet.size === KRW_ONTOLOGY_MCP_TOOLS.length &&
+    KRW_ONTOLOGY_MCP_TOOLS.every((toolName) => toolSet.has(toolName));
+  const fingerprintOk = asBoolean(metadata.fingerprintOk, false);
+  const pluginContractErrors = Array.isArray(metadata.pluginContractErrors)
+    ? metadata.pluginContractErrors.filter(
+        (error): error is string => typeof error === "string",
+      )
+    : [];
+  const pluginContractOk = asBoolean(metadata.pluginContractOk, false);
 
   return {
-    connected: true,
+    connected:
+      asBoolean(metadata.connected, false) &&
+      contractOk &&
+      toolParityOk &&
+      fingerprintOk &&
+      pluginContractOk,
     staticOk: asBoolean(metadata.staticOk, true),
     commandOk: asBoolean(metadata.commandOk, true),
     liveOk: asBoolean(metadata.liveOk, true),
     sqliteOk: asBoolean(metadata.sqliteOk, true),
+    contractOk,
+    toolParityOk,
+    fingerprintOk,
+    fingerprintErrors,
+    pluginContractOk,
+    pluginContractErrors,
+    pluginContentSha256: asOptionalString(metadata.pluginContentSha256),
+    pluginMcpConfigSha256: asOptionalString(metadata.pluginMcpConfigSha256),
+    mcpContractVersion: asOptionalString(metadata.mcpContractVersion),
+    buildId: asOptionalString(metadata.buildId),
+    backendGitSha: asOptionalString(metadata.backendGitSha),
+    toolSchemaSha256: asOptionalString(metadata.toolSchemaSha256),
+    buildFingerprintSha256: asOptionalString(
+      metadata.buildFingerprintSha256,
+    ),
+    releaseManifestSha256: asOptionalString(
+      metadata.releaseManifestSha256,
+    ),
+    serviceFingerprintSha256: asOptionalString(
+      metadata.serviceFingerprintSha256,
+    ),
     env: row.ontology_env,
     releaseId: row.ontology_release_id,
     manifestPath: row.manifest_path,
@@ -250,6 +326,21 @@ function fallbackMcpHealth(error: unknown): McpHealthResult {
     commandOk: false,
     liveOk: false,
     sqliteOk: false,
+    contractOk: false,
+    toolParityOk: false,
+    fingerprintOk: false,
+    fingerprintErrors: ["MCP readiness could not be evaluated"],
+    pluginContractOk: false,
+    pluginContractErrors: ["Plugin contract readiness could not be evaluated"],
+    pluginContentSha256: null,
+    pluginMcpConfigSha256: null,
+    mcpContractVersion: null,
+    buildId: null,
+    backendGitSha: null,
+    toolSchemaSha256: null,
+    buildFingerprintSha256: null,
+    releaseManifestSha256: null,
+    serviceFingerprintSha256: null,
     env: getOntologyEnv(),
     releaseId: null,
     manifestPath: process.env.KRW_ONTOLOGY_MANIFEST_PATH ?? null,
@@ -282,6 +373,7 @@ export function isReadyMcpHealth(mcpHealth: McpHealthResult): boolean {
   const ontologyEnv = getOntologyEnv();
   return (
     mcpHealth.connected &&
+    mcpHealth.pluginContractOk === true &&
     mcpHealth.env === ontologyEnv &&
     mcpHealth.manifestValid &&
     Boolean(mcpHealth.releaseId)
@@ -291,6 +383,12 @@ export function isReadyMcpHealth(mcpHealth: McpHealthResult): boolean {
 function readinessErrorMessage(mcpHealth: McpHealthResult): string | null {
   const ontologyEnv = getOntologyEnv();
   if (!mcpHealth.connected) return mcpHealth.error ?? "MCP unavailable";
+  if (!mcpHealth.pluginContractOk) {
+    return (
+      mcpHealth.pluginContractErrors?.join("; ") ||
+      "Plugin contract is invalid"
+    );
+  }
   if (mcpHealth.env !== ontologyEnv) {
     return `Ontology env mismatch: worker=${ontologyEnv} mcp=${mcpHealth.env ?? "missing"}`;
   }
@@ -325,6 +423,10 @@ async function readClaudeCodeVersion(): Promise<string | null> {
 
 function asBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
+}
+
+function asOptionalString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

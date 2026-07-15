@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "contract_version": "desktop-notebook-mutation/v1",
+  "data": {
+    "mark": {
+      "is_watchlisted": true,
+      "version": "2026-06-23T00:00:00.000Z"
+    }
+  },
+  "meta": {
+    "generated_at": "2026-06-23T00:00:00.000Z",
+    "replayed": false
+  }
+}

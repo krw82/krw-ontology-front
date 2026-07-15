@@ -1,12 +1,15 @@
 import "server-only";
 
-import { execFile } from "node:child_process";
-import { constants } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { promisify } from "node:util";
-import { normalizeOntologyEnv, type OntologyEnv } from "@/lib/env";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import {
+  getOntologyEnv,
+  normalizeOntologyEnv,
+  type OntologyEnv,
+} from "@/lib/env";
 import type {
   ChartMCPToolName,
   GuruMCPToolName,
@@ -19,14 +22,13 @@ import {
   YAHOO_FINANCE_MCP_TOOLS,
   YAHOO_FINANCE_SDK_ALLOWED_TOOLS,
 } from "@/lib/news-discovery/yahoo-finance-mcp-constants";
+import { verifyMaterializedOntologyPluginContract } from "@/lib/agent/plugin-contract";
 
-const KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX =
-  "mcp__plugin_krw-ontology_krw-ontology__";
 const KRW_ONTOLOGY_MCP_SERVER_NAME = "krw-ontology";
 const KRW_ONTOLOGY_DIRECT_TOOL_PREFIX =
   `mcp__${KRW_ONTOLOGY_MCP_SERVER_NAME}__`;
-const STOCK_NEWS_PLUGIN_TOOL_PREFIX =
-  "mcp__plugin_krw-ontology_stock-news__";
+const STOCK_NEWS_MCP_SERVER_NAME = "stock-news";
+const STOCK_NEWS_DIRECT_TOOL_PREFIX = `mcp__${STOCK_NEWS_MCP_SERVER_NAME}__`;
 const GURU_ADVISOR_PLUGIN_TOOL_PREFIX =
   "mcp__plugin_krw-guru-advisor_krw-guru-advisor__";
 const CHART_MCP_TOOL_PREFIX = "mcp__krw_presentation__";
@@ -42,11 +44,14 @@ export const KRW_ONTOLOGY_MCP_TOOLS = [
   "krw_ontology_query_context",
   "krw_ontology_retrieve",
   "krw_ontology_trace",
+  "krw_ontology_verify_evidence",
   "krw_ontology_quality",
   "krw_ontology_compare",
   "krw_ontology_plan_query",
   "krw_ontology_chain",
 ] as const satisfies readonly KRWOntologyMCPToolName[];
+
+export const KRW_ONTOLOGY_MCP_CONTRACT_VERSION = "krw-ontology-mcp/v2";
 
 export const STOCK_NEWS_MCP_TOOLS = [
   "route_news_question",
@@ -76,6 +81,7 @@ export const GURU_MCP_TOOLS = [
   "krw_guru_eval_questions",
   "krw_guru_company_brief",
   "krw_guru_company_pack",
+  "krw_guru_review_company_evidence",
 ] as const satisfies readonly GuruMCPToolName[];
 
 export {
@@ -84,7 +90,7 @@ export {
 };
 
 export const KRW_ONTOLOGY_SDK_ALLOWED_TOOLS = KRW_ONTOLOGY_MCP_TOOLS.map(
-  (toolName) => `${KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX}${toolName}`,
+  (toolName) => `${KRW_ONTOLOGY_DIRECT_TOOL_PREFIX}${toolName}`,
 );
 
 export const KRW_ONTOLOGY_DIRECT_SDK_ALLOWED_TOOLS =
@@ -93,7 +99,7 @@ export const KRW_ONTOLOGY_DIRECT_SDK_ALLOWED_TOOLS =
   );
 
 export const STOCK_NEWS_SDK_ALLOWED_TOOLS = STOCK_NEWS_MCP_TOOLS.map(
-  (toolName) => `${STOCK_NEWS_PLUGIN_TOOL_PREFIX}${toolName}`,
+  (toolName) => `${STOCK_NEWS_DIRECT_TOOL_PREFIX}${toolName}`,
 );
 
 export const GURU_ADVISOR_SDK_ALLOWED_TOOLS = GURU_MCP_TOOLS.map(
@@ -109,25 +115,19 @@ const STOCK_NEWS_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_MCP_TOOLS);
 const GURU_MCP_TOOL_SET = new Set<string>(GURU_MCP_TOOLS);
 const YAHOO_FINANCE_MCP_TOOL_SET = new Set<string>(YAHOO_FINANCE_MCP_TOOLS);
 const CHART_MCP_TOOL_SET = new Set<string>(CHART_MCP_TOOLS);
-const execFileAsync = promisify(execFile);
 const DEFAULT_MCP_HEALTH_TIMEOUT_MS = 30_000;
 type McpProbeKind = "health" | "ready";
 
 export function isKrwOntologySdkTool(toolName: string): boolean {
-  const prefix = toolName.startsWith(KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX)
-    ? KRW_ONTOLOGY_PLUGIN_TOOL_PREFIX
-    : toolName.startsWith(KRW_ONTOLOGY_DIRECT_TOOL_PREFIX)
-      ? KRW_ONTOLOGY_DIRECT_TOOL_PREFIX
-      : null;
-  if (!prefix) return false;
-  const bareName = toolName.slice(prefix.length);
+  if (!toolName.startsWith(KRW_ONTOLOGY_DIRECT_TOOL_PREFIX)) return false;
+  const bareName = toolName.slice(KRW_ONTOLOGY_DIRECT_TOOL_PREFIX.length);
 
   return Boolean(bareName && KRW_ONTOLOGY_MCP_TOOL_SET.has(bareName));
 }
 
 export function isStockNewsSdkTool(toolName: string): boolean {
-  if (!toolName.startsWith(STOCK_NEWS_PLUGIN_TOOL_PREFIX)) return false;
-  const bareName = toolName.slice(STOCK_NEWS_PLUGIN_TOOL_PREFIX.length);
+  if (!toolName.startsWith(STOCK_NEWS_DIRECT_TOOL_PREFIX)) return false;
+  const bareName = toolName.slice(STOCK_NEWS_DIRECT_TOOL_PREFIX.length);
 
   return Boolean(bareName && STOCK_NEWS_MCP_TOOL_SET.has(bareName));
 }
@@ -180,6 +180,21 @@ export interface McpHealthResult {
   commandOk: boolean;
   liveOk: boolean;
   sqliteOk: boolean;
+  contractOk: boolean;
+  toolParityOk: boolean;
+  fingerprintOk: boolean;
+  fingerprintErrors: string[];
+  pluginContractOk?: boolean;
+  pluginContractErrors?: string[];
+  pluginContentSha256?: string | null;
+  pluginMcpConfigSha256?: string | null;
+  mcpContractVersion: string | null;
+  buildId: string | null;
+  backendGitSha: string | null;
+  toolSchemaSha256: string | null;
+  buildFingerprintSha256: string | null;
+  releaseManifestSha256: string | null;
+  serviceFingerprintSha256: string | null;
   env: OntologyEnv | null;
   releaseId: string | null;
   manifestPath: string | null;
@@ -262,17 +277,6 @@ export async function resolveGuruAdvisorPluginPath(): Promise<string> {
   );
 }
 
-async function isExecutable(command: string): Promise<boolean> {
-  if (!path.isAbsolute(command)) return true;
-
-  try {
-    await access(command, constants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function baseHealthResult(
   pluginPath: string,
   root: string | null = null,
@@ -282,6 +286,21 @@ function baseHealthResult(
     commandOk: false,
     liveOk: false,
     sqliteOk: false,
+    contractOk: false,
+    toolParityOk: false,
+    fingerprintOk: false,
+    fingerprintErrors: [],
+    pluginContractOk: false,
+    pluginContractErrors: [],
+    pluginContentSha256: null,
+    pluginMcpConfigSha256: null,
+    mcpContractVersion: null,
+    buildId: null,
+    backendGitSha: null,
+    toolSchemaSha256: null,
+    buildFingerprintSha256: null,
+    releaseManifestSha256: null,
+    serviceFingerprintSha256: null,
     env: null,
     releaseId: null,
     manifestPath: null,
@@ -307,68 +326,6 @@ function getHealthTimeoutMs(): number {
     : DEFAULT_MCP_HEALTH_TIMEOUT_MS;
 }
 
-function buildHealthCommand(
-  serverConfig: PluginMcpServerConfig,
-  probeKind: McpProbeKind,
-): {
-  command: string;
-  args: string[];
-} {
-  const command = serverConfig.command ?? "";
-  const args = serverConfig.args ?? [];
-  const probePythonCode =
-    probeKind === "ready" ? MCP_READY_PYTHON_CODE : MCP_HEALTH_PYTHON_CODE;
-
-  if (path.basename(command) === "uv") {
-    const directoryIndex = args.indexOf("--directory");
-    const directory =
-      directoryIndex >= 0 ? args[directoryIndex + 1] : process.cwd();
-    return {
-      command,
-      args: [
-        "--directory",
-        directory,
-        "run",
-        "python",
-        "-c",
-        probePythonCode,
-      ],
-    };
-  }
-
-  if (path.isAbsolute(command)) {
-    return {
-      command: path.join(path.dirname(command), "python"),
-      args: ["-c", probePythonCode],
-    };
-  }
-
-  return {
-    command: process.env.KRW_ONTOLOGY_HEALTH_PYTHON || "python3",
-    args: ["-c", probePythonCode],
-  };
-}
-
-const MCP_HEALTH_PYTHON_CODE = `
-import json
-import os
-from krw_ontology.mcp_server.server import health_payload
-
-payload, status = health_payload()
-print(json.dumps({"status": status, "payload": payload}, ensure_ascii=False))
-raise SystemExit(0 if status == 200 and payload.get("ok") else 1)
-`;
-
-const MCP_READY_PYTHON_CODE = `
-import json
-import os
-from krw_ontology.mcp_server.server import ready_payload
-
-payload, status = ready_payload()
-print(json.dumps({"status": status, "payload": payload}, ensure_ascii=False))
-raise SystemExit(0 if status == 200 and payload.get("ok") else 1)
-`;
-
 function asNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -393,8 +350,136 @@ function asStringArray(value: unknown): string[] {
     : [];
 }
 
+function isSha256(value: string | null): value is string {
+  return Boolean(value && /^[a-f0-9]{64}$/.test(value));
+}
+
+function sameStringSet(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) return false;
+  const leftSet = new Set(left);
+  const rightSet = new Set(right);
+  return (
+    leftSet.size === left.length &&
+    rightSet.size === right.length &&
+    leftSet.size === rightSet.size &&
+    left.every((value) => rightSet.has(value))
+  );
+}
+
+function validateRuntimeFingerprint(payload: Record<string, unknown>): {
+  contractOk: boolean;
+  toolParityOk: boolean;
+  fingerprintOk: boolean;
+  fingerprintErrors: string[];
+  mcpContractVersion: string | null;
+  buildId: string | null;
+  backendGitSha: string | null;
+  toolSchemaSha256: string | null;
+  buildFingerprintSha256: string | null;
+  releaseManifestSha256: string | null;
+  serviceFingerprintSha256: string | null;
+  toolCount: number | null;
+  tools: string[];
+} {
+  const mcpContractVersion = asString(payload.mcp_contract_version);
+  const buildId = asString(payload.build_id);
+  const backendGitSha = asString(payload.backend_git_sha);
+  const toolSchemaSha256 = asString(payload.tool_schema_sha256);
+  const buildFingerprintSha256 = asString(payload.build_fingerprint_sha256);
+  const releaseManifestSha256 = asString(payload.release_manifest_sha256);
+  const serviceFingerprintSha256 = asString(payload.service_fingerprint_sha256);
+  const toolCount = asNumber(payload.tool_count);
+  const tools = asStringArray(payload.tool_names);
+  const contractOk =
+    mcpContractVersion === KRW_ONTOLOGY_MCP_CONTRACT_VERSION;
+  const toolParityOk =
+    payload.tool_names_match === true &&
+    toolCount === KRW_ONTOLOGY_MCP_TOOLS.length &&
+    sameStringSet(tools, KRW_ONTOLOGY_MCP_TOOLS);
+  const fingerprintErrors: string[] = [];
+
+  if (!contractOk) {
+    fingerprintErrors.push(
+      `mcp_contract_version mismatch: ${mcpContractVersion ?? "missing"}`,
+    );
+  }
+  if (!toolParityOk) {
+    fingerprintErrors.push(
+      `tool parity mismatch: expected ${KRW_ONTOLOGY_MCP_TOOLS.length} exact tools`,
+    );
+  }
+  if (!buildId?.trim()) fingerprintErrors.push("build_id is missing");
+  if (!backendGitSha?.trim() && !isSha256(buildFingerprintSha256)) {
+    fingerprintErrors.push(
+      "backend_git_sha is missing and build_fingerprint_sha256 is unavailable",
+    );
+  }
+
+  for (const [field, value] of [
+    ["tool_schema_sha256", toolSchemaSha256],
+    ["build_fingerprint_sha256", buildFingerprintSha256],
+    ["release_manifest_sha256", releaseManifestSha256],
+    ["service_fingerprint_sha256", serviceFingerprintSha256],
+  ] as const) {
+    if (!isSha256(value)) {
+      fingerprintErrors.push(`${field} is missing or is not a SHA-256 digest`);
+    }
+  }
+
+  for (const [envName, field, value] of [
+    [
+      "KRW_MCP_EXPECTED_CONTRACT_VERSION",
+      "mcp_contract_version",
+      mcpContractVersion,
+    ],
+    ["KRW_MCP_EXPECTED_BUILD_ID", "build_id", buildId],
+    ["KRW_MCP_EXPECTED_BACKEND_GIT_SHA", "backend_git_sha", backendGitSha],
+    [
+      "KRW_MCP_EXPECTED_TOOL_SCHEMA_SHA256",
+      "tool_schema_sha256",
+      toolSchemaSha256,
+    ],
+    [
+      "KRW_MCP_EXPECTED_BUILD_FINGERPRINT_SHA256",
+      "build_fingerprint_sha256",
+      buildFingerprintSha256,
+    ],
+    [
+      "KRW_MCP_EXPECTED_RELEASE_MANIFEST_SHA256",
+      "release_manifest_sha256",
+      releaseManifestSha256,
+    ],
+    [
+      "KRW_MCP_EXPECTED_SERVICE_FINGERPRINT_SHA256",
+      "service_fingerprint_sha256",
+      serviceFingerprintSha256,
+    ],
+  ] as const) {
+    const expected = process.env[envName]?.trim();
+    if (expected && expected !== value) {
+      fingerprintErrors.push(`${field} does not match ${envName}`);
+    }
+  }
+
+  return {
+    contractOk,
+    toolParityOk,
+    fingerprintOk: fingerprintErrors.length === 0,
+    fingerprintErrors,
+    mcpContractVersion,
+    buildId,
+    backendGitSha,
+    toolSchemaSha256,
+    buildFingerprintSha256,
+    releaseManifestSha256,
+    serviceFingerprintSha256,
+    toolCount,
+    tools,
+  };
+}
+
 function isHttpMcpServer(serverConfig: PluginMcpServerConfig): boolean {
-  return serverConfig.type === "http" || serverConfig.type === "sse";
+  return serverConfig.type === "http";
 }
 
 function getConfiguredMcpUrl(serverConfig: PluginMcpServerConfig): string | null {
@@ -426,6 +511,17 @@ function parseMcpHealthPayload(
     McpHealthResult,
     | "liveOk"
     | "sqliteOk"
+    | "contractOk"
+    | "toolParityOk"
+    | "fingerprintOk"
+    | "fingerprintErrors"
+    | "mcpContractVersion"
+    | "buildId"
+    | "backendGitSha"
+    | "toolSchemaSha256"
+    | "buildFingerprintSha256"
+    | "releaseManifestSha256"
+    | "serviceFingerprintSha256"
     | "env"
     | "releaseId"
     | "manifestPath"
@@ -442,7 +538,7 @@ function parseMcpHealthPayload(
     | "releaseMetadata"
   >
 > {
-  const tools = asStringArray(payload.tools);
+  const runtimeFingerprint = validateRuntimeFingerprint(payload);
   const ontologyEnv = normalizeOntologyEnv(asString(payload.env) ?? undefined);
   const manifestValid = asBoolean(payload.manifest_valid) ?? false;
   const indexGeneratedAt =
@@ -466,6 +562,13 @@ function parseMcpHealthPayload(
     company_count: companyCount,
     document_count: documentCount,
     object_count: objectCount,
+    mcp_contract_version: runtimeFingerprint.mcpContractVersion,
+    build_id: runtimeFingerprint.buildId,
+    backend_git_sha: runtimeFingerprint.backendGitSha,
+    tool_schema_sha256: runtimeFingerprint.toolSchemaSha256,
+    build_fingerprint_sha256: runtimeFingerprint.buildFingerprintSha256,
+    release_manifest_sha256: runtimeFingerprint.releaseManifestSha256,
+    service_fingerprint_sha256: runtimeFingerprint.serviceFingerprintSha256,
   };
 
   return Promise.resolve({
@@ -476,6 +579,17 @@ function parseMcpHealthPayload(
       typeof payload.global_spine_path === "string" &&
       documentCount !== null &&
       objectCount !== null,
+    contractOk: runtimeFingerprint.contractOk,
+    toolParityOk: runtimeFingerprint.toolParityOk,
+    fingerprintOk: runtimeFingerprint.fingerprintOk,
+    fingerprintErrors: runtimeFingerprint.fingerprintErrors,
+    mcpContractVersion: runtimeFingerprint.mcpContractVersion,
+    buildId: runtimeFingerprint.buildId,
+    backendGitSha: runtimeFingerprint.backendGitSha,
+    toolSchemaSha256: runtimeFingerprint.toolSchemaSha256,
+    buildFingerprintSha256: runtimeFingerprint.buildFingerprintSha256,
+    releaseManifestSha256: runtimeFingerprint.releaseManifestSha256,
+    serviceFingerprintSha256: runtimeFingerprint.serviceFingerprintSha256,
     env: ontologyEnv,
     releaseId: asString(payload.release_id),
     manifestPath: asString(payload.manifest_path),
@@ -485,8 +599,8 @@ function parseMcpHealthPayload(
     companyCount,
     documentCount,
     objectCount,
-    toolCount: tools.length,
-    tools,
+    toolCount: runtimeFingerprint.toolCount,
+    tools: runtimeFingerprint.tools,
     root: asString(payload.root) ?? root,
     indexPath: globalSpinePath,
     releaseMetadata: (asRecord(payload.manifest) as Json | null) ?? releaseMetadata,
@@ -522,43 +636,36 @@ async function runHttpMcpHealth(
   }
 }
 
-async function runStdioMcpHealth(
+async function requireHttpMcpToolParity(
   serverConfig: PluginMcpServerConfig,
-  root: string | null,
-  probeKind: McpProbeKind,
-): Promise<
-  Awaited<ReturnType<typeof parseMcpHealthPayload>>
-> {
-  const healthCommand = buildHealthCommand(serverConfig, probeKind);
-  const env = {
-    ...(serverConfig.env ?? {}),
-    ...process.env,
-    ...(root
-      ? {
-          KRW_ONTOLOGY_RELEASE_ROOT: root,
-          KRW_ONTOLOGY_ROOT: root,
-          KRW_ONTOLOGY_MANIFEST_PATH:
-            process.env.KRW_ONTOLOGY_MANIFEST_PATH ||
-            path.join(root, "manifest.json"),
-          KRW_ONTOLOGY_GLOBAL_SPINE_PATH:
-            process.env.KRW_ONTOLOGY_GLOBAL_SPINE_PATH ||
-            path.join(root, "indexes", "global_spine.sqlite"),
-          KRW_ONTOLOGY_SHARD_MANIFEST_PATH:
-            process.env.KRW_ONTOLOGY_SHARD_MANIFEST_PATH ||
-            path.join(root, "indexes", "shard_manifest.json"),
-        }
-      : {}),
-  };
-  const { stdout } = await execFileAsync(healthCommand.command, healthCommand.args, {
-    env,
-    timeout: getHealthTimeoutMs(),
-    maxBuffer: 1024 * 1024,
+): Promise<void> {
+  const mcpUrl = getConfiguredMcpUrl(serverConfig);
+  if (!mcpUrl) throw new Error("KRW Ontology MCP HTTP URL is missing");
+  const client = new Client({
+    name: "krw-ontology-worker-readiness",
+    version: "0.1.0",
   });
-  const parsed = JSON.parse(stdout.trim()) as {
-    status?: number;
-    payload?: Record<string, unknown>;
-  };
-  return parseMcpHealthPayload(parsed.status ?? 500, parsed.payload ?? {}, root);
+  const transport = new StreamableHTTPClientTransport(new URL(mcpUrl), {
+    requestInit: {
+      headers: serverConfig.headers,
+    },
+  });
+  const timeout = getHealthTimeoutMs();
+  try {
+    await client.connect(transport, { timeout });
+    const result = await client.listTools(undefined, {
+      timeout,
+      maxTotalTimeout: timeout,
+    });
+    const names = result.tools.map((tool) => tool.name);
+    if (!sameStringSet(names, KRW_ONTOLOGY_MCP_TOOLS)) {
+      throw new Error(
+        `MCP /mcp tool parity mismatch: expected ${KRW_ONTOLOGY_MCP_TOOLS.length} exact tools`,
+      );
+    }
+  } finally {
+    await client.close().catch(() => undefined);
+  }
 }
 
 async function checkMcpProbe(probeKind: McpProbeKind): Promise<McpHealthResult> {
@@ -608,72 +715,93 @@ async function checkMcpProbe(probeKind: McpProbeKind): Promise<McpHealthResult> 
       };
     }
 
-    const isHttp = isHttpMcpServer(serverConfig);
-    const commandOk = isHttp ? Boolean(getConfiguredMcpUrl(serverConfig)) : Boolean(serverConfig.command);
-
-    if (!commandOk) {
+    if (!isHttpMcpServer(serverConfig)) {
       return {
         ...baseHealthResult(pluginPath, root),
         staticOk: true,
         connected: false,
-        error: isHttp
-          ? "KRW Ontology MCP HTTP URL is missing"
-          : "KRW Ontology MCP server command is missing",
+        error: "KRW Ontology MCP must use explicit streamable HTTP transport",
       };
     }
-
-    if (!isHttp && serverConfig.command && !(await isExecutable(serverConfig.command))) {
+    const configuredMcpUrl = getConfiguredMcpUrl(serverConfig);
+    if (!configuredMcpUrl) {
       return {
         ...baseHealthResult(pluginPath, root),
         staticOk: true,
         connected: false,
-        error: `KRW Ontology MCP server command is not executable: ${serverConfig.command}`,
+        error: "KRW Ontology MCP HTTP URL is missing",
       };
     }
-
-    if (
-      root ||
-      process.env.KRW_ONTOLOGY_GLOBAL_SPINE_PATH ||
-      serverConfig.env?.KRW_ONTOLOGY_GLOBAL_SPINE_PATH
-    ) {
-      const indexPath =
-        process.env.KRW_ONTOLOGY_GLOBAL_SPINE_PATH ||
-        serverConfig.env?.KRW_ONTOLOGY_GLOBAL_SPINE_PATH ||
-        path.join(root ?? "", "indexes", "global_spine.sqlite");
-      if (!(await exists(indexPath))) {
-        return {
-          ...baseHealthResult(pluginPath, root),
-          staticOk: true,
-          commandOk: true,
-          indexPath,
-          connected: false,
-          error: `Ontology global spine not found at ${indexPath}`,
-        };
+    try {
+      const parsedUrl = new URL(configuredMcpUrl);
+      if (
+        !["http:", "https:"].includes(parsedUrl.protocol) ||
+        parsedUrl.pathname.replace(/\/+$/, "") !== "/mcp" ||
+        parsedUrl.username ||
+        parsedUrl.password
+      ) {
+        throw new Error("invalid HTTP MCP URL");
       }
-    }
-
-    const liveHealth = isHttp
-      ? await runHttpMcpHealth(serverConfig, root, probeKind)
-      : await runStdioMcpHealth(serverConfig, root, probeKind);
-    if (!liveHealth.liveOk || !liveHealth.sqliteOk) {
+    } catch {
       return {
         ...baseHealthResult(pluginPath, root),
         staticOk: true,
-        commandOk,
+        connected: false,
+        error: "KRW Ontology MCP URL must be credential-free HTTP(S) ending at /mcp",
+      };
+    }
+
+    const liveHealth = await runHttpMcpHealth(serverConfig, root, probeKind);
+    await requireHttpMcpToolParity(serverConfig);
+    const ontologyEnv = getOntologyEnv();
+    if (ontologyEnv === "staging") {
+      throw new Error("KRW Ontology materialized plugin supports dev or prod only");
+    }
+    const pluginContract = await verifyMaterializedOntologyPluginContract({
+      pluginPath,
+      expectedEnvironment: ontologyEnv,
+      expectedMcpContractVersion: KRW_ONTOLOGY_MCP_CONTRACT_VERSION,
+      runtimeToolSchemaSha256: liveHealth.toolSchemaSha256,
+      runtimeBuildFingerprintSha256: liveHealth.buildFingerprintSha256,
+    });
+    if (
+      !liveHealth.liveOk ||
+      !liveHealth.sqliteOk ||
+      !liveHealth.contractOk ||
+      !liveHealth.toolParityOk ||
+      !liveHealth.fingerprintOk ||
+      !pluginContract.ok
+    ) {
+      return {
+        ...baseHealthResult(pluginPath, root),
+        staticOk: true,
+        commandOk: true,
         ...liveHealth,
+        pluginContractOk: pluginContract.ok,
+        pluginContractErrors: pluginContract.errors,
+        pluginContentSha256: pluginContract.contentSha256,
+        pluginMcpConfigSha256: pluginContract.mcpConfigSha256,
         connected: false,
         error:
-          probeKind === "ready"
-            ? "KRW Ontology MCP readiness check failed"
-            : "KRW Ontology MCP live health check failed",
+          pluginContract.errors.length > 0
+            ? `KRW Ontology plugin contract mismatch: ${pluginContract.errors.join("; ")}`
+            : liveHealth.fingerprintErrors.length > 0
+            ? `KRW Ontology MCP runtime fingerprint mismatch: ${liveHealth.fingerprintErrors.join("; ")}`
+            : probeKind === "ready"
+              ? "KRW Ontology MCP readiness check failed"
+              : "KRW Ontology MCP live health check failed",
       };
     }
 
     return {
       connected: true,
       staticOk: true,
-      commandOk,
+      commandOk: true,
       ...liveHealth,
+      pluginContractOk: true,
+      pluginContractErrors: [],
+      pluginContentSha256: pluginContract.contentSha256,
+      pluginMcpConfigSha256: pluginContract.mcpConfigSha256,
       pluginPath,
     };
   } catch (err) {

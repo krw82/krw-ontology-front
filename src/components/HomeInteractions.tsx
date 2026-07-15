@@ -138,7 +138,7 @@ export function HomeHeaderActions({
   locale?: Locale;
 }) {
   const companiesHref = localizedPath(locale, "/companies");
-  const startLabel = locale === "ko" ? "무료로 시작" : "Start free";
+  const startLabel = locale === "ko" ? "리서치 시작" : "Start research";
   const loginLabel = locale === "ko" ? "로그인" : "Log in";
   const researchLabel = locale === "ko" ? "내 리서치" : "My research";
   const [authState, setAuthState] = useState<

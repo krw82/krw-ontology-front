@@ -12,6 +12,7 @@ interface ResearchMarkdownProps {
   className?: string;
   normalizePlainText?: boolean;
   charts?: ChatMessageChart[];
+  presentation?: "default" | "guru";
 }
 
 const SAFE_LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
@@ -324,14 +325,42 @@ const RESEARCH_MARKDOWN_COMPONENTS = {
   ),
 } satisfies Components;
 
+const GURU_RESEARCH_MARKDOWN_COMPONENTS = {
+  ...RESEARCH_MARKDOWN_COMPONENTS,
+  p: ({ children }) => (
+    <p className="mb-[1.05rem] mt-0 text-[16px] leading-[1.78] text-ink/80 [text-wrap:pretty] first:mt-0 last:mb-0 sm:mb-[1.2rem] sm:text-[17px] sm:leading-[1.86]">
+      {children}
+    </p>
+  ),
+  ul: ({ children }) => (
+    <ul className="mb-[1.05rem] mt-[0.35rem] list-disc space-y-2.5 pl-5 text-[16px] leading-[1.76] text-ink/80 marker:text-primary/65 sm:mb-[1.2rem] sm:mt-[0.45rem] sm:space-y-3 sm:pl-6 sm:text-[17px] sm:leading-[1.84]">
+      {children}
+    </ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="mb-[1.05rem] mt-[0.35rem] list-decimal space-y-2.5 pl-5 text-[16px] leading-[1.76] text-ink/80 marker:font-bold marker:text-primary/65 sm:mb-[1.2rem] sm:mt-[0.45rem] sm:space-y-3 sm:pl-6 sm:text-[17px] sm:leading-[1.84]">
+      {children}
+    </ol>
+  ),
+  blockquote: ({ children }) => (
+    <blockquote className="my-xl border-l-[3px] border-primary/55 bg-surface/70 py-sm pl-md pr-sm text-ink/80 [&>p]:my-0">
+      {children}
+    </blockquote>
+  ),
+} satisfies Components;
+
 export default function ResearchMarkdown({
   content,
   className,
   normalizePlainText = true,
   charts = [],
+  presentation = "default",
 }: ResearchMarkdownProps) {
+  const isGuru = presentation === "guru";
   const classes = [
-    "w-full max-w-[820px] break-words text-body",
+    isGuru
+      ? "w-full max-w-[760px] break-words text-ink [&>p:first-of-type]:border-b [&>p:first-of-type]:border-hairline [&>p:first-of-type]:pb-md [&>p:first-of-type]:text-[17px] [&>p:first-of-type]:font-semibold [&>p:first-of-type]:leading-[1.74] [&>p:first-of-type]:text-ink sm:[&>p:first-of-type]:pb-lg sm:[&>p:first-of-type]:text-[19px] sm:[&>p:first-of-type]:leading-[1.78]"
+      : "w-full max-w-[820px] break-words text-body",
     className,
   ]
     .filter(Boolean)
@@ -360,7 +389,11 @@ export default function ResearchMarkdown({
           <ReactMarkdown
             key={`markdown-${index}`}
             remarkPlugins={[remarkGfm]}
-            components={RESEARCH_MARKDOWN_COMPONENTS}
+            components={
+              isGuru
+                ? GURU_RESEARCH_MARKDOWN_COMPONENTS
+                : RESEARCH_MARKDOWN_COMPONENTS
+            }
           >
             {part.content}
           </ReactMarkdown>

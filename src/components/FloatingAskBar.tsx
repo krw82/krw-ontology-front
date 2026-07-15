@@ -30,7 +30,7 @@ export default function FloatingAskBar({ selectedTicker }: FloatingAskBarProps) 
       >
         <input
           className="min-w-0 flex-grow border-0 bg-transparent text-[15px] font-bold leading-[1.5] text-ink placeholder:text-muted-soft focus:outline-none focus:ring-0 sm:text-[16px]"
-          placeholder="KRW Ontology에 질문하세요..."
+          placeholder="KRW.O에 질문하세요..."
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}

@@ -30,6 +30,14 @@ export function getPathLocale(pathname: string): Locale | null {
   return isLocale(maybeLocale) ? maybeLocale : null;
 }
 
+export function resolveRouteLocale(
+  pathname: string,
+  localeParam?: string | null,
+): Locale {
+  return getPathLocale(pathname) ??
+    (isLocale(localeParam) ? localeParam : DEFAULT_LOCALE);
+}
+
 export function hasLocalePrefix(pathname: string): boolean {
   return getPathLocale(pathname) !== null;
 }
@@ -62,6 +70,39 @@ export function isPublicLocalizedPathname(pathname: string): boolean {
         unlocalizedPathname.startsWith(`${prefix}/`),
     )
   );
+}
+
+function appendSearchParams(pathname: string, params: URLSearchParams): string {
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
+export function localeSwitchHref(
+  locale: Locale,
+  pathname: string,
+  query = "",
+): string {
+  const params = new URLSearchParams(query);
+  const unlocalizedPathname = stripLocalePrefix(pathname);
+
+  if (isPublicLocalizedPathname(pathname)) {
+    params.delete("locale");
+    return appendSearchParams(
+      localizedPath(locale, unlocalizedPathname),
+      params,
+    );
+  }
+
+  if (locale === DEFAULT_LOCALE) {
+    params.delete("locale");
+  } else {
+    params.set("locale", locale);
+  }
+  return appendSearchParams(unlocalizedPathname, params);
+}
+
+export function queryLocalizedPath(locale: Locale, pathname: string): string {
+  return localeSwitchHref(locale, pathname);
 }
 
 export function defaultLocalizedPath(pathname = "/"): string {

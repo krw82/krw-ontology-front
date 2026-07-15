@@ -209,22 +209,34 @@ start_queue() {
 
 restart_queue_on_exit() {
   exit_code=$?
+  queue_restart_failed=0
+  trap - EXIT INT TERM
+
   if [ "$RESTART_QUEUE" = "1" ] && [ "$QUEUE_WAS_RUNNING" = "1" ] && [ "$QUEUE_STOPPED_BY_SCRIPT" = "1" ]; then
     echo "Restarting queue worker..."
     if start_queue; then
       queue_status || true
     else
+      queue_restart_failed=1
       echo "Failed to restart queue worker. Start it manually with:" >&2
       echo "  cd '$ONTOLOGY_SOURCE_DIR' && uv run krw-ontology queue start --root '$QUEUE_ROOT' --poll-interval '$QUEUE_POLL_INTERVAL' --no-publish-prod --no-refresh-index" >&2
     fi
   fi
 
+  if [ "$exit_code" -ne 0 ]; then
+    exit "$exit_code"
+  fi
+  if [ "$queue_restart_failed" = "1" ]; then
+    exit 1
+  fi
   if [ "$DEPLOY_SUCCEEDED" = "1" ]; then
     exit 0
   fi
   exit "$exit_code"
 }
-trap restart_queue_on_exit EXIT INT TERM
+trap restart_queue_on_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 require_command node
 

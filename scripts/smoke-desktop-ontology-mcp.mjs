@@ -11,6 +11,9 @@ const mcpUrl =
 const ticker = (args.ticker ?? "AAPL").toUpperCase();
 const question =
   args.question ?? `${ticker} demand, margin, and risk evidence`;
+const normalizedQuestion = question.trim().slice(0, 900);
+const retrievalQuery = `${ticker} ${normalizedQuestion}`.trim();
+const requiredConcept = normalizedQuestion.slice(0, 150).trim();
 const timeoutMs = positiveInt(args.timeoutMs, 30_000);
 const maxResultBytes = positiveInt(
   process.env.DESKTOP_ONTOLOGY_MAX_RESULT_BYTES,
@@ -47,10 +50,20 @@ try {
     {
       name: "krw_ontology_query_context",
       arguments: {
-        question,
-        tickers: [ticker],
-        limit_results: 2,
-        response_format: "json",
+        search_plan: {
+          question,
+          intent: "smoke_test",
+          tickers: [ticker],
+          clauses: [
+            {
+              clause_id: "smoke",
+              retrieval_query: retrievalQuery,
+              required_concepts: [requiredConcept],
+              directness: "any",
+            },
+          ],
+          limit_results: 2,
+        },
       },
     },
     undefined,
@@ -92,7 +105,8 @@ try {
           : null,
         ticker,
         result_bytes: bytes,
-        research_status: payload.research_status ?? null,
+        research_status:
+          payload.answerability?.status ?? payload.research_status ?? null,
         result_keys: Object.keys(payload).sort(),
       },
       null,

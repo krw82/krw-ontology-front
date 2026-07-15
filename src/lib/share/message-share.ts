@@ -4,6 +4,7 @@ import type {
   AgentRunRow,
   ChatAttachmentRow,
   ChatSessionRow,
+  Json,
   MessageRow,
   MessageShareRow,
 } from "@/types/database";
@@ -15,6 +16,8 @@ import { parseChatAttachmentContent } from "@/lib/chat/attachments";
 import { normalizeTickers } from "@/lib/ontology/ticker";
 import { redactSensitiveOutput } from "@/lib/security/sensitive-output";
 import type { Locale } from "@/i18n/config";
+import { normalizeGuruLensKey, type GuruLensKey } from "@/lib/guru-lenses";
+import type { RunKind } from "@/lib/run-kind";
 import { inferShareLocale } from "./share-locale";
 
 const SHARE_TOKEN_BYTES = 18;
@@ -33,6 +36,11 @@ export interface PublicShareQuestionAttachmentFile {
   size: number | null;
 }
 
+export interface PublicShareContext {
+  run_kind: RunKind | null;
+  guru_lens: GuruLensKey | null;
+}
+
 export interface PublicMessageShare {
   token: string;
   title: string;
@@ -42,6 +50,7 @@ export interface PublicMessageShare {
   answer_content: string;
   answer_created_at: string;
   tickers: string[] | null;
+  share_context: PublicShareContext;
   created_at: string;
   locale: Locale;
 }
@@ -87,7 +96,7 @@ export async function findPublicMessageShare(
   const { data } = await admin
     .from("message_shares")
     .select(
-      "token, title, question_content, question_created_at, source_question_message_id, answer_content, answer_created_at, tickers, created_at",
+      "token, title, question_content, question_created_at, source_question_message_id, answer_content, answer_created_at, tickers, share_context, created_at",
     )
     .eq("token", token)
     .is("revoked_at", null)
@@ -111,15 +120,17 @@ export async function findPublicMessageShare(
     admin,
     data.source_question_message_id,
   );
-  const { source_question_message_id: _sourceQuestionMessageId, ...share } =
-    data;
   return {
-    ...share,
+    token: data.token,
     title: buildShareTitle(answerContent, titleFallback || undefined),
     question_content: questionContent,
+    question_created_at: data.question_created_at,
     question_attachments: questionAttachments,
     answer_content: answerContent,
+    answer_created_at: data.answer_created_at,
     tickers: normalizeShareTickers(data.tickers),
+    share_context: normalizeShareContext(data.share_context),
+    created_at: data.created_at,
     locale: inferShareLocale({
       questionContent,
       answerContent,
@@ -144,14 +155,18 @@ export async function findPublicShareStarter(
 
 export async function findExistingActiveShare(
   messageId: string,
-): Promise<Pick<MessageShareRow, "token" | "question_content"> | null> {
+): Promise<
+  Pick<MessageShareRow, "token" | "question_content" | "share_context"> | null
+> {
   const admin = getSupabaseAdmin();
   const { data } = await admin
     .from("message_shares")
-    .select("token, question_content")
+    .select("token, question_content, share_context")
     .eq("source_message_id", messageId)
     .is("revoked_at", null)
-    .maybeSingle<Pick<MessageShareRow, "token" | "question_content">>();
+    .maybeSingle<
+      Pick<MessageShareRow, "token" | "question_content" | "share_context">
+    >();
 
   return data ?? null;
 }
@@ -167,6 +182,7 @@ export async function createMessageShare(params: {
     sanitizeAssistantContent(params.message.content),
   ).content;
   const questionSnapshot = await resolveShareQuestionSnapshot(params);
+  const shareContext = await resolveShareContext(admin, params.message);
   const payload = {
     token,
     owner_user_id: params.userId,
@@ -179,6 +195,7 @@ export async function createMessageShare(params: {
     answer_content: answerContent,
     answer_created_at: params.message.created_at,
     tickers: normalizeShareTickers(params.session.default_tickers),
+    share_context: toShareContextJson(shareContext),
     snapshot_version: SHARE_SNAPSHOT_VERSION,
   };
 
@@ -226,6 +243,22 @@ export async function ensureMessageShareQuestionSnapshot(params: {
     .eq("source_message_id", params.message.id)
     .is("revoked_at", null)
     .is("question_content", null);
+}
+
+export async function ensureMessageShareContextSnapshot(params: {
+  message: MessageRow;
+}): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const shareContext = await resolveShareContext(admin, params.message);
+  if (!hasShareContext(shareContext)) return;
+
+  await admin
+    .from("message_shares")
+    .update({
+      share_context: toShareContextJson(shareContext),
+    } satisfies Partial<MessageShareRow>)
+    .eq("source_message_id", params.message.id)
+    .is("revoked_at", null);
 }
 
 async function resolveShareQuestionSnapshot(params: {
@@ -309,6 +342,80 @@ function normalizeShareQuestion(value: string | null | undefined): string | null
   const visibleText = parseChatAttachmentContent(value).visibleText;
   const normalized = visibleText.replace(/\s+\n/g, "\n").trim();
   return normalized ? normalized.slice(0, MAX_SHARE_QUESTION_CHARS) : null;
+}
+
+async function resolveShareContext(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  answerMessage: MessageRow,
+): Promise<PublicShareContext> {
+  const { data: run } = await admin
+    .from("agent_runs")
+    .select("id, run_kind")
+    .eq("assistant_message_id", answerMessage.id)
+    .eq("session_id", answerMessage.session_id)
+    .order("queued_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle<Pick<AgentRunRow, "id" | "run_kind">>();
+
+  const runKind = readShareRunKind(run?.run_kind);
+  if (!runKind) return emptyShareContext();
+
+  if (runKind !== "guru_advisor" || !run?.id) {
+    return { run_kind: runKind, guru_lens: null };
+  }
+
+  const { data: queuedEvent } = await admin
+    .from("agent_run_events")
+    .select("payload")
+    .eq("run_id", run.id)
+    .eq("event_type", "run_queued")
+    .order("id", { ascending: true })
+    .limit(1)
+    .maybeSingle<{ payload: unknown }>();
+
+  const guruLens = isRecord(queuedEvent?.payload)
+    ? normalizeGuruLensKey(queuedEvent.payload.guru_lens)
+    : null;
+
+  return { run_kind: runKind, guru_lens: guruLens };
+}
+
+function normalizeShareContext(value: unknown): PublicShareContext {
+  if (!isRecord(value)) return emptyShareContext();
+  return {
+    run_kind: readShareRunKind(value.run_kind),
+    guru_lens: normalizeGuruLensKey(value.guru_lens),
+  };
+}
+
+function readShareRunKind(value: unknown): RunKind | null {
+  return value === "idea_generation" ||
+    value === "news_discovery" ||
+    value === "market_move_research" ||
+    value === "scenario_sensitivity" ||
+    value === "guru_advisor" ||
+    value === "company_research"
+    ? value
+    : null;
+}
+
+function emptyShareContext(): PublicShareContext {
+  return { run_kind: null, guru_lens: null };
+}
+
+function hasShareContext(value: PublicShareContext): boolean {
+  return Boolean(value.run_kind || value.guru_lens);
+}
+
+function toShareContextJson(value: PublicShareContext): Json {
+  return {
+    run_kind: value.run_kind,
+    guru_lens: value.guru_lens,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 async function loadPublicQuestionAttachments(

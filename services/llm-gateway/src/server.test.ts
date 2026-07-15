@@ -77,6 +77,25 @@ describe("LLM gateway request enforcement", () => {
     ).toThrow(/exceeds the job limit/);
   });
 
+  it("injects the job output limit when max_tokens is omitted", () => {
+    const result = enforceJobRequest(
+      { model: "claude-sonnet-4-6" },
+      job({ max_output_tokens: 4096 }),
+    );
+
+    expect(result.max_tokens).toBe(4096);
+  });
+
+  it("does not add max_tokens to token-counting requests", () => {
+    const result = enforceJobRequest(
+      { model: "claude-sonnet-4-6" },
+      job({ max_output_tokens: 4096 }),
+      { enforceOutputLimit: false },
+    );
+
+    expect(result).not.toHaveProperty("max_tokens");
+  });
+
   it("drops client provider credentials and injects only the DeepSeek key", () => {
     const headers = upstreamHeaders(
       {
@@ -166,7 +185,6 @@ describe("LLM gateway request enforcement", () => {
         },
         body: JSON.stringify({
           model: "claude-opus-4-6",
-          max_tokens: 128,
           metadata: { client_field: "kept" },
         }),
       });
@@ -189,7 +207,7 @@ describe("LLM gateway request enforcement", () => {
       expect(upstreamRequestHeaders.get("anthropic-version")).toBe("2023-06-01");
       expect(JSON.parse(String(upstreamRequest.body))).toMatchObject({
         model: "deepseek-v4-flash",
-        max_tokens: 128,
+        max_tokens: 4096,
         metadata: {
           client_field: "kept",
           user_id: expect.stringMatching(/^krw_[0-9a-f]{32}$/),

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KRW Ontology — 베타 종료 카피 검토</title>
+    <style>
+      :root { color-scheme: light; font-family: Inter, Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #101114; background: #f7f8fa; }
+      body { max-width: 980px; margin: 0 auto; padding: 48px 24px 80px; line-height: 1.65; }
+      h1 { font-size: 34px; line-height: 1.2; margin-bottom: 8px; }
+      h2 { margin-top: 48px; border-top: 1px solid #dfe3e8; padding-top: 28px; }
+      h3 { margin-top: 28px; }
+      .lede, .muted { color: #5c6573; }
+      .callout { border-left: 4px solid #155eef; background: #eef4ff; padding: 16px 20px; border-radius: 8px; }
+      table { border-collapse: collapse; width: 100%; background: #fff; }
+      th, td { text-align: left; vertical-align: top; padding: 12px; border: 1px solid #dfe3e8; }
+      th { background: #f4f6f8; }
+      code { font-size: .9em; background: #eef1f4; padding: 2px 5px; border-radius: 4px; }
+      figure { margin: 20px 0; }
+      img { max-width: 100%; border: 1px solid #dfe3e8; border-radius: 10px; }
+      figcaption { color: #5c6573; font-size: 14px; margin-top: 8px; }
+      a { color: #155eef; }
+    </style>
+  </head>
+  <body>
+    <h1>베타 종료 카피 검토</h1>
+    <p class="lede">대상: KRW Ontology 공개·로그인·가격 화면. 2026-07-13 로컬 화면과 소스 기준.</p>
+
+    <section class="callout">
+      <strong>권장 결론:</strong> “무료 분석”을 단순히 “분석 시작”으로 지우기보다, 정식 출시의 약속인 <strong>공시 근거 기반 리서치</strong>와 <strong>플랜 선택</strong>으로 치환한다. 단, 실제로 0원 플랜이 남아 있는 가격표의 가격·플랜명은 정확한 상품 정보이므로 유지한다. 공유 링크 화면은 현행 카피를 그대로 두고 이번 변경 범위에서 명시적으로 제외한다.
+    </section>
+
+    <h2>현재 상태</h2>
+    <figure>
+      <img src="current.png" alt="KRW Ontology 홈 화면" />
+      <figcaption>홈 화면: 제품 가치 제안은 이미 “공시 근거”에 집중되어 있고, 우측 상단 CTA만 “무료 시작”이라 메시지가 충돌한다.</figcaption>
+    </figure>
+    <figure>
+      <img src="references/current-pricing.png" alt="KRW Ontology 가격 화면" />
+      <figcaption>가격 화면: “무료로 첫 분석 시작” CTA와 Free 플랜의 실제 가격 정보가 함께 보인다. 두 요소를 같은 방식으로 지우면 가격 투명성이 떨어진다.</figcaption>
+    </figure>
+
+    <h2>바꿔야 할 노출 카피</h2>
+    <table>
+      <thead><tr><th>우선순위</th><th>화면·위치</th><th>현재</th><th>권장</th><th>이유</th></tr></thead>
+      <tbody>
+        <tr><td>P0</td><td>로그인</td><td>“무료 베타로 기업 분석 시작”, “무료 베타 · 카드 불필요”, “Google로 무료 시작”</td><td>“기업 리서치 시작”, “Google 계정으로 시작 · 이전 화면으로 돌아갑니다”, “Google로 계속”</td><td>베타 종료를 가장 분명히 보여 주는 진입점이다. “카드 불필요”는 유료 결제가 즉시 시작되지 않는 사실일 때만 유지한다.</td></tr>
+        <tr><td>P0</td><td>공개 내비게이션·홈 헤더</td><td>“무료 시작”</td><td>“리서치 시작”</td><td>홈의 주 CTA “공시 근거로 확인하기”와 같은 결과 중심 언어로 맞춘다.</td></tr>
+        <tr><td>P0</td><td>회사 상세 CTA</td><td>“AMZN 무료 분석 시작”</td><td>“AMZN 분석 시작”</td><td>종목을 고른 뒤의 행동을 정확히 설명하며, 베타 혜택처럼 보이지 않는다.</td></tr>
+        <tr><td>P1</td><td>가격 히어로 CTA</td><td>“무료로 첫 분석 시작”</td><td>“첫 분석 시작”</td><td>바로 아래 Free 플랜 카드가 가격 정보를 담당하므로 CTA까지 무료를 반복할 필요가 없다.</td></tr>
+        <tr><td>P1</td><td>검색/공유용 OG 이미지</td><td>“무료 베타에서 시작…”</td><td>“필요한 리서치 범위에 맞는 플랜을 선택하세요.”</td><td>웹·메신저 미리보기는 오래 캐시되어, 종료된 베타 문구를 가장 오래 남길 수 있다.</td></tr>
+        <tr><td>P1</td><td>사용량 경고</td><td>“무료 사용량을 모두 사용했습니다/거의 찼습니다”</td><td>“체험 사용량을 모두 사용했습니다/거의 찼습니다” 또는 “현재 플랜 사용량…”</td><td>Free 플랜을 계속 운영한다면 “무료”보다 플랜·사용량 문맥을 명확히 한다. Free 플랜을 없앤다면 반드시 함께 변경한다.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>의도적으로 유지할 것</h2>
+    <ul>
+      <li><strong>가격표의 Free/무료, 월 0원:</strong> 실제 제공 중인 Free 플랜의 상품 정보다. “무료 분석”이라는 프로모션 문구와 구분해 유지한다. Linear도 무료 플랜을 가격·한도와 함께 명시한다. <a href="https://linear.app/pricing">참고</a></li>
+      <li><strong>내부 키·데이터 모델의 <code>free</code>, <code>beta</code>:</strong> 이번 작업은 표시 카피 정리다. 데이터 마이그레이션으로 넓히지 않는다.</li>
+      <li><strong>공유 화면:</strong> <code>src/app/share/[token]/page.tsx</code>, <code>src/app/[locale]/share/[token]/page.tsx</code>와 공유 OG/API는 이번 변경 대상에서 제외한다. 현재 “무료/베타” 표시 카피도 검색되지 않았다.</li>
+    </ul>
+
+    <h2>카피 원칙</h2>
+    <ol>
+      <li>무료 여부는 <strong>가격표·플랜 카드</strong>에서만 말한다. CTA는 사용자가 얻게 될 결과를 말한다.</li>
+      <li>“베타”는 종료 공지나 릴리스 노트처럼 시간 정보가 필요한 곳에만 남기고, 로그인·메타데이터·OG에서는 제거한다.</li>
+      <li>유료 전환이 필요한 흐름에서는 “체험”·“현재 플랜 사용량”처럼 실제 권한 모델과 일치하는 언어를 쓴다. 가격 정책은 숨기지 않는다. Stripe도 가격 조건을 상품 맥락 안에 분리해 제시한다. <a href="https://stripe.com/pricing">참고</a></li>
+    </ol>
+
+    <h2>구현 범위와 검증</h2>
+    <p>표시 카피만 바꾸는 작은 변경으로 제한한다. 예상 대상은 <code>src/app/login/page.tsx</code>, <code>src/app/login/layout.tsx</code>, <code>src/components/PublicTopNav.tsx</code>, <code>src/components/HomeInteractions.tsx</code>, <code>src/app/[locale]/(public)/companies/[ticker]/page.tsx</code>, <code>src/app/[locale]/(public)/pricing/page.tsx</code>, <code>src/lib/og/page-og.ts</code>, <code>src/lib/billing/entitlement-model.ts</code>와 해당 E2E 라벨이다.</p>
+    <p>변경 뒤에는 소스 검색에서 공유 라우트를 제외한 사용자 노출 “무료 분석”, “무료 베타”, “Start free”, “free beta”가 사라졌는지 확인하고, 회사 상세 E2E의 링크 이름을 “AMZN 분석 시작”으로 갱신한다.</p>
+  </body>
+</html>

@@ -3,7 +3,7 @@ import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import { APPLE_QUESTION_CHAINS } from "@/lib/companies/landing-copy";
 import { normalizeTicker } from "@/lib/ontology/ticker";
 
-export const SITE_NAME = "KRW Ontology";
+export const SITE_NAME = "KRW.O";
 export const DEFAULT_SITE_ORIGIN = "https://krwontology.com";
 export const SITE_DESCRIPTION =
   "공시 원문 근거를 따라가며 미국 상장기업의 실적 변화, 리스크, 사업 흐름을 확인하는 기업 리서치 AI.";
@@ -254,7 +254,7 @@ export const QUESTION_TOPIC_PAGES: QuestionTopicPage[] = [
     exampleTickers: ["AAPL", "AMZN", "NVDA"],
     answerBlocks: [
       "매출 성장은 보통 제품 판매량, 가격, 서비스 믹스, 지역 수요, 신규 세그먼트 기여가 함께 움직입니다.",
-      "KRW Ontology는 답변 전에 관련 공시 문장과 사업 활동을 먼저 찾고, 어느 근거에서 요인이 나왔는지 남깁니다.",
+      "KRW.O는 답변 전에 관련 공시 문장과 사업 활동을 먼저 찾고, 어느 근거에서 요인이 나왔는지 남깁니다.",
     ],
     relatedUseCaseSlugs: ["filing-analysis", "thesis-check"],
     relatedQuestionSlugs: ["segment-performance", "margin-change", "risk-factors"],
@@ -342,7 +342,7 @@ export const QUESTION_TOPIC_PAGES: QuestionTopicPage[] = [
     exampleTickers: ["AAPL", "NVDA", "XOM"],
     answerBlocks: [
       "리스크는 독립적인 문장처럼 보이지만 실제로는 특정 제품, 공급망, 고객군, 규제 환경과 연결됩니다.",
-      "KRW Ontology는 리스크를 단순 목록이 아니라 회사의 사업 활동과 외부 변수에 붙여 확인하는 데 초점을 둡니다.",
+      "KRW.O는 리스크를 단순 목록이 아니라 회사의 사업 활동과 외부 변수에 붙여 확인하는 데 초점을 둡니다.",
     ],
     relatedUseCaseSlugs: ["risk-factor-analysis", "thesis-check"],
     relatedQuestionSlugs: ["thesis-check", "margin-change", "capex-and-cash-flow"],
@@ -430,7 +430,7 @@ export const QUESTION_TOPIC_PAGES: QuestionTopicPage[] = [
     exampleTickers: ["NVDA", "AMZN", "XOM"],
     answerBlocks: [
       "투자 지출 증가는 성장 신호일 수도 있고, 단기 현금흐름 부담일 수도 있습니다. 공시에서 투자 목적과 사업 맥락을 같이 봐야 합니다.",
-      "KRW Ontology는 숫자 변화와 설명 문장을 함께 추적해 현금흐름 해석의 근거를 남깁니다.",
+      "KRW.O는 숫자 변화와 설명 문장을 함께 추적해 현금흐름 해석의 근거를 남깁니다.",
     ],
     relatedUseCaseSlugs: ["filing-analysis", "risk-factor-analysis"],
     relatedQuestionSlugs: ["margin-change", "risk-factors", "thesis-check"],
@@ -474,7 +474,7 @@ export const QUESTION_TOPIC_PAGES: QuestionTopicPage[] = [
     exampleTickers: ["AAPL", "META", "TSLA"],
     answerBlocks: [
       "좋은 투자 아이디어도 공시 근거와 어긋나면 위험합니다. 가설을 매출 동인, 리스크, 비용 구조와 나눠 확인해야 합니다.",
-      "KRW Ontology는 결론을 대신 내리기보다, 판단에 필요한 원문 근거와 반대 근거를 찾는 흐름을 제공합니다.",
+      "KRW.O는 결론을 대신 내리기보다, 판단에 필요한 원문 근거와 반대 근거를 찾는 흐름을 제공합니다.",
     ],
     relatedUseCaseSlugs: ["thesis-check", "risk-factor-analysis"],
     relatedQuestionSlugs: ["risk-factors", "revenue-growth", "margin-change"],

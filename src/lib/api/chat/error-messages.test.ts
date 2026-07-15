@@ -10,4 +10,10 @@ describe("publicErrorMessage", () => {
       "답변 생성 중 문제가 발생했습니다. 같은 질문으로 다시 시도하거나 범위를 조금 좁혀주세요.",
     );
   });
+
+  it("does not describe provider throttling as a user plan limit", () => {
+    expect(publicErrorMessage("claude_rate_limited")).toBe(
+      "분석 서비스가 잠시 바쁩니다. 잠시 후 다시 시도해주세요.",
+    );
+  });
 });

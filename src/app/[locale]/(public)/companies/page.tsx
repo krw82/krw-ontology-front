@@ -20,12 +20,12 @@ const companiesMetadataCopy = {
   ko: {
     title: "분석 가능한 회사 목록",
     description:
-      "KRW Ontology에서 공시 근거 기반으로 분석할 수 있는 미국 상장기업을 티커, 사업 활동, 리스크 키워드로 찾아보세요.",
+      "KRW.O에서 공시 근거 기반으로 분석할 수 있는 미국 상장기업을 티커, 사업 활동, 리스크 키워드로 찾아보세요.",
   },
   en: {
     title: "Companies available for analysis",
     description:
-      "Browse U.S. public companies available in KRW Ontology by ticker, business activity, and risk keyword.",
+      "Browse U.S. public companies available in KRW.O by ticker, business activity, and risk keyword.",
   },
 } as const;
 
@@ -92,6 +92,7 @@ export default async function CompaniesPage({ params }: CompaniesPageProps) {
       <CompaniesBrowser
         initialCompanies={displayCompanies}
         locale={locale}
+        onboardingUserId={user?.id ?? null}
       />
     </div>
   );

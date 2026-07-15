@@ -65,7 +65,7 @@ describe("buildResearchArtifacts", () => {
     expect(artifacts).toEqual([]);
   });
 
-  it("uses tickers from MCP tool arguments for fallback artifact titles", () => {
+  it("uses SearchPlan tickers and ResearchState lineage for fallback artifacts", () => {
     const [artifact] = buildResearchArtifacts({
       sessionId: "session",
       runId: "run",
@@ -77,21 +77,32 @@ describe("buildResearchArtifacts", () => {
       toolCalls: [
         {
           id: "tool-1",
-          toolName: "krw_ontology_query",
-          argumentsJson: JSON.stringify({ tickers: ["AMZN"] }),
+          toolName: "krw_ontology_query_context",
+          argumentsJson: JSON.stringify({
+            search_plan: { tickers: ["AMZN"] },
+          }),
           resultSummary: null,
           resultJson: {
-            result: JSON.stringify({
-              results: [
-                {
-                  type: "FinancialMetricValue",
-                  ticker: "AMZN",
-                  document_type: "10-K",
-                  period: "FY2025",
-                  text: "revenue: 716924000000.0 USD",
+            contract_version: "research-state/v2",
+            resolved_scope: {
+              requested_tickers: ["AMZN"],
+              resolved_tickers: ["AMZN"],
+            },
+            evidence_units: [
+              {
+                evidence_id: "ev:revenue",
+                object_id: "metric:AMZN:revenue",
+                object_type: "MetricObservation",
+                ticker: "AMZN",
+                period: "FY2025",
+                document_type: "10-K",
+                evidence_grade: "strong",
+                source: {
+                  object_ids: ["metric:AMZN:revenue"],
+                  source_label: "AMZN FY2025 10-K",
                 },
-              ],
-            }),
+              },
+            ],
           },
           resultText: null,
           startedAt: new Date(0).toISOString(),
@@ -104,10 +115,23 @@ describe("buildResearchArtifacts", () => {
 
     expect(artifact?.title).toBe("AMZN Research Brief");
     expect(artifact?.tickers).toEqual(["AMZN"]);
+    expect(artifact?.blocks_json).toEqual([
+      expect.objectContaining({
+        type: "markdown",
+        content:
+          "AMZN FY2025 10-K 기준 종합 분석입니다. AWS가 핵심 이익 엔진입니다.",
+      }),
+    ]);
+    expect(artifact?.evidence_refs).toEqual([
+      expect.objectContaining({
+        id: "ev:revenue",
+        trace_id: "metric:AMZN:revenue",
+      }),
+    ]);
   });
 
-  it("builds a research artifact from ontology evidence when the final text is only a confirmation", () => {
-    const [artifact] = buildResearchArtifacts({
+  it("does not replace a thin final answer with synthesized company-specific content", () => {
+    const artifacts = buildResearchArtifacts({
       sessionId: "session",
       runId: "run",
       messageId: "message",
@@ -183,27 +207,11 @@ describe("buildResearchArtifacts", () => {
       fallbackWhenMissing: true,
     });
 
-    expect(artifact?.summary).toContain("AMZN FY2025 10-K 기준");
-    expect(artifact?.blocks_json.map((block) => block.type)).toEqual([
-      "markdown",
-      "business_segments",
-      "metric_grid",
-    ]);
-    expect(
-      artifact?.blocks_json.find((block) => block.type === "metric_grid"),
-    ).toMatchObject({
-      metrics: [
-        expect.objectContaining({
-          label: "총매출",
-          value: "$716.9B",
-          period: "2025",
-        }),
-      ],
-    });
+    expect(artifacts).toEqual([]);
   });
 
-  it("does not turn revenue-topic side numbers or per-share impacts into headline metrics", () => {
-    const [artifact] = buildResearchArtifacts({
+  it("does not mine raw query text into answer claims or headline metrics", () => {
+    const artifacts = buildResearchArtifacts({
       sessionId: "session",
       runId: "run",
       messageId: "message",
@@ -260,12 +268,7 @@ describe("buildResearchArtifacts", () => {
       fallbackWhenMissing: true,
     });
 
-    const blockTypes = artifact?.blocks_json.map((block) => block.type) ?? [];
-
-    expect(blockTypes).not.toContain("metric_grid");
-    expect(blockTypes.filter((type) => type === "markdown")).toHaveLength(1);
-    expect(JSON.stringify(artifact?.blocks_json)).not.toContain("$0.0B");
-    expect(JSON.stringify(artifact?.blocks_json)).not.toContain("증가했습니다");
+    expect(artifacts).toEqual([]);
   });
 
   it("does not supplement canonical/display-plan artifacts with evidence-derived blocks", () => {
@@ -363,8 +366,8 @@ describe("buildResearchArtifacts", () => {
     });
   });
 
-  it("turns non-AMZN ontology tool evidence into concrete artifact blocks", () => {
-    const [artifact] = buildResearchArtifacts({
+  it("does not synthesize domain blocks from non-v2 raw ontology results", () => {
+    const artifacts = buildResearchArtifacts({
       sessionId: "session",
       runId: "run",
       messageId: "message",
@@ -528,28 +531,7 @@ describe("buildResearchArtifacts", () => {
       fallbackWhenMissing: true,
     });
 
-    expect(artifact?.blocks_json.map((block) => block.type)).toEqual([
-      "markdown",
-      "business_segments",
-      "metric_grid",
-      "risk_driver_map",
-    ]);
-    expect(
-      artifact?.blocks_json.find((block) => block.type === "metric_grid"),
-    ).toMatchObject({
-      metrics: [
-        expect.objectContaining({ label: "매출", value: "$9.3B" }),
-        expect.objectContaining({ label: "영업이익", value: "$3.4B" }),
-      ],
-    });
-    expect(
-      artifact?.blocks_json.find((block) => block.type === "risk_driver_map"),
-    ).toMatchObject({
-      items: expect.arrayContaining([
-        expect.objectContaining({ kind: "driver" }),
-        expect.objectContaining({ kind: "risk" }),
-      ]),
-    });
+    expect(artifacts).toEqual([]);
   });
 });
 

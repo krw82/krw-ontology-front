@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { SUPPORTED_LOCALES, DEFAULT_LOCALE } from "@/i18n/config";
+import { SUPPORTED_LOCALES } from "@/i18n/config";
 import {
-  getPathLocale,
-  localizedPath,
-  stripLocalePrefix,
+  localeSwitchHref,
+  resolveRouteLocale,
 } from "@/i18n/routing";
 
 interface LocaleSwitcherProps {
@@ -18,10 +17,11 @@ export default function LocaleSwitcher({
 }: LocaleSwitcherProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const currentLocale = getPathLocale(pathname) ?? DEFAULT_LOCALE;
-  const unlocalizedPathname = stripLocalePrefix(pathname);
+  const currentLocale = resolveRouteLocale(
+    pathname,
+    searchParams.get("locale"),
+  );
   const query = searchParams.toString();
-  const querySuffix = query ? `?${query}` : "";
 
   return (
     <div
@@ -38,7 +38,7 @@ export default function LocaleSwitcher({
         return (
           <Link
             key={locale}
-            href={`${localizedPath(locale, unlocalizedPathname)}${querySuffix}`}
+            href={localeSwitchHref(locale, pathname, query)}
             aria-current={active ? "page" : undefined}
             className={[
               "inline-flex h-full min-w-9 items-center justify-center rounded-[6px] px-2 font-mono text-[11px] font-black leading-4 transition-colors",

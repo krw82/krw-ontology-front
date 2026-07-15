@@ -20,7 +20,8 @@ const PUBLIC_ERROR_MESSAGES: Record<ErrorCode, string> = {
   worker_unavailable: "분석 워커가 준비되지 않았습니다. 잠시 후 다시 시도해주세요.",
   mcp_error: "온톨로지 도구 실행 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
   claude_api_error: "에이전트 실행 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-  claude_rate_limited: "현재 모델 요청 한도에 도달했습니다. 잠시 후 다시 시도해주세요.",
+  claude_rate_limited:
+    "분석 서비스가 잠시 바쁩니다. 잠시 후 다시 시도해주세요.",
   rate_limited: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
   validation_error: "요청 형식이 올바르지 않습니다.",
   internal_error: "요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.",

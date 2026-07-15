@@ -1,0 +1,184 @@
+[
+  {
+    "id": "buffett-slb-cycle-data-center",
+    "guru": "buffett",
+    "ticker": "SLB",
+    "question": "SLB를 버핏 관점에서 보면 장기 보유할 만한가? Data Center Solutions가 순환성을 줄이는지도 같이 봐줘.",
+    "category": "cycle_vs_quality"
+  },
+  {
+    "id": "buffett-aapl-services-iphone",
+    "guru": "buffett",
+    "ticker": "AAPL",
+    "question": "AAPL 서비스 매출과 아이폰 의존성을 버핏 관점에서 봐줘.",
+    "category": "company_quality"
+  },
+  {
+    "id": "buffett-msft-ai-investment",
+    "guru": "buffett",
+    "ticker": "MSFT",
+    "question": "MSFT의 AI 투자는 좋은 사업을 더 좋게 만드는 투자야?",
+    "category": "capital_allocation"
+  },
+  {
+    "id": "buffett-xom-oil-70",
+    "guru": "buffett",
+    "ticker": "XOM",
+    "question": "XOM은 유가 70달러가 오래가면 버핏 관점에서 어떻게 봐야 해?",
+    "category": "commodity_scenario"
+  },
+  {
+    "id": "buffett-cost-good-business-price",
+    "guru": "buffett",
+    "ticker": "COST",
+    "question": "COST는 좋은 회사인데 지금도 좋은 투자인지 버핏 관점에서 봐줘.",
+    "category": "quality_vs_price"
+  },
+  {
+    "id": "buffett-jnj-slow-compounder",
+    "guru": "buffett",
+    "ticker": "JNJ",
+    "question": "JNJ는 느리지만 오래 들고 갈 만한 회사인지 버핏 관점에서 봐줘.",
+    "category": "long_term_holding"
+  },
+  {
+    "id": "marks-nvda-good-company-good-investment",
+    "guru": "marks",
+    "ticker": "NVDA",
+    "question": "NVDA는 좋은 회사와 좋은 투자 사이에서 어디에 있어?",
+    "category": "risk_price"
+  },
+  {
+    "id": "marks-mu-memory-cycle",
+    "guru": "marks",
+    "ticker": "MU",
+    "question": "MU는 메모리 사이클에서 지금 리스크가 더 큰 구간이야?",
+    "category": "cycle_risk"
+  },
+  {
+    "id": "marks-amd-ai-expectations",
+    "guru": "marks",
+    "ticker": "AMD",
+    "question": "AMD는 AI 기대가 이미 너무 반영된 상태인지 막스 관점에서 봐줘.",
+    "category": "expectations"
+  },
+  {
+    "id": "marks-googl-ai-capex",
+    "guru": "marks",
+    "ticker": "GOOGL",
+    "question": "GOOGL AI capex 우려는 과잉반응인지 막스 관점에서 봐줘.",
+    "category": "capex_risk"
+  },
+  {
+    "id": "marks-semiconductor-downside",
+    "guru": "marks",
+    "ticker": "NVDA",
+    "question": "반도체 섹터가 다시 오를 때 가장 조심해야 할 가정은 뭐야?",
+    "category": "sector_risk"
+  },
+  {
+    "id": "ackman-googl-market-misunderstanding",
+    "guru": "ackman",
+    "ticker": "GOOGL",
+    "question": "GOOGL은 시장이 뭘 오해하고 있는지 애크먼 관점에서 봐줘.",
+    "category": "mispricing"
+  },
+  {
+    "id": "ackman-adbe-ai-defense",
+    "guru": "ackman",
+    "ticker": "ADBE",
+    "question": "ADBE는 AI 때문에 무너지는 회사인지, 방어 가능한 회사인지 봐줘.",
+    "category": "business_thesis"
+  },
+  {
+    "id": "ackman-mrvl-datacenter",
+    "guru": "ackman",
+    "ticker": "MRVL",
+    "question": "MRVL 데이터센터 매출은 시장이 제대로 보는 포인트야?",
+    "category": "operating_leverage"
+  },
+  {
+    "id": "ackman-pypl-turnaround",
+    "guru": "ackman",
+    "ticker": "PYPL",
+    "question": "PYPL은 턴어라운드로 볼 수 있는지 애크먼 관점에서 봐줘.",
+    "category": "turnaround"
+  },
+  {
+    "id": "ackman-cmg-growth-model",
+    "guru": "ackman",
+    "ticker": "CMG",
+    "question": "CMG 같은 단순 성장 모델이 아직 매력적인지 봐줘.",
+    "category": "simple_growth"
+  },
+  {
+    "id": "flatt-gev-rpo-power",
+    "guru": "flatt",
+    "ticker": "GEV",
+    "question": "GEV의 RPO와 전력 인프라 수요를 장기 자산 관점에서 봐줘.",
+    "category": "infrastructure_backlog"
+  },
+  {
+    "id": "flatt-xom-guyana-lng",
+    "guru": "flatt",
+    "ticker": "XOM",
+    "question": "XOM의 Guyana와 LNG 투자는 자본배분 관점에서 좋은가?",
+    "category": "capital_allocation"
+  },
+  {
+    "id": "flatt-pwr-grid-cycle",
+    "guru": "flatt",
+    "ticker": "PWR",
+    "question": "PWR은 전력망 투자 사이클에서 어떤 위치야?",
+    "category": "infrastructure_cycle"
+  },
+  {
+    "id": "flatt-nee-rates-demand",
+    "guru": "flatt",
+    "ticker": "NEE",
+    "question": "NEE는 금리와 전력 수요 사이에서 어떻게 봐야 해?",
+    "category": "rates_infrastructure"
+  },
+  {
+    "id": "flatt-amt-infra-quality",
+    "guru": "flatt",
+    "ticker": "AMT",
+    "question": "AMT는 인프라 자산으로서 아직 매력적인가?",
+    "category": "infrastructure_quality"
+  },
+  {
+    "id": "terry-msft-quality",
+    "guru": "terry_smith",
+    "ticker": "MSFT",
+    "question": "MSFT는 품질 성장주 기준에 계속 부합해?",
+    "category": "quality_growth"
+  },
+  {
+    "id": "terry-aapl-services-quality",
+    "guru": "terry_smith",
+    "ticker": "AAPL",
+    "question": "AAPL 서비스 매출은 품질을 높이는 성장인가?",
+    "category": "quality_growth"
+  },
+  {
+    "id": "terry-adbe-quality-after-ai",
+    "guru": "terry_smith",
+    "ticker": "ADBE",
+    "question": "ADBE는 AI 이후에도 고품질 소프트웨어 회사로 볼 수 있어?",
+    "category": "quality_risk"
+  },
+  {
+    "id": "terry-ko-slow-quality",
+    "guru": "terry_smith",
+    "ticker": "KO",
+    "question": "KO는 느린 성장에도 좋은 장기 보유주인지 봐줘.",
+    "category": "slow_compounder"
+  },
+  {
+    "id": "terry-intu-quality-holding",
+    "guru": "terry_smith",
+    "ticker": "INTU",
+    "question": "INTU는 오래 보유할 만한 품질 회사인지 봐줘.",
+    "category": "quality_holding"
+  }
+]

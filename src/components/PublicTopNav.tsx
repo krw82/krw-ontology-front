@@ -27,7 +27,7 @@ interface PublicTopNavProps {
 export default function PublicTopNav({
   locale = DEFAULT_LOCALE,
 }: PublicTopNavProps) {
-  const ctaLabel = locale === "ko" ? "무료 시작" : "Start free";
+  const ctaLabel = locale === "ko" ? "리서치 시작" : "Start research";
 
   return (
     <header className="sticky top-0 z-50 w-full flex-shrink-0 border-b border-hairline bg-canvas/95 backdrop-blur-xl">

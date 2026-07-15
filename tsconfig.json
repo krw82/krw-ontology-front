@@ -41,6 +41,7 @@
   "exclude": [
     "node_modules",
     ".next-e2e",
+    ".next-billing-debug",
     "marketing-video"
   ]
 }

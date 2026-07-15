@@ -26,15 +26,21 @@ const cardTransition = {
 } as const;
 
 type TourStepId =
-  | "company-search"
-  | "stock-discovery-cta"
-  | "stock-discovery-nav"
   | "research-notebook-nav"
+  | "stock-discovery-nav"
+  | "guru-advisor-nav"
+  | "company-search-nav"
+  | "wide-research-nav"
+  | "institutional-holdings-nav"
   | "chat-context"
   | "chat-wide-research"
   | "chat-starters"
   | "chat-composer"
-  | "chat-notebook";
+  | "chat-notebook"
+  | "guru-lens"
+  | "guru-company"
+  | "guru-question"
+  | "guru-composer";
 
 interface TourStep {
   id: TourStepId;
@@ -53,52 +59,12 @@ interface SpotlightRect {
 
 interface ProductOnboardingTourProps {
   pathname: string;
-  tour?: "companies" | "chat";
+  tour?: "companies" | "chat" | "guru-directory" | "guru-chat";
   force?: boolean;
   continuePath?: string | null;
 }
 
 const companyTourSteps: TourStep[] = [
-  {
-    id: "company-search",
-    selector: '[data-onboarding-target="company-search"]',
-    icon: "search",
-    title: {
-      ko: "회사를 알고 있다면 검색부터",
-      en: "Start with search when you know the company",
-    },
-    body: {
-      ko: "AAPL, 애플, 브로드컴처럼 티커나 회사명을 입력하면 그 회사의 공시 근거 리서치로 바로 이어집니다.",
-      en: "Enter a ticker or company name like AAPL, Apple, or Broadcom to start filing-grounded research on that company.",
-    },
-  },
-  {
-    id: "stock-discovery-cta",
-    selector: '[data-onboarding-target="stock-discovery-cta"]',
-    icon: "travel_explore",
-    title: {
-      ko: "회사를 모르면 종목 발굴기",
-      en: "Use discovery when you do not know the stock",
-    },
-    body: {
-      ko: "아이디어, 산업, 리스크, 재무 조건을 넣으면 여러 회사를 비교해 다음 리서치 후보를 좁힙니다.",
-      en: "Add an idea, industry, risk, or financial condition to compare companies and narrow the next research candidates.",
-    },
-  },
-  {
-    id: "stock-discovery-nav",
-    selector:
-      '[data-onboarding-target="stock-discovery-nav"], [data-onboarding-target="stock-discovery-sidebar"], [data-onboarding-target="sidebar-trigger"]',
-    icon: "menu_open",
-    title: {
-      ko: "조건이 구체적일수록 빨라집니다",
-      en: "Specific conditions make discovery faster",
-    },
-    body: {
-      ko: "“지금 살만한 기업”보다 “AI 데이터센터 수혜지만 부채 부담이 낮은 기업”처럼 물으면 더 빠르고 정확합니다.",
-      en: "Instead of asking for any stock to buy now, use a condition like AI data-center beneficiaries with lower debt burden.",
-    },
-  },
   {
     id: "research-notebook-nav",
     selector:
@@ -111,6 +77,76 @@ const companyTourSteps: TourStep[] = [
     body: {
       ko: "관심·보유 종목과 이전 질문을 모아두고, 나중에 같은 맥락에서 다시 이어볼 때 사용합니다.",
       en: "Use the notebook to keep watched companies, holdings, and past questions so you can continue from the same context later.",
+    },
+  },
+  {
+    id: "stock-discovery-nav",
+    selector:
+      '[data-onboarding-target="stock-discovery-nav"], [data-onboarding-target="stock-discovery-sidebar"], [data-onboarding-target="sidebar-trigger"]',
+    icon: "travel_explore",
+    title: {
+      ko: "조건으로 기업을 검색하세요",
+      en: "Search companies by criteria",
+    },
+    body: {
+      ko: "아이디어, 산업, 리스크, 재무 조건을 넣으면 여러 회사를 비교해 리서치 범위를 좁힙니다. 조건이 구체적일수록 더 빠르고 정확합니다.",
+      en: "Add an idea, industry, risk, or financial condition to compare companies and narrow the research scope. More specific conditions make it faster.",
+    },
+  },
+  {
+    id: "guru-advisor-nav",
+    selector:
+      '[data-onboarding-target="guru-advisor-nav"], [data-onboarding-target="guru-advisor-sidebar"], [data-onboarding-target="guru-advisor-cta"], [data-onboarding-target="sidebar-trigger"]',
+    icon: "psychology",
+    title: {
+      ko: "공개 원칙으로 아이디어 점검",
+      en: "Check ideas with public principles",
+    },
+    body: {
+      ko: "버핏, 하워드 막스처럼 공개된 질문 원칙으로 회사나 아이디어의 좋은 점과 의심할 점을 다시 정리합니다.",
+      en: "Reframe a company or idea through public question principles such as Buffett or Howard Marks, then separate strengths from doubts.",
+    },
+  },
+  {
+    id: "company-search-nav",
+    selector:
+      '[data-onboarding-target="company-search-nav"], [data-onboarding-target="company-search-sidebar"], [data-onboarding-target="company-search"]',
+    icon: "search",
+    title: {
+      ko: "회사를 알면 회사 찾기",
+      en: "Use company search when you know the company",
+    },
+    body: {
+      ko: "티커나 회사명을 입력하면 그 회사의 공시·실적·리스크 리서치로 바로 이어집니다.",
+      en: "Enter a ticker or company name to go straight into filing, earnings, and risk research for that company.",
+    },
+  },
+  {
+    id: "wide-research-nav",
+    selector:
+      '[data-onboarding-target="wide-research-nav"], [data-onboarding-target="wide-research-sidebar"], [data-onboarding-target="sidebar-trigger"]',
+    icon: "hub",
+    title: {
+      ko: "이슈를 넓게 보려면 와이드 리서치",
+      en: "Use wide research for broad issues",
+    },
+    body: {
+      ko: "티커 없이 산업이나 이슈를 넣어 여러 회사를 함께 탐색합니다. 범위가 넓어 일반 회사 질문보다 시간이 더 걸릴 수 있습니다.",
+      en: "Explore an industry or issue across multiple companies without starting from a ticker. Broad searches can take longer than single-company research.",
+    },
+  },
+  {
+    id: "institutional-holdings-nav",
+    selector:
+      '[data-onboarding-target="institutional-holdings-nav"], [data-onboarding-target="institutional-holdings-sidebar"], [data-onboarding-target="sidebar-trigger"]',
+    icon: "monitoring",
+    title: {
+      ko: "기관 보유 변화는 13F",
+      en: "Use 13F for institutional holdings",
+    },
+    body: {
+      ko: "기관의 보유 변화를 보고, 다음에 더 확인할 회사와 질문을 정할 때 사용합니다.",
+      en: "Use institutional holding changes to decide which companies and questions to review next.",
     },
   },
 ];
@@ -150,11 +186,11 @@ const chatTourSteps: TourStep[] = [
       '[data-onboarding-target="chat-suggested-prompts"], [data-onboarding-target="chat-composer"]',
     icon: "format_list_bulleted",
     title: {
-      ko: "처음엔 추천 질문으로 흐름을 잡으세요",
+      ko: "처음엔 시작 질문으로 흐름을 잡으세요",
       en: "Use starter questions to set the direction",
     },
     body: {
-      ko: "무엇을 물어야 할지 애매하면 추천 질문으로 시작하세요. 답변 끝의 이어서 볼 질문은 그대로 눌러 다음 리서치로 이어갈 수 있습니다.",
+      ko: "무엇을 물어야 할지 애매하면 시작 질문으로 시작하세요. 답변 끝의 이어서 볼 질문은 그대로 눌러 다음 리서치로 이어갈 수 있습니다.",
       en: "If the next question is unclear, start from suggested prompts. Follow-up prompts after answers are written so you can send them directly.",
     },
   },
@@ -188,6 +224,74 @@ const chatTourSteps: TourStep[] = [
   },
 ];
 
+const guruDirectoryTourSteps: TourStep[] = [
+  {
+    id: "guru-lens",
+    selector: '[data-onboarding-target="guru-lens-cards"]',
+    icon: "psychology",
+    title: {
+      ko: "먼저 분석 관점을 고릅니다",
+      en: "Start by choosing an analysis perspective",
+    },
+    body: {
+      ko: "버핏, 하워드 막스, 애크먼처럼 서로 다른 질문법으로 같은 회사를 다르게 점검할 수 있습니다. 잘 모르겠으면 자동 선택으로 시작해도 됩니다.",
+      en: "Check the same company through different question frames, such as Buffett, Howard Marks, or Ackman. If unsure, start with Auto.",
+    },
+  },
+];
+
+const guruChatTourSteps: TourStep[] = [
+  {
+    id: "guru-company",
+    selector:
+      '[data-onboarding-target="guru-company-tool"], [data-onboarding-target="guru-company-picker"], [data-onboarding-target="chat-composer-tools"], [data-onboarding-target="chat-context"]',
+    icon: "domain",
+    title: {
+      ko: "회사 컨텍스트를 같이 넣으세요",
+      en: "Add company context",
+    },
+    body: {
+      ko: "회사를 선택하면 최신 보고서가 분석 배경에 들어갑니다. 관점만 보는 게 아니라, 실제 회사 근거와 함께 봅니다.",
+      en: "Choose a company to bring its latest filings into the analysis. The answer combines the perspective with company evidence.",
+    },
+  },
+  {
+    id: "guru-question",
+    selector:
+      '[data-onboarding-target="guru-suggested-prompts"], [data-onboarding-target="chat-composer"]',
+    icon: "format_list_bulleted",
+    title: {
+      ko: "시작 질문은 가정 점검용입니다",
+      en: "Starter questions pressure-test assumptions",
+    },
+    body: {
+      ko: "“좋은 회사일까?”보다 “어떤 조건에서 판단을 바꿀까?”처럼 물으면 분석 결과가 더 좋아집니다.",
+      en: "Instead of only asking whether a company is good, ask what would change the judgment for a stronger analysis.",
+    },
+  },
+  {
+    id: "guru-composer",
+    selector:
+      '[data-onboarding-target="chat-composer"], [data-onboarding-target="chat-composer-input"]',
+    icon: "edit",
+    title: {
+      ko: "분석은 판단 조건을 정리하는 용도입니다",
+      en: "Use analysis to clarify judgment conditions",
+    },
+    body: {
+      ko: "관점별 분석은 결론을 대신 내리는 곳이 아니라, 좋은 점·의심할 점·판단이 바뀌는 조건을 정리하는 공간입니다.",
+      en: "Perspective analysis does not make the decision for you. It helps organize strengths, doubts, and what would change the judgment.",
+    },
+  },
+];
+
+function getTourSteps(tour: ProductOnboardingTourProps["tour"]): TourStep[] {
+  if (tour === "chat") return chatTourSteps;
+  if (tour === "guru-directory") return guruDirectoryTourSteps;
+  if (tour === "guru-chat") return guruChatTourSteps;
+  return companyTourSteps;
+}
+
 export default function ProductOnboardingTour({
   pathname,
   tour = "companies",
@@ -204,7 +308,7 @@ export default function ProductOnboardingTour({
   const [spotlight, setSpotlight] = useState<SpotlightRect | null>(null);
   const [userStorageKey, setUserStorageKey] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const steps = tour === "chat" ? chatTourSteps : companyTourSteps;
+  const steps = getTourSteps(tour);
 
   const currentStep = steps[stepIndex] ?? steps[0];
   const isLastStep = stepIndex >= steps.length - 1;
@@ -282,7 +386,13 @@ export default function ProductOnboardingTour({
   useEffect(() => {
     if (!ready || !isAuthenticated) return;
     let timeoutId: number | null = null;
-    if (IS_DEV_ENV || force) {
+
+    // Development pages are opened repeatedly while implementing and testing
+    // product flows. Keep the tour available through `?tour=1`, but do not let
+    // it cover every dev navigation by default.
+    if (IS_DEV_ENV && !force) return;
+
+    if (force) {
       timeoutId = window.setTimeout(() => setVisible(true), 0);
       return () => {
         if (timeoutId !== null) window.clearTimeout(timeoutId);
@@ -630,8 +740,12 @@ function needsMobileSidebar(stepId: TourStepId): boolean {
   }
 
   return (
+    stepId === "research-notebook-nav" ||
     stepId === "stock-discovery-nav" ||
-    stepId === "research-notebook-nav"
+    stepId === "guru-advisor-nav" ||
+    stepId === "company-search-nav" ||
+    stepId === "wide-research-nav" ||
+    stepId === "institutional-holdings-nav"
   );
 }
 

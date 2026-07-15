@@ -8,7 +8,9 @@ import {
   listFilingsForManager,
   listHoldingsForFiling,
   listInstitutionalManagers,
+  listPositionChangesForCusips,
   listPositionChangesForFiling,
+  listPositionChangesForTicker,
   upsert13FFilingPackage,
 } from "@/lib/sec-13f/repository";
 import type {
@@ -21,6 +23,7 @@ import type {
   InstitutionalHoldingView,
   InstitutionalHoldingShareTrend,
   InstitutionalHoldingsDashboard,
+  InstitutionalTickerActivity,
   Known13FManager,
   PositionChangeType,
 } from "./types";
@@ -33,6 +36,7 @@ import {
 const REBALANCING_LIST_LIMIT = 5;
 const SHARE_TREND_LIMIT = 10;
 const CUSIP_TICKER_OVERRIDES: Record<string, string> = {
+  "037833100": "AAPL",
   "30231G102": "XOM",
 };
 
@@ -283,6 +287,57 @@ export async function getInstitutionalManagerDirectory(): Promise<Known13FManage
         notes: row.notes ?? "",
       })),
   ];
+}
+
+export async function getInstitutionalTickerActivity(
+  ticker: string,
+  limit = 5,
+): Promise<InstitutionalTickerActivity[]> {
+  const normalizedTicker = ticker.trim().toUpperCase();
+  const fallbackCusips = Object.entries(CUSIP_TICKER_OVERRIDES)
+    .filter(([, mappedTicker]) => mappedTicker === normalizedTicker)
+    .map(([cusip]) => cusip);
+  const [tickerChanges, cusipChanges, managerRows] = await Promise.all([
+    listPositionChangesForTicker(ticker),
+    listPositionChangesForCusips(fallbackCusips),
+    listInstitutionalManagers(),
+  ]);
+  const changes = Array.from(
+    new Map(
+      [...tickerChanges, ...cusipChanges].map((change) => [change.id, change]),
+    ).values(),
+  ).sort((left, right) => {
+    const periodCompare = right.report_period.localeCompare(left.report_period);
+    if (periodCompare !== 0) return periodCompare;
+    return Number(right.current_value_usd) - Number(left.current_value_usd);
+  });
+  const managersByCik = new Map(managerRows.map((manager) => [manager.cik, manager]));
+  const seenCiks = new Set<string>();
+
+  return changes
+    .filter((change) => {
+      if (seenCiks.has(change.cik)) return false;
+      seenCiks.add(change.cik);
+      return true;
+    })
+    .slice(0, limit)
+    .map((change) => {
+      const manager = managerView(change.cik, managersByCik.get(change.cik) ?? null);
+      return {
+        cik: change.cik,
+        managerName: manager.name,
+        managerDisplayName: manager.displayName,
+        reportPeriod: change.report_period,
+        changeType: change.change_type as PositionChangeType,
+        valueUsd: Number(change.current_value_usd),
+        previousValueUsd:
+          change.previous_value_usd === null
+            ? null
+            : Number(change.previous_value_usd),
+        shares:
+          change.current_shares === null ? null : Number(change.current_shares),
+      };
+    });
 }
 
 export async function getInstitutionalHoldingsDashboard(

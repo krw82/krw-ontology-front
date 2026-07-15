@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import CompanyCard, {
   type CompanyCardData,
 } from "@/components/CompanyCard";
+import FirstResearchChoice from "@/components/FirstResearchChoice";
 import { easeOutExpo } from "@/lib/animation";
 import { filterAndSortCompanies } from "@/lib/companies/filter";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
@@ -15,6 +16,7 @@ import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 interface CompaniesBrowserProps {
   initialCompanies: CompanyCardData[];
   locale?: Locale;
+  onboardingUserId?: string | null;
 }
 
 /* ─── Flow Animation ─────────────────────────────────────────────
@@ -26,6 +28,7 @@ const FLOW_CYCLE = 4.5; // total seconds per loop
 const LINE_MOVE = 1.0; // how long lines travel
 const ARROW_NUDGE_DELAY = 0.9; // when the arrow kicks
 const SEARCH_COACHMARK_STORAGE_KEY = "krw:companies-search-coachmark-seen:v1";
+const FIRST_RESEARCH_CHOICE_STORAGE_KEY = "krw:first-research-choice-seen:v1";
 const IS_DEV_ENV = process.env.NODE_ENV === "development";
 
 function FlowAnimation({ disabled }: { disabled: boolean }) {
@@ -86,13 +89,17 @@ function FlowAnimation({ disabled }: { disabled: boolean }) {
 export default function CompaniesBrowser({
   initialCompanies,
   locale = DEFAULT_LOCALE,
+  onboardingUserId = null,
 }: CompaniesBrowserProps) {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [showSearchCoachmark, setShowSearchCoachmark] = useState(false);
+  const [showFirstResearchChoice, setShowFirstResearchChoice] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const reducedMotion = useReducedMotion();
   const normalizedSearch = search.trim();
   const forceCoachmarks = searchParams.get("coach") === "1";
+  const forceFirstResearchChoice = searchParams.get("onboarding") === "1";
   const copy = locale === "ko"
       ? {
         eyebrow: "회사 찾기",
@@ -104,18 +111,18 @@ export default function CompaniesBrowser({
         searchAria: "회사 검색",
         searchCoachmark: "분석할 회사명이나 티커를 입력하세요",
         dismissCoachmarkAria: "회사 검색 안내 닫기",
-        discoveryEyebrow: "회사를 아직 모른다면",
-        discoveryTitle: "종목 발굴기",
+        discoveryEyebrow: "다른 분석 관점이 필요하다면",
+        discoveryTitle: "관점별 분석",
         discoveryDescription:
-          "아이디어, 산업, 리스크, 재무 조건을 넣어 볼 만한 회사를 먼저 좁힙니다.",
-        discoveryCta: "종목 발굴 시작",
+          "버핏·하워드 막스처럼 공개된 질문 원칙으로 회사나 아이디어를 점검합니다.",
+        discoveryCta: "분석 관점 선택",
         emptyCatalog:
           "현재 환경의 웹 카탈로그에서 인덱싱된 회사를 찾지 못했습니다.",
         availableCompanies: "분석 가능한 회사",
         countSuffix: "개 표시",
         emptySearch: "검색 조건에 맞는 회사가 없습니다.",
         footer:
-          "© 2026 KRW Ontology. 공시 근거 기반 기업 리서치.",
+          "© 2026 KRW.O. 공시 근거 기반 기업 리서치.",
       }
     : {
         eyebrow: "Find a company",
@@ -127,18 +134,18 @@ export default function CompaniesBrowser({
         searchAria: "Company search",
         searchCoachmark: "Type a company name or ticker to analyze",
         dismissCoachmarkAria: "Dismiss company search tip",
-        discoveryEyebrow: "If you do not know the company yet",
-        discoveryTitle: "Stock discovery",
+        discoveryEyebrow: "If you want another analysis perspective",
+        discoveryTitle: "Perspective analysis",
         discoveryDescription:
-          "Start from an idea, industry, risk, or financial condition to narrow candidate companies.",
-        discoveryCta: "Start discovery",
+          "Pressure-test a company or idea through public question frames such as Buffett or Howard Marks.",
+        discoveryCta: "Choose a perspective",
         emptyCatalog:
           "No indexed companies were found in the current web catalog.",
         availableCompanies: "Available companies",
         countSuffix: "shown",
         emptySearch: "No companies match this search.",
         footer:
-          "© 2026 KRW Ontology. Filing-grounded company research.",
+          "© 2026 KRW.O. Filing-grounded company research.",
       };
 
   const filteredCompanies = useMemo(() => {
@@ -176,8 +183,52 @@ export default function CompaniesBrowser({
     };
   }, [forceCoachmarks]);
 
+  useEffect(() => {
+    if (!onboardingUserId && !forceFirstResearchChoice) return;
+
+    if (forceFirstResearchChoice) {
+      const showTimer = window.setTimeout(
+        () => setShowFirstResearchChoice(true),
+        0,
+      );
+      return () => window.clearTimeout(showTimer);
+    }
+
+    try {
+      const storageKey = `${FIRST_RESEARCH_CHOICE_STORAGE_KEY}:${onboardingUserId}`;
+      if (window.localStorage.getItem(storageKey) === "1") return;
+    } catch {
+      // Show the choice for this visit when storage is unavailable.
+    }
+
+    const showTimer = window.setTimeout(
+      () => setShowFirstResearchChoice(true),
+      0,
+    );
+    return () => window.clearTimeout(showTimer);
+  }, [forceFirstResearchChoice, onboardingUserId]);
+
   function dismissSearchCoachmark() {
     setShowSearchCoachmark(false);
+  }
+
+  function completeFirstResearchChoice() {
+    if (onboardingUserId) {
+      try {
+        window.localStorage.setItem(
+          `${FIRST_RESEARCH_CHOICE_STORAGE_KEY}:${onboardingUserId}`,
+          "1",
+        );
+      } catch {
+        // The screen remains usable if browser storage is unavailable.
+      }
+    }
+    setShowFirstResearchChoice(false);
+  }
+
+  function startCompanySearch() {
+    completeFirstResearchChoice();
+    window.requestAnimationFrame(() => searchInputRef.current?.focus());
   }
 
   return (
@@ -186,6 +237,13 @@ export default function CompaniesBrowser({
         id="main-content"
         className="w-full px-base pb-[112px] pt-lg sm:px-md md:px-xl md:pb-[96px] md:pt-xl"
       >
+        {showFirstResearchChoice ? (
+          <FirstResearchChoice
+            locale={locale}
+            onStartCompany={startCompanySearch}
+            onDismiss={completeFirstResearchChoice}
+          />
+        ) : (
         <header className="border-b border-hairline pb-5">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.82fr)] lg:items-end">
             <div className="min-w-0 max-w-2xl">
@@ -252,6 +310,7 @@ export default function CompaniesBrowser({
                     search
                   </motion.span>
                   <input
+                    ref={searchInputRef}
                     className="h-11 w-full rounded-[8px] border border-hairline bg-canvas pl-10 pr-sm font-mono text-[14px] font-semibold uppercase leading-[1.5] tracking-wide shadow-sm transition-all duration-150 ease-out placeholder:normal-case placeholder:tracking-normal placeholder:text-muted focus:border-outline focus:ring-2 focus:ring-primary-fixed-dim/25 focus:outline-none"
                     placeholder={copy.searchPlaceholder}
                     type="text"
@@ -275,8 +334,8 @@ export default function CompaniesBrowser({
                     </p>
                   </div>
                   <Link
-                    href="/discover"
-                    data-onboarding-target="stock-discovery-cta"
+                    href="/guru"
+                    data-onboarding-target="guru-advisor-cta"
                     className="group inline-flex h-10 min-w-0 shrink-0 items-center justify-between gap-2 rounded-[8px] bg-ink px-3 text-[13px] font-bold leading-5 text-canvas shadow-sm transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                     aria-label={copy.discoveryCta}
                   >
@@ -288,6 +347,7 @@ export default function CompaniesBrowser({
             </div>
           </div>
         </header>
+        )}
 
         {initialCompanies.length === 0 ? (
           <div className="mt-8 rounded-[8px] border border-hairline bg-surface p-lg text-[15px] leading-[1.5] text-body sm:text-[16px]">

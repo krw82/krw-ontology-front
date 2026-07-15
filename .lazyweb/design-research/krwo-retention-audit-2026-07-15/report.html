@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KRW.O 리텐션 전체 감사 — 2026-07-15</title>
+  <style>
+    :root{--ink:#101218;--muted:#5f6673;--line:#dfe3ea;--soft:#f5f7fa;--blue:#164ed8;--green:#087a5b;--amber:#9a5a00;--red:#b42318;--card:#fff}*{box-sizing:border-box}body{margin:0;background:#eef1f6;color:var(--ink);font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",sans-serif}main{width:min(1180px,calc(100% - 32px));margin:32px auto 80px}.hero,.section{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 14px 40px rgba(24,34,56,.06)}.hero{padding:42px}.section{padding:30px;margin-top:18px}h1{font-size:42px;line-height:1.15;letter-spacing:-.04em;margin:8px 0 14px}h2{font-size:25px;letter-spacing:-.03em;margin:0 0 16px}h3{font-size:18px;margin:24px 0 9px}.kicker{font-weight:800;color:var(--blue);letter-spacing:.12em;text-transform:uppercase}.lead{max-width:900px;font-size:18px;color:#363b46}.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.pill{border:1px solid var(--line);background:var(--soft);border-radius:999px;padding:5px 10px;font-size:12px;font-weight:700}.verdict{border-left:5px solid var(--green);background:#eefaf6;padding:16px 18px;border-radius:10px;font-size:17px;font-weight:700}.warning{border-left-color:var(--amber);background:#fff8e8}.danger{border-left-color:var(--red);background:#fff1f0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.card{border:1px solid var(--line);border-radius:13px;padding:17px;background:#fff}.card h3{margin:0 0 6px}.tag{display:inline-block;border-radius:5px;padding:2px 7px;font-size:11px;font-weight:850}.p0{color:#fff;background:var(--red)}.p1{color:#fff;background:var(--amber)}.p2{color:#fff;background:var(--blue)}.good{color:#fff;background:var(--green)}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px solid var(--line);padding:11px 9px;text-align:left;vertical-align:top}th{background:var(--soft);font-size:12px}code{background:var(--soft);padding:2px 5px;border-radius:5px;font-size:.9em}a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}ol,ul{padding-left:22px}.flow{display:flex;flex-wrap:wrap;gap:7px;align-items:center}.node{border:1px solid #c8d3ee;background:#f2f6ff;border-radius:9px;padding:8px 10px;font-weight:750;font-size:13px}.arrow{color:var(--muted)}figure{margin:0}.shot{width:100%;border:1px solid var(--line);border-radius:12px;background:#fff}.caption{font-size:12px;color:var(--muted);margin-top:8px}.small{font-size:12px;color:var(--muted)}.rank{font-size:24px;font-weight:900;color:var(--blue)}.decision-yes{color:var(--green);font-weight:800}.decision-no{color:var(--red);font-weight:800}.toc a{display:block;padding:4px 0}.cols{columns:2;column-gap:40px}.cols li{break-inside:avoid;margin-bottom:5px}@media(max-width:780px){main{width:min(100% - 18px,1180px);margin-top:10px}.hero,.section{padding:22px;border-radius:13px}.grid{grid-template-columns:1fr}h1{font-size:32px}.cols{columns:1}table{display:block;overflow-x:auto}}
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div class="kicker">Retention audit · Product Design + Lazyweb + repository + web</div>
+    <h1>KRW.O 리텐션 전체 감사</h1>
+    <p class="lead">기존 제품, 진행 중인 8-K·6-K 알림과 Research Pulse, 신규 후보, 경쟁사 패턴, 상업용 무료·오픈소스 조건을 한 번에 검토한 결과입니다. 제품 코드는 수정하지 않았습니다.</p>
+    <div class="meta"><span class="pill">2026-07-15 07:48 KST 전후 스냅샷</span><span class="pill">moving worktree</span><span class="pill">자동 LLM 없는 리텐션 루프</span><span class="pill">zero additional SaaS</span></div>
+  </section>
+
+  <section class="section">
+    <h2>한 줄 결론</h2>
+    <div class="verdict">방향은 맞습니다. 인스타그램에서 가져올 것은 무한스크롤이 아니라 <b>팔로우 그래프 + 개인화된 사건 피드 + 저장/재진입</b>입니다. 리텐션의 본체는 <code>관심기업 → 실제 공시 → 신뢰 가능한 알림 → 원문/Exhibit → 읽음·저장·메모 → 다음 공시</code>입니다.</div>
+    <p>현재 코드에는 이 루프의 상당 부분이 이미 있습니다. 따라서 신규 콘텐츠를 더 만드는 것보다 <b>배포·식별자·알림 신뢰성·저장된 가치의 연결</b>을 먼저 완성해야 합니다. 랜덤 AI Q&amp;A, 자동 AI 만화, 무한 피드, streak, 초기 공개 커뮤니티는 보류가 맞습니다.</p>
+  </section>
+
+  <section class="section toc">
+    <h2>목차</h2>
+    <div class="grid"><div><a href="#status">1. 현재 기능 전체 판정</a><a href="#trigger">2. 실제 트리거와 LLM 경계</a><a href="#findings">3. 우선순위 문제</a><a href="#pulse">4. Pulse 화면 감사</a></div><div><a href="#patterns">5. 피드·Q&amp;A·4컷 판단</a><a href="#competitors">6. 경쟁사 비교</a><a href="#stack">7. 무료·오픈소스 스택</a><a href="#metrics">8. 지표·실험·로드맵</a></div></div>
+  </section>
+
+  <section class="section" id="status">
+    <h2>1. 현재 기능 전체 판정</h2>
+    <table><thead><tr><th>기능</th><th>리텐션 역할</th><th>현재 판정</th><th>모델/외부비용</th><th>권고</th></tr></thead><tbody>
+      <tr><td>회사·Discover·Guru</td><td>첫 기업 발견과 분석 시작</td><td>획득/활성화에 강함, 자체 재방문 트리거는 약함</td><td>조회 0, 분석 실행 시 LLM</td><td>결과마다 팔로우·공시알림·저장으로 닫기</td></tr>
+      <tr><td>채팅 리서치</td><td>사건 발생 후 깊이 파기</td><td>강한 가치 기능이나 비용형·간헐형</td><td>LLM 비용 발생</td><td>트리거가 아니라 사용자 선택형 depth로 유지</td></tr>
+      <tr><td>리서치 노트북·메모·thesis</td><td>사용자 축적 가치와 장기 락인</td><td>핵심 잠재력, 일부 저장 UI·링크 미연결</td><td>수동 0, AI 재정리만 LLM</td><td>새 콘텐츠보다 저장→다시보기 연결 우선</td></tr>
+      <tr><td>공시 알림</td><td>실제 외부 사건 기반 재방문</td><td><span class="tag good">가장 강함</span> 구독·분류·inbox·push·digest·RSS/ICS·diff 구현</td><td>LLM 0, SEC 무료</td><td>신뢰성/ID/quiet hours 후 단계 출시</td></tr>
+      <tr><td>Research Pulse</td><td>공시·질문·메모·학습의 개인 홈</td><td><span class="tag p1">진행 중</span> finite feed와 결정론적 랭킹 구현, prod 기본 off</td><td>합성 LLM 0</td><td>공시 중심 “since last visit” 인박스로 좁히기</td></tr>
+      <tr><td>13F</td><td>분기별 재방문</td><td>조회 경험은 있으나 자동 갱신 루프 미확인</td><td>표시 0</td><td>분기 변경 리캡만; 일상 피드 슬롯 채우기 금지</td></tr>
+      <tr><td>공유 링크·공개 질문</td><td>추천/획득</td><td>리텐션보다는 acquisition</td><td>열람 0</td><td>공시 fact card 공유로 확장 가능</td></tr>
+      <tr><td>온보딩 투어</td><td>기존 분석 기능 안내</td><td>회사·채팅·Guru 중심, 공시/Pulse 루프 없음</td><td>0</td><td>기업 추적→최근 3건→원문→푸시 테스트로 교체/추가</td></tr>
+      <tr><td>1st-party analytics</td><td>학습과 실험</td><td>이벤트는 많지만 사용자 코호트와 retention dashboard 미완성</td><td>외부 SaaS 0</td><td>Postgres 집계·TTL·identity 연결</td></tr>
+    </tbody></table>
+  </section>
+
+  <section class="section" id="trigger">
+    <h2>2. 실제 트리거와 LLM 경계</h2>
+    <h3>8-K·6-K</h3>
+    <div class="flow"><span class="node">회사 알림 받기</span><span class="arrow">→</span><span class="node">ticker→CIK</span><span class="arrow">→</span><span class="node">due claim</span><span class="arrow">→</span><span class="node">CIK submissions JSON</span><span class="arrow">→</span><span class="node">accession 멱등 저장</span><span class="arrow">→</span><span class="node">규칙 분류</span><span class="arrow">→</span><span class="node">inbox/outbox</span><span class="arrow">→</span><span class="node">push·digest·RSS/ICS</span></div>
+    <ul>
+      <li>Worker tick 기본 15초, 각 CIK poll 기본 5분, SEC 요청 사이 기본 650ms입니다.</li>
+      <li>최초 poll은 과거 이력만 저장하고 알림을 만들지 않습니다.</li>
+      <li>긴급은 즉시, 일반은 같은 ticker 10분 묶음, 선택 시 일간 digest입니다.</li>
+      <li>분류·키워드·diff·push에는 LLM이 없습니다. 사용자가 상세에서 분석 CTA를 누를 때만 기존 채팅 경로가 시작됩니다.</li>
+    </ul>
+    <h3>Pulse</h3>
+    <p>페이지 요청 시 기존 DB 상태에서 공시·체크업·열린 질문·오래된 메모/노트북·정적 학습을 합성하고 규칙 점수로 정렬합니다. 새 항목 수는 화면이 보일 때 60초마다 확인합니다. 질문의 답은 생성하지 않으며 클릭하면 질문이 미리 입력된 채팅으로 이동할 뿐입니다.</p>
+    <div class="verdict warning">코드가 존재하는 것과 운영 적용은 다릅니다. 공시 3개 플래그와 Pulse 플래그의 예시 기본값은 0이며, 현재 공개 사이트에서 <code>/pulse</code>는 404였습니다. <code>/filings</code>는 로그인 경로까지는 배포돼 있으나 실제 사용자 데이터 플로우는 인증 없이 확인할 수 없습니다.</div>
+  </section>
+
+  <section class="section" id="findings">
+    <h2>3. 우선순위 문제</h2>
+    <div class="grid">
+      <article class="card"><span class="tag p0">P0</span><h3>브라우저 이벤트의 사용자 ID가 끊김</h3><p>로그인 상태의 client analytics도 API에서 <code>userId: null</code>로 저장됩니다. Worker는 user ID를 쓰므로 구독→탐지→push→원문→두 번째 공시 코호트가 분절됩니다. 기능보다 먼저 고쳐야 실험 결과를 믿을 수 있습니다.</p></article>
+      <article class="card"><span class="tag p0">P0</span><h3>SSR 화면이 JS animation에 종속</h3><p>감사 중 layout chunk 오류가 나자 AppShell의 초기 <code>opacity:0</code>가 풀리지 않아 전체 화면이 빈 화면으로 남았습니다. 서버 렌더 콘텐츠는 hydration/animation 실패 시에도 보여야 합니다.</p></article>
+      <article class="card"><span class="tag p0">P0</span><h3>현재 로컬 공시함이 오류 상태</h3><p><code>/filings</code>에서 “공시 알림을 불러오지 못했습니다”를 관찰했습니다. moving worktree/미적용 migration 가능성이 있으므로 retention 실험 전에 migration·API·worker·flag·heartbeat 인수 테스트가 필요합니다.</p></article>
+      <article class="card"><span class="tag p0">P0</span><h3>quiet hours가 저장만 되고 실행되지 않음</h3><p>DB/API에는 시작·종료 필드가 있으나 설정 UI와 push 정책에서 사용되지 않습니다. 금융 알림의 피로와 해지를 막는 핵심 guardrail입니다.</p></article>
+      <article class="card"><span class="tag p0">P0</span><h3>현재 Pulse D7 SQL은 0명 산출 가능</h3><p><code>pulse_viewed</code>는 client에서 보내지만 analytics API가 로그인 사용자도 <code>user_id:null</code>로 저장하고, D7 SQL은 <code>user_id is not null</code>만 집계합니다. 조회·노출·원문 열기를 한 사용자로 연결하기 전에는 Pulse 실험을 판정할 수 없습니다.</p></article>
+      <article class="card"><span class="tag p0">P0</span><h3>푸시 CTR의 분모·분자 단위가 다름</h3><p><code>push_provider_accepted</code>는 기기 delivery 단위지만 receipt click은 사용자+notification 단위로 중복 제거됩니다. 다중 기기 사용자는 CTR이 인위적으로 낮아지고 test push도 분모를 오염시킬 수 있습니다. 사용자 알림 퍼널과 기기 전달 퍼널을 분리해야 합니다.</p></article>
+      <article class="card"><span class="tag p0">P0</span><h3>탐지 이벤트가 실제 SEC 탐지가 아님</h3><p><code>filing_detected</code>가 공시 단위 최초 발견이 아니라 사용자별 알림 생성 루프에서 기록됩니다. 구독자가 많으면 중복되고 baseline·미알림 공시는 빠집니다. 탐지 지연은 <code>accepted_at → first_seen_at</code>을 accession별 한 번 계산해야 합니다.</p></article>
+      <article class="card"><span class="tag p0">P0</span><h3>대시보드가 새 리텐션을 집계하지 않음</h3><p>현재 dashboard는 기존 채팅 funnel 중심이며 30일 raw rows를 페이지네이션 없이 가져옵니다. API max rows가 1,000이면 이후 행이 조용히 잘리고, 10% sampled pageview를 보정 없이 분모로 쓰면 비율도 왜곡됩니다. SQL view/일간 rollup이 필요합니다.</p></article>
+      <article class="card"><span class="tag p1">P1</span><h3>저장된 가치 루프가 미연결</h3><p>답변 저장 컴포넌트가 화면에서 사용되지 않고, Pulse 메모가 존재하지 않는 <code>?tab=notes</code>로 가며, 빈 watchlist의 <code>#watchlist-ticker</code>도 target이 없습니다. 새 카드보다 이 루프를 먼저 완성해야 합니다.</p></article>
+      <article class="card"><span class="tag p1">P1</span><h3>실험 계획은 있지만 assignment가 없음</h3><p>고정 사용자 bucket, <code>experiment_exposed</code>, 공시/Pulse SQL cohort가 없습니다. 특히 “1개 기업 vs 3개 기업 후 권한”을 실험한다면서 화면은 3개를 하드코딩해 한 변형을 사실상 기본값으로 만들었습니다.</p></article>
+      <article class="card"><span class="tag p1">P1</span><h3>Pulse 새 항목이 거짓 양성 가능</h3><p>일일 checkup의 <code>available_at</code>이 합성 때마다 현재 시각으로 바뀌어, 상태 변화가 없어도 60초 poll에서 새 항목으로 셀 수 있습니다. 학습 카드도 매번 “방금”으로 보입니다.</p></article>
+      <article class="card"><span class="tag p1">P1</span><h3>Pulse와 nav flag 경로가 다름</h3><p>서버 route와 client nav가 서로 다른 private/public env 값을 보며 build args 전달도 별도입니다. route만 켜지고 nav는 숨는 부분 출시 위험이 있습니다.</p></article>
+      <article class="card"><span class="tag p1">P1</span><h3>리텐션 지표의 중심이 흔들림</h3><p>공시 문서는 next-event retention을 north star로 잡았지만 Pulse 문서는 첫 Pulse 후 7일 재방문을 1차로 둡니다. D7 최적화는 공시 없는 날 filler를 만들 유인이 있습니다. next-event를 1차, D7을 진단 지표로 두는 편이 맞습니다.</p></article>
+      <article class="card"><span class="tag p2">P2</span><h3>일간 digest가 오래된 unread를 반복 포함</h3><p>“새로 생긴 것”과 “계속 안 읽은 것”을 구분하지 않으면 같은 공시가 매일 리캡에 남아 피로를 만들 수 있습니다. 반복 알림은 명시적 옵션으로 제한해야 합니다.</p></article>
+      <article class="card"><span class="tag p2">P2</span><h3>negative feedback가 행동 가능한 이유로 안 남음</h3><p>👍/👎 이벤트는 좋지만, DB의 feedback 필드는 연결되지 않았고 이유도 없습니다. 부정 후 ‘관련 없음/반복/너무 일반적/오류’ 네 개 chip만 받으면 텍스트 수집 없이 개선할 수 있습니다.</p></article>
+      <article class="card"><span class="tag p2">P2</span><h3>글로벌 unread/신뢰 신호 부족</h3><p>nav에 공시/Pulse 새 항목 수가 없고, 장애 배너는 어느 소스와 어느 행동이 영향을 받는지 말하지 않습니다. 과한 badge가 아니라 ‘미열람 중요 공시’와 ‘SEC 원문 정상/지연’만 보여야 합니다.</p></article>
+    </div>
+  </section>
+
+  <section class="section" id="pulse">
+    <h2>4. 실제 Pulse 화면 감사</h2>
+    <div class="grid">
+      <figure><img class="shot" src="references/pulse-current.png" alt="현재 Pulse 개발 화면" /><figcaption class="caption">실제 local DOM을 감사한 화면. local chunk 오류로 page-transition wrapper가 opacity 0에 남아, 검사를 위해 해당 wrapper만 시각적으로 드러낸 뒤 캡처했습니다.</figcaption></figure>
+      <div>
+        <h3>잘된 점</h3><ul><li>유한 피드와 “오늘은 여기까지”</li><li>공시를 가장 높게 두는 결정론적 ranking</li><li>같은 ticker 과다 노출 제한</li><li>“왜 이 항목이 보이나요?” 설명</li><li>저장·숨기기·내일 다시보기</li><li>소스 일부 실패 시 나머지 feed 유지</li><li>runtime LLM 0을 화면에서도 명시</li></ul>
+        <h3>보완</h3><ul><li>큰 hero보다 첫 미열람 공시를 더 위로</li><li>“오늘”을 <b>마지막 방문 이후</b> 상태와 함께 표현</li><li>CTA를 “공시함 열기”보다 “SEC 원문/핵심 첨부 열기”로 명확화</li><li>끝 지점에 다음 확인 예정, 알림 상태, 저장 항목 CTA 중 하나만 제공</li><li>학습 카드의 시간은 실제 주차/게시일로 표시</li></ul>
+      </div>
+    </div>
+    <h3>Lazyweb의 독립 제안</h3>
+    <ol><li><b>Inbox Since-Last</b> — 마지막 방문 이후의 미열람 원문을 첫 행동으로.</li><li><b>Reliability Strip</b> — “일부 오류” 대신 지연 소스, 영향 범위, SEC 원문 가능 여부를 투명하게.</li></ol>
+    <p><a href="https://www.lazyweb.com/report/lazyweb/68e96199-7ac7-45c7-8382-f3119a2730c3/?source=create">Lazyweb hosted report 열기 ↗</a></p>
+    <figure style="margin-top:20px"><img class="shot" src="references/filings-error.png" alt="공시함 오류 상태" /><figcaption class="caption">감사 시점의 local 공시함 오류 상태. 실제 DB/migration/worker 준비 상태가 검증되기 전에는 feature completion으로 보지 않는 것이 안전합니다.</figcaption></figure>
+  </section>
+
+  <section class="section" id="patterns">
+    <h2>5. 피드·무작위 Q&amp;A·4컷 판단</h2>
+    <table><thead><tr><th>패턴</th><th>판정</th><th>적용한다면</th><th>이유</th></tr></thead><tbody>
+      <tr><td>인스타식 팔로우 그래프</td><td class="decision-yes">채택</td><td>팔로우한 기업·보유 종목·저장한 질문이 feed 입력</td><td>관련성을 만든다</td></tr>
+      <tr><td>인스타식 무한스크롤</td><td class="decision-no">거절</td><td>20개 단위 수동 “이전 항목 더 보기”와 명확한 끝</td><td>투자 제품의 완료감·신뢰를 지킨다</td></tr>
+      <tr><td>새 항목 badge</td><td class="decision-yes">제한 채택</td><td>중요 미열람 공시만; vanity count 금지</td><td>실제 사건을 알린다</td></tr>
+      <tr><td>무작위 AI 질문·답변</td><td class="decision-no">거절</td><td>사용자 열린 질문, 공시 Item 기반 고정 질문, 오래된 메모만</td><td>비용·환각·무관성 방지</td></tr>
+      <tr><td>정적 4컷</td><td class="decision-yes">주 1회/온보딩</td><td>구조화 사실→고정 템플릿, SEC 링크·accession·생성시각 표시</td><td>공유·교육에는 유용, 핵심 리텐션은 아님</td></tr>
+      <tr><td>실시간 생성 4컷</td><td class="decision-no">보류</td><td>수요 검증 후에도 runtime LLM 대신 편집 템플릿</td><td>검수·모델·저작권 비용</td></tr>
+      <tr><td>streak</td><td class="decision-no">거절</td><td>대신 “알림 정상/미열람 0/다음 예정” 상태</td><td>공시는 매일 발생하지 않는다</td></tr>
+      <tr><td>댓글·종목 채팅</td><td class="decision-no">초기 거절</td><td>개인 메모→원문 특정 위치 공유→제한 질문판 순서</td><td>스팸·pump·신고·moderation 비용</td></tr>
+      <tr><td>광고/스폰서 콘텐츠</td><td class="decision-no">공시 feed와 혼합 금지</td><td>필요 시 완전히 분리된 영역과 명확한 라벨</td><td>공식 공시 신뢰 훼손</td></tr>
+    </tbody></table>
+  </section>
+
+  <section class="section" id="competitors">
+    <h2>6. 경쟁사 비교</h2>
+    <table><thead><tr><th>제품</th><th>재방문 장치</th><th>KRW.O가 가져올 것</th><th>가져오지 않을 것</th></tr></thead><tbody>
+      <tr><td><a href="https://quartr.com/features/watchlists">Quartr</a></td><td>watchlist, calendar sync, live/keyword alerts, daily·weekly recap</td><td>팔로우 전역 연결, 빈 recap 미발송</td><td>콜·transcript·AI 범위 확장</td></tr>
+      <tr><td><a href="https://support.tikr.com/hc/en-us/articles/5365387794203-How-to-set-up-a-watchlist-on-TIKR">TIKR</a></td><td>active watchlist가 events/news/filings feed 생성</td><td>관심목록을 홈의 입력으로</td><td>뉴스·재무 terminal 확장</td></tr>
+      <tr><td><a href="https://www.koyfin.com/help/release-notes/v3-66-desktop-alerts/">Koyfin</a></td><td>채널 선택, alert center, watchlist 일괄 설정, pause/delete</td><td>유형 toggle·이력·일시정지·원문 링크</td><td>가격·기술지표 alert</td></tr>
+      <tr><td><a href="https://fiscal.ai/blog/ultimate-guide-to-using-fiscal-AI/">Fiscal.ai</a></td><td>투자 dashboard를 로그인 시작 화면으로</td><td>검색창보다 “내 기업 변경사항”으로 시작</td><td>broker·estimate·Copilot</td></tr>
+      <tr><td><a href="https://help.seekingalpha.com/how-do-i-set-up-real-time-alerts-for-my-seeking-alpha-portfolio">Seeking Alpha</a></td><td>portfolio alert·daily digest·author/community loop</td><td>digest와 개인 메모</td><td>초기 공개 댓글/그룹</td></tr>
+      <tr><td><a href="https://help.bamsec.com/docs/customize-email-alerts">BamSEC</a></td><td>기업×문서 matrix, amendment filter, 1~2분 반영 주장</td><td>정확한 수신시각·누락 진단·유형 matrix</td><td>전사 문서검색·Excel</td></tr>
+      <tr><td><a href="https://help.stocktwits.com/c/navigating/articles/home-feed">Stocktwits</a></td><td>following/watchlist/trending/suggested symbol streams</td><td>피드 탭 구조만</td><td>UGC·sentiment·engagement 조작 위험</td></tr>
+      <tr><td><a href="https://www.tradingview.com/support/solutions/43000762838-news-alerts/">TradingView</a></td><td>watchlist·saved news flow·alerts·community</td><td>저장 필터·watchlist별 규칙</td><td>기술지표 engine·social network</td></tr>
+    </tbody></table>
+    <p class="small">경쟁사의 실제 retention rate는 공개되지 않았습니다. 위 표는 공식 기능·가격 문서에서 관찰한 재방문 장치이며, 효과 크기는 추론입니다.</p>
+  </section>
+
+  <section class="section" id="stack">
+    <h2>7. 상업용 무료·오픈소스 스택</h2>
+    <div class="verdict">목표는 “절대 운영비 0”이 아니라 <b>추가 라이선스/API 비용 0</b>입니다. 서버·도메인·DB 저장공간·백업은 현실적으로 비용 또는 운영 노동이 듭니다.</div>
+    <h3>그대로 재사용</h3>
+    <div class="cols"><ul>
+      <li>Next.js + 현재 Postgres/Supabase</li><li>자체 <code>analytics_events</code></li><li>현재 filing worker의 DB claim/retry/heartbeat</li><li><a href="https://github.com/web-push-libs/web-push">web-push</a> MPL-2.0</li><li>서비스 워커와 표준 Push API</li><li>자체 RSS/ICS route</li><li>Postgres FTS/pg_trgm</li><li>Nivo MIT</li><li>기존 <code>next/og</code> ImageResponse</li><li>자체 micro-survey</li>
+    </ul></div>
+    <h3>추가하지 않기</h3>
+    <p>PostHog, Plausible CE, GrowthBook full, Novu, Formbricks, Fider, listmonk, Unleash, Meilisearch, 별도 이메일 인프라는 현재 규모에서 운영·RAM·copyleft·동기화 비용이 더 큽니다.</p>
+    <h3>즉시 확인할 함정</h3>
+    <table><thead><tr><th>항목</th><th>문제</th><th>권고</th></tr></thead><tbody>
+      <tr><td><code>redis:7-alpine</code></td><td>부동 tag가 Redis 7.4~7.8 RSAL/SSPL로 이동 가능</td><td>불필요하면 제거, 필요하면 <a href="https://github.com/valkey-io/valkey">Valkey</a> BSD-3 호환 테스트</td></tr>
+      <tr><td>Claude Agent SDK</td><td><a href="https://github.com/anthropics/claude-agent-sdk-typescript">Commercial Terms</a> 적용, OSS 아님</td><td>공시/Pulse와 격리; LLM 제거 범위라면 SDK·gateway·worker 제거 후보</td></tr>
+      <tr><td>Brandfetch</td><td>월 50만 logo render 무료이나 proprietary SaaS와 revocable terms</td><td>ticker/이니셜 fallback, 4컷에는 기업 logo 제외</td></tr>
+      <tr><td>Supabase Free</td><td><a href="https://supabase.com/pricing">500MB DB·5GB egress·7일 저활동 pause·SLA/자동백업 없음</a></td><td>raw TTL, daily rollup, 별도 backup</td></tr>
+      <tr><td>Vercel Hobby</td><td><a href="https://vercel.com/docs/plans/hobby">비상업 개인용만</a></td><td>상업 서비스의 무료 배포 대안으로 간주 금지</td></tr>
+      <tr><td>폰트·binary</td><td>Material Symbols, Sharp/libvips 등 notice 의무</td><td><code>THIRD_PARTY_NOTICES</code>와 license CI</td></tr>
+    </tbody></table>
+    <h3>4컷용 무료 자산</h3>
+    <p><a href="https://openpeeps.com/">Open Peeps</a> CC0, <a href="https://github.com/rough-stuff/rough">Rough.js</a> MIT, <a href="https://github.com/lucide-icons/lucide">Lucide</a> ISC, <a href="https://github.com/notofonts/noto-cjk">Noto CJK</a> OFL을 사용할 수 있습니다. 단, 현재처럼 텍스트 4패널로 먼저 검증하는 편이 가장 저렴합니다.</p>
+  </section>
+
+  <section class="section" id="metrics">
+    <h2>8. 지표·실험·로드맵</h2>
+    <h3>North star</h3>
+    <div class="verdict">첫 유효 공시 원문을 연 사용자가 <b>다음 유효 공시에서도 SEC 원문 또는 핵심 Exhibit을 여는 비율</b>.</div>
+    <p><b>유효 공시</b>는 구독 이후 실제로 사용자에게 생성된 별도 filing event이며, baseline·과거 이력·test push·동일 공시 중복 전달은 제외합니다. 다음 사건이 발생하고 클릭 관찰 7일까지 지난 사용자만 성숙 분모에 넣어 우측 검열을 막습니다.</p>
+    <h3>운영 지표</h3>
+    <table><thead><tr><th>영역</th><th>지표</th></tr></thead><tbody>
+      <tr><td>Activation</td><td>기업 구독→최근 공시 open→원문 open→push test received</td></tr>
+      <tr><td>Reliability</td><td>탐지 p50/p95, duplicate, worker heartbeat, provider accepted→SW received→show called</td></tr>
+      <tr><td>Value</td><td>notification click→SEC source, key Exhibit open, next-event retention</td></tr>
+      <tr><td>Pulse</td><td>impression→useful action, source open per impression, negative reason, source degraded</td></tr>
+      <tr><td>Guardrail</td><td>push unsubscribe, company unfollow, digest 전환, quiet-hours 설정, 부정 feedback</td></tr>
+      <tr><td>Cost</td><td>raw analytics row growth, DB/egress, Pulse 원인의 LLM job=0</td></tr>
+    </tbody></table>
+    <h3>무료 집계 구조</h3>
+    <ul>
+      <li><code>filing_delivery_funnel_daily</code>: 사용자 알림 전환과 기기 delivery 상태를 분리.</li>
+      <li><code>filing_next_event_cohort_weekly</code>: 성숙 코호트의 다음 사건 상세·근거 열기를 분리.</li>
+      <li><code>pulse_user_daily</code>: 실제 view·50%/1초 impression·useful action·feedback을 사용자/소스별 집계.</li>
+      <li><code>experiment_assignments</code> + <code>experiment_exposures</code>: stable hash 배정과 실제 노출을 구분.</li>
+      <li><code>analytics_data_quality_daily</code>: 필수 속성 누락, 중복, 익명/로그인 연결 실패, 집계 freshness.</li>
+    </ul>
+    <p>처음에는 Postgres view로 시작하고, raw notification/delivery가 TTL로 삭제되기 전에 기존 worker가 일·주간 요약만 남기면 외부 분석 SaaS가 필요 없습니다.</p>
+    <h3>실행 순서</h3>
+    <ol>
+      <li><span class="tag p0">P0</span> migration/API/worker/flag/receipt 인수 테스트, SSR visibility, analytics identity, quiet hours.</li>
+      <li><span class="tag p1">P1</span> 회사 1개 구독→최근 3건→SEC 원문→push test의 하나의 온보딩. 3개 gate는 실험으로만.</li>
+      <li><span class="tag p1">P1</span> 저장 답변·메모·thesis 화면과 Pulse resurface 링크 연결.</li>
+      <li><span class="tag p1">P1</span> 공시/Pulse Postgres cohort view, raw event 30~90일 TTL, daily rollup.</li>
+      <li><span class="tag p2">P2</span> Pulse를 “마지막 방문 이후” 인박스로 출시하고 reliability strip·정확한 timestamp 추가.</li>
+      <li><span class="tag p2">P2</span> keyword, amendment diff, expected window, RSS/ICS는 reliability가 증명된 뒤 점진 노출.</li>
+      <li><span class="tag p2">P2</span> 주간 recap은 내용이 있을 때만, daily와 상호배타 옵션.</li>
+      <li><span class="tag p2">P2</span> 정적 4컷은 주 1회 또는 onboarding/share에서 효과 검증.</li>
+      <li><span class="tag p2">P2</span> 13F 자동 갱신과 분기 변경 recap.</li>
+    </ol>
+    <h3>처음 실행할 세 실험</h3>
+    <ol><li>빈 공시함 vs 최근 공시 3건.</li><li>형식명 push vs 사건 유형+알림 이유.</li><li>기업 1개+원문 preview 뒤 권한 vs 기업 3개 뒤 권한.</li></ol>
+    <p>동시에 하나만 실행하고 user ID 기반 stable hash를 사용합니다. <code>experiment_exposed</code>는 사용자·실험당 한 번 기록하며, 최소 기간/표본/guardrail을 시작 전에 고정합니다.</p>
+  </section>
+
+  <section class="section">
+    <h2>최종 선택</h2>
+    <div class="grid">
+      <div class="card"><div class="rank">KEEP</div><p>CIK-first 8-K/6-K, inbox, source deep link, priority/digest, finite Pulse, explainability, saved state, RSS/ICS, static learning.</p></div>
+      <div class="card"><div class="rank">FIX FIRST</div><p>prod readiness, user-linked metrics, quiet hours, broken saved-value links, page visibility resilience, timestamp/new count, stable experiments.</p></div>
+      <div class="card"><div class="rank">TEST LATER</div><p>weekly recap, since-last home, expected filing window, shareable fact card, static 4컷, 13F quarterly recap.</p></div>
+      <div class="card"><div class="rank">DO NOT BUILD</div><p>random AI Q&amp;A, automatic AI summaries, infinite scroll, streaks, early comments/chat, global news feed, sponsored content mixed with filings.</p></div>
+    </div>
+    <p class="small">관찰과 추론을 구분했습니다. 로컬 실행 화면·코드는 관찰, 경쟁 기능에서 KRW.O로의 효과 예상은 추론입니다. 작업 트리는 감사 중에도 변경돼 이 문서는 시점 스냅샷입니다.</p>
+  </section>
+</main>
+</body>
+</html>

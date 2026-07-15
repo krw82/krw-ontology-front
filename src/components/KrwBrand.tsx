@@ -54,7 +54,7 @@ export function KrwBrand({
       />
       <span className="flex min-w-0 flex-col justify-center">
         <span className="block whitespace-nowrap text-[15px] font-extrabold leading-[1.32] tracking-[0.06em]">
-          KRW Ontology
+          KRW.O
         </span>
         {!compact && (
           <span

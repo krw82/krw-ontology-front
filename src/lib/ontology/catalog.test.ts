@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
+  buildGuruLightCompanyContext,
   getActiveOntologyCatalogRelease,
   getIndexedCompany,
   getIndexedCompanies,
@@ -192,6 +193,55 @@ class QueryMock {
 }
 
 describe("ontology catalog", () => {
+  it("builds neutral Guru company context with trusted anchors only", () => {
+    const context = buildGuruLightCompanyContext({
+      ticker: "AAPL",
+      name: "Apple Inc.",
+      sector: "Technology",
+      industry: "Consumer electronics",
+      description: "Apple designs devices and ecosystem services.",
+      primary_activities: ["devices", "ecosystem services"],
+      products_or_segments: ["iPhone", "Services"],
+      revenue_logic: "Device sales and ecosystem services.",
+      latest_period: "CY2026Q1",
+      coverage: "coverage",
+      icon: "hub",
+      document_count: 2,
+      document_types: ["10-Q", "10-K"],
+      periods: ["CY2026Q1", "CY2025"],
+      documents: [
+        {
+          period: "CY2026Q1",
+          document_type: "10-Q",
+          doc_type_key: "10Q",
+          generated_at: null,
+        },
+        {
+          period: "CY2025",
+          document_type: "10-K",
+          doc_type_key: "10K",
+          generated_at: null,
+        },
+      ],
+      generated_at: null,
+      core_strength: "must not reach the Guru question input",
+      critical_risk: "must not reach the Guru question input",
+    });
+
+    expect(context.contextAnchors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ anchorId: "business_description" }),
+        expect.objectContaining({ anchorId: "primary_activity_1" }),
+        expect.objectContaining({ anchorId: "revenue_logic" }),
+      ]),
+    );
+    expect(JSON.stringify(context)).not.toContain("must not reach");
+    expect(context.filingAvailability).toEqual({
+      hasCurrentFiling: true,
+      hasAnnualBaseline: true,
+    });
+  });
+
   beforeEach(() => {
     process.env.KRW_ONTOLOGY_ENV = "prod";
     process.env.KRW_E2E_STATIC_CATALOG = "0";

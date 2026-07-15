@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { buildChatSessionHref, buildNewChatHref } from "@/lib/chat/history-state";
 import { useSessions } from "@/hooks/useSessions";
+import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   easeOutExpo,
   popoverMenu,
@@ -16,13 +17,22 @@ import {
 } from "@/lib/animation";
 import { OPEN_CHAT_SIDEBAR_EVENT } from "@/lib/chat/sidebar-events";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
-import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
-import { getPathLocale, localizedPath } from "@/i18n/routing";
+import type { Locale } from "@/i18n/config";
+import {
+  localizedPath,
+  queryLocalizedPath,
+  resolveRouteLocale,
+} from "@/i18n/routing";
 import type {
   SessionSummary,
   WatchlistOverviewResponse,
 } from "@/types/api-contracts";
+import type { EntitlementStatus } from "@/types/entitlement";
 import { normalizeTickers } from "@/lib/ontology/ticker";
+import {
+  isEntitlementFeatureEnabled,
+  type MenuFeatureKey,
+} from "@/lib/billing/feature-access";
 
 interface ChatSidebarProps {
   activeSessionId: string | null;
@@ -44,14 +54,16 @@ const sidebarCopy = {
     history: "채팅 기록",
     researchNotebook: "리서치 노트북",
     openResearchNotebook: "내 리서치 노트북 열기",
-    stockDiscovery: "종목 발굴기",
-    openStockDiscovery: "종목 발굴기 열기",
+    stockDiscovery: "조건으로 기업 검색",
+    openStockDiscovery: "조건으로 기업 검색 열기",
+    guruAdvisor: "관점별 분석",
+    openGuruAdvisor: "관점별 분석 열기",
     companySearch: "회사 찾기",
     openCompanySearch: "회사 찾기 열기",
     wideResearch: "와이드 리서치",
     openWideResearch: "와이드 리서치 시작",
-    institutionalHoldings: "13F 기관매수",
-    openInstitutionalHoldings: "13F 기관매수 열기",
+    institutionalHoldings: "13F 기관 보유",
+    openInstitutionalHoldings: "13F 기관 보유 열기",
     recentChats: "최근 채팅 목록",
     newChat: "새 채팅",
     nameSaved: "채팅 이름을 저장했습니다.",
@@ -73,20 +85,24 @@ const sidebarCopy = {
       "목록에서 숨겨집니다. 이 작업은 현재 화면에서 바로 되돌릴 수 없습니다.",
     cancel: "취소",
     deleting: "삭제 중",
+    retry: "다시 시도",
+    upgradeRequired: "현재 플랜에서 사용할 수 없습니다. 플랜을 확인하세요.",
   },
   en: {
     closeHistory: "Close chat history",
     history: "Chat history",
     researchNotebook: "Research notebook",
     openResearchNotebook: "Open my research notebook",
-    stockDiscovery: "Stock discovery",
-    openStockDiscovery: "Open stock discovery",
+    stockDiscovery: "Company search by criteria",
+    openStockDiscovery: "Open company search by criteria",
+    guruAdvisor: "Perspective analysis",
+    openGuruAdvisor: "Open perspective analysis",
     companySearch: "Find companies",
     openCompanySearch: "Open company search",
     wideResearch: "Wide research",
     openWideResearch: "Start wide research",
-    institutionalHoldings: "13F institutional buying",
-    openInstitutionalHoldings: "Open 13F institutional buying",
+    institutionalHoldings: "13F institutional holdings",
+    openInstitutionalHoldings: "Open 13F institutional holdings",
     recentChats: "Recent chats",
     newChat: "New chat",
     nameSaved: "Chat name saved.",
@@ -109,6 +125,8 @@ const sidebarCopy = {
       "It will be hidden from the list. This cannot be undone from the current screen.",
     cancel: "Cancel",
     deleting: "Deleting",
+    retry: "Retry",
+    upgradeRequired: "Unavailable on the current plan. Review plans.",
   },
 } satisfies Record<Locale, Record<string, string>>;
 
@@ -122,6 +140,8 @@ interface SidebarContentProps {
   sessions: ReturnType<typeof useSessions>["sessions"];
   mutatingSessionId: ReturnType<typeof useSessions>["mutatingSessionId"];
   mutationError: ReturnType<typeof useSessions>["mutationError"];
+  listError: ReturnType<typeof useSessions>["listError"];
+  onRetry: () => void;
   renameSession: ReturnType<typeof useSessions>["renameSession"];
   deleteSession: ReturnType<typeof useSessions>["deleteSession"];
   pendingNavigationSessionId?: string | null;
@@ -134,6 +154,7 @@ interface SidebarPrimaryLinksProps {
   copy: SidebarCopy;
   hasResearchInboxItems: boolean;
   reducedMotion: boolean;
+  entitlement: EntitlementStatus | null;
   onNavigate?: () => void;
 }
 
@@ -182,6 +203,7 @@ export default function ChatSidebar({
     loading,
     mutatingSessionId,
     mutationError,
+    listError,
     listSessions,
     renameSession,
     deleteSession,
@@ -191,10 +213,8 @@ export default function ChatSidebar({
     useState<string | null>(null);
   const [hasResearchInboxItems, setHasResearchInboxItems] = useState(false);
   const reducedMotion = useReducedMotion();
-  const queryLocale = searchParams.get("locale");
-  const locale =
-    getPathLocale(pathname) ??
-    (isLocale(queryLocale) ? queryLocale : DEFAULT_LOCALE);
+  const { entitlement } = useEntitlement();
+  const locale = resolveRouteLocale(pathname, searchParams.get("locale"));
   const copy = sidebarCopy[locale];
 
   const closeMobileSidebar = useCallback(() => {
@@ -323,6 +343,7 @@ export default function ChatSidebar({
                 copy={copy}
                 hasResearchInboxItems={hasResearchInboxItems}
                 reducedMotion={reducedMotion}
+                entitlement={entitlement}
                 onNavigate={closeMobileSidebar}
               />
               <div className="border-b border-hairline px-sm py-xs">
@@ -338,6 +359,8 @@ export default function ChatSidebar({
                 sessions={sessions}
                 mutatingSessionId={mutatingSessionId}
                 mutationError={mutationError}
+                listError={listError}
+                onRetry={() => void listSessions(1, 30)}
                 renameSession={renameSession}
                 deleteSession={deleteSession}
                 pendingNavigationSessionId={pendingNavigationSessionId}
@@ -359,6 +382,7 @@ export default function ChatSidebar({
             copy={copy}
             hasResearchInboxItems={hasResearchInboxItems}
             reducedMotion={reducedMotion}
+            entitlement={entitlement}
           />
           <div className="border-b border-hairline px-sm py-xs">
             <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] leading-4 text-muted">
@@ -373,6 +397,8 @@ export default function ChatSidebar({
             sessions={sessions}
             mutatingSessionId={mutatingSessionId}
             mutationError={mutationError}
+            listError={listError}
+            onRetry={() => void listSessions(1, 30)}
             renameSession={renameSession}
             deleteSession={deleteSession}
             pendingNavigationSessionId={null}
@@ -391,20 +417,39 @@ function SidebarPrimaryLinks({
   copy,
   hasResearchInboxItems,
   reducedMotion,
+  entitlement,
   onNavigate,
 }: SidebarPrimaryLinksProps) {
   const linkClass =
     "group flex h-10 items-center gap-xs rounded-[8px] px-xs text-[14px] font-bold leading-5 text-ink transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
   const iconClass =
     "material-symbols-outlined text-[20px] text-muted transition-colors group-hover:text-ink";
+  const isLocked = (featureKey: MenuFeatureKey) =>
+    entitlement !== null &&
+    !isEntitlementFeatureEnabled(entitlement, featureKey);
+  const featureHref = (href: string, featureKey: MenuFeatureKey) =>
+    isLocked(featureKey)
+      ? `/settings/billing?feature=${encodeURIComponent(featureKey)}`
+      : href;
+  const featureLabel = (label: string, featureKey: MenuFeatureKey) =>
+    isLocked(featureKey) ? `${label} — ${copy.upgradeRequired}` : label;
+  const lockIcon = (featureKey: MenuFeatureKey) =>
+    isLocked(featureKey) ? (
+      <span
+        aria-hidden="true"
+        className="material-symbols-outlined ml-auto text-[17px] text-muted"
+      >
+        lock
+      </span>
+    ) : null;
 
   return (
     <div className="border-b border-hairline px-xs py-xs">
       <Link
-        href="/watchlist"
+        href={featureHref(queryLocalizedPath(locale, "/watchlist"), "research_notebook")}
         data-onboarding-target="research-notebook-sidebar"
         className={linkClass}
-        aria-label={copy.openResearchNotebook}
+        aria-label={featureLabel(copy.openResearchNotebook, "research_notebook")}
         onClick={onNavigate}
       >
         <span aria-hidden="true" className={iconClass}>
@@ -430,52 +475,78 @@ function SidebarPrimaryLinks({
             </span>
           ) : null}
         </span>
+        {lockIcon("research_notebook")}
       </Link>
       <Link
-        href="/discover"
+        href={featureHref(queryLocalizedPath(locale, "/discover"), "stock_discovery")}
         data-onboarding-target="stock-discovery-sidebar"
         className={linkClass}
-        aria-label={copy.openStockDiscovery}
+        aria-label={featureLabel(copy.openStockDiscovery, "stock_discovery")}
         onClick={onNavigate}
       >
         <span aria-hidden="true" className={iconClass}>
           travel_explore
         </span>
         <span className="truncate">{copy.stockDiscovery}</span>
+        {lockIcon("stock_discovery")}
       </Link>
       <Link
-        href={localizedPath(locale, "/companies")}
+        href={featureHref(queryLocalizedPath(locale, "/guru"), "guru_advisor")}
+        data-onboarding-target="guru-advisor-sidebar"
         className={linkClass}
-        aria-label={copy.openCompanySearch}
+        aria-label={featureLabel(copy.openGuruAdvisor, "guru_advisor")}
+        onClick={onNavigate}
+      >
+        <span aria-hidden="true" className={iconClass}>
+          psychology
+        </span>
+        <span className="truncate">{copy.guruAdvisor}</span>
+        {lockIcon("guru_advisor")}
+      </Link>
+      <Link
+        href={featureHref(localizedPath(locale, "/companies"), "company_search")}
+        data-onboarding-target="company-search-sidebar"
+        className={linkClass}
+        aria-label={featureLabel(copy.openCompanySearch, "company_search")}
         onClick={onNavigate}
       >
         <span aria-hidden="true" className={iconClass}>
           search
         </span>
         <span className="truncate">{copy.companySearch}</span>
+        {lockIcon("company_search")}
       </Link>
       <Link
-        href={buildNewChatHref(undefined, { locale })}
+        href={featureHref(buildNewChatHref(undefined, { locale }), "wide_research")}
         data-onboarding-target="wide-research-sidebar"
         className={linkClass}
-        aria-label={copy.openWideResearch}
+        aria-label={featureLabel(copy.openWideResearch, "wide_research")}
         onClick={onNavigate}
       >
         <span aria-hidden="true" className={iconClass}>
           hub
         </span>
         <span className="truncate">{copy.wideResearch}</span>
+        {lockIcon("wide_research")}
       </Link>
       <Link
-        href="/institutional-holdings"
+        href={featureHref(
+          queryLocalizedPath(locale, "/institutional-holdings"),
+          "institutional_holdings",
+        )}
+        data-onboarding-target="institutional-holdings-sidebar"
         className={linkClass}
-        aria-label={copy.openInstitutionalHoldings}
+        aria-label={featureLabel(
+          copy.openInstitutionalHoldings,
+          "institutional_holdings",
+        )}
         onClick={onNavigate}
       >
         <span aria-hidden="true" className={iconClass}>
           monitoring
         </span>
         <span className="truncate">{copy.institutionalHoldings}</span>
+        {lockIcon("institutional_holdings")}
       </Link>
     </div>
   );
@@ -489,6 +560,8 @@ function SidebarContent({
   sessions,
   mutatingSessionId,
   mutationError,
+  listError,
+  onRetry,
   renameSession,
   deleteSession,
   pendingNavigationSessionId,
@@ -585,6 +658,21 @@ function SidebarContent({
             {mutationError || notice}
           </div>
         )}
+        {listError ? (
+          <div
+            className="mb-sm flex items-center justify-between gap-2 rounded-[8px] border border-error-container bg-error-container/30 px-sm py-xs text-[12px] font-semibold leading-[1.45] text-on-error-container"
+            role="alert"
+          >
+            <span>{listError}</span>
+            <button
+              type="button"
+              className="shrink-0 rounded-[6px] border border-current px-2 py-1 font-bold hover:bg-canvas/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              onClick={onRetry}
+            >
+              {copy.retry}
+            </button>
+          </div>
+        ) : null}
         {loading && sessions.length === 0 ? (
           <div className="space-y-1">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -595,9 +683,11 @@ function SidebarContent({
             ))}
           </div>
         ) : sessions.length === 0 ? (
-          <div className="rounded-[8px] border border-dashed border-hairline bg-canvas px-sm py-sm text-[13px] font-medium leading-[1.45] text-muted">
-            {copy.empty}
-          </div>
+          listError ? null : (
+            <div className="rounded-[8px] border border-dashed border-hairline bg-canvas px-sm py-sm text-[13px] font-medium leading-[1.45] text-muted">
+              {copy.empty}
+            </div>
+          )
         ) : (
           <nav className="space-y-1" aria-label={copy.history}>
             {sessions.map((session) => {

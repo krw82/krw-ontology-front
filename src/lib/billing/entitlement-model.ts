@@ -11,6 +11,11 @@ import type {
   EntitlementAccessStatus,
   EntitlementPlanKey,
 } from "@/types/entitlement";
+import {
+  getFeatureSplitMode,
+  isPlanFeatureEnabled,
+  MENU_FEATURE_DEFINITIONS,
+} from "./feature-access";
 
 export interface EntitlementUsageInput {
   planKey: EntitlementPlanKey;
@@ -95,7 +100,7 @@ function upgradeCopy(
   if (percentUsed >= 100) {
     return {
       enabled: true,
-      title: `${usageLabel} 무료 사용량을 모두 사용했습니다.`,
+      title: `${usageLabel} 체험 사용량을 모두 사용했습니다.`,
       message: "Standard로 업그레이드하면 더 넉넉한 주간 분석량을 사용할 수 있습니다.",
       label: "Standard 보기",
     };
@@ -104,7 +109,7 @@ function upgradeCopy(
   if (percentUsed >= 80) {
     return {
       enabled: true,
-      title: `${usageLabel} 무료 사용량이 거의 찼습니다.`,
+      title: `${usageLabel} 체험 사용량이 거의 찼습니다.`,
       message: "Standard로 업그레이드하면 더 넉넉한 주간 분석량을 사용할 수 있습니다.",
       label: "플랜 확인",
     };
@@ -283,6 +288,14 @@ export function buildEntitlementStatus({
         description: "플랜과 사용량 상태에 따라 작업 처리 순서를 조정",
         enabled: true,
       },
+      ...MENU_FEATURE_DEFINITIONS.map((feature) => ({
+        ...feature,
+        enabled: isPlanFeatureEnabled(
+          planKey,
+          feature.key,
+          getFeatureSplitMode(),
+        ),
+      })),
     ],
     upgrade: {
       label: upgrade.label,
