@@ -1649,6 +1649,7 @@ export interface McpContainerEnv {
 
 export type PulseItemKind =
   | "filing"
+  | "analysis"
   | "checkup"
   | "question"
   | "resurface"
@@ -1660,7 +1661,14 @@ export type PulseTrigger = "event" | "schedule" | "state" | "editorial";
 
 export type PulseItemPriority = "urgent" | "high" | "normal" | "low";
 
+export type PulseItemState = "new" | "seen" | "reviewed";
+
+export type PulseAnalysisPhase = "active" | "completed" | "failed";
+
 export type PulseMutationAction =
+  | "review"
+  | "unreview"
+  // Legacy aliases remain accepted by the API for one release.
   | "read"
   | "unread"
   | "save"
@@ -1700,13 +1708,16 @@ export interface PulseItemBase<K extends PulseItemKind> {
   reason_code: string;
   reason_label: string;
   priority: PulseItemPriority;
-  score: number;
   occurred_at: string;
   available_at: string;
   expires_at: string | null;
+  reviewed_at: string | null;
   read_at: string | null;
   saved_at: string | null;
   snoozed_until: string | null;
+  state: PulseItemState;
+  actionable: boolean;
+  phase: PulseAnalysisPhase | null;
   group_key: string | null;
   primary_action: PulseItemAction;
   secondary_actions: PulseItemAction[];
@@ -1714,6 +1725,7 @@ export interface PulseItemBase<K extends PulseItemKind> {
 }
 
 export type PulseFilingItem = PulseItemBase<"filing">;
+export type PulseAnalysisItem = PulseItemBase<"analysis">;
 export type PulseCheckupItem = PulseItemBase<"checkup">;
 export type PulseQuestionItem = PulseItemBase<"question">;
 export type PulseResurfaceItem = PulseItemBase<"resurface">;
@@ -1721,6 +1733,7 @@ export type PulseLearningItem = PulseItemBase<"learning">;
 
 export type PulseItem =
   | PulseFilingItem
+  | PulseAnalysisItem
   | PulseCheckupItem
   | PulseQuestionItem
   | PulseResurfaceItem
@@ -1733,11 +1746,25 @@ export interface PulseSourceStatus {
   latency_ms?: number;
 }
 
+export interface PulseFeedSummary {
+  actionable_count: number;
+  active_analysis_count: number;
+  counts: {
+    filing: number;
+    analysis: number;
+    question: number;
+    resurface: number;
+  };
+  primary_action: PulseLinkAction | null;
+}
+
 export interface PulseFeedResponse {
   generated_at: string;
+  snapshot_at: string;
   timezone: string;
   date_label: string;
   filter: PulseFilter;
+  summary: PulseFeedSummary;
   items: PulseItem[];
   next_cursor: string | null;
   has_more: boolean;
@@ -1775,11 +1802,13 @@ export interface PulsePreferencesPatch {
 export interface PulseItemMutationRequest {
   action: PulseStateMutationAction;
   snoozed_until?: string;
+  feed_session_id?: string;
 }
 
 export interface PulseItemMutationResponse {
   item_id: string;
   action: PulseStateMutationAction;
+  reviewed_at: string | null;
   read_at: string | null;
   saved_at: string | null;
   snoozed_until: string | null;

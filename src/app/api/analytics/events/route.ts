@@ -6,6 +6,7 @@ import {
   readPositiveIntEnv,
 } from "@/lib/api/rate-limit";
 import { getClientIp } from "@/lib/http/client-ip";
+import { getAuthUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -62,9 +63,13 @@ export async function POST(request: NextRequest) {
   ]);
   if (!rateLimit.ok) return rateLimitResponse(rateLimit);
 
+  // Browser analytics never supplies a user id. Resolve it from the protected
+  // session so authenticated retention cohorts remain trustworthy while
+  // anonymous events continue to work.
+  const user = await getAuthUser().catch(() => null);
   const result = await recordAnalyticsEventFromRequest(request, {
     eventName: body.event_name,
-    userId: null,
+    userId: user?.id ?? null,
     anonymousId,
     properties,
     path: typeof body.path === "string" ? body.path : null,

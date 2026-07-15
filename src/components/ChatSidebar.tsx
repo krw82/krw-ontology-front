@@ -2,42 +2,32 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent, MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { buildChatSessionHref, buildNewChatHref } from "@/lib/chat/history-state";
 import { useSessions } from "@/hooks/useSessions";
-import { useEntitlement } from "@/hooks/useEntitlement";
 import {
   easeOutExpo,
   popoverMenu,
-  sidebarPanel,
+  bottomSheetPanel,
+  rightDrawerPanel,
   sidebarBackdrop,
 } from "@/lib/animation";
 import { OPEN_CHAT_SIDEBAR_EVENT } from "@/lib/chat/sidebar-events";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import type { Locale } from "@/i18n/config";
 import {
-  localizedPath,
-  queryLocalizedPath,
+  localeSwitchHref,
   resolveRouteLocale,
 } from "@/i18n/routing";
-import type {
-  SessionSummary,
-  WatchlistOverviewResponse,
-} from "@/types/api-contracts";
-import type { EntitlementStatus } from "@/types/entitlement";
+import type { SessionSummary } from "@/types/api-contracts";
 import { normalizeTickers } from "@/lib/ontology/ticker";
-import {
-  isEntitlementFeatureEnabled,
-  type MenuFeatureKey,
-} from "@/lib/billing/feature-access";
 
 interface ChatSidebarProps {
   activeSessionId: string | null;
   refreshSignal?: string | number;
-  showDesktopSidebar?: boolean;
 }
 
 function subscribePortalTarget() {
@@ -149,15 +139,6 @@ interface SidebarContentProps {
   onDeleteActiveSession?: () => void;
 }
 
-interface SidebarPrimaryLinksProps {
-  locale: Locale;
-  copy: SidebarCopy;
-  hasResearchInboxItems: boolean;
-  reducedMotion: boolean;
-  entitlement: EntitlementStatus | null;
-  onNavigate?: () => void;
-}
-
 function formatRelativeDate(value: string, locale: Locale): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
@@ -193,7 +174,6 @@ function formatRelativeDate(value: string, locale: Locale): string {
 export default function ChatSidebar({
   activeSessionId,
   refreshSignal,
-  showDesktopSidebar = true,
 }: ChatSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -208,17 +188,29 @@ export default function ChatSidebar({
     renameSession,
     deleteSession,
   } = useSessions();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
   const [pendingNavigationSessionId, setPendingNavigationSessionId] =
     useState<string | null>(null);
-  const [hasResearchInboxItems, setHasResearchInboxItems] = useState(false);
-  const reducedMotion = useReducedMotion();
-  const { entitlement } = useEntitlement();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const locale = resolveRouteLocale(pathname, searchParams.get("locale"));
   const copy = sidebarCopy[locale];
+  const preferredTicker = normalizeTickers([searchParams.get("ticker") ?? ""])[0] ?? null;
+  const orderedSessions = useMemo(() => [...sessions].sort((left, right) => {
+    const leftRunning = ["pending", "queued", "running"].includes(left.latest_run_status ?? "") ? 1 : 0;
+    const rightRunning = ["pending", "queued", "running"].includes(right.latest_run_status ?? "") ? 1 : 0;
+    if (leftRunning !== rightRunning) return rightRunning - leftRunning;
+    if (preferredTicker) {
+      const leftPreferred = normalizeTickers(left.default_tickers).includes(preferredTicker) ? 1 : 0;
+      const rightPreferred = normalizeTickers(right.default_tickers).includes(preferredTicker) ? 1 : 0;
+      if (leftPreferred !== rightPreferred) return rightPreferred - leftPreferred;
+    }
+    return Date.parse(right.updated_at) - Date.parse(left.updated_at);
+  }), [preferredTicker, sessions]);
 
-  const closeMobileSidebar = useCallback(() => {
-    setMobileOpen(false);
+  const closeHistory = useCallback(() => {
+    setOpen(false);
     setPendingNavigationSessionId(null);
   }, []);
 
@@ -229,7 +221,10 @@ export default function ChatSidebar({
   useEffect(() => {
     const handleOpenSidebar = () => {
       setPendingNavigationSessionId(null);
-      setMobileOpen(true);
+      returnFocusRef.current = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+      setOpen(true);
     };
 
     window.addEventListener(OPEN_CHAT_SIDEBAR_EVENT, handleOpenSidebar);
@@ -239,57 +234,49 @@ export default function ChatSidebar({
   }, []);
 
   useEffect(() => {
-    if (!mobileOpen) return;
+    const media = window.matchMedia("(min-width: 768px)");
+    const sync = () => setIsDesktop(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusTimer = window.setTimeout(() => closeButtonRef.current?.focus(), 0);
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeMobileSidebar();
+      if (event.key === "Escape") closeHistory();
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [closeMobileSidebar, mobileOpen]);
-
-  useEffect(() => {
-    let stale = false;
-    async function loadResearchInboxState() {
-      try {
-        const response = await fetch("/api/watchlist", { cache: "no-store" });
-        if (!response.ok) {
-          if (!stale) setHasResearchInboxItems(false);
-          return;
-        }
-        const overview = (await response.json()) as WatchlistOverviewResponse;
-        if (!stale) {
-          setHasResearchInboxItems(overview.research_inbox.length > 0);
-        }
-      } catch {
-        if (!stale) setHasResearchInboxItems(false);
-      }
-    }
-
-    void loadResearchInboxState();
     return () => {
-      stale = true;
+      window.clearTimeout(focusTimer);
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+      returnFocusRef.current?.focus();
     };
-  }, []);
+  }, [closeHistory, open]);
 
   useEffect(() => {
     if (!pendingNavigationSessionId) return;
     if (pathname !== "/chat") return;
     if (activeSessionId !== pendingNavigationSessionId) return;
 
-    const timeoutId = window.setTimeout(closeMobileSidebar, 0);
+    const timeoutId = window.setTimeout(closeHistory, 0);
     return () => window.clearTimeout(timeoutId);
   }, [
     activeSessionId,
-    closeMobileSidebar,
+    closeHistory,
     pathname,
     pendingNavigationSessionId,
   ]);
 
-  const handleMobileSessionNavigate = (sessionId: string) => {
+  const handleSessionNavigate = (sessionId: string) => {
     if (pathname === "/chat" && activeSessionId === sessionId) {
-      closeMobileSidebar();
+      closeHistory();
       return;
     }
 
@@ -300,52 +287,53 @@ export default function ChatSidebar({
   return (
     <>
       <AnimatePresence>
-        {mobileOpen && (
-          <div className="fixed inset-0 z-[80] md:hidden">
+        {open && (
+          <div className="fixed inset-0 z-[80]">
             <motion.button
               type="button"
-              className="absolute inset-0 bg-black/30"
+              className="absolute inset-0 bg-black/35 backdrop-blur-[1px]"
               aria-label={copy.closeHistory}
-              onClick={closeMobileSidebar}
+              onClick={closeHistory}
               initial="hidden"
               animate="visible"
               exit="exit"
               variants={sidebarBackdrop}
             />
             <motion.aside
-              id="mobile-chat-sidebar"
-              className="absolute bottom-0 left-0 top-0 flex w-[min(86vw,328px)] flex-col border-r border-hairline bg-surface shadow-xl"
+              id="chat-history-panel"
+              className="absolute inset-x-0 bottom-0 flex h-[min(78dvh,720px)] max-h-[88dvh] flex-col overflow-hidden rounded-t-[22px] border-t border-hairline bg-surface shadow-2xl md:inset-y-0 md:left-auto md:right-0 md:h-full md:max-h-none md:w-[400px] md:rounded-none md:border-l md:border-t-0"
               role="dialog"
               aria-modal="true"
               aria-label={copy.history}
               initial="hidden"
               animate="visible"
               exit="exit"
-              variants={sidebarPanel}
+              variants={isDesktop ? rightDrawerPanel : bottomSheetPanel}
             >
-              <div className="flex h-[56px] items-center justify-between border-b border-hairline px-sm">
-                <p className="text-[13px] font-bold leading-5 text-ink">
-                  {copy.history}
-                </p>
+              <div className="flex justify-center pb-1 pt-2 md:hidden" aria-hidden="true">
+                <span className="h-1 w-10 rounded-full bg-outline" />
+              </div>
+              <div className="flex min-h-[56px] items-center justify-between border-b border-hairline px-base">
+                <div>
+                  <p className="text-[15px] font-black leading-5 text-ink">
+                    {preferredTicker ? `${preferredTicker} ${copy.history}` : copy.history}
+                  </p>
+                  <p className="mt-0.5 text-[11px] font-semibold text-muted">
+                    {locale === "ko" ? "진행 중인 분석과 최근 대화" : "Running research and recent conversations"}
+                  </p>
+                </div>
                 <button
+                  ref={closeButtonRef}
                   type="button"
                   className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-canvas hover:text-ink"
                   aria-label={copy.closeHistory}
-                  onClick={closeMobileSidebar}
+                  onClick={closeHistory}
                 >
                   <span aria-hidden="true" className="material-symbols-outlined text-[20px]">
                     close
                   </span>
                 </button>
               </div>
-              <SidebarPrimaryLinks
-                locale={locale}
-                copy={copy}
-                hasResearchInboxItems={hasResearchInboxItems}
-                reducedMotion={reducedMotion}
-                entitlement={entitlement}
-                onNavigate={closeMobileSidebar}
-              />
               <div className="border-b border-hairline px-sm py-xs">
                 <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] leading-4 text-muted">
                   {copy.recentChats}
@@ -356,7 +344,7 @@ export default function ChatSidebar({
                 locale={locale}
                 copy={copy}
                 loading={loading}
-                sessions={sessions}
+                sessions={orderedSessions}
                 mutatingSessionId={mutatingSessionId}
                 mutationError={mutationError}
                 listError={listError}
@@ -364,191 +352,28 @@ export default function ChatSidebar({
                 renameSession={renameSession}
                 deleteSession={deleteSession}
                 pendingNavigationSessionId={pendingNavigationSessionId}
-                onNavigate={handleMobileSessionNavigate}
+                onNavigate={handleSessionNavigate}
                 onDeleteActiveSession={() => {
-                  closeMobileSidebar();
+                  closeHistory();
                   router.replace(buildNewChatHref(undefined, { locale }));
                 }}
               />
+              <div className="border-t border-hairline bg-canvas/80 p-xs">
+                <Link
+                  href={localeSwitchHref(locale, "/watchlist", "tab=history")}
+                  className="flex h-10 items-center justify-between rounded-[8px] px-sm text-[13px] font-extrabold text-primary transition-colors hover:bg-surface-soft"
+                  onClick={closeHistory}
+                >
+                  <span>{locale === "ko" ? "리서치 노트북에서 전체 기록 보기" : "View all in Research Notebook"}</span>
+                  <span aria-hidden="true" className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                </Link>
+              </div>
             </motion.aside>
           </div>
         )}
       </AnimatePresence>
 
-      {showDesktopSidebar && (
-        <aside className="hidden w-[280px] shrink-0 flex-col border-r border-hairline bg-surface/80 md:sticky md:top-0 md:flex md:h-[100dvh] md:max-h-[100dvh]">
-          <SidebarPrimaryLinks
-            locale={locale}
-            copy={copy}
-            hasResearchInboxItems={hasResearchInboxItems}
-            reducedMotion={reducedMotion}
-            entitlement={entitlement}
-          />
-          <div className="border-b border-hairline px-sm py-xs">
-            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] leading-4 text-muted">
-              {copy.recentChats}
-            </p>
-          </div>
-          <SidebarContent
-            activeSessionId={activeSessionId}
-            locale={locale}
-            copy={copy}
-            loading={loading}
-            sessions={sessions}
-            mutatingSessionId={mutatingSessionId}
-            mutationError={mutationError}
-            listError={listError}
-            onRetry={() => void listSessions(1, 30)}
-            renameSession={renameSession}
-            deleteSession={deleteSession}
-            pendingNavigationSessionId={null}
-            onDeleteActiveSession={() =>
-              router.replace(buildNewChatHref(undefined, { locale }))
-            }
-          />
-        </aside>
-      )}
     </>
-  );
-}
-
-function SidebarPrimaryLinks({
-  locale,
-  copy,
-  hasResearchInboxItems,
-  reducedMotion,
-  entitlement,
-  onNavigate,
-}: SidebarPrimaryLinksProps) {
-  const linkClass =
-    "group flex h-10 items-center gap-xs rounded-[8px] px-xs text-[14px] font-bold leading-5 text-ink transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
-  const iconClass =
-    "material-symbols-outlined text-[20px] text-muted transition-colors group-hover:text-ink";
-  const isLocked = (featureKey: MenuFeatureKey) =>
-    entitlement !== null &&
-    !isEntitlementFeatureEnabled(entitlement, featureKey);
-  const featureHref = (href: string, featureKey: MenuFeatureKey) =>
-    isLocked(featureKey)
-      ? `/settings/billing?feature=${encodeURIComponent(featureKey)}`
-      : href;
-  const featureLabel = (label: string, featureKey: MenuFeatureKey) =>
-    isLocked(featureKey) ? `${label} — ${copy.upgradeRequired}` : label;
-  const lockIcon = (featureKey: MenuFeatureKey) =>
-    isLocked(featureKey) ? (
-      <span
-        aria-hidden="true"
-        className="material-symbols-outlined ml-auto text-[17px] text-muted"
-      >
-        lock
-      </span>
-    ) : null;
-
-  return (
-    <div className="border-b border-hairline px-xs py-xs">
-      <Link
-        href={featureHref(queryLocalizedPath(locale, "/watchlist"), "research_notebook")}
-        data-onboarding-target="research-notebook-sidebar"
-        className={linkClass}
-        aria-label={featureLabel(copy.openResearchNotebook, "research_notebook")}
-        onClick={onNavigate}
-      >
-        <span aria-hidden="true" className={iconClass}>
-          article
-        </span>
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate">{copy.researchNotebook}</span>
-          {hasResearchInboxItems ? (
-            <span aria-hidden="true" className="relative h-2.5 w-2.5 shrink-0">
-              <span className="absolute inset-[1px] rounded-full bg-primary-container" />
-              {!reducedMotion && (
-                <motion.span
-                  aria-hidden="true"
-                  className="absolute inset-0 rounded-full border border-primary-container"
-                  animate={{ opacity: [0.48, 0], scale: [1, 2.2] }}
-                  transition={{
-                    duration: 1.2,
-                    repeat: Infinity,
-                    ease: "easeOut",
-                  }}
-                />
-              )}
-            </span>
-          ) : null}
-        </span>
-        {lockIcon("research_notebook")}
-      </Link>
-      <Link
-        href={featureHref(queryLocalizedPath(locale, "/discover"), "stock_discovery")}
-        data-onboarding-target="stock-discovery-sidebar"
-        className={linkClass}
-        aria-label={featureLabel(copy.openStockDiscovery, "stock_discovery")}
-        onClick={onNavigate}
-      >
-        <span aria-hidden="true" className={iconClass}>
-          travel_explore
-        </span>
-        <span className="truncate">{copy.stockDiscovery}</span>
-        {lockIcon("stock_discovery")}
-      </Link>
-      <Link
-        href={featureHref(queryLocalizedPath(locale, "/guru"), "guru_advisor")}
-        data-onboarding-target="guru-advisor-sidebar"
-        className={linkClass}
-        aria-label={featureLabel(copy.openGuruAdvisor, "guru_advisor")}
-        onClick={onNavigate}
-      >
-        <span aria-hidden="true" className={iconClass}>
-          psychology
-        </span>
-        <span className="truncate">{copy.guruAdvisor}</span>
-        {lockIcon("guru_advisor")}
-      </Link>
-      <Link
-        href={featureHref(localizedPath(locale, "/companies"), "company_search")}
-        data-onboarding-target="company-search-sidebar"
-        className={linkClass}
-        aria-label={featureLabel(copy.openCompanySearch, "company_search")}
-        onClick={onNavigate}
-      >
-        <span aria-hidden="true" className={iconClass}>
-          search
-        </span>
-        <span className="truncate">{copy.companySearch}</span>
-        {lockIcon("company_search")}
-      </Link>
-      <Link
-        href={featureHref(buildNewChatHref(undefined, { locale }), "wide_research")}
-        data-onboarding-target="wide-research-sidebar"
-        className={linkClass}
-        aria-label={featureLabel(copy.openWideResearch, "wide_research")}
-        onClick={onNavigate}
-      >
-        <span aria-hidden="true" className={iconClass}>
-          hub
-        </span>
-        <span className="truncate">{copy.wideResearch}</span>
-        {lockIcon("wide_research")}
-      </Link>
-      <Link
-        href={featureHref(
-          queryLocalizedPath(locale, "/institutional-holdings"),
-          "institutional_holdings",
-        )}
-        data-onboarding-target="institutional-holdings-sidebar"
-        className={linkClass}
-        aria-label={featureLabel(
-          copy.openInstitutionalHoldings,
-          "institutional_holdings",
-        )}
-        onClick={onNavigate}
-      >
-        <span aria-hidden="true" className={iconClass}>
-          monitoring
-        </span>
-        <span className="truncate">{copy.institutionalHoldings}</span>
-        {lockIcon("institutional_holdings")}
-      </Link>
-    </div>
   );
 }
 

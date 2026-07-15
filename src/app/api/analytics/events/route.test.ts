@@ -8,9 +8,11 @@ vi.mock("@/lib/api/rate-limit", () => ({
 vi.mock("@/lib/analytics/server", () => ({
   recordAnalyticsEventFromRequest: vi.fn(),
 }));
+vi.mock("@/lib/auth", () => ({ getAuthUser: vi.fn() }));
 
 import { checkDurableRateLimits } from "@/lib/api/rate-limit";
 import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
+import { getAuthUser } from "@/lib/auth";
 import { POST } from "./route";
 
 describe("POST /api/analytics/events", () => {
@@ -18,6 +20,18 @@ describe("POST /api/analytics/events", () => {
     vi.clearAllMocks();
     vi.mocked(checkDurableRateLimits).mockResolvedValue({ ok: true });
     vi.mocked(recordAnalyticsEventFromRequest).mockResolvedValue({ ok: true });
+    vi.mocked(getAuthUser).mockResolvedValue(null);
+  });
+
+  it("derives an authenticated analytics identity from the session", async () => {
+    vi.mocked(getAuthUser).mockResolvedValue({ id: "user-1" } as Awaited<ReturnType<typeof getAuthUser>>);
+    const request = new NextRequest("https://app.example.com/api/analytics/events", {
+      method: "POST",
+      body: JSON.stringify({ event_name: "pulse_viewed", anonymous_id: "anon-1" }),
+    });
+
+    expect((await POST(request)).status).toBe(200);
+    expect(recordAnalyticsEventFromRequest).toHaveBeenCalledWith(request, expect.objectContaining({ userId: "user-1" }));
   });
 
   it("records public analytics without trusting object reference ids", async () => {

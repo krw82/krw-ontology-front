@@ -787,7 +787,6 @@ export default function DevComponentsGallery() {
               <div className="overflow-hidden rounded-[8px] border border-hairline">
                 <TopNav
                   hideAccountMenu
-                  showSidebarTrigger
                   brandHref="/companies"
                   brandAriaLabel="회사 목록으로 이동"
                   actionSlot={

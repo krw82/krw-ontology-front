@@ -1,30 +1,51 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { encodePulseCursor, decodePulseCursor } from "@/lib/pulse/cursor";
+import {
+  encodePulseCursor,
+  isPulseCursorV2,
+  type PulseCursorV2,
+} from "@/lib/pulse/cursor";
 import { isPulseSourceEnabled } from "@/lib/pulse/enabled";
 import {
   encodePulseItemId,
+  normalizePulseDateTime,
   PULSE_MAX_PAGE_SIZE,
   PULSE_PAGE_SIZE,
   pulseItemSchema,
   type PulseCandidate,
+  type PulseRankedCandidate,
 } from "@/lib/pulse/contract";
-import { applyPulseItemStates, getPulseItemStates, markPulseItemsFirstSeen } from "@/lib/pulse/item-state";
+import { decodePulseCursor } from "@/lib/pulse/cursor";
+import {
+  applyPulseItemStates,
+  getPulseItemStates,
+  hasRecentKindImpression,
+  markPulseItemsFirstSeen,
+} from "@/lib/pulse/item-state";
 import { getPulsePreferences } from "@/lib/pulse/preferences";
-import { rankPulseCandidates } from "@/lib/pulse/ranking";
-import { buildCheckupCandidate } from "@/lib/pulse/sources/checkup";
+import {
+  comparePulseSortKeys,
+  rankPulseCandidates,
+  reorderFirstPageWindow,
+  sortKeyOf,
+} from "@/lib/pulse/ranking";
+import { selectLearningCandidate, buildLearningCandidates } from "@/lib/pulse/sources/learning";
+import { getAnalysisCandidates } from "@/lib/pulse/sources/analysis";
 import { getFilingCandidates } from "@/lib/pulse/sources/filings";
-import { buildLearningCandidates } from "@/lib/pulse/sources/learning";
 import { getQuestionCandidates } from "@/lib/pulse/sources/questions";
-import { getResurfaceCandidates } from "@/lib/pulse/sources/resurface";
+import { getRawResurfaceCandidates, selectResurfaceCandidate } from "@/lib/pulse/sources/resurface";
+import { buildPulseSummary } from "@/lib/pulse/summary";
 import type {
   PulseFeedResponse,
   PulseFilter,
+  PulseItem,
   PulseItemKind,
   PulseSourceStatus,
 } from "@/types/api-contracts";
 import type { Database } from "@/types/database";
+
+const SOURCE_KINDS = ["filing", "analysis", "question", "resurface", "learning"] as const satisfies readonly PulseItemKind[];
 
 export interface ComposePulseFeedOptions {
   supabase: SupabaseClient<Database>;
@@ -37,6 +58,10 @@ export interface ComposePulseFeedOptions {
   now?: Date;
 }
 
+/**
+ * Builds a deterministic, finite research inbox. Source retrieval is parallel;
+ * no LLM, credit reservation, or new agent run is started from this path.
+ */
 export async function composePulseFeed({
   supabase,
   userId,
@@ -47,88 +72,191 @@ export async function composePulseFeed({
   since,
   now = new Date(),
 }: ComposePulseFeedOptions): Promise<PulseFeedResponse> {
+  const decodedCursor = decodePulseCursor(cursor);
+  const cursorV2 = isPulseCursorV2(decodedCursor) ? decodedCursor : null;
+  const snapshotAt = cursorV2 ? new Date(cursorV2.snapshot_at) : now;
   const preferences = await getPulsePreferences(supabase, userId);
-  const resurfaceCadence = preferences.resurface_cadence === "biweekly" ? "biweekly" : "weekly";
   const enabledKinds = new Set(preferences.enabled_kinds);
-  const sourceKinds: PulseItemKind[] = ["filing", "question", "resurface", "learning"];
-  const settledSources = await Promise.allSettled([
-    settleSource("filing", enabledKinds.has("filing"), () => getFilingCandidates(supabase, userId, now)),
-    settleSource("question", includeNotebookSources && isQuestionCadenceDay(preferences.question_cadence, preferences.timezone, now) && enabledKinds.has("question"), () => getQuestionCandidates(supabase, userId, now)),
-    settleSource("resurface", isPulseSourceEnabled("resurface") && includeNotebookSources && preferences.resurface_cadence !== "off" && preferences.resurfacing_enabled && enabledKinds.has("resurface"), () => getResurfaceCandidates(supabase, userId, now, resurfaceCadence)),
-    settleSource("learning", isPulseSourceEnabled("learning") && preferences.learning_cadence !== "off" && preferences.learning_enabled && enabledKinds.has("learning"), async () => buildLearningCandidates(now)),
-  ]);
-  const sources = settledSources.map((result, index) => result.status === "fulfilled"
+  const resurfaceCadence = preferences.resurface_cadence === "biweekly" ? "biweekly" : "weekly";
+
+  const settled = await Promise.allSettled([
+    loadSource("filing", enabledKinds.has("filing"), () => getFilingCandidates(supabase, userId, snapshotAt)),
+    loadSource("analysis", enabledKinds.has("analysis"), () => getAnalysisCandidates(supabase, userId, snapshotAt)),
+    loadSource(
+      "question",
+      includeNotebookSources
+        && isQuestionCadenceDay(preferences.question_cadence, preferences.timezone, snapshotAt)
+        && enabledKinds.has("question"),
+      () => getQuestionCandidates(supabase, userId, snapshotAt),
+    ),
+    loadSource(
+      "resurface",
+      isPulseSourceEnabled("resurface")
+        && includeNotebookSources
+        && preferences.resurface_cadence !== "off"
+        && preferences.resurfacing_enabled
+        && enabledKinds.has("resurface"),
+      () => getRawResurfaceCandidates(supabase, userId, snapshotAt),
+    ),
+    loadSource(
+      "learning",
+      isPulseSourceEnabled("learning")
+        && preferences.learning_cadence !== "off"
+        && preferences.learning_enabled
+        && enabledKinds.has("learning"),
+      async () => buildLearningCandidates(snapshotAt),
+    ),
+  ] as const);
+
+  const sources = settled.map((result, index) => result.status === "fulfilled"
     ? result.value
-    : {
-        items: [],
-        status: { source: sourceKinds[index], status: "degraded" as const, item_count: 0 },
-      });
-  const sourceStatuses: PulseSourceStatus[] = sources.map((source) => source.status);
-  const sourceCandidates = sources.flatMap((source) => source.items);
-
-  const checkup = preferences.daily_checkup_enabled && enabledKinds.has("checkup")
-    ? buildCheckupCandidate({
-        urgentFilings: sourceCandidates.filter((item) => item.kind === "filing" && item.priority === "urgent" && !item.read_at).length,
-        unreadFilings: sourceCandidates.filter((item) => item.kind === "filing" && !item.read_at).length,
-        openQuestions: sourceCandidates.filter((item) => item.kind === "question").length,
-        staleNotes: sourceCandidates.filter((item) => item.kind === "resurface").length,
-      }, preferences.timezone, now, preferences.daily_checkup_at)
-    : null;
-  sourceStatuses.push({
-    source: "checkup",
-    status: checkup ? "ready" : "empty",
-    item_count: checkup ? 1 : 0,
-  });
-
-  const muted = new Set(preferences.muted_tickers);
-  const filteredCandidates = [...sourceCandidates, ...(checkup ? [checkup] : [])]
-    .filter((item) => !item.ticker || !muted.has(item.ticker))
+    : { items: [], status: degradedStatus(SOURCE_KINDS[index]) });
+  const sourceStatuses = sources.map((source) => source.status);
+  const mutedTickers = new Set(preferences.muted_tickers);
+  const sourceCandidates = sources
+    .flatMap((source) => source.items)
+    .filter((item) => !item.ticker || !mutedTickers.has(item.ticker))
     .filter((item) => filter === "all" || item.kind === filter);
+
   const holdingTickers = await getHoldingTickers(supabase, userId).catch(() => new Set<string>());
-  const candidates = filteredCandidates.map((item) => ({
+  const withHoldings = sourceCandidates.map((item) => ({
     ...item,
     is_holding: Boolean(item.ticker && holdingTickers.has(item.ticker)),
   }));
-  const states = await getPulseItemStates(supabase, userId, candidates.map((item) => item.item_key));
-  const stateful = applyPulseItemStates(candidates, states, now);
-  const decodedCursor = decodePulseCursor(cursor);
-  const offset = decodedCursor?.filter === filter ? decodedCursor.offset : 0;
-  const rankedAt = decodedCursor?.filter === filter
-    ? new Date(decodedCursor.generated_at)
-    : now;
-  const ranked = rankPulseCandidates(
-    stateful.filter((item) => Date.parse(item.available_at) <= rankedAt.getTime()),
-    rankedAt,
-  );
+  const states = await getPulseItemStates(supabase, userId, withHoldings.map((item) => item.item_key));
+  const stateful = applyPulseItemStates(withHoldings, states, snapshotAt, preferences.timezone);
+
+  // Rotation follows per-item hidden/snoozed/fatigue state, ensuring a hidden
+  // first candidate never makes the whole resurface/learning source disappear.
+  const resurface = hasRecentKindImpression(
+    states,
+    "resurface",
+    snapshotAt,
+    preferences.timezone,
+    28 * 24 * 60 * 60 * 1_000,
+  )
+    ? []
+    : selectResurfaceCandidate(
+      stateful.filter((item) => item.kind === "resurface"),
+      userId,
+      snapshotAt,
+      resurfaceCadence,
+    );
+  const learning = hasRecentKindImpression(
+    states,
+    "learning",
+    snapshotAt,
+    preferences.timezone,
+    7 * 24 * 60 * 60 * 1_000,
+  )
+    ? []
+    : selectLearningCandidate(
+      stateful.filter((item) => item.kind === "learning"),
+      userId,
+      snapshotAt,
+    );
+  const candidates = [
+    ...stateful.filter((item) => item.kind !== "resurface" && item.kind !== "learning"),
+    ...resurface,
+    ...learning,
+  ];
+  const ranked = rankPulseCandidates(candidates, snapshotAt);
+  const summary = buildPulseSummary(ranked);
+
+  const afterBoundary = cursorV2
+    ? ranked.filter((item) => comparePulseSortKeys(item, cursorV2.boundary) > 0)
+    : ranked;
   const boundedLimit = Math.max(1, Math.min(limit, PULSE_MAX_PAGE_SIZE));
-  const page = ranked.slice(offset, offset + boundedLimit);
-  await markPulseItemsFirstSeen(supabase, userId, page, now).catch((error) => {
-    console.warn("[pulse] failed to mark first seen", {
+  const rawWindow = afterBoundary.slice(0, boundedLimit);
+  const displayItems = cursorV2 ? rawWindow : reorderFirstPageWindow(rawWindow);
+
+  await markPulseItemsFirstSeen(supabase, userId, rawWindow, snapshotAt).catch((error) => {
+    console.warn("[pulse] failed to mark first delivered", {
       error_code: typeof error === "object" && error && "code" in error ? String(error.code) : "unknown",
     });
   });
-  const nextOffset = offset + page.length;
-  const generatedAt = rankedAt.toISOString();
-  const nextCursor = nextOffset < ranked.length
-    ? encodePulseCursor({ version: 1, offset: nextOffset, filter, generated_at: generatedAt })
+
+  const nextCursor = rawWindow.length > 0 && afterBoundary.length > rawWindow.length
+    ? encodePulseCursor(makeCursor(snapshotAt, sortKeyOf(rawWindow[rawWindow.length - 1])))
     : null;
   const sinceTime = since && !Number.isNaN(Date.parse(since)) ? Date.parse(since) : null;
 
   return {
-    generated_at: generatedAt,
+    generated_at: snapshotAt.toISOString(),
+    snapshot_at: snapshotAt.toISOString(),
     timezone: preferences.timezone,
-    date_label: formatDateLabel(now, preferences.timezone),
+    date_label: formatDateLabel(snapshotAt, preferences.timezone),
     filter,
-    items: page.map(({ item_key, is_holding, is_pinned, ...item }) => {
-      void is_holding;
-      void is_pinned;
-      return pulseItemSchema.parse({ ...item, id: encodePulseItemId(item_key) });
-    }),
+    summary,
+    items: displayItems.map(toPublicItem),
     next_cursor: nextCursor,
     has_more: nextCursor !== null,
-    new_item_count: sinceTime === null ? 0 : ranked.filter((item) => Date.parse(item.available_at) > sinceTime).length,
+    new_item_count: sinceTime === null
+      ? 0
+      : ranked.filter((item) => item.actionable
+        && item.kind !== "learning"
+        && item.kind !== "resurface"
+        && Date.parse(item.available_at) > sinceTime).length,
     source_statuses: sourceStatuses,
   };
+}
+
+function toPublicItem(candidate: PulseRankedCandidate): PulseItem {
+  const {
+    item_key,
+    is_holding,
+    is_pinned,
+    lane,
+    priority_rank,
+    holding_rank,
+    saved_rank,
+    ...item
+  } = candidate;
+  void is_holding;
+  void is_pinned;
+  void lane;
+  void priority_rank;
+  void holding_rank;
+  void saved_rank;
+  return pulseItemSchema.parse({
+    ...item,
+    id: encodePulseItemId(item_key),
+    phase: item.phase ?? null,
+    occurred_at: normalizePulseDateTime(item.occurred_at),
+    available_at: normalizePulseDateTime(item.available_at),
+    expires_at: normalizePulseDateTime(item.expires_at),
+    reviewed_at: normalizePulseDateTime(item.reviewed_at),
+    read_at: normalizePulseDateTime(item.read_at),
+    saved_at: normalizePulseDateTime(item.saved_at),
+    snoozed_until: normalizePulseDateTime(item.snoozed_until),
+  });
+}
+
+function makeCursor(snapshotAt: Date, boundary: PulseCursorV2["boundary"]): PulseCursorV2 {
+  return { version: 2, snapshot_at: snapshotAt.toISOString(), filter: "all", boundary };
+}
+
+async function loadSource(
+  source: (typeof SOURCE_KINDS)[number],
+  enabled: boolean,
+  load: () => Promise<PulseCandidate[]>,
+): Promise<{ items: PulseCandidate[]; status: PulseSourceStatus }> {
+  if (!enabled) return { items: [], status: { source, status: "unavailable", item_count: 0 } };
+  const startedAt = performance.now();
+  const items = await load();
+  return {
+    items,
+    status: {
+      source,
+      status: items.length > 0 ? "ready" : "empty",
+      item_count: items.length,
+      latency_ms: Math.round(performance.now() - startedAt),
+    },
+  };
+}
+
+function degradedStatus(source: (typeof SOURCE_KINDS)[number]): PulseSourceStatus {
+  return { source, status: "degraded", item_count: 0 };
 }
 
 async function getHoldingTickers(
@@ -142,27 +270,6 @@ async function getHoldingTickers(
     .eq("is_holding", true);
   if (error) throw error;
   return new Set(data.map((row) => row.ticker));
-}
-
-async function settleSource(
-  source: PulseItemKind,
-  enabled: boolean,
-  load: () => Promise<PulseCandidate[]>,
-): Promise<{ items: PulseCandidate[]; status: PulseSourceStatus }> {
-  if (!enabled) return { items: [], status: { source, status: "unavailable", item_count: 0 } };
-  const startedAt = performance.now();
-  try {
-    const items = await load();
-    return { items, status: { source, status: items.length > 0 ? "ready" : "empty", item_count: items.length, latency_ms: Math.round(performance.now() - startedAt) } };
-  } catch (error) {
-    const latencyMs = Math.round(performance.now() - startedAt);
-    console.warn("[pulse] source degraded", {
-      source,
-      latency_ms: latencyMs,
-      error_code: typeof error === "object" && error && "code" in error ? String(error.code) : "unknown",
-    });
-    return { items: [], status: { source, status: "degraded", item_count: 0, latency_ms: latencyMs } };
-  }
 }
 
 function formatDateLabel(now: Date, timezone: string): string {

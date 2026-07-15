@@ -249,6 +249,16 @@ const checks = [
       "id,user_id,filing_event_id,kind,title,destination_path,read_at,clicked_at",
   },
   {
+    table: "user_pulse_preferences",
+    select:
+      "user_id,timezone,enabled_kinds,question_cadence,resurface_cadence,learning_cadence",
+  },
+  {
+    table: "user_pulse_item_states",
+    select:
+      "user_id,item_key,source_type,kind,reviewed_at,last_impression_session_id,impression_count",
+  },
+  {
     table: "filing_notification_deliveries",
     select:
       "id,notification_id,subscription_id,status,attempts,next_attempt_at,claim_token",
@@ -342,6 +352,23 @@ if (reserveAnalysisRpcError && reserveAnalysisRpcError.code !== "23503") {
 }
 console.log("OK schema: reserve_analysis_credits RPC");
 
+const { error: pulseImpressionRpcError } = await supabase.rpc("record_pulse_item_impression", {
+  p_user_id: zeroUuid,
+  p_item_key: "filing:schema-smoke",
+  p_source_type: "filing",
+  p_source_id: "schema-smoke",
+  p_kind: "filing",
+  p_feed_session_id: "00000000-0000-4000-8000-000000000000",
+  p_seen_at: new Date().toISOString(),
+});
+if (pulseImpressionRpcError && pulseImpressionRpcError.code !== "23503") {
+  console.error(
+    `Schema smoke failed for record_pulse_item_impression RPC: ${pulseImpressionRpcError.message}`,
+  );
+  process.exit(1);
+}
+console.log("OK schema: record_pulse_item_impression RPC");
+
 function isExpectedBlockedRpcError(error) {
   const code = String(error?.code ?? "");
   const message = String(error?.message ?? "").toLowerCase();
@@ -421,6 +448,15 @@ await expectAnonRpcBlocked("claim_agent_run", {
   p_worker_id: "",
   p_lease_seconds: 300,
   p_global_limit: 1,
+});
+await expectAnonRpcBlocked("record_pulse_item_impression", {
+  p_user_id: zeroUuid,
+  p_item_key: "filing:schema-smoke",
+  p_source_type: "filing",
+  p_source_id: "schema-smoke",
+  p_kind: "filing",
+  p_feed_session_id: "00000000-0000-4000-8000-000000000000",
+  p_seen_at: new Date().toISOString(),
 });
 await expectAnonRpcBlocked("claim_agent_run", {
   p_worker_id: "schema-smoke",

@@ -10,21 +10,16 @@ import LocaleSwitcher from "@/components/LocaleSwitcher";
 import UsageStatus from "@/components/UsageStatus";
 import {
   localeSwitchHref,
-  localizedPath,
-  queryLocalizedPath,
   resolveRouteLocale,
 } from "@/i18n/routing";
 import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
 import { dispatchOpenChatSidebar } from "@/lib/chat/sidebar-events";
+import WorkspaceNavigation from "@/components/navigation/WorkspaceNavigation";
 import { createClient } from "@/lib/supabase/client";
 import { popoverMenu } from "@/lib/animation";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
-
-const SIDEBAR_COACHMARK_STORAGE_KEY =
-  "krw:topnav-sidebar-coachmark-seen:v1";
-const IS_DEV_ENV = process.env.NODE_ENV === "development";
 
 export interface TopNavUserProfile {
   email: string;
@@ -37,8 +32,7 @@ interface TopNavProps {
   brandHref?: string;
   brandAriaLabel?: string;
   hideAccountMenu?: boolean;
-  showSidebarTrigger?: boolean;
-  showSidebarCoachmarkTip?: boolean;
+  showChatHistoryTrigger?: boolean;
   mobileCollapsed?: boolean;
   mobileOverlay?: boolean;
   preserveInitialUserProfile?: boolean;
@@ -104,8 +98,7 @@ export default function TopNav({
   brandHref = "/companies",
   brandAriaLabel,
   hideAccountMenu = false,
-  showSidebarTrigger = false,
-  showSidebarCoachmarkTip = true,
+  showChatHistoryTrigger = false,
   mobileCollapsed = false,
   mobileOverlay = false,
   preserveInitialUserProfile = false,
@@ -130,8 +123,6 @@ export default function TopNav({
   );
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [clientReady, setClientReady] = useState(false);
-  const [showSidebarCoachmark, setShowSidebarCoachmark] =
-    useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const shouldLoadAccount = !hideAccountMenu;
   const { entitlement } = useEntitlement(shouldLoadAccount && Boolean(userProfile));
@@ -142,68 +133,9 @@ export default function TopNav({
     [shouldLoadAccount],
   );
   const query = searchParams.toString();
-  const forceCoachmarks = searchParams.get("coach") === "1";
   const currentPath = normalizeInternalNextPath(
     query ? `${pathname}?${query}` : pathname,
   );
-  const navLinks: Array<{
-    href: string;
-    label: string;
-    active: boolean;
-    badge?: string;
-  }> = [
-    ...(process.env.NEXT_PUBLIC_PULSE_FEED_ENABLED === "1" || process.env.NODE_ENV !== "production" ? [{
-      href: queryLocalizedPath(currentLocale, "/pulse"),
-      label: currentLocale === "ko" ? "오늘" : "Today",
-      active: pathname.startsWith("/pulse"),
-    }] : []),
-    {
-      href: queryLocalizedPath(currentLocale, "/discover"),
-      label: currentLocale === "ko" ? "조건으로 기업 검색" : "Company search by criteria",
-      active: pathname.startsWith("/discover"),
-    },
-    {
-      href: queryLocalizedPath(currentLocale, "/guru"),
-      label: currentLocale === "ko" ? "관점별 분석" : "Perspective analysis",
-      active: pathname.startsWith("/guru"),
-    },
-    {
-      href: localizedPath(currentLocale, "/companies"),
-      label: currentLocale === "ko" ? "회사" : "Companies",
-      active: pathname.includes("/companies"),
-    },
-    {
-      href: queryLocalizedPath(currentLocale, "/watchlist"),
-      label: currentLocale === "ko" ? "리서치 노트북" : "Research Notebook",
-      active: pathname.startsWith("/watchlist"),
-    },
-    {
-      href: queryLocalizedPath(currentLocale, "/filings"),
-      label: currentLocale === "ko" ? "공시 알림" : "Filing alerts",
-      active: pathname.startsWith("/filings"),
-    },
-    {
-      href: queryLocalizedPath(currentLocale, "/institutional-holdings"),
-      label: currentLocale === "ko" ? "13F 보유" : "13F Holdings",
-      active: pathname.startsWith("/institutional-holdings"),
-    },
-  ];
-  const sidebarCoachmarkCopy =
-    currentLocale === "ko"
-      ? {
-          body: "이전 리서치는 여기에서",
-          dismiss: "리서치 기록 안내 닫기",
-        }
-      : {
-          body: "Past research lives here",
-          dismiss: "Dismiss research history tip",
-        };
-  const shouldShowSidebarCoachmark =
-    showSidebarTrigger &&
-    showSidebarCoachmarkTip &&
-    clientReady &&
-    showSidebarCoachmark;
-
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setClientReady(true);
@@ -211,40 +143,6 @@ export default function TopNav({
 
     return () => window.clearTimeout(timeoutId);
   }, []);
-
-  useEffect(() => {
-    if (!showSidebarTrigger || !showSidebarCoachmarkTip) return undefined;
-    if (forceCoachmarks) {
-      const showTimer = window.setTimeout(
-        () => setShowSidebarCoachmark(true),
-        0,
-      );
-      return () => {
-        window.clearTimeout(showTimer);
-      };
-    }
-    if (IS_DEV_ENV) return undefined;
-
-    try {
-      if (
-        window.localStorage.getItem(SIDEBAR_COACHMARK_STORAGE_KEY) === "1"
-      ) {
-        return undefined;
-      }
-      window.localStorage.setItem(SIDEBAR_COACHMARK_STORAGE_KEY, "1");
-    } catch {
-      // If storage is unavailable, still show the tip for this page view.
-    }
-
-    const showTimer = window.setTimeout(
-      () => setShowSidebarCoachmark(true),
-      0,
-    );
-
-    return () => {
-      window.clearTimeout(showTimer);
-    };
-  }, [forceCoachmarks, showSidebarCoachmarkTip, showSidebarTrigger]);
 
   // M-08: onAuthStateChange listener
   useEffect(() => {
@@ -340,110 +238,30 @@ export default function TopNav({
     >
       <div className="mx-auto flex h-full w-full max-w-[1600px] items-center justify-between gap-sm px-base sm:px-md md:pl-md">
         <div className="flex min-w-0 items-center gap-sm sm:gap-lg">
-          {showSidebarTrigger && (
-            <div className="relative shrink-0 md:hidden">
-              <AnimatePresence initial={false}>
-                {shouldShowSidebarCoachmark ? (
-                  <motion.div
-                    key="sidebar-coachmark"
-                    className="absolute left-0 top-[calc(100%+8px)] z-50 inline-flex max-w-[220px] items-center gap-2 rounded-[8px] border border-outline bg-canvas px-3 py-2 text-[12px] font-bold leading-4 text-ink shadow-lg"
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-                  >
-                    <span className="min-w-0 whitespace-nowrap">
-                      {sidebarCoachmarkCopy.body}
-                    </span>
-                    <button
-                      type="button"
-                      className="-mr-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                      aria-label={sidebarCoachmarkCopy.dismiss}
-                      onClick={() => setShowSidebarCoachmark(false)}
-                    >
-                      <span
-                        className="material-symbols-outlined text-[15px]"
-                        aria-hidden="true"
-                      >
-                        close
-                      </span>
-                    </button>
-                    <span
-                      aria-hidden="true"
-                      className="absolute -top-[5px] left-4 h-2.5 w-2.5 rotate-45 border-l border-t border-outline bg-canvas"
-                    />
-                  </motion.div>
-                ) : null}
-              </AnimatePresence>
-              <button
-                type="button"
-                data-onboarding-target="sidebar-trigger"
-                className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55"
-                aria-label={
-                  currentLocale === "ko" ? "채팅 기록 열기" : "Open chat history"
-                }
-                aria-controls="mobile-chat-sidebar"
-                onClick={() => {
-                  setShowSidebarCoachmark(false);
-                  dispatchOpenChatSidebar();
-                }}
-                disabled={!clientReady}
-              >
-                <span aria-hidden="true" className="relative block h-5 w-6">
-                  <span className="absolute left-0 top-[3px] h-[2px] w-5 rounded-full bg-ink" />
-                  <span className="absolute bottom-[3px] left-0 h-[2px] w-3.5 rounded-full bg-ink" />
-                </span>
-              </button>
-            </div>
-          )}
+          <WorkspaceNavigation locale={currentLocale} pathname={pathname} />
           <KrwBrand
             href={localizedBrandHref}
             compact
             ariaLabel={brandAriaLabel}
           />
-          <nav className="hidden items-center gap-1 md:flex" aria-label="Primary">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                data-onboarding-target={
-                  link.href.startsWith("/pulse")
-                    ? "research-pulse-nav"
-                    : link.href.startsWith("/discover")
-                    ? "stock-discovery-nav"
-                    : link.href.startsWith("/guru")
-                      ? "guru-advisor-nav"
-                      : link.href.startsWith("/watchlist")
-                        ? "research-notebook-nav"
-                        : link.href.startsWith("/filings")
-                          ? "filing-alerts-nav"
-                        : link.href.startsWith("/institutional-holdings")
-                        ? "institutional-holdings-nav"
-                        : link.href.includes("/companies")
-                          ? "company-search-nav"
-                          : undefined
-                }
-                className={[
-                  "rounded-[8px] px-sm py-xs text-[13px] font-extrabold leading-5 transition-colors",
-                  link.active
-                    ? "bg-surface text-ink"
-                    : "text-muted hover:bg-surface-soft hover:text-primary",
-                ].join(" ")}
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  <span>{link.label}</span>
-                  {"badge" in link && link.badge ? (
-                    <span className="rounded-[6px] border border-hairline bg-canvas px-1.5 py-[1px] font-mono text-[9px] font-black uppercase tracking-[0.08em] text-primary">
-                      {link.badge}
-                    </span>
-                  ) : null}
-                </span>
-              </Link>
-            ))}
-          </nav>
         </div>
 
         <div className="flex shrink-0 items-center justify-end gap-xs sm:gap-md">
+          {showChatHistoryTrigger ? (
+            <button
+              type="button"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-[8px] border border-hairline bg-canvas text-ink shadow-sm transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-55 lg:w-auto lg:gap-1.5 lg:px-sm lg:text-[13px] lg:font-extrabold"
+              aria-label={currentLocale === "ko" ? "채팅 기록 열기" : "Open chat history"}
+              aria-controls="chat-history-panel"
+              onClick={() => {
+                dispatchOpenChatSidebar();
+              }}
+              disabled={!clientReady}
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[19px]">history</span>
+              <span className="hidden lg:inline">{currentLocale === "ko" ? "채팅 기록" : "History"}</span>
+            </button>
+          ) : null}
           {actionSlot}
           {showLocaleSwitcher && <LocaleSwitcher compact />}
           {hideAccountMenu ? null : !authChecked ? (
@@ -509,17 +327,6 @@ export default function TopNav({
                     >
                       <UsageStatus entitlement={entitlement} variant="menu" />
                     </Link>
-                    {process.env.NEXT_PUBLIC_PULSE_FEED_ENABLED === "1" || process.env.NODE_ENV !== "production" ? (
-                      <Link
-                        href={queryLocalizedPath(currentLocale, "/pulse")}
-                        className="mt-xs flex w-full items-center justify-between rounded-[8px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-surface-soft hover:text-primary"
-                        role="menuitem"
-                        onClick={() => setAccountMenuOpen(false)}
-                      >
-                        <span>{currentLocale === "ko" ? "오늘의 Pulse" : "Today's Pulse"}</span>
-                        <span aria-hidden="true" className="material-symbols-outlined text-[18px]">dynamic_feed</span>
-                      </Link>
-                    ) : null}
                     <Link
                       href="/filings"
                       className="mt-xs flex w-full items-center justify-between rounded-[8px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-surface-soft hover:text-primary"

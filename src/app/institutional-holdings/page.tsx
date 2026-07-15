@@ -79,8 +79,6 @@ export default async function InstitutionalHoldingsPage({
         preserveInitialUserProfile={shouldPreserveInitialProfile(user)}
         brandHref="/companies"
         brandAriaLabel="회사 목록으로 이동"
-        showSidebarTrigger
-        showSidebarCoachmarkTip={false}
         showLocaleSwitcher
       />
       <InstitutionalHoldingsClient

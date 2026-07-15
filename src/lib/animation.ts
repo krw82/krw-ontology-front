@@ -191,6 +191,30 @@ export const sidebarPanel: Variants = {
   },
 };
 
+export const bottomSheetPanel: Variants = {
+  hidden: { y: "100%" },
+  visible: {
+    y: 0,
+    transition: { duration: duration.normal, ease: easeOutExpo },
+  },
+  exit: {
+    y: "100%",
+    transition: { duration: 0.2, ease: easeOutQuart },
+  },
+};
+
+export const rightDrawerPanel: Variants = {
+  hidden: { x: "100%" },
+  visible: {
+    x: 0,
+    transition: { duration: duration.normal, ease: easeOutExpo },
+  },
+  exit: {
+    x: "100%",
+    transition: { duration: 0.2, ease: easeOutQuart },
+  },
+};
+
 export const sidebarBackdrop: Variants = {
   hidden: { opacity: 0 },
   visible: {

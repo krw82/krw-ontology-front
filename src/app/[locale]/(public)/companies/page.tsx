@@ -86,7 +86,6 @@ export default async function CompaniesPage({ params }: CompaniesPageProps) {
         preserveInitialUserProfile={preserveInitialUserProfile}
         brandHref="/companies"
         brandAriaLabel={locale === "ko" ? "회사 목록으로 이동" : "Go to companies"}
-        showSidebarTrigger
         showLocaleSwitcher
       />
       <CompaniesBrowser

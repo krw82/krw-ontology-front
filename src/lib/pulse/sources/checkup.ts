@@ -47,7 +47,7 @@ export function buildCheckupCandidate(
     saved_at: null,
     snoozed_until: null,
     group_key: `checkup:${localDate}`,
-    primary_action: { type: "link", label: "중요 항목부터 보기", href: "/pulse?filter=filing" },
+    primary_action: { type: "link", label: "중요 공시 보기", href: "/filings" },
     secondary_actions: [{ type: "mutation", label: "오늘 체크 완료", action: "read" }],
     metadata: {
       urgent_filings: counts.urgentFilings,

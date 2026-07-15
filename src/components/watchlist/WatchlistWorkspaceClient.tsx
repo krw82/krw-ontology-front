@@ -453,7 +453,7 @@ export default function WatchlistWorkspaceClient({
           </section>
 
           <aside className="grid gap-4">
-            <SidebarSection title="최근 대화">
+            <SidebarSection title="이 종목의 채팅 기록">
               {recentSessions.length === 0 ? (
                 <p className="text-[13px] font-bold leading-5 text-muted">
                   아직 이 종목으로 저장된 대화가 없습니다.

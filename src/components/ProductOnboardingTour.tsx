@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
-import { dispatchOpenChatSidebar } from "@/lib/chat/sidebar-events";
+import { dispatchOpenWorkspaceMenu } from "@/lib/navigation/workspace-menu-events";
 import { easeOutExpo } from "@/lib/animation";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { getPathLocale } from "@/i18n/routing";
@@ -68,7 +68,7 @@ const companyTourSteps: TourStep[] = [
   {
     id: "research-notebook-nav",
     selector:
-      '[data-onboarding-target="research-notebook-nav"], [data-onboarding-target="research-notebook-sidebar"], [data-onboarding-target="sidebar-trigger"]',
+      '[data-onboarding-target="research-notebook-nav"], [data-onboarding-target="workspace-menu-trigger"]',
     icon: "article",
     title: {
       ko: "리서치 노트북은 이어보기 공간입니다",
@@ -82,7 +82,7 @@ const companyTourSteps: TourStep[] = [
   {
     id: "stock-discovery-nav",
     selector:
-      '[data-onboarding-target="stock-discovery-nav"], [data-onboarding-target="stock-discovery-sidebar"], [data-onboarding-target="sidebar-trigger"]',
+      '[data-onboarding-target="stock-discovery-nav"], [data-onboarding-target="workspace-menu-trigger"]',
     icon: "travel_explore",
     title: {
       ko: "조건으로 기업을 검색하세요",
@@ -96,7 +96,7 @@ const companyTourSteps: TourStep[] = [
   {
     id: "guru-advisor-nav",
     selector:
-      '[data-onboarding-target="guru-advisor-nav"], [data-onboarding-target="guru-advisor-sidebar"], [data-onboarding-target="guru-advisor-cta"], [data-onboarding-target="sidebar-trigger"]',
+      '[data-onboarding-target="guru-advisor-nav"], [data-onboarding-target="guru-advisor-cta"], [data-onboarding-target="workspace-menu-trigger"]',
     icon: "psychology",
     title: {
       ko: "공개 원칙으로 아이디어 점검",
@@ -110,7 +110,7 @@ const companyTourSteps: TourStep[] = [
   {
     id: "company-search-nav",
     selector:
-      '[data-onboarding-target="company-search-nav"], [data-onboarding-target="company-search-sidebar"], [data-onboarding-target="company-search"]',
+      '[data-onboarding-target="company-search-nav"], [data-onboarding-target="company-search"], [data-onboarding-target="workspace-menu-trigger"]',
     icon: "search",
     title: {
       ko: "회사를 알면 회사 찾기",
@@ -124,7 +124,7 @@ const companyTourSteps: TourStep[] = [
   {
     id: "wide-research-nav",
     selector:
-      '[data-onboarding-target="wide-research-nav"], [data-onboarding-target="wide-research-sidebar"], [data-onboarding-target="sidebar-trigger"]',
+      '[data-onboarding-target="wide-research-nav"], [data-onboarding-target="workspace-menu-trigger"]',
     icon: "hub",
     title: {
       ko: "이슈를 넓게 보려면 와이드 리서치",
@@ -138,7 +138,7 @@ const companyTourSteps: TourStep[] = [
   {
     id: "institutional-holdings-nav",
     selector:
-      '[data-onboarding-target="institutional-holdings-nav"], [data-onboarding-target="institutional-holdings-sidebar"], [data-onboarding-target="sidebar-trigger"]',
+      '[data-onboarding-target="institutional-holdings-nav"], [data-onboarding-target="workspace-menu-trigger"]',
     icon: "monitoring",
     title: {
       ko: "기관 보유 변화는 13F",
@@ -169,7 +169,7 @@ const chatTourSteps: TourStep[] = [
   {
     id: "chat-wide-research",
     selector:
-      '[data-onboarding-target="chat-empty-heading"], [data-onboarding-target="chat-suggested-prompts"], [data-onboarding-target="wide-research-sidebar"], [data-onboarding-target="chat-composer"]',
+      '[data-onboarding-target="chat-empty-heading"], [data-onboarding-target="chat-suggested-prompts"], [data-onboarding-target="chat-composer"]',
     icon: "hub",
     title: {
       ko: "와이드 리서치는 여러 회사를 동시에 봅니다",
@@ -211,7 +211,7 @@ const chatTourSteps: TourStep[] = [
   {
     id: "chat-notebook",
     selector:
-      '[data-onboarding-target="chat-notebook-actions"], [data-onboarding-target="research-notebook-nav"], [data-onboarding-target="research-notebook-sidebar"], [data-onboarding-target="sidebar-trigger"]',
+      '[data-onboarding-target="chat-notebook-actions"], [data-onboarding-target="research-notebook-nav"], [data-onboarding-target="workspace-menu-trigger"]',
     icon: "article",
     title: {
       ko: "중요한 리서치는 노트북에 남기세요",
@@ -467,8 +467,8 @@ export default function ProductOnboardingTour({
   useEffect(() => {
     if (!visible) return;
 
-    if (isMobileViewport() && needsMobileSidebar(currentStep.id)) {
-      dispatchOpenChatSidebar();
+    if (isMobileViewport() && needsMobileWorkspaceMenu(currentStep.id)) {
+      dispatchOpenWorkspaceMenu();
     }
 
     const frameId = window.requestAnimationFrame(updateSpotlight);
@@ -734,7 +734,7 @@ function isVisibleTarget(element: Element): boolean {
   );
 }
 
-function needsMobileSidebar(stepId: TourStepId): boolean {
+function needsMobileWorkspaceMenu(stepId: TourStepId): boolean {
   if (stepId === "chat-notebook") {
     return !findVisibleTarget('[data-onboarding-target="chat-notebook-actions"]');
   }

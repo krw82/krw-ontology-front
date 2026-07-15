@@ -9,18 +9,20 @@ interface PulseCardProps {
   item: PulseItem;
   position: number;
   pending: boolean;
+  feedSessionId: string;
   onMutation: (item: PulseItem, action: PulseMutationAction) => void;
 }
 
 const KIND_STYLES = {
   filing: { icon: "description", rail: "bg-primary", wash: "bg-primary-fixed/50" },
+  analysis: { icon: "manage_search", rail: "bg-[#4f46e5]", wash: "bg-[#eef0ff]" },
   checkup: { icon: "fact_check", rail: "bg-[#ff6b4a]", wash: "bg-[#fff1ed]" },
   question: { icon: "help", rail: "bg-[#7259d9]", wash: "bg-[#f3f0ff]" },
   resurface: { icon: "history", rail: "bg-[#a56a14]", wash: "bg-[#fff7e8]" },
   learning: { icon: "school", rail: "bg-[#178768]", wash: "bg-[#eaf8f3]" },
 } as const;
 
-export default function PulseCard({ item, position, pending, onMutation }: PulseCardProps) {
+export default function PulseCard({ item, position, pending, feedSessionId, onMutation }: PulseCardProps) {
   const ref = useRef<HTMLElement>(null);
   const impressionSent = useRef(false);
   const style = KIND_STYLES[item.kind];
@@ -45,13 +47,15 @@ export default function PulseCard({ item, position, pending, onMutation }: Pulse
           item_kind: item.kind,
           position,
           priority: item.priority,
+          item_state: item.state,
+          phase: item.phase,
           has_ticker: Boolean(item.ticker),
           visible_ms: 1000,
         });
         void fetch(`/api/pulse/items/${encodeURIComponent(item.id)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "impression" }),
+          body: JSON.stringify({ action: "impression", feed_session_id: feedSessionId }),
         }).catch(() => undefined);
         observer.disconnect();
       }, 1_000);
@@ -61,9 +65,11 @@ export default function PulseCard({ item, position, pending, onMutation }: Pulse
       if (impressionTimer !== null) window.clearTimeout(impressionTimer);
       observer.disconnect();
     };
-  }, [item.id, item.kind, item.priority, item.ticker, position]);
+  }, [feedSessionId, item.id, item.kind, item.phase, item.priority, item.state, item.ticker, position]);
 
   const primary = item.primary_action;
+  const analysisStatus = item.kind === "analysis" ? String(item.metadata.run_status ?? "") : null;
+  const analysisActive = item.kind === "analysis" && item.phase === "active";
   return (
     <article
       ref={ref}
@@ -80,6 +86,7 @@ export default function PulseCard({ item, position, pending, onMutation }: Pulse
             <div className="min-w-0">
               <p className="truncate text-[11px] font-black uppercase tracking-[0.13em] text-muted">{item.eyebrow}</p>
               {item.priority === "urgent" ? <p className="mt-0.5 text-[11px] font-black text-[#c43c22]">긴급 · 먼저 확인</p> : null}
+              {item.state === "reviewed" ? <p className="mt-0.5 text-[11px] font-black text-muted">이전에 검토함</p> : null}
               {item.ticker ? <p className="mt-0.5 text-[12px] font-extrabold text-primary">{item.ticker}</p> : null}
             </div>
           </div>
@@ -89,6 +96,12 @@ export default function PulseCard({ item, position, pending, onMutation }: Pulse
         </div>
 
         <h2 className="mt-base text-[19px] font-black leading-[1.35] tracking-[-0.025em] text-ink sm:text-[21px]">{item.title}</h2>
+        {analysisActive ? (
+          <div className="mt-sm inline-flex items-center gap-xs rounded-full bg-[#eef0ff] px-sm py-xs text-[12px] font-extrabold text-[#4338ca]" role="status">
+            <span className="material-symbols-outlined animate-spin text-[16px]" aria-hidden="true">progress_activity</span>
+            {analysisStatus === "running" ? "근거 확인 중" : "분석 대기 중"}
+          </div>
+        ) : null}
         {item.kind === "learning" && item.metadata.learning_kind === "four_panel" ? (
           <div className="mt-base grid grid-cols-2 gap-xs" aria-label="공시 알림 4컷">
             {[1, 2, 3, 4].map((panel) => (
@@ -105,7 +118,7 @@ export default function PulseCard({ item, position, pending, onMutation }: Pulse
             <Link
               href={primary.href}
               className="inline-flex min-h-10 items-center gap-xs rounded-[10px] bg-ink px-base text-[13px] font-extrabold text-white transition-colors hover:bg-primary"
-              onClick={() => trackClientEventSilently("pulse_item_opened", { item_kind: item.kind, action: "primary" })}
+              onClick={() => trackClientEventSilently("pulse_item_opened", { item_kind: item.kind, action: "primary", item_state: item.state, phase: item.phase })}
             >
               {primary.label}<span className="material-symbols-outlined text-[16px]" aria-hidden="true">arrow_forward</span>
             </Link>
@@ -119,19 +132,22 @@ export default function PulseCard({ item, position, pending, onMutation }: Pulse
               key={`${action.type}-${action.label}`}
               href={action.href}
               className="inline-flex min-h-10 items-center rounded-[10px] px-sm text-[13px] font-bold text-primary hover:bg-primary-fixed/60"
-              onClick={() => trackClientEventSilently(action.analytics_name === "pulse_answer_prefilled" ? "pulse_answer_prefilled" : "pulse_item_opened", { item_kind: item.kind, action: action.label })}
+              onClick={() => trackClientEventSilently(action.analytics_name === "pulse_answer_prefilled" ? "pulse_answer_prefilled" : "pulse_item_opened", { item_kind: item.kind, action: action.label, item_state: item.state, phase: item.phase })}
             >
               {action.label}
             </Link>
           ) : (() => {
             const effectiveAction = action.action === "save" && item.saved_at ? "unsave" : action.action;
-            const label = action.action === "save" && item.saved_at ? "저장됨" : action.label;
+            const reviewAction = effectiveAction === "review" && item.reviewed_at ? "unreview" : effectiveAction;
+            const label = action.action === "save" && item.saved_at
+              ? "저장됨"
+              : effectiveAction === "review" && item.reviewed_at ? "다시 미검토" : action.label;
             return (
             <button
               key={`${action.type}-${action.action}`}
               type="button"
               disabled={pending}
-              onClick={() => onMutation(item, effectiveAction)}
+              onClick={() => onMutation(item, reviewAction)}
               className="inline-flex min-h-10 items-center rounded-[10px] px-sm text-[13px] font-bold text-muted transition-colors hover:bg-surface-soft hover:text-ink disabled:opacity-45"
             >
               {label}
@@ -153,7 +169,7 @@ function triggerLabel(trigger: PulseItem["trigger"]): string {
   if (trigger === "event") return "새 사건 감지";
   if (trigger === "schedule") return "예약된 체크";
   if (trigger === "editorial") return "주간 편집 콘텐츠";
-  return "저장 상태 변화";
+  return "내 활동 상태 변화";
 }
 
 function formatRelativeTime(iso: string): string {

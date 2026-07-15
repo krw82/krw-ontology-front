@@ -116,8 +116,6 @@ export default async function GuruPage({ searchParams }: GuruPageProps) {
         preserveInitialUserProfile={shouldPreserveInitialProfile(user)}
         brandHref="/companies"
         brandAriaLabel="회사 목록으로 이동"
-        showSidebarTrigger={false}
-        showSidebarCoachmarkTip={false}
         showLocaleSwitcher
       />
       <GuruDirectoryClient locale={locale} company={companyContext} />

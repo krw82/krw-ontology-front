@@ -72,6 +72,7 @@ export const ANALYTICS_EVENT_NAMES = [
   "pulse_item_impression",
   "pulse_item_opened",
   "pulse_item_actioned",
+  "pulse_summary_actioned",
   "pulse_filter_changed",
   "pulse_preferences_updated",
   "pulse_new_items_seen",

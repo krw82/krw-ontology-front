@@ -66,6 +66,38 @@ test.describe("dev auth bypass", () => {
     });
   });
 
+  test("renders the filterless P0 research feed without a legacy checkup card", async ({
+    page,
+  }) => {
+    test.skip(
+      process.env.PULSE_P0_V2_ENABLED === "0",
+      "This assertion targets the v2 feed surface.",
+    );
+    await page.goto("/pulse", { waitUntil: "domcontentloaded" });
+
+    await expect(page).toHaveURL(/\/pulse$/);
+    await expect(page.getByRole("heading", { name: "피드" })).toBeVisible();
+    await expect(page.locator('nav[aria-label="피드 종류"]')).toHaveCount(0);
+    await expect(page.locator('[data-pulse-kind="checkup"]')).toHaveCount(0);
+    await expect(page.getByRole("main")).toContainText(
+      "확인한 활동은 여기까지입니다",
+    );
+  });
+
+  test("keeps the legacy Pulse surface available when the P0 flag is disabled", async ({
+    page,
+  }) => {
+    test.skip(
+      process.env.PULSE_P0_V2_ENABLED !== "0",
+      "This assertion targets the one-release rollback surface.",
+    );
+    await page.goto("/pulse", { waitUntil: "domcontentloaded" });
+
+    await expect(page).toHaveURL(/\/pulse$/);
+    await expect(page.getByRole("heading", { name: "오늘" })).toBeVisible();
+    await expect(page.locator('nav[aria-label="피드 종류"]')).toHaveCount(1);
+  });
+
   test("opens protected companies page with stable account nav", async ({
     page,
   }, testInfo) => {
@@ -692,7 +724,7 @@ test.describe("dev auth bypass", () => {
   }, testInfo) => {
     test.skip(
       testInfo.project.name !== "mobile-chrome",
-      "mobile drawer behavior is only relevant on small viewports",
+      "mobile bottom-sheet behavior is only relevant on small viewports",
     );
 
     const sessionId = "33333333-3333-4333-8333-333333333333";
@@ -806,13 +838,33 @@ test.describe("dev auth bypass", () => {
       });
     });
 
-    await page.goto("/companies", { waitUntil: "domcontentloaded" });
-    await expect(page).toHaveURL(/\/companies$/);
+    await page.goto("/chat?ticker=AAPL", { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(/\/chat\/new\?ticker=AAPL$/);
     const historyButton = page.getByRole("button", { name: "채팅 기록 열기" });
     await expect(historyButton).toBeEnabled();
     await historyButton.click();
 
-    await expect(page.getByRole("dialog", { name: "채팅 기록" })).toBeVisible();
+    const historyDialog = page.getByRole("dialog", { name: "채팅 기록" });
+    await expect(historyDialog).toBeVisible();
+    const viewport = page.viewportSize();
+    expect(viewport).not.toBeNull();
+    await expect
+      .poll(async () => {
+        const box = await historyDialog.boundingBox();
+        return box
+          ? Math.abs(box.y + box.height - (viewport?.height ?? 0))
+          : Number.POSITIVE_INFINITY;
+      })
+      .toBeLessThanOrEqual(2);
+    const historyBox = await historyDialog.boundingBox();
+    expect(historyBox).not.toBeNull();
+    expect(historyBox?.x).toBeLessThanOrEqual(1);
+    expect(historyBox?.width).toBeGreaterThanOrEqual(
+      (viewport?.width ?? 0) - 2,
+    );
+    expect(historyBox?.height).toBeLessThan(
+      viewport?.height ?? Number.POSITIVE_INFINITY,
+    );
 
     await page.getByRole("link", { name: /모바일 전환 회귀 테스트/ }).click();
 
@@ -835,6 +887,41 @@ test.describe("dev auth bypass", () => {
     await expect(page.getByRole("dialog", { name: "채팅 기록" })).toHaveCount(
       0,
     );
+  });
+
+  test("mobile workspace menu groups global routes separately from chat history", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "mobile-chrome",
+      "the workspace menu is rendered as a mobile drawer",
+    );
+
+    await page.goto("/companies", { waitUntil: "domcontentloaded" });
+    const workspaceMenuButton = page.getByRole("button", {
+      name: "전체 메뉴 열기",
+    });
+    await expect(workspaceMenuButton).toHaveAttribute(
+      "data-workspace-menu-ready",
+      "true",
+    );
+    await workspaceMenuButton.click();
+
+    const menu = page.getByRole("dialog", { name: "메뉴" });
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole("heading", { name: "탐색" })).toBeVisible();
+    await expect(
+      menu.getByRole("heading", { name: "내 리서치" }),
+    ).toBeVisible();
+    await expect(
+      menu.getByRole("link", { name: "리서치 노트북" }),
+    ).toBeVisible();
+    await expect(
+      menu.getByRole("link", { name: "와이드 리서치" }),
+    ).toBeVisible();
+    await expect(menu.getByRole("link", { name: "공시 알림" })).toBeVisible();
+    await expect(menu.getByRole("link", { name: "13F 보유" })).toBeVisible();
+    await expect(menu.getByRole("link", { name: "채팅 기록" })).toHaveCount(0);
   });
 });
 

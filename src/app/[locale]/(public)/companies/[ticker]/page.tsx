@@ -262,7 +262,6 @@ export default async function CompanyLandingPage({ params }: CompanyPageProps) {
         brandAriaLabel={
           locale === "ko" ? "회사 목록으로 이동" : "Go to companies"
         }
-        showSidebarTrigger
         showLocaleSwitcher
       />
       <main

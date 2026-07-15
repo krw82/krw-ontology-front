@@ -1,12 +1,16 @@
 import type {
+  PulseAnalysisPhase,
   PulseItem,
+  PulseItemBase,
   PulseItemKind,
   PulseItemPriority,
+  PulseItemState,
 } from "@/types/api-contracts";
 import { z } from "zod";
 
 export const PULSE_ITEM_KINDS = [
   "filing",
+  "analysis",
   "checkup",
   "question",
   "resurface",
@@ -26,7 +30,7 @@ const pulseLinkActionSchema = z.object({
 const pulseMutationActionSchema = z.object({
   type: z.literal("mutation"),
   label: z.string().min(1).max(80),
-  action: z.enum(["read", "unread", "save", "unsave", "snooze", "dismiss"]),
+  action: z.enum(["review", "unreview", "read", "unread", "save", "unsave", "snooze", "dismiss"]),
   analytics_name: z.string().max(80).optional(),
 });
 
@@ -46,13 +50,16 @@ const pulseItemBaseSchema = z.object({
   reason_code: z.string().min(1),
   reason_label: z.string().min(1),
   priority: z.enum(["urgent", "high", "normal", "low"]),
-  score: z.number().finite(),
   occurred_at: z.iso.datetime(),
   available_at: z.iso.datetime(),
   expires_at: z.iso.datetime().nullable(),
+  reviewed_at: z.iso.datetime().nullable(),
   read_at: z.iso.datetime().nullable(),
   saved_at: z.iso.datetime().nullable(),
   snoozed_until: z.iso.datetime().nullable(),
+  state: z.enum(["new", "seen", "reviewed"] satisfies readonly PulseItemState[]),
+  actionable: z.boolean(),
+  phase: z.enum(["active", "completed", "failed"] satisfies readonly PulseAnalysisPhase[]).nullable(),
   group_key: z.string().nullable(),
   primary_action: pulseActionSchema,
   secondary_actions: z.array(pulseActionSchema).max(3),
@@ -65,42 +72,47 @@ function pulseKindSchema<K extends PulseItemKind>(kind: K) {
 
 export const pulseItemSchema = z.discriminatedUnion("kind", [
   pulseKindSchema("filing"),
+  pulseKindSchema("analysis"),
   pulseKindSchema("checkup"),
   pulseKindSchema("question"),
   pulseKindSchema("resurface"),
   pulseKindSchema("learning"),
 ]);
 
-export interface PulseCandidate extends Omit<PulseItem, "id" | "score"> {
+export interface PulseCandidate extends Omit<
+  PulseItemBase<PulseItemKind>,
+  "id" | "reviewed_at" | "state" | "actionable" | "phase"
+> {
   item_key: string;
+  reviewed_at?: string | null;
+  state?: PulseItemState;
+  actionable?: boolean;
+  phase?: PulseAnalysisPhase | null;
   is_holding?: boolean;
   is_pinned?: boolean;
 }
 
-export interface PulseRankedCandidate extends PulseCandidate {
-  score: number;
+export interface PulseSortKey {
+  lane: number;
+  priority_rank: number;
+  holding_rank: number;
+  saved_rank: number;
+  occurred_at: string;
+  item_key: string;
 }
 
-export interface PulseCursorPayload {
-  version: 1;
-  offset: number;
-  filter: string;
-  generated_at: string;
+export interface PulseRankedCandidate extends PulseCandidate, PulseSortKey {
+  reviewed_at: string | null;
+  state: PulseItemState;
+  actionable: boolean;
+  phase: PulseAnalysisPhase | null;
 }
 
-export const PULSE_BASE_SCORES: Record<PulseItemKind, number> = {
-  filing: 900,
-  checkup: 650,
-  question: 700,
-  resurface: 500,
-  learning: 300,
-};
-
-export const PULSE_PRIORITY_SCORES: Record<PulseItemPriority, number> = {
-  urgent: 200,
-  high: 100,
-  normal: 0,
-  low: -40,
+export const PULSE_PRIORITY_RANK: Record<PulseItemPriority, number> = {
+  urgent: 0,
+  high: 1,
+  normal: 2,
+  low: 3,
 };
 
 export function makePulseItemKey(
@@ -125,4 +137,17 @@ export function decodePulseItemId(itemId: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Supabase can serialize timestamptz values with an explicit UTC offset
+ * (for example, `+00:00`), while the public Pulse contract uses canonical
+ * RFC 3339 UTC strings ending in `Z`.
+ */
+export function normalizePulseDateTime(value: string): string;
+export function normalizePulseDateTime(value: string | null): string | null;
+export function normalizePulseDateTime(value: string | null): string | null {
+  if (value === null) return null;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? value : new Date(timestamp).toISOString();
 }

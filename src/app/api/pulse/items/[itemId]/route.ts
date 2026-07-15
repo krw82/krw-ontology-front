@@ -6,17 +6,22 @@ import {
   invalidOriginResponse,
   isExpectedMutationOrigin,
 } from "@/lib/filing-notifications/request";
-import { decodePulseItemId } from "@/lib/pulse/contract";
+import { decodePulseItemId, PULSE_ITEM_KINDS } from "@/lib/pulse/contract";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { PULSE_LEARNING_ENTRIES } from "@/content/pulse/learning";
-import type { PulseItemMutationResponse, PulseStateMutationAction } from "@/types/api-contracts";
+import type {
+  PulseItemKind,
+  PulseItemMutationResponse,
+  PulseStateMutationAction,
+} from "@/types/api-contracts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
-  action: z.enum(["read", "unread", "save", "unsave", "snooze", "dismiss", "impression"]),
+  action: z.enum(["review", "unreview", "read", "unread", "save", "unsave", "snooze", "dismiss", "impression"]),
   snoozed_until: z.iso.datetime().optional(),
+  feed_session_id: z.string().uuid().optional(),
 }).strict();
 
 export async function PATCH(
@@ -38,11 +43,20 @@ export async function PATCH(
   if (!itemKey || !parsed.success) {
     return Response.json({ error: { code: "validation_error", message: "항목 요청이 올바르지 않습니다." } }, { status: 400 });
   }
+
   const separator = itemKey.indexOf(":");
-  const sourceType = itemKey.slice(0, separator) as "filing" | "checkup" | "question" | "resurface" | "learning";
+  const sourceType = itemKey.slice(0, separator) as PulseItemKind;
   const sourceId = itemKey.slice(separator + 1);
+  if (!PULSE_ITEM_KINDS.includes(sourceType) || !sourceId) {
+    return Response.json({ error: { code: "validation_error", message: "항목 출처가 올바르지 않습니다." } }, { status: 400 });
+  }
+
+  const action = canonicalAction(parsed.data.action);
+  if (action === "impression" && !parsed.data.feed_session_id) {
+    return Response.json({ error: { code: "validation_error", message: "노출 세션 정보가 필요합니다." } }, { status: 400 });
+  }
   const now = new Date();
-  const snoozedUntil = parsed.data.action === "snooze"
+  const snoozedUntil = action === "snooze"
     ? parsed.data.snoozed_until ?? new Date(now.getTime() + 24 * 60 * 60 * 1_000).toISOString()
     : null;
 
@@ -52,32 +66,35 @@ export async function PATCH(
       itemKey,
       sourceType,
       sourceId,
-      action: parsed.data.action,
+      action,
       now: now.toISOString(),
       snoozedUntil,
     });
     if (!exists) {
       return Response.json({ error: { code: "not_found", message: "항목을 찾지 못했습니다." } }, { status: 404 });
     }
+
     const state = await upsertState({
       userId: user.id,
       itemKey,
       sourceType,
       sourceId,
-      action: parsed.data.action,
+      action,
       now: now.toISOString(),
       snoozedUntil,
+      feedSessionId: parsed.data.feed_session_id ?? null,
     });
-    if (parsed.data.action !== "impression") {
+    if (action !== "impression") {
       void recordAnalyticsEventFromRequest(request, {
         eventName: "pulse_item_actioned",
         userId: user.id,
-        properties: { item_kind: sourceType, action: parsed.data.action },
+        properties: { item_kind: sourceType, action },
       });
     }
     const response: PulseItemMutationResponse = {
       item_id: itemId,
-      action: parsed.data.action,
+      action,
+      reviewed_at: state.reviewed_at,
       read_at: state.read_at,
       saved_at: state.saved_at,
       snoozed_until: state.snoozed_until,
@@ -92,11 +109,18 @@ export async function PATCH(
 interface MutationContext {
   userId: string;
   itemKey: string;
-  sourceType: "filing" | "checkup" | "question" | "resurface" | "learning";
+  sourceType: PulseItemKind;
   sourceId: string;
   action: PulseStateMutationAction;
   now: string;
   snoozedUntil: string | null;
+  feedSessionId?: string | null;
+}
+
+function canonicalAction(action: PulseStateMutationAction): PulseStateMutationAction {
+  if (action === "read") return "review";
+  if (action === "unread") return "unreview";
+  return action;
 }
 
 async function mutateSourceIfRequired(context: MutationContext): Promise<boolean> {
@@ -110,10 +134,10 @@ async function mutateSourceIfRequired(context: MutationContext): Promise<boolean
       .in("id", ids);
     if (error) throw error;
     if (data.length !== ids.length) return false;
-    if (context.action === "read" || context.action === "unread") {
+    if (context.action === "review" || context.action === "unreview") {
       const { error: updateError } = await supabase
         .from("user_filing_notifications")
-        .update({ read_at: context.action === "read" ? context.now : null })
+        .update({ read_at: context.action === "review" ? context.now : null })
         .eq("user_id", context.userId)
         .in("id", ids);
       if (updateError) throw updateError;
@@ -128,6 +152,7 @@ async function mutateSourceIfRequired(context: MutationContext): Promise<boolean
     }
     return true;
   }
+  if (context.sourceType === "analysis") return analysisBelongsToUser(context.sourceId, context.userId);
   if (context.sourceType === "question") {
     const { data, error } = await supabase
       .from("user_company_questions")
@@ -164,40 +189,78 @@ async function mutateSourceIfRequired(context: MutationContext): Promise<boolean
     if (error) throw error;
     return Boolean(data);
   }
-  if (context.sourceType === "learning") {
-    return PULSE_LEARNING_ENTRIES.some((entry) => entry.slug === context.sourceId);
-  }
-  if (context.sourceType === "checkup") {
-    return /^\d{4}-\d{2}-\d{2}$/.test(context.sourceId);
-  }
-  return true;
+  if (context.sourceType === "learning") return PULSE_LEARNING_ENTRIES.some((entry) => entry.slug === context.sourceId);
+  if (context.sourceType === "checkup") return /^\d{4}-\d{2}-\d{2}$/.test(context.sourceId);
+  return false;
+}
+
+async function analysisBelongsToUser(sourceId: string, userId: string): Promise<boolean> {
+  const runId = sourceId.split(":", 1)[0];
+  if (!runId) return false;
+  const supabase = getSupabaseAdmin();
+  const { data: run, error: runError } = await supabase
+    .from("agent_runs")
+    .select("session_id")
+    .eq("id", runId)
+    .maybeSingle();
+  if (runError) throw runError;
+  if (!run) return false;
+  const { data: session, error: sessionError } = await supabase
+    .from("chat_sessions")
+    .select("id")
+    .eq("id", run.session_id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (sessionError) throw sessionError;
+  return Boolean(session);
 }
 
 async function upsertState(context: MutationContext) {
-  const { data: existing, error: existingError } = await getSupabaseAdmin()
+  const supabase = getSupabaseAdmin();
+  if (context.action === "impression") {
+    const { error } = await supabase.rpc("record_pulse_item_impression", {
+      p_user_id: context.userId,
+      p_item_key: context.itemKey,
+      p_source_type: context.sourceType,
+      p_source_id: context.sourceId,
+      p_kind: context.sourceType,
+      p_feed_session_id: context.feedSessionId!,
+      p_seen_at: context.now,
+    });
+    if (error) throw error;
+    const { data, error: stateError } = await supabase
+      .from("user_pulse_item_states")
+      .select("reviewed_at,read_at,saved_at,snoozed_until,dismissed_at")
+      .eq("user_id", context.userId)
+      .eq("item_key", context.itemKey)
+      .single();
+    if (stateError) throw stateError;
+    return data;
+  }
+
+  const { data: existing, error: existingError } = await supabase
     .from("user_pulse_item_states")
-    .select("first_seen_at,view_count")
+    .select("first_seen_at")
     .eq("user_id", context.userId)
     .eq("item_key", context.itemKey)
     .maybeSingle();
   if (existingError && existingError.code !== "PGRST116") throw existingError;
+
   const fields: Record<string, string | null> = {};
-  if (context.action === "read") fields.read_at = context.now;
-  if (context.action === "unread") fields.read_at = null;
+  if (context.action === "review") {
+    fields.reviewed_at = context.now;
+    fields.read_at = context.now;
+  }
+  if (context.action === "unreview") {
+    fields.reviewed_at = null;
+    fields.read_at = null;
+  }
   if (context.action === "save") fields.saved_at = context.now;
   if (context.action === "unsave") fields.saved_at = null;
   if (context.action === "snooze") fields.snoozed_until = context.snoozedUntil;
   if (context.action === "dismiss") fields.dismissed_at = context.now;
-  let impressionFields: Record<string, string | number | null> = {};
-  if (context.action === "impression") {
-    impressionFields = {
-      last_seen_at: context.now,
-      last_impression_at: context.now,
-      view_count: (existing?.view_count ?? 0) + 1,
-      impression_count: (existing?.view_count ?? 0) + 1,
-    };
-  }
-  const { data, error } = await getSupabaseAdmin()
+
+  const { data, error } = await supabase
     .from("user_pulse_item_states")
     .upsert({
       user_id: context.userId,
@@ -207,9 +270,8 @@ async function upsertState(context: MutationContext) {
       kind: context.sourceType,
       first_seen_at: existing?.first_seen_at ?? context.now,
       ...fields,
-      ...impressionFields,
     }, { onConflict: "user_id,item_key" })
-    .select("read_at,saved_at,snoozed_until,dismissed_at")
+    .select("reviewed_at,read_at,saved_at,snoozed_until,dismissed_at")
     .single();
   if (error) throw error;
   return data;

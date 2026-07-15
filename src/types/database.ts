@@ -608,7 +608,7 @@ export interface UserFilingNotificationRow extends Record<string, unknown> {
 export interface UserPulsePreferencesRow extends Record<string, unknown> {
   user_id: string;
   timezone: string;
-  enabled_kinds: Array<"filing" | "checkup" | "question" | "resurface" | "learning">;
+  enabled_kinds: Array<"filing" | "analysis" | "checkup" | "question" | "resurface" | "learning">;
   muted_tickers: string[];
   daily_checkup_enabled: boolean;
   daily_checkup_at: string;
@@ -624,17 +624,19 @@ export interface UserPulsePreferencesRow extends Record<string, unknown> {
 export interface UserPulseItemStateRow extends Record<string, unknown> {
   user_id: string;
   item_key: string;
-  source_type: "filing" | "checkup" | "question" | "resurface" | "learning";
+  source_type: "filing" | "analysis" | "checkup" | "question" | "resurface" | "learning";
   source_id: string;
-  kind: "filing" | "checkup" | "question" | "resurface" | "learning";
+  kind: "filing" | "analysis" | "checkup" | "question" | "resurface" | "learning";
   first_seen_at: string | null;
   last_seen_at: string | null;
   view_count: number;
   read_at: string | null;
+  reviewed_at: string | null;
   saved_at: string | null;
   snoozed_until: string | null;
   dismissed_at: string | null;
   last_impression_at: string | null;
+  last_impression_session_id: string | null;
   impression_count: number;
   feedback: -1 | 1 | null;
   created_at: string;
@@ -3349,6 +3351,18 @@ export interface Database {
           daily_reserved_usd: number;
           daily_limit_usd: number;
         }>;
+      };
+      record_pulse_item_impression: {
+        Args: {
+          p_user_id: string;
+          p_item_key: string;
+          p_source_type: "filing" | "analysis" | "checkup" | "question" | "resurface" | "learning";
+          p_source_id: string;
+          p_kind: "filing" | "analysis" | "checkup" | "question" | "resurface" | "learning";
+          p_feed_session_id: string;
+          p_seen_at?: string;
+        };
+        Returns: undefined;
       };
       attach_execution_budget_run: {
         Args: {

@@ -7,11 +7,11 @@ import type { Database } from "@/types/database";
 const NOTE_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 const NOTEBOOK_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
-export async function getResurfaceCandidates(
+/** Returns raw candidates. Rotation happens only after per-item state filtering. */
+export async function getRawResurfaceCandidates(
   supabase: SupabaseClient<Database>,
   userId: string,
   now: Date,
-  cadence: "weekly" | "biweekly" = "weekly",
 ): Promise<PulseCandidate[]> {
   const [notesResult, notebooksResult] = await Promise.all([
     supabase
@@ -90,7 +90,7 @@ export async function getResurfaceCandidates(
       metadata: { resurface_type: "notebook" },
     }));
 
-  return selectResurfaceCandidate([...notes, ...notebooks], userId, now, cadence);
+  return [...notes, ...notebooks];
 }
 
 export function selectResurfaceCandidate(

@@ -10,7 +10,7 @@ interface PulseSettingsProps {
 
 const KIND_OPTIONS: Array<{ kind: PulseItemKind; label: string; description: string }> = [
   { kind: "filing", label: "공시 알림", description: "추적 기업의 8-K·6-K" },
-  { kind: "checkup", label: "오늘의 체크업", description: "08:30 이후 확인할 항목 요약" },
+  { kind: "analysis", label: "내 분석 상태", description: "회사 채팅에서 직접 시작한 분석" },
   { kind: "question", label: "열린 질문", description: "리서치 노트북의 다음 질문" },
   { kind: "resurface", label: "다시 보기", description: "오래된 메모와 투자 관점" },
   { kind: "learning", label: "짧은 학습", description: "주 1회 공시 읽기 가이드" },
@@ -39,9 +39,8 @@ export default function PulseSettings({ initialPreferences }: PulseSettingsProps
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         timezone: preferences.timezone,
-        enabled_kinds: preferences.enabled_kinds,
-        daily_checkup_enabled: preferences.enabled_kinds.includes("checkup"),
-        daily_checkup_at: preferences.daily_checkup_at,
+        enabled_kinds: preferences.enabled_kinds.filter((kind) => kind !== "checkup"),
+        daily_checkup_enabled: false,
         question_cadence: preferences.enabled_kinds.includes("question") ? preferences.question_cadence : "off",
         resurface_cadence: preferences.enabled_kinds.includes("resurface") ? preferences.resurface_cadence : "off",
         learning_cadence: preferences.enabled_kinds.includes("learning") ? "weekly" : "off",
@@ -63,9 +62,9 @@ export default function PulseSettings({ initialPreferences }: PulseSettingsProps
   return (
     <main id="main-content" className="mx-auto w-full max-w-[680px] px-base py-2xl sm:px-xl sm:py-3xl">
       <button type="button" onClick={() => router.back()} className="inline-flex items-center gap-xs text-[13px] font-bold text-muted hover:text-ink">
-        <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>Pulse로 돌아가기
+        <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>피드로 돌아가기
       </button>
-      <p className="mt-xl text-[11px] font-black uppercase tracking-[0.18em] text-primary">Research pulse</p>
+      <p className="mt-xl text-[11px] font-black uppercase tracking-[0.18em] text-primary">Research feed</p>
       <h1 className="mt-sm text-3xl font-black tracking-[-0.045em] text-ink">피드 설정</h1>
       <p className="mt-sm text-sm leading-6 text-muted">원하는 종류만 남겨도 중요한 공시의 원본 알림 설정은 바뀌지 않습니다.</p>
 
@@ -87,7 +86,7 @@ export default function PulseSettings({ initialPreferences }: PulseSettingsProps
 
       <section className="mt-base rounded-[18px] border border-hairline bg-white p-lg">
         <label htmlFor="pulse-timezone" className="block text-sm font-extrabold text-ink">기준 시간대</label>
-        <p className="mt-1 text-[12px] text-muted">오늘의 체크업과 날짜 표시에 사용합니다.</p>
+        <p className="mt-1 text-[12px] text-muted">피드 날짜와 질문·학습 노출 주기에 사용합니다.</p>
         <select id="pulse-timezone" value={preferences.timezone} onChange={(event) => setPreferences((current) => ({ ...current, timezone: event.target.value }))} className="mt-base h-11 w-full rounded-[10px] border border-hairline bg-white px-sm text-sm font-semibold text-ink outline-none focus:border-primary">
           <option value="Asia/Seoul">서울 (KST)</option>
           <option value="America/New_York">뉴욕 (ET)</option>
@@ -97,11 +96,7 @@ export default function PulseSettings({ initialPreferences }: PulseSettingsProps
 
       <section className="mt-base rounded-[18px] border border-hairline bg-white p-lg">
         <h2 className="text-sm font-extrabold text-ink">노출 빈도</h2>
-        <div className="mt-base grid gap-base sm:grid-cols-3">
-          <label className="text-[12px] font-semibold text-muted">
-            체크업 시각
-            <input type="time" value={preferences.daily_checkup_at.slice(0, 5)} onChange={(event) => setPreferences((current) => ({ ...current, daily_checkup_at: `${event.target.value}:00` }))} className="mt-xs h-10 w-full rounded-[9px] border border-hairline bg-white px-sm text-sm text-ink" />
-          </label>
+        <div className="mt-base grid gap-base sm:grid-cols-2">
           <label className="text-[12px] font-semibold text-muted">
             질문
             <select value={preferences.question_cadence} onChange={(event) => setPreferences((current) => ({ ...current, question_cadence: event.target.value as PulsePreferences["question_cadence"] }))} className="mt-xs h-10 w-full rounded-[9px] border border-hairline bg-white px-sm text-sm text-ink">

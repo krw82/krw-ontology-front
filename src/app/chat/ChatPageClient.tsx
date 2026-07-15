@@ -639,7 +639,7 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
         brandHref="/companies"
         brandAriaLabel="회사 목록으로 이동"
         hideAccountMenu
-        showSidebarTrigger
+        showChatHistoryTrigger
         mobileOverlay
         mobileCollapsed={mobileHeaderHidden}
         actionSlot={

@@ -3,24 +3,39 @@ import { z } from "zod";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
 import { canAccessMenuFeature } from "@/lib/billing/feature-access-server";
 import { composePulseFeed } from "@/lib/pulse/composer";
-import { decodePulseCursor } from "@/lib/pulse/cursor";
-import { isPulseFeedEnabled } from "@/lib/pulse/enabled";
+import { decodePulseCursor, isPulseCursorV2 } from "@/lib/pulse/cursor";
+import { isPulseFeedEnabled, isPulseP0V2Enabled } from "@/lib/pulse/enabled";
+import { composeLegacyPulseFeed } from "@/lib/pulse/legacy-composer";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const querySchema = z.object({
-  filter: z.enum(["all", "filing", "checkup", "question", "resurface", "learning"]).default("all"),
-  cursor: z.string().max(2_000).refine((value) => decodePulseCursor(value) !== null).optional(),
+  filter: z
+    .enum([
+      "all",
+      "filing",
+      "analysis",
+      "checkup",
+      "question",
+      "resurface",
+      "learning",
+    ])
+    .default("all"),
+  cursor: z.string().max(2_000).optional(),
   limit: z.coerce.number().int().min(1).max(30).default(20),
   since: z.iso.datetime().optional(),
 });
 
 export async function GET(request: NextRequest) {
   if (!isPulseFeedEnabled()) {
-    return Response.json({ error: { code: "not_found", message: "Pulse feed is not enabled" } }, { status: 404 });
+    return Response.json(
+      { error: { code: "not_found", message: "Pulse feed is not enabled" } },
+      { status: 404 },
+    );
   }
+  const p0V2Enabled = isPulseP0V2Enabled();
   let user;
   try {
     user = await getAuthUser();
@@ -29,13 +44,79 @@ export async function GET(request: NextRequest) {
   }
   if (!user) return handleAuthError(new Error("No user"));
 
-  const parsed = querySchema.safeParse(Object.fromEntries(request.nextUrl.searchParams));
+  const parsed = querySchema.safeParse(
+    Object.fromEntries(request.nextUrl.searchParams),
+  );
   if (!parsed.success) {
-    return Response.json({ error: { code: "validation_error", message: "피드 요청 값이 올바르지 않습니다." } }, { status: 400 });
+    return Response.json(
+      {
+        error: {
+          code: "validation_error",
+          message: "피드 요청 값이 올바르지 않습니다.",
+        },
+      },
+      { status: 400 },
+    );
   }
-  const decodedCursor = parsed.data.cursor ? decodePulseCursor(parsed.data.cursor) : null;
+  if (p0V2Enabled && parsed.data.filter !== "all") {
+    return Response.json(
+      {
+        error: {
+          code: "validation_error",
+          message: "P0 피드는 별도 필터를 지원하지 않습니다.",
+        },
+      },
+      { status: 400 },
+    );
+  }
+  const decodedCursor = parsed.data.cursor
+    ? decodePulseCursor(parsed.data.cursor)
+    : null;
+  if (parsed.data.cursor && !decodedCursor) {
+    return Response.json(
+      {
+        error: {
+          code: "validation_error",
+          message: "피드 커서가 올바르지 않습니다.",
+        },
+      },
+      { status: 400 },
+    );
+  }
+  if (p0V2Enabled && decodedCursor && !isPulseCursorV2(decodedCursor)) {
+    return Response.json(
+      {
+        error: {
+          code: "cursor_version_expired",
+          message:
+            "피드 목록이 업데이트되었습니다. 처음부터 다시 불러와주세요.",
+        },
+      },
+      { status: 409 },
+    );
+  }
+  if (!p0V2Enabled && decodedCursor && isPulseCursorV2(decodedCursor)) {
+    return Response.json(
+      {
+        error: {
+          code: "cursor_version_expired",
+          message:
+            "피드 목록이 업데이트되었습니다. 처음부터 다시 불러와주세요.",
+        },
+      },
+      { status: 409 },
+    );
+  }
   if (decodedCursor && decodedCursor.filter !== parsed.data.filter) {
-    return Response.json({ error: { code: "validation_error", message: "커서와 필터가 일치하지 않습니다." } }, { status: 400 });
+    return Response.json(
+      {
+        error: {
+          code: "validation_error",
+          message: "커서와 필터가 일치하지 않습니다.",
+        },
+      },
+      { status: 400 },
+    );
   }
 
   try {
@@ -44,16 +125,27 @@ export async function GET(request: NextRequest) {
       user.email,
       "research_notebook",
     ).catch(() => false);
-    const response = await composePulseFeed({
+    const options = {
       supabase: getSupabaseAdmin(),
       userId: user.id,
       includeNotebookSources,
       ...parsed.data,
-    });
+    };
+    const response = p0V2Enabled
+      ? await composePulseFeed(options)
+      : await composeLegacyPulseFeed(options);
     return Response.json(response, {
       headers: { "Cache-Control": "private, no-store, max-age=0" },
     });
   } catch {
-    return Response.json({ error: { code: "service_unavailable", message: "피드를 불러오지 못했습니다." } }, { status: 503 });
+    return Response.json(
+      {
+        error: {
+          code: "service_unavailable",
+          message: "피드를 불러오지 못했습니다.",
+        },
+      },
+      { status: 503 },
+    );
   }
 }

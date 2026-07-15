@@ -1,9 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useSessions } from "@/hooks/useSessions";
+import { buildChatSessionHref } from "@/lib/chat/history-state";
+import { localeSwitchHref, resolveRouteLocale } from "@/i18n/routing";
 import type {
   ResearchInboxItem,
+  SessionSummary,
   WatchlistCompanySummary,
   WatchlistOverviewResponse,
 } from "@/types/api-contracts";
@@ -17,14 +22,40 @@ export default function WatchlistHomeClient({
   overview,
   loadError = null,
 }: WatchlistHomeClientProps) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [overviewState, setOverviewState] = useState(overview);
   const [dismissingQuestionId, setDismissingQuestionId] = useState<string | null>(
     null,
   );
   const companies = overviewState.companies;
   const [query, setQuery] = useState("");
+  const locale = resolveRouteLocale(pathname, searchParams.get("locale"));
+  const activeTab = searchParams.get("tab") === "history" ? "history" : "notebook";
+  const {
+    sessions,
+    loading: historyLoading,
+    listError: historyError,
+    listSessions,
+  } = useSessions();
 
   const researchInbox = overviewState.research_inbox;
+  const filteredSessions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return sessions;
+
+    return sessions.filter((session) =>
+      [
+        session.title,
+        session.last_message_preview,
+        session.default_tickers.join(" "),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedQuery),
+    );
+  }, [query, sessions]);
   const filteredCompanies = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return companies.filter((company) => {
@@ -68,6 +99,11 @@ export default function WatchlistHomeClient({
     ];
   }, [filteredCompanies]);
   const showEmptySections = query.trim().length === 0;
+
+  useEffect(() => {
+    if (activeTab !== "history") return;
+    void listSessions(1, 60);
+  }, [activeTab, listSessions]);
 
   async function handleDismissInboxQuestion(item: ResearchInboxItem) {
     if (!item.dismiss_question_id || dismissingQuestionId) return;
@@ -122,8 +158,36 @@ export default function WatchlistHomeClient({
                 리서치 노트북
               </h1>
               <p className="mt-3 max-w-2xl text-[15px] leading-6 text-body sm:text-[16px]">
-                관심종목과 보유종목을 공시 근거로 계속 점검하고, 확인할 질문을 한곳에 쌓아둡니다.
+                {activeTab === "history"
+                  ? "이전 질문과 분석 결과를 찾아, 같은 맥락에서 바로 이어서 볼 수 있습니다."
+                  : "관심종목과 보유종목을 공시 근거로 계속 점검하고, 확인할 질문을 한곳에 쌓아둡니다."}
               </p>
+              <nav className="mt-4 flex items-center gap-1" aria-label="리서치 노트북 보기">
+                <Link
+                  href={localeSwitchHref(locale, "/watchlist")}
+                  className={[
+                    "rounded-[8px] px-sm py-xs text-[13px] font-extrabold leading-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                    activeTab === "notebook"
+                      ? "bg-surface text-ink"
+                      : "text-muted hover:bg-surface-soft hover:text-ink",
+                  ].join(" ")}
+                  aria-current={activeTab === "notebook" ? "page" : undefined}
+                >
+                  리서치 노트북
+                </Link>
+                <Link
+                  href={localeSwitchHref(locale, "/watchlist", "tab=history")}
+                  className={[
+                    "rounded-[8px] px-sm py-xs text-[13px] font-extrabold leading-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                    activeTab === "history"
+                      ? "bg-surface text-ink"
+                      : "text-muted hover:bg-surface-soft hover:text-ink",
+                  ].join(" ")}
+                  aria-current={activeTab === "history" ? "page" : undefined}
+                >
+                  채팅 기록
+                </Link>
+              </nav>
             </div>
           </div>
           <div className="relative min-w-0">
@@ -138,52 +202,177 @@ export default function WatchlistHomeClient({
             </span>
             <input
               className="h-11 w-full rounded-[8px] border border-hairline bg-canvas pl-10 pr-sm text-[14px] font-semibold leading-5 text-ink shadow-sm placeholder:text-muted focus:border-outline focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim/25"
-              placeholder="티커, 회사명, 노트 검색"
+              placeholder={activeTab === "history" ? "티커, 질문, 대화 검색" : "티커, 회사명, 노트 검색"}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
         </header>
 
-        {loadError && (
+        {activeTab === "notebook" && loadError && (
           <div className="mt-4 border border-error-container bg-error-container/40 px-sm py-xs text-[13px] font-bold leading-5 text-error">
             {loadError}
           </div>
         )}
 
-        <ResearchInboxPanel
-          dismissingQuestionId={dismissingQuestionId}
-          inbox={researchInbox}
-          onDismissQuestion={handleDismissInboxQuestion}
-        />
+        {activeTab === "history" ? (
+          <ChatHistoryTab
+            locale={locale}
+            loading={historyLoading}
+            error={historyError}
+            sessions={filteredSessions}
+            query={query}
+            onRetry={() => void listSessions(1, 60)}
+          />
+        ) : (
+          <>
+            <ResearchInboxPanel
+              dismissingQuestionId={dismissingQuestionId}
+              inbox={researchInbox}
+              onDismissQuestion={handleDismissInboxQuestion}
+            />
 
-        <section className="mt-5">
-          {companies.length === 0 ? (
-            <EmptyWatchlist />
-          ) : filteredCompanies.length === 0 ? (
-            <div className="mt-5 rounded-[8px] border border-hairline bg-surface-soft p-lg text-center text-[15px] font-bold leading-6 text-muted">
-              조건에 맞는 종목이 없습니다.
-            </div>
-          ) : (
-            <div className="grid gap-6">
-              {companySections
-                .filter(
-                  (section) => section.companies.length > 0 || showEmptySections,
-                )
-                .map((section) => (
-                  <CompanySection
-                    key={section.key}
-                    title={section.title}
-                    emptyMessage={section.emptyMessage}
-                    companies={section.companies}
-                  />
-                ))}
-            </div>
-          )}
-        </section>
+            <section className="mt-5">
+              {companies.length === 0 ? (
+                <EmptyWatchlist />
+              ) : filteredCompanies.length === 0 ? (
+                <div className="mt-5 rounded-[8px] border border-hairline bg-surface-soft p-lg text-center text-[15px] font-bold leading-6 text-muted">
+                  조건에 맞는 종목이 없습니다.
+                </div>
+              ) : (
+                <div className="grid gap-6">
+                  {companySections
+                    .filter(
+                      (section) => section.companies.length > 0 || showEmptySections,
+                    )
+                    .map((section) => (
+                      <CompanySection
+                        key={section.key}
+                        title={section.title}
+                        emptyMessage={section.emptyMessage}
+                        companies={section.companies}
+                      />
+                    ))}
+                </div>
+              )}
+            </section>
+          </>
+        )}
       </div>
     </main>
   );
+}
+
+function ChatHistoryTab({
+  locale,
+  loading,
+  error,
+  sessions,
+  query,
+  onRetry,
+}: {
+  locale: "ko" | "en";
+  loading: boolean;
+  error: string | null;
+  sessions: SessionSummary[];
+  query: string;
+  onRetry: () => void;
+}) {
+  return (
+    <section className="mt-5 overflow-hidden rounded-[8px] border border-hairline bg-canvas">
+      <div className="flex flex-wrap items-end justify-between gap-2 border-b border-hairline px-sm py-3 md:px-md">
+        <div>
+          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
+            Chat history
+          </p>
+          <h2 className="mt-0.5 text-[18px] font-black leading-7 text-ink">
+            이전 질문과 분석
+          </h2>
+        </div>
+        {!loading && !error && (
+          <span className="font-mono text-[12px] font-bold leading-5 text-muted">
+            {sessions.length.toLocaleString()}개
+          </span>
+        )}
+      </div>
+
+      {error ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 px-sm py-sm text-[13px] font-bold leading-5 text-error md:px-md">
+          <span>{error}</span>
+          <button
+            type="button"
+            className="rounded-[8px] border border-current px-sm py-xs text-[12px] font-extrabold transition-colors hover:bg-error-container/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            onClick={onRetry}
+          >
+            다시 시도
+          </button>
+        </div>
+      ) : loading && sessions.length === 0 ? (
+        <div className="space-y-1 p-sm md:p-md" aria-label="채팅 기록을 불러오는 중">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="h-[78px] animate-pulse rounded-[8px] bg-surface-strong" />
+          ))}
+        </div>
+      ) : sessions.length === 0 ? (
+        <div className="px-sm py-xl text-center md:px-md">
+          <span aria-hidden="true" className="material-symbols-outlined text-[28px] text-muted">history</span>
+          <p className="mt-2 text-[14px] font-black leading-5 text-ink">
+            {query.trim() ? "조건에 맞는 대화가 없습니다." : "아직 저장된 대화가 없습니다."}
+          </p>
+          <p className="mt-1 text-[13px] font-semibold leading-5 text-muted">
+            질문을 시작하면 여기에서 언제든 이어서 볼 수 있습니다.
+          </p>
+        </div>
+      ) : (
+        <div className="divide-y divide-hairline">
+          {sessions.map((session) => (
+            <Link
+              key={session.id}
+              href={buildChatSessionHref(session.id, {
+                locale,
+                ticker: session.default_tickers[0],
+              })}
+              className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-sm py-3 transition-colors hover:bg-surface-soft md:px-md"
+            >
+              <div className="min-w-0">
+                <div className="flex min-w-0 items-center gap-2">
+                  {session.default_tickers[0] && (
+                    <span className="font-mono text-[12px] font-black text-primary">
+                      {session.default_tickers[0]}
+                    </span>
+                  )}
+                  <p className="truncate text-[14px] font-black leading-5 text-ink">
+                    {session.title || "제목 없는 대화"}
+                  </p>
+                </div>
+                <p className="mt-1 line-clamp-2 text-[13px] font-semibold leading-5 text-muted">
+                  {session.last_message_preview || "최근 메시지 없음"}
+                </p>
+                <p className="mt-1 font-mono text-[11px] font-bold leading-4 text-muted">
+                  {formatChatDateTime(session.last_message_at ?? session.updated_at, locale)}
+                </p>
+              </div>
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-muted transition-colors group-hover:text-ink">
+                arrow_forward
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function formatChatDateTime(value: string, locale: "ko" | "en"): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return new Intl.DateTimeFormat(locale === "ko" ? "ko-KR" : "en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function CompanySection({

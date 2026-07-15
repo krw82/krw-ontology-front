@@ -31,6 +31,10 @@ const pulseAnalyticsMigrationPath = join(
   process.cwd(),
   "supabase/migrations/20260715007000_research_pulse_analytics.sql",
 );
+const pulseV2MigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260715009000_research_pulse_p0_v2.sql",
+);
 const FILING_NOTIFICATION_EVENT_NAMES = [
   "company_followed",
   "push_permission_requested",
@@ -63,6 +67,7 @@ const pulseEventNames = [
   "pulse_item_actioned", "pulse_filter_changed", "pulse_preferences_updated",
   "pulse_new_items_seen", "pulse_end_reached", "pulse_feedback_submitted",
   "pulse_source_degraded", "pulse_answer_prefilled",
+  "pulse_summary_actioned",
 ] as const;
 const postInitialAnalyticsEventNameSet = new Set<string>([
   ...filingNotificationEventNameSet,
@@ -146,8 +151,9 @@ describe("analytics events migration", () => {
 
   it("adds Pulse analytics events to already-created databases", () => {
     const pulseMigration = readFileSync(pulseAnalyticsMigrationPath, "utf8");
+    const pulseV2Migration = readFileSync(pulseV2MigrationPath, "utf8");
     for (const eventName of pulseEventNames) {
-      expect(pulseMigration).toContain(`'${eventName}'`);
+      expect(`${pulseMigration}\n${pulseV2Migration}`).toContain(`'${eventName}'`);
     }
   });
 

@@ -1,6 +1,5 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
-import ChatSidebar from "@/components/ChatSidebar";
 import TopNav from "@/components/TopNav";
 import WatchlistWorkspaceClient from "@/components/watchlist/WatchlistWorkspaceClient";
 import { getAuthUser } from "@/lib/auth";
@@ -56,12 +55,6 @@ export default async function WatchlistCompanyPage({
         preserveInitialUserProfile={shouldPreserveInitialProfile(user)}
         brandHref="/companies"
         brandAriaLabel="회사 목록으로 이동"
-        showSidebarTrigger
-      />
-      <ChatSidebar
-        activeSessionId={null}
-        refreshSignal={`/watchlist/${detail.company.ticker}`}
-        showDesktopSidebar={false}
       />
       <WatchlistWorkspaceClient detail={detail} />
     </div>

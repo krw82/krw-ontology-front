@@ -108,7 +108,7 @@ function toCandidate(group: FilingEntry[]): PulseCandidate {
     priority,
     occurred_at: event.accepted_at ?? event.first_seen_at,
     available_at: lead.notification.created_at,
-    expires_at: null,
+    expires_at: new Date(Date.parse(lead.notification.created_at) + 90 * 24 * 60 * 60 * 1_000).toISOString(),
     read_at: group.every((entry) => entry.notification.read_at)
       ? lead.notification.read_at
       : null,
@@ -120,7 +120,7 @@ function toCandidate(group: FilingEntry[]): PulseCandidate {
     primary_action: { type: "link", label: isGrouped ? "공시함에서 보기" : "공시 보기", href: detailHref },
     secondary_actions: [
       { type: "link", label: "이 공시로 질문", href: `/chat/new?${params}`, analytics_name: "pulse_answer_prefilled" },
-      { type: "mutation", label: "읽음", action: "read" },
+      { type: "mutation", label: "검토 완료", action: "review" },
       { type: "mutation", label: "내일 다시 보기", action: "snooze" },
     ],
     metadata: {

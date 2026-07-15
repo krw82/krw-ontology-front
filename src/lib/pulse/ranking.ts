@@ -1,68 +1,142 @@
+import type { PulseAnalysisPhase } from "@/types/api-contracts";
 import {
-  PULSE_BASE_SCORES,
-  PULSE_PRIORITY_SCORES,
+  PULSE_PRIORITY_RANK,
   type PulseCandidate,
   type PulseRankedCandidate,
+  type PulseSortKey,
 } from "@/lib/pulse/contract";
 
-const UNREAD_BOOST = 40;
-const PINNED_BOOST = 60;
-const HOLDING_BOOST = 20;
-const URGENT_DIVERSITY_EXEMPTION = "urgent";
+const HOUR_MS = 60 * 60 * 1_000;
+const DAY_MS = 24 * HOUR_MS;
+const URGENT_FRESH_MS = 72 * HOUR_MS;
+const FILING_FRESH_MS = 7 * DAY_MS;
+const DIGEST_FRESH_MS = 3 * DAY_MS;
+const TERMINAL_ANALYSIS_FRESH_MS = 7 * DAY_MS;
 
-export function scorePulseCandidate(candidate: PulseCandidate): number {
-  return (
-    PULSE_BASE_SCORES[candidate.kind] +
-    PULSE_PRIORITY_SCORES[candidate.priority] +
-    (candidate.read_at ? 0 : UNREAD_BOOST) +
-    (candidate.is_pinned ? PINNED_BOOST : 0) +
-    (candidate.is_holding ? HOLDING_BOOST : 0)
-  );
-}
-
+/**
+ * Lane order is intentionally categorical rather than a weighted score. A
+ * lower number always wins; preference boosts only break ties inside a lane.
+ */
 export function rankPulseCandidates(
   candidates: PulseCandidate[],
   now = new Date(),
 ): PulseRankedCandidate[] {
-  const scored = candidates
-    .filter((candidate) => {
-      const available = Date.parse(candidate.available_at);
-      const expires = candidate.expires_at ? Date.parse(candidate.expires_at) : null;
-      const current = now.getTime();
-      return available <= current && (expires === null || expires > current);
-    })
-    .map((candidate) => ({
-      ...candidate,
-      score: scorePulseCandidate(candidate),
-    }))
+  return candidates
+    .filter((candidate) => isAvailable(candidate, now))
+    .map((candidate) => toRankedCandidate(candidate, now))
     .sort(compareRankedCandidates);
+}
 
-  return enforceFirstPageDiversity(scored);
+export function toRankedCandidate(
+  candidate: PulseCandidate,
+  now = new Date(),
+): PulseRankedCandidate {
+  const phase = getAnalysisPhase(candidate);
+  const reviewedAt = candidate.reviewed_at ?? candidate.read_at;
+  const actionable = candidate.actionable ?? isActionableCandidate(candidate, phase, reviewedAt);
+  const state = candidate.state ?? (reviewedAt ? "reviewed" : "new");
+  const lane = reviewedAt ? 90 : getPulseLane(candidate, phase, now);
+
+  return {
+    ...candidate,
+    phase,
+    reviewed_at: reviewedAt,
+    read_at: candidate.read_at ?? reviewedAt,
+    state,
+    actionable,
+    lane,
+    priority_rank: PULSE_PRIORITY_RANK[candidate.priority],
+    holding_rank: candidate.is_holding ? 0 : 1,
+    saved_rank: candidate.is_pinned || candidate.saved_at ? 0 : 1,
+  };
+}
+
+export function getAnalysisPhase(candidate: PulseCandidate): PulseAnalysisPhase | null {
+  if (candidate.kind !== "analysis") return null;
+  if (candidate.phase) return candidate.phase;
+  const status = String(candidate.metadata.run_status ?? "");
+  if (status === "completed") return "completed";
+  if (status === "failed") return "failed";
+  return "active";
+}
+
+export function isActionableCandidate(
+  candidate: PulseCandidate,
+  phase = getAnalysisPhase(candidate),
+  reviewedAt = candidate.reviewed_at ?? candidate.read_at,
+): boolean {
+  if (reviewedAt) return false;
+  if (candidate.kind === "filing" || candidate.kind === "question" || candidate.kind === "resurface") return true;
+  return candidate.kind === "analysis" && phase !== "active";
+}
+
+export function getPulseLane(
+  candidate: PulseCandidate,
+  phase: PulseAnalysisPhase | null,
+  now: Date,
+): number {
+  const ageMs = Math.max(0, now.getTime() - Date.parse(candidate.occurred_at));
+  if (candidate.kind === "filing") {
+    if (candidate.priority === "urgent" && ageMs <= URGENT_FRESH_MS) return 0;
+    if (isDigestFiling(candidate) && ageMs <= DIGEST_FRESH_MS) return 12;
+    if (!isDigestFiling(candidate) && ageMs <= FILING_FRESH_MS) return 10;
+    return 15;
+  }
+  if (candidate.kind === "analysis") {
+    if (phase === "active") return 30;
+    return ageMs <= TERMINAL_ANALYSIS_FRESH_MS ? 20 : 25;
+  }
+  if (candidate.kind === "question") return 25;
+  if (candidate.kind === "resurface") return 40;
+  if (candidate.kind === "learning") return 50;
+  return 90;
 }
 
 export function compareRankedCandidates(
   left: PulseRankedCandidate,
   right: PulseRankedCandidate,
 ): number {
-  if (left.score !== right.score) return right.score - left.score;
+  return comparePulseSortKeys(left, right);
+}
+
+export function comparePulseSortKeys(
+  left: PulseSortKey,
+  right: PulseSortKey,
+): number {
+  if (left.lane !== right.lane) return left.lane - right.lane;
+  if (left.priority_rank !== right.priority_rank) return left.priority_rank - right.priority_rank;
+  if (left.holding_rank !== right.holding_rank) return left.holding_rank - right.holding_rank;
+  if (left.saved_rank !== right.saved_rank) return left.saved_rank - right.saved_rank;
   const occurredDiff = Date.parse(right.occurred_at) - Date.parse(left.occurred_at);
   if (occurredDiff !== 0) return occurredDiff;
   return left.item_key.localeCompare(right.item_key);
 }
 
+export function sortKeyOf(candidate: PulseRankedCandidate): PulseSortKey {
+  const {
+    lane,
+    priority_rank,
+    holding_rank,
+    saved_rank,
+    occurred_at,
+    item_key,
+  } = candidate;
+  return { lane, priority_rank, holding_rank, saved_rank, occurred_at, item_key };
+}
+
 /**
- * Keeps the first screen useful without hiding candidates: deferred items retain
- * their relative order and rejoin immediately after the protected window.
+ * Diversity is a display-only pass. Call this only with the already bounded
+ * first raw page window so it cannot alter keyset pagination boundaries.
  */
-export function enforceFirstPageDiversity(
-  ranked: PulseRankedCandidate[],
+export function reorderFirstPageWindow(
+  rawWindow: PulseRankedCandidate[],
 ): PulseRankedCandidate[] {
   const protectedWindow: PulseRankedCandidate[] = [];
   const deferred: PulseRankedCandidate[] = [];
   const tickerCounts = new Map<string, number>();
   let learningCount = 0;
 
-  for (const candidate of ranked) {
+  for (const candidate of rawWindow) {
     if (protectedWindow.length >= 10) {
       deferred.push(candidate);
       continue;
@@ -71,10 +145,10 @@ export function enforceFirstPageDiversity(
     const ticker = candidate.ticker;
     const tickerCount = ticker ? tickerCounts.get(ticker) ?? 0 : 0;
     const tickerAllowed =
-      protectedWindow.length >= 8 ||
-      !ticker ||
-      tickerCount < 2 ||
-      candidate.priority === URGENT_DIVERSITY_EXEMPTION;
+      protectedWindow.length >= 8
+      || !ticker
+      || tickerCount < 2
+      || candidate.priority === "urgent";
     const learningAllowed = candidate.kind !== "learning" || learningCount < 1;
 
     if (!tickerAllowed || !learningAllowed) {
@@ -83,11 +157,24 @@ export function enforceFirstPageDiversity(
     }
 
     protectedWindow.push(candidate);
-    if (ticker && protectedWindow.length <= 8) {
-      tickerCounts.set(ticker, tickerCount + 1);
-    }
+    if (ticker && protectedWindow.length <= 8) tickerCounts.set(ticker, tickerCount + 1);
     if (candidate.kind === "learning") learningCount += 1;
   }
 
   return [...protectedWindow, ...deferred];
+}
+
+// Compatibility export retained for tests and any temporary callers. New code
+// must only call it with a bounded first-page window.
+export const enforceFirstPageDiversity = reorderFirstPageWindow;
+
+function isAvailable(candidate: PulseCandidate, now: Date): boolean {
+  const available = Date.parse(candidate.available_at);
+  const expires = candidate.expires_at ? Date.parse(candidate.expires_at) : null;
+  const current = now.getTime();
+  return available <= current && (expires === null || expires > current);
+}
+
+function isDigestFiling(candidate: PulseCandidate): boolean {
+  return candidate.kind === "filing" && String(candidate.metadata.alert_priority ?? "") === "digest";
 }

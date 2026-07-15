@@ -2,16 +2,14 @@ import { PULSE_LEARNING_ENTRIES } from "@/content/pulse/learning";
 import { makePulseItemKey, type PulseCandidate } from "@/lib/pulse/contract";
 import { pulseLearningManifestSchema } from "@/lib/pulse/learning-schema";
 
+/** Returns all active static entries; weekly rotation follows item-state filtering. */
 export function buildLearningCandidates(now: Date): PulseCandidate[] {
   const current = now.getTime();
   const manifest = pulseLearningManifestSchema.parse(PULSE_LEARNING_ENTRIES);
   const activeEntries = manifest
     .filter((entry) => Date.parse(entry.active_from) <= current && Date.parse(entry.active_until) > current);
   if (activeEntries.length === 0) return [];
-  // Unix epoch was a Thursday; +3 makes each bucket start on Monday UTC.
-  const weekIndex = Math.floor((Math.floor(current / 86_400_000) + 3) / 7);
-  const selected = activeEntries[weekIndex % activeEntries.length];
-  return [selected]
+  return activeEntries
     .map((entry) => ({
       item_key: makePulseItemKey("learning", entry.slug),
       kind: "learning",
@@ -47,4 +45,24 @@ export function buildLearningCandidates(now: Date): PulseCandidate[] {
         panel_4: entry.panels?.[3] ?? null,
       },
     }));
+}
+
+export function selectLearningCandidate(
+  candidates: PulseCandidate[],
+  userId: string,
+  now: Date,
+): PulseCandidate[] {
+  const sorted = [...candidates].sort((left, right) => left.item_key.localeCompare(right.item_key));
+  if (sorted.length === 0) return [];
+  const weekIndex = Math.floor((Math.floor(now.getTime() / 86_400_000) + 3) / 7);
+  return [sorted[stableIndex(`${userId}:${weekIndex}`, sorted.length)]];
+}
+
+function stableIndex(seed: string, size: number): number {
+  let hash = 2166136261;
+  for (const character of seed) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash) % size;
 }

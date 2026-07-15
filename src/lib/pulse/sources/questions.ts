@@ -19,6 +19,10 @@ export async function getQuestionCandidates(
     .limit(50);
   if (error) throw error;
 
+  const remainingByTicker = new Map<string, number>();
+  for (const question of data) {
+    remainingByTicker.set(question.ticker, (remainingByTicker.get(question.ticker) ?? 0) + 1);
+  }
   const seenTickers = new Set<string>();
   return data.flatMap((question) => {
     if (seenTickers.has(question.ticker)) return [];
@@ -45,8 +49,14 @@ export async function getQuestionCandidates(
       snoozed_until: null,
       group_key: `question:${question.ticker}`,
       primary_action: { type: "link" as const, label: "이 질문으로 리서치", href: `/chat/new?${params}` },
-      secondary_actions: [{ type: "mutation" as const, label: "질문 닫기", action: "dismiss" as const }],
-      metadata: { source: question.source },
+      secondary_actions: [
+        { type: "mutation" as const, label: "질문 닫기", action: "dismiss" as const },
+        { type: "mutation" as const, label: "내일 보기", action: "snooze" as const },
+      ],
+      metadata: {
+        source: question.source,
+        open_ticker_question_count: Math.max(0, (remainingByTicker.get(question.ticker) ?? 1) - 1),
+      },
     }];
   });
 }

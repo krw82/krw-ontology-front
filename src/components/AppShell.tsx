@@ -10,25 +10,6 @@ interface AppShellProps {
   children: React.ReactNode;
 }
 
-function shouldShowGlobalSidebar(pathname: string): boolean {
-  return (
-    pathname === "/chat" ||
-    pathname.startsWith("/chat/") ||
-    pathname === "/discover" ||
-    pathname === "/companies" ||
-    pathname.startsWith("/companies/")
-  );
-}
-
-function shouldShowMobileOnlySidebar(pathname: string): boolean {
-  return (
-    pathname === "/guru" ||
-    pathname.startsWith("/guru/") ||
-    pathname === "/institutional-holdings" ||
-    pathname.startsWith("/institutional-holdings/")
-  );
-}
-
 function isBrowseWorkspace(pathname: string): boolean {
   return (
     pathname === "/companies" ||
@@ -49,8 +30,6 @@ export default function AppShell({ children }: AppShellProps) {
   const searchParams = useSearchParams();
   const reducedMotion = useReducedMotion();
   const unlocalizedPathname = stripLocalePrefix(pathname);
-  const showSidebar = shouldShowGlobalSidebar(unlocalizedPathname);
-  const showMobileOnlySidebar = shouldShowMobileOnlySidebar(unlocalizedPathname);
   const isBrowse = isBrowseWorkspace(unlocalizedPathname);
   const isChat = isChatWorkspace(unlocalizedPathname);
   const activeSessionId = searchParams.get("sessionId");
@@ -68,33 +47,9 @@ export default function AppShell({ children }: AppShellProps) {
     },
   };
 
-  if (!showSidebar) {
-    return (
-      <motion.div
-        key={pathname}
-        className="flex min-h-0 flex-1 flex-col"
-        initial={reducedMotion ? false : { opacity: 0, y: 8 }}
-        animate={pageEntrance}
-      >
-        {children}
-        {showMobileOnlySidebar ? (
-          <ChatSidebar
-            activeSessionId={activeSessionId}
-            refreshSignal={refreshSignal}
-            showDesktopSidebar={false}
-          />
-        ) : null}
-      </motion.div>
-    );
-  }
-
   if (isBrowse) {
     return (
-      <div className="min-h-[100dvh] w-full bg-canvas md:grid md:grid-cols-[280px_minmax(0,1fr)]">
-        <ChatSidebar
-          activeSessionId={activeSessionId}
-          refreshSignal={refreshSignal}
-        />
+      <div className="min-h-[100dvh] w-full bg-canvas">
         <motion.div
           key={pathname}
           className="min-w-0"
@@ -117,10 +72,6 @@ export default function AppShell({ children }: AppShellProps) {
   if (isChat) {
     return (
       <div className="min-h-[100dvh] w-full bg-canvas md:flex md:h-[100dvh] md:min-h-[100svh] md:overflow-hidden">
-        <ChatSidebar
-          activeSessionId={activeSessionId}
-          refreshSignal={refreshSignal}
-        />
         <motion.div
           key={pathname}
           className="min-w-0 md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-hidden"
@@ -129,6 +80,7 @@ export default function AppShell({ children }: AppShellProps) {
         >
           {children}
         </motion.div>
+        <ChatSidebar activeSessionId={activeSessionId} refreshSignal={refreshSignal} />
         {unlocalizedPathname === "/chat" ||
         unlocalizedPathname.startsWith("/chat/") ? (
           <ProductOnboardingTour
@@ -143,19 +95,13 @@ export default function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className="flex h-[100dvh] min-h-[100svh] w-full overflow-hidden bg-canvas">
-      <ChatSidebar
-        activeSessionId={activeSessionId}
-        refreshSignal={refreshSignal}
-      />
-      <motion.div
-        key={pathname}
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-        initial={reducedMotion ? false : { opacity: 0, y: 8 }}
-        animate={pageEntrance}
-      >
-        {children}
-      </motion.div>
-    </div>
+    <motion.div
+      key={pathname}
+      className="flex min-h-0 flex-1 flex-col"
+      initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+      animate={pageEntrance}
+    >
+      {children}
+    </motion.div>
   );
 }
