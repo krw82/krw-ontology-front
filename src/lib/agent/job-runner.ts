@@ -1,7 +1,11 @@
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { checkMcpReady, type McpHealthResult } from "@/lib/agent/mcp-client";
+import {
+  checkKrwFilingsMcpReady,
+  checkMcpReady,
+  type McpHealthResult,
+} from "@/lib/agent/mcp-client";
 import { runAgent, type SdkDiagnostics } from "@/lib/agent/runner";
 import type {
   AccumulatedRun,
@@ -150,7 +154,7 @@ interface AgentJob {
   >;
   session: Pick<
     ChatSessionRow,
-    "id" | "user_id" | "scope_type" | "default_tickers" | "default_document_types"
+    "id" | "user_id" | "scope_type" | "default_tickers" | "default_document_types" | "source_filing_event_id"
   >;
   userMessage: Pick<MessageRow, "id" | "content">;
   assistantMessageId: string;
@@ -251,6 +255,25 @@ export async function runAgentJob(runId: string, workerId: string) {
       return;
     }
 
+    if (job.session.source_filing_event_id) {
+      const filingsMcpHealth = await checkKrwFilingsMcpReady();
+      if (!filingsMcpHealth.connected) {
+        await handleFailedJob({
+          admin,
+          job,
+          runStartedAt,
+          result: {
+            acc: emptyAccumulatedRun(),
+            errorCode: "mcp_unavailable",
+            errorMessage: "공시 원문 조회 서비스를 연결하지 못했습니다. 잠시 후 다시 시도해주세요.",
+            internalErrorMessage: filingsMcpHealth.error,
+          },
+          sendEvent,
+        });
+        return;
+      }
+    }
+
     await admin
       .from("agent_runs")
       .update({
@@ -302,6 +325,7 @@ export async function runAgentJob(runId: string, workerId: string) {
           defaultTickers: job.session.default_tickers ?? [],
           defaultDocumentTypes:
             (job.session.default_document_types ?? []) as DocumentType[],
+          sourceFilingEventId: job.session.source_filing_event_id ?? null,
           history: job.history,
           researchMode: job.researchMode,
           analysisMode: job.analysisMode,
@@ -566,7 +590,7 @@ async function loadAgentJob(
     await Promise.all([
       admin
         .from("chat_sessions")
-        .select("id, user_id, scope_type, default_tickers, default_document_types")
+        .select("id, user_id, scope_type, default_tickers, default_document_types, source_filing_event_id")
         .eq("id", run.session_id)
         .is("deleted_at", null)
         .maybeSingle<AgentJob["session"]>(),

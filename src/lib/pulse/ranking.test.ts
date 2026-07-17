@@ -85,6 +85,33 @@ describe("pulse lane ranking", () => {
     expect(comparePulseSortKeys(ranked[0], ranked[1])).toBeLessThan(0);
   });
 
+  it("uses personal relevance only within the same hard lane", () => {
+    const ranked = rankPulseCandidates([
+      candidate("filing:ordinary", { ticker: "MSFT", priority: "high" }),
+      candidate("filing:holding", {
+        ticker: "AAPL",
+        priority: "normal",
+        is_holding: true,
+        is_watchlisted: true,
+        has_recent_research: true,
+      }),
+      candidate("filing:watchlisted", {
+        ticker: "NVDA",
+        is_watchlisted: true,
+        has_recent_research: true,
+      }),
+      candidate("filing:plain", { ticker: "GOOG" }),
+    ], now);
+
+    expect(ranked.map((item) => item.item_key)).toEqual([
+      "filing:holding",
+      "filing:watchlisted",
+      "filing:ordinary",
+      "filing:plain",
+    ]);
+    expect(ranked[0].rank_score).toBeGreaterThan(ranked[1].rank_score);
+  });
+
   it("keeps ticker and learning diversity inside the supplied first-page window", () => {
     const rawWindow = rankPulseCandidates(Array.from({ length: 14 }, (_, index) => candidate(
       `${index < 4 ? "learning" : "filing"}:${index}`,
@@ -96,6 +123,31 @@ describe("pulse lane ranking", () => {
     expect(displayed).toHaveLength(rawWindow.length);
     expect(displayed.slice(0, 8).filter((item) => item.ticker === "AAPL")).toHaveLength(2);
     expect(displayed.slice(0, 10).filter((item) => item.kind === "learning")).toHaveLength(1);
+  });
+
+  it("reserves a late first-screen discovery slot without jumping an urgent filing", () => {
+    const rawWindow = rankPulseCandidates(Array.from({ length: 12 }, (_, index) => candidate(`filing:${index}`, {
+      ticker: `T${index}`,
+      occurred_at: new Date(now.getTime() - index * 60 * 60 * 1_000).toISOString(),
+      metadata: index === 11 ? { candidate_bucket: "discovery" } : {},
+    })), now);
+
+    const displayed = reorderFirstPageWindow(rawWindow);
+    expect(displayed.slice(0, 10).some((item) => item.metadata.candidate_bucket === "discovery")).toBe(true);
+    expect(displayed).toHaveLength(rawWindow.length);
+
+    const urgentWindow = rankPulseCandidates([
+      ...Array.from({ length: 10 }, (_, index) => candidate(`filing:urgent:${index}`, {
+        ticker: `U${index}`,
+        priority: "urgent",
+        occurred_at: new Date(now.getTime() - index * 60 * 60 * 1_000).toISOString(),
+      })),
+      candidate("filing:discovery", {
+        ticker: "DISC",
+        metadata: { candidate_bucket: "discovery" },
+      }),
+    ], now);
+    expect(reorderFirstPageWindow(urgentWindow).slice(0, 10).every((item) => item.priority === "urgent")).toBe(true);
   });
 
   it("ranks one thousand deterministic fixtures within a small local budget", () => {

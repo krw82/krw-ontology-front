@@ -36,7 +36,7 @@ const privacyCopy = {
         title: "2. 정보 이용 목적",
         body: [
           "수집한 정보는 사용자 인증, 개인 워크스페이스 제공, 채팅 기록 보관, 리서치 결과 생성 및 서비스 품질 개선을 위해 사용됩니다.",
-          "푸시 구독 정보와 알림 설정은 관심 기업의 8-K·6-K 공시 알림을 전송하고 알림 기능을 운영하기 위해서만 사용됩니다.",
+          "푸시 구독 정보와 알림 설정은 관심 기업의 8-K·6-K·Form 4 공시 알림을 전송하고 알림 기능을 운영하기 위해서만 사용됩니다.",
           "로그인 정보는 사용자를 식별하고 세션을 유지하기 위한 목적으로만 사용됩니다. Google 로그인 이용 시에도 Gmail, Drive, Calendar 등 별도 Google 서비스 데이터에는 접근하지 않습니다.",
         ],
       },
@@ -99,7 +99,7 @@ const privacyCopy = {
         title: "2. How we use information",
         body: [
           "Collected information is used for authentication, personal workspaces, chat history, research result generation, and service quality improvement.",
-          "Push subscription information and alert preferences are used only to deliver and operate 8-K and 6-K filing alerts for companies a user follows.",
+          "Push subscription information and alert preferences are used only to deliver and operate 8-K, 6-K, and Form 4 filing alerts for companies a user follows.",
           "Sign-in information is used only to identify users and maintain sessions. When Google sign-in is used, KRW.O does not access separate Google services such as Gmail, Drive, or Calendar.",
         ],
       },

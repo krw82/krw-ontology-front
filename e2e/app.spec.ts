@@ -69,10 +69,6 @@ test.describe("dev auth bypass", () => {
   test("renders the filterless P0 research feed without a legacy checkup card", async ({
     page,
   }) => {
-    test.skip(
-      process.env.PULSE_P0_V2_ENABLED === "0",
-      "This assertion targets the v2 feed surface.",
-    );
     await page.goto("/pulse", { waitUntil: "domcontentloaded" });
 
     await expect(page).toHaveURL(/\/pulse$/);
@@ -82,20 +78,6 @@ test.describe("dev auth bypass", () => {
     await expect(page.getByRole("main")).toContainText(
       "확인한 활동은 여기까지입니다",
     );
-  });
-
-  test("keeps the legacy Pulse surface available when the P0 flag is disabled", async ({
-    page,
-  }) => {
-    test.skip(
-      process.env.PULSE_P0_V2_ENABLED !== "0",
-      "This assertion targets the one-release rollback surface.",
-    );
-    await page.goto("/pulse", { waitUntil: "domcontentloaded" });
-
-    await expect(page).toHaveURL(/\/pulse$/);
-    await expect(page.getByRole("heading", { name: "오늘" })).toBeVisible();
-    await expect(page.locator('nav[aria-label="피드 종류"]')).toHaveCount(1);
   });
 
   test("opens protected companies page with stable account nav", async ({

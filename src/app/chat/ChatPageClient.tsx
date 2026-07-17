@@ -91,6 +91,7 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
   const runKindParam = searchParams.get("runKind");
   const guruParam = searchParams.get("guru");
   const entryParam = searchParams.get("entry");
+  const filingEventId = searchParams.get("filing_event_id");
   const isDiscoverRoute = pathname === "/discover";
   const isGuruRoute = pathname === "/guru";
   const isGuruWorkspace = workspace === "guru" || isGuruRoute;
@@ -367,6 +368,7 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
       scope_type: normalizedTicker ? "company" : "global",
       default_tickers: normalizedTicker ? [normalizedTicker] : [],
       default_document_types: [],
+      ...(filingEventId ? { source_filing_event_id: filingEventId } : {}),
     };
 
     const response = await fetch("/api/sessions", {
@@ -385,7 +387,7 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
 
     const data = (await response.json()) as CreateSessionResponse;
     return data.session.id;
-  }, [activeTicker, setSessionError]);
+  }, [activeTicker, filingEventId, setSessionError]);
 
   const clearComposerPrefillParams = useCallback(() => {
     if (!hasComposerPrefillParams) return;

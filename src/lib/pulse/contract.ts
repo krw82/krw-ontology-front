@@ -1,6 +1,5 @@
 import type {
   PulseAnalysisPhase,
-  PulseItem,
   PulseItemBase,
   PulseItemKind,
   PulseItemPriority,
@@ -89,11 +88,14 @@ export interface PulseCandidate extends Omit<
   actionable?: boolean;
   phase?: PulseAnalysisPhase | null;
   is_holding?: boolean;
+  is_watchlisted?: boolean;
+  has_recent_research?: boolean;
   is_pinned?: boolean;
 }
 
 export interface PulseSortKey {
   lane: number;
+  rank_score: number;
   priority_rank: number;
   holding_rank: number;
   saved_rank: number;

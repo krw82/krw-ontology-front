@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -14,6 +14,8 @@ import {
 const DEFAULT_PORT = 8787;
 const DEFAULT_MAX_BODY_BYTES = 4 * 1024 * 1024;
 const DEFAULT_UPSTREAM_BASE_URL = "https://api.deepseek.com/anthropic";
+const DEFAULT_OPENAI_UPSTREAM_BASE_URL = "https://api.deepseek.com";
+const FILING_BRIEF_PATH = "/internal/v1/filing-brief";
 const SUPPORTED_PATHS = new Set([
   "/anthropic/v1/messages",
   "/anthropic/v1/messages/count_tokens",
@@ -28,6 +30,11 @@ export interface GatewayContext {
   deepSeekApiKey: string;
   upstreamBaseUrl: string;
   maxBodyBytes: number;
+  filingBriefGatewayToken: string | null;
+  filingBriefModel: string;
+  filingBriefUpstreamBaseUrl: string;
+  filingBriefTimeoutMs: number;
+  filingBriefMaxBodyBytes: number;
 }
 
 export function createLlmGatewayServer(env: GatewayEnv = process.env) {
@@ -54,6 +61,10 @@ async function handleRequest(
         service: "krw-llm-gateway",
         provider: "deepseek",
       });
+    }
+
+    if (request.method === "POST" && url.pathname === FILING_BRIEF_PATH) {
+      return handleFilingBriefRequest(request, response, context);
     }
 
     if (request.method !== "POST" || !SUPPORTED_PATHS.has(url.pathname)) {
@@ -162,6 +173,214 @@ async function handleRequest(
   }
 }
 
+type FilingBriefGatewayPayload = {
+  jobId: string;
+  claimToken: string;
+  model: string;
+  systemPrompt: string;
+  userPrompt: string;
+  maxTokens: number;
+};
+
+type FilingBriefClaim = {
+  id: string;
+  filing_event_id: string;
+  stage: string;
+  status: string;
+  claim_token: string | null;
+  lease_expires_at: string | null;
+};
+
+/**
+ * Private worker-only endpoint. It intentionally has a separate auth path
+ * from desktop LLM jobs: filing briefs are shared catalog work, not a user's
+ * metered interactive request.
+ */
+async function handleFilingBriefRequest(
+  request: IncomingMessage,
+  response: ServerResponse,
+  context: GatewayContext,
+) {
+  if (!context.filingBriefGatewayToken) {
+    return sendJson(response, 503, {
+      error: { code: "filing_brief_disabled", message: "Filing brief gateway is not configured." },
+    });
+  }
+  const token = bearerToken(request.headers.authorization);
+  if (!token || !secureTokenEquals(token, context.filingBriefGatewayToken)) {
+    return gatewayAuthError(response, "Invalid filing brief gateway token");
+  }
+
+  const payload = parseFilingBriefGatewayPayload(
+    await readJsonBody(request, context.filingBriefMaxBodyBytes),
+    context.filingBriefModel,
+  );
+  const claim = await loadActiveFilingBriefClaim(context.supabase, payload.jobId, payload.claimToken);
+  if (!claim) {
+    return sendJson(response, 409, {
+      error: { code: "brief_job_inactive", message: "The filing brief job lease is no longer active." },
+    });
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(new FilingBriefTimeoutError()),
+    context.filingBriefTimeoutMs,
+  );
+  const abortOnDisconnect = () => {
+    if (!response.writableEnded) controller.abort(new GatewayClientDisconnectedError());
+  };
+  response.once("close", abortOnDisconnect);
+  try {
+    const upstream = await fetch(`${context.filingBriefUpstreamBaseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${context.deepSeekApiKey}`,
+      },
+      body: JSON.stringify({
+        model: payload.model,
+        messages: [
+          { role: "system", content: payload.systemPrompt },
+          { role: "user", content: payload.userPrompt },
+        ],
+        stream: false,
+        thinking: { type: "disabled" },
+        response_format: { type: "json_object" },
+        max_tokens: payload.maxTokens,
+      }),
+      signal: controller.signal,
+    });
+    const upstreamPayload = await upstream.json().catch(() => null) as Record<string, unknown> | null;
+    if (!upstream.ok) {
+      return sendJson(response, normalizeUpstreamStatus(upstream.status), {
+        error: {
+          code: upstreamErrorCode(upstreamPayload, upstream.status),
+          message: upstreamErrorMessage(upstreamPayload, upstream.status),
+        },
+      });
+    }
+    const content = deepSeekContent(upstreamPayload);
+    if (!content) {
+      return sendJson(response, 502, {
+        error: { code: "empty_model_content", message: "DeepSeek returned empty filing brief content." },
+      });
+    }
+    const usage = objectOrNull(upstreamPayload?.usage);
+    return sendJson(response, 200, {
+      content,
+      model: stringOrNull(upstreamPayload?.model) ?? payload.model,
+      request_id: upstream.headers.get("x-request-id") ?? upstream.headers.get("request-id"),
+      usage: {
+        input_tokens: safeInteger(usage?.prompt_tokens),
+        output_tokens: safeInteger(usage?.completion_tokens),
+        cache_read_input_tokens: safeInteger(
+          usage?.prompt_cache_hit_tokens ?? usage?.cache_read_input_tokens ?? usage?.cached_tokens,
+        ),
+      },
+    });
+  } catch (error) {
+    if (
+      error instanceof GatewayClientDisconnectedError ||
+      controller.signal.reason instanceof GatewayClientDisconnectedError
+    ) return;
+    if (error instanceof FilingBriefTimeoutError || (error instanceof DOMException && error.name === "AbortError")) {
+      return sendJson(response, 504, {
+        error: { code: "upstream_timeout", message: "DeepSeek filing brief request timed out." },
+      });
+    }
+    return sendJson(response, 502, {
+      error: {
+        code: "upstream_unavailable",
+        message: error instanceof Error ? `DeepSeek connection failed: ${error.message}` : "DeepSeek connection failed.",
+      },
+    });
+  } finally {
+    clearTimeout(timeout);
+    response.removeListener("close", abortOnDisconnect);
+  }
+}
+
+export function parseFilingBriefGatewayPayload(
+  body: Record<string, unknown>,
+  allowedModel: string,
+): FilingBriefGatewayPayload {
+  const jobId = stringOrNull(body.job_id);
+  const claimToken = stringOrNull(body.claim_token);
+  const model = stringOrNull(body.model);
+  const systemPrompt = stringOrNull(body.system_prompt);
+  const userPrompt = stringOrNull(body.user_prompt);
+  const maxTokens = numberValue(body.max_tokens);
+  if (!jobId || !UUID_PATTERN.test(jobId) || !claimToken || !UUID_PATTERN.test(claimToken)) {
+    throw new Error("filing brief job_id and claim_token must be UUIDs");
+  }
+  if (!model || model !== allowedModel) throw new Error("filing brief model is not allowed");
+  if (!systemPrompt || systemPrompt.length > 20_000) throw new Error("filing brief system_prompt is invalid");
+  if (!userPrompt || userPrompt.length > 100_000) throw new Error("filing brief user_prompt is invalid");
+  if (maxTokens === null || !Number.isInteger(maxTokens) || maxTokens < 64 || maxTokens > 1_200) {
+    throw new Error("filing brief max_tokens must be between 64 and 1200");
+  }
+  return { jobId, claimToken, model, systemPrompt, userPrompt, maxTokens };
+}
+
+async function loadActiveFilingBriefClaim(
+  supabase: SupabaseClient<Database>,
+  jobId: string,
+  claimToken: string,
+): Promise<FilingBriefClaim | null> {
+  const { data, error } = await supabase
+    .from("sec_filing_processing_jobs")
+    .select("id, filing_event_id, stage, status, claim_token, lease_expires_at")
+    .eq("id", jobId)
+    .eq("stage", "brief")
+    .eq("status", "claimed")
+    .eq("claim_token", claimToken)
+    .maybeSingle<FilingBriefClaim>();
+  if (error || !data || !data.lease_expires_at || Date.parse(data.lease_expires_at) <= Date.now()) return null;
+  return data;
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function secureTokenEquals(actual: string, expected: string): boolean {
+  const actualBytes = Buffer.from(actual);
+  const expectedBytes = Buffer.from(expected);
+  return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
+}
+
+function deepSeekContent(payload: Record<string, unknown> | null): string | null {
+  const choices = Array.isArray(payload?.choices) ? payload.choices : [];
+  const firstChoice = objectOrNull(choices[0]);
+  const message = objectOrNull(firstChoice?.message);
+  return stringOrNull(message?.content);
+}
+
+function normalizeUpstreamStatus(status: number): number {
+  if (status === 408 || status === 409 || status === 429) return status;
+  return status >= 500 ? 502 : 400;
+}
+
+function upstreamErrorCode(payload: Record<string, unknown> | null, status: number): string {
+  const error = objectOrNull(payload?.error);
+  return stringOrNull(error?.code) ?? `deepseek_${status}`;
+}
+
+function upstreamErrorMessage(payload: Record<string, unknown> | null, status: number): string {
+  const error = objectOrNull(payload?.error);
+  const message = stringOrNull(error?.message);
+  return message ? message.slice(0, 500) : `DeepSeek filing brief request failed (${status}).`;
+}
+
+function objectOrNull(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function stringOrNull(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 function createGatewayContext(env: GatewayEnv): GatewayContext {
   const supabaseUrl = requireEnv(env, "SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL");
   const serviceRoleKey = requireEnv(env, "SUPABASE_SERVICE_ROLE_KEY");
@@ -183,6 +402,23 @@ function createGatewayContext(env: GatewayEnv): GatewayContext {
     ).replace(/\/+$/, ""),
     maxBodyBytes: positiveInt(
       env.LLM_GATEWAY_MAX_BODY_BYTES,
+      DEFAULT_MAX_BODY_BYTES,
+    ),
+    filingBriefGatewayToken: optionalEnv(env, "FILING_BRIEF_GATEWAY_TOKEN"),
+    filingBriefModel: env.FILING_BRIEF_MODEL?.trim() || "deepseek-v4-flash",
+    filingBriefUpstreamBaseUrl: (
+      env.DEEPSEEK_OPENAI_BASE_URL ?? DEFAULT_OPENAI_UPSTREAM_BASE_URL
+    ).replace(/\/+$/, ""),
+    filingBriefTimeoutMs: boundedPositiveInt(
+      env.FILING_BRIEF_UPSTREAM_TIMEOUT_MS,
+      30_000,
+      5_000,
+      60_000,
+    ),
+    filingBriefMaxBodyBytes: boundedPositiveInt(
+      env.FILING_BRIEF_GATEWAY_MAX_BODY_BYTES,
+      512 * 1024,
+      64 * 1024,
       DEFAULT_MAX_BODY_BYTES,
     ),
   };
@@ -496,9 +732,24 @@ function requireEnv(
   return value;
 }
 
+function optionalEnv(env: GatewayEnv, name: string): string | null {
+  const value = env[name]?.trim();
+  return value || null;
+}
+
 function positiveInt(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function boundedPositiveInt(
+  value: string | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const parsed = positiveInt(value, fallback);
+  return Math.max(min, Math.min(max, parsed));
 }
 
 function numberValue(value: unknown): number | null {
@@ -532,6 +783,13 @@ class GatewayClientDisconnectedError extends Error {
   constructor() {
     super("Gateway client disconnected");
     this.name = "GatewayClientDisconnectedError";
+  }
+}
+
+class FilingBriefTimeoutError extends Error {
+  constructor() {
+    super("Filing brief upstream request timed out");
+    this.name = "FilingBriefTimeoutError";
   }
 }
 

@@ -37,11 +37,17 @@ VALIDATE_AGENT_WORKER=1
 VALIDATE_BILLING_WORKER=1
 VALIDATE_DOCUMENT_WORKER=1
 VALIDATE_DOCUMENT_OUTBOX_DISPATCHER=1
+VALIDATE_FILINGS_MCP=1
+VALIDATE_FILING_NOTIFICATION_WORKER=1
+VALIDATE_FILING_BRIEF_WORKER=1
 if [ "$#" -gt 0 ]; then
   VALIDATE_AGENT_WORKER=0
   VALIDATE_BILLING_WORKER=0
   VALIDATE_DOCUMENT_WORKER=0
   VALIDATE_DOCUMENT_OUTBOX_DISPATCHER=0
+  VALIDATE_FILINGS_MCP=0
+  VALIDATE_FILING_NOTIFICATION_WORKER=0
+  VALIDATE_FILING_BRIEF_WORKER=0
   for compose_arg in "$@"; do
     if [ "$compose_arg" = "agent-worker" ]; then
       VALIDATE_AGENT_WORKER=1
@@ -54,6 +60,15 @@ if [ "$#" -gt 0 ]; then
     fi
     if [ "$compose_arg" = "document-outbox-dispatcher" ]; then
       VALIDATE_DOCUMENT_OUTBOX_DISPATCHER=1
+    fi
+    if [ "$compose_arg" = "filings-mcp" ]; then
+      VALIDATE_FILINGS_MCP=1
+    fi
+    if [ "$compose_arg" = "filing-notification-worker" ]; then
+      VALIDATE_FILING_NOTIFICATION_WORKER=1
+    fi
+    if [ "$compose_arg" = "filing-brief-worker" ]; then
+      VALIDATE_FILING_BRIEF_WORKER=1
     fi
   done
 fi
@@ -188,6 +203,16 @@ done
 
 require_env_exact ANALYSIS_CREDIT_ENFORCEMENT_MODE enforced
 require_env_exact TRUSTED_CLIENT_IP_HEADER x-krw-client-ip
+
+FILING_BRIEF_ENABLED_VALUE=$(env_value FILING_BRIEF_ENABLED)
+if [ -n "$FILING_BRIEF_ENABLED_VALUE" ] && [ "$FILING_BRIEF_ENABLED_VALUE" != "0" ] && [ "$FILING_BRIEF_ENABLED_VALUE" != "1" ]; then
+  echo "Invalid environment value in $ENV_FILE: FILING_BRIEF_ENABLED must be 0 or 1" >&2
+  exit 1
+fi
+if [ "$FILING_BRIEF_ENABLED_VALUE" = "1" ]; then
+  require_env_value FILING_BRIEF_GATEWAY_TOKEN
+  require_env_value SEC_USER_AGENT
+fi
 
 if [ "${ALLOW_MISSING_TOSS_PAYMENTS:-0}" = "1" ]; then
   echo "Warning: skipping Toss Payments key validation because ALLOW_MISSING_TOSS_PAYMENTS=1." >&2
@@ -506,6 +531,159 @@ console.log(JSON.stringify({
 NODE
 else
   echo "Skipping document-outbox-dispatcher validation; compose target excludes document-outbox-dispatcher."
+fi
+
+if [ "$VALIDATE_FILINGS_MCP" = "1" ]; then
+  for i in $(seq 1 30); do
+    filings_mcp_container=$(
+      docker compose \
+        --project-name "$COMPOSE_PROJECT_NAME" \
+        --env-file "$ENV_FILE" \
+        -f "$BUILD_CONTEXT/docker-compose.yml" \
+        ps -q filings-mcp
+    )
+    if [ -n "$filings_mcp_container" ] && [ "$(docker inspect --format '{{.State.Status}}' "$filings_mcp_container")" = "running" ]; then
+      health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$filings_mcp_container")
+      if [ "$health" = "healthy" ] || [ "$health" = "none" ]; then
+        break
+      fi
+    fi
+    if [ "$i" -eq 30 ]; then
+      echo "filings-mcp did not become healthy" >&2
+      docker compose \
+        --project-name "$COMPOSE_PROJECT_NAME" \
+        --env-file "$ENV_FILE" \
+        -f "$BUILD_CONTEXT/docker-compose.yml" \
+        ps >&2
+      exit 1
+    fi
+    sleep 2
+  done
+
+  docker compose \
+    --project-name "$COMPOSE_PROJECT_NAME" \
+    --env-file "$ENV_FILE" \
+    -f "$BUILD_CONTEXT/docker-compose.yml" \
+    exec -T filings-mcp node - <<'NODE'
+const fs = require("fs");
+fs.accessSync(".worker/filings-mcp-server.mjs", fs.constants.R_OK);
+const enabled = process.env.FILINGS_MCP_ENABLED === "1";
+async function verify() {
+  if (enabled) {
+    for (const key of ["FILINGS_MCP_AUTH_TOKEN", "SEC_USER_AGENT"]) {
+      if (!process.env[key]) throw new Error(`filings-mcp missing ${key} while enabled`);
+    }
+    const response = await fetch("http://127.0.0.1:8785/readyz");
+    const payload = await response.json();
+    if (!response.ok || payload?.ok !== true) throw new Error("filings-mcp readiness is not ok");
+  }
+  console.log(JSON.stringify({ worker: "filings-mcp", enabled }));
+}
+verify().catch((error) => {
+  console.error(error.message || error);
+  process.exit(1);
+});
+NODE
+else
+  echo "Skipping filings-mcp validation; compose target excludes filings-mcp."
+fi
+
+if [ "$VALIDATE_FILING_NOTIFICATION_WORKER" = "1" ]; then
+  for i in $(seq 1 30); do
+    filing_container=$(
+      docker compose \
+        --project-name "$COMPOSE_PROJECT_NAME" \
+        --env-file "$ENV_FILE" \
+        -f "$BUILD_CONTEXT/docker-compose.yml" \
+        ps -q filing-notification-worker
+    )
+    if [ -n "$filing_container" ] && [ "$(docker inspect --format '{{.State.Status}}' "$filing_container")" = "running" ]; then
+      health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$filing_container")
+      if [ "$health" = "healthy" ] || [ "$health" = "none" ]; then
+        break
+      fi
+    fi
+    if [ "$i" -eq 30 ]; then
+      echo "filing-notification-worker did not become healthy" >&2
+      docker compose \
+        --project-name "$COMPOSE_PROJECT_NAME" \
+        --env-file "$ENV_FILE" \
+        -f "$BUILD_CONTEXT/docker-compose.yml" \
+        ps >&2
+      exit 1
+    fi
+    sleep 2
+  done
+
+  docker compose \
+    --project-name "$COMPOSE_PROJECT_NAME" \
+    --env-file "$ENV_FILE" \
+    -f "$BUILD_CONTEXT/docker-compose.yml" \
+    exec -T filing-notification-worker node - <<'NODE'
+const fs = require("fs");
+fs.accessSync(".worker/filing-notification-worker.mjs", fs.constants.R_OK);
+const detection = process.env.FILING_DETECTION_ENABLED !== "0";
+if (detection && !process.env.SEC_USER_AGENT) {
+  throw new Error("filing-notification-worker missing SEC_USER_AGENT while detection is enabled");
+}
+console.log(JSON.stringify({
+  worker: "filing-notification-worker",
+  detectionEnabled: detection,
+  deploymentId: process.env.FILING_WORKER_DEPLOYMENT_ID || "unset",
+}));
+NODE
+else
+  echo "Skipping filing-notification-worker validation; compose target excludes filing-notification-worker."
+fi
+
+if [ "$VALIDATE_FILING_BRIEF_WORKER" = "1" ]; then
+  for i in $(seq 1 30); do
+    filing_brief_container=$(
+      docker compose \
+        --project-name "$COMPOSE_PROJECT_NAME" \
+        --env-file "$ENV_FILE" \
+        -f "$BUILD_CONTEXT/docker-compose.yml" \
+        ps -q filing-brief-worker
+    )
+    if [ -n "$filing_brief_container" ] && [ "$(docker inspect --format '{{.State.Status}}' "$filing_brief_container")" = "running" ]; then
+      health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$filing_brief_container")
+      if [ "$health" = "healthy" ] || [ "$health" = "none" ]; then
+        break
+      fi
+    fi
+    if [ "$i" -eq 30 ]; then
+      echo "filing-brief-worker did not become healthy" >&2
+      docker compose \
+        --project-name "$COMPOSE_PROJECT_NAME" \
+        --env-file "$ENV_FILE" \
+        -f "$BUILD_CONTEXT/docker-compose.yml" \
+        ps >&2
+      exit 1
+    fi
+    sleep 2
+  done
+
+  docker compose \
+    --project-name "$COMPOSE_PROJECT_NAME" \
+    --env-file "$ENV_FILE" \
+    -f "$BUILD_CONTEXT/docker-compose.yml" \
+    exec -T filing-brief-worker node - <<'NODE'
+const fs = require("fs");
+fs.accessSync(".worker/filing-brief-worker.mjs", fs.constants.R_OK);
+const enabled = process.env.FILING_BRIEF_ENABLED === "1";
+if (enabled) {
+  for (const key of ["FILING_BRIEF_GATEWAY_TOKEN", "SEC_USER_AGENT"]) {
+    if (!process.env[key]) throw new Error(`filing-brief-worker missing ${key} while enabled`);
+  }
+}
+console.log(JSON.stringify({
+  worker: "filing-brief-worker",
+  enabled,
+  model: process.env.FILING_BRIEF_MODEL || "deepseek-v4-flash",
+}));
+NODE
+else
+  echo "Skipping filing-brief-worker validation; compose target excludes filing-brief-worker."
 fi
 
 if [ "$VALIDATE_BILLING_WORKER" = "1" ]; then

@@ -68,10 +68,6 @@ const GROUP_ORDER: WorkspaceNavigationGroupId[] = [
   "monitor",
 ];
 
-const isFeedWorkspaceEnabled = () =>
-  process.env.NEXT_PUBLIC_PULSE_FEED_ENABLED === "1" ||
-  process.env.NODE_ENV !== "production";
-
 const WORKSPACE_ROUTES: WorkspaceRouteDefinition[] = [
   {
     id: "feed",
@@ -79,7 +75,6 @@ const WORKSPACE_ROUTES: WorkspaceRouteDefinition[] = [
     icon: "dynamic_feed",
     labels: { ko: "피드", en: "Feed" },
     onboardingTarget: "research-pulse-nav",
-    visible: isFeedWorkspaceEnabled,
     href: (locale) => queryLocalizedPath(locale, "/pulse"),
     matches: (pathname) => pathname === "/pulse" || pathname.startsWith("/pulse/"),
   },

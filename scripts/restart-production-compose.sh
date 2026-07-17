@@ -55,7 +55,7 @@ require_command gcloud
 REMOTE_COMMAND=$(cat <<EOF
 set -eu
 cd '$REMOTE_FRONT_DIR'
-docker compose --project-name '$COMPOSE_PROJECT_NAME' --env-file '$ENV_FILE' restart reverse-proxy web llm-gateway document-worker document-outbox-dispatcher billing-worker
+docker compose --project-name '$COMPOSE_PROJECT_NAME' --env-file '$ENV_FILE' restart reverse-proxy web llm-gateway document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker billing-worker
 docker compose --project-name '$COMPOSE_PROJECT_NAME' --env-file '$ENV_FILE' ps
 EOF
 )
@@ -65,7 +65,7 @@ echo "Remote frontend: $REMOTE_FRONT_DIR"
 echo "Compose project: $COMPOSE_PROJECT_NAME"
 
 if [ "$DRY_RUN" = "1" ]; then
-  echo "Dry run: would restart reverse-proxy, web, llm-gateway, document-worker, document-outbox-dispatcher, and billing-worker on production."
+  echo "Dry run: would restart reverse-proxy, web, llm-gateway, document-worker, document-outbox-dispatcher, filings-mcp, filing-notification-worker, filing-brief-worker, and billing-worker on production."
   exit 0
 fi
 

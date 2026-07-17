@@ -57,7 +57,7 @@ const checks = [
   {
     table: "chat_sessions",
     select:
-      "id,deleted_at,client_request_id,last_message_preview,last_message_at,latest_run_status",
+      "id,deleted_at,client_request_id,last_message_preview,last_message_at,latest_run_status,source_filing_event_id",
   },
   {
     table: "messages",
@@ -88,7 +88,7 @@ const checks = [
   },
   {
     table: "ontology_companies",
-    select: "env,release_id,ticker,name,document_count",
+    select: "env,release_id,ticker,name,document_count,sec_cik,sec_ticker,sec_mapping_source,sec_mapping_checked_at",
   },
   {
     table: "message_shares",
@@ -232,12 +232,58 @@ const checks = [
   {
     table: "sec_filing_events",
     select:
-      "id,ticker,cik,accession_number,form_type,is_amendment,analysis_status,filing_detail_url",
+      "id,env,ticker,cik,accession_number,form_type,is_amendment,analysis_status,filing_detail_url,event_family,discovery_source,processing_status,feed_eligible,feed_available_at,feed_expires_at,occurred_at,parser_version",
+  },
+  {
+    table: "sec_filing_event_catalog_coverage",
+    select: "filing_event_id,env,release_id,ticker,covered_at",
+  },
+  {
+    table: "sec_filing_discovery_checkpoints",
+    select: "env,source_key,watermark_at,next_poll_at,last_success_at,gap_risk",
+  },
+  {
+    table: "sec_catalog_filing_reconciliation_state",
+    select: "env,cik,baseline_completed_at,next_poll_at,last_success_at",
+  },
+  {
+    table: "sec_filing_worker_leases",
+    select: "env,lease_key,worker_id,deployment_id,lease_expires_at",
+  },
+  {
+    table: "sec_filing_processing_jobs",
+    select: "id,env,filing_event_id,stage,status,priority,attempts,next_attempt_at",
+  },
+  {
+    table: "sec_filing_briefs",
+    select:
+      "filing_event_id,locale,headline_ko,summary_sentences,facts,source_document_url,source_sha256,source_section_keys,source_truncated,generator_model,prompt_version,schema_version,generated_at",
+  },
+  {
+    table: "sec_filing_brief_runs",
+    select:
+      "id,env,filing_event_id,job_id,outcome,model,prompt_version,schema_version,source_sha256,input_tokens,output_tokens,provider_cost_usd,latency_ms,error_code,created_at",
+  },
+  {
+    table: "sec_request_rate_limit_slots",
+    select: "scope,next_allowed_at,updated_at",
+  },
+  {
+    table: "sec_form4_reporting_owners",
+    select: "filing_event_id,reporting_owner_index,owner_cik,owner_name",
+  },
+  {
+    table: "sec_form4_transactions",
+    select: "id,filing_event_id,transaction_code,reported_transaction_value,reported_value_basis",
+  },
+  {
+    table: "sec_form4_event_summaries",
+    select: "filing_event_id,reported_purchase_value,reported_sale_value,tenb5_one_status",
   },
   {
     table: "filing_notification_preferences",
     select:
-      "user_id,enabled,notify_8k,notify_6k,include_amendments,timezone",
+      "user_id,enabled,notify_8k,notify_6k,notify_form4,insider_notification_mode,include_amendments,timezone",
   },
   {
     table: "push_subscriptions",
@@ -247,6 +293,10 @@ const checks = [
     table: "user_filing_notifications",
     select:
       "id,user_id,filing_event_id,kind,title,destination_path,read_at,clicked_at",
+  },
+  {
+    table: "user_filing_subscriptions",
+    select: "id,user_id,ticker,cik,env,catalog_collection_status,enabled",
   },
   {
     table: "user_pulse_preferences",
@@ -313,6 +363,82 @@ if (filingClaimError) {
   process.exit(1);
 }
 console.log("OK schema: claim_filing_notification_deliveries RPC");
+
+const { error: globalFilingFeedRpcError } = await supabase.rpc("get_catalog_global_filing_feed", {
+  p_env: "prod",
+  p_snapshot_at: new Date().toISOString(),
+  p_before_occurred_at: null,
+  p_before_filing_event_id: null,
+  p_limit: 1,
+});
+if (globalFilingFeedRpcError) {
+  console.error(`Schema smoke failed for get_catalog_global_filing_feed RPC: ${globalFilingFeedRpcError.message}`);
+  process.exit(1);
+}
+console.log("OK schema: get_catalog_global_filing_feed RPC");
+
+const pulseSnapshot = new Date();
+const { error: pulseCandidateRpcError } = await supabase.rpc(
+  "get_catalog_pulse_filing_candidates_v2",
+  {
+    p_env: "prod",
+    p_snapshot_at: pulseSnapshot.toISOString(),
+    p_preferred_tickers: [],
+    p_urgent_limit: 1,
+    p_priority_limit: 1,
+    p_preferred_limit: 1,
+    p_discovery_limit: 1,
+  },
+);
+if (pulseCandidateRpcError) {
+  console.error(`Schema smoke failed for get_catalog_pulse_filing_candidates_v2 RPC: ${pulseCandidateRpcError.message}`);
+  process.exit(1);
+}
+console.log("OK schema: get_catalog_pulse_filing_candidates_v2 RPC");
+
+const { error: pulseCandidateV3RpcError } = await supabase.rpc(
+  "get_catalog_pulse_filing_candidates_v3",
+  {
+    p_env: "prod",
+    p_snapshot_at: pulseSnapshot.toISOString(),
+    p_preferred_tickers: [],
+    p_urgent_limit: 1,
+    p_priority_limit: 1,
+    p_preferred_limit: 1,
+    p_discovery_limit: 1,
+  },
+);
+if (pulseCandidateV3RpcError) {
+  console.error(`Schema smoke failed for get_catalog_pulse_filing_candidates_v3 RPC: ${pulseCandidateV3RpcError.message}`);
+  process.exit(1);
+}
+console.log("OK schema: get_catalog_pulse_filing_candidates_v3 RPC");
+
+const { error: pulseStatusRpcError } = await supabase.rpc(
+  "get_catalog_pulse_feed_status_v1",
+  {
+    p_env: "prod",
+    p_since: new Date(pulseSnapshot.getTime() - 5 * 60_000).toISOString(),
+    p_snapshot_at: pulseSnapshot.toISOString(),
+  },
+);
+if (pulseStatusRpcError) {
+  console.error(`Schema smoke failed for get_catalog_pulse_feed_status_v1 RPC: ${pulseStatusRpcError.message}`);
+  process.exit(1);
+}
+console.log("OK schema: get_catalog_pulse_feed_status_v1 RPC");
+
+const secLimiterScope = `schema-smoke-${Date.now()}`;
+const { data: secSlot, error: secSlotError } = await supabase.rpc("reserve_sec_request_slot", {
+  p_scope: secLimiterScope,
+  p_min_interval_ms: 100,
+});
+if (secSlotError || typeof secSlot !== "string" || Number.isNaN(Date.parse(secSlot))) {
+  console.error(`Schema smoke failed for reserve_sec_request_slot RPC: ${secSlotError?.message ?? "invalid slot timestamp"}`);
+  process.exit(1);
+}
+await supabase.from("sec_request_rate_limit_slots").delete().eq("scope", secLimiterScope);
+console.log("OK schema: reserve_sec_request_slot RPC");
 
 const zeroUuid = "00000000-0000-0000-0000-000000000000";
 const { error: reserveRpcError } = await supabase.rpc("reserve_execution_budget", {
@@ -443,6 +569,18 @@ await expectAnonTableBlocked(
   "billing_toss_payments",
   "id,user_id,status",
 );
+await expectAnonTableBlocked(
+  "sec_filing_processing_jobs",
+  "id,env,filing_event_id,status",
+);
+await expectAnonTableBlocked(
+  "sec_request_rate_limit_slots",
+  "scope,next_allowed_at",
+);
+await expectAnonTableBlocked(
+  "sec_form4_transactions",
+  "id,filing_event_id,reported_transaction_value",
+);
 
 await expectAnonRpcBlocked("claim_agent_run", {
   p_worker_id: "",
@@ -489,6 +627,40 @@ await expectAnonRpcBlocked("mark_agent_run_terminal", {
 });
 await expectAnonRpcBlocked("publish_ontology_web_catalog", {
   p_catalog: {},
+});
+await expectAnonRpcBlocked("get_catalog_global_filing_feed", {
+  p_env: "prod",
+  p_snapshot_at: new Date().toISOString(),
+  p_before_occurred_at: null,
+  p_before_filing_event_id: null,
+  p_limit: 1,
+});
+await expectAnonRpcBlocked("get_catalog_pulse_filing_candidates_v2", {
+  p_env: "prod",
+  p_snapshot_at: new Date().toISOString(),
+  p_preferred_tickers: [],
+  p_urgent_limit: 1,
+  p_priority_limit: 1,
+  p_preferred_limit: 1,
+  p_discovery_limit: 1,
+});
+await expectAnonRpcBlocked("get_catalog_pulse_filing_candidates_v3", {
+  p_env: "prod",
+  p_snapshot_at: new Date().toISOString(),
+  p_preferred_tickers: [],
+  p_urgent_limit: 1,
+  p_priority_limit: 1,
+  p_preferred_limit: 1,
+  p_discovery_limit: 1,
+});
+await expectAnonRpcBlocked("get_catalog_pulse_feed_status_v1", {
+  p_env: "prod",
+  p_since: new Date(Date.now() - 5 * 60_000).toISOString(),
+  p_snapshot_at: new Date().toISOString(),
+});
+await expectAnonRpcBlocked("reserve_sec_request_slot", {
+  p_scope: "anon-schema-smoke",
+  p_min_interval_ms: 100,
 });
 await expectAnonRpcBlocked("record_usage_event", {
   p_user_id: zeroUuid,

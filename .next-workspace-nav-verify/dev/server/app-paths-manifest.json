@@ -1,0 +1,7 @@
+{
+  "/api/analytics/events/route": "app/api/analytics/events/route.js",
+  "/api/watchlist/[ticker]/route": "app/api/watchlist/[ticker]/route.js",
+  "/chat/page": "app/chat/page.js",
+  "/chat/new/page": "app/chat/new/page.js",
+  "/[locale]/(public)/companies/page": "app/[locale]/(public)/companies/page.js"
+}

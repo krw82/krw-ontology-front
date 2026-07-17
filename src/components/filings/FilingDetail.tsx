@@ -9,7 +9,7 @@ import { trackClientEventSilently } from "@/lib/analytics/client";
 type Filing = {
   id: string;
   display_ticker: string;
-  form_type: "8-K" | "8-K/A" | "6-K" | "6-K/A";
+  form_type: "8-K" | "8-K/A" | "6-K" | "6-K/A" | "4" | "4/A";
   filing_date: string;
   accepted_at: string | null;
   is_amendment: boolean;
@@ -37,6 +37,29 @@ type KeywordMatch = {
   matched_context: string;
 };
 
+type FilingBrief = {
+  filing_event_id: string;
+  locale: "ko-KR";
+  headline_ko: string;
+  summary_sentences: string[];
+  facts: Array<{
+    fact_ko: string;
+    section_key: string;
+    source_quote: string;
+    section_heading: string;
+    source_document_url: string;
+  }>;
+  question_suggestions: string[];
+  uncertainty_notes: string[];
+  source_document_url: string;
+  source_section_keys: string[];
+  source_truncated: boolean;
+  generator_model: string;
+  prompt_version: string;
+  schema_version: number;
+  generated_at: string;
+};
+
 type AmendmentComparison = {
   available: boolean;
   message?: string;
@@ -56,9 +79,11 @@ type AmendmentComparison = {
 export default function FilingDetail({ eventId }: { eventId: string }) {
   const searchParams = useSearchParams();
   const notificationId = searchParams.get("notification");
+  const fromPulse = searchParams.get("source") === "pulse";
   const [filing, setFiling] = useState<Filing | null>(null);
   const [documents, setDocuments] = useState<FilingDocument[]>([]);
   const [keywordMatches, setKeywordMatches] = useState<KeywordMatch[]>([]);
+  const [brief, setBrief] = useState<FilingBrief | null>(null);
   const [amendmentComparison, setAmendmentComparison] = useState<AmendmentComparison | null>(null);
   const [loadingComparison, setLoadingComparison] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,13 +93,14 @@ export default function FilingDetail({ eventId }: { eventId: string }) {
     void fetch(`/api/filings/${encodeURIComponent(eventId)}`, { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) throw new Error("filing_unavailable");
-        return response.json() as Promise<{ filing: Filing; documents: FilingDocument[]; keyword_matches?: KeywordMatch[]; unread_count?: number }>;
+        return response.json() as Promise<{ filing: Filing; documents: FilingDocument[]; keyword_matches?: KeywordMatch[]; brief?: FilingBrief | null; unread_count?: number }>;
       })
       .then((payload) => {
         if (!active) return;
         setFiling(payload.filing);
         setDocuments(payload.documents ?? []);
         setKeywordMatches(payload.keyword_matches ?? []);
+        setBrief(payload.brief ?? null);
         syncAppBadge(payload.unread_count ?? 0);
         trackClientEventSilently("filing_detail_viewed", { filing_event_id: eventId, ticker: payload.filing.display_ticker, form_type: payload.filing.form_type });
         if (notificationId) {
@@ -97,7 +123,8 @@ export default function FilingDetail({ eventId }: { eventId: string }) {
     : [];
   const reason = filingClassificationReason({ formType: filing.form_type, secItems: filing.sec_items, primaryEventTag: filing.primary_event_tag, primaryDocDescription: description, metadataRulePhrases });
   const recommended = documents.find((document) => document.recommendation_score > 0) ?? null;
-  const analysisQuery = `${filing.display_ticker}의 ${filing.form_type} 공시(${formatDate(filing.filing_date)})가 기존 투자 논지에 미치는 영향을 SEC 원문 근거로 분석해줘.`;
+  const analysisQuery = brief?.question_suggestions[0]
+    ?? `${filing.display_ticker}의 ${filing.form_type} 공시(${formatDate(filing.filing_date)})가 기존 투자 논지에 미치는 영향을 SEC 원문 근거로 분석해줘.`;
   const loadAmendmentComparison = async () => {
     if (loadingComparison || amendmentComparison) return;
     setLoadingComparison(true);
@@ -114,7 +141,7 @@ export default function FilingDetail({ eventId }: { eventId: string }) {
   };
 
   return <article>
-    <Link href="/filings" className="inline-flex text-sm font-bold text-primary underline underline-offset-4">← 공시함</Link>
+    <Link href={fromPulse ? "/pulse" : "/filings"} className="inline-flex text-sm font-bold text-primary underline underline-offset-4">← {fromPulse ? "피드" : "공시함"}</Link>
     <div className="mt-lg rounded-[10px] border border-hairline bg-canvas p-lg shadow-sm">
       <div className="flex flex-wrap items-center gap-2 text-xs font-black tracking-[0.04em] text-primary"><span>{filing.display_ticker}</span><span className="rounded-[5px] border border-current/20 px-1.5 py-0.5">{filing.form_type}</span></div>
       <h1 className="mt-sm text-2xl font-black tracking-[-0.04em] text-ink">{eventLabel ?? "새 SEC 공시"}</h1>
@@ -123,6 +150,8 @@ export default function FilingDetail({ eventId }: { eventId: string }) {
       {filing.sec_items.length ? <div className="mt-md flex flex-wrap gap-2">{filing.sec_items.map((item) => <span key={item} className="rounded-[5px] bg-surface-soft px-2 py-1 text-xs font-bold text-muted">Item {item}</span>)}</div> : null}
       {keywordMatches.length ? <div className="mt-md rounded-[7px] bg-surface-soft px-sm py-sm"><p className="text-xs font-extrabold text-ink">내 키워드 규칙 일치</p>{keywordMatches.slice(0, 2).map((match) => <p key={match.id} className="mt-1 text-xs leading-5 text-muted">{match.matched_context}</p>)}</div> : null}
     </div>
+
+    {brief ? <FilingBriefPanel brief={brief} filingEventId={filing.id} /> : null}
 
     <section className="mt-lg rounded-[10px] border border-hairline bg-canvas p-lg">
       <h2 className="text-base font-extrabold text-ink">권장 첨부문서</h2>
@@ -139,10 +168,29 @@ export default function FilingDetail({ eventId }: { eventId: string }) {
 
     <section className="mt-lg rounded-[10px] border border-primary/25 bg-primary-fixed p-lg">
       <h2 className="text-base font-extrabold text-ink">이 공시를 KRW.O로 더 확인하기</h2>
-      <p className="mt-xs text-sm leading-6 text-muted">자동 분석은 실행하지 않습니다. 필요할 때만 기존 리서치 사용량으로 질문을 시작합니다.</p>
-      <Link href={`/chat/new?${new URLSearchParams({ ticker: filing.display_ticker, query: analysisQuery }).toString()}`} onClick={() => trackClientEventSilently("filing_analysis_started", { filing_event_id: filing.id, ticker: filing.display_ticker })} className="mt-md inline-flex min-h-10 items-center rounded-[7px] bg-primary px-base text-sm font-extrabold text-on-primary hover:bg-primary-active">이 공시 분석 시작</Link>
+      <p className="mt-xs text-sm leading-6 text-muted">원문 기반 자동 요약은 투자 판단을 대신하지 않습니다. 필요할 때만 SEC 원문을 다시 확인하는 질문을 시작합니다.</p>
+      <Link href={`/chat/new?${new URLSearchParams({ ticker: filing.display_ticker, filing_event_id: filing.id, query: analysisQuery }).toString()}`} onClick={() => trackClientEventSilently("filing_analysis_started", { filing_event_id: filing.id, ticker: filing.display_ticker })} className="mt-md inline-flex min-h-10 items-center rounded-[7px] bg-primary px-base text-sm font-extrabold text-on-primary hover:bg-primary-active">이 공시 분석 시작</Link>
     </section>
   </article>;
+}
+
+function FilingBriefPanel({ brief, filingEventId }: { brief: FilingBrief; filingEventId: string }) {
+  return <section className="mt-lg rounded-[10px] border border-[#cbdcff] bg-[#f6f9ff] p-lg">
+    <div className="flex flex-wrap items-start justify-between gap-sm">
+      <div>
+        <p className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-[0.08em] text-primary"><span className="material-symbols-outlined text-[15px]" aria-hidden="true">format_quote</span>원문 기반 자동 요약</p>
+        <h2 className="mt-sm text-lg font-black tracking-[-0.03em] text-ink">{brief.headline_ko}</h2>
+      </div>
+      <a href={brief.source_document_url} target="_blank" rel="noreferrer" onClick={() => trackClientEventSilently("sec_source_opened", { filing_event_id: filingEventId, source: "filing_brief" })} className="inline-flex min-h-9 shrink-0 items-center rounded-[7px] border border-primary/30 bg-white px-sm text-xs font-extrabold text-primary hover:bg-primary-fixed">원문 열기<span aria-hidden="true" className="material-symbols-outlined ml-1 text-[15px]">open_in_new</span></a>
+    </div>
+    <div className="mt-md space-y-2 text-sm leading-6 text-body">{brief.summary_sentences.map((sentence) => <p key={sentence}>{sentence}</p>)}</div>
+    <details className="mt-md rounded-[8px] border border-primary/15 bg-white px-sm py-sm">
+      <summary className="cursor-pointer text-sm font-extrabold text-ink">근거 인용 {brief.facts.length}개</summary>
+      <div className="mt-sm space-y-sm">{brief.facts.map((fact, index) => <div key={`${fact.section_key}-${index}`} className="border-l-2 border-primary/40 pl-sm"><p className="text-sm font-bold text-ink">{fact.fact_ko}</p><p className="mt-1 text-xs font-semibold text-muted">{fact.section_heading}</p><blockquote className="mt-1 text-xs leading-5 text-muted">“{fact.source_quote}”</blockquote></div>)}</div>
+    </details>
+    {brief.uncertainty_notes.length ? <p className="mt-sm text-xs leading-5 text-muted">{brief.uncertainty_notes.join(" · ")}</p> : null}
+    <p className="mt-sm text-[11px] leading-5 text-muted">자동 생성된 사실 요약입니다. 전체 문맥은 SEC 원문에서 확인하세요.</p>
+  </section>;
 }
 
 function AmendmentComparisonPanel({ comparison }: { comparison: AmendmentComparison }) {

@@ -9,6 +9,15 @@ export type FilingDocumentCandidate = {
   recommendationScore: number;
 };
 
+/**
+ * SEC exposes Form 4's browser-rendered XSL view beside the source ownership
+ * XML. The primary-document metadata can encode the XSL path separator as
+ * `%2F`, which otherwise looks like an ordinary XML URL.
+ */
+export function isSecXslRenderedDocumentUrl(value: string): boolean {
+  return /\/xsl[^/%]*(?:\/|%2f)/i.test(value);
+}
+
 export function parseFilingIndexDocuments(params: {
   html: string;
   filingDetailUrl: string;
@@ -112,14 +121,17 @@ function recommendationScore(params: {
 }
 
 function dedupeDocuments(candidates: FilingDocumentCandidate[]): FilingDocumentCandidate[] {
-  const byName = new Map<string, FilingDocumentCandidate>();
+  // The SEC index can list an XSL-rendered Form 4 XML and the underlying
+  // ownership XML with the same basename. They are distinct documents for
+  // selection purposes, so only dedupe an identical canonical URL.
+  const byUrl = new Map<string, FilingDocumentCandidate>();
   for (const candidate of candidates) {
-    const existing = byName.get(candidate.documentName);
+    const existing = byUrl.get(candidate.documentUrl);
     if (!existing || candidate.recommendationScore > existing.recommendationScore) {
-      byName.set(candidate.documentName, candidate);
+      byUrl.set(candidate.documentUrl, candidate);
     }
   }
-  return [...byName.values()].sort(
+  return [...byUrl.values()].sort(
     (left, right) => right.recommendationScore - left.recommendationScore || (left.sequence ?? Infinity) - (right.sequence ?? Infinity),
   );
 }

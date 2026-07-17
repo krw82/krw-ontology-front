@@ -161,6 +161,15 @@ export type YahooFinanceMCPToolName =
 /** Local presentation MCP tool names */
 export type ChartMCPToolName = "create_chart_v1";
 
+/** On-demand SEC filing MCP tools. Document bodies are never persisted. */
+export type KrwFilingsMCPToolName =
+  | "get_filing"
+  | "get_filing_brief"
+  | "search_catalog_filings"
+  | "list_filing_sections"
+  | "read_filing_section"
+  | "get_form4_insider_transactions";
+
 /** Allowed Guru Advisor MCP tool names */
 export type GuruMCPToolName =
   | "krw_guru_status"
@@ -183,6 +192,7 @@ export type MCPToolName =
   | StockNewsMCPToolName
   | YahooFinanceMCPToolName
   | ChartMCPToolName
+  | KrwFilingsMCPToolName
   | GuruMCPToolName;
 
 /** Document types in the ontology */
@@ -1386,6 +1396,8 @@ export interface CreateSessionRequest {
   scope_type: SessionScopeType;
   default_tickers?: string[]; // required when scope_type is "company"
   default_document_types?: string[];
+  /** Runtime-owned pointer to the Pulse filing card that opened this chat. */
+  source_filing_event_id?: string;
 }
 
 /** PATCH /api/sessions/[sessionId] request body */
@@ -1761,15 +1773,25 @@ export interface PulseFeedSummary {
 export interface PulseFeedResponse {
   generated_at: string;
   snapshot_at: string;
+  ranking_version: "rule_v1";
   timezone: string;
   date_label: string;
   filter: PulseFilter;
   summary: PulseFeedSummary;
+  active_analysis_items: PulseItem[];
   items: PulseItem[];
   next_cursor: string | null;
   has_more: boolean;
   new_item_count: number;
   source_statuses: PulseSourceStatus[];
+}
+
+export interface PulseFeedStatusResponse {
+  generated_at: string;
+  new_item_count: number;
+  active_analysis_count: number;
+  active_analysis_updated_at: string | null;
+  active_analysis_session_ids: string[];
 }
 
 export interface PulsePreferences {

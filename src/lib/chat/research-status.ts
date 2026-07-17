@@ -56,6 +56,12 @@ const toolLabels: Partial<Record<MCPToolName, string>> = {
   krw_guru_company_brief: "회사 질문 정리",
   krw_guru_company_pack: "회사 근거와 구루 렌즈 결합",
   krw_guru_review_company_evidence: "회사 근거를 구루 렌즈로 재검토",
+  get_filing: "공시 제출 정보 확인",
+  get_filing_brief: "공시 핵심 요약 확인",
+  search_catalog_filings: "관련 공시 목록 확인",
+  list_filing_sections: "공시 원문 항목 확인",
+  read_filing_section: "공시 원문 근거 확인",
+  get_form4_insider_transactions: "내부자 거래 내역 확인",
 };
 
 const toolStepMap: Record<MCPToolName, ResearchStepId> = {
@@ -96,6 +102,12 @@ const toolStepMap: Record<MCPToolName, ResearchStepId> = {
   krw_guru_company_brief: "scope",
   krw_guru_company_pack: "compose",
   krw_guru_review_company_evidence: "compose",
+  get_filing: "scope",
+  get_filing_brief: "scope",
+  search_catalog_filings: "scope",
+  list_filing_sections: "search",
+  read_filing_section: "search",
+  get_form4_insider_transactions: "search",
 };
 
 const baseSteps: Array<{ id: ResearchStepId; label: string }> = [

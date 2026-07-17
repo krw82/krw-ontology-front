@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KRW.O 카탈로그 공시 피드 개선 검토</title>
+  <style>
+    :root { color-scheme: light; --ink:#121826; --muted:#596579; --line:#dce2eb; --blue:#0e4fd8; --soft:#eef5ff; --card:#fff; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#f8fafc; color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; line-height:1.6; }
+    main { max-width:900px; margin:0 auto; padding:48px 24px 72px; }
+    h1 { margin:0; font-size:32px; line-height:1.2; letter-spacing:-.03em; }
+    h2 { margin:44px 0 14px; font-size:22px; letter-spacing:-.02em; }
+    h3 { margin:32px 0 8px; font-size:18px; }
+    p { margin:8px 0; }
+    .lead { color:var(--muted); font-size:16px; }
+    .callout { margin:24px 0; padding:18px 20px; border:1px solid #bfdbfe; border-radius:14px; background:var(--soft); }
+    .callout strong { display:block; margin-bottom:4px; }
+    figure { margin:20px 0; }
+    img { display:block; width:100%; max-width:100%; border:1px solid var(--line); border-radius:12px; box-shadow:0 10px 28px rgba(15,23,42,.08); }
+    figcaption { margin-top:8px; color:var(--muted); font-size:13px; }
+    .idea { margin:18px 0; padding:20px; border:1px solid var(--line); border-radius:14px; background:var(--card); }
+    .tag { display:inline-block; margin-right:6px; padding:2px 8px; border-radius:99px; background:#edf2ff; color:#304eae; font-size:12px; font-weight:700; }
+    pre { overflow:auto; margin:14px 0 0; padding:14px; border-radius:10px; background:#101828; color:#e5e7eb; font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    table { width:100%; border-collapse:collapse; background:#fff; }
+    th,td { padding:12px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { background:#f3f6fa; font-size:13px; }
+    a { color:#0e4fd8; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; }
+    .grid figure { margin:0; }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="tag">DESKTOP · PULSE + NOTIFICATIONS</p>
+    <h1>KRW.O 카탈로그 공시 피드 개선 검토</h1>
+    <p class="lead">대상: 온톨로지 카탈로그 회사의 8-K·6-K·Form 4를 Pulse에 보여주고, 개인 관심기업 알림은 별도로 제어하는 흐름.</p>
+    <section class="callout"><strong>TL;DR</strong>피드는 필터가 많은 공시함이 아니라 리서치의 다음 행동을 고르는 사건 스트림으로 유지합니다. Form 4는 동일한 카드 문법 안에서 사실과 범위를 짧게 보여주고, 개인 알림 범위는 설정 카드의 조건부 선택지로 분리하는 것이 가장 적은 UI 비용으로 안전합니다.</section>
+    <h2>현재 상태</h2>
+    <figure><img src="references/current.png" alt="현재 KRW.O Pulse 카드 화면"><figcaption>현재 Pulse는 큰 제목, 분명한 1차 행동, 검토·저장·숨기기 같은 리서치 상태를 카드 안에 담고 있다. 이 집중도는 유지해야 한다.</figcaption></figure>
+    <h2>적용할 개선</h2>
+    <article class="idea">
+      <h3>1. 공시 카드는 “알림”이 아니라 사실 기반 사건 카드로 고정 <span class="tag">가장 큰 효과</span></h3>
+      <p>카드 상단에는 <strong>티커 · Form · 사건 종류 · 시각</strong>을 짧게 두고, 제목에는 판정 가능한 사실만 표시합니다. Form 4는 P/S로 보고된 공개시장 거래만 금액을 표시하고, 나머지는 “신고 제출”로 끝냅니다. 1차 행동은 “공시 보기”, 2차 행동은 “이 공시로 질문”입니다.</p>
+      <p><strong>왜:</strong> Trello의 활동 피드는 시간과 활동을 읽기 쉬운 목록으로 유지한다. KRW.O에서는 그 패턴을 투자 판단용 카드에 맞춰, 사람이 보낸 알림 대신 SEC 이벤트의 출처·형식·시간으로 치환한다.</p>
+      <pre>┌──────────────────────────────────────────┐&#10;│ 내부자 거래 · AAPL · Form 4        12분 전 │&#10;│ AAPL 내부자 거래: 매도 $1.2M              │&#10;│ P/S 보고 거래만 표시 · 10b5-1 정보 없음   │&#10;│ [공시 보기 →]  이 공시로 질문  검토 완료   │&#10;└──────────────────────────────────────────┘</pre>
+      <figure><img src="references/trello-activity-feed.png" alt="Trello 활동 피드 레퍼런스"><figcaption>Trello — 시간과 활동을 한 줄의 읽기 쉬운 피드로 정리한 패턴. [Lazyweb]</figcaption></figure>
+    </article>
+    <article class="idea">
+      <h3>2. Form 4 개인 알림은 토글 하나와 조건부 범위 선택으로 제한</h3>
+      <p>“Form 4 알림” 토글을 켠 경우에만 선택지를 보입니다. 기본값은 <strong>보고된 매수·매도만</strong>, 선택지는 “모든 Form 4”입니다. 토글을 끄면 범위 선택은 숨깁니다. “카탈로그 피드에는 이 설정과 무관하게 현재 커버 기업의 공시가 보인다”는 설명을 한 줄 붙입니다.</p>
+      <p><strong>왜:</strong> Intercom의 설정 화면처럼 알림 종류와 채널/세부 범위를 계층적으로 보여주면, 사용자가 무엇을 켰는지 즉시 파악할 수 있다. 설정을 두 개의 독립 토글로 두면 ‘끔 + 모든 Form 4’ 같은 모순 상태가 생긴다.</p>
+      <pre>Form 4 알림                                  [●]&#10;보고된 공개시장 매수·매도만                 [▼]&#10;  └ 카탈로그 피드 노출은 이 설정과 별개입니다.</pre>
+      <figure><img src="references/notification-preferences.png" alt="Intercom 알림 설정 레퍼런스"><figcaption>Intercom — 종류별 알림과 세부 설정을 명확히 분리한 설정 화면. [Lazyweb]</figcaption></figure>
+    </article>
+    <article class="idea">
+      <h3>3. 필터 바 대신 카드 안의 상태 행동과 저장을 유지</h3>
+      <p>Pulse 상단에 공시 필터를 상시 추가하지 않습니다. 사용자는 새 공시를 피드에서 자연스럽게 보며, 필요한 경우 카드의 저장·검토 완료·내일 다시 보기로 자신의 리서치 큐를 만든다. 공시함은 개인 알림의 이력용으로 남깁니다.</p>
+      <p><strong>왜:</strong> Financial Times의 기사 스트림은 날짜·레이블·저장 행동을 조합해 탐색을 돕는다. KRW.O는 뉴스량 경쟁이 아니라 개별 사건을 리서치로 전환하는 제품이므로, 우측 추천이나 복잡한 탐색 구조보다 카드 내부 상태가 더 맞다.</p>
+      <figure><img src="references/financial-times-financials.png" alt="Financial Times 금융 기사 스트림 레퍼런스"><figcaption>Financial Times — 날짜·카테고리·저장 행동으로 긴 스트림을 읽게 하는 패턴. [Lazyweb]</figcaption></figure>
+    </article>
+    <h2>유지할 점</h2>
+    <ul><li>현재 카드의 강한 제목 대비와 검은 1차 행동은 유지한다.</li><li>“왜 이 항목이 보이나요?”처럼 출처를 설명하는 접이식 근거는 공시 카드에도 유지한다.</li><li>자동 분석을 암시하지 않는다. 질문 행동은 사용자가 직접 시작한 채팅으로만 연결한다.</li><li>카탈로그 전역 피드와 개인 관심기업 알림을 같은 설정으로 보이게 만들지 않는다.</li></ul>
+    <h2>상태별 문구</h2>
+    <table><thead><tr><th>상태</th><th>카드 문구</th><th>행동</th></tr></thead><tbody><tr><td>8-K·6-K</td><td>“AAPL 실적·재무 관련 8-K 공시”</td><td>공시 보기 / 이 공시로 질문</td></tr><tr><td>Form 4, P/S 거래 있음</td><td>“AAPL 내부자 거래: 매도 $1.2M”</td><td>공시 보기 / 이 공시로 질문</td></tr><tr><td>Form 4, P/S 거래 없음</td><td>“AAPL 내부자 거래 신고가 제출되었습니다”</td><td>공시 보기</td></tr><tr><td>정정</td><td>“8-K/A 정정 공시” 또는 “내부자 거래 정정”</td><td>공시 보기 / 원본 비교(가능할 때)</td></tr></tbody></table>
+    <h2>참고 자료</h2>
+    <div class="grid"><figure><img src="references/trello-activity-feed.png" alt="Trello"><figcaption>Trello 활동 피드 [Lazyweb]</figcaption></figure><figure><img src="references/notification-preferences.png" alt="Intercom"><figcaption>Intercom 알림 설정 [Lazyweb]</figcaption></figure><figure><img src="references/financial-times-financials.png" alt="Financial Times"><figcaption>Financial Times 금융 스트림 [Lazyweb]</figcaption></figure></div>
+    <p class="lead">보조 근거: <a href="https://slack.com/help/articles/19693583638803-Get-your-work-done-from-the-Activity-view">Slack Activity 안내</a>는 상세 보기와 밀도 높은 보기를 분리하고, 개별 알림을 처리 가능한 항목으로 다룬다. 라이브 경쟁사 캡처는 봇 차단(403)으로 보조하지 못했고, 위 이미지는 Lazyweb의 화면 설명을 확인한 뒤 선택했다.</p>
+  </main>
+</body>
+</html>

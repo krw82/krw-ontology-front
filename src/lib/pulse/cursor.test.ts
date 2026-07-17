@@ -8,11 +8,13 @@ import {
 describe("pulse cursor", () => {
   it("round-trips a valid cursor", () => {
     const cursor = encodePulseCursor({
-      version: 2,
+      version: 3,
       snapshot_at: "2026-07-15T00:00:00.000Z",
       filter: "all",
+      ranking_version: "rule_v1",
       boundary: {
         lane: 10,
+        rank_score: 42,
         priority_rank: 1,
         holding_rank: 0,
         saved_rank: 1,
@@ -22,11 +24,13 @@ describe("pulse cursor", () => {
     });
 
     expect(decodePulseCursor(cursor)).toEqual({
-      version: 2,
+      version: 3,
       snapshot_at: "2026-07-15T00:00:00.000Z",
       filter: "all",
+      ranking_version: "rule_v1",
       boundary: {
         lane: 10,
+        rank_score: 42,
         priority_rank: 1,
         holding_rank: 0,
         saved_rank: 1,
@@ -55,6 +59,17 @@ describe("pulse cursor", () => {
       }),
     ).toString("base64url");
     expect(decodePulseCursor(malformedV2)).toBeNull();
+
+    const malformedV3 = Buffer.from(
+      JSON.stringify({
+        version: 3,
+        filter: "all",
+        ranking_version: "rule_v1",
+        snapshot_at: new Date().toISOString(),
+        boundary: { lane: 10 },
+      }),
+    ).toString("base64url");
+    expect(decodePulseCursor(malformedV3)).toBeNull();
   });
 
   it("keeps an offset cursor encoder only for the temporary legacy fallback", () => {

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { filingUrls, normalizeCik, parseRecentFilingCandidates } from "./sec-edgar";
+import {
+  filingUrls,
+  isFilingCandidateWithinLookback,
+  normalizeCik,
+  parseRecentFilingCandidates,
+} from "./sec-edgar";
 
 describe("SEC filing notification parser", () => {
   it("normalizes SEC CIK identifiers", () => {
@@ -35,5 +40,17 @@ describe("SEC filing notification parser", () => {
       filingDetailUrl: "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/0000320193-26-000001-index.html",
       primaryDocumentUrl: null,
     });
+  });
+
+  it("limits catalog baseline candidates to the feed retention window", () => {
+    const [candidate] = parseRecentFilingCandidates("0000320193", {
+      accessionNumber: ["0000320193-26-000001"],
+      form: ["8-K"],
+      filingDate: ["2026-07-15"],
+      acceptanceDateTime: ["2026-07-15T12:30:00.000Z"],
+    });
+    expect(candidate).toBeDefined();
+    expect(isFilingCandidateWithinLookback(candidate!, new Date("2026-04-17T00:00:00.000Z"))).toBe(true);
+    expect(isFilingCandidateWithinLookback(candidate!, new Date("2026-07-16T00:00:00.000Z"))).toBe(false);
   });
 });

@@ -19,12 +19,56 @@ vi.mock("@/lib/supabase/admin", () => ({
 const ORIGINAL_INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
 
 function mockSupabaseOk() {
+  const now = new Date().toISOString();
   vi.mocked(getSupabaseAdmin).mockReturnValue({
-    from: () => ({
-      select: () => ({
-        limit: async () => ({ error: null }),
-      }),
-    }),
+    from: (table: string) => {
+      if (table === "chat_sessions") {
+        return {
+          select: () => ({
+            limit: async () => ({ error: null }),
+          }),
+        };
+      }
+      if (table === "filing_notification_worker_heartbeats") {
+        return {
+          select: () => ({
+            order: () => ({
+              limit: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    worker_id: "filing-worker-1",
+                    last_seen_at: now,
+                    last_success_at: now,
+                    last_error: null,
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "sec_filing_worker_leases") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    worker_id: "filing-worker-1",
+                    deployment_id: "deployment-1",
+                    heartbeat_at: now,
+                    lease_expires_at: new Date(Date.now() + 60_000).toISOString(),
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`Unexpected Supabase table: ${table}`);
+    },
   } as unknown as ReturnType<typeof getSupabaseAdmin>);
 }
 
@@ -178,7 +222,7 @@ describe("GET /api/healthz/deep", () => {
     expect(body.checks.mcp.tool_count).toBe(13);
     expect(body.checks.mcp.worker_id).toBe("mac-worker-1");
     expect(body.checks.trusted_client_ip.ok).toBe(true);
-    expect(getSupabaseAdmin).toHaveBeenCalledOnce();
+    expect(getSupabaseAdmin).toHaveBeenCalledTimes(2);
     expect(getActiveOntologyCatalogRelease).toHaveBeenCalledOnce();
     expect(getReadyAgentWorker).toHaveBeenCalledOnce();
   });

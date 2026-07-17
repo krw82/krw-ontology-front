@@ -5,6 +5,9 @@ import { describe, expect, it } from "vitest";
 describe("Research Pulse state migration", () => {
   const migration = readFileSync(join(process.cwd(), "supabase/migrations/20260715006000_research_pulse_state.sql"), "utf8");
   const v2Migration = readFileSync(join(process.cwd(), "supabase/migrations/20260715009000_research_pulse_p0_v2.sql"), "utf8");
+  const rankedCandidatesMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260717010000_pulse_ranked_filing_candidates_v2.sql"), "utf8");
+  const candidateRepairMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260717011000_fix_pulse_candidate_ticker_ambiguity.sql"), "utf8");
+  const filingBriefMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260717020000_sec_filing_briefs.sql"), "utf8");
 
   it("creates additive preference and item-state tables with ownership RLS", () => {
     expect(migration).toContain("create table if not exists public.user_pulse_preferences");
@@ -35,5 +38,31 @@ describe("Research Pulse state migration", () => {
     expect(v2Migration).toContain("impression_count = public.user_pulse_item_states.impression_count + 1");
     expect(v2Migration).toContain("from public, anon, authenticated");
     expect(v2Migration).toContain("to service_role");
+  });
+
+  it("adds a bounded catalog candidate and lightweight status path without public RPC access", () => {
+    expect(rankedCandidatesMigration).toContain("get_catalog_pulse_filing_candidates_v2");
+    expect(rankedCandidatesMigration).toContain("p_preferred_tickers text[]");
+    expect(rankedCandidatesMigration).toContain("idx_sec_filing_events_pulse_available");
+    expect(rankedCandidatesMigration).toContain("#variable_conflict use_column");
+    expect(rankedCandidatesMigration).toContain("limit v_urgent_limit + v_priority_limit + v_preferred_limit + v_discovery_limit");
+    expect(rankedCandidatesMigration).toContain("get_catalog_pulse_feed_status_v1");
+    expect(rankedCandidatesMigration).toContain("to service_role");
+    expect(rankedCandidatesMigration).toContain("notify pgrst, 'reload schema'");
+  });
+
+  it("redefines the candidate RPC with column-precedence after the initial migration", () => {
+    expect(candidateRepairMigration).toContain("create or replace function public.get_catalog_pulse_filing_candidates_v2");
+    expect(candidateRepairMigration).toContain("#variable_conflict use_column");
+    expect(candidateRepairMigration).toContain("eligible.ticker = any(v_preferred_tickers)");
+    expect(candidateRepairMigration).toContain("notify pgrst, 'reload schema'");
+  });
+
+  it("adds a brief-aware candidate RPC as an additive, service-role-only read path", () => {
+    expect(filingBriefMigration).toContain("get_catalog_pulse_filing_candidates_v3");
+    expect(filingBriefMigration).toContain("left join public.sec_filing_briefs brief");
+    expect(filingBriefMigration).toContain("filing_brief_headline_ko");
+    expect(filingBriefMigration).toContain("from public, anon, authenticated");
+    expect(filingBriefMigration).toContain("notify pgrst, 'reload schema'");
   });
 });

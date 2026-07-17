@@ -28,10 +28,15 @@ import {
   YAHOO_FINANCE_SDK_ALLOWED_TOOLS,
   CHART_MCP_TOOLS,
   CHART_SDK_ALLOWED_TOOLS,
+  KRW_FILINGS_MCP_TOOLS,
+  KRW_FILINGS_SDK_ALLOWED_TOOLS,
   getStockNewsSdkAllowedTools,
   getKrwOntologyPluginPath,
   isChartSdkTool,
   isGuruAdvisorSdkTool,
+  isKrwFilingsMcpEnabled,
+  isKrwFilingsSdkTool,
+  filingsMcpToken,
   isKrwOntologySdkTool,
   isStockNewsEnabled,
   isStockNewsSdkTool,
@@ -100,6 +105,7 @@ import type {
   DocumentType,
   ChartMCPToolName,
   GuruMCPToolName,
+  KrwFilingsMCPToolName,
   KRWOntologyMCPToolName,
   MCPToolName,
   StreamingCitation,
@@ -112,6 +118,7 @@ const STOCK_NEWS_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_MCP_TOOLS);
 const GURU_MCP_TOOL_SET = new Set<string>(GURU_MCP_TOOLS);
 const YAHOO_FINANCE_MCP_TOOL_SET = new Set<string>(YAHOO_FINANCE_MCP_TOOLS);
 const CHART_MCP_TOOL_SET = new Set<string>(CHART_MCP_TOOLS);
+const KRW_FILINGS_MCP_TOOL_SET = new Set<string>(KRW_FILINGS_MCP_TOOLS);
 const DEFAULT_MAX_TURNS = 40;
 const TOOL_BUDGET_EXCEEDED = "tool_budget_exceeded";
 const TOOL_RESULT_MISSING = "tool_result_missing";
@@ -200,6 +207,8 @@ export interface AgentRunOptions {
   guruLensKey?: GuruLensKey | null;
   responseLocale?: Locale;
   selectedNewsEventContext?: Record<string, unknown> | null;
+  /** Source card that opened this chat; constrains on-demand SEC reads. */
+  sourceFilingEventId?: string | null;
   history?: Array<{ role: string; content: string }>;
   abortSignal?: AbortSignal;
   onSdkDiagnostics?: (diagnostics: SdkDiagnostics) => Promise<void>;
@@ -345,6 +354,7 @@ export async function runAgent(
   const stockNewsEnabledForRun = stockNewsRun && isStockNewsEnabled();
   const yahooFinanceRun = isYahooFinanceRunKind(runKind);
   const chartGenerationEnabled = !guruAdvisorRun && isChartGenerationEnabled();
+  const hasSourceFilingContext = Boolean(options.sourceFilingEventId);
   const toolBudget = getResearchModeToolBudget(researchMode);
   const abortHandler = () => abortController.abort();
   options.abortSignal?.addEventListener("abort", abortHandler, { once: true });
@@ -352,11 +362,21 @@ export async function runAgent(
     options.abortSignal.removeEventListener("abort", abortHandler);
     return { acc, status: "cancelled" };
   }
+  if (hasSourceFilingContext && !isKrwFilingsMcpEnabled()) {
+    return {
+      acc,
+      status: "failed",
+      errorCode: "mcp_unavailable",
+      errorMessage: "공시 원문 조회 서비스를 연결하지 못했습니다. 잠시 후 다시 시도해주세요.",
+      internalErrorMessage: "Source filing context requires FILINGS_MCP_ENABLED=1 and a filings MCP auth token.",
+    };
+  }
 
   const promptContext = {
     scopeType: options.scopeType,
     defaultTickers: options.defaultTickers,
     defaultDocumentTypes: options.defaultDocumentTypes,
+    sourceFilingEventId: options.sourceFilingEventId ?? null,
     companies: await getCompanyPromptContexts(options.defaultTickers),
   };
   const sdkSession = await getSessionInfo(options.sessionId, {
@@ -375,6 +395,7 @@ export async function runAgent(
       chartGenerationEnabled,
       guruAdvisorMode: guruAdvisorRun,
       guruAgentGeneratedBriefEnabled,
+      filingSourceActive: hasSourceFilingContext,
       responseLocale,
     },
   );
@@ -397,6 +418,7 @@ export async function runAgent(
     analysisMode,
     runKind,
     chartGenerationEnabled,
+    hasSourceFilingContext,
   );
 
   const requestedModel = getClaudeAgentModel();
@@ -404,7 +426,9 @@ export async function runAgent(
   try {
     strictHttpMcpServers = guruAdvisorRun
       ? undefined
-      : readStrictHttpMcpServerConfigs(ontologyPluginPath);
+      : readStrictHttpMcpServerConfigs(ontologyPluginPath, {
+          requireFilingsMcp: hasSourceFilingContext,
+        });
   } catch (error) {
     options.abortSignal?.removeEventListener("abort", abortHandler);
     const rawErrorMessage =
@@ -641,6 +665,7 @@ async function runSdkPass(params: {
       chartGenerationEnabled,
       guruAgentGeneratedBriefEnabled,
       requiredGuruCompanyTicker,
+      options.sourceFilingEventId ?? null,
     );
     const mcpServers = {
       ...(sdkOptions.mcpServers ?? {}),
@@ -697,6 +722,7 @@ async function runSdkPass(params: {
         onToolCallStart: options.onToolCallStart,
         onToolCallEnd: options.onToolCallEnd,
         onCitation: options.onCitation,
+        sourceFilingEventId: options.sourceFilingEventId ?? null,
         passName,
       });
 
@@ -1112,6 +1138,7 @@ function validateHttpMcpServerConfig(
 
 function readStrictHttpMcpServerConfigs(
   pluginPath: string,
+  options: { requireFilingsMcp?: boolean } = {},
 ): Record<string, McpHttpServerConfig> {
   const mcpConfigPath = path.join(pluginPath, ".mcp.json");
   const parsed = JSON.parse(readFileSync(mcpConfigPath, "utf8")) as {
@@ -1121,26 +1148,43 @@ function readStrictHttpMcpServerConfigs(
   if (!rawServers || !rawServers["krw-ontology"]) {
     throw new Error("KRW Ontology plugin is missing mcpServers.krw-ontology");
   }
+  if (options.requireFilingsMcp && !isKrwFilingsMcpEnabled()) {
+    throw new Error("On-demand filings MCP requires FILINGS_MCP_ENABLED=1 and a filings MCP auth token");
+  }
+  if (options.requireFilingsMcp && !rawServers["krw-filings"]) {
+    throw new Error("KRW Ontology plugin is missing mcpServers.krw-filings");
+  }
 
   const serverConfigs = Object.fromEntries(
-    Object.entries(rawServers).map(([serverName, rawConfig]) => {
+    Object.entries(rawServers)
+      .filter(([serverName]) => serverName !== "krw-filings" || options.requireFilingsMcp)
+      .map(([serverName, rawConfig]) => {
       const config = validateHttpMcpServerConfig(serverName, rawConfig);
       const overriddenUrl =
         serverName === "krw-ontology"
           ? process.env.KRW_ONTOLOGY_MCP_URL
           : serverName === "stock-news"
             ? process.env.STOCK_NEWS_MCP_URL
+            : serverName === "krw-filings"
+              ? process.env.KRW_FILINGS_MCP_URL
             : undefined;
+      const runtimeHeaders = serverName === "krw-filings"
+        ? {
+            ...((config as { headers?: Record<string, string> }).headers ?? {}),
+            Authorization: `Bearer ${filingsMcpToken() ?? ""}`,
+          }
+        : undefined;
       return [
         serverName,
-        overriddenUrl
+        overriddenUrl || runtimeHeaders
           ? validateHttpMcpServerConfig(serverName, {
               ...config,
-              url: overriddenUrl,
+              ...(overriddenUrl ? { url: overriddenUrl } : {}),
+              ...(runtimeHeaders ? { headers: runtimeHeaders } : {}),
             })
           : config,
       ];
-    }),
+      }),
   );
 
   return serverConfigs;
@@ -1643,6 +1687,7 @@ function allowedSdkToolsForResearchMode(
   analysisMode: AnalysisMode,
   runKind: RunKind,
   chartGenerationEnabled = isChartGenerationEnabled(),
+  hasSourceFilingContext = false,
 ): string[] {
   if (runKind === "guru_advisor") {
     return [
@@ -1685,6 +1730,9 @@ function allowedSdkToolsForResearchMode(
     ...(chartGenerationEnabled && runKind !== "news_discovery"
       ? CHART_SDK_ALLOWED_TOOLS
       : []),
+    ...(hasSourceFilingContext
+      ? KRW_FILINGS_SDK_ALLOWED_TOOLS
+      : []),
   ];
 }
 
@@ -1700,6 +1748,7 @@ function createToolPermissionGuard(
   chartGenerationEnabled = isChartGenerationEnabled(),
   guruAgentGeneratedBriefEnabled = false,
   requiredGuruCompanyTicker: string | null = null,
+  sourceFilingEventId: string | null = null,
 ): CanUseTool {
   let guruSawCompanyBrief = false;
   let guruSawCompanyEvidenceAgent = false;
@@ -1718,6 +1767,36 @@ function createToolPermissionGuard(
             behavior: "deny",
             message: "Inline chart generation is disabled for this runtime.",
           };
+    }
+
+    if (isKrwFilingsSdkTool(toolName)) {
+      if (!sourceFilingEventId) {
+        return {
+          behavior: "deny",
+          message: "On-demand SEC filing tools are available only for the filing card that opened this chat.",
+        };
+      }
+      const filingToolName = normalizeKrwFilingsToolName(toolName);
+      if (!filingToolName) {
+        return { behavior: "deny", message: "Unknown on-demand SEC filing tool." };
+      }
+      if (filingToolName === "search_catalog_filings") {
+        return {
+          behavior: "deny",
+          message: "This filing-scoped chat may read only its source filing, not search other filings.",
+        };
+      }
+      if (acc.toolCalls.length + 1 > maxToolCalls) {
+        return { behavior: "deny", message: buildToolBudgetDenyMessage() };
+      }
+      const preparedInput = constrainFilingToolInput(
+        filingToolName,
+        input,
+        sourceFilingEventId,
+      );
+      return preparedInput.changed
+        ? { behavior: "allow", updatedInput: preparedInput.input }
+        : { behavior: "allow" };
     }
 
     if (runKind === "guru_advisor") {
@@ -2796,6 +2875,7 @@ function prepareToolInputForRun(
   mcpToolName: MCPToolName | null,
   input: Record<string, unknown>,
   acc: AccumulatedRun,
+  sourceFilingEventId: string | null = null,
 ): PreparedToolInput {
   if (isStockNewsMcpToolName(mcpToolName)) {
     return { input, changed: false };
@@ -2805,6 +2885,11 @@ function prepareToolInputForRun(
   }
   if (isGuruMcpToolName(mcpToolName)) {
     return { input, changed: false };
+  }
+  if (isKrwFilingsMcpToolName(mcpToolName)) {
+    return sourceFilingEventId
+      ? constrainFilingToolInput(mcpToolName, input, sourceFilingEventId)
+      : { input, changed: false };
   }
   if (isChartMcpToolName(mcpToolName) || !mcpToolName) {
     return { input, changed: false };
@@ -2818,6 +2903,19 @@ function prepareToolInputForRun(
   return {
     input: policy.input,
     changed: inputWithContext.changed || policy.changed,
+  };
+}
+
+function constrainFilingToolInput(
+  toolName: KrwFilingsMCPToolName,
+  input: Record<string, unknown>,
+  sourceFilingEventId: string,
+): PreparedToolInput {
+  if (toolName === "search_catalog_filings") return { input, changed: false };
+  const next = { ...input, filing_event_id: sourceFilingEventId };
+  return {
+    input: next,
+    changed: canonicalJson(next) !== canonicalJson(input),
   };
 }
 
@@ -3146,6 +3244,7 @@ async function consumeSdkMessage(params: {
   onToolCallStart?: (toolCall: AccumulatedToolCall) => Promise<void>;
   onToolCallEnd?: (toolCall: AccumulatedToolCall) => Promise<void>;
   onCitation?: (citation: StreamingCitation) => Promise<void>;
+  sourceFilingEventId?: string | null;
   passName: "research";
 }) {
   const {
@@ -3156,6 +3255,7 @@ async function consumeSdkMessage(params: {
     onToolCallStart,
     onToolCallEnd,
     onCitation,
+    sourceFilingEventId,
     passName,
   } = params;
 
@@ -3173,7 +3273,12 @@ async function consumeSdkMessage(params: {
         const toolCallId =
           typeof block.id === "string" ? block.id : crypto.randomUUID();
         const rawInput = isRecord(block.input) ? block.input : {};
-        const input = prepareToolInputForRun(toolName, rawInput, acc).input;
+        const input = prepareToolInputForRun(
+          toolName,
+          rawInput,
+          acc,
+          sourceFilingEventId,
+        ).input;
 
         if (!openToolCalls.has(toolCallId)) {
           openToolCalls.add(toolCallId);
@@ -3364,11 +3469,21 @@ function summarizeToolResult(text: string): string | null {
 function normalizeMcpToolName(name: unknown): MCPToolName | null {
   return (
     normalizeKrwOntologyToolName(name) ??
+    normalizeKrwFilingsToolName(name) ??
     normalizeStockNewsToolName(name) ??
     normalizeGuruAdvisorToolName(name) ??
     normalizeYahooFinanceToolName(name) ??
     normalizeChartToolName(name)
   );
+}
+
+function normalizeKrwFilingsToolName(
+  name: unknown,
+): KrwFilingsMCPToolName | null {
+  if (typeof name !== "string") return null;
+  const bareName = name.includes("__") ? name.split("__").at(-1) : name;
+  if (!bareName || !KRW_FILINGS_MCP_TOOL_SET.has(bareName)) return null;
+  return bareName as KrwFilingsMCPToolName;
 }
 
 function normalizeKrwOntologyToolName(
@@ -3480,6 +3595,12 @@ function isChartMcpToolName(
   toolName: MCPToolName | null,
 ): toolName is ChartMCPToolName {
   return Boolean(toolName && CHART_MCP_TOOL_SET.has(toolName));
+}
+
+function isKrwFilingsMcpToolName(
+  toolName: MCPToolName | null,
+): toolName is KrwFilingsMCPToolName {
+  return Boolean(toolName && KRW_FILINGS_MCP_TOOL_SET.has(toolName));
 }
 
 function isGuruMcpToolName(
@@ -3762,6 +3883,28 @@ function addCitationFromBundle(acc: AccumulatedRun, bundle: UnknownRecord) {
   });
 }
 
+function addCitationFromFilingMcpResult(acc: AccumulatedRun, data: UnknownRecord) {
+  const citation = isRecord(data.citation) ? data.citation : null;
+  const filing = isRecord(data.filing) ? data.filing : null;
+  if (!citation || typeof citation.filing_event_id !== "string") return;
+
+  const formType = typeof filing?.form_type === "string" ? filing.form_type : null;
+  addCitation(acc, {
+    object_id: `sec-filing:${citation.filing_event_id}`,
+    ticker: typeof filing?.ticker === "string" ? filing.ticker : null,
+    document_type: formType === "8-K" || formType === "8-K/A" || formType === "6-K" || formType === "6-K/A"
+      ? "current_report"
+      : "other",
+    period: typeof filing?.filing_date === "string" ? filing.filing_date : null,
+    section: typeof citation.section_heading === "string" ? citation.section_heading : null,
+    quote_text: typeof data.text === "string" ? data.text.slice(0, 500) : null,
+    claim_text: typeof citation.document_url === "string" ? citation.document_url : null,
+    evidence_grade: "high",
+    source_quality: "filing_direct",
+    trace_json: citation,
+  });
+}
+
 function addCitationFromResearchStateEvidenceUnit(
   acc: AccumulatedRun,
   unit: UnknownRecord,
@@ -3852,6 +3995,8 @@ function extractCitations(
         }
       }
     }
+
+    addCitationFromFilingMcpResult(acc, data);
 
     if (Array.isArray(data.objects)) {
       for (const obj of asRecordArray(data.objects)) {

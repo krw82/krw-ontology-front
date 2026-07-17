@@ -90,8 +90,23 @@ elif truthy_env "${STOCK_NEWS_ENABLED:-}"; then
   STOCK_NEWS_RUNTIME_ENABLED=1
 fi
 
+FILINGS_MCP_RUNTIME_ENABLED=0
+if truthy_env "${FILINGS_MCP_ENABLED:-}"; then
+  if [ -z "${FILINGS_MCP_AUTH_TOKEN:-}" ]; then
+    echo "FILINGS_MCP_ENABLED=1 but FILINGS_MCP_AUTH_TOKEN is missing in $ENV_PATH" >&2
+    exit 1
+  fi
+  if [ -z "${SEC_USER_AGENT:-}" ]; then
+    echo "FILINGS_MCP_ENABLED=1 but SEC_USER_AGENT is missing in $ENV_PATH" >&2
+    exit 1
+  fi
+  FILINGS_MCP_RUNTIME_ENABLED=1
+fi
+
 ONTOLOGY_SOURCE_DIR=${KRW_ONTOLOGY_SOURCE_DIR:-"$HOME/krw-ontology"}
 require_command uv
+require_command npm
+require_command node
 require_path "$ONTOLOGY_SOURCE_DIR/pyproject.toml"
 require_path "$ONTOLOGY_SOURCE_DIR/src/krw_ontology"
 PLUGIN_SOURCE_PATH=${KRW_ONTOLOGY_PLUGIN_SOURCE_PATH:-"$ONTOLOGY_SOURCE_DIR/plugins/krw-ontology"}
@@ -186,16 +201,25 @@ if [ "$STOCK_NEWS_RUNTIME_ENABLED" = "1" ]; then
 else
   echo "Stock News MCP: disabled"
 fi
+if [ "$FILINGS_MCP_RUNTIME_ENABLED" = "1" ]; then
+  echo "On-demand filings MCP URL: ${KRW_FILINGS_MCP_URL:-http://127.0.0.1:${FILINGS_MCP_PORT:-8785}/mcp}"
+else
+  echo "On-demand filings MCP: disabled"
+fi
 
 if [ "$DRY_RUN" = "1" ]; then
   "$SCRIPT_DIR/install-mcp-server-launchd.sh" --env-file "$ENV_PATH" --dry-run
   "$SCRIPT_DIR/install-stock-news-mcp-launchd.sh" --env-file "$ENV_PATH" --dry-run
+  "$SCRIPT_DIR/install-filings-mcp-launchd.sh" --env-file "$ENV_PATH" --dry-run
   "$SCRIPT_DIR/deploy-worker-production.sh" --env-file "$ENV_PATH" --dry-run
   exit 0
 fi
 
+echo "Building Node workers including on-demand filings MCP..."
+(cd "$FRONT_DIR" && npm run build:worker)
 "$SCRIPT_DIR/install-mcp-server-launchd.sh" --env-file "$ENV_PATH" --load
 "$SCRIPT_DIR/install-stock-news-mcp-launchd.sh" --env-file "$ENV_PATH" --load
+"$SCRIPT_DIR/install-filings-mcp-launchd.sh" --env-file "$ENV_PATH" --load
 "$SCRIPT_DIR/deploy-worker-production.sh" --env-file "$ENV_PATH"
 
 echo "Plugin/MCP Mac worker deployment complete."

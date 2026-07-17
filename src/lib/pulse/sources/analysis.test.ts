@@ -36,7 +36,7 @@ describe("Pulse analysis activity source", () => {
       metadata: { run_status: "running", user_started: true },
       primary_action: {
         type: "link",
-        label: "채팅에서 보기",
+        label: "대화로 돌아가기",
         href: "/chat?sessionId=session-1&ticker=AAPL",
       },
     });

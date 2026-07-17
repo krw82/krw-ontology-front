@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KRW.O 피드 — 리서치용 익명화 화면</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #fbfcff; color: #111319; font-family: Inter, Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    nav { height: 64px; display: flex; align-items: center; gap: 26px; padding: 0 22px; border-bottom: 1px solid #e8ebf1; background: #fff; font-size: 13px; font-weight: 750; color: #6e7583; }
+    .brand { display: flex; align-items: center; gap: 10px; color: #111319; font-weight: 900; letter-spacing: .05em; margin-right: 4px; }
+    .mark { width: 31px; height: 31px; border: 1px solid #cad6ff; border-radius: 8px; display: grid; place-items: center; color: #0649dc; font-size: 21px; }
+    .selected { color: #111319; background: #f4f6fb; padding: 10px 13px; border-radius: 10px; }
+    .avatar { margin-left: auto; width: 32px; height: 32px; border-radius: 9px; background: linear-gradient(135deg,#ffd54a,#8055df); }
+    header { position: relative; overflow: hidden; border-bottom: 1px solid #e7eaf0; background: #fff; }
+    header::after { content:""; position:absolute; right: 8%; top:-100px; width:310px; height:250px; border-radius:50%; background:#e7e9ff; filter:blur(55px); opacity:.9; }
+    .head { position: relative; z-index: 1; width: 760px; margin: 0 auto; padding: 38px 24px 40px; }
+    .kicker { color:#0649dc; font-size:11px; font-weight:950; letter-spacing:.21em; text-transform:uppercase; }
+    h1 { margin: 8px 0 0; font-size: 40px; line-height: 1; letter-spacing: -.055em; }
+    .meta { margin: 17px 0 0; color:#737b89; font-size:13px; font-weight:700; }
+    .settings { position:absolute; right:24px; top:56px; width:41px; height:41px; border:1px solid #dfe3eb; border-radius:12px; background:#fff; box-shadow:0 4px 12px #16244312; display:grid; place-items:center; font-size:18px; color:#6d7481; }
+    main { width: 760px; margin: 0 auto; padding: 30px 24px 70px; }
+    .active-title { display:flex; align-items:center; justify-content:space-between; margin:0 0 10px; font-size:14px; font-weight:900; }
+    .active { border:1px solid #d8ddeb; border-left:4px solid #5146e5; border-radius:17px; padding:20px 22px; background:#fff; box-shadow:0 9px 28px #13244c0a; }
+    .status { display:flex; align-items:center; gap:8px; color:#5146e5; font-size:11px; font-weight:950; letter-spacing:.1em; }
+    .dot { width:9px; height:9px; border-radius:50%; background:#5146e5; box-shadow:0 0 0 5px #eeeefe; }
+    .ticker { margin:8px 0 0; color:#0649dc; font-size:13px; font-weight:950; }
+    .active h2, .card h2 { margin:14px 0 0; font-size:21px; line-height:1.35; letter-spacing:-.025em; }
+    .body { margin:10px 0 0; color:#69717f; font-size:14px; line-height:1.65; }
+    .button { display:inline-flex; align-items:center; gap:9px; margin-top:17px; padding:11px 15px; border-radius:10px; background:#101114; color:#fff; font-size:13px; font-weight:900; }
+    .stream { margin-top:18px; display:grid; gap:16px; }
+    .card { position:relative; overflow:hidden; border:1px solid #dfe3ea; border-radius:17px; padding:21px 24px 18px; background:#fff; box-shadow:0 9px 28px #13244c08; }
+    .rail { position:absolute; inset:0 auto 0 0; width:4px; }
+    .filing .rail { background:#0649dc; } .analysis .rail { background:#5146e5; } .question .rail { background:#7259d9; } .resurface .rail { background:#a56a14; }
+    .row { display:flex; justify-content:space-between; gap:20px; color:#747c89; font-size:11px; font-weight:850; }
+    .eyebrow { color:#6f7785; font-weight:900; }
+    .actions { display:flex; align-items:center; gap:24px; margin-top:18px; font-size:13px; font-weight:850; color:#747c88; }
+    .actions .button { margin:0; color:#fff; }
+    .reason { margin-top:17px; padding-top:14px; border-top:1px solid #e2e5eb; color:#818895; font-size:12px; font-weight:750; }
+    .end { padding:34px 0 6px; text-align:center; }
+    .end strong { font-size:13px; } .end p { margin:7px 0 0; color:#858c98; font-size:12px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="brand"><span class="mark">K</span>KRW.O</div>
+    <span class="selected">피드</span><span>조건으로 기업 검색</span><span>관점별 분석</span><span>회사</span><span>리서치 노트북</span><span>공시 알림</span><span>13F 보유</span>
+    <span class="avatar"></span>
+  </nav>
+  <header>
+    <div class="head"><div class="kicker">Research feed</div><h1>피드</h1><p class="meta">7월 16일 목요일 · 미검토 4개</p><div class="settings">☷</div></div>
+  </header>
+  <main>
+    <div class="active-title"><span>진행 중인 분석</span><span style="color:#858c98;font-size:12px">1개</span></div>
+    <section class="active"><div class="status"><span class="dot"></span>분석 진행 중</div><p class="ticker">NVDA</p><h2>최근 실적 변화가 투자 논지에 미치는 근거를 확인하고 있습니다</h2><p class="body">질문은 회사 채팅에서 시작됐고, 완료되면 결과 카드가 피드에 추가됩니다.</p><span class="button">대화로 돌아가기 →</span></section>
+    <div class="stream">
+      <article class="card filing"><i class="rail"></i><div class="row"><span class="eyebrow">8-K 새 공시 · AAPL</span><span>12분 전</span></div><h2>투자 판단에 중요한 새 공시가 도착했습니다</h2><p class="body">공시 유형, 발생 시점, 원문에서 먼저 확인할 항목을 한눈에 보여줍니다.</p><div class="actions"><span class="button">공시 원문 보기 →</span><span>이 공시로 질문</span><span>내일 보기</span></div><div class="reason">▸ 왜 이 항목이 보이나요?</div></article>
+      <article class="card analysis"><i class="rail"></i><div class="row"><span class="eyebrow">내가 시작한 분석 · 완료 · MSFT</span><span>1시간 전</span></div><h2>클라우드 성장률과 마진 변화에 대한 근거 검토가 끝났습니다</h2><p class="body">완료된 답변과 인용 근거는 원래 회사 채팅에서 이어서 확인할 수 있습니다.</p><div class="actions"><span class="button">결과 이어보기 →</span><span>검토 완료</span><span>저장</span></div><div class="reason">▸ 왜 이 항목이 보이나요?</div></article>
+      <article class="card question"><i class="rail"></i><div class="row"><span class="eyebrow">다음 질문 · AMZN</span><span>오늘</span></div><h2>현금흐름 개선이 일회성인지 다음 공시에서 무엇을 확인해야 할까요?</h2><p class="body">자동으로 답하지 않습니다. 열면 질문이 입력된 상태에서 직접 리서치를 시작합니다.</p><div class="actions"><span class="button">이 질문으로 리서치 →</span><span>질문 닫기</span></div><div class="reason">▸ 왜 이 항목이 보이나요?</div></article>
+      <article class="card resurface"><i class="rail"></i><div class="row"><span class="eyebrow">다시 볼 메모 · COST</span><span>3주 전</span></div><h2>이전에 저장한 투자 관점을 다시 확인할 때입니다</h2><p class="body">새 공시 이후에도 기존 가정이 유지되는지 비교할 수 있도록 오래된 메모를 다시 보여줍니다.</p><div class="actions"><span class="button">노트북 보기 →</span><span>7일 뒤 보기</span><span>숨기기</span></div><div class="reason">▸ 왜 이 항목이 보이나요?</div></article>
+    </div>
+    <div class="end"><strong>확인한 활동은 여기까지입니다</strong><p>새 공시나 분석 상태가 생기면 위에 추가됩니다.</p></div>
+  </main>
+</body>
+</html>

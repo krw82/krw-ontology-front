@@ -4,9 +4,9 @@ import type { SecFilingEventRow } from "@/types/database";
 
 function event(overrides: Partial<SecFilingEventRow>): SecFilingEventRow {
   return {
-    id: crypto.randomUUID(), ticker: "AAPL", cik: "0000320193", accession_number: "0000320193-26-000001", form_type: "8-K", is_amendment: false,
+    id: crypto.randomUUID(), env: "prod", ticker: "AAPL", cik: "0000320193", accession_number: "0000320193-26-000001", form_type: "8-K", is_amendment: false,
     filing_date: "2026-01-01", report_date: null, accepted_at: "2026-01-01T12:00:00Z", primary_document_name: null, filing_detail_url: "https://www.sec.gov/Archives/example", primary_document_url: null,
-    source_metadata: {}, first_seen_at: "2026-01-01T12:00:00Z", sec_items: [], event_tags: [], primary_event_tag: null, classification_source: "unclassified", classification_version: 1, alert_priority: "digest", enrichment_status: "not_requested", analysis_status: "not_requested", analysis_requested_at: null, analysis_completed_at: null, analysis_error: null, created_at: "2026-01-01T12:00:00Z", updated_at: "2026-01-01T12:00:00Z",
+    source_metadata: {}, first_seen_at: "2026-01-01T12:00:00Z", sec_items: [], event_tags: [], primary_event_tag: null, classification_source: "unclassified", classification_version: 1, alert_priority: "digest", enrichment_status: "not_requested", event_family: "material_event", discovery_source: "legacy", processing_status: "ready", feed_eligible: false, feed_available_at: null, feed_expires_at: null, feed_lane: null, feed_priority_rank: null, occurred_at: "2026-01-01T12:00:00Z", parser_version: 1, original_filing_date: null, processing_error: null, analysis_status: "not_requested", analysis_requested_at: null, analysis_completed_at: null, analysis_error: null, created_at: "2026-01-01T12:00:00Z", updated_at: "2026-01-01T12:00:00Z",
     ...overrides,
   };
 }

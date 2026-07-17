@@ -71,14 +71,18 @@ echo "Remote ontology used for build: $REMOTE_ONTOLOGY_DIR"
   COPYFILE_DISABLE=1 tar -czf "$FRONT_ARCHIVE" \
     --exclude './.git' \
     --exclude './.next' \
+    --exclude './.next-*' \
     --exclude './.next-e2e' \
     --exclude './node_modules' \
     --exclude './out' \
     --exclude './output' \
     --exclude './.claude' \
     --exclude './.codex' \
+    --exclude './.lazyweb' \
     --exclude './.playwright-mcp' \
     --exclude './_workspace' \
+    --exclude './.vendor' \
+    --exclude './marketing-video' \
     --exclude './krw-ontology' \
     --exclude './.env' \
     --exclude './.env.*' \
@@ -139,7 +143,7 @@ ln -s ../krw-ontology "\$REMOTE_FRONT_DIR/krw-ontology"
 
 chmod +x "\$REMOTE_FRONT_DIR/scripts/deploy-vm-compose.sh"
 cd "\$REMOTE_FRONT_DIR"
-KRW_ONTOLOGY_SOURCE_DIR="\$REMOTE_ONTOLOGY_DIR" scripts/deploy-vm-compose.sh reverse-proxy web llm-gateway redis document-worker document-outbox-dispatcher billing-worker
+KRW_ONTOLOGY_SOURCE_DIR="\$REMOTE_ONTOLOGY_DIR" scripts/deploy-vm-compose.sh reverse-proxy web llm-gateway redis document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker billing-worker
 docker compose --project-name krw-ontology-front --env-file .env ps
 EOF
 )

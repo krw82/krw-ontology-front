@@ -243,6 +243,7 @@ export default function TopNav({
             href={localizedBrandHref}
             compact
             ariaLabel={brandAriaLabel}
+            className="lg:order-first"
           />
         </div>
 

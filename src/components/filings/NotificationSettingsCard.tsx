@@ -18,6 +18,8 @@ type Preferences = {
   enabled: boolean;
   notify_8k: boolean;
   notify_6k: boolean;
+  notify_form4: boolean;
+  insider_notification_mode: "none" | "reported_p_s" | "all";
   include_amendments: boolean;
   delivery_mode: "important_immediate" | "all_immediate" | "daily_digest";
   daily_digest_at: string;
@@ -28,6 +30,8 @@ const DEFAULT_PREFERENCES: Preferences = {
   enabled: true,
   notify_8k: true,
   notify_6k: true,
+  notify_form4: true,
+  insider_notification_mode: "reported_p_s",
   include_amendments: false,
   delivery_mode: "important_immediate",
   daily_digest_at: "08:30",
@@ -68,7 +72,7 @@ export default function NotificationSettingsCard() {
         if (!active) return;
         if (preferencesResponse.ok) {
           const payload = (await preferencesResponse.json()) as { preferences?: Preferences };
-          if (payload.preferences) setPreferences(payload.preferences);
+          if (payload.preferences) setPreferences({ ...DEFAULT_PREFERENCES, ...payload.preferences });
         }
         if (subscriptionsResponse.ok) {
           const payload = await subscriptionsResponse.json() as { subscriptions?: Array<{ enabled?: boolean }> };
@@ -143,7 +147,7 @@ export default function NotificationSettingsCard() {
       await savePushSubscription(subscription);
       setSubscribed(true);
       trackClientEventSilently("push_subscribed", { surface: "filing_notification_settings" });
-      setMessage("새 8-K·6-K 공시 알림이 켜졌습니다.");
+      setMessage("새 8-K·6-K·Form 4 공시 알림이 켜졌습니다.");
     } catch {
       setMessage("알림을 켜지 못했습니다. 브라우저 설정을 확인한 뒤 다시 시도해주세요.");
     } finally {
@@ -209,7 +213,7 @@ export default function NotificationSettingsCard() {
       });
       if (!response.ok) throw new Error("preference_save_failed");
       const payload = (await response.json()) as { preferences?: Preferences };
-      if (payload.preferences) setPreferences(payload.preferences);
+      if (payload.preferences) setPreferences({ ...DEFAULT_PREFERENCES, ...payload.preferences });
     } catch {
       setPreferences(preferences);
       setMessage("알림 설정을 저장하지 못했습니다.");
@@ -225,7 +229,8 @@ export default function NotificationSettingsCard() {
       <div className="flex flex-col gap-sm border-b border-hairline pb-lg sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-black tracking-[-0.03em] text-ink">공시 알림</h1>
-          <p className="mt-xs text-sm leading-6 text-muted">관심 기업의 새 8-K·6-K 공시를 알려드립니다.</p>
+          <p className="mt-xs text-sm leading-6 text-muted">관심 기업의 새 8-K·6-K·Form 4를 공시함과 이 기기 알림으로 받습니다.</p>
+          <p className="mt-1 text-xs leading-5 text-muted">카탈로그 피드에는 현재 커버 기업의 공시가 별도로 보이며, 이 설정은 내 관심 기업 알림만 바꿉니다.</p>
           <p className="mt-1 text-xs leading-5 text-muted">첫 설정 순서 · 관심기업 3개 → 최근 공시 확인 → 홈 화면 설치 → 테스트 알림</p>
         </div>
         {subscribed ? (
@@ -254,6 +259,8 @@ export default function NotificationSettingsCard() {
         <PreferenceToggle label="새 공시 알림 생성" description="구독한 기업의 새 공시를 공시함과 푸시 대상으로 만듭니다." checked={preferences.enabled} onChange={(checked) => void updatePreferences({ enabled: checked })} />
         <PreferenceToggle label="8-K 알림" description="미국 기업의 주요 수시 공시" checked={preferences.notify_8k} onChange={(checked) => void updatePreferences({ notify_8k: checked })} />
         <PreferenceToggle label="6-K 알림" description="해외 발행인의 수시 공시" checked={preferences.notify_6k} onChange={(checked) => void updatePreferences({ notify_6k: checked })} />
+        <PreferenceToggle label="Form 4 알림" description="내부자 거래 신고입니다. 기본값은 보고된 공개시장 매수·매도(P/S)만 알립니다." checked={preferences.notify_form4} onChange={(checked) => { const nextMode = checked && preferences.insider_notification_mode === "none" ? "reported_p_s" : preferences.insider_notification_mode; void updatePreferences({ notify_form4: checked, ...(checked ? { insider_notification_mode: nextMode } : {}) }); }} />
+        {preferences.notify_form4 ? <label className="block rounded-[8px] border border-hairline px-base py-sm"><span className="block text-sm font-extrabold text-ink">Form 4 알림 범위</span><span className="mt-0.5 block text-xs leading-5 text-muted">금액은 SEC에 P/S로 보고된 공개시장 거래만 표시하며, 추정하지 않습니다.</span><select value={preferences.insider_notification_mode === "none" ? "reported_p_s" : preferences.insider_notification_mode} onChange={(event) => { const insiderNotificationMode = event.target.value as Exclude<Preferences["insider_notification_mode"], "none">; void updatePreferences({ insider_notification_mode: insiderNotificationMode }); }} className="mt-sm min-h-9 w-full rounded-[7px] border border-hairline bg-canvas px-sm text-sm font-bold text-ink"><option value="reported_p_s">보고된 공개시장 매수·매도만</option><option value="all">모든 Form 4</option></select></label> : null}
         <PreferenceToggle label="정정 공시도 받기" description="8-K/A·6-K/A를 포함합니다." checked={preferences.include_amendments} onChange={(checked) => void updatePreferences({ include_amendments: checked })} />
       </div>
       <FilingSubscriptionList />

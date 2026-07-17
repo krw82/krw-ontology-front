@@ -18,6 +18,9 @@ export function isFilingInboxEligible(params: {
   const preference = params.preference;
   if (!preference) return true;
   if (!preference.enabled) return false;
+  if (params.formType.startsWith("4")) {
+    return preference.notify_form4 && preference.insider_notification_mode !== "none";
+  }
   return params.formType.startsWith("8-K") ? preference.notify_8k : preference.notify_6k;
 }
 

@@ -2,8 +2,9 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
+import { resolveFilingAccess } from "@/lib/filing-notifications/filing-access";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import type { SecFilingDocumentRow, SecFilingEventRow, UserFilingSubscriptionRow } from "@/types/database";
+import type { SecFilingDocumentRow, SecFilingEventRow } from "@/types/database";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,13 +36,13 @@ export async function GET(
   if (filingError) return Response.json({ error: { code: "service_unavailable", message: "공시를 불러오지 못했습니다." } }, { status: 503 });
   if (!filing) return Response.json({ error: { code: "not_found", message: "공시를 찾지 못했습니다." } }, { status: 404 });
 
-  const [{ data: subscription }, { data: notification }] = await Promise.all([
-    admin.from("user_filing_subscriptions").select("*").eq("user_id", user.id).eq("cik", filing.cik).limit(1).maybeSingle<UserFilingSubscriptionRow>(),
-    admin.from("user_filing_notifications").select("id").eq("user_id", user.id).eq("filing_event_id", filing.id).limit(1).maybeSingle(),
-  ]);
-  if (!subscription && !notification) {
-    return Response.json({ error: { code: "forbidden", message: "구독한 기업의 공시만 열 수 있습니다." } }, { status: 403 });
+  let access;
+  try {
+    access = await resolveFilingAccess({ userId: user.id, filing });
+  } catch {
+    return Response.json({ error: { code: "service_unavailable", message: "공시 접근 권한을 확인하지 못했습니다." } }, { status: 503 });
   }
+  if (!access) return Response.json({ error: { code: "forbidden", message: "내 공시 알림 또는 현재 카탈로그 피드에 있는 공시만 열 수 있습니다." } }, { status: 403 });
 
   const documentId = request.nextUrl.searchParams.get("document");
   let url = targetSchema.parse(request.nextUrl.searchParams.get("target")) === "primary"
@@ -70,7 +71,7 @@ export async function GET(
   await recordAnalyticsEvent({
     eventName: source === "recommended_exhibit" ? "key_exhibit_opened" : "sec_source_opened",
     userId: user.id,
-    properties: { filing_event_id: filing.id, ticker: subscription?.ticker ?? filing.ticker, source, document_id: documentId },
+    properties: { filing_event_id: filing.id, ticker: access.subscription?.ticker ?? filing.ticker, source, document_id: documentId },
   });
   return Response.redirect(url, 302);
 }

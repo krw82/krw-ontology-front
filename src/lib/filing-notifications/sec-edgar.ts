@@ -99,6 +99,17 @@ export function parseRecentFilingCandidates(
   return candidates;
 }
 
+/**
+ * The catalog feed retains ninety days of events. Reconciliation may return
+ * up to a thousand historical submissions for one CIK, so older records must
+ * not be inserted into the live processing queue during the initial baseline.
+ */
+export function isFilingCandidateWithinLookback(candidate: SecFilingCandidate, cutoff: Date): boolean {
+  const occurredAt = candidate.acceptedAt ?? `${candidate.filingDate}T23:59:59.999Z`;
+  const timestamp = Date.parse(occurredAt);
+  return Number.isFinite(timestamp) && timestamp >= cutoff.getTime();
+}
+
 function arrayOfStrings(value: unknown): string[] {
   return Array.isArray(value) ? value.map((item) => (typeof item === "string" ? item : "")) : [];
 }

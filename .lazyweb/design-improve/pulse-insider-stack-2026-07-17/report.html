@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KRW.O 큰 카드 + 내부자 거래 스택 검토</title>
+  <style>
+    :root { --ink:#101318; --body:#384152; --muted:#6d7686; --line:#dfe4ec; --soft:#f4f7fb; --blue:#003ec7; --blue-soft:#edf3ff; --green:#137357; --amber:#8a5900; --red:#b83b25; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#f2f4f8; color:var(--ink); font-family:Inter,Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; line-height:1.6; }
+    main { width:min(900px,calc(100% - 32px)); margin:32px auto 80px; }
+    section { margin-top:20px; padding:clamp(24px,5vw,48px); border:1px solid var(--line); border-radius:24px; background:#fff; box-shadow:0 18px 55px rgba(16,24,40,.07); }
+    section:first-child { margin-top:0; }
+    .kicker { margin:0; color:var(--blue); font-size:12px; font-weight:900; letter-spacing:.16em; text-transform:uppercase; }
+    h1 { margin:10px 0 16px; font-size:clamp(34px,6vw,58px); line-height:1.07; letter-spacing:-.05em; }
+    h2 { margin:0 0 18px; font-size:clamp(24px,4vw,34px); letter-spacing:-.035em; line-height:1.2; }
+    h3 { margin:0 0 7px; font-size:19px; line-height:1.35; }
+    p { margin:0; }
+    .lead { max-width:720px; color:var(--body); font-size:18px; }
+    .verdict { margin-top:24px; padding:18px 20px; border-left:5px solid var(--blue); border-radius:0 14px 14px 0; background:var(--blue-soft); font-weight:850; }
+    .grid { display:grid; gap:16px; }
+    .two { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .three { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .card { padding:19px; border:1px solid var(--line); border-radius:17px; background:#fff; }
+    .card.recommended { border-color:#aebfea; background:#f8faff; }
+    .tag { display:inline-flex; margin-bottom:9px; padding:3px 8px; border-radius:999px; background:var(--soft); color:var(--muted); font-size:11px; font-weight:900; }
+    .tag.blue { background:var(--blue-soft); color:var(--blue); }
+    .tag.red { background:#fff0ed; color:var(--red); }
+    .tag.green { background:#eaf8f3; color:var(--green); }
+    figure { margin:0; }
+    figure img { display:block; width:100%; border:1px solid var(--line); border-radius:18px; box-shadow:0 12px 32px rgba(16,24,40,.06); }
+    figcaption { margin-top:9px; color:var(--muted); font-size:13px; }
+    ul,ol { margin:10px 0 0; padding-left:22px; }
+    li+li { margin-top:7px; }
+    pre { overflow:auto; margin:16px 0 0; padding:18px; border-radius:16px; background:#11151b; color:#f5f7fb; font:600 13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    th,td { padding:13px 11px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--muted); background:var(--soft); font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
+    .note { margin-top:17px; padding:16px 18px; border-radius:15px; background:#fff7e8; color:#6b4707; }
+    a { color:var(--blue); }
+    @media (max-width:720px) { .two,.three { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <section>
+    <p class="kicker">KRW.O · Follow-up design review</p>
+    <h1>전부 큰 카드여도 됩니다</h1>
+    <p class="lead">단, 내부자 거래는 여러 카드를 포개는 장식이 아니라 <strong>하나의 큰 요약 카드 안에 완전한 거래 행을 쌓는 구조</strong>로 만드는 것이 좋습니다.</p>
+    <p class="verdict">추천안: 모든 최상위 피드 항목은 큰 카드로 통일하고, 내부자 거래 카드는 상단 요약 + 항상 보이는 상위 3건 + “나머지 N건 펼치기”로 구성합니다. 카드 뒤의 얇은 2개 레이어는 묶음이라는 시각적 단서로만 사용합니다.</p>
+  </section>
+
+  <section>
+    <p class="kicker">Current state</p>
+    <h2>지금 문제는 큰 카드 자체가 아님</h2>
+    <figure>
+      <img src="references/current.jpg" alt="현재 KRW.O 내부자 거래 피드 카드" />
+      <figcaption>큰 카드가 연속되는 리듬은 좋지만, 거래 하나마다 동일한 설명과 액션이 반복되는 것이 피로의 원인입니다.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <p class="kicker">Three stack variants</p>
+    <h2>스택형을 만드는 세 가지 방법</h2>
+    <div class="grid three">
+      <article class="card"><span class="tag red">비추천</span><h3>거래 카드끼리 실제로 겹치기</h3><p>시각적으로는 재미있지만 금액·방향이 가려지고, 무엇을 클릭하는지 불명확하며 키보드·스크린리더 순서가 어려워집니다.</p></article>
+      <article class="card recommended"><span class="tag blue">추천</span><h3>큰 부모 카드 + 내부 행 스택</h3><p>요약은 크게 유지하면서 상위 거래 3건을 모두 읽을 수 있습니다. 하단에 얇은 레이어를 보여 묶음 느낌만 더합니다.</p></article>
+      <article class="card"><span class="tag green">보조안</span><h3>큰 카드 + 내부 캐러셀</h3><p>모바일에는 흥미롭지만 다음 거래가 숨겨집니다. 금융 정보에서는 좌우 스와이프보다 펼치기가 더 예측 가능합니다.</p></article>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Recommended anatomy</p>
+    <h2>권장 카드 구조</h2>
+    <pre aria-label="내부자 거래 묶음 카드 구조">┌────────────────────────────────────────┐
+│ 내부자 거래 · 오늘                    방금 │
+│ 27건 · 매수 3 · 매도 24                   │
+│ 보유 2 · 관심 4                            │
+│                                            │
+│ AAPL  매도  $12.7M   임원 · 10b5-1 표시   │
+│ CRWV  매도  $24.9M   임원 · 계획 미표시   │
+│ XYZ   매수   $1.8M   이사 · 최근 리서치   │
+│                                            │
+│ [27건 모두 보기 →]            [확인 완료] │
+└────────────────────────────────────────┘
+   └────────────────────────────────────┘
+     └────────────────────────────────┘</pre>
+    <div class="grid two" style="margin-top:18px">
+      <article class="card"><h3>접힌 상태에서도 반드시 보일 것</h3><ul><li>전체 건수와 매수/매도 수</li><li>상위 3건의 티커·방향·금액</li><li>보유/관심/최근 리서치 이유</li><li>나머지 건수와 명확한 펼치기</li></ul></article>
+      <article class="card"><h3>반복하지 않아도 되는 것</h3><ul><li>모든 행의 동일한 Form 4 설명</li><li>각 행마다 3~4개 액션</li><li>카탈로그 커버리지의 긴 문장</li><li>장식 때문에 가려지는 거래 카드</li></ul></article>
+    </div>
+  </section>
+
+  <section>
+    <p class="kicker">Grouping rules</p>
+    <h2>무엇을 한 묶음으로 볼지</h2>
+    <table>
+      <thead><tr><th>상황</th><th>표시</th><th>이유</th></tr></thead>
+      <tbody>
+        <tr><td>한 기업에서 24시간 안에 여러 내부자가 거래</td><td><b>기업별 큰 스택 카드</b></td><td>클러스터 매수·매도 자체가 하나의 해석 단위가 됨</td></tr>
+        <tr><td>카탈로그 전역의 일반 Form 4</td><td><b>오늘의 내부자 거래 큰 카드</b></td><td>상위 3건만 보이고 나머지는 펼침</td></tr>
+        <tr><td>보유 기업, 대규모 매수, urgent 판정</td><td><b>묶음에서 분리된 단독 큰 카드</b></td><td>다른 거래에 묻히면 안 됨</td></tr>
+        <tr><td>소액·일상적 매도·10b5-1 표시</td><td><b>묶음 내부 하위 행</b></td><td>정보는 보존하되 피드 지면은 과점하지 않음</td></tr>
+      </tbody>
+    </table>
+    <p class="note"><strong>핵심 규칙:</strong> “큰 카드”는 화면 면적이 아니라 하나의 이야기 단위입니다. 중요 거래 하나도 이야기이고, 반복 거래 27건의 묶음도 하나의 이야기입니다.</p>
+  </section>
+
+  <section>
+    <p class="kicker">Reference evidence</p>
+    <h2>왜 이 방식이 안전한가</h2>
+    <div class="grid two">
+      <figure><img src="references/android-grouped-notifications.png" alt="Android 공식 문서의 접힌 알림 묶음과 펼친 알림 묶음" /><figcaption>[Web] Android 공식 패턴은 요약을 먼저 보여주고, 개별 항목이 각각 완전하고 유용할 때 펼칠 수 있는 그룹으로 만듭니다.</figcaption></figure>
+      <figure><img src="references/qatalog-notifications.png" alt="Qatalog의 행 기반 알림 목록" /><figcaption>[Lazyweb] Qatalog은 반복 알림을 짧고 독립적인 행으로 만들어 빠르게 스캔하게 합니다. KRW.O에서는 이 행들을 큰 부모 카드 안에 넣는 방식이 맞습니다.</figcaption></figure>
+    </div>
+    <p style="margin-top:16px">Android는 각 하위 항목이 독립적으로 이해되고 개별 행동 가치가 있을 때 그룹을 사용하라고 안내합니다. 내부자 거래의 티커·매수/매도·금액·원문 링크는 이 조건에 잘 맞습니다. <a href="https://developer.android.com/develop/ui/views/notifications/group">Android grouped notifications</a></p>
+  </section>
+
+  <section>
+    <p class="kicker">Decision</p>
+    <h2>최종 판단</h2>
+    <ol>
+      <li>최상위 항목은 전부 큰 카드로 통일해도 됩니다.</li>
+      <li>내부자 거래는 부모 큰 카드 안에서 읽을 수 있는 행 3개를 기본 노출합니다.</li>
+      <li>겹친 레이어는 8–12px 정도만 보여주는 장식으로 제한합니다.</li>
+      <li>urgent·보유 기업·큰 매수는 묶음에서 꺼내 단독 카드로 승격합니다.</li>
+      <li>펼침은 카드 내부 확장 또는 바텀시트로 제공하고, 캐러셀은 쓰지 않습니다.</li>
+    </ol>
+  </section>
+</main>
+</body>
+</html>

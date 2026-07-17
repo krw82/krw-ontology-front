@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseFilingIndexDocuments } from "./sec-filing-index";
+import { isSecXslRenderedDocumentUrl, parseFilingIndexDocuments } from "./sec-filing-index";
 
 describe("SEC filing index parser", () => {
   it("keeps metadata only and prioritizes a results exhibit", () => {
@@ -19,5 +19,26 @@ describe("SEC filing index parser", () => {
       primaryDocumentName: null,
       html: `<tr><td>1</td><td>Bad</td><td><a href="https://example.com/file.htm">file.htm</a></td><td>EX-99</td><td>1</td></tr>`,
     })).toEqual([]);
+  });
+
+  it("keeps both an XSL-rendered Form 4 XML and its ownership XML source", () => {
+    const documents = parseFilingIndexDocuments({
+      filingDetailUrl: "https://www.sec.gov/Archives/edgar/data/1253512/000125351226000013/0001253512-26-000013-index.htm",
+      primaryDocumentName: null,
+      html: `<table><tr><td>1</td><td>Form 4 rendered view</td><td><a href="xslF345X06/form4-07152026_080703.xml">form4-07152026_080703.html</a></td><td>4</td><td>1</td></tr><tr><td>2</td><td>Form 4 ownership XML</td><td><a href="form4-07152026_080703.xml">form4-07152026_080703.xml</a></td><td>4</td><td>2</td></tr></table>`,
+    });
+    expect(documents).toHaveLength(2);
+    expect(documents.map((document) => document.documentUrl)).toContain(
+      "https://www.sec.gov/Archives/edgar/data/1253512/000125351226000013/form4-07152026_080703.xml",
+    );
+  });
+
+  it("recognizes encoded SEC XSL Form 4 primary-document URLs", () => {
+    expect(isSecXslRenderedDocumentUrl(
+      "https://www.sec.gov/Archives/edgar/data/1535527/000125351226000013/xslF345X06%2Fform4.xml",
+    )).toBe(true);
+    expect(isSecXslRenderedDocumentUrl(
+      "https://www.sec.gov/Archives/edgar/data/1253512/000125351226000013/form4.xml",
+    )).toBe(false);
   });
 });

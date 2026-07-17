@@ -51,7 +51,7 @@ export default function FilingSubscriptionList() {
     <section className="mt-lg border-t border-hairline pt-lg">
       <h2 className="text-sm font-extrabold text-ink">공시를 추적 중인 기업</h2>
       {loading ? <p className="mt-sm text-sm text-muted">추적 기업을 불러오는 중…</p> : null}
-      {!loading && !subscriptions.length ? <p className="mt-sm text-sm leading-6 text-muted">아직 공시를 추적 중인 기업이 없습니다. 회사 페이지에서 새 8-K·6-K 알림을 켜보세요.</p> : null}
+      {!loading && !subscriptions.length ? <p className="mt-sm text-sm leading-6 text-muted">아직 공시를 추적 중인 기업이 없습니다. 회사 페이지에서 새 8-K·6-K·Form 4 알림을 켜보세요.</p> : null}
       <ul className="mt-sm divide-y divide-hairline rounded-[8px] border border-hairline">
         {subscriptions.map((subscription) => (
           <li key={subscription.ticker} className="flex items-center justify-between gap-sm px-base py-sm">

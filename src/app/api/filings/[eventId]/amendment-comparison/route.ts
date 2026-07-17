@@ -3,10 +3,11 @@ import { z } from "zod";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { diffFilingText, findAmendedOriginal, originalFormType } from "@/lib/filing-notifications/amendment-comparison";
+import { resolveFilingAccess } from "@/lib/filing-notifications/filing-access";
 import { loadFilingDocuments } from "@/lib/filing-notifications/filing-documents";
 import { fetchSecText } from "@/lib/filing-notifications/sec-client";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import type { SecFilingEventRow, UserFilingSubscriptionRow } from "@/types/database";
+import type { SecFilingEventRow } from "@/types/database";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,13 +34,13 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     return Response.json({ available: false, reason: "not_an_amendment", message: "정정 공시에만 원본 비교를 제공합니다." });
   }
 
-  const [{ data: subscription }, { data: notification }] = await Promise.all([
-    admin.from("user_filing_subscriptions").select("*").eq("user_id", user.id).eq("cik", amendment.cik).limit(1).maybeSingle<UserFilingSubscriptionRow>(),
-    admin.from("user_filing_notifications").select("id").eq("user_id", user.id).eq("filing_event_id", amendment.id).maybeSingle<{ id: string }>(),
-  ]);
-  if (!subscription && !notification) {
-    return Response.json({ error: { code: "forbidden", message: "구독한 기업의 공시만 확인할 수 있습니다." } }, { status: 403 });
+  let access;
+  try {
+    access = await resolveFilingAccess({ userId: user.id, filing: amendment });
+  } catch {
+    return Response.json({ error: { code: "service_unavailable", message: "공시 접근 권한을 확인하지 못했습니다." } }, { status: 503 });
   }
+  if (!access) return Response.json({ error: { code: "forbidden", message: "내 공시 알림 또는 현재 카탈로그 피드에 있는 공시만 확인할 수 있습니다." } }, { status: 403 });
   if (!amendment.primary_document_url) {
     return Response.json({ available: false, reason: "no_primary_document", message: "SEC가 비교할 주요 제출문서를 제공하지 않았습니다." });
   }

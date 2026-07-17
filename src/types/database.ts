@@ -16,6 +16,7 @@ export interface ChatSessionRow extends Record<string, unknown> {
   scope_type: "global" | "company";
   default_tickers: string[] | null;
   default_document_types: string[] | null;
+  source_filing_event_id?: string | null;
   last_message_preview: string | null;
   last_message_at: string | null;
   latest_run_status: AgentRunRow["status"] | null;
@@ -440,6 +441,10 @@ export interface OntologyCompanyRow extends Record<string, unknown> {
   documents_json: Json;
   company_json: Json;
   generated_at: string | null;
+  sec_cik: string | null;
+  sec_ticker: string | null;
+  sec_mapping_source: "exact" | "verified_alias" | "catalog_native" | null;
+  sec_mapping_checked_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -457,7 +462,7 @@ export interface UserCompanyMarkRow extends Record<string, unknown> {
   updated_at: string;
 }
 
-export type SecFilingFormType = "8-K" | "8-K/A" | "6-K" | "6-K/A";
+export type SecFilingFormType = "8-K" | "8-K/A" | "6-K" | "6-K/A" | "4" | "4/A";
 
 export interface SecCompanyIdentifierRow extends Record<string, unknown> {
   ticker: string;
@@ -471,6 +476,7 @@ export interface SecCompanyIdentifierRow extends Record<string, unknown> {
 
 export interface SecFilingEventRow extends Record<string, unknown> {
   id: string;
+  env: "dev" | "staging" | "prod";
   ticker: string;
   cik: string;
   accession_number: string;
@@ -491,6 +497,18 @@ export interface SecFilingEventRow extends Record<string, unknown> {
   classification_version: number;
   alert_priority: "urgent" | "normal" | "digest";
   enrichment_status: "not_requested" | "queued" | "ready" | "failed";
+  event_family: "material_event" | "insider_trade";
+  discovery_source: "legacy" | "atom" | "submissions" | "daily_index";
+  processing_status: "discovered" | "processing" | "ready" | "failed";
+  feed_eligible: boolean;
+  feed_available_at: string | null;
+  feed_expires_at: string | null;
+  feed_lane: number | null;
+  feed_priority_rank: number | null;
+  occurred_at: string;
+  parser_version: number;
+  original_filing_date: string | null;
+  processing_error: string | null;
   // Reserved for the future 8-K/6-K automatic analysis pipeline.
   analysis_status: "not_requested" | "queued" | "processing" | "ready" | "failed";
   analysis_requested_at: string | null;
@@ -505,7 +523,9 @@ export interface FilingNotificationPreferencesRow extends Record<string, unknown
   enabled: boolean;
   notify_8k: boolean;
   notify_6k: boolean;
+  notify_form4: boolean;
   include_amendments: boolean;
+  insider_notification_mode: "none" | "reported_p_s" | "all";
   delivery_mode: "important_immediate" | "all_immediate" | "daily_digest";
   daily_digest_at: string;
   last_digest_at: string | null;
@@ -521,6 +541,8 @@ export interface UserFilingSubscriptionRow extends Record<string, unknown> {
   user_id: string;
   ticker: string;
   cik: string;
+  env: "dev" | "staging" | "prod";
+  catalog_collection_status: "active" | "dormant";
   enabled: boolean;
   alert_preset: "important" | "all";
   delivery_mode: "inherit" | "important_immediate" | "all_immediate" | "daily_digest";
@@ -557,6 +579,185 @@ export interface SecFilingDocumentRow extends Record<string, unknown> {
   size_bytes: number | null;
   is_primary: boolean;
   recommendation_score: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SecFilingEventCatalogCoverageRow extends Record<string, unknown> {
+  filing_event_id: string;
+  env: "dev" | "staging" | "prod";
+  release_id: string;
+  ticker: string;
+  covered_at: string;
+  created_at: string;
+}
+
+export interface SecFilingDiscoveryCheckpointRow extends Record<string, unknown> {
+  env: "dev" | "staging" | "prod";
+  source_key: "atom:8-K" | "atom:8-K/A" | "atom:6-K" | "atom:6-K/A" | "atom:4" | "atom:4/A" | "daily_index:master";
+  enabled: boolean;
+  watermark_at: string | null;
+  watermark_accession: string | null;
+  next_poll_at: string;
+  last_success_at: string | null;
+  consecutive_errors: number;
+  gap_risk: boolean;
+  worker_id: string | null;
+  claim_token: string | null;
+  lease_expires_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SecCatalogFilingReconciliationStateRow extends Record<string, unknown> {
+  env: "dev" | "staging" | "prod";
+  cik: string;
+  enabled: boolean;
+  coverage_started_at: string;
+  baseline_completed_at: string | null;
+  last_polled_at: string | null;
+  last_success_at: string | null;
+  next_poll_at: string;
+  consecutive_errors: number;
+  last_error: string | null;
+  worker_id: string | null;
+  claim_token: string | null;
+  lease_expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SecFilingWorkerLeaseRow extends Record<string, unknown> {
+  env: "dev" | "staging" | "prod";
+  lease_key: "sec_request_scheduler";
+  deployment_id: string;
+  worker_id: string;
+  claim_token: string;
+  lease_expires_at: string;
+  heartbeat_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SecFilingProcessingJobRow extends Record<string, unknown> {
+  id: string;
+  env: "dev" | "staging" | "prod";
+  filing_event_id: string;
+  stage: "enrich" | "notification_fanout" | "brief";
+  status: "queued" | "claimed" | "retry" | "completed" | "failed";
+  priority: number;
+  attempts: number;
+  max_attempts: number;
+  next_attempt_at: string;
+  worker_id: string | null;
+  claim_token: string | null;
+  lease_expires_at: string | null;
+  progress_json: Json;
+  last_error: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Source-grounded Korean brief. It holds no raw SEC document body. */
+export interface SecFilingBriefRow extends Record<string, unknown> {
+  filing_event_id: string;
+  locale: "ko-KR";
+  headline_ko: string;
+  summary_sentences: Json;
+  facts: Json;
+  question_suggestions: Json;
+  uncertainty_notes: Json;
+  source_document_url: string;
+  source_sha256: string;
+  source_section_keys: string[];
+  source_truncated: boolean;
+  input_char_count: number;
+  generator_model: string;
+  prompt_version: string;
+  schema_version: number;
+  generated_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Immutable operational audit rows for a filing-brief generation attempt. */
+export interface SecFilingBriefRunRow extends Record<string, unknown> {
+  id: string;
+  env: "dev" | "staging" | "prod";
+  filing_event_id: string;
+  job_id: string | null;
+  outcome: "succeeded" | "failed" | "validation_failed";
+  model: string;
+  prompt_version: string;
+  schema_version: number;
+  source_document_url: string | null;
+  source_sha256: string | null;
+  source_truncated: boolean | null;
+  input_char_count: number | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  cache_read_input_tokens: number | null;
+  provider_cost_usd: number | null;
+  latency_ms: number | null;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string;
+}
+
+export interface SecForm4ReportingOwnerRow extends Record<string, unknown> {
+  filing_event_id: string;
+  reporting_owner_index: number;
+  owner_cik: string | null;
+  owner_name: string;
+  is_director: boolean;
+  is_officer: boolean;
+  is_ten_percent_owner: boolean;
+  is_other: boolean;
+  officer_title: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SecForm4TransactionRow extends Record<string, unknown> {
+  id: string;
+  filing_event_id: string;
+  reporting_owner_index: number;
+  transaction_index: number;
+  security_kind: "non_derivative" | "derivative";
+  security_title: string;
+  transaction_date: string | null;
+  transaction_code: string | null;
+  equity_swap_involved: boolean | null;
+  transaction_shares: number | null;
+  transaction_price_per_share: number | null;
+  acquired_disposed_code: "A" | "D" | null;
+  shares_owned_following: number | null;
+  direct_indirect_code: "D" | "I" | null;
+  nature_of_ownership: string | null;
+  reported_transaction_value: number | null;
+  reported_value_basis: "p_or_s" | "not_reported";
+  footnotes: Json;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SecForm4EventSummaryRow extends Record<string, unknown> {
+  filing_event_id: string;
+  reporting_owner_count: number;
+  transaction_count: number;
+  reported_purchase_count: number;
+  reported_sale_count: number;
+  reported_purchase_shares: number | null;
+  reported_sale_shares: number | null;
+  reported_purchase_value: number | null;
+  reported_sale_value: number | null;
+  net_reported_shares: number | null;
+  tenb5_one_status: "yes" | "no" | "unknown";
+  has_reported_open_market_trade: boolean;
+  source_xml_version: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1468,6 +1669,7 @@ export interface Database {
           | "last_message_preview"
           | "last_message_at"
           | "latest_run_status"
+          | "source_filing_event_id"
         > & {
           id?: string;
           client_request_id?: string | null;
@@ -1475,6 +1677,7 @@ export interface Database {
           last_message_preview?: string | null;
           last_message_at?: string | null;
           latest_run_status?: AgentRunRow["status"] | null;
+          source_filing_event_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -2269,6 +2472,169 @@ export interface Database {
             updated_at?: string;
           };
         Update: Partial<Omit<SecFilingDocumentRow, "id" | "filing_event_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      sec_filing_event_catalog_coverage: {
+        Row: SecFilingEventCatalogCoverageRow;
+        Insert: Omit<SecFilingEventCatalogCoverageRow, "covered_at" | "created_at"> & {
+          covered_at?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<SecFilingEventCatalogCoverageRow, "filing_event_id" | "env" | "release_id" | "ticker" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      sec_filing_discovery_checkpoints: {
+        Row: SecFilingDiscoveryCheckpointRow;
+        Insert: Pick<SecFilingDiscoveryCheckpointRow, "env" | "source_key"> &
+          Partial<Omit<SecFilingDiscoveryCheckpointRow, "env" | "source_key" | "created_at" | "updated_at">> & {
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<SecFilingDiscoveryCheckpointRow, "env" | "source_key" | "created_at">>;
+        Relationships: [];
+      };
+      sec_catalog_filing_reconciliation_state: {
+        Row: SecCatalogFilingReconciliationStateRow;
+        Insert: Pick<SecCatalogFilingReconciliationStateRow, "env" | "cik"> &
+          Partial<Omit<SecCatalogFilingReconciliationStateRow, "env" | "cik" | "created_at" | "updated_at">> & {
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<SecCatalogFilingReconciliationStateRow, "env" | "cik" | "created_at">>;
+        Relationships: [];
+      };
+      sec_filing_worker_leases: {
+        Row: SecFilingWorkerLeaseRow;
+        Insert: Omit<SecFilingWorkerLeaseRow, "created_at" | "updated_at" | "heartbeat_at"> & {
+          heartbeat_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<SecFilingWorkerLeaseRow, "env" | "lease_key" | "created_at">>;
+        Relationships: [];
+      };
+      sec_filing_processing_jobs: {
+        Row: SecFilingProcessingJobRow;
+        Insert: Pick<SecFilingProcessingJobRow, "env" | "filing_event_id" | "stage"> &
+          Partial<Omit<SecFilingProcessingJobRow, "id" | "env" | "filing_event_id" | "stage" | "created_at" | "updated_at">> & {
+            id?: string;
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<SecFilingProcessingJobRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      sec_filing_briefs: {
+        Row: SecFilingBriefRow;
+        Insert: Pick<
+          SecFilingBriefRow,
+          | "filing_event_id"
+          | "headline_ko"
+          | "summary_sentences"
+          | "facts"
+          | "source_document_url"
+          | "source_sha256"
+          | "source_section_keys"
+          | "input_char_count"
+          | "generator_model"
+          | "prompt_version"
+          | "schema_version"
+        > &
+          Partial<Omit<SecFilingBriefRow, "filing_event_id" | "created_at" | "updated_at">> & {
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<SecFilingBriefRow, "filing_event_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      sec_filing_brief_runs: {
+        Row: SecFilingBriefRunRow;
+        Insert: Pick<
+          SecFilingBriefRunRow,
+          "env" | "filing_event_id" | "outcome" | "model" | "prompt_version" | "schema_version"
+        > &
+          Partial<Omit<SecFilingBriefRunRow, "id" | "created_at" | "completed_at">> & {
+            id?: string;
+            created_at?: string;
+            completed_at?: string;
+          };
+        Update: Partial<Omit<SecFilingBriefRunRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      sec_form4_reporting_owners: {
+        Row: SecForm4ReportingOwnerRow;
+        Insert: Pick<SecForm4ReportingOwnerRow, "filing_event_id" | "reporting_owner_index" | "owner_name"> &
+          Partial<Omit<SecForm4ReportingOwnerRow, "filing_event_id" | "reporting_owner_index" | "owner_name" | "created_at" | "updated_at">> & {
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<SecForm4ReportingOwnerRow, "filing_event_id" | "reporting_owner_index" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      sec_form4_transactions: {
+        Row: SecForm4TransactionRow;
+        Insert: Pick<
+          SecForm4TransactionRow,
+          "filing_event_id" | "reporting_owner_index" | "transaction_index" | "security_kind" | "security_title"
+        > &
+          Partial<Omit<SecForm4TransactionRow, "id" | "filing_event_id" | "reporting_owner_index" | "transaction_index" | "security_kind" | "security_title" | "created_at" | "updated_at">> & {
+            id?: string;
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<SecForm4TransactionRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      sec_form4_event_summaries: {
+        Row: SecForm4EventSummaryRow;
+        Insert: Pick<SecForm4EventSummaryRow, "filing_event_id"> &
+          Partial<Omit<SecForm4EventSummaryRow, "filing_event_id" | "created_at" | "updated_at">> & {
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<SecForm4EventSummaryRow, "filing_event_id" | "created_at">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];
@@ -3280,6 +3646,343 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      get_active_catalog_sec_targets: {
+        Args: { p_env: string };
+        Returns: Array<{ cik: string; release_id: string }>;
+      };
+      reserve_sec_request_slot: {
+        Args: { p_scope?: string; p_min_interval_ms?: number };
+        Returns: string;
+      };
+      sync_catalog_sec_filing_reconciliation_targets: {
+        Args: { p_env: string };
+        Returns: number;
+      };
+      ensure_sec_filing_discovery_sources: {
+        Args: { p_env: string };
+        Returns: number;
+      };
+      claim_sec_filing_discovery_checkpoint: {
+        Args: { p_env: string; p_worker_id: string; p_lease_seconds?: number };
+        Returns: Array<{
+          env: "dev" | "staging" | "prod";
+          source_key: SecFilingDiscoveryCheckpointRow["source_key"];
+          watermark_at: string | null;
+          watermark_accession: string | null;
+          claim_token: string;
+        }>;
+      };
+      claim_catalog_sec_filing_reconciliation_targets: {
+        Args: { p_env: string; p_worker_id: string; p_limit?: number; p_lease_seconds?: number };
+        Returns: Array<{
+          env: "dev" | "staging" | "prod";
+          cik: string;
+          release_id: string;
+          coverage_started_at: string;
+          baseline_completed_at: string | null;
+          claim_token: string;
+        }>;
+      };
+      claim_sec_filing_scheduler_leader: {
+        Args: { p_env: string; p_deployment_id: string; p_worker_id: string; p_lease_seconds?: number };
+        Returns: Array<{ claim_token: string; lease_expires_at: string }>;
+      };
+      record_catalog_sec_filing_discovery: {
+        Args: {
+          p_env: string;
+          p_release_id: string;
+          p_cik: string;
+          p_accession_number: string;
+          p_form_type: SecFilingFormType;
+          p_filing_date: string;
+          p_report_date: string | null;
+          p_accepted_at: string | null;
+          p_primary_document_name: string | null;
+          p_filing_detail_url: string;
+          p_primary_document_url: string | null;
+          p_source_metadata: Json;
+          p_discovery_source: "atom" | "submissions" | "daily_index";
+          p_seen_at?: string;
+        };
+        Returns: Array<{ filing_event_id: string; inserted: boolean }>;
+      };
+      claim_sec_filing_processing_jobs: {
+        Args: { p_env: string; p_worker_id: string; p_stage?: "enrich" | "notification_fanout" | "brief" | null; p_limit?: number; p_lease_seconds?: number };
+        Returns: Array<{
+          id: string;
+          filing_event_id: string;
+          stage: SecFilingProcessingJobRow["stage"];
+          claim_token: string;
+          attempts: number;
+          progress_json: Json;
+        }>;
+      };
+      enqueue_ready_sec_filing_brief_jobs: {
+        Args: { p_env: string; p_limit?: number };
+        Returns: number;
+      };
+      prune_catalog_sec_baseline_backfill: {
+        Args: { p_env: string; p_before_occurred_at: string; p_limit?: number };
+        Returns: number;
+      };
+      complete_sec_filing_discovery_checkpoint: {
+        Args: {
+          p_env: string;
+          p_source_key: SecFilingDiscoveryCheckpointRow["source_key"];
+          p_worker_id: string;
+          p_claim_token: string;
+          p_watermark_at: string | null;
+          p_watermark_accession: string | null;
+          p_next_poll_seconds?: number;
+        };
+        Returns: boolean;
+      };
+      fail_sec_filing_discovery_checkpoint: {
+        Args: {
+          p_env: string;
+          p_source_key: SecFilingDiscoveryCheckpointRow["source_key"];
+          p_worker_id: string;
+          p_claim_token: string;
+          p_error: string;
+          p_retry_after_seconds?: number | null;
+        };
+        Returns: boolean;
+      };
+      complete_catalog_sec_filing_reconciliation: {
+        Args: {
+          p_env: string;
+          p_cik: string;
+          p_worker_id: string;
+          p_claim_token: string;
+          p_baseline_completed: boolean;
+          p_next_poll_seconds?: number;
+        };
+        Returns: boolean;
+      };
+      fail_catalog_sec_filing_reconciliation: {
+        Args: {
+          p_env: string;
+          p_cik: string;
+          p_worker_id: string;
+          p_claim_token: string;
+          p_error: string;
+          p_retry_after_seconds?: number | null;
+        };
+        Returns: boolean;
+      };
+      complete_sec_filing_enrichment: {
+        Args: {
+          p_job_id: string;
+          p_claim_token: string;
+          p_sec_items: string[];
+          p_event_tags: string[];
+          p_primary_event_tag: string | null;
+          p_classification_source: "sec_items" | "metadata" | "unclassified";
+          p_alert_priority: "urgent" | "normal" | "digest";
+          p_documents: Json;
+          p_form4_owners: Json;
+          p_form4_transactions: Json;
+          p_form4_summary: Json;
+          p_parser_version: number;
+        };
+        Returns: boolean;
+      };
+      complete_sec_filing_brief: {
+        Args: {
+          p_job_id: string;
+          p_claim_token: string;
+          p_locale: "ko-KR";
+          p_headline_ko: string;
+          p_summary_sentences: Json;
+          p_facts: Json;
+          p_question_suggestions: Json;
+          p_uncertainty_notes: Json;
+          p_source_document_url: string;
+          p_source_sha256: string;
+          p_source_section_keys: string[];
+          p_source_truncated: boolean;
+          p_input_char_count: number;
+          p_generator_model: string;
+          p_prompt_version: string;
+          p_schema_version: number;
+          p_input_tokens: number;
+          p_output_tokens: number;
+          p_cache_read_input_tokens: number;
+          p_provider_cost_usd: number;
+          p_latency_ms: number;
+        };
+        Returns: boolean;
+      };
+      record_sec_filing_brief_failure: {
+        Args: {
+          p_job_id: string;
+          p_claim_token: string;
+          p_outcome: "failed" | "validation_failed";
+          p_model: string;
+          p_prompt_version: string;
+          p_schema_version: number;
+          p_source_document_url?: string | null;
+          p_source_sha256?: string | null;
+          p_source_truncated?: boolean | null;
+          p_input_char_count?: number | null;
+          p_latency_ms?: number | null;
+          p_error_code?: string | null;
+          p_error_message?: string | null;
+        };
+        Returns: boolean;
+      };
+      fail_sec_filing_processing_job: {
+        Args: { p_job_id: string; p_claim_token: string; p_error: string; p_retry_after_seconds?: number | null };
+        Returns: boolean;
+      };
+      sync_catalog_filing_subscription_status: {
+        Args: { p_env: string };
+        Returns: number;
+      };
+      get_catalog_global_filing_feed: {
+        Args: {
+          p_env: string;
+          p_snapshot_at: string;
+          p_before_occurred_at?: string | null;
+          p_before_filing_event_id?: string | null;
+          p_limit?: number;
+        };
+        Returns: Array<{
+          filing_event_id: string;
+          ticker: string;
+          covered_tickers: string[];
+          cik: string;
+          accession_number: string;
+          form_type: SecFilingFormType;
+          is_amendment: boolean;
+          filing_date: string;
+          report_date: string | null;
+          accepted_at: string | null;
+          first_seen_at: string;
+          occurred_at: string;
+          feed_available_at: string | null;
+          feed_expires_at: string | null;
+          feed_lane: number | null;
+          feed_priority_rank: number | null;
+          alert_priority: "urgent" | "normal" | "digest";
+          primary_event_tag: string | null;
+          sec_items: string[];
+          event_tags: string[];
+          filing_detail_url: string;
+          primary_document_url: string | null;
+          source_metadata: Json;
+          processing_status: SecFilingEventRow["processing_status"];
+          form4_reported_purchase_value: number | null;
+          form4_reported_sale_value: number | null;
+          form4_tenb5_one_status: "yes" | "no" | "unknown" | null;
+          form4_has_reported_open_market_trade: boolean | null;
+        }>;
+      };
+      get_catalog_pulse_filing_candidates_v2: {
+        Args: {
+          p_env: string;
+          p_snapshot_at: string;
+          p_preferred_tickers?: string[];
+          p_urgent_limit?: number;
+          p_priority_limit?: number;
+          p_preferred_limit?: number;
+          p_discovery_limit?: number;
+        };
+        Returns: Array<{
+          filing_event_id: string;
+          ticker: string;
+          covered_tickers: string[];
+          cik: string;
+          accession_number: string;
+          form_type: SecFilingFormType;
+          is_amendment: boolean;
+          filing_date: string;
+          report_date: string | null;
+          accepted_at: string | null;
+          first_seen_at: string;
+          occurred_at: string;
+          feed_available_at: string | null;
+          feed_expires_at: string | null;
+          feed_lane: number | null;
+          feed_priority_rank: number | null;
+          alert_priority: "urgent" | "normal" | "digest";
+          primary_event_tag: string | null;
+          sec_items: string[];
+          event_tags: string[];
+          filing_detail_url: string;
+          primary_document_url: string | null;
+          source_metadata: Json;
+          processing_status: SecFilingEventRow["processing_status"];
+          form4_reported_purchase_value: number | null;
+          form4_reported_sale_value: number | null;
+          form4_tenb5_one_status: "yes" | "no" | "unknown" | null;
+          form4_has_reported_open_market_trade: boolean | null;
+          candidate_bucket: "urgent" | "priority" | "preferred" | "discovery";
+        }>;
+      };
+      get_catalog_pulse_filing_candidates_v3: {
+        Args: {
+          p_env: string;
+          p_snapshot_at: string;
+          p_preferred_tickers?: string[];
+          p_urgent_limit?: number;
+          p_priority_limit?: number;
+          p_preferred_limit?: number;
+          p_discovery_limit?: number;
+        };
+        Returns: Array<{
+          filing_event_id: string;
+          ticker: string;
+          covered_tickers: string[];
+          cik: string;
+          accession_number: string;
+          form_type: SecFilingFormType;
+          is_amendment: boolean;
+          filing_date: string;
+          report_date: string | null;
+          accepted_at: string | null;
+          first_seen_at: string;
+          occurred_at: string;
+          feed_available_at: string | null;
+          feed_expires_at: string | null;
+          feed_lane: number | null;
+          feed_priority_rank: number | null;
+          alert_priority: "urgent" | "normal" | "digest";
+          primary_event_tag: string | null;
+          sec_items: string[];
+          event_tags: string[];
+          filing_detail_url: string;
+          primary_document_url: string | null;
+          source_metadata: Json;
+          processing_status: SecFilingEventRow["processing_status"];
+          form4_reported_purchase_value: number | null;
+          form4_reported_sale_value: number | null;
+          form4_tenb5_one_status: "yes" | "no" | "unknown" | null;
+          form4_has_reported_open_market_trade: boolean | null;
+          candidate_bucket: "urgent" | "priority" | "preferred" | "discovery";
+          filing_brief_headline_ko: string | null;
+          filing_brief_summary_sentences: Json | null;
+          filing_brief_facts: Json | null;
+          filing_brief_question_suggestions: Json | null;
+          filing_brief_source_document_url: string | null;
+          filing_brief_generated_at: string | null;
+        }>;
+      };
+      get_catalog_pulse_feed_status_v1: {
+        Args: {
+          p_env: string;
+          p_since: string;
+          p_snapshot_at?: string;
+        };
+        Returns: Array<{
+          new_filing_count: number;
+          latest_filing_available_at: string | null;
+        }>;
+      };
+      complete_sec_filing_notification_fanout: {
+        Args: { p_job_id: string; p_claim_token: string; p_progress_json?: Json };
+        Returns: boolean;
+      };
       claim_sec_filing_poll_targets: {
         Args: {
           p_worker_id: string;

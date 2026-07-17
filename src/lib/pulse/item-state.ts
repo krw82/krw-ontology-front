@@ -6,23 +6,43 @@ import type { Database, UserPulseItemStateRow } from "@/types/database";
 
 const RESURFACE_COOLDOWN_MS = 28 * 24 * 60 * 60 * 1_000;
 const QUESTION_FATIGUE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1_000;
+const PULSE_STATE_QUERY_CHUNK_SIZE = 100;
+const PULSE_STATE_QUERY_CONCURRENCY = 3;
 
 export async function getPulseItemStates(
   supabase: SupabaseClient<Database>,
   userId: string,
   itemKeys: string[],
 ): Promise<Map<string, UserPulseItemStateRow>> {
-  if (itemKeys.length === 0) return new Map();
-  const { data, error } = await supabase
-    .from("user_pulse_item_states")
-    .select("*")
-    .eq("user_id", userId)
-    .in("item_key", itemKeys);
-  if (error) {
-    if (isMissingPulseStateTable(error)) return new Map();
-    throw error;
+  const uniqueItemKeys = [...new Set(itemKeys)];
+  if (uniqueItemKeys.length === 0) return new Map();
+
+  const rows: UserPulseItemStateRow[] = [];
+  for (let index = 0; index < uniqueItemKeys.length; index += PULSE_STATE_QUERY_CHUNK_SIZE * PULSE_STATE_QUERY_CONCURRENCY) {
+    const batch = uniqueItemKeys.slice(index, index + PULSE_STATE_QUERY_CHUNK_SIZE * PULSE_STATE_QUERY_CONCURRENCY);
+    const batchRows = await Promise.all(batch
+      .reduce<string[][]>((chunks, itemKey, itemIndex) => {
+        const chunkIndex = Math.floor(itemIndex / PULSE_STATE_QUERY_CHUNK_SIZE);
+        const chunk = chunks[chunkIndex] ?? [];
+        chunk.push(itemKey);
+        chunks[chunkIndex] = chunk;
+        return chunks;
+      }, [])
+      .map(async (chunk) => {
+        const { data, error } = await supabase
+          .from("user_pulse_item_states")
+          .select("*")
+          .eq("user_id", userId)
+          .in("item_key", chunk);
+        if (error) {
+          if (isMissingPulseStateTable(error)) return [];
+          throw error;
+        }
+        return data ?? [];
+      }));
+    rows.push(...batchRows.flat());
   }
-  return new Map(data.map((row) => [row.item_key, row]));
+  return new Map(rows.map((row) => [row.item_key, row]));
 }
 
 /** Applies user-owned visibility state before any rotation, summary, or rank. */

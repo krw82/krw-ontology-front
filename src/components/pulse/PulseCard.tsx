@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { trackClientEventSilently } from "@/lib/analytics/client";
-import type { PulseItem, PulseMutationAction } from "@/types/api-contracts";
+import CompanyLogo from "@/components/CompanyLogo";
+import type { PulseFeedResponse, PulseItem, PulseMutationAction } from "@/types/api-contracts";
 
 interface PulseCardProps {
   item: PulseItem;
   position: number;
   pending: boolean;
   feedSessionId: string;
+  rankingVersion: PulseFeedResponse["ranking_version"];
   onMutation: (item: PulseItem, action: PulseMutationAction) => void;
 }
 
@@ -22,12 +24,16 @@ const KIND_STYLES = {
   learning: { icon: "school", rail: "bg-[#178768]", wash: "bg-[#eaf8f3]" },
 } as const;
 
-export default function PulseCard({ item, position, pending, feedSessionId, onMutation }: PulseCardProps) {
+export default function PulseCard({ item, position, pending, feedSessionId, rankingVersion, onMutation }: PulseCardProps) {
   const ref = useRef<HTMLElement>(null);
   const impressionSent = useRef(false);
   const style = KIND_STYLES[item.kind];
+  const isDevelopmentShowcase = item.metadata.development_showcase === true;
+  const showsCompanyLogo = item.kind === "question" && Boolean(item.ticker);
+  const hasSourceGroundedBrief = item.kind === "filing" && item.metadata.filing_brief_ready === true;
 
   useEffect(() => {
+    if (isDevelopmentShowcase) return;
     const element = ref.current;
     if (!element) return;
     const sessionKey = `pulse-impression:${item.id}`;
@@ -51,6 +57,10 @@ export default function PulseCard({ item, position, pending, feedSessionId, onMu
           phase: item.phase,
           has_ticker: Boolean(item.ticker),
           visible_ms: 1000,
+          feed_session_id: feedSessionId,
+          ranking_version: rankingVersion,
+          reason_code: item.reason_code,
+          has_source_grounded_brief: hasSourceGroundedBrief,
         });
         void fetch(`/api/pulse/items/${encodeURIComponent(item.id)}`, {
           method: "PATCH",
@@ -65,7 +75,7 @@ export default function PulseCard({ item, position, pending, feedSessionId, onMu
       if (impressionTimer !== null) window.clearTimeout(impressionTimer);
       observer.disconnect();
     };
-  }, [feedSessionId, item.id, item.kind, item.phase, item.priority, item.state, item.ticker, position]);
+  }, [feedSessionId, hasSourceGroundedBrief, isDevelopmentShowcase, item.id, item.kind, item.phase, item.priority, item.reason_code, item.state, item.ticker, position, rankingVersion]);
 
   const primary = item.primary_action;
   const analysisStatus = item.kind === "analysis" ? String(item.metadata.run_status ?? "") : null;
@@ -81,7 +91,16 @@ export default function PulseCard({ item, position, pending, feedSessionId, onMu
         <div className="flex items-start justify-between gap-base">
           <div className="flex min-w-0 items-center gap-sm">
             <span className={`grid size-9 shrink-0 place-items-center rounded-[11px] ${style.wash}`} aria-hidden="true">
-              <span className="material-symbols-outlined text-[19px] text-ink">{style.icon}</span>
+              {showsCompanyLogo && item.ticker ? (
+                <CompanyLogo
+                  ticker={item.ticker}
+                  companyName={item.ticker}
+                  className="size-7 text-[10px] text-ink"
+                  imageSize={48}
+                />
+              ) : (
+                <span className="material-symbols-outlined text-[19px] text-ink">{style.icon}</span>
+              )}
             </span>
             <div className="min-w-0">
               <p className="truncate text-[11px] font-black uppercase tracking-[0.13em] text-muted">{item.eyebrow}</p>
@@ -112,13 +131,19 @@ export default function PulseCard({ item, position, pending, feedSessionId, onMu
           </div>
         ) : null}
         <p className="mt-sm text-[14px] leading-6 text-body">{item.body}</p>
+        {hasSourceGroundedBrief ? (
+          <p className="mt-sm inline-flex items-center gap-1 rounded-full bg-[#eef5ff] px-sm py-1 text-[11px] font-extrabold text-primary">
+            <span className="material-symbols-outlined text-[14px]" aria-hidden="true">format_quote</span>
+            원문 기반 자동 요약
+          </p>
+        ) : null}
 
         <div className="mt-lg flex flex-wrap items-center gap-sm">
           {primary.type === "link" ? (
             <Link
               href={primary.href}
               className="inline-flex min-h-10 items-center gap-xs rounded-[10px] bg-ink px-base text-[13px] font-extrabold text-white transition-colors hover:bg-primary"
-              onClick={() => trackClientEventSilently("pulse_item_opened", { item_kind: item.kind, action: "primary", item_state: item.state, phase: item.phase })}
+              onClick={() => trackClientEventSilently("pulse_item_opened", { item_kind: item.kind, action: "primary", item_state: item.state, phase: item.phase, feed_session_id: feedSessionId, ranking_version: rankingVersion, reason_code: item.reason_code, has_source_grounded_brief: hasSourceGroundedBrief })}
             >
               {primary.label}<span className="material-symbols-outlined text-[16px]" aria-hidden="true">arrow_forward</span>
             </Link>
@@ -132,7 +157,7 @@ export default function PulseCard({ item, position, pending, feedSessionId, onMu
               key={`${action.type}-${action.label}`}
               href={action.href}
               className="inline-flex min-h-10 items-center rounded-[10px] px-sm text-[13px] font-bold text-primary hover:bg-primary-fixed/60"
-              onClick={() => trackClientEventSilently(action.analytics_name === "pulse_answer_prefilled" ? "pulse_answer_prefilled" : "pulse_item_opened", { item_kind: item.kind, action: action.label, item_state: item.state, phase: item.phase })}
+              onClick={() => trackClientEventSilently(action.analytics_name === "pulse_answer_prefilled" ? "pulse_answer_prefilled" : "pulse_item_opened", { item_kind: item.kind, action: action.label, item_state: item.state, phase: item.phase, feed_session_id: feedSessionId, ranking_version: rankingVersion, reason_code: item.reason_code, has_source_grounded_brief: hasSourceGroundedBrief })}
             >
               {action.label}
             </Link>

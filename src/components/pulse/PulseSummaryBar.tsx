@@ -11,10 +11,8 @@ interface PulseSummaryBarProps {
 export default function PulseSummaryBar({ summary }: PulseSummaryBarProps) {
   const parts = [
     summary.counts.filing ? `새 공시 ${summary.counts.filing}` : null,
-    summary.counts.analysis ? `결과 ${summary.counts.analysis}` : null,
     summary.counts.question ? `이어볼 질문 ${summary.counts.question}` : null,
     summary.counts.resurface ? `다시 볼 리서치 ${summary.counts.resurface}` : null,
-    summary.active_analysis_count ? `분석 진행 ${summary.active_analysis_count}` : null,
   ].filter((value): value is string => Boolean(value));
 
   if (parts.length === 0) return null;

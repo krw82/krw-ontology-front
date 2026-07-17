@@ -13,6 +13,7 @@ import {
 import type {
   ChartMCPToolName,
   GuruMCPToolName,
+  KrwFilingsMCPToolName,
   KRWOntologyMCPToolName,
   StockNewsMCPToolName,
 } from "@/types/api-contracts";
@@ -34,6 +35,9 @@ const GURU_ADVISOR_PLUGIN_TOOL_PREFIX =
 const CHART_MCP_TOOL_PREFIX = "mcp__krw_presentation__";
 const YAHOO_FINANCE_MCP_TOOL_PREFIX =
   `mcp__${YAHOO_FINANCE_MCP_SERVER_NAME}__`;
+export const KRW_FILINGS_MCP_SERVER_NAME = "krw-filings";
+const KRW_FILINGS_DIRECT_TOOL_PREFIX =
+  `mcp__${KRW_FILINGS_MCP_SERVER_NAME}__`;
 
 export const KRW_ONTOLOGY_MCP_TOOLS = [
   "krw_ontology_catalog",
@@ -67,6 +71,15 @@ export const STOCK_NEWS_MCP_TOOLS = [
 export const CHART_MCP_TOOLS = [
   "create_chart_v1",
 ] as const satisfies readonly ChartMCPToolName[];
+
+export const KRW_FILINGS_MCP_TOOLS = [
+  "get_filing",
+  "get_filing_brief",
+  "search_catalog_filings",
+  "list_filing_sections",
+  "read_filing_section",
+  "get_form4_insider_transactions",
+] as const satisfies readonly KrwFilingsMCPToolName[];
 
 export const GURU_MCP_TOOLS = [
   "krw_guru_status",
@@ -110,11 +123,16 @@ export const CHART_SDK_ALLOWED_TOOLS = CHART_MCP_TOOLS.map(
   (toolName) => `${CHART_MCP_TOOL_PREFIX}${toolName}`,
 );
 
+export const KRW_FILINGS_SDK_ALLOWED_TOOLS = KRW_FILINGS_MCP_TOOLS.map(
+  (toolName) => `${KRW_FILINGS_DIRECT_TOOL_PREFIX}${toolName}`,
+);
+
 const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const STOCK_NEWS_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_MCP_TOOLS);
 const GURU_MCP_TOOL_SET = new Set<string>(GURU_MCP_TOOLS);
 const YAHOO_FINANCE_MCP_TOOL_SET = new Set<string>(YAHOO_FINANCE_MCP_TOOLS);
 const CHART_MCP_TOOL_SET = new Set<string>(CHART_MCP_TOOLS);
+const KRW_FILINGS_MCP_TOOL_SET = new Set<string>(KRW_FILINGS_MCP_TOOLS);
 const DEFAULT_MCP_HEALTH_TIMEOUT_MS = 30_000;
 type McpProbeKind = "health" | "ready";
 
@@ -151,6 +169,24 @@ export function isChartSdkTool(toolName: string): boolean {
   const bareName = toolName.slice(CHART_MCP_TOOL_PREFIX.length);
 
   return Boolean(bareName && CHART_MCP_TOOL_SET.has(bareName));
+}
+
+export function isKrwFilingsSdkTool(toolName: string): boolean {
+  if (!toolName.startsWith(KRW_FILINGS_DIRECT_TOOL_PREFIX)) return false;
+  const bareName = toolName.slice(KRW_FILINGS_DIRECT_TOOL_PREFIX.length);
+  return Boolean(bareName && KRW_FILINGS_MCP_TOOL_SET.has(bareName));
+}
+
+export function isKrwFilingsMcpEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return truthyEnv(env.FILINGS_MCP_ENABLED) && Boolean(filingsMcpToken(env));
+}
+
+export function filingsMcpToken(
+  env: Record<string, string | undefined> = process.env,
+): string | null {
+  return env.KRW_FILINGS_MCP_TOKEN?.trim() || env.FILINGS_MCP_AUTH_TOKEN?.trim() || null;
 }
 
 export function isStockNewsEnabled(
@@ -212,6 +248,12 @@ export interface McpHealthResult {
   releaseMetadata: Json | null;
   error?: string;
 }
+
+export type FilingsMcpHealthResult = {
+  connected: boolean;
+  tools: string[];
+  error?: string;
+};
 
 interface PluginMcpConfig {
   mcpServers?: Record<
@@ -819,4 +861,66 @@ export async function checkMcpHealth(): Promise<McpHealthResult> {
 
 export async function checkMcpReady(): Promise<McpHealthResult> {
   return checkMcpProbe("ready");
+}
+
+/**
+ * Source-filing chat jobs call this separately from ontology readiness. The
+ * filings MCP is intentionally optional for every other chat, so a disabled
+ * service cannot block ordinary ontology research.
+ */
+export async function checkKrwFilingsMcpReady(): Promise<FilingsMcpHealthResult> {
+  if (!isKrwFilingsMcpEnabled()) {
+    return {
+      connected: false,
+      tools: [],
+      error: "FILINGS_MCP_ENABLED=1 and a filings MCP auth token are required",
+    };
+  }
+  const mcpUrl = process.env.KRW_FILINGS_MCP_URL?.trim();
+  if (!mcpUrl) {
+    return { connected: false, tools: [], error: "KRW_FILINGS_MCP_URL is required" };
+  }
+  const token = filingsMcpToken();
+  const headers = { Authorization: `Bearer ${token}` };
+  const timeout = getHealthTimeoutMs();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(readyUrlFromMcpUrl(mcpUrl), {
+      headers: { accept: "application/json", ...headers },
+      signal: controller.signal,
+    });
+    const payload = await response.json().catch(() => null) as Record<string, unknown> | null;
+    if (!response.ok || payload?.ok !== true) {
+      return { connected: false, tools: [], error: "On-demand filings MCP readiness check failed" };
+    }
+
+    const client = new Client({ name: "krw-filings-worker-readiness", version: "0.1.0" });
+    const transport = new StreamableHTTPClientTransport(new URL(mcpUrl), {
+      requestInit: { headers },
+    });
+    try {
+      await client.connect(transport, { timeout });
+      const result = await client.listTools(undefined, { timeout, maxTotalTimeout: timeout });
+      const tools = result.tools.map((tool) => tool.name);
+      if (!sameStringSet(tools, KRW_FILINGS_MCP_TOOLS)) {
+        return {
+          connected: false,
+          tools,
+          error: `On-demand filings MCP tool parity mismatch: expected ${KRW_FILINGS_MCP_TOOLS.length} exact tools`,
+        };
+      }
+      return { connected: true, tools };
+    } finally {
+      await client.close().catch(() => undefined);
+    }
+  } catch (error) {
+    return {
+      connected: false,
+      tools: [],
+      error: error instanceof Error ? error.message : "On-demand filings MCP readiness check failed",
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }

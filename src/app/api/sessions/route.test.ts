@@ -22,10 +22,18 @@ vi.mock("@/lib/ontology/catalog", () => ({
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
+vi.mock("@/lib/supabase/admin", () => ({
+  getSupabaseAdmin: vi.fn(),
+}));
+vi.mock("@/lib/filing-notifications/filing-access", () => ({
+  resolveFilingAccess: vi.fn(),
+}));
 
 import { getAuthUser } from "@/lib/auth";
 import { getIndexedCompanies } from "@/lib/ontology/catalog";
 import { createClient } from "@/lib/supabase/server";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { resolveFilingAccess } from "@/lib/filing-notifications/filing-access";
 import { GET, POST } from "./route";
 
 function getRequest() {
@@ -104,6 +112,54 @@ function createSupabase(params: {
   } as unknown as Awaited<ReturnType<typeof createClient>>;
 
   return { client, queriedTables };
+}
+
+function createInsertSupabase() {
+  const inserts: Array<Record<string, unknown>> = [];
+  const client = {
+    from(table: string) {
+      if (table !== "chat_sessions") throw new Error(`Unexpected table: ${table}`);
+      return {
+        insert(payload: Record<string, unknown>) {
+          inserts.push(payload);
+          return {
+            select() {
+              return {
+                single: async () => ({
+                  data: {
+                    id: "session-1",
+                    user_id: "user-1",
+                    title: payload.title,
+                    scope_type: payload.scope_type,
+                    default_tickers: payload.default_tickers,
+                    default_document_types: payload.default_document_types,
+                    deleted_at: null,
+                    created_at: "2026-07-17T00:00:00.000Z",
+                    updated_at: "2026-07-17T00:00:00.000Z",
+                  },
+                  error: null,
+                }),
+              };
+            },
+          };
+        },
+      };
+    },
+  } as unknown as Awaited<ReturnType<typeof createClient>>;
+  return { client, inserts };
+}
+
+function mockSourceFiling(filing: Record<string, unknown>) {
+  vi.mocked(getSupabaseAdmin).mockReturnValue({
+    from: (table: string) => {
+      if (table !== "sec_filing_events") throw new Error(`Unexpected table: ${table}`);
+      const query = {
+        eq: () => query,
+        maybeSingle: async () => ({ data: filing, error: null }),
+      };
+      return { select: () => query };
+    },
+  } as unknown as ReturnType<typeof getSupabaseAdmin>);
 }
 
 async function json(response: Response) {
@@ -223,6 +279,80 @@ describe("POST /api/sessions", () => {
     });
     expect(getIndexedCompanies).toHaveBeenCalledTimes(1);
     expect(getIndexedCompanies).toHaveBeenCalledWith(["AAPL", "MSFT"]);
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed source filing id before looking up a filing", async () => {
+    const response = await POST(
+      postRequest({
+        scope_type: "company",
+        default_tickers: ["AAPL"],
+        source_filing_event_id: "not-a-uuid",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await json(response)).toMatchObject({
+      error: { code: "validation_error", message: "source_filing_event_id must be a UUID" },
+    });
+    expect(getSupabaseAdmin).not.toHaveBeenCalled();
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it("pins a valid source filing chat to the filing company even when the caller requests global scope", async () => {
+    const filingId = "11111111-1111-4111-8111-111111111111";
+    mockSourceFiling({ id: filingId, ticker: "AAPL" });
+    vi.mocked(resolveFilingAccess).mockResolvedValue({
+      source: "catalog",
+      subscription: null,
+      notification: null,
+    });
+    vi.mocked(getIndexedCompanies).mockResolvedValue([
+      { ticker: "AAPL", name: "Apple Inc." },
+    ] as Awaited<ReturnType<typeof getIndexedCompanies>>);
+    const insert = createInsertSupabase();
+    vi.mocked(createClient).mockResolvedValue(insert.client);
+
+    const response = await POST(
+      postRequest({
+        scope_type: "global",
+        default_tickers: [],
+        source_filing_event_id: filingId,
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(insert.inserts).toEqual([
+      expect.objectContaining({
+        scope_type: "company",
+        default_tickers: ["AAPL"],
+        source_filing_event_id: filingId,
+      }),
+    ]);
+    expect(getIndexedCompanies).toHaveBeenCalledWith(["AAPL"]);
+  });
+
+  it("rejects a source filing when the supplied company does not match", async () => {
+    const filingId = "11111111-1111-4111-8111-111111111111";
+    mockSourceFiling({ id: filingId, ticker: "AAPL" });
+    vi.mocked(resolveFilingAccess).mockResolvedValue({
+      source: "catalog",
+      subscription: null,
+      notification: null,
+    });
+
+    const response = await POST(
+      postRequest({
+        scope_type: "company",
+        default_tickers: ["MSFT"],
+        source_filing_event_id: filingId,
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await json(response)).toMatchObject({
+      error: { code: "validation_error", message: "공시의 회사와 채팅 회사가 일치하지 않습니다." },
+    });
     expect(createClient).not.toHaveBeenCalled();
   });
 });

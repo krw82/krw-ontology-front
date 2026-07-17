@@ -3,6 +3,10 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
+import {
+  enrichCatalogWithSecIdentifiers,
+  fetchSecTickerIndex,
+} from "./sec-company-mapping.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -107,7 +111,9 @@ if (!existsSync(catalogFilePath)) {
   throw new Error(`Catalog file not found: ${catalogFilePath}`);
 }
 
-const catalog = readCatalog(catalogFilePath);
+const inputCatalog = readCatalog(catalogFilePath);
+const secTickerIndex = await fetchSecTickerIndex({ userAgent: process.env.SEC_USER_AGENT });
+const catalog = enrichCatalogWithSecIdentifiers(inputCatalog, secTickerIndex);
 const client = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
@@ -167,6 +173,7 @@ console.log(
     `env=${published.env}`,
     `release_id=${published.release_id}`,
     `companies=${published.company_count}`,
+    "sec_mappings=verified",
     `documents=${published.document_count}`,
     `objects=${published.object_count}`,
   ].join(" "),

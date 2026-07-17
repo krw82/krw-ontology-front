@@ -9,7 +9,7 @@ interface PulseSettingsProps {
 }
 
 const KIND_OPTIONS: Array<{ kind: PulseItemKind; label: string; description: string }> = [
-  { kind: "filing", label: "공시 알림", description: "추적 기업의 8-K·6-K" },
+  { kind: "filing", label: "카탈로그 공시", description: "카탈로그 기업의 8-K·6-K·Form 4" },
   { kind: "analysis", label: "내 분석 상태", description: "회사 채팅에서 직접 시작한 분석" },
   { kind: "question", label: "열린 질문", description: "리서치 노트북의 다음 질문" },
   { kind: "resurface", label: "다시 보기", description: "오래된 메모와 투자 관점" },

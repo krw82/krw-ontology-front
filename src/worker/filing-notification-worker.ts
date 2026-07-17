@@ -15,6 +15,7 @@ import {
 } from "@/lib/filing-notifications/sec-edgar";
 import { readIntEnv } from "@/lib/env";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { runGlobalFilingPipeline } from "@/worker/filings/global-filing-pipeline";
 import type {
   FilingNotificationDeliveryRow,
   FilingNotificationPreferencesRow,
@@ -47,6 +48,50 @@ const MAX_PUSH_ATTEMPTS = readIntEnv("FILING_NOTIFICATION_MAX_PUSH_ATTEMPTS", 8,
 const SEC_REQUEST_DELAY_MS = readIntEnv("SEC_FILING_REQUEST_DELAY_MS", 650, {
   min: 100,
 });
+const FILING_WORKER_ENV = (() => {
+  const value = process.env.FILING_WORKER_ENV?.trim().toLowerCase() || "prod";
+  if (value !== "dev" && value !== "staging" && value !== "prod") {
+    throw new Error("FILING_WORKER_ENV must be dev, staging, or prod");
+  }
+  return value;
+})();
+const FILING_WORKER_DEPLOYMENT_ID = process.env.FILING_WORKER_DEPLOYMENT_ID?.trim()
+  || "gcp-compose-prod";
+const SEC_GLOBAL_MIN_REQUEST_INTERVAL_MS = readIntEnv(
+  "SEC_GLOBAL_MIN_REQUEST_INTERVAL_MS",
+  Math.max(125, Math.min(SEC_REQUEST_DELAY_MS, 1_000)),
+  { min: 100, max: 10_000 },
+);
+const SEC_GLOBAL_DISCOVERY_SOURCES_PER_CYCLE = readIntEnv(
+  "SEC_GLOBAL_DISCOVERY_SOURCES_PER_CYCLE",
+  2,
+  { min: 1, max: 6 },
+);
+const SEC_GLOBAL_SCHEDULER_LEASE_SECONDS = readIntEnv(
+  "SEC_GLOBAL_SCHEDULER_LEASE_SECONDS",
+  300,
+  { min: 90, max: 900 },
+);
+const SEC_GLOBAL_RECONCILIATION_BATCH_SIZE = readIntEnv("SEC_GLOBAL_RECONCILIATION_BATCH_SIZE", 10, {
+  min: 1,
+  max: 50,
+});
+const SEC_GLOBAL_ENRICHMENT_BATCH_SIZE = readIntEnv("SEC_GLOBAL_ENRICHMENT_BATCH_SIZE", 10, {
+  min: 1,
+  max: 50,
+});
+const SEC_GLOBAL_NOTIFICATION_BATCH_SIZE = readIntEnv("SEC_GLOBAL_NOTIFICATION_BATCH_SIZE", 25, {
+  min: 1,
+  max: 100,
+});
+const SEC_GLOBAL_CATALOG_LOOKBACK_DAYS = readIntEnv("SEC_GLOBAL_CATALOG_LOOKBACK_DAYS", 90, {
+  min: 7,
+  max: 365,
+});
+const SEC_GLOBAL_BASELINE_CLEANUP_BATCH_SIZE = readIntEnv("SEC_GLOBAL_BASELINE_CLEANUP_BATCH_SIZE", 500, {
+  min: 1,
+  max: 5_000,
+});
 const RETENTION_CLEANUP_INTERVAL_MS = readIntEnv("FILING_RETENTION_CLEANUP_INTERVAL_MS", 24 * 60 * 60 * 1000, {
   min: 60 * 60 * 1000,
 });
@@ -69,33 +114,33 @@ type UserKeywordMatch = { phrase: string; matchedContext: string };
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     if (signal?.aborted) return resolve();
-    const timer = setTimeout(resolve, ms);
-    signal?.addEventListener("abort", () => {
-      clearTimeout(timer);
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const onAbort = () => finish();
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
       resolve();
-    }, { once: true });
+    };
+    timer = setTimeout(finish, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
 
-function legacyFeatureEnabled() {
-  return process.env.FILING_NOTIFICATIONS_ENABLED === "1";
-}
-
-function featureEnabled(name: string): boolean {
-  const override = process.env[name];
-  return override == null ? legacyFeatureEnabled() : override === "1";
-}
-
 function detectionEnabled() {
-  return featureEnabled("FILING_DETECTION_ENABLED");
+  // Discovery defaults to on. Set this explicit kill switch to 0 to pause SEC
+  // traffic; it does not stop enrichment of already discovered events.
+  return process.env.FILING_DETECTION_ENABLED !== "0";
 }
 
 function notificationCreationEnabled() {
-  return featureEnabled("FILING_NOTIFICATION_CREATION_ENABLED");
+  return process.env.FILING_NOTIFICATION_CREATION_ENABLED === "1";
 }
 
 function pushEnabled() {
-  return featureEnabled("FILING_PUSH_ENABLED");
+  return process.env.FILING_PUSH_ENABLED === "1";
 }
 
 function configureWebPush(): boolean {
@@ -790,33 +835,33 @@ function errorMessage(error: unknown): string {
 }
 
 async function runCycle() {
-  let filingsCreated = 0;
-  let notificationsCreated = 0;
-  if (detectionEnabled()) {
-    const claims = await claimDueCiks();
-    for (const claim of claims) {
-      try {
-        const result = await monitorCik(claim);
-        filingsCreated += result.filings;
-        notificationsCreated += result.created;
-      } catch (error) {
-        console.error("[filing-notification-worker] CIK poll failed", {
-          cik: claim.cik,
-          error: errorMessage(error),
-        });
-      }
-      await sleep(SEC_REQUEST_DELAY_MS + Math.floor(Math.random() * 150));
-    }
-  }
+  const global = await runGlobalFilingPipeline({
+    env: FILING_WORKER_ENV,
+    deploymentId: FILING_WORKER_DEPLOYMENT_ID,
+    workerId: WORKER_ID,
+    detectionEnabled: detectionEnabled(),
+    notificationCreationEnabled: notificationCreationEnabled(),
+    secMinRequestIntervalMs: SEC_GLOBAL_MIN_REQUEST_INTERVAL_MS,
+    discoverySourcesPerCycle: SEC_GLOBAL_DISCOVERY_SOURCES_PER_CYCLE,
+    schedulerLeaseSeconds: SEC_GLOBAL_SCHEDULER_LEASE_SECONDS,
+    reconciliationBatchSize: SEC_GLOBAL_RECONCILIATION_BATCH_SIZE,
+    enrichmentBatchSize: SEC_GLOBAL_ENRICHMENT_BATCH_SIZE,
+    notificationBatchSize: SEC_GLOBAL_NOTIFICATION_BATCH_SIZE,
+    catalogLookbackDays: SEC_GLOBAL_CATALOG_LOOKBACK_DAYS,
+    baselineCleanupBatchSize: SEC_GLOBAL_BASELINE_CLEANUP_BATCH_SIZE,
+  });
   const digestsCreated = await queueDailyDigests();
   const delivered = await dispatchPushes();
   await cleanupExpiredFilingData();
   await recordHeartbeat({ lastSuccessAt: new Date().toISOString() });
-  if (filingsCreated || notificationsCreated || digestsCreated || delivered) {
+  if (global.discovered || global.enriched || global.notificationsCreated || digestsCreated || delivered) {
     console.info("[filing-notification-worker] cycle completed", {
       workerId: WORKER_ID,
-      filingsCreated,
-      notificationsCreated,
+      filingEnv: FILING_WORKER_ENV,
+      schedulerLeader: global.schedulerLeader,
+      filingsDiscovered: global.discovered,
+      filingsEnriched: global.enriched,
+      notificationsCreated: global.notificationsCreated,
       digestsCreated,
       pushDeliveriesProcessed: delivered,
     });
@@ -854,6 +899,8 @@ async function main() {
   void waitForStopSignal(controller);
   console.info("[filing-notification-worker] started", {
     workerId: WORKER_ID,
+    filingEnv: FILING_WORKER_ENV,
+    deploymentId: FILING_WORKER_DEPLOYMENT_ID,
     workerTickMs: WORKER_TICK_MS,
     cikPollIntervalMs: CIK_POLL_INTERVAL_MS,
   });

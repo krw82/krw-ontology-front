@@ -46,7 +46,7 @@ export default function CompanyFilingSubscriptionControl({
   if (!isAuthenticated) {
     return (
       <p className="mt-3 text-[13px] font-semibold leading-5 text-muted">
-        <Link href={loginHref} className="text-primary underline underline-offset-4">로그인하고 새 8-K·6-K 공시 알림 받기</Link>
+        <Link href={loginHref} className="text-primary underline underline-offset-4">로그인하고 새 8-K·6-K·Form 4 공시 알림 받기</Link>
       </p>
     );
   }
@@ -88,7 +88,7 @@ export default function CompanyFilingSubscriptionControl({
       <div className="flex flex-wrap items-center justify-between gap-sm">
         <div>
           <p className="text-[13px] font-extrabold text-ink">새 SEC 공시 알림</p>
-          <p className="mt-0.5 text-xs leading-5 text-muted">이 기업의 8-K·6-K가 제출되면 알려드립니다.</p>
+          <p className="mt-0.5 text-xs leading-5 text-muted">이 기업의 8-K·6-K·Form 4가 제출되면 알려드립니다.</p>
         </div>
         <button
           type="button"

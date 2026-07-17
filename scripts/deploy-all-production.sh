@@ -9,7 +9,9 @@ Deploy data, GCP web/API, and Mac worker plugin/MCP changes to production.
 
 Order:
   1. Supabase migration drift check and schema smoke test, unless skipped.
-  2. Local prod release catalog publish and Mac worker restart, if not skipped.
+  2. Local prod release catalog publish. When code is also deployed, defer the
+     Mac runtime restart to the final plugin/worker step so its plugin and MCP
+     fingerprints are updated atomically.
   3. GCP web image rebuild, if not skipped.
   4. Mac worker/plugin validation and launchd restart, if not skipped.
   5. Optional GCP web/reverse-proxy restart with --restart-all.
@@ -28,6 +30,7 @@ DEPLOY_CODE=1
 DB_CHECK=1
 APPLY_MIGRATIONS=0
 RESTART_ALL=0
+SKIP_DATA_RUNTIME_RESTART=0
 DATA_ARGS=""
 
 while [ "$#" -gt 0 ]; do
@@ -54,6 +57,7 @@ while [ "$#" -gt 0 ]; do
       ;;
     --skip-worker-restart)
       DATA_ARGS="$DATA_ARGS --skip-worker-restart"
+      SKIP_DATA_RUNTIME_RESTART=1
       ;;
     --skip-data)
       DEPLOY_DATA=0
@@ -77,6 +81,17 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
+
+# A catalog publish can safely precede the frontend/plugin deployment, but a
+# Mac worker restart cannot: it would boot the current worker against a stale
+# plugin while the MCP/runtime fingerprints have already changed. The plugin
+# lane below materializes the plugin, restarts both MCPs, and then starts the
+# worker, so it is the one authoritative restart point for a combined deploy.
+if [ "$DEPLOY_DATA" = "1" ] && [ "$DEPLOY_CODE" = "1" ] && [ "$SKIP_DATA_RUNTIME_RESTART" = "0" ]; then
+  DATA_ARGS="$DATA_ARGS --skip-worker-restart"
+  SKIP_DATA_RUNTIME_RESTART=1
+  echo "Deferring Mac runtime restart until the final plugin/worker deployment step."
+fi
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)

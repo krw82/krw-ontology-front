@@ -9,6 +9,7 @@ export interface ResolvedSession {
   scopeType: "global" | "company";
   defaultTickers: string[];
   defaultDocumentTypes: string[];
+  sourceFilingEventId?: string | null;
 }
 
 function errorResponse(
@@ -34,7 +35,7 @@ export async function resolveSession(
   const supabase = await createClient();
   const { data: session, error: sessionError } = await supabase
     .from("chat_sessions")
-    .select("id, user_id, scope_type, default_tickers, default_document_types")
+    .select("id, user_id, scope_type, default_tickers, default_document_types, source_filing_event_id")
     .eq("id", sessionId)
     .is("deleted_at", null)
     .single<ChatSessionRow>();
@@ -58,6 +59,7 @@ export async function resolveSession(
       scopeType: session.scope_type,
       defaultTickers: session.default_tickers ?? [],
       defaultDocumentTypes: session.default_document_types ?? [],
+      sourceFilingEventId: session.source_filing_event_id ?? null,
     },
   };
 }

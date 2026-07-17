@@ -2,8 +2,10 @@ import type { NextRequest } from "next/server";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
 import { getIndexedCompanies } from "@/lib/ontology/catalog";
 import { createClient } from "@/lib/supabase/server";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { resolveFilingAccess } from "@/lib/filing-notifications/filing-access";
 import type { CreateSessionRequest } from "@/types/api-contracts";
-import type { ChatSessionRow } from "@/types/database";
+import type { ChatSessionRow, SecFilingEventRow } from "@/types/database";
 import { sanitizeAssistantPreviewContent } from "@/lib/chat/assistant-content";
 import { canAccessMenuFeature } from "@/lib/billing/feature-access-server";
 import {
@@ -108,6 +110,7 @@ export async function POST(request: NextRequest) {
     scope_type,
     default_tickers,
     default_document_types,
+    source_filing_event_id,
   } = parsedBody;
 
   if (scope_type !== "global" && scope_type !== "company") {
@@ -120,6 +123,16 @@ export async function POST(request: NextRequest) {
   if (rawTitle !== undefined && typeof rawTitle !== "string") {
     return Response.json(
       { error: { code: "validation_error" as const, message: "title must be a string" } },
+      { status: 400 },
+    );
+  }
+
+  if (
+    source_filing_event_id !== undefined &&
+    (typeof source_filing_event_id !== "string" || !isUuid(source_filing_event_id))
+  ) {
+    return Response.json(
+      { error: { code: "validation_error" as const, message: "source_filing_event_id must be a UUID" } },
       { status: 400 },
     );
   }
@@ -138,18 +151,51 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const normalizedTickers = Array.from(
+  let normalizedTickers = Array.from(
     new Set(
       normalizeStringList(default_tickers).map((ticker) => ticker.toUpperCase()),
     ),
   );
   const normalizedDocumentTypes = normalizeStringList(default_document_types);
   const normalizedTitle = rawTitle?.trim();
+
+  let sourceFilingEventId: string | null = null;
+  if (typeof source_filing_event_id === "string") {
+    const { data: filing, error: filingError } = await getSupabaseAdmin()
+      .from("sec_filing_events")
+      .select("*")
+      .eq("id", source_filing_event_id)
+      .maybeSingle<SecFilingEventRow>();
+    if (filingError || !filing) {
+      return Response.json(
+        { error: { code: "not_found" as const, message: "연결할 공시를 찾지 못했습니다." } },
+        { status: 404 },
+      );
+    }
+    const access = await resolveFilingAccess({ userId: user.id, filing });
+    if (!access) {
+      return Response.json(
+        { error: { code: "forbidden" as const, message: "이 공시를 리서치에 연결할 권한이 없습니다." } },
+        { status: 403 },
+      );
+    }
+    if (normalizedTickers.length > 0 && !normalizedTickers.includes(filing.ticker)) {
+      return Response.json(
+        { error: { code: "validation_error" as const, message: "공시의 회사와 채팅 회사가 일치하지 않습니다." } },
+        { status: 400 },
+      );
+    }
+    normalizedTickers = [filing.ticker];
+    sourceFilingEventId = filing.id;
+  }
   const body: CreateSessionRequest = {
-    scope_type,
+    // A filing card always opens a single-company research context, even if a
+    // caller forged a global scope in the browser request.
+    scope_type: sourceFilingEventId ? "company" : scope_type,
     ...(normalizedTitle ? { title: normalizedTitle } : {}),
     default_tickers: normalizedTickers,
     default_document_types: normalizedDocumentTypes,
+    ...(sourceFilingEventId ? { source_filing_event_id: sourceFilingEventId } : {}),
   };
 
   if (
@@ -233,6 +279,7 @@ export async function POST(request: NextRequest) {
       scope_type: body.scope_type,
       default_tickers: body.default_tickers ?? [],
       default_document_types: body.default_document_types ?? [],
+      source_filing_event_id: sourceFilingEventId,
     })
     .select(
       "id, user_id, title, scope_type, default_tickers, default_document_types, deleted_at, created_at, updated_at",
@@ -244,4 +291,8 @@ export async function POST(request: NextRequest) {
   }
 
   return Response.json({ session }, { status: 201 });
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }

@@ -180,13 +180,15 @@ describe("production deploy scripts", () => {
     expect(deployAll).toContain("deploy-plugin-worker-production.sh");
     expect(deployAll).toContain("deploy-data-release-production.sh");
     expect(deployAll).toContain("Mac worker/plugin validation");
+    expect(deployAll).toContain("Deferring Mac runtime restart until the final plugin/worker deployment step.");
+    expect(deployAll).toContain("plugin while the MCP/runtime fingerprints have already changed");
     expect(deployAll.indexOf("Applying Supabase migrations")).toBeLessThan(
       deployAll.indexOf("deploy-web-production.sh"),
     );
     expect(deployAll.indexOf("npm run supabase:schema:smoke")).toBeLessThan(
       deployAll.indexOf("deploy-web-production.sh"),
     );
-    expect(deployWeb).toContain("redis document-worker document-outbox-dispatcher billing-worker");
+    expect(deployWeb).toContain("redis document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker billing-worker");
     expect(compose).toContain('profiles: ["legacy-gcp-agent"]');
     expect(compose).not.toContain(
       "- DESKTOP_ONTOLOGY_EXECUTOR=mcp",
@@ -350,14 +352,26 @@ describe("production deploy scripts", () => {
     expect(script).toContain("document-worker did not become healthy");
     expect(script).toContain("ps -q document-outbox-dispatcher");
     expect(script).toContain("document-outbox-dispatcher did not become healthy");
+    expect(script).toContain("ps -q filings-mcp");
+    expect(script).toContain("filings-mcp did not become healthy");
+    expect(script).toContain("ps -q filing-notification-worker");
+    expect(script).toContain("filing-notification-worker did not become healthy");
+    expect(script).toContain("ps -q filing-brief-worker");
+    expect(script).toContain("filing-brief-worker did not become healthy");
     expect(script).toContain("document-worker must run BullMQ backend in production");
     expect(script).toContain("document-outbox-dispatcher missing Redis queue URL");
     expect(script).toContain("exec -T agent-worker node");
     expect(script).toContain("exec -T document-worker node");
     expect(script).toContain("exec -T document-outbox-dispatcher node");
+    expect(script).toContain("exec -T filings-mcp node");
+    expect(script).toContain("exec -T filing-notification-worker node");
+    expect(script).toContain("exec -T filing-brief-worker node");
     expect(script).toContain(".worker/agent-worker.mjs");
     expect(script).toContain(".worker/document-worker.mjs");
     expect(script).toContain(".worker/document-outbox-dispatcher.mjs");
+    expect(script).toContain(".worker/filings-mcp-server.mjs");
+    expect(script).toContain(".worker/filing-notification-worker.mjs");
+    expect(script).toContain(".worker/filing-brief-worker.mjs");
     expect(script).toContain("KRW_ONTOLOGY_PLUGIN_PATH");
     expect(script).toContain("OK web ontology data boundary: Supabase catalog only");
     expect(script).toContain('"KRW_ONTOLOGY_MCP_URL"');

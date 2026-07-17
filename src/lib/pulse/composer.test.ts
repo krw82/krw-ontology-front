@@ -1,0 +1,13 @@
+import { describe, expect, it } from "vitest";
+import { createUnavailablePulseFeed } from "@/lib/pulse/composer";
+
+describe("createUnavailablePulseFeed", () => {
+  it("returns a renderable, truthful empty shell when a server-side source is unavailable", () => {
+    const feed = createUnavailablePulseFeed(new Date("2026-07-17T00:00:00.000Z"));
+
+    expect(feed.items).toEqual([]);
+    expect(feed.active_analysis_items).toEqual([]);
+    expect(feed.has_more).toBe(false);
+    expect(feed.source_statuses.every((source) => source.status === "degraded")).toBe(true);
+  });
+});

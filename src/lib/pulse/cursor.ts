@@ -11,18 +11,26 @@ export interface PulseCursorV2 {
   version: 2;
   snapshot_at: string;
   filter: "all";
+  boundary: Omit<PulseSortKey, "rank_score">;
+}
+
+export interface PulseCursorV3 {
+  version: 3;
+  snapshot_at: string;
+  filter: "all";
+  ranking_version: "rule_v1";
   boundary: PulseSortKey;
 }
 
-export type PulseCursorPayload = PulseCursorV1 | PulseCursorV2;
+export type PulseCursorPayload = PulseCursorV1 | PulseCursorV2 | PulseCursorV3;
 
-export function encodePulseCursor(payload: PulseCursorV2): string {
+export function encodePulseCursor(payload: PulseCursorV3): string {
   return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
 }
 
 /**
  * Temporary one-release compatibility encoder for the legacy Pulse surface.
- * New v2 callers must always use `encodePulseCursor` above.
+ * New v3 callers must always use `encodePulseCursor` above.
  */
 export function encodeLegacyPulseCursor(payload: PulseCursorV1): string {
   return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
@@ -39,6 +47,7 @@ export function decodePulseCursor(
     ) as Record<string, unknown>;
     if (isPulseCursorV1(parsed)) return parsed as PulseCursorV1;
     if (isEncodedPulseCursorV2(parsed)) return parsed as PulseCursorV2;
+    if (isEncodedPulseCursorV3(parsed)) return parsed as PulseCursorV3;
     return null;
   } catch {
     return null;
@@ -49,6 +58,12 @@ export function isPulseCursorV2(
   value: PulseCursorPayload | null,
 ): value is PulseCursorV2 {
   return value?.version === 2;
+}
+
+export function isPulseCursorV3(
+  value: PulseCursorPayload | null,
+): value is PulseCursorV3 {
+  return value?.version === 3;
 }
 
 function isPulseCursorV1(
@@ -83,6 +98,30 @@ function isEncodedPulseCursorV2(
     typeof boundary.item_key === "string" &&
     boundary.item_key.length > 0 &&
     boundary.item_key.length <= 300
+  );
+}
+
+function isEncodedPulseCursorV3(
+  value: Record<string, unknown>,
+): value is Record<string, unknown> & PulseCursorV3 {
+  if (
+    value.version !== 3
+    || value.filter !== "all"
+    || value.ranking_version !== "rule_v1"
+    || !isIsoDate(value.snapshot_at)
+    || !isRecord(value.boundary)
+  ) return false;
+  const boundary = value.boundary;
+  return (
+    Number.isInteger(boundary.lane)
+    && Number.isInteger(boundary.rank_score)
+    && Number.isInteger(boundary.priority_rank)
+    && Number.isInteger(boundary.holding_rank)
+    && Number.isInteger(boundary.saved_rank)
+    && isIsoDate(boundary.occurred_at)
+    && typeof boundary.item_key === "string"
+    && boundary.item_key.length > 0
+    && boundary.item_key.length <= 300
   );
 }
 

@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   applyPulseItemStates,
+  getPulseItemStates,
   hasRecentKindImpression,
 } from "@/lib/pulse/item-state";
 import type { PulseCandidate } from "@/lib/pulse/contract";
-import type { UserPulseItemStateRow } from "@/types/database";
+import type { Database, UserPulseItemStateRow } from "@/types/database";
 
 const now = new Date("2026-07-15T12:00:00.000Z");
 
@@ -61,6 +63,34 @@ function state(overrides: Partial<UserPulseItemStateRow> = {}): UserPulseItemSta
 }
 
 describe("Pulse item state", () => {
+  it("bounds PostgREST state lookups to one hundred deduplicated item keys", async () => {
+    const queriedChunks: string[][] = [];
+    const supabase = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            in: vi.fn(async (_column: string, itemKeys: string[]) => {
+              queriedChunks.push(itemKeys);
+              return {
+                data: itemKeys.map((itemKey) => ({ item_key: itemKey })),
+                error: null,
+              };
+            }),
+          })),
+        })),
+      })),
+    } as unknown as SupabaseClient<Database>;
+
+    const keys = Array.from({ length: 205 }, (_, index) => `filing:${index}`);
+    keys.push("filing:0");
+    const states = await getPulseItemStates(supabase, "user-1", keys);
+
+    expect(queriedChunks).toHaveLength(3);
+    expect(queriedChunks.map((chunk) => chunk.length)).toEqual([100, 100, 5]);
+    expect(new Set(queriedChunks.flat())).toHaveLength(205);
+    expect(states).toHaveLength(205);
+  });
+
   it("filters hidden candidates before rotation while retaining a fallback candidate", () => {
     const first = candidate("resurface", "first");
     const second = candidate("resurface", "second");

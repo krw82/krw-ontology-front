@@ -12,6 +12,7 @@ const URGENT_FRESH_MS = 72 * HOUR_MS;
 const FILING_FRESH_MS = 7 * DAY_MS;
 const DIGEST_FRESH_MS = 3 * DAY_MS;
 const TERMINAL_ANALYSIS_FRESH_MS = 7 * DAY_MS;
+const DISCOVERY_WINDOW_SIZE = 10;
 
 /**
  * Lane order is intentionally categorical rather than a weighted score. A
@@ -45,6 +46,7 @@ export function toRankedCandidate(
     state,
     actionable,
     lane,
+    rank_score: getRankScore(candidate, phase, actionable, reviewedAt, now),
     priority_rank: PULSE_PRIORITY_RANK[candidate.priority],
     holding_rank: candidate.is_holding ? 0 : 1,
     saved_rank: candidate.is_pinned || candidate.saved_at ? 0 : 1,
@@ -104,6 +106,7 @@ export function comparePulseSortKeys(
   right: PulseSortKey,
 ): number {
   if (left.lane !== right.lane) return left.lane - right.lane;
+  if (left.rank_score !== right.rank_score) return right.rank_score - left.rank_score;
   if (left.priority_rank !== right.priority_rank) return left.priority_rank - right.priority_rank;
   if (left.holding_rank !== right.holding_rank) return left.holding_rank - right.holding_rank;
   if (left.saved_rank !== right.saved_rank) return left.saved_rank - right.saved_rank;
@@ -115,13 +118,14 @@ export function comparePulseSortKeys(
 export function sortKeyOf(candidate: PulseRankedCandidate): PulseSortKey {
   const {
     lane,
+    rank_score,
     priority_rank,
     holding_rank,
     saved_rank,
     occurred_at,
     item_key,
   } = candidate;
-  return { lane, priority_rank, holding_rank, saved_rank, occurred_at, item_key };
+  return { lane, rank_score, priority_rank, holding_rank, saved_rank, occurred_at, item_key };
 }
 
 /**
@@ -161,12 +165,42 @@ export function reorderFirstPageWindow(
     if (candidate.kind === "learning") learningCount += 1;
   }
 
-  return [...protectedWindow, ...deferred];
+  return reserveDiscoverySlot([...protectedWindow, ...deferred]);
 }
 
 // Compatibility export retained for tests and any temporary callers. New code
 // must only call it with a bounded first-page window.
 export const enforceFirstPageDiversity = reorderFirstPageWindow;
+
+/**
+ * One catalog-discovery item earns a late first-screen slot when the bounded
+ * candidate RPC supplied one. It never moves ahead of an urgent filing, so the
+ * feed remains an inbox before it becomes a discovery surface.
+ */
+function reserveDiscoverySlot(
+  candidates: PulseRankedCandidate[],
+): PulseRankedCandidate[] {
+  if (candidates.slice(0, DISCOVERY_WINDOW_SIZE).some(isDiscoveryCandidate)) return candidates;
+  const discoveryIndex = candidates.findIndex(isDiscoveryCandidate);
+  if (discoveryIndex < DISCOVERY_WINDOW_SIZE) return candidates;
+
+  const destination = candidates
+    .slice(0, DISCOVERY_WINDOW_SIZE)
+    .map((candidate, index) => ({ candidate, index }))
+    .filter(({ candidate }) => candidate.priority !== "urgent")
+    .at(-1)?.index;
+  if (destination === undefined) return candidates;
+
+  const next = [...candidates];
+  const [discovery] = next.splice(discoveryIndex, 1);
+  if (!discovery) return candidates;
+  next.splice(destination, 0, discovery);
+  return next;
+}
+
+function isDiscoveryCandidate(candidate: PulseRankedCandidate): boolean {
+  return candidate.kind === "filing" && candidate.metadata.candidate_bucket === "discovery";
+}
 
 function isAvailable(candidate: PulseCandidate, now: Date): boolean {
   const available = Date.parse(candidate.available_at);
@@ -177,4 +211,39 @@ function isAvailable(candidate: PulseCandidate, now: Date): boolean {
 
 function isDigestFiling(candidate: PulseCandidate): boolean {
   return candidate.kind === "filing" && String(candidate.metadata.alert_priority ?? "") === "digest";
+}
+
+function getRankScore(
+  candidate: PulseCandidate,
+  phase: PulseAnalysisPhase | null,
+  actionable: boolean,
+  reviewedAt: string | null,
+  now: Date,
+): number {
+  if (reviewedAt) return 0;
+
+  const materiality = candidate.priority === "urgent"
+    ? 35
+    : candidate.priority === "high" ? 25 : candidate.priority === "normal" ? 15 : 8;
+  const userRelevance = Math.min(
+    30,
+    (candidate.is_holding ? 18 : 0)
+      + (candidate.is_watchlisted ? 10 : 0)
+      + (candidate.has_recent_research ? 8 : 0)
+      + (candidate.saved_at || candidate.is_pinned ? 5 : 0),
+  );
+  const actionValue = actionable ? 10 : phase === "active" ? 6 : 0;
+
+  return materiality + userRelevance + actionValue + freshnessScore(candidate.occurred_at, now);
+}
+
+function freshnessScore(occurredAt: string, now: Date): number {
+  const parsed = Date.parse(occurredAt);
+  if (Number.isNaN(parsed)) return 0;
+  const ageHours = Math.max(0, now.getTime() - parsed) / HOUR_MS;
+  if (ageHours <= 6) return 20;
+  if (ageHours <= 24) return 16;
+  if (ageHours <= 72) return 10;
+  if (ageHours <= 7 * 24) return 4;
+  return 0;
 }

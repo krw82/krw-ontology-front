@@ -24,6 +24,7 @@ export interface PromptContext {
   scopeType: "global" | "company";
   defaultTickers: string[];
   defaultDocumentTypes: string[];
+  sourceFilingEventId?: string | null;
   companies?: CompanyPromptContext[];
 }
 
@@ -37,6 +38,7 @@ export interface PromptRuntimeFeatures {
   chartGenerationEnabled?: boolean;
   guruAdvisorMode?: boolean;
   guruAgentGeneratedBriefEnabled?: boolean;
+  filingSourceActive?: boolean;
   responseLocale?: Locale;
 }
 
@@ -134,6 +136,13 @@ function buildWorkflowPolicy(features: PromptRuntimeFeatures): string {
     "Use configured read-only KRW Ontology tools for filing evidence retrieval and, when explicitly enabled, the configured read-only current-news MCP tools for current context.",
     "For the first filing-research call, author a complete SearchPlan v2 and call krw_ontology_query_context with only {search_plan}; never send legacy question, ticker, tickers, limit, or response-detail arguments directly to query_context.",
     "Keep qualitative relations and exact metrics in separate, independently verifiable clauses. Use the returned ResearchState v2 coverage, calculation coverage, missing parts, and recommended actions to decide whether targeted continuation is useful.",
+    ...(features.filingSourceActive
+      ? [
+          "This chat was opened from one SEC filing card. Treat that filing as the active source context and do not substitute a different filing.",
+          "For an 8-K or 6-K question about the source filing, first retrieve its metadata, list its deterministic document sections, then read only the relevant section(s). For a Form 4 source, retrieve the structured insider transactions instead. The runtime locks every filing request to the source card.",
+          "Use the returned SEC EDGAR link and exact section content as the source for filing-specific claims. If the relevant content is unavailable, say that the filing itself could not be directly confirmed; do not fill the gap from memory or a different filing.",
+        ]
+      : []),
   ].join("\n");
 }
 
@@ -272,11 +281,14 @@ function buildRuntimeContext(
           )
           .join("\n")}`
       : "";
+  const sourceFilingContext = context.sourceFilingEventId
+    ? "\nThis chat was opened from a verified SEC filing card. Its event identity is runtime-owned; use the filing-specific tools when that filing is relevant."
+    : "";
   const historyContext = buildHistoryContext(history);
 
   return `<web_runtime_context>
 ${scopeContext}${docTypeContext}
-${companyCatalogContext}${historyContext}
+${companyCatalogContext}${sourceFilingContext}${historyContext}
 </web_runtime_context>`;
 }
 

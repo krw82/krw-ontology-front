@@ -288,6 +288,7 @@ export function executeRun(params: RunAgentParams): Response {
             scopeType: session.scopeType,
             defaultTickers: session.defaultTickers,
             defaultDocumentTypes: session.defaultDocumentTypes,
+            sourceFilingEventId: session.sourceFilingEventId,
             researchMode: params.researchMode,
             responseLocale: params.responseLocale,
             history: history.history,

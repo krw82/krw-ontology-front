@@ -126,20 +126,36 @@ function canonicalAction(action: PulseStateMutationAction): PulseStateMutationAc
 async function mutateSourceIfRequired(context: MutationContext): Promise<boolean> {
   const supabase = getSupabaseAdmin();
   if (context.sourceType === "filing") {
-    const ids = context.sourceId.split(",").filter(Boolean);
-    const { data, error } = await supabase
+    const { data: event, error: eventError } = await supabase
+      .from("sec_filing_events")
+      .select("id")
+      .eq("id", context.sourceId)
+      .eq("feed_eligible", true)
+      .eq("processing_status", "ready")
+      .maybeSingle();
+    if (eventError) throw eventError;
+    if (event) {
+      await syncLegacyFilingNotificationState(context);
+      return true;
+    }
+
+    // One release of compatibility for item ids emitted by the notification
+    // based feed. New catalog-wide filing cards use the durable event UUID
+    // above and never require a user-owned notification row to exist.
+    const notificationIds = context.sourceId.split(",").filter(Boolean);
+    const { data: notifications, error: notificationError } = await supabase
       .from("user_filing_notifications")
       .select("id")
       .eq("user_id", context.userId)
-      .in("id", ids);
-    if (error) throw error;
-    if (data.length !== ids.length) return false;
+      .in("id", notificationIds);
+    if (notificationError) throw notificationError;
+    if (notifications.length !== notificationIds.length) return false;
     if (context.action === "review" || context.action === "unreview") {
       const { error: updateError } = await supabase
         .from("user_filing_notifications")
         .update({ read_at: context.action === "review" ? context.now : null })
         .eq("user_id", context.userId)
-        .in("id", ids);
+        .in("id", notificationIds);
       if (updateError) throw updateError;
     }
     if (context.action === "snooze") {
@@ -147,7 +163,7 @@ async function mutateSourceIfRequired(context: MutationContext): Promise<boolean
         .from("user_filing_notifications")
         .update({ snoozed_until: context.snoozedUntil })
         .eq("user_id", context.userId)
-        .in("id", ids);
+        .in("id", notificationIds);
       if (updateError) throw updateError;
     }
     return true;
@@ -192,6 +208,19 @@ async function mutateSourceIfRequired(context: MutationContext): Promise<boolean
   if (context.sourceType === "learning") return PULSE_LEARNING_ENTRIES.some((entry) => entry.slug === context.sourceId);
   if (context.sourceType === "checkup") return /^\d{4}-\d{2}-\d{2}$/.test(context.sourceId);
   return false;
+}
+
+async function syncLegacyFilingNotificationState(context: MutationContext): Promise<void> {
+  if (context.action !== "review" && context.action !== "unreview" && context.action !== "snooze") return;
+  const fields = context.action === "snooze"
+    ? { snoozed_until: context.snoozedUntil }
+    : { read_at: context.action === "review" ? context.now : null };
+  const { error } = await getSupabaseAdmin()
+    .from("user_filing_notifications")
+    .update(fields)
+    .eq("user_id", context.userId)
+    .eq("filing_event_id", context.sourceId);
+  if (error) throw error;
 }
 
 async function analysisBelongsToUser(sourceId: string, userId: string): Promise<boolean> {

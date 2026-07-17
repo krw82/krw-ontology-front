@@ -86,7 +86,7 @@ export default function FilingInbox() {
 
   if (loading) return <p className="text-sm text-muted">공시 알림을 불러오는 중…</p>;
   if (error) return <p className="rounded-[8px] bg-surface-soft p-md text-sm text-muted">{error}</p>;
-  if (!notifications.length && !recentFilings.length) return <p className="rounded-[8px] border border-dashed border-hairline p-lg text-sm leading-6 text-muted">아직 공시를 추적 중인 기업이 없습니다. 회사 페이지에서 새 8-K·6-K 공시 알림을 켜면 최근 공시와 다음 알림이 여기에 표시됩니다.</p>;
+  if (!notifications.length && !recentFilings.length) return <p className="rounded-[8px] border border-dashed border-hairline p-lg text-sm leading-6 text-muted">아직 공시를 추적 중인 기업이 없습니다. 회사 페이지에서 새 8-K·6-K·Form 4 공시 알림을 켜면 최근 공시와 다음 알림이 여기에 표시됩니다.</p>;
 
   return <div className="space-y-xl">
     <section>

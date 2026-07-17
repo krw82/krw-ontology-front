@@ -3,9 +3,7 @@ import { z } from "zod";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
 import { canAccessMenuFeature } from "@/lib/billing/feature-access-server";
 import { composePulseFeed } from "@/lib/pulse/composer";
-import { decodePulseCursor, isPulseCursorV2 } from "@/lib/pulse/cursor";
-import { isPulseFeedEnabled, isPulseP0V2Enabled } from "@/lib/pulse/enabled";
-import { composeLegacyPulseFeed } from "@/lib/pulse/legacy-composer";
+import { decodePulseCursor, isPulseCursorV3 } from "@/lib/pulse/cursor";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -29,13 +27,6 @@ const querySchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  if (!isPulseFeedEnabled()) {
-    return Response.json(
-      { error: { code: "not_found", message: "Pulse feed is not enabled" } },
-      { status: 404 },
-    );
-  }
-  const p0V2Enabled = isPulseP0V2Enabled();
   let user;
   try {
     user = await getAuthUser();
@@ -58,7 +49,7 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     );
   }
-  if (p0V2Enabled && parsed.data.filter !== "all") {
+  if (parsed.data.filter !== "all") {
     return Response.json(
       {
         error: {
@@ -83,25 +74,13 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     );
   }
-  if (p0V2Enabled && decodedCursor && !isPulseCursorV2(decodedCursor)) {
+  if (decodedCursor && !isPulseCursorV3(decodedCursor)) {
     return Response.json(
       {
         error: {
           code: "cursor_version_expired",
           message:
-            "피드 목록이 업데이트되었습니다. 처음부터 다시 불러와주세요.",
-        },
-      },
-      { status: 409 },
-    );
-  }
-  if (!p0V2Enabled && decodedCursor && isPulseCursorV2(decodedCursor)) {
-    return Response.json(
-      {
-        error: {
-          code: "cursor_version_expired",
-          message:
-            "피드 목록이 업데이트되었습니다. 처음부터 다시 불러와주세요.",
+            "피드 순서가 업데이트되었습니다. 처음부터 다시 불러와주세요.",
         },
       },
       { status: 409 },
@@ -131,9 +110,7 @@ export async function GET(request: NextRequest) {
       includeNotebookSources,
       ...parsed.data,
     };
-    const response = p0V2Enabled
-      ? await composePulseFeed(options)
-      : await composeLegacyPulseFeed(options);
+    const response = await composePulseFeed(options);
     return Response.json(response, {
       headers: { "Cache-Control": "private, no-store, max-age=0" },
     });

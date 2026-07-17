@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>피드 진행 중 상태 개선</title>
+    <style>
+      :root { color-scheme: light; font-family: Inter, Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #111318; background: #f7f8fb; }
+      body { margin: 0; line-height: 1.65; }
+      main { max-width: 900px; margin: 0 auto; padding: 48px 24px 80px; }
+      h1 { margin: 0 0 8px; font-size: 32px; letter-spacing: -0.04em; }
+      h2 { margin: 48px 0 14px; font-size: 21px; letter-spacing: -0.02em; }
+      h3 { margin: 30px 0 8px; font-size: 17px; }
+      p { margin: 8px 0; color: #3d4350; }
+      .lede { font-size: 18px; color: #616a78; }
+      .callout { margin-top: 28px; padding: 20px 22px; border: 1px solid #bfd0ff; border-radius: 16px; background: #edf3ff; color: #17376f; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+      figure { margin: 0; border: 1px solid #dde1e8; border-radius: 14px; overflow: hidden; background: white; }
+      img { display: block; width: 100%; height: auto; }
+      figcaption { padding: 10px 12px; color: #697283; font-size: 13px; }
+      .wireframe { margin-top: 14px; border-radius: 14px; border: 1px solid #d8dce4; background: #fff; padding: 18px; color: #1b1e26; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.5; overflow-x: auto; white-space: pre; }
+      .card { border-left: 4px solid #5146e5; border-radius: 12px; background: white; padding: 18px 20px; box-shadow: 0 6px 20px rgba(20, 28, 44, 0.05); }
+      .status { display: inline-flex; gap: 8px; align-items: center; color: #4338ca; font-size: 13px; font-weight: 750; }
+      .dot { display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: #5b50ed; box-shadow: 0 0 0 4px #ecebff; }
+      ul { padding-left: 21px; color: #3d4350; }
+      a { color: #2556c9; }
+      table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #dde1e8; border-radius: 12px; overflow: hidden; }
+      th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e8eaf0; vertical-align: top; }
+      th { background: #f5f6f9; font-size: 13px; }
+      tr:last-child td { border-bottom: 0; }
+      @media (max-width: 700px) { main { padding: 28px 16px 56px; } .grid { grid-template-columns: 1fr; } h1 { font-size: 27px; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>피드의 “분석 진행 중” 상태 분리</h1>
+      <p class="lede">대상 화면: KRW.O 피드 상단 요약과 분석 카드</p>
+
+      <section class="callout">
+        <strong>권장 결론:</strong> 상단의 <em>“결과 19 · 분석 진행 1”</em>과
+        <em>“결과 이어보기”</em> CTA는 제거하고, 진행 중인 질문을 피드 안에서 독립된
+        상태 카드로 보여준다. <strong>티커는 고정</strong>하고 바로 옆의 상태 점과 짧은
+        인디케이터만 움직인다. 현재 작업의 완료율을 신뢰성 있게 알 수 없으므로 퍼센트나
+        가짜 단계 바는 사용하지 않는다.
+      </section>
+
+      <h2>현재 상태</h2>
+      <div class="grid">
+        <figure>
+          <img src="references/current.png" alt="현재 피드 화면" />
+          <figcaption>현재 화면 — 완료 결과 수와 진행 중인 분석이 한 줄에 섞여 있다.</figcaption>
+        </figure>
+        <figure>
+          <img src="references/linear-project-status.png" alt="Linear 상태 레퍼런스" />
+          <figcaption>Linear — 객체 옆의 짧은 상태 라벨로 라이프사이클을 구분한다. [Web]</figcaption>
+        </figure>
+      </div>
+
+      <h2>개선안</h2>
+      <h3>1. 진행 중 질문을 첫 번째 독립 카드로 배치 ⭐</h3>
+      <p>
+        진행 중인 분석이 하나라도 있으면 완료 카드보다 먼저, 단 하나의 “진행 중” 카드로
+        노출한다. 상단 요약 바는 없애고, 완료된 결과는 아래의 일반 피드 카드로만 남긴다.
+        사용자는 “지금 내 분석이 살아 있다”는 사실과 다시 들어갈 위치를 한 번에 알 수 있다.
+      </p>
+      <div class="card">
+        <span class="status"><span class="dot"></span>분석 진행 중</span>
+        <p><strong style="color:#2456d6">AAPL</strong> · 근거 확인 및 답변 정리 중</p>
+        <p style="margin-bottom:0;color:#181b23;font-weight:700">아이폰·서비스 매출 비중과 현금창출력의 연결을 비교해줘</p>
+      </div>
+      <div class="wireframe">┌──────────────────────────────────────────────────────┐
+│  ●  분석 진행 중                                      │
+│     AAPL · 근거 확인 및 답변 정리 중                  │
+│     아이폰·서비스 매출 비중과 현금창출력의 연결…      │
+│                                      [대화로 돌아가기] │
+└──────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────┐
+│  내가 시작한 분석 · 완료 · 35분 전                    │
+│  AAPL · 애플의 … 비교해줘                             │
+│  분석이 완료되었습니다.                 [결과 이어보기]│
+└──────────────────────────────────────────────────────┘</div>
+
+      <h3>2. 티커가 아닌 상태 표시만 미세하게 움직이기</h3>
+      <p>
+        <code>AAPL</code> 글자나 질문 제목은 정적으로 둔다. 티커가 움직이면 시세 변화나
+        강조 링크처럼 읽힐 수 있다. 대신 티커 위/옆의 8px 상태 점 또는 48px 이하의
+        짧은 indeterminate 선을 1.6~2.0초 주기로 부드럽게 움직인다. 애니메이션을 끈
+        사용자는 고정 점으로 보이게 한다.
+      </p>
+      <div class="wireframe">상태 점:  8px 보라 점 + 4px 옅은 halo, opacity 0.65 → 1 → 0.65
+진행선:  48px track 안에서 16px segment가 좌→우 이동
+문구:    “분석 진행 중” + 실제로 관측 가능한 단계만 표시
+금지:    “72% 완료”, “거의 끝났어요”처럼 산출 근거 없는 진척도</div>
+      <p>
+        Apple과 Material은 완료 시간을 알 수 없는 작업에는 indeterminate indicator를,
+        알 수 있을 때만 determinate progress를 권장한다. Apple은 또한 모션이 멈추면
+        멈춘 작업처럼 보일 수 있으므로, 상태가 지속되는 동안 일관된 위치에서 움직임을
+        보여주라고 안내한다.
+      </p>
+
+      <h3>3. 카드 상태와 행동을 명확히 분리</h3>
+      <table>
+        <thead><tr><th>상태</th><th>표시</th><th>행동</th></tr></thead>
+        <tbody>
+          <tr><td>진행 중</td><td>보라 상태 점, “분석 진행 중”, 현재 단계</td><td>“대화로 돌아가기”만 노출</td></tr>
+          <tr><td>완료</td><td>중립 텍스트 “완료”, 완료 시각</td><td>“결과 이어보기”, 검토·저장·숨기기</td></tr>
+          <tr><td>실패/중단</td><td>정지된 경고 아이콘, 짧은 원인</td><td>“다시 시도” 또는 “대화 열기”</td></tr>
+        </tbody>
+      </table>
+
+      <h2>적용 규칙</h2>
+      <ul>
+        <li>진행 중 카드가 0개면 진행 영역 자체를 렌더링하지 않는다.</li>
+        <li>동시에 여러 개면 최대 2개만 보이고, 나머지는 “진행 중인 분석 n개”로 접는다.</li>
+        <li>“근거 수집 중 / 비교 중 / 답변 정리 중”은 백엔드 run 단계가 실제로 있을 때만 쓴다. 없으면 “분석 진행 중”만 쓴다.</li>
+        <li><code>prefers-reduced-motion: reduce</code>에서는 모션을 끄고 상태 점을 고정한다.</li>
+      </ul>
+
+      <h2>참고한 패턴</h2>
+      <div class="grid">
+        <figure>
+          <img src="references/apple-progress-indicators.png" alt="Apple Progress indicators" />
+          <figcaption><a href="https://developer.apple.com/design/human-interface-guidelines/progress-indicators">Apple HIG — Progress indicators</a> [Web]</figcaption>
+        </figure>
+        <figure>
+          <img src="references/linear-project-status.png" alt="Linear Project status" />
+          <figcaption><a href="https://linear.app/docs/project-status">Linear — Project status</a> [Web]</figcaption>
+        </figure>
+      </div>
+    </main>
+  </body>
+</html>

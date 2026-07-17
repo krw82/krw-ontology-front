@@ -9,7 +9,7 @@ export function buildPrivateFilingRss(params: { origin: string; events: Array<Se
     const published = event.accepted_at ?? `${event.filing_date}T00:00:00Z`;
     return `<item><guid isPermaLink="false">${escapeXml(event.id)}</guid><title>${escapeXml(title)}</title><link>${escapeXml(`${params.origin}/filings/${event.id}`)}</link><pubDate>${new Date(published).toUTCString()}</pubDate><description>${escapeXml(`SEC ${event.form_type} · ${event.filing_date}`)}</description></item>`;
   }).join("");
-  return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>KRW.O 내 관심기업 공시</title><link>${escapeXml(`${params.origin}/filings`)}</link><description>개인 관심기업의 최근 8-K·6-K 공시</description><lastBuildDate>${new Date(updated).toUTCString()}</lastBuildDate>${items}</channel></rss>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>KRW.O 내 관심기업 공시</title><link>${escapeXml(`${params.origin}/filings`)}</link><description>개인 관심기업의 최근 8-K·6-K·Form 4 공시</description><lastBuildDate>${new Date(updated).toUTCString()}</lastBuildDate>${items}</channel></rss>`;
 }
 
 export function buildExpectedFilingIcs(params: { origin: string; windows: Array<{ ticker: string; window: ExpectedFilingWindow }> }): string {

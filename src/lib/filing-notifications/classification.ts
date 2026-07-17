@@ -86,6 +86,7 @@ const TAG_LABELS: Record<string, string> = {
   shareholder_vote: "주주 의결",
   other_material_event: "기타 중요 사건",
   foreign_issuer_report: "해외발행인 수시공시",
+  insider_trade: "내부자 거래",
 };
 
 export function normalizeSecItems(value: string | null | undefined): string[] {
@@ -105,6 +106,16 @@ export function classifyFiling(params: {
   secItems: string[];
   primaryDocDescription?: string | null;
 }): FilingClassification {
+  if (params.formType.startsWith("4")) {
+    // The worker subsequently normalizes ownership XML. Header metadata must
+    // not be used to infer a trade value or investment conclusion.
+    return {
+      eventTags: ["insider_trade"],
+      primaryEventTag: "insider_trade",
+      source: "metadata",
+      metadataRulePhrases: [],
+    };
+  }
   if (params.formType.startsWith("8-K")) {
     const eventTags = Array.from(
       new Set(params.secItems.map((item) => ITEM_TAGS[item]).filter((tag): tag is string => Boolean(tag))),

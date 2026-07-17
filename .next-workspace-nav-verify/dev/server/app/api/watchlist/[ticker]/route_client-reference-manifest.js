@@ -1,0 +1,1 @@
+globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});globalThis.__RSC_MANIFEST["/api/watchlist/[ticker]/route"]={"moduleLoading":{"prefix":"/_next/"},"ssrModuleMapping":{},"edgeSSRModuleMapping":{},"clientModules":{},"entryCSSFiles":{"~/krw-ontology-front/src/app/api/watchlist/[ticker]/route":[]},"rscModuleMapping":{},"edgeRscModuleMapping":{}};

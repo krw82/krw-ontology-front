@@ -2,11 +2,15 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ActiveAnalysisPulseCard from "@/components/pulse/ActiveAnalysisPulseCard";
+import InsiderTradeStackCard from "@/components/pulse/InsiderTradeStackCard";
 import PulseCard from "@/components/pulse/PulseCard";
 import PulseSummaryBar from "@/components/pulse/PulseSummaryBar";
 import { trackClientEventSilently } from "@/lib/analytics/client";
+import { buildPulseFeedDisplayEntries } from "@/lib/pulse/insider-trade-stack";
 import type {
   PulseFeedResponse,
+  PulseFeedStatusResponse,
   PulseItem,
   PulseMutationAction,
 } from "@/types/api-contracts";
@@ -25,11 +29,23 @@ export default function PulseFeed({ initialFeed }: PulseFeedProps) {
   const [newItemCount, setNewItemCount] = useState(0);
   const [feedback, setFeedback] = useState<"helpful" | "not_helpful" | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [feedSessionId] = useState(createFeedSessionId);
+  const [activeAnalysisCount, setActiveAnalysisCount] = useState(initialFeed.summary.active_analysis_count);
   const generatedAtRef = useRef(initialFeed.generated_at);
   const requestInFlightRef = useRef(false);
-  const feedSessionIdRef = useRef(createFeedSessionId());
 
-  const hasActiveAnalysis = feed.summary.active_analysis_count > 0;
+  const hasActiveAnalysis = activeAnalysisCount > 0;
+  const activeAnalysisItems = feed.active_analysis_items;
+  const visibleActiveAnalysisItems = activeAnalysisItems.slice(0, 2);
+  const feedItems = feed.items;
+  const displayEntries = useMemo(
+    () => buildPulseFeedDisplayEntries(feedItems, feed.timezone),
+    [feedItems, feed.timezone],
+  );
+  const hiddenActiveAnalysisCount = Math.max(
+    0,
+    activeAnalysisCount - visibleActiveAnalysisItems.length,
+  );
   const degraded = useMemo(
     () => feed.source_statuses.filter((source) => source.status === "degraded"),
     [feed.source_statuses],
@@ -37,16 +53,19 @@ export default function PulseFeed({ initialFeed }: PulseFeedProps) {
 
   useEffect(() => {
     trackClientEventSilently("pulse_viewed", {
-      feed_session_id: feedSessionIdRef.current,
-      item_count: feed.items.length,
+      feed_session_id: feedSessionId,
+      item_count: feed.items.length + feed.active_analysis_items.length,
       actionable_count: feed.summary.actionable_count,
       active_analysis_count: feed.summary.active_analysis_count,
+      ranking_version: feed.ranking_version,
       degraded_sources: feed.source_statuses.filter((source) => source.status === "degraded").map((source) => source.source),
     });
     for (const source of feed.source_statuses.filter((item) => item.status === "degraded")) {
       trackClientEventSilently("pulse_source_degraded", { source: source.source });
     }
-  }, []); // Event describes the page view, not later polling updates.
+    // This event intentionally describes the initial page view only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchFirstPage = useCallback(async () => {
     if (requestInFlightRef.current) return null;
@@ -59,6 +78,7 @@ export default function PulseFeed({ initialFeed }: PulseFeedProps) {
       const next = await response.json() as PulseFeedResponse;
       generatedAtRef.current = next.generated_at;
       setFeed(next);
+      setActiveAnalysisCount(next.summary.active_analysis_count);
       setNewItemCount(0);
       return next;
     } catch {
@@ -103,6 +123,7 @@ export default function PulseFeed({ initialFeed }: PulseFeedProps) {
       }
 
       if (nextFeed) {
+        setActiveAnalysisCount(nextFeed.summary.active_analysis_count);
         setFeed((current) => ({
           ...nextFeed,
           items: [...current.items, ...additions],
@@ -119,16 +140,25 @@ export default function PulseFeed({ initialFeed }: PulseFeedProps) {
   useEffect(() => {
     const poll = async () => {
       if (document.visibilityState !== "visible" || requestInFlightRef.current) return;
-      const params = new URLSearchParams({ filter: "all", limit: "1", since: generatedAtRef.current });
-      const response = await fetch(`/api/pulse?${params}`, { cache: "no-store" }).catch(() => null);
+      const params = new URLSearchParams({ since: generatedAtRef.current });
+      const response = await fetch(`/api/pulse/status?${params}`, { cache: "no-store" }).catch(() => null);
       if (!response?.ok) return;
-      const next = await response.json() as PulseFeedResponse;
+      const next = await response.json() as PulseFeedStatusResponse;
       setNewItemCount(next.new_item_count);
+      setActiveAnalysisCount(next.active_analysis_count);
+      const activeSessionIds = new Set(next.active_analysis_session_ids);
+      setFeed((current) => ({
+        ...current,
+        active_analysis_items: current.active_analysis_items.filter((item) => {
+          const sessionId = typeof item.metadata.session_id === "string" ? item.metadata.session_id : null;
+          return !sessionId || activeSessionIds.has(sessionId);
+        }),
+      }));
     };
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") void poll();
     };
-    const interval = window.setInterval(() => void poll(), hasActiveAnalysis ? 15_000 : 60_000);
+    const interval = window.setInterval(() => void poll(), hasActiveAnalysis ? 30_000 : 120_000);
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       window.clearInterval(interval);
@@ -138,7 +168,7 @@ export default function PulseFeed({ initialFeed }: PulseFeedProps) {
 
   async function refreshNewItems() {
     trackClientEventSilently("pulse_new_items_seen", {
-      feed_session_id: feedSessionIdRef.current,
+      feed_session_id: feedSessionId,
       item_count: newItemCount,
     });
     const refreshed = await fetchFirstPage();
@@ -150,11 +180,13 @@ export default function PulseFeed({ initialFeed }: PulseFeedProps) {
   async function mutate(item: PulseItem, action: PulseMutationAction) {
     setPendingIds((current) => new Set(current).add(item.id));
     const previous = feed;
+    const previousActiveAnalysisCount = activeAnalysisCount;
     const timestamp = new Date().toISOString();
     if (action === "dismiss" || action === "snooze") {
       setFeed((current) => ({
         ...current,
         items: current.items.filter((candidate) => candidate.id !== item.id),
+        active_analysis_items: current.active_analysis_items.filter((candidate) => candidate.id !== item.id),
         summary: action === "dismiss" || item.actionable
           ? decrementSummary(current, item)
           : current.summary,
@@ -163,6 +195,14 @@ export default function PulseFeed({ initialFeed }: PulseFeedProps) {
       setFeed((current) => ({
         ...current,
         items: current.items.map((candidate) => candidate.id === item.id ? {
+          ...candidate,
+          reviewed_at: action === "review" ? timestamp : action === "unreview" ? null : candidate.reviewed_at,
+          read_at: action === "review" ? timestamp : action === "unreview" ? null : candidate.read_at,
+          state: action === "review" ? "reviewed" : action === "unreview" ? "seen" : candidate.state,
+          actionable: action === "review" ? false : action === "unreview" ? isItemActionable(candidate) : candidate.actionable,
+          saved_at: action === "save" ? timestamp : action === "unsave" ? null : candidate.saved_at,
+        } : candidate),
+        active_analysis_items: current.active_analysis_items.map((candidate) => candidate.id === item.id ? {
           ...candidate,
           reviewed_at: action === "review" ? timestamp : action === "unreview" ? null : candidate.reviewed_at,
           read_at: action === "review" ? timestamp : action === "unreview" ? null : candidate.read_at,
@@ -181,7 +221,10 @@ export default function PulseFeed({ initialFeed }: PulseFeedProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }).catch(() => null);
-    if (!response?.ok) setFeed(previous);
+    if (!response?.ok) {
+      setFeed(previous);
+      setActiveAnalysisCount(previousActiveAnalysisCount);
+    }
     setPendingIds((current) => {
       const next = new Set(current);
       next.delete(item.id);
@@ -200,7 +243,6 @@ export default function PulseFeed({ initialFeed }: PulseFeedProps) {
               <h1 className="mt-xs text-[32px] font-black leading-none tracking-[-0.05em] text-ink sm:text-[40px]">피드</h1>
               <p className="mt-sm text-[13px] font-semibold text-muted">
                 {feed.date_label} · {feed.summary.actionable_count > 0 ? `미검토 ${feed.summary.actionable_count}개` : "미검토 항목 없음"}
-                {feed.summary.active_analysis_count > 0 ? ` · 분석 진행 ${feed.summary.active_analysis_count}개` : ""}
               </p>
             </div>
             <Link href="/pulse/settings" className="inline-flex size-10 items-center justify-center rounded-[12px] border border-hairline bg-white text-muted shadow-sm hover:text-ink" aria-label="피드 설정">
@@ -220,8 +262,9 @@ export default function PulseFeed({ initialFeed }: PulseFeedProps) {
         </div>
 
         {degraded.length > 0 ? (
-          <div className="mb-base rounded-[12px] border border-[#f3d8a5] bg-[#fff8e9] px-base py-sm text-[12px] leading-5 text-[#76510e]" role="status">
-            일부 리서치 항목을 불러오지 못했습니다. 공시와 나머지 항목은 정상적으로 표시됩니다.
+          <div className="mb-base flex items-center justify-between gap-base rounded-[12px] border border-[#f3d8a5] bg-[#fff8e9] px-base py-sm text-[12px] leading-5 text-[#76510e]" role="status">
+            <span>일부 리서치 항목을 아직 불러오지 못했습니다. 현재 목록은 보존되며 다시 시도할 수 있습니다.</span>
+            <button type="button" onClick={() => void fetchFirstPage()} className="shrink-0 font-extrabold underline">다시 시도</button>
           </div>
         ) : null}
         {errorMessage ? (
@@ -233,12 +276,47 @@ export default function PulseFeed({ initialFeed }: PulseFeedProps) {
 
         <PulseSummaryBar summary={feed.summary} />
 
-        {feed.items.length > 0 ? (
+        {hasActiveAnalysis ? (
+          <section className="mb-xl" aria-label="진행 중인 분석">
+            <div className="mb-sm flex items-center justify-between gap-base">
+              <h2 className="text-[14px] font-black text-ink">진행 중인 분석</h2>
+              {visibleActiveAnalysisItems.length > 0 && hiddenActiveAnalysisCount > 0 ? (
+                <p className="text-[12px] font-semibold text-muted">
+                  추가 {hiddenActiveAnalysisCount}개 진행 중
+                </p>
+              ) : null}
+            </div>
+            {visibleActiveAnalysisItems.length > 0 ? (
+              <div className="space-y-base">
+                {visibleActiveAnalysisItems.map((item, index) => (
+                  <ActiveAnalysisPulseCard
+                    key={item.id}
+                    item={item}
+                    position={index + 1}
+                    feedSessionId={feedSessionId}
+                    rankingVersion={feed.ranking_version}
+                  />
+                ))}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void fetchFirstPage()}
+                className="flex w-full items-center justify-between gap-base rounded-[14px] border border-[#d9d7ff] bg-[#fbfbff] px-base py-base text-left text-[13px] font-extrabold text-[#4338ca]"
+              >
+                <span>진행 중인 분석 {activeAnalysisCount}개를 불러오기</span>
+                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">refresh</span>
+              </button>
+            )}
+          </section>
+        ) : null}
+
+        {displayEntries.length > 0 ? (
           <div className="relative space-y-base before:absolute before:bottom-8 before:left-[-13px] before:top-8 before:hidden before:w-px before:bg-hairline sm:before:block">
-            {feed.items.map((item, index) => {
-              const showReviewedDivider = item.state === "reviewed" && (index === 0 || feed.items[index - 1]?.state !== "reviewed");
+            {displayEntries.map((entry, index) => {
+              const showReviewedDivider = entry.state === "reviewed" && (index === 0 || displayEntries[index - 1]?.state !== "reviewed");
               return (
-                <div key={item.id}>
+                <div key={entry.id}>
                   {showReviewedDivider ? (
                     <div className="mb-base flex items-center gap-sm" role="separator" aria-label="이전에 검토한 항목">
                       <span className="h-px flex-1 bg-hairline" />
@@ -246,22 +324,32 @@ export default function PulseFeed({ initialFeed }: PulseFeedProps) {
                       <span className="h-px flex-1 bg-hairline" />
                     </div>
                   ) : null}
-                  <PulseCard item={item} position={index + 1} pending={pendingIds.has(item.id)} feedSessionId={feedSessionIdRef.current} onMutation={mutate} />
+                  {entry.type === "insider_trade_stack" ? (
+                    <InsiderTradeStackCard
+                      items={entry.items}
+                      pending={entry.items.some(({ item }) => pendingIds.has(item.id))}
+                      feedSessionId={feedSessionId}
+                      rankingVersion={feed.ranking_version}
+                      onMutation={mutate}
+                    />
+                  ) : (
+                    <PulseCard item={entry.item} position={entry.position} pending={pendingIds.has(entry.item.id)} feedSessionId={feedSessionId} rankingVersion={feed.ranking_version} onMutation={mutate} />
+                  )}
                 </div>
               );
             })}
           </div>
-        ) : (
+        ) : visibleActiveAnalysisItems.length === 0 ? (
           <div className="rounded-[18px] border border-dashed border-hairline bg-white px-xl py-3xl text-center">
             <span className="material-symbols-outlined text-[34px] text-muted" aria-hidden="true">done_all</span>
-            <h2 className="mt-sm text-lg font-black text-ink">지금 확인할 신호가 없습니다</h2>
-            <p className="mt-xs text-sm leading-6 text-muted">새 공시나 내가 시작한 분석 상태가 생기면 여기에 표시됩니다.</p>
+            <h2 className="mt-sm text-lg font-black text-ink">{degraded.length > 0 ? "신호를 준비하는 중입니다" : "지금 확인할 신호가 없습니다"}</h2>
+            <p className="mt-xs text-sm leading-6 text-muted">{degraded.length > 0 ? "잠시 후 다시 시도하면 최신 공시와 분석 상태를 불러옵니다." : "새 공시나 내가 시작한 분석 상태가 생기면 여기에 표시됩니다."}</p>
             <div className="mt-lg flex flex-wrap justify-center gap-sm">
               <Link href="/filings" className="rounded-[10px] bg-ink px-base py-sm text-[13px] font-extrabold text-white">공시 알림 기업 추가</Link>
               <Link href="/watchlist" className="rounded-[10px] px-base py-sm text-[13px] font-extrabold text-primary hover:bg-primary-fixed/60">리서치 노트북 열기</Link>
             </div>
           </div>
-        )}
+        ) : null}
 
         <div className="py-2xl text-center" aria-live="polite">
           {feed.has_more && feed.next_cursor ? (

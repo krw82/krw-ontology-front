@@ -6,6 +6,7 @@ import { createLlmJobToken } from "../../../src/lib/desktop/llm-token";
 import {
   createLlmGatewayServerFromContext,
   enforceJobRequest,
+  parseFilingBriefGatewayPayload,
   upstreamHeaders,
   type GatewayContext,
 } from "./server";
@@ -48,6 +49,37 @@ function job(overrides: Partial<DesktopLlmJobRow> = {}): DesktopLlmJobRow {
 }
 
 describe("LLM gateway request enforcement", () => {
+  it("accepts only a bounded, server-approved filing brief payload", () => {
+    const payload = parseFilingBriefGatewayPayload(
+      {
+        job_id: "71d9a791-dc4a-4a90-a8f8-2a0957920352",
+        claim_token: "a49cdc67-2383-47de-837b-a4cd06907d31",
+        model: "deepseek-v4-flash",
+        system_prompt: "Return JSON.",
+        user_prompt: "A bounded SEC source.",
+        max_tokens: 600,
+      },
+      "deepseek-v4-flash",
+    );
+
+    expect(payload).toMatchObject({
+      jobId: "71d9a791-dc4a-4a90-a8f8-2a0957920352",
+      model: "deepseek-v4-flash",
+      maxTokens: 600,
+    });
+    expect(() => parseFilingBriefGatewayPayload(
+      {
+        job_id: "71d9a791-dc4a-4a90-a8f8-2a0957920352",
+        claim_token: "a49cdc67-2383-47de-837b-a4cd06907d31",
+        model: "another-model",
+        system_prompt: "Return JSON.",
+        user_prompt: "source",
+        max_tokens: 600,
+      },
+      "deepseek-v4-flash",
+    )).toThrow("model is not allowed");
+  });
+
   it("forces the server-selected DeepSeek model and replaces provider metadata", () => {
     const result = enforceJobRequest(
       {

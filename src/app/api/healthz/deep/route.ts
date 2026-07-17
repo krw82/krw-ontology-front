@@ -80,27 +80,55 @@ function checkTrustedClientIpConfiguration(): CheckResult {
 }
 
 function filingDetectionExpected(): boolean {
-  const explicit = process.env.FILING_DETECTION_ENABLED;
-  return explicit == null || explicit === ""
-    ? process.env.FILING_NOTIFICATIONS_ENABLED === "1"
-    : explicit === "1";
+  return process.env.FILING_DETECTION_ENABLED !== "0";
+}
+
+function filingWorkerEnv(): "dev" | "staging" | "prod" {
+  const value = process.env.FILING_WORKER_ENV?.trim().toLowerCase();
+  return value === "dev" || value === "staging" || value === "prod" ? value : "prod";
 }
 
 async function checkFilingWorker(): Promise<CheckResult> {
   if (!filingDetectionExpected()) return { ok: true, enabled: false };
   try {
-    const { data, error } = await getSupabaseAdmin()
+    const admin = getSupabaseAdmin();
+    const [{ data, error }, { data: lease, error: leaseError }] = await Promise.all([
+      admin
       .from("filing_notification_worker_heartbeats")
       .select("worker_id, last_seen_at, last_success_at, last_error")
       .order("last_seen_at", { ascending: false })
       .limit(1)
-      .maybeSingle();
+      .maybeSingle(),
+      admin
+        .from("sec_filing_worker_leases")
+        .select("worker_id, deployment_id, heartbeat_at, lease_expires_at")
+        .eq("env", filingWorkerEnv())
+        .eq("lease_key", "sec_request_scheduler")
+        .maybeSingle(),
+    ]);
     if (error || !data) return { ok: false, enabled: true, error: error?.message ?? "No filing notification worker heartbeat" };
     const ageMs = Date.now() - Date.parse(data.last_seen_at);
     if (!Number.isFinite(ageMs) || ageMs > 75_000) {
       return { ok: false, enabled: true, error: "Filing notification worker heartbeat is stale", worker_id: data.worker_id, last_seen_at: data.last_seen_at };
     }
-    return { ok: true, enabled: true, worker_id: data.worker_id, last_seen_at: data.last_seen_at, last_success_at: data.last_success_at, last_error: data.last_error };
+    const leaseIsCurrent = !leaseError
+      && Boolean(lease)
+      && Date.parse(lease?.lease_expires_at ?? "") > Date.now();
+    return {
+      ok: true,
+      enabled: true,
+      worker_id: data.worker_id,
+      last_seen_at: data.last_seen_at,
+      last_success_at: data.last_success_at,
+      last_error: data.last_error,
+      scheduler_leader: leaseIsCurrent ? {
+        worker_id: lease?.worker_id,
+        deployment_id: lease?.deployment_id,
+        heartbeat_at: lease?.heartbeat_at,
+        lease_expires_at: lease?.lease_expires_at,
+      } : null,
+      scheduler_lease_error: leaseError?.message ?? null,
+    };
   } catch (err) {
     return { ok: false, enabled: true, error: err instanceof Error ? err.message : "Unknown filing worker health error" };
   }

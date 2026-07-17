@@ -4,9 +4,7 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   getAuthUser: vi.fn(),
   composePulseFeed: vi.fn(),
-  composeLegacyPulseFeed: vi.fn(),
   canAccessMenuFeature: vi.fn(),
-  p0V2Enabled: true,
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -16,13 +14,6 @@ vi.mock("@/lib/auth", () => ({
 }));
 vi.mock("@/lib/pulse/composer", () => ({
   composePulseFeed: mocks.composePulseFeed,
-}));
-vi.mock("@/lib/pulse/legacy-composer", () => ({
-  composeLegacyPulseFeed: mocks.composeLegacyPulseFeed,
-}));
-vi.mock("@/lib/pulse/enabled", () => ({
-  isPulseFeedEnabled: () => true,
-  isPulseP0V2Enabled: () => mocks.p0V2Enabled,
 }));
 vi.mock("@/lib/billing/feature-access-server", () => ({
   canAccessMenuFeature: mocks.canAccessMenuFeature,
@@ -34,6 +25,7 @@ import { GET } from "@/app/api/pulse/route";
 const feed = {
   generated_at: "2026-07-15T00:00:00.000Z",
   snapshot_at: "2026-07-15T00:00:00.000Z",
+  ranking_version: "rule_v1",
   timezone: "Asia/Seoul",
   date_label: "7월 15일 수요일",
   filter: "all",
@@ -43,6 +35,7 @@ const feed = {
     counts: { filing: 0, analysis: 0, question: 0, resurface: 0 },
     primary_action: null,
   },
+  active_analysis_items: [],
   items: [],
   next_cursor: null,
   has_more: false,
@@ -59,8 +52,6 @@ describe("GET /api/pulse", () => {
     });
     mocks.canAccessMenuFeature.mockResolvedValue(true);
     mocks.composePulseFeed.mockResolvedValue(feed);
-    mocks.composeLegacyPulseFeed.mockResolvedValue(feed);
-    mocks.p0V2Enabled = true;
   });
 
   it("requires authentication", async () => {
@@ -100,6 +91,25 @@ describe("GET /api/pulse", () => {
     ).toBe(409);
   });
 
+  it("asks an old v2 cursor to refresh before using the rule-ranked v3 stream", async () => {
+    const v2 = Buffer.from(
+      JSON.stringify({
+        version: 2,
+        filter: "all",
+        snapshot_at: "2026-07-15T00:00:00.000Z",
+        boundary: {
+          lane: 10,
+          priority_rank: 1,
+          holding_rank: 0,
+          saved_rank: 1,
+          occurred_at: "2026-07-15T00:00:00.000Z",
+          item_key: "filing:1",
+        },
+      }),
+    ).toString("base64url");
+    expect((await GET(new NextRequest(`http://localhost/api/pulse?cursor=${v2}`))).status).toBe(409);
+  });
+
   it("returns a private no-store response without starting any research run", async () => {
     const response = await GET(
       new NextRequest("http://localhost/api/pulse?filter=all&limit=20"),
@@ -125,28 +135,4 @@ describe("GET /api/pulse", () => {
     expect(mocks.composePulseFeed).not.toHaveBeenCalled();
   });
 
-  it("keeps the legacy Pulse composer available when the v2 flag is off", async () => {
-    mocks.p0V2Enabled = false;
-    const legacy = Buffer.from(
-      JSON.stringify({
-        version: 1,
-        offset: 20,
-        filter: "all",
-        generated_at: "2026-07-15T00:00:00.000Z",
-      }),
-    ).toString("base64url");
-
-    const response = await GET(
-      new NextRequest(`http://localhost/api/pulse?cursor=${legacy}`),
-    );
-
-    expect(response.status).toBe(200);
-    expect(mocks.composeLegacyPulseFeed).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: "user-1",
-        cursor: legacy,
-      }),
-    );
-    expect(mocks.composePulseFeed).not.toHaveBeenCalled();
-  });
 });

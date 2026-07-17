@@ -16,6 +16,8 @@ const updateSchema = z.object({
   enabled: z.boolean().optional(),
   notify_8k: z.boolean().optional(),
   notify_6k: z.boolean().optional(),
+  notify_form4: z.boolean().optional(),
+  insider_notification_mode: z.enum(["none", "reported_p_s", "all"]).optional(),
   include_amendments: z.boolean().optional(),
   delivery_mode: z.enum(["important_immediate", "all_immediate", "daily_digest"]).optional(),
   daily_digest_at: timeSchema.optional(),

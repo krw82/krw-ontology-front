@@ -367,16 +367,16 @@ if (!stockNewsEnabled) {
     throw new Error("Stock News MCP is disabled, but plugin .mcp.json still includes mcpServers.stock-news");
   }
   console.log("OK plugin Stock News MCP disabled");
-  process.exit(0);
+} else {
+  if (!stockNewsServer) throw new Error("Missing mcpServers.stock-news");
+  if (stockNewsServer.type !== "http") {
+    throw new Error(`Stock News MCP must use streamable HTTP MCP, got: ${stockNewsServer.type}`);
+  }
+  if (stockNewsServer.url !== expectedStockNewsUrl) {
+    throw new Error(`Plugin .mcp.json Stock News MCP URL mismatch: ${stockNewsServer.url} !== ${expectedStockNewsUrl}`);
+  }
+  console.log(`OK plugin Stock News MCP URL: ${stockNewsServer.url}`);
 }
-if (!stockNewsServer) throw new Error("Missing mcpServers.stock-news");
-if (stockNewsServer.type !== "http") {
-  throw new Error(`Stock News MCP must use streamable HTTP MCP, got: ${stockNewsServer.type}`);
-}
-if (stockNewsServer.url !== expectedStockNewsUrl) {
-  throw new Error(`Plugin .mcp.json Stock News MCP URL mismatch: ${stockNewsServer.url} !== ${expectedStockNewsUrl}`);
-}
-console.log(`OK plugin Stock News MCP URL: ${stockNewsServer.url}`);
 
 function isStockNewsEnabled() {
   if (truthyEnv(process.env.STOCK_NEWS_FORCE_DISABLED)) return false;
@@ -396,6 +396,49 @@ function falseyEnv(value) {
   if (!value) return false;
   return ["0", "false", "no", "off"].includes(value.trim().toLowerCase());
 }
+NODE
+
+echo "Checking on-demand filings MCP config..."
+node --input-type=module <<'NODE'
+import fs from "node:fs";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+
+const enabled = ["1", "true", "yes", "on"].includes((process.env.FILINGS_MCP_ENABLED || "").trim().toLowerCase());
+const config = JSON.parse(fs.readFileSync(`${process.env.KRW_ONTOLOGY_PLUGIN_PATH}/.mcp.json`, "utf8"));
+const server = config.mcpServers?.["krw-filings"];
+if (!enabled) {
+  if (server) throw new Error("On-demand filings MCP is disabled, but plugin .mcp.json still includes mcpServers.krw-filings");
+  console.log("OK plugin on-demand filings MCP disabled");
+  process.exit(0);
+}
+const token = process.env.KRW_FILINGS_MCP_TOKEN || process.env.FILINGS_MCP_AUTH_TOKEN;
+if (!token) throw new Error("FILINGS_MCP_ENABLED=1 but filings MCP auth token is missing");
+const expectedUrl = process.env.KRW_FILINGS_MCP_URL || `http://127.0.0.1:${process.env.FILINGS_MCP_PORT || "8785"}/mcp`;
+if (!server) throw new Error("Missing mcpServers.krw-filings");
+if (server.type !== "http" || server.url !== expectedUrl) {
+  throw new Error(`Plugin filings MCP URL mismatch: ${server.url} !== ${expectedUrl}`);
+}
+const headers = { Authorization: `Bearer ${token}`, accept: "application/json" };
+const readyUrl = new URL(expectedUrl);
+readyUrl.pathname = "/readyz";
+const timeout = Number(process.env.MCP_HEALTH_TIMEOUT_MS || 30000);
+const response = await fetch(readyUrl, { headers, signal: AbortSignal.timeout(timeout) });
+const payload = await response.json().catch(() => null);
+if (!response.ok || payload?.ok !== true) throw new Error("On-demand filings MCP readiness is not ok");
+const expectedTools = ["get_filing", "get_filing_brief", "search_catalog_filings", "list_filing_sections", "read_filing_section", "get_form4_insider_transactions"];
+const client = new Client({ name: "mac-worker-filings-preflight", version: "1.0.0" });
+const transport = new StreamableHTTPClientTransport(new URL(expectedUrl), { requestInit: { headers } });
+try {
+  await client.connect(transport, { timeout });
+  const tools = (await client.listTools(undefined, { timeout, maxTotalTimeout: timeout })).tools.map((tool) => tool.name);
+  if (tools.length !== expectedTools.length || expectedTools.some((name) => !tools.includes(name))) {
+    throw new Error("On-demand filings MCP tool parity mismatch");
+  }
+} finally {
+  await client.close().catch(() => undefined);
+}
+console.log(`OK plugin on-demand filings MCP URL: ${server.url}`);
 NODE
 
 echo "Checking Guru plugin MCP config..."

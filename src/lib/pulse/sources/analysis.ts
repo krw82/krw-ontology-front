@@ -139,7 +139,7 @@ export function buildAnalysisCandidates(
       group_key: `analysis:${session.id}`,
       primary_action: {
         type: "link" as const,
-        label: active ? "채팅에서 보기" : completed ? "결과 이어보기" : "채팅에서 확인",
+        label: active ? "대화로 돌아가기" : completed ? "결과 이어보기" : "채팅에서 확인",
         href,
       },
       secondary_actions: active
