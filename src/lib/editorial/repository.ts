@@ -1,6 +1,5 @@
 import "server-only";
 
-import { unstable_cache } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type {
@@ -10,9 +9,9 @@ import type {
 } from "@/types/database";
 
 export const PULSE_EDITORIAL_BUCKET = "pulse-editorial";
-export const PULSE_EDITORIAL_CACHE_TAG = "pulse-editorial-live";
 
 const MAX_PULSE_EDITORIAL_CANDIDATES = 48;
+const PUBLISHED_EDITORIAL_CACHE_TTL_MS = 5 * 60 * 1_000;
 
 export type PulseEditorialEntryWithAssets = PulseEditorialEntryRow & {
   pulse_editorial_assets: PulseEditorialAssetRow[];
@@ -66,24 +65,50 @@ async function listPublishedPulseEditorialEntries(
   return data ?? [];
 }
 
-/**
- * Editorial cards are shared, public content. Keep the database join out of
- * every personalized Pulse request while leaving publish/expiry decisions to
- * the caller at request time. The authoring route invalidates this tag.
- */
-const getCachedPublishedPulseEditorialEntries = unstable_cache(
-  async () => listPublishedPulseEditorialEntries(getSupabaseAdmin()),
-  ["pulse-editorial-live-v1"],
-  {
-    revalidate: 300,
-    tags: [PULSE_EDITORIAL_CACHE_TAG],
-  },
-);
+let publishedEntriesCache: {
+  expiresAt: number;
+  entries: PulseEditorialPublishedEntry[];
+} | null = null;
+let publishedEntriesLoad: Promise<PulseEditorialPublishedEntry[]> | null = null;
+let publishedEntriesGeneration = 0;
 
-export function getPublishedPulseEditorialEntries(): Promise<
+/**
+ * Editorial cards are shared, public content. This process-local cache keeps
+ * the join out of repeated personalized Pulse requests without importing a
+ * Next-only cache API into code also bundled for background workers.
+ */
+export async function getPublishedPulseEditorialEntries(): Promise<
   PulseEditorialPublishedEntry[]
 > {
-  return getCachedPublishedPulseEditorialEntries();
+  const now = Date.now();
+  if (publishedEntriesCache && publishedEntriesCache.expiresAt > now) {
+    return publishedEntriesCache.entries;
+  }
+  if (publishedEntriesLoad) return publishedEntriesLoad;
+
+  const generation = publishedEntriesGeneration;
+  const load = listPublishedPulseEditorialEntries(getSupabaseAdmin())
+    .then((entries) => {
+      if (generation === publishedEntriesGeneration) {
+        publishedEntriesCache = {
+          entries,
+          expiresAt: Date.now() + PUBLISHED_EDITORIAL_CACHE_TTL_MS,
+        };
+      }
+      return entries;
+    });
+  publishedEntriesLoad = load;
+  try {
+    return await load;
+  } finally {
+    if (publishedEntriesLoad === load) publishedEntriesLoad = null;
+  }
+}
+
+export function invalidatePublishedPulseEditorialEntries(): void {
+  publishedEntriesCache = null;
+  publishedEntriesLoad = null;
+  publishedEntriesGeneration += 1;
 }
 
 export function editorialPublicUrl(

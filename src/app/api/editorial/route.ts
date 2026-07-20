@@ -1,12 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { revalidateTag } from "next/cache";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { forbiddenError, getAuthUser, handleAuthError } from "@/lib/auth";
 import { isEditorialAdmin } from "@/lib/editorial/access";
 import {
   PULSE_EDITORIAL_BUCKET,
-  PULSE_EDITORIAL_CACHE_TAG,
+  invalidatePublishedPulseEditorialEntries,
 } from "@/lib/editorial/repository";
 import {
   invalidOriginResponse,
@@ -168,7 +167,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (fields.data.status === "published") {
-    revalidateTag(PULSE_EDITORIAL_CACHE_TAG, { expire: 0 });
+    invalidatePublishedPulseEditorialEntries();
   }
 
   return Response.json({ id: entryId }, { status: 201 });

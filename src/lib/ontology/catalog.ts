@@ -1,5 +1,4 @@
 import "server-only";
-import { unstable_cache } from "next/cache";
 import { isProductionE2ERuntimeConfigured } from "@/lib/dev-auth-runtime";
 
 import { getOntologyEnv, type OntologyEnv } from "@/lib/env";
@@ -132,6 +131,7 @@ const BROWSE_COMPANY_SELECT_COLUMNS =
 const DEFAULT_COMPANY_SEARCH_LIMIT = 50;
 const MAX_COMPANY_SEARCH_LIMIT = 500;
 const COMPANY_BROWSE_CACHE_REVALIDATE_SECONDS = 60 * 60;
+const MAX_COMPANY_BROWSE_CACHE_ENTRIES = 8;
 const STATIC_E2E_COMPANIES: IndexedCompany[] = [
   {
     ticker: "AMZN",
@@ -541,28 +541,66 @@ function browseCardsFromRows(
   });
 }
 
-const getCachedCompanyBrowseCards = unstable_cache(
-  async (
-    env: OntologyEnv,
-    releaseId: string,
-  ): Promise<IndexedCompanyBrowseCard[]> => {
-    const { data, error } = await getSupabaseAdmin()
-      .from("ontology_companies")
-      .select(BROWSE_COMPANY_SELECT_COLUMNS)
-      .eq("env", env)
-      .eq("release_id", releaseId)
-      .order("ticker", { ascending: true })
-      .returns<OntologyCompanyBrowseRow[]>();
+const companyBrowseCardsCache = new Map<string, {
+  expiresAt: number;
+  cards: IndexedCompanyBrowseCard[];
+}>();
+const companyBrowseCardsLoads = new Map<
+  string,
+  Promise<IndexedCompanyBrowseCard[]>
+>();
 
-    if (error) {
-      throw new Error(`Failed to read ontology browse cards: ${error.message}`);
+async function getCachedCompanyBrowseCards(
+  env: OntologyEnv,
+  releaseId: string,
+): Promise<IndexedCompanyBrowseCard[]> {
+  const key = `${env}:${releaseId}`;
+  const cached = companyBrowseCardsCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.cards;
+
+  const inFlight = companyBrowseCardsLoads.get(key);
+  if (inFlight) return inFlight;
+
+  const load = readCompanyBrowseCards(env, releaseId).then((cards) => {
+    companyBrowseCardsCache.set(key, {
+      cards,
+      expiresAt: Date.now() + COMPANY_BROWSE_CACHE_REVALIDATE_SECONDS * 1_000,
+    });
+    while (companyBrowseCardsCache.size > MAX_COMPANY_BROWSE_CACHE_ENTRIES) {
+      const oldestKey = companyBrowseCardsCache.keys().next().value;
+      if (!oldestKey) break;
+      companyBrowseCardsCache.delete(oldestKey);
     }
+    return cards;
+  });
+  companyBrowseCardsLoads.set(key, load);
+  try {
+    return await load;
+  } finally {
+    if (companyBrowseCardsLoads.get(key) === load) {
+      companyBrowseCardsLoads.delete(key);
+    }
+  }
+}
 
-    return browseCardsFromRows(data ?? []);
-  },
-  ["ontology-company-browse-cards-v1"],
-  { revalidate: COMPANY_BROWSE_CACHE_REVALIDATE_SECONDS },
-);
+async function readCompanyBrowseCards(
+  env: OntologyEnv,
+  releaseId: string,
+): Promise<IndexedCompanyBrowseCard[]> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("ontology_companies")
+    .select(BROWSE_COMPANY_SELECT_COLUMNS)
+    .eq("env", env)
+    .eq("release_id", releaseId)
+    .order("ticker", { ascending: true })
+    .returns<OntologyCompanyBrowseRow[]>();
+
+  if (error) {
+    throw new Error(`Failed to read ontology browse cards: ${error.message}`);
+  }
+
+  return browseCardsFromRows(data ?? []);
+}
 
 export async function getActiveOntologyCatalogRelease(
   env: OntologyEnv = getOntologyEnv(),
