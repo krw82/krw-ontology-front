@@ -9,6 +9,7 @@ describe("Research Pulse state migration", () => {
   const candidateRepairMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260717011000_fix_pulse_candidate_ticker_ambiguity.sql"), "utf8");
   const filingBriefMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260717020000_sec_filing_briefs.sql"), "utf8");
   const v3ReadModelMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260720040000_pulse_feed_v3_read_model.sql"), "utf8");
+  const editorialRepairMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260720041000_repair_pulse_editorial_schema.sql"), "utf8");
 
   it("creates additive preference and item-state tables with ownership RLS", () => {
     expect(migration).toContain("create table if not exists public.user_pulse_preferences");
@@ -88,8 +89,16 @@ describe("Research Pulse state migration", () => {
     expect(v3ReadModelMigration).toContain("trg_pulse_feed_revision_entitlements");
     expect(v3ReadModelMigration).toContain("trg_pulse_global_feed_revision_editorial_entries");
     expect(v3ReadModelMigration).toContain("trg_pulse_global_feed_revision_editorial_assets");
+    expect(v3ReadModelMigration).toContain("to_regclass('public.pulse_editorial_entries')");
     expect(v3ReadModelMigration).toContain("/ 300");
     expect(v3ReadModelMigration).toContain("from public, anon, authenticated");
     expect(v3ReadModelMigration).toContain("to service_role");
+  });
+
+  it("repairs a historically recorded but missing editorial schema before V3 uses it", () => {
+    expect(editorialRepairMigration).toContain("create table if not exists public.pulse_editorial_entries");
+    expect(editorialRepairMigration).toContain("create table if not exists public.pulse_editorial_assets");
+    expect(editorialRepairMigration).toContain("trg_pulse_global_feed_revision_editorial_entries");
+    expect(editorialRepairMigration).toContain("to service_role");
   });
 });

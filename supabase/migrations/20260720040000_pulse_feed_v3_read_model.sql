@@ -734,15 +734,23 @@ create trigger trg_pulse_feed_revision_entitlements
 after insert or update or delete on public.user_entitlements
 for each row execute function public.pulse_user_feed_revision_from_row();
 
-drop trigger if exists trg_pulse_global_feed_revision_editorial_entries on public.pulse_editorial_entries;
-create trigger trg_pulse_global_feed_revision_editorial_entries
-after insert or update or delete on public.pulse_editorial_entries
-for each row execute function public.pulse_global_feed_revision_from_shared_row();
+-- Some older production databases recorded the editorial migration before the
+-- table was actually provisioned. The following repair migration recreates
+-- that table; guard these triggers so the read-model cutover itself cannot be
+-- blocked by that historical schema drift.
+do $$
+begin
+  if to_regclass('public.pulse_editorial_entries') is not null then
+    execute 'drop trigger if exists trg_pulse_global_feed_revision_editorial_entries on public.pulse_editorial_entries';
+    execute 'create trigger trg_pulse_global_feed_revision_editorial_entries after insert or update or delete on public.pulse_editorial_entries for each row execute function public.pulse_global_feed_revision_from_shared_row()';
+  end if;
 
-drop trigger if exists trg_pulse_global_feed_revision_editorial_assets on public.pulse_editorial_assets;
-create trigger trg_pulse_global_feed_revision_editorial_assets
-after insert or update or delete on public.pulse_editorial_assets
-for each row execute function public.pulse_global_feed_revision_from_shared_row();
+  if to_regclass('public.pulse_editorial_assets') is not null then
+    execute 'drop trigger if exists trg_pulse_global_feed_revision_editorial_assets on public.pulse_editorial_assets';
+    execute 'create trigger trg_pulse_global_feed_revision_editorial_assets after insert or update or delete on public.pulse_editorial_assets for each row execute function public.pulse_global_feed_revision_from_shared_row()';
+  end if;
+end;
+$$;
 
 revoke all on function public.bump_pulse_global_feed_revision(text) from public, anon, authenticated;
 revoke all on function public.bump_user_pulse_feed_revision(uuid) from public, anon, authenticated;
