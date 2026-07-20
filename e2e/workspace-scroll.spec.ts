@@ -16,7 +16,8 @@ test.describe("standard workspace scroll restoration", () => {
       ),
     ).toBeVisible();
     await page.addStyleTag({
-      content: "body { min-height: 4000px !important; }",
+      content:
+        "html { overflow-anchor: none !important; } body { min-height: 4000px !important; }",
     });
 
     await page.evaluate(() => window.scrollTo(0, 820));
@@ -47,7 +48,8 @@ test.describe("standard workspace scroll restoration", () => {
       page.locator("[data-workspace-bottom-navigation]"),
     ).toBeVisible();
     await page.addStyleTag({
-      content: "body { min-height: 4000px !important; }",
+      content:
+        "html { overflow-anchor: none !important; } body { min-height: 4000px !important; }",
     });
     await expect
       .poll(() => page.evaluate(() => Math.round(window.scrollY)))

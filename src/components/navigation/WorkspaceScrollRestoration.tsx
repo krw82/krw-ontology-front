@@ -13,7 +13,10 @@ import {
 const WRITE_THROTTLE_MS = 180;
 const RESTORE_RETRY_MS = 50;
 const RESTORE_SETTLE_MS = 200;
-const RESTORE_TIMEOUT_MS = 1_800;
+// A route can finish its initial render before streamed data or a client-side
+// expansion makes the previous position reachable. Do not permanently clamp a
+// saved position to the provisional document height during that gap.
+const RESTORE_DEFER_TIMEOUT_MS = 10_000;
 
 function getSessionStorage(): Storage | null {
   try {
@@ -109,6 +112,20 @@ export default function WorkspaceScrollRestoration() {
     let lastLayoutChangeAt = restoreStartedAt;
     let overflowAnchorSuppressed = false;
 
+    const captureCurrentScrollPosition = () => {
+      const currentScrollY = window.scrollY;
+      const maximumScrollY = maxWindowScrollY();
+      // Browsers can clamp the document before React's cleanup runs while a
+      // route is being torn down. That clamp is not a user scroll and must not
+      // replace the position we just persisted for the outgoing route.
+      const wasClampedByLayout =
+        currentScrollY < lastObservedScrollY &&
+        Math.abs(currentScrollY - maximumScrollY) <= 1;
+      if (!wasClampedByLayout) {
+        lastObservedScrollY = currentScrollY;
+      }
+    };
+
     const flushScrollPosition = () => {
       if (!persistenceStarted) return;
       if (writeTimer !== null) {
@@ -123,7 +140,7 @@ export default function WorkspaceScrollRestoration() {
     };
 
     const scheduleScrollWrite = () => {
-      lastObservedScrollY = window.scrollY;
+      captureCurrentScrollPosition();
       if (writeTimer !== null) return;
       writeTimer = window.setTimeout(() => {
         writeTimer = null;
@@ -136,20 +153,20 @@ export default function WorkspaceScrollRestoration() {
     };
 
     const handlePageHide = () => {
-      lastObservedScrollY = window.scrollY;
+      captureCurrentScrollPosition();
       flushScrollPosition();
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState !== "hidden") return;
-      lastObservedScrollY = window.scrollY;
+      captureCurrentScrollPosition();
       flushScrollPosition();
     };
 
     const beginPersistence = () => {
       if (persistenceStarted || disposed) return;
       persistenceStarted = true;
-      lastObservedScrollY = window.scrollY;
+      captureCurrentScrollPosition();
       window.addEventListener("scroll", scheduleScrollWrite, { passive: true });
       window.addEventListener("pagehide", handlePageHide);
       document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -225,7 +242,8 @@ export default function WorkspaceScrollRestoration() {
 
       const attemptRestoration = () => {
         if (disposed) return;
-        const timedOut = Date.now() - restoreStartedAt >= RESTORE_TIMEOUT_MS;
+        const deferredRestoreTimedOut =
+          Date.now() - restoreStartedAt >= RESTORE_DEFER_TIMEOUT_MS;
         const routeIsLoading = Boolean(
           routeContent?.querySelector("[data-workspace-route-loading]"),
         );
@@ -241,17 +259,17 @@ export default function WorkspaceScrollRestoration() {
                 savedAnchor.getBoundingClientRect().top -
                 (savedEntry.anchorOffset ?? 0),
             );
-            if (maximumScrollY >= anchorTarget || timedOut) {
-              targetScrollY = Math.min(anchorTarget, maximumScrollY);
+            if (maximumScrollY >= anchorTarget) {
+              targetScrollY = anchorTarget;
             }
           }
         }
 
         if (
           targetScrollY === null &&
-          ((!routeIsLoading && maximumScrollY >= savedEntry.y) || timedOut)
+          !routeIsLoading && maximumScrollY >= savedEntry.y
         ) {
-          targetScrollY = Math.min(savedEntry.y, maximumScrollY);
+          targetScrollY = savedEntry.y;
         }
 
         if (targetScrollY !== null) {
@@ -261,12 +279,21 @@ export default function WorkspaceScrollRestoration() {
           // restored page by hundreds of pixels.
           scrollWindowImmediately(targetScrollY);
           if (
-            timedOut ||
+            deferredRestoreTimedOut ||
             Date.now() - lastLayoutChangeAt >= RESTORE_SETTLE_MS
           ) {
             finishRestoration(targetScrollY);
             return;
           }
+        }
+
+        // The route stayed shorter than the saved position. Release the
+        // temporary restoration guards after a bounded window, but never
+        // overwrite the saved value with the current document's shorter max.
+        // That would make a later data expansion restore to the wrong place.
+        if (deferredRestoreTimedOut) {
+          finishRestoration(null);
+          return;
         }
 
         scheduleRestoreAttempt();
