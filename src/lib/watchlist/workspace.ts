@@ -1,6 +1,9 @@
 import "server-only";
 
-import { getIndexedCompanies, getIndexedCompany } from "@/lib/ontology/catalog";
+import {
+  getIndexedCompanyBrowseCards,
+  getIndexedCompany,
+} from "@/lib/ontology/catalog";
 import { normalizeTicker, normalizeTickers } from "@/lib/ontology/ticker";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
@@ -97,15 +100,21 @@ export async function listWatchlistOverview(
     .map(markFromRow)
     .filter((mark) => Boolean(normalizeTicker(mark.ticker)));
   const tickers = normalizeTickers(normalizedMarks.map((mark) => mark.ticker));
-  const companies = await getIndexedCompanies(tickers);
-  const companyByTicker = new Map(companies.map((company) => [company.ticker, company]));
-  const [questionStatesByTicker, notesByTicker, notebooksByTicker, sessionsByTicker] =
+  const [
+    companies,
+    questionStatesByTicker,
+    notesByTicker,
+    notebooksByTicker,
+    sessionsByTicker,
+  ] =
     await Promise.all([
+      getIndexedCompanyBrowseCards(tickers),
       listVisibleOpenQuestionStatesByTicker(userId, tickers),
       countNotesByTicker(userId, tickers),
       listNotebookStatesByTicker(userId, tickers),
       countRecentSessionsByTicker(userId, tickers),
     ]);
+  const companyByTicker = new Map(companies.map((company) => [company.ticker, company]));
 
   const summaries = normalizedMarks.map((mark) =>
     buildCompanySummary({
@@ -552,7 +561,7 @@ function buildCompanySummary({
 }: {
   userId: string;
   mark: UserCompanyMark;
-  company: Awaited<ReturnType<typeof getIndexedCompany>>;
+  company: Awaited<ReturnType<typeof getIndexedCompanyBrowseCards>>[number] | null;
   openQuestionCount: number;
   noteCount: number;
   recentChatCount: number;

@@ -4,7 +4,6 @@ import WatchlistHomeClient from "@/components/watchlist/WatchlistHomeClient";
 import { getAuthUser } from "@/lib/auth";
 import { getEntitlementStatus } from "@/lib/billing/entitlement";
 import { isEntitlementFeatureEnabled } from "@/lib/billing/feature-access";
-import { listWatchlistOverview } from "@/lib/watchlist/workspace";
 import type { WatchlistOverviewResponse } from "@/types/api-contracts";
 
 export const runtime = "nodejs";
@@ -30,23 +29,6 @@ const EMPTY_OVERVIEW: WatchlistOverviewResponse = {
   },
 };
 
-async function loadWatchlistPageData(userId: string): Promise<{
-  overview: WatchlistOverviewResponse;
-  loadError: string | null;
-}> {
-  try {
-    return {
-      overview: await listWatchlistOverview(userId),
-      loadError: null,
-    };
-  } catch {
-    return {
-      overview: EMPTY_OVERVIEW,
-      loadError: "리서치 노트북 데이터를 불러오지 못했습니다.",
-    };
-  }
-}
-
 export default async function WatchlistPage() {
   const user = await getAuthUser().catch(() => null);
   if (!user) {
@@ -58,11 +40,13 @@ export default async function WatchlistPage() {
     redirect("/settings/billing?feature=research_notebook");
   }
 
-  const { overview, loadError } = await loadWatchlistPageData(user.id);
-
   return (
     <div className="bg-canvas text-ink">
-      <WatchlistHomeClient overview={overview} loadError={loadError} />
+      <WatchlistHomeClient
+        overview={EMPTY_OVERVIEW}
+        cacheOwnerId={user.id}
+        loadOverview
+      />
     </div>
   );
 }

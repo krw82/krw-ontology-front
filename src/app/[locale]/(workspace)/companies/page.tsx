@@ -1,14 +1,9 @@
 import CompaniesBrowser from "@/components/CompaniesBrowser";
-import { getCompanyDisplayCopyForTicker } from "@/content/companies/display";
 import { isLocale } from "@/i18n/config";
 import { localizedPageMetadata } from "@/i18n/metadata";
-import { getAuthUser } from "@/lib/auth";
 import { buildSiteOgImagePath, SITE_NAME } from "@/lib/marketing/site";
-import { listIndexedCompanies } from "@/lib/ontology/catalog";
-import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import type { UserRetentionMilestoneRow } from "@/types/database";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,31 +46,12 @@ export default async function CompaniesPage({ params }: CompaniesPageProps) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
 
-  const [companies, user] = await Promise.all([
-    listIndexedCompanies(),
-    getAuthUser().catch(() => null),
-  ]);
-  const displayCompanies = companies.map((company) => ({
-    ...company,
-    ...getCompanyDisplayCopyForTicker(locale, company.ticker),
-  }));
-  let coverageOnboardingActivated = false;
-  if (user) {
-    const { data } = await getSupabaseAdmin()
-      .from("user_retention_milestones")
-      .select("achieved_at")
-      .eq("user_id", user.id)
-      .eq("milestone", "coverage_activated")
-      .maybeSingle<Pick<UserRetentionMilestoneRow, "achieved_at">>();
-    coverageOnboardingActivated = Boolean(data?.achieved_at);
-  }
   return (
     <div className="bg-canvas">
       <CompaniesBrowser
-        initialCompanies={displayCompanies}
+        initialCompanies={[]}
         locale={locale}
-        isAuthenticated={Boolean(user)}
-        coverageOnboardingActivated={coverageOnboardingActivated}
+        loadCatalog
       />
     </div>
   );

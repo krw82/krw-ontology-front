@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type {
   Session,
   SessionSummary,
@@ -10,8 +10,16 @@ import type {
   ListSessionsResponse,
   UpdateSessionResponse,
 } from "@/types/api-contracts";
+import {
+  readDeviceSessionList,
+  saveDeviceSessionList,
+} from "@/lib/pwa/device-cache";
 
-export function useSessions() {
+interface UseSessionsOptions {
+  cacheOwnerId?: string | null;
+}
+
+export function useSessions({ cacheOwnerId = null }: UseSessionsOptions = {}) {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -20,17 +28,56 @@ export function useSessions() {
   const [listError, setListError] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [hasLoadedSnapshot, setHasLoadedSnapshot] = useState(false);
+  const currentOwnerIdRef = useRef(cacheOwnerId);
+  const [loadedOwnerId, setLoadedOwnerId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (
+      !cacheOwnerId ||
+      !hasLoadedSnapshot ||
+      loadedOwnerId !== cacheOwnerId
+    ) {
+      return;
+    }
+    void saveDeviceSessionList(cacheOwnerId, sessions).catch(() => undefined);
+  }, [cacheOwnerId, hasLoadedSnapshot, loadedOwnerId, sessions]);
 
   const listSessions = useCallback(async (page = 1, limit = 20) => {
+    if (currentOwnerIdRef.current !== cacheOwnerId) {
+      currentOwnerIdRef.current = cacheOwnerId;
+      setLoadedOwnerId(null);
+      setSessions([]);
+      setHasLoadedSnapshot(false);
+    }
     setLoading(true);
     setListError(null);
+    let networkCompleted = false;
+    if (cacheOwnerId) {
+      void readDeviceSessionList(cacheOwnerId)
+        .then((cachedSessions) => {
+          if (
+            !networkCompleted &&
+            currentOwnerIdRef.current === cacheOwnerId &&
+            cachedSessions
+          ) {
+            setLoadedOwnerId(cacheOwnerId);
+            setSessions(cachedSessions);
+            setHasLoadedSnapshot(true);
+          }
+        })
+        .catch(() => undefined);
+    }
     try {
       const res = await fetch(
         `/api/sessions?page=${page}&limit=${limit}`,
       );
       if (!res.ok) throw new Error("채팅 목록을 불러오지 못했습니다.");
       const data: ListSessionsResponse = await res.json();
+      networkCompleted = true;
+      setLoadedOwnerId(cacheOwnerId);
       setSessions(data.sessions);
+      setHasLoadedSnapshot(true);
       return data;
     } catch (err) {
       setListError((err as Error).message);
@@ -38,7 +85,7 @@ export function useSessions() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [cacheOwnerId]);
 
   const createSession = useCallback(
     async (request: CreateSessionRequest): Promise<Session | null> => {
@@ -164,7 +211,8 @@ export function useSessions() {
   );
 
   return {
-    sessions,
+    sessions:
+      loadedOwnerId === cacheOwnerId ? sessions : [],
     loading,
     creating,
     mutatingSessionId,

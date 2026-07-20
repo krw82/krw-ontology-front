@@ -24,6 +24,10 @@ import {
 } from "@/i18n/routing";
 import type { SessionSummary } from "@/types/api-contracts";
 import { normalizeTickers } from "@/lib/ontology/ticker";
+import {
+  DEVICE_CACHE_OWNER_CHANGED_EVENT,
+  getDeviceCacheOwner,
+} from "@/lib/pwa/device-cache-owner";
 
 interface ChatSidebarProps {
   activeSessionId: string | null;
@@ -178,6 +182,7 @@ export default function ChatSidebar({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [cacheOwnerId, setCacheOwnerId] = useState<string | null>(null);
   const {
     sessions,
     loading,
@@ -187,7 +192,7 @@ export default function ChatSidebar({
     listSessions,
     renameSession,
     deleteSession,
-  } = useSessions();
+  } = useSessions({ cacheOwnerId });
   const [open, setOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [pendingNavigationSessionId, setPendingNavigationSessionId] =
@@ -209,14 +214,24 @@ export default function ChatSidebar({
     return Date.parse(right.updated_at) - Date.parse(left.updated_at);
   }), [preferredTicker, sessions]);
 
+  useEffect(() => {
+    const syncOwner = () => setCacheOwnerId(getDeviceCacheOwner());
+    syncOwner();
+    window.addEventListener(DEVICE_CACHE_OWNER_CHANGED_EVENT, syncOwner);
+    return () => {
+      window.removeEventListener(DEVICE_CACHE_OWNER_CHANGED_EVENT, syncOwner);
+    };
+  }, []);
+
   const closeHistory = useCallback(() => {
     setOpen(false);
     setPendingNavigationSessionId(null);
   }, []);
 
   useEffect(() => {
-    listSessions(1, 30);
-  }, [listSessions, refreshSignal]);
+    if (!open) return;
+    void listSessions(1, 30);
+  }, [listSessions, open, refreshSignal]);
 
   useEffect(() => {
     const handleOpenSidebar = () => {

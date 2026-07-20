@@ -1,4 +1,5 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { isProductionE2ERuntimeConfigured } from "@/lib/dev-auth-runtime";
 
 import { getOntologyEnv, type OntologyEnv } from "@/lib/env";
@@ -36,6 +37,31 @@ export interface IndexedCompanyDocument {
   document_type: string;
   doc_type_key: string | null;
   generated_at: string | null;
+}
+
+/**
+ * The company index only needs enough data to render and search a card. Keep
+ * document arrays and the full catalog JSON on the detail/read-model path.
+ */
+export interface IndexedCompanyBrowseCard {
+  ticker: string;
+  name: string;
+  sector: string | null;
+  description: string;
+  latest_period: string | null;
+  coverage: string;
+  core_strength?: string;
+  critical_risk?: string;
+  document_count: number;
+  document_types: string[];
+  periods: string[];
+  generated_at: string | null;
+}
+
+export interface IndexedCompanyBrowseCatalog {
+  release_id: string | null;
+  generated_at: string | null;
+  companies: IndexedCompanyBrowseCard[];
 }
 
 export interface GuruCompanyContextAnchor {
@@ -78,11 +104,34 @@ interface SearchIndexedCompaniesOptions {
 }
 
 type UnknownRecord = Record<string, unknown>;
+type OntologyCompanyBrowseRow = Pick<
+  OntologyCompanyRow,
+  | "env"
+  | "release_id"
+  | "ticker"
+  | "name"
+  | "sector"
+  | "description"
+  | "latest_period"
+  | "document_count"
+  | "document_types"
+  | "periods"
+  | "generated_at"
+  | "browse_core_strength"
+  | "browse_critical_risk"
+>;
+type OntologyCatalogReleaseSummary = Pick<
+  OntologyCatalogReleaseRow,
+  "env" | "release_id" | "generated_at" | "company_count"
+>;
 
 const COMPANY_SELECT_COLUMNS =
   "env, release_id, ticker, name, sector, description, latest_period, document_count, document_types, periods, coverage_json, documents_json, company_json, generated_at, created_at, updated_at";
+const BROWSE_COMPANY_SELECT_COLUMNS =
+  "env, release_id, ticker, name, sector, description, latest_period, document_count, document_types, periods, browse_core_strength, browse_critical_risk, generated_at";
 const DEFAULT_COMPANY_SEARCH_LIMIT = 50;
 const MAX_COMPANY_SEARCH_LIMIT = 500;
+const COMPANY_BROWSE_CACHE_REVALIDATE_SECONDS = 60 * 60;
 const STATIC_E2E_COMPANIES: IndexedCompany[] = [
   {
     ticker: "AMZN",
@@ -279,7 +328,12 @@ function iconForCompany(row: OntologyCompanyRow): string {
   return "business";
 }
 
-function buildCoverage(row: OntologyCompanyRow): string {
+function buildCoverage(
+  row: Pick<
+    OntologyCompanyRow,
+    "latest_period" | "document_count" | "document_types" | "periods"
+  >,
+): string {
   const latestPeriod = row.latest_period;
   const documentCount = row.document_count || row.periods.length;
   return `${documentCount}개 공시 인덱싱${
@@ -354,6 +408,32 @@ function companyFromRow(row: OntologyCompanyRow): IndexedCompany {
     document_types: row.document_types,
     periods: row.periods,
     documents: documentArrayValue(row.documents_json),
+    generated_at: row.generated_at,
+  };
+}
+
+function companyBrowseCardFromRow(
+  row: OntologyCompanyBrowseRow,
+): IndexedCompanyBrowseCard {
+  const ticker = normalizeTicker(row.ticker) ?? row.ticker;
+  return {
+    ticker,
+    name: row.name || FALLBACK_COMPANY_NAMES[ticker] || ticker,
+    sector: formatLabel(row.sector),
+    description: trimSentence(
+      row.description || `Indexed ontology coverage for ${ticker}.`,
+    ),
+    latest_period: row.latest_period,
+    coverage: buildCoverage(row),
+    ...(row.browse_core_strength
+      ? { core_strength: row.browse_core_strength }
+      : {}),
+    ...(row.browse_critical_risk
+      ? { critical_risk: row.browse_critical_risk }
+      : {}),
+    document_count: row.document_count,
+    document_types: row.document_types,
+    periods: row.periods,
     generated_at: row.generated_at,
   };
 }
@@ -452,6 +532,38 @@ function companiesFromRows(rows: OntologyCompanyRow[]): IndexedCompany[] {
   });
 }
 
+function browseCardsFromRows(
+  rows: OntologyCompanyBrowseRow[],
+): IndexedCompanyBrowseCard[] {
+  return rows.flatMap((row) => {
+    if (!normalizeTicker(row.ticker)) return [];
+    return [companyBrowseCardFromRow(row)];
+  });
+}
+
+const getCachedCompanyBrowseCards = unstable_cache(
+  async (
+    env: OntologyEnv,
+    releaseId: string,
+  ): Promise<IndexedCompanyBrowseCard[]> => {
+    const { data, error } = await getSupabaseAdmin()
+      .from("ontology_companies")
+      .select(BROWSE_COMPANY_SELECT_COLUMNS)
+      .eq("env", env)
+      .eq("release_id", releaseId)
+      .order("ticker", { ascending: true })
+      .returns<OntologyCompanyBrowseRow[]>();
+
+    if (error) {
+      throw new Error(`Failed to read ontology browse cards: ${error.message}`);
+    }
+
+    return browseCardsFromRows(data ?? []);
+  },
+  ["ontology-company-browse-cards-v1"],
+  { revalidate: COMPANY_BROWSE_CACHE_REVALIDATE_SECONDS },
+);
+
 export async function getActiveOntologyCatalogRelease(
   env: OntologyEnv = getOntologyEnv(),
 ): Promise<OntologyCatalogReleaseRow | null> {
@@ -468,6 +580,71 @@ export async function getActiveOntologyCatalogRelease(
     throw new Error(`Failed to read active ontology catalog release: ${error.message}`);
   }
   return data ?? null;
+}
+
+export async function getActiveOntologyCatalogReleaseSummary(
+  env: OntologyEnv = getOntologyEnv(),
+): Promise<OntologyCatalogReleaseSummary | null> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("ontology_catalog_releases")
+    .select("env, release_id, generated_at, company_count")
+    .eq("env", env)
+    .eq("active", true)
+    .maybeSingle<OntologyCatalogReleaseSummary>();
+
+  if (error) {
+    throw new Error(`Failed to read active ontology catalog release: ${error.message}`);
+  }
+  return data ?? null;
+}
+
+export async function getIndexedCompanyBrowseCatalog(): Promise<IndexedCompanyBrowseCatalog> {
+  if (shouldUseStaticE2ECatalog()) {
+    return {
+      release_id: "static-e2e",
+      generated_at: STATIC_E2E_COMPANIES[0]?.generated_at ?? null,
+      companies: STATIC_E2E_COMPANIES.map((company) => ({
+        ticker: company.ticker,
+        name: company.name,
+        sector: company.sector,
+        description: company.description,
+        latest_period: company.latest_period,
+        coverage: buildCoverage(company),
+        ...(company.core_strength ? { core_strength: company.core_strength } : {}),
+        ...(company.critical_risk ? { critical_risk: company.critical_risk } : {}),
+        document_count: company.document_count,
+        document_types: company.document_types,
+        periods: company.periods,
+        generated_at: company.generated_at,
+      })),
+    };
+  }
+
+  const env = getOntologyEnv();
+  const release = await getActiveOntologyCatalogReleaseSummary(env);
+  if (!release) {
+    return { release_id: null, generated_at: null, companies: [] };
+  }
+
+  return {
+    release_id: release.release_id,
+    generated_at: release.generated_at,
+    companies: await getCachedCompanyBrowseCards(env, release.release_id),
+  };
+}
+
+export async function getIndexedCompanyBrowseCards(
+  tickers: string[],
+): Promise<IndexedCompanyBrowseCard[]> {
+  const normalizedTickers = normalizeTickers(tickers);
+  if (normalizedTickers.length === 0) return [];
+  const catalog = await getIndexedCompanyBrowseCatalog();
+  const byTicker = new Map(
+    catalog.companies.map((company) => [company.ticker, company]),
+  );
+  return normalizedTickers
+    .map((ticker) => byTicker.get(ticker))
+    .filter((company): company is IndexedCompanyBrowseCard => Boolean(company));
 }
 
 export async function listIndexedCompanies(): Promise<IndexedCompany[]> {

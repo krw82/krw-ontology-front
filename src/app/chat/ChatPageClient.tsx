@@ -72,6 +72,10 @@ import {
   PWA_BEFORE_UPDATE_EVENT,
   signalPwaInstallEngagement,
 } from "@/components/pwa/lifecycle";
+import {
+  clearDeviceCacheOwner,
+  setDeviceCacheOwner,
+} from "@/lib/pwa/device-cache-owner";
 import type { ResearchMode } from "@/lib/research-mode";
 import type {
   CreateSessionRequest,
@@ -120,6 +124,11 @@ function ChatContent({
   workspace?: ChatWorkspace;
   draftOwnerId: string;
 }) {
+  useEffect(() => {
+    setDeviceCacheOwner(draftOwnerId);
+    return () => clearDeviceCacheOwner(draftOwnerId);
+  }, [draftOwnerId]);
+
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();

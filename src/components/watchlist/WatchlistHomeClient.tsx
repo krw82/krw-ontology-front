@@ -6,6 +6,10 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useSessions } from "@/hooks/useSessions";
 import { buildChatSessionHref } from "@/lib/chat/history-state";
 import { localeSwitchHref, resolveRouteLocale } from "@/i18n/routing";
+import {
+  readDeviceWatchlistOverview,
+  saveDeviceWatchlistOverview,
+} from "@/lib/pwa/device-cache";
 import type {
   ResearchInboxItem,
   SessionSummary,
@@ -16,18 +20,25 @@ import type {
 
 interface WatchlistHomeClientProps {
   overview: WatchlistOverviewResponse;
-  loadError?: string | null;
+  cacheOwnerId?: string | null;
+  loadOverview?: boolean;
 }
 
 let retainedWatchlistQuery = "";
 
 export default function WatchlistHomeClient({
   overview,
-  loadError = null,
+  cacheOwnerId = null,
+  loadOverview = false,
 }: WatchlistHomeClientProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [overviewState, setOverviewState] = useState(overview);
+  const [visibleLoadError, setVisibleLoadError] = useState<string | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(loadOverview);
+  const [overviewReadyForCache, setOverviewReadyForCache] = useState(
+    !loadOverview,
+  );
   const [dismissingQuestionId, setDismissingQuestionId] = useState<string | null>(
     null,
   );
@@ -56,9 +67,60 @@ export default function WatchlistHomeClient({
     loading: historyLoading,
     listError: historyError,
     listSessions,
-  } = useSessions();
+  } = useSessions({ cacheOwnerId });
 
   const researchInbox = overviewState.research_inbox;
+
+  useEffect(() => {
+    if (!loadOverview || !cacheOwnerId) return;
+
+    let active = true;
+    let freshOverviewLoaded = false;
+    let deviceOverviewLoaded = false;
+    void readDeviceWatchlistOverview(cacheOwnerId)
+      .then((snapshot) => {
+        if (!active || !snapshot) return;
+        if (freshOverviewLoaded) return;
+        deviceOverviewLoaded = true;
+        setOverviewState(snapshot.overview);
+        setVisibleLoadError(null);
+        setOverviewLoading(false);
+        setOverviewReadyForCache(true);
+      })
+      .catch(() => undefined);
+
+    void fetch("/api/watchlist", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load watchlist overview");
+        const next = await response.json() as WatchlistOverviewResponse;
+        if (!Array.isArray(next.companies) || !Array.isArray(next.research_inbox)) {
+          throw new Error("Invalid watchlist overview response");
+        }
+        if (!active) return;
+        freshOverviewLoaded = true;
+        setOverviewState(next);
+        setVisibleLoadError(null);
+        setOverviewReadyForCache(true);
+      })
+      .catch(() => {
+        if (active && !deviceOverviewLoaded) {
+          setVisibleLoadError("리서치 노트북 데이터를 불러오지 못했습니다.");
+        }
+      })
+      .finally(() => {
+        if (active) setOverviewLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [cacheOwnerId, loadOverview]);
+
+  useEffect(() => {
+    if (!cacheOwnerId || !overviewReadyForCache) return;
+    void saveDeviceWatchlistOverview(cacheOwnerId, overviewState)
+      .catch(() => undefined);
+  }, [cacheOwnerId, overviewReadyForCache, overviewState]);
   const filteredSessions = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLowerCase();
     if (!normalizedQuery) return sessions;
@@ -243,9 +305,9 @@ export default function WatchlistHomeClient({
           </div>
         </header>
 
-        {activeTab === "notebook" && loadError && (
+        {activeTab === "notebook" && visibleLoadError && (
           <div className="mt-4 border border-error-container bg-error-container/40 px-sm py-xs text-[13px] font-bold leading-5 text-error">
-            {loadError}
+            {visibleLoadError}
           </div>
         )}
 
@@ -269,37 +331,67 @@ export default function WatchlistHomeClient({
                 {dismissQuestionError}
               </p>
             )}
-            <ResearchInboxPanel
-              dismissingQuestionId={dismissingQuestionId}
-              inbox={researchInbox}
-              onDismissQuestion={handleDismissInboxQuestion}
-            />
+            {overviewLoading ? (
+              <WatchlistOverviewSkeleton />
+            ) : (
+              <>
+                <ResearchInboxPanel
+                  dismissingQuestionId={dismissingQuestionId}
+                  inbox={researchInbox}
+                  onDismissQuestion={handleDismissInboxQuestion}
+                />
 
-            <section className="mt-5">
-              {companies.length === 0 ? (
-                <EmptyWatchlist />
-              ) : filteredCompanies.length === 0 ? (
-                <div className="mt-5 rounded-[8px] border border-hairline bg-surface-soft p-lg text-center text-[15px] font-bold leading-6 text-muted">
-                  조건에 맞는 종목이 없습니다.
-                </div>
-              ) : (
-                <div className="grid gap-6">
-                  {companySections
-                    .filter((section) => section.companies.length > 0)
-                    .map((section) => (
-                      <CompanySection
-                        key={section.key}
-                        title={section.title}
-                        companies={section.companies}
-                      />
-                    ))}
-                </div>
-              )}
-            </section>
+                <section className="mt-5">
+                  {companies.length === 0 ? (
+                    <EmptyWatchlist />
+                  ) : filteredCompanies.length === 0 ? (
+                    <div className="mt-5 rounded-[8px] border border-hairline bg-surface-soft p-lg text-center text-[15px] font-bold leading-6 text-muted">
+                      조건에 맞는 종목이 없습니다.
+                    </div>
+                  ) : (
+                    <div className="grid gap-6">
+                      {companySections
+                        .filter((section) => section.companies.length > 0)
+                        .map((section) => (
+                          <CompanySection
+                            key={section.key}
+                            title={section.title}
+                            companies={section.companies}
+                          />
+                        ))}
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
           </>
         )}
       </div>
     </main>
+  );
+}
+
+function WatchlistOverviewSkeleton() {
+  return (
+    <section
+      className="mt-5 overflow-hidden rounded-[8px] border border-hairline bg-canvas"
+      aria-busy="true"
+      aria-label="리서치 노트북을 불러오는 중"
+    >
+      {Array.from({ length: 5 }, (_, index) => (
+        <div
+          key={index}
+          className="grid min-h-[94px] grid-cols-[104px_minmax(0,1fr)] gap-4 border-b border-hairline px-4 py-3.5 last:border-b-0 xl:grid-cols-[104px_minmax(220px,1fr)_120px]"
+        >
+          <div className="h-5 w-16 animate-pulse rounded bg-surface-soft" />
+          <div className="space-y-2">
+            <div className="h-5 w-36 animate-pulse rounded bg-surface-soft" />
+            <div className="h-4 w-4/5 animate-pulse rounded bg-surface-soft" />
+          </div>
+          <div className="hidden h-4 w-14 animate-pulse rounded bg-surface-soft xl:block" />
+        </div>
+      ))}
+    </section>
   );
 }
 

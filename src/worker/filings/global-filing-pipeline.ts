@@ -55,6 +55,19 @@ type ProcessingClaim = {
   stage: "enrich" | "notification_fanout";
   claim_token: string;
 };
+type FilingDiscoveryCandidate = {
+  env: GlobalFilingPipelineOptions["env"];
+  releaseId: string;
+  candidate: SecFilingCandidate;
+  discoverySource: "atom" | "submissions" | "daily_index";
+  sourceMetadata: Json;
+};
+type FilingDiscoveryMetrics = {
+  candidates: number;
+  rpcCalls: number;
+};
+
+const FILING_DISCOVERY_BATCH_SIZE = 100;
 
 export type GlobalFilingPipelineOptions = {
   env: "dev" | "staging" | "prod";
@@ -74,6 +87,8 @@ export type GlobalFilingPipelineOptions = {
 
 export type GlobalFilingPipelineResult = {
   discovered: number;
+  discoveryCandidates: number;
+  discoveryRpcCalls: number;
   enriched: number;
   notificationsCreated: number;
   schedulerLeader: boolean;
@@ -91,6 +106,7 @@ export async function runGlobalFilingPipeline(
   const leader = options.detectionEnabled
     ? await claimSchedulerLeader(options)
     : false;
+  const discoveryMetrics: FilingDiscoveryMetrics = { candidates: 0, rpcCalls: 0 };
   let discovered = 0;
 
   if (leader) {
@@ -109,9 +125,9 @@ export async function runGlobalFilingPipeline(
     // two due sources per 15s worker tick keeps each Atom source near the
     // intended 60-second cadence without exceeding SEC's request budget.
     for (let sourceIndex = 0; sourceIndex < options.discoverySourcesPerCycle; sourceIndex += 1) {
-      discovered += await pollOneCurrentFeed(options, scheduler);
+      discovered += await pollOneCurrentFeed(options, scheduler, discoveryMetrics);
     }
-    discovered += await reconcileCatalogCiks(options, scheduler);
+    discovered += await reconcileCatalogCiks(options, scheduler, discoveryMetrics);
   }
 
   // Processing stays live even when discovery is paused. This lets an operator
@@ -120,7 +136,14 @@ export async function runGlobalFilingPipeline(
   const notificationsCreated = options.notificationCreationEnabled
     ? await processNotificationFanoutJobs(options)
     : 0;
-  return { discovered, enriched, notificationsCreated, schedulerLeader: leader };
+  return {
+    discovered,
+    discoveryCandidates: discoveryMetrics.candidates,
+    discoveryRpcCalls: discoveryMetrics.rpcCalls,
+    enriched,
+    notificationsCreated,
+    schedulerLeader: leader,
+  };
 }
 
 async function claimSchedulerLeader(options: GlobalFilingPipelineOptions): Promise<boolean> {
@@ -153,6 +176,7 @@ async function loadActiveTargets(env: GlobalFilingPipelineOptions["env"]): Promi
 async function pollOneCurrentFeed(
   options: GlobalFilingPipelineOptions,
   scheduler: SecRequestScheduler,
+  discoveryMetrics: FilingDiscoveryMetrics,
 ): Promise<number> {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin.rpc("claim_sec_filing_discovery_checkpoint", {
@@ -164,7 +188,7 @@ async function pollOneCurrentFeed(
   const checkpoint = (data?.[0] ?? null) as DiscoveryCheckpoint | null;
   if (!checkpoint) return 0;
   if (checkpoint.source_key === "daily_index:master") {
-    return auditDailyMasterIndex(options, scheduler, checkpoint);
+    return auditDailyMasterIndex(options, scheduler, checkpoint, discoveryMetrics);
   }
   const formType = formTypeFromAtomSourceKey(checkpoint.source_key);
   if (!formType) {
@@ -184,11 +208,10 @@ async function pollOneCurrentFeed(
       options.env,
       candidates.map((candidate) => candidate.cik),
     );
-    let discovered = 0;
-    for (const candidate of candidates) {
+    const discovered = await recordCandidates(candidates.flatMap((candidate) => {
       const releaseId = targets.get(candidate.cik);
-      if (!releaseId) continue;
-      discovered += await recordCandidate({
+      if (!releaseId) return [];
+      return [{
         env: options.env,
         releaseId,
         candidate,
@@ -200,8 +223,8 @@ async function pollOneCurrentFeed(
           ...candidate.sourceMetadata,
           discoveryBaseline: !baselineCompletedCiks.has(candidate.cik),
         },
-      });
-    }
+      } satisfies FilingDiscoveryCandidate];
+    }), discoveryMetrics);
     const newest = candidates[0] ?? null;
     const { error: completeError } = await admin.rpc("complete_sec_filing_discovery_checkpoint", {
       p_env: options.env,
@@ -224,6 +247,7 @@ async function auditDailyMasterIndex(
   options: GlobalFilingPipelineOptions,
   scheduler: SecRequestScheduler,
   checkpoint: DiscoveryCheckpoint,
+  discoveryMetrics: FilingDiscoveryMetrics,
 ): Promise<number> {
   const admin = getSupabaseAdmin();
   try {
@@ -258,10 +282,10 @@ async function auditDailyMasterIndex(
         options.env,
         candidates.map((candidate) => candidate.cik),
       );
-      for (const candidate of candidates) {
+      discovered += await recordCandidates(candidates.flatMap((candidate) => {
         const releaseId = targets.get(candidate.cik);
-        if (!releaseId) continue;
-        discovered += await recordCandidate({
+        if (!releaseId) return [];
+        return [{
           env: options.env,
           releaseId,
           candidate,
@@ -271,8 +295,8 @@ async function auditDailyMasterIndex(
             dailyIndexDate: utcDateKey(day),
             discoveryBaseline: !baselineCompletedCiks.has(candidate.cik),
           },
-        });
-      }
+        } satisfies FilingDiscoveryCandidate];
+      }), discoveryMetrics);
       newestAudited = day;
       day = utcDayAfter(day);
     }
@@ -296,6 +320,7 @@ async function auditDailyMasterIndex(
 async function reconcileCatalogCiks(
   options: GlobalFilingPipelineOptions,
   scheduler: SecRequestScheduler,
+  discoveryMetrics: FilingDiscoveryMetrics,
 ): Promise<number> {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin.rpc("claim_catalog_sec_filing_reconciliation_targets", {
@@ -315,8 +340,8 @@ async function reconcileCatalogCiks(
         claim.cik,
         payload.filings?.recent as SecSubmissionsRecent | undefined,
       ).filter((candidate) => isFilingCandidateWithinLookback(candidate, catalogLookbackCutoff(options)));
-      for (const candidate of candidates) {
-        discovered += await recordCandidate({
+      discovered += await recordCandidates(candidates.map((candidate) => (
+        {
           env: options.env,
           releaseId: claim.release_id,
           candidate,
@@ -325,8 +350,8 @@ async function reconcileCatalogCiks(
             ...candidate.sourceMetadata,
             discoveryBaseline: !claim.baseline_completed_at,
           },
-        });
-      }
+        } satisfies FilingDiscoveryCandidate
+      )), discoveryMetrics);
       const { error: completeError } = await admin.rpc("complete_catalog_sec_filing_reconciliation", {
         p_env: options.env,
         p_cik: claim.cik,
@@ -347,31 +372,41 @@ async function reconcileCatalogCiks(
   return discovered;
 }
 
-async function recordCandidate(params: {
-  env: GlobalFilingPipelineOptions["env"];
-  releaseId: string;
-  candidate: SecFilingCandidate;
-  discoverySource: "atom" | "submissions" | "daily_index";
-  sourceMetadata: Json;
-}): Promise<number> {
-  const { data, error } = await getSupabaseAdmin().rpc("record_catalog_sec_filing_discovery", {
-    p_env: params.env,
-    p_release_id: params.releaseId,
-    p_cik: params.candidate.cik,
-    p_accession_number: params.candidate.accessionNumber,
-    p_form_type: params.candidate.formType,
-    p_filing_date: params.candidate.filingDate,
-    p_report_date: params.candidate.reportDate,
-    p_accepted_at: params.candidate.acceptedAt,
-    p_primary_document_name: params.candidate.primaryDocumentName,
-    p_filing_detail_url: params.candidate.filingDetailUrl,
-    p_primary_document_url: params.candidate.primaryDocumentUrl,
-    p_source_metadata: params.sourceMetadata,
-    p_discovery_source: params.discoverySource,
-    p_seen_at: new Date().toISOString(),
-  });
-  if (error) throw new Error(`Failed to record SEC filing discovery: ${error.message}`);
-  return data?.[0]?.inserted ? 1 : 0;
+async function recordCandidates(
+  candidates: FilingDiscoveryCandidate[],
+  metrics: FilingDiscoveryMetrics,
+): Promise<number> {
+  let discovered = 0;
+  const seenAt = new Date().toISOString();
+  const admin = getSupabaseAdmin();
+  metrics.candidates += candidates.length;
+
+  for (let index = 0; index < candidates.length; index += FILING_DISCOVERY_BATCH_SIZE) {
+    const batch = candidates.slice(index, index + FILING_DISCOVERY_BATCH_SIZE);
+    metrics.rpcCalls += 1;
+    const { data, error } = await admin.rpc("record_catalog_sec_filing_discoveries", {
+      p_candidates: batch.map((params) => ({
+        env: params.env,
+        release_id: params.releaseId,
+        cik: params.candidate.cik,
+        accession_number: params.candidate.accessionNumber,
+        form_type: params.candidate.formType,
+        filing_date: params.candidate.filingDate,
+        report_date: params.candidate.reportDate,
+        accepted_at: params.candidate.acceptedAt,
+        primary_document_name: params.candidate.primaryDocumentName,
+        filing_detail_url: params.candidate.filingDetailUrl,
+        primary_document_url: params.candidate.primaryDocumentUrl,
+        source_metadata: params.sourceMetadata,
+        discovery_source: params.discoverySource,
+        seen_at: seenAt,
+      })),
+    });
+    if (error) throw new Error(`Failed to record SEC filing discovery batch: ${error.message}`);
+    discovered += (data ?? []).filter((result) => result.inserted).length;
+  }
+
+  return discovered;
 }
 
 function catalogLookbackCutoff(options: GlobalFilingPipelineOptions): Date {

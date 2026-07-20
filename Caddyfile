@@ -21,7 +21,7 @@
         }
     }
 
-    encode gzip
+    encode zstd gzip
 
     log {
         output stdout
@@ -38,7 +38,7 @@ dalim.krwontology.com {
         header_up -X-Real-IP
     }
 
-    encode gzip
+    encode zstd gzip
 
     log {
         output stdout

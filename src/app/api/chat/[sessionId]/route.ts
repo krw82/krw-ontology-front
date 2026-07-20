@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { getAuthUser, handleAuthError, forbiddenError } from "@/lib/auth";
+import { getAuthUser, handleAuthError } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/api/validation";
 import { publicAgentErrorMessage } from "@/lib/api/chat/error-messages";
@@ -14,8 +14,9 @@ import type {
 } from "@/types/database";
 import { toPublicChatArtifact } from "@/lib/chat-artifacts/news-event-selection";
 import { toPublicChatChart } from "@/lib/charts/db";
+import { ServerTiming } from "@/lib/performance/server-timing";
 
-const DEFAULT_CHAT_DETAIL_MESSAGE_LIMIT = 200;
+const DEFAULT_CHAT_DETAIL_MESSAGE_LIMIT = 50;
 const MAX_CHAT_DETAIL_MESSAGE_LIMIT = 500;
 
 function notFoundError(message: string) {
@@ -53,6 +54,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
+  const timing = new ServerTiming();
   const { sessionId } = await params;
   const messageLimit = parsePositiveIntParam(
     request.nextUrl.searchParams.get("limit"),
@@ -69,7 +71,7 @@ export async function GET(
 
   let user;
   try {
-    user = await getAuthUser();
+    user = await timing.measure("auth", () => getAuthUser());
   } catch (err) {
     return handleAuthError(err);
   }
@@ -77,14 +79,18 @@ export async function GET(
 
   const supabase = await createClient();
 
-  const { data: session, error: sessionError } = await supabase
-    .from("chat_sessions")
-    .select(
-      "id, user_id, title, scope_type, default_tickers, default_document_types, last_message_preview, last_message_at, latest_run_status, created_at, updated_at, deleted_at",
-    )
-    .eq("id", sessionId)
-    .is("deleted_at", null)
-    .maybeSingle<ChatSessionRow>();
+  const { data: session, error: sessionError } = await timing.measure(
+    "session",
+    () => supabase
+      .from("chat_sessions")
+      .select(
+        "id, user_id, title, scope_type, default_tickers, default_document_types, last_message_preview, last_message_at, latest_run_status, created_at, updated_at, deleted_at",
+      )
+      .eq("id", sessionId)
+      .eq("user_id", user.id)
+      .is("deleted_at", null)
+      .maybeSingle<ChatSessionRow>(),
+  );
 
   if (sessionError) {
     return internalError("채팅을 불러오지 못했습니다.");
@@ -94,10 +100,6 @@ export async function GET(
     return notFoundError("채팅을 찾지 못했습니다.");
   }
 
-  if (session.user_id !== user.id) {
-    return forbiddenError("이 채팅에 접근할 권한이 없습니다.");
-  }
-
   const messagesBaseQuery = supabase
     .from("messages")
     .select("id, session_id, role, content, status, metadata, created_at, updated_at")
@@ -105,10 +107,26 @@ export async function GET(
   const messagesQuery = beforeCreatedAt
     ? messagesBaseQuery.lt("created_at", beforeCreatedAt)
     : messagesBaseQuery;
-  const { data: messagesPage, error: messagesError } = await messagesQuery
+  const messagesRequest = messagesQuery
     .order("created_at", { ascending: false })
     .limit(messageLimit + 1)
     .returns<MessageRow[]>();
+  const runsRequest = supabase
+    .from("agent_runs")
+    .select(
+      "id, status, model, assistant_message_id, queued_at, started_at, finished_at, latency_ms, input_tokens, output_tokens, estimated_cost_usd, ontology_env, worker_env, ontology_release_id, index_generated_at, company_count, document_count, object_count, manifest_valid, agent_index_schema_version, error_code, run_kind, source_artifact_id, source_event_id"
+    )
+    .eq("session_id", sessionId)
+    .order("queued_at", { ascending: false, nullsFirst: false })
+    .limit(messageLimit + 1)
+    .returns<Partial<AgentRunRow>[]>();
+  const [
+    { data: messagesPage, error: messagesError },
+    { data: runsPage, error: runsError },
+  ] = await timing.measure("messages_runs", () => Promise.all([
+    messagesRequest,
+    runsRequest,
+  ]));
 
   if (messagesError) {
     return internalError("채팅 메시지를 불러오지 못했습니다.");
@@ -118,48 +136,42 @@ export async function GET(
   const messages = (messagesPage ?? []).slice(0, messageLimit).reverse();
   const messageIds = messages.map((message) => message.id);
 
-  const { data: runsPage, error: runsError } = await supabase
-    .from("agent_runs")
-    .select(
-      "id, status, model, assistant_message_id, queued_at, started_at, finished_at, latency_ms, input_tokens, output_tokens, estimated_cost_usd, ontology_env, worker_env, ontology_release_id, index_generated_at, company_count, document_count, object_count, manifest_valid, agent_index_schema_version, error_code, run_kind, source_artifact_id, source_event_id"
-    )
-    .eq("session_id", sessionId)
-    .order("queued_at", { ascending: false, nullsFirst: false })
-    .limit(messageLimit + 1)
-    .returns<Partial<AgentRunRow>[]>();
-
   if (runsError) {
     return internalError("채팅 실행 기록을 불러오지 못했습니다.");
   }
 
   const runs = (runsPage ?? []).slice(0, messageLimit).reverse();
-  const { data: chatArtifacts, error: chatArtifactsError } =
-    messageIds.length > 0
-      ? await supabase
-          .from("chat_message_artifacts")
-          .select("id, session_id, message_id, run_id, type, payload_json, created_at")
-          .eq("session_id", sessionId)
-          .in("message_id", messageIds)
-          .order("created_at", { ascending: true })
-          .returns<ChatMessageArtifactRow[]>()
-      : { data: [], error: null };
+  const artifactsRequest = messageIds.length > 0
+    ? supabase
+        .from("chat_message_artifacts")
+        .select("id, session_id, message_id, run_id, type, payload_json, created_at")
+        .eq("session_id", sessionId)
+        .in("message_id", messageIds)
+        .order("created_at", { ascending: true })
+        .returns<ChatMessageArtifactRow[]>()
+    : Promise.resolve({ data: [], error: null });
+  const chartsRequest = messageIds.length > 0
+    ? supabase
+        .from("chat_message_charts")
+        .select(
+          "id, session_id, message_id, run_id, chart_ref, insert_token, title, chart_type, payload_json, created_at",
+        )
+        .eq("session_id", sessionId)
+        .in("message_id", messageIds)
+        .order("created_at", { ascending: true })
+        .returns<ChatMessageChartRow[]>()
+    : Promise.resolve({ data: [], error: null });
+  const [
+    { data: chatArtifacts, error: chatArtifactsError },
+    { data: chatCharts, error: chatChartsError },
+  ] = await timing.measure("artifacts_charts", () => Promise.all([
+    artifactsRequest,
+    chartsRequest,
+  ]));
 
   if (chatArtifactsError) {
     return internalError("채팅 artifact를 불러오지 못했습니다.");
   }
-
-  const { data: chatCharts, error: chatChartsError } =
-    messageIds.length > 0
-      ? await supabase
-          .from("chat_message_charts")
-          .select(
-            "id, session_id, message_id, run_id, chart_ref, insert_token, title, chart_type, payload_json, created_at",
-          )
-          .eq("session_id", sessionId)
-          .in("message_id", messageIds)
-          .order("created_at", { ascending: true })
-          .returns<ChatMessageChartRow[]>()
-      : { data: [], error: null };
 
   if (chatChartsError) {
     return internalError("채팅 차트를 불러오지 못했습니다.");
@@ -168,14 +180,14 @@ export async function GET(
   const artifactIds = (chatArtifacts ?? []).map((artifact) => artifact.id);
   const { data: artifactSelections, error: artifactSelectionsError } =
     artifactIds.length > 0
-      ? await supabase
+      ? await timing.measure("artifact_selections", () => supabase
           .from("chat_message_artifact_selections")
           .select(
             "id, artifact_id, session_id, event_id, user_id, selected_payload_json, user_message_id, research_run_id, status, created_at, updated_at",
           )
           .in("artifact_id", artifactIds)
           .order("created_at", { ascending: true })
-          .returns<ChatMessageArtifactSelectionRow[]>()
+          .returns<ChatMessageArtifactSelectionRow[]>())
       : { data: [], error: null };
 
   if (artifactSelectionsError) {
@@ -197,6 +209,8 @@ export async function GET(
     },
     rich_answers: [],
     research_artifacts: [],
+  }, {
+    headers: timing.headers({ "Cache-Control": "private, no-store" }),
   });
 }
 

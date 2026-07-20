@@ -19,13 +19,32 @@ import { filterAndSortCompanies } from "@/lib/companies/filter";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
+import {
+  readDeviceCompanyBrowseCatalog,
+  readDeviceCoverageOnboarding,
+  saveDeviceCompanyBrowseCatalog,
+  saveDeviceCoverageOnboarding,
+} from "@/lib/pwa/device-cache";
+import {
+  DEVICE_CACHE_OWNER_CHANGED_EVENT,
+  getDeviceCacheOwner,
+} from "@/lib/pwa/device-cache-owner";
 
 interface CompaniesBrowserProps {
   initialCompanies: CompanyCardData[];
   locale?: Locale;
   isAuthenticated?: boolean;
-  coverageOnboardingActivated?: boolean;
+  cacheOwnerId?: string | null;
+  catalogReleaseId?: string | null;
+  catalogGeneratedAt?: string | null;
+  loadCatalog?: boolean;
 }
+
+type CompanyBrowseCatalogResponse = {
+  release_id: string | null;
+  generated_at: string | null;
+  companies: CompanyCardData[];
+};
 
 /* ─── Flow Animation ─────────────────────────────────────────────
    3 thin lines slide in from left, fade into the arrow, then the
@@ -37,6 +56,8 @@ const LINE_MOVE = 1.0; // how long lines travel
 const ARROW_NUDGE_DELAY = 0.9; // when the arrow kicks
 const SEARCH_COACHMARK_STORAGE_KEY = "krw:companies-search-coachmark-seen:v1";
 const IS_DEV_ENV = process.env.NODE_ENV === "development";
+const EMPTY_COMPANIES: CompanyCardData[] = [];
+const COMPANY_RENDER_PAGE_SIZE = 120;
 
 function FlowAnimation({ disabled }: { disabled: boolean }) {
   return (
@@ -93,11 +114,46 @@ function FlowAnimation({ disabled }: { disabled: boolean }) {
   );
 }
 
+function CompanyCatalogSkeleton() {
+  return (
+    <div
+      className="mt-5 overflow-hidden rounded-[8px] border border-hairline bg-canvas"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <span className="sr-only">회사 목록을 불러오는 중입니다.</span>
+      {Array.from({ length: 6 }, (_, index) => (
+        <div
+          key={index}
+          className="grid min-h-[112px] grid-cols-[88px_minmax(0,1fr)] gap-4 border-b border-hairline-soft px-4 py-4 last:border-b-0 xl:grid-cols-[148px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)]"
+        >
+          <div className="h-5 w-14 animate-pulse rounded bg-surface-soft" />
+          <div className="space-y-2">
+            <div className="h-5 w-36 animate-pulse rounded bg-surface-soft" />
+            <div className="h-4 w-24 animate-pulse rounded bg-surface-soft" />
+          </div>
+          <div className="hidden space-y-2 xl:block">
+            <div className="h-4 w-4/5 animate-pulse rounded bg-surface-soft" />
+            <div className="h-4 w-3/5 animate-pulse rounded bg-surface-soft" />
+          </div>
+          <div className="hidden space-y-2 xl:block">
+            <div className="h-4 w-3/4 animate-pulse rounded bg-surface-soft" />
+            <div className="h-4 w-1/2 animate-pulse rounded bg-surface-soft" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function CompaniesBrowser({
   initialCompanies,
   locale = DEFAULT_LOCALE,
   isAuthenticated = false,
-  coverageOnboardingActivated = false,
+  cacheOwnerId = null,
+  catalogReleaseId = null,
+  catalogGeneratedAt = null,
+  loadCatalog = false,
 }: CompaniesBrowserProps) {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
@@ -106,6 +162,29 @@ export default function CompaniesBrowser({
   const [coverageOnboardingActive, setCoverageOnboardingActive] = useState(
     () => searchParams.get("onboarding") === "coverage",
   );
+  const [deviceCacheOwnerId, setDeviceCacheOwnerId] = useState<string | null>(
+    null,
+  );
+  const [coverageOnboardingByOwner, setCoverageOnboardingByOwner] = useState<{
+    ownerId: string;
+    activated: boolean;
+  } | null>(null);
+  const [freshCatalog, setFreshCatalog] =
+    useState<CompanyBrowseCatalogResponse | null>(() =>
+      initialCompanies.length > 0
+        ? {
+            release_id: catalogReleaseId,
+            generated_at: catalogGeneratedAt,
+            companies: initialCompanies,
+          }
+        : null,
+    );
+  const [deviceCatalog, setDeviceCatalog] =
+    useState<CompanyBrowseCatalogResponse | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(
+    loadCatalog && initialCompanies.length === 0,
+  );
+  const [companyRenderPage, setCompanyRenderPage] = useState(1);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const reducedMotion = useReducedMotion();
   const coarsePointer = useCoarsePointer();
@@ -118,6 +197,18 @@ export default function CompaniesBrowser({
   const coverageOnboardingRequested =
     searchParams.get("onboarding") === "coverage";
   const onboardingContinuePath = searchParams.get("continue");
+  const resolvedCacheOwnerId = cacheOwnerId ?? deviceCacheOwnerId;
+  const hasAuthenticatedSession =
+    isAuthenticated || Boolean(resolvedCacheOwnerId);
+  const coverageOnboardingActivated = !hasAuthenticatedSession
+    ? true
+    : coverageOnboardingByOwner?.ownerId === resolvedCacheOwnerId
+      ? coverageOnboardingByOwner.activated
+      : null;
+  const companies = useMemo(
+    () => freshCatalog?.companies ?? deviceCatalog?.companies ?? EMPTY_COMPANIES,
+    [deviceCatalog, freshCatalog],
+  );
   const copy = locale === "ko"
       ? {
         eyebrow: "회사 찾기",
@@ -138,6 +229,7 @@ export default function CompaniesBrowser({
           "현재 환경의 웹 카탈로그에서 인덱싱된 회사를 찾지 못했습니다.",
         availableCompanies: "분석 가능한 회사",
         countSuffix: "개 표시",
+        loadMore: "회사 더 보기",
         emptySearch: "검색 조건에 맞는 회사가 없습니다.",
         footer:
           "© 2026 KRW.O. 공시 근거 기반 기업 리서치.",
@@ -161,14 +253,151 @@ export default function CompaniesBrowser({
           "No indexed companies were found in the current web catalog.",
         availableCompanies: "Available companies",
         countSuffix: "shown",
+        loadMore: "Load more companies",
         emptySearch: "No companies match this search.",
         footer:
           "© 2026 KRW.O. Filing-grounded company research.",
       };
 
   const filteredCompanies = useMemo(() => {
-    return filterAndSortCompanies(initialCompanies, deferredSearch);
-  }, [deferredSearch, initialCompanies]);
+    return filterAndSortCompanies(companies, deferredSearch);
+  }, [companies, deferredSearch]);
+  const visibleCompanies = useMemo(
+    () =>
+      filteredCompanies.slice(
+        0,
+        companyRenderPage * COMPANY_RENDER_PAGE_SIZE,
+      ),
+    [companyRenderPage, filteredCompanies],
+  );
+  const hasMoreCompanies = visibleCompanies.length < filteredCompanies.length;
+
+  useEffect(() => {
+    if (!cacheOwnerId) {
+      const syncOwner = () => setDeviceCacheOwnerId(getDeviceCacheOwner());
+      syncOwner();
+      window.addEventListener(DEVICE_CACHE_OWNER_CHANGED_EVENT, syncOwner);
+      return () => {
+        window.removeEventListener(DEVICE_CACHE_OWNER_CHANGED_EVENT, syncOwner);
+      };
+    }
+    return undefined;
+  }, [cacheOwnerId]);
+
+  useEffect(() => {
+    if (freshCatalog?.release_id && freshCatalog.companies.length > 0) {
+      void saveDeviceCompanyBrowseCatalog({
+        release_id: freshCatalog.release_id,
+        generated_at: freshCatalog.generated_at,
+        locale,
+        companies: freshCatalog.companies,
+      }).catch(() => undefined);
+    }
+  }, [freshCatalog, locale]);
+
+  useEffect(() => {
+    if (!loadCatalog) return;
+    let active = true;
+    void readDeviceCompanyBrowseCatalog<CompanyCardData>(locale)
+      .then((snapshot) => {
+        if (!active || !snapshot) return;
+        setDeviceCatalog({
+          release_id: snapshot.release_id,
+          generated_at: snapshot.generated_at,
+          companies: snapshot.companies,
+        });
+        setCatalogLoading(false);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [loadCatalog, locale]);
+
+  useEffect(() => {
+    if (!loadCatalog) return;
+    const controller = new AbortController();
+    let active = true;
+    void fetch(`/api/companies/browse?locale=${encodeURIComponent(locale)}`, {
+      signal: controller.signal,
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load company browse catalog");
+        const data = await response.json() as CompanyBrowseCatalogResponse;
+        if (!Array.isArray(data.companies)) {
+          throw new Error("Invalid company browse catalog response");
+        }
+        if (active) setFreshCatalog(data);
+      })
+      .catch((error: unknown) => {
+        if ((error as { name?: string }).name !== "AbortError") {
+          // A last-known-good device catalog, if available, remains visible.
+        }
+      })
+      .finally(() => {
+        if (active) setCatalogLoading(false);
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [loadCatalog, locale]);
+
+  useEffect(() => {
+    if (!hasAuthenticatedSession || !resolvedCacheOwnerId) {
+      return;
+    }
+
+    const controller = new AbortController();
+    let active = true;
+    void readDeviceCoverageOnboarding(resolvedCacheOwnerId)
+      .then((snapshot) => {
+        if (active && snapshot) {
+          setCoverageOnboardingByOwner({
+            ownerId: resolvedCacheOwnerId,
+            activated: snapshot.coverage_activated,
+          });
+        }
+      })
+      .catch(() => undefined);
+    void fetch("/api/onboarding/coverage/status", {
+      signal: controller.signal,
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load coverage status");
+        const data = await response.json() as {
+          coverage_activated?: boolean;
+        };
+        const coverageActivated = data.coverage_activated === true;
+        if (active) {
+          setCoverageOnboardingByOwner({
+            ownerId: resolvedCacheOwnerId,
+            activated: coverageActivated,
+          });
+        }
+        void saveDeviceCoverageOnboarding(resolvedCacheOwnerId, coverageActivated)
+          .catch(() => undefined);
+      })
+      .catch((error: unknown) => {
+        if ((error as { name?: string }).name !== "AbortError") {
+          // Never block the company index when a personalized onboarding read
+          // is unavailable. It can retry on the next navigation.
+          if (active) {
+            setCoverageOnboardingByOwner({
+              ownerId: resolvedCacheOwnerId,
+              activated: true,
+            });
+          }
+        }
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [hasAuthenticatedSession, resolvedCacheOwnerId]);
 
   useEffect(() => {
     if (forceCoachmarks) {
@@ -202,10 +431,6 @@ export default function CompaniesBrowser({
   }, [forceCoachmarks]);
 
   useEffect(() => {
-    if (!isAuthenticated && !forceFirstResearchChoice) return;
-    if (coverageOnboardingActivated && !forceFirstResearchChoice) return;
-    if (coverageOnboardingRequested) return;
-
     if (forceFirstResearchChoice) {
       const showTimer = window.setTimeout(
         () => setShowFirstResearchChoice(true),
@@ -213,6 +438,10 @@ export default function CompaniesBrowser({
       );
       return () => window.clearTimeout(showTimer);
     }
+
+    if (!hasAuthenticatedSession) return;
+    if (coverageOnboardingActivated === null) return;
+    if (coverageOnboardingActivated || coverageOnboardingRequested) return;
 
     const showTimer = window.setTimeout(
       () => setShowFirstResearchChoice(true),
@@ -223,7 +452,7 @@ export default function CompaniesBrowser({
     coverageOnboardingActivated,
     coverageOnboardingRequested,
     forceFirstResearchChoice,
-    isAuthenticated,
+    hasAuthenticatedSession,
   ]);
 
   function dismissSearchCoachmark() {
@@ -384,7 +613,9 @@ export default function CompaniesBrowser({
         </header>
         )}
 
-        {initialCompanies.length === 0 ? (
+        {catalogLoading ? (
+          <CompanyCatalogSkeleton />
+        ) : companies.length === 0 ? (
           <div className="mt-8 rounded-[8px] border border-hairline bg-surface p-lg text-[15px] leading-[1.5] text-body sm:text-[16px]">
             {copy.emptyCatalog}
           </div>
@@ -397,7 +628,7 @@ export default function CompaniesBrowser({
               <p className="text-[12px] font-bold leading-4 text-muted" aria-live="polite">
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.span
-                    key={filteredCompanies.length}
+                    key={`${visibleCompanies.length}:${filteredCompanies.length}`}
                     initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
@@ -406,7 +637,9 @@ export default function CompaniesBrowser({
                       ease: easeOutExpo,
                     }}
                   >
-                    {filteredCompanies.length.toLocaleString()} {copy.countSuffix}
+                    {hasMoreCompanies
+                      ? `${visibleCompanies.length.toLocaleString()} / ${filteredCompanies.length.toLocaleString()} ${copy.countSuffix}`
+                      : `${filteredCompanies.length.toLocaleString()} ${copy.countSuffix}`}
                   </motion.span>
                 </AnimatePresence>
               </p>
@@ -426,7 +659,7 @@ export default function CompaniesBrowser({
                 <span>watch</span>
               </div>
               <AnimatePresence initial={false}>
-                {filteredCompanies.map((company, index) => (
+                {visibleCompanies.map((company, index) => (
                   <CompanyCard
                     key={company.ticker}
                     company={company}
@@ -439,11 +672,22 @@ export default function CompaniesBrowser({
                 ))}
               </AnimatePresence>
             </motion.div>
+            {hasMoreCompanies ? (
+              <div className="mt-3 flex justify-center">
+                <button
+                  type="button"
+                  className="min-h-11 rounded-[8px] border border-hairline bg-canvas px-base text-[13px] font-extrabold text-ink shadow-sm transition-colors hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  onClick={() => setCompanyRenderPage((page) => page + 1)}
+                >
+                  {copy.loadMore}
+                </button>
+              </div>
+            ) : null}
           </div>
         )}
 
         <AnimatePresence mode="wait" initial={false}>
-          {initialCompanies.length > 0 && filteredCompanies.length === 0 && (
+          {companies.length > 0 && filteredCompanies.length === 0 && (
             <motion.div
               key="empty-results"
               className="py-xxl text-center"

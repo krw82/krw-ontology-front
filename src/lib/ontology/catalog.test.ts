@@ -55,6 +55,8 @@ const companyRows: OntologyCompanyRow[] = [
     document_count: 2,
     document_types: ["10-K", "10-Q"],
     periods: ["FY2025", "CY2025Q3"],
+    browse_core_strength: "Devices, Services",
+    browse_critical_risk: "China demand",
     coverage_json: {},
     documents_json: [
       {
@@ -93,6 +95,8 @@ const companyRows: OntologyCompanyRow[] = [
     document_count: 1,
     document_types: ["10-K"],
     periods: ["FY2025"],
+    browse_core_strength: null,
+    browse_critical_risk: null,
     coverage_json: {},
     documents_json: [],
     company_json: {},
