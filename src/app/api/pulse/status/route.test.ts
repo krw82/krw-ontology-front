@@ -21,29 +21,27 @@ describe("GET /api/pulse/status", () => {
     mocks.getAuthUser.mockResolvedValue({ id: "user-1" });
     mocks.getPulseFeedStatus.mockResolvedValue({
       generated_at: "2026-07-17T00:00:00.000Z",
-      new_item_count: 2,
-      active_analysis_count: 1,
-      active_analysis_updated_at: "2026-07-17T00:00:00.000Z",
-      active_analysis_session_ids: ["session-1"],
+      revision: "p3.1.1.1",
+      changed: false,
     });
   });
 
-  it("requires authentication and a valid since timestamp", async () => {
+  it("requires authentication and a valid revision", async () => {
     mocks.getAuthUser.mockResolvedValue(null);
-    expect((await GET(new NextRequest("http://localhost/api/pulse/status?since=2026-07-17T00:00:00.000Z"))).status).toBe(401);
+    expect((await GET(new NextRequest("http://localhost/api/pulse/status?revision=p3.1.1.1"))).status).toBe(401);
 
     mocks.getAuthUser.mockResolvedValue({ id: "user-1" });
-    expect((await GET(new NextRequest("http://localhost/api/pulse/status?since=bad"))).status).toBe(400);
+    expect((await GET(new NextRequest(`http://localhost/api/pulse/status?revision=${"x".repeat(129)}`))).status).toBe(400);
     expect(mocks.getPulseFeedStatus).not.toHaveBeenCalled();
   });
 
   it("uses the lightweight status reader with a private no-store response", async () => {
-    const response = await GET(new NextRequest("http://localhost/api/pulse/status?since=2026-07-17T00:00:00.000Z"));
+    const response = await GET(new NextRequest("http://localhost/api/pulse/status?revision=p3.1.1.1"));
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(mocks.getPulseFeedStatus).toHaveBeenCalledWith(expect.objectContaining({
       userId: "user-1",
-      since: expect.any(Date),
+      revision: "p3.1.1.1",
     }));
   });
 });

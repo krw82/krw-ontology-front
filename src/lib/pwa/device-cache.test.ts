@@ -38,6 +38,7 @@ function pulseItem(kind: PulseItem["kind"], title: string): PulseItem {
 
 function feed(items: PulseItem[]): PulseFeedResponse {
   return {
+    revision: "p3.1.1.1",
     generated_at: "2026-07-20T01:00:00.000Z",
     snapshot_at: "2026-07-20T01:00:00.000Z",
     ranking_version: "rule_v3",
@@ -58,6 +59,7 @@ function feed(items: PulseItem[]): PulseFeedResponse {
     },
     active_analysis_items: items.filter((item) => item.kind === "analysis"),
     items,
+    item_versions: {},
     new_item_count: items.length,
     source_statuses: [],
   };
@@ -81,6 +83,8 @@ describe("device-scoped Pulse cache", () => {
     expect(snapshot?.feed.summary.active_analysis_count).toBe(0);
     expect(snapshot?.feed.summary.counts.analysis).toBe(0);
     expect(snapshot?.feed.new_item_count).toBe(0);
+    expect(snapshot?.feed.revision).toBe("device-partial");
+    expect(snapshot?.feed.item_versions).toEqual({});
   });
 
   it("does not write an empty snapshot after excluding analysis-only data", () => {

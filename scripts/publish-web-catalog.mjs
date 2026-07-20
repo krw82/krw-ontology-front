@@ -152,6 +152,15 @@ if (!activeRelease || activeRelease.release_id !== catalog.release_id) {
   );
 }
 
+const { error: pulseRebuildError } = await client.rpc(
+  "rebuild_pulse_global_filing_candidates",
+  { p_env: catalog.env },
+);
+
+if (pulseRebuildError) {
+  throw new Error(`rebuild_pulse_global_filing_candidates failed: ${pulseRebuildError.message}`);
+}
+
 const { count, error: companyCountError } = await client
   .from("ontology_companies")
   .select("ticker", { count: "exact", head: true })

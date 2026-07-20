@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getAuthUser: vi.fn(),
   composePulseFeed: vi.fn(),
   canAccessMenuFeature: vi.fn(),
+  getPulseFeedRevision: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -18,11 +19,17 @@ vi.mock("@/lib/pulse/composer", () => ({
 vi.mock("@/lib/billing/feature-access-server", () => ({
   canAccessMenuFeature: mocks.canAccessMenuFeature,
 }));
+vi.mock("@/lib/pulse/revision", () => ({
+  getPulseFeedRevision: mocks.getPulseFeedRevision,
+  matchesPulseFeedETag: (value: string | null, revision: string) => value === `\"${revision}\"`,
+  pulseFeedETag: (revision: string) => `\"${revision}\"`,
+}));
 vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => ({}) }));
 
 import { GET } from "@/app/api/pulse/route";
 
 const feed = {
+  revision: "p3.1.1.1",
   generated_at: "2026-07-15T00:00:00.000Z",
   snapshot_at: "2026-07-15T00:00:00.000Z",
   ranking_version: "rule_v3",
@@ -37,6 +44,7 @@ const feed = {
   },
   active_analysis_items: [],
   items: [],
+  item_versions: {},
   new_item_count: 0,
   source_statuses: [],
 };
@@ -49,6 +57,12 @@ describe("GET /api/pulse", () => {
       email: "user@example.com",
     });
     mocks.canAccessMenuFeature.mockResolvedValue(true);
+    mocks.getPulseFeedRevision.mockResolvedValue({
+      value: "p3.1.1.1",
+      globalRevision: 1,
+      userRevision: 1,
+      timeBucket: 1,
+    });
     mocks.composePulseFeed.mockResolvedValue(feed);
   });
 
@@ -123,6 +137,17 @@ describe("GET /api/pulse", () => {
         limit: 20,
       }),
     );
+  });
+
+  it("returns 304 before composition when the private revision matches", async () => {
+    const response = await GET(new NextRequest("http://localhost/api/pulse", {
+      headers: { "if-none-match": '"p3.1.1.1"' },
+    }));
+
+    expect(response.status).toBe(304);
+    expect(response.headers.get("etag")).toBe('"p3.1.1.1"');
+    expect(mocks.composePulseFeed).not.toHaveBeenCalled();
+    expect(mocks.canAccessMenuFeature).not.toHaveBeenCalled();
   });
 
   it("rejects content-type filters because the feed is one ranked stream", async () => {

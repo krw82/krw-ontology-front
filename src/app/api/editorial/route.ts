@@ -3,10 +3,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { forbiddenError, getAuthUser, handleAuthError } from "@/lib/auth";
 import { isEditorialAdmin } from "@/lib/editorial/access";
-import {
-  PULSE_EDITORIAL_BUCKET,
-  invalidatePublishedPulseEditorialEntries,
-} from "@/lib/editorial/repository";
+import { PULSE_EDITORIAL_BUCKET } from "@/lib/editorial/repository";
 import {
   invalidOriginResponse,
   isExpectedMutationOrigin,
@@ -164,10 +161,6 @@ export async function POST(request: NextRequest) {
       await admin.storage.from(PULSE_EDITORIAL_BUCKET).remove(uploadedPaths).catch(() => undefined);
     }
     return errorResponse(500, "이미지 콘텐츠를 저장하지 못했습니다. 다시 시도해주세요.");
-  }
-
-  if (fields.data.status === "published") {
-    invalidatePublishedPulseEditorialEntries();
   }
 
   return Response.json({ id: entryId }, { status: 201 });

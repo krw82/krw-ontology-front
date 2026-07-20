@@ -108,6 +108,9 @@ services:
       - MCP_HEALTH_TIMEOUT_MS=${MCP_HEALTH_TIMEOUT_MS:-30000}
       - MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-INFO}
       - DOCUMENT_STORAGE_ROOT=/srv/krw-document-inbox
+      # Optional dedicated Redis/Valkey DB for shared Pulse candidates. When
+      # omitted, Pulse falls back to the existing queue Redis URL.
+      - PULSE_REDIS_URL=${PULSE_REDIS_URL:-}
       - REDIS_QUEUE_URL=${REDIS_QUEUE_URL:-}
       - DOCUMENT_QUEUE_REDIS_URL=${DOCUMENT_QUEUE_REDIS_URL:-redis://redis:6379/0}
     volumes:

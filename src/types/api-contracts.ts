@@ -1884,6 +1884,8 @@ export interface PulseFeedSummary {
 }
 
 export interface PulseFeedResponse {
+  /** Opaque, account-scoped V3 snapshot revision used for status and delta. */
+  revision: string;
   generated_at: string;
   snapshot_at: string;
   ranking_version: "rule_v3";
@@ -1893,16 +1895,33 @@ export interface PulseFeedResponse {
   summary: PulseFeedSummary;
   active_analysis_items: PulseItem[];
   items: PulseItem[];
+  /** Render fingerprints for private delta synchronization. */
+  item_versions: Record<string, string>;
   new_item_count: number;
   source_statuses: PulseSourceStatus[];
 }
 
 export interface PulseFeedStatusResponse {
   generated_at: string;
-  new_item_count: number;
-  active_analysis_count: number;
-  active_analysis_updated_at: string | null;
-  active_analysis_session_ids: string[];
+  revision: string;
+  changed: boolean;
+}
+
+export interface PulseFeedDeltaResponse {
+  generated_at: string;
+  revision: string;
+  changed: boolean;
+  /** Null when the caller already has the exact current revision. */
+  snapshot: Omit<
+    PulseFeedResponse,
+    "revision" | "generated_at" | "snapshot_at" | "items" | "active_analysis_items" | "item_versions"
+  > | null;
+  ordered_item_ids: string[];
+  active_analysis_item_ids: string[];
+  /** Only cards whose rendering fingerprint changed since the device snapshot. */
+  upserts: PulseItem[];
+  removed_item_ids: string[];
+  item_versions: Record<string, string>;
 }
 
 export interface PulsePreferences {

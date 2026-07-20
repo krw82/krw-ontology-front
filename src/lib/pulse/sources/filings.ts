@@ -2,10 +2,43 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { makePulseItemKey, type PulseCandidate } from "@/lib/pulse/contract";
+import {
+  getOrLoadPulseGlobalCache,
+  pulseGlobalCacheKey,
+} from "@/lib/pulse/global-cache";
 import type { Database, Json, SecFilingFormType } from "@/types/database";
 
-type PulseFilingRowV3 = Database["public"]["Functions"]["get_catalog_pulse_filing_candidates_v3"]["Returns"][number];
-type FilingRow = PulseFilingRowV3;
+/** The compact payload persisted in the V3 global candidate read model. */
+type FilingRow = {
+  filing_event_id: string;
+  ticker: string;
+  covered_tickers: string[];
+  form_type: SecFilingFormType;
+  is_amendment: boolean;
+  occurred_at: string;
+  first_seen_at: string;
+  feed_available_at: string | null;
+  feed_expires_at: string | null;
+  alert_priority: "urgent" | "normal" | "digest";
+  primary_event_tag: string | null;
+  sec_items: string[];
+  form4_reported_purchase_value: number | null;
+  form4_reported_sale_value: number | null;
+  form4_tenb5_one_status: "yes" | "no" | "unknown" | null;
+  form4_has_reported_open_market_trade: boolean | null;
+  candidate_bucket: "urgent" | "priority" | "preferred" | "discovery";
+  filing_brief_headline_ko: string | null;
+  filing_brief_summary_sentences: Json | null;
+  filing_brief_facts: Json | null;
+  filing_brief_question_suggestions: Json | null;
+  filing_brief_generated_at: string | null;
+};
+
+type GlobalFilingCandidateRow = {
+  filing_event_id: string;
+  payload: Json;
+  candidate_bucket: "urgent" | "priority" | "preferred" | "discovery";
+};
 
 type FilingBriefPreview = {
   headline: string;
@@ -17,6 +50,11 @@ type FilingBriefPreview = {
 
 export const MAX_PULSE_FILING_CANDIDATES = 300;
 
+export interface PulseGlobalCandidateVersion {
+  globalRevision: bigint | number | string;
+  timeBucket: bigint | number | string;
+}
+
 /**
  * Global, catalog-scoped filing source. The v3 RPC returns a bounded blend of
  * urgent, high-priority, preferred-company, and discovery candidates. It keeps
@@ -26,21 +64,85 @@ export async function getFilingCandidates(
   supabase: SupabaseClient<Database>,
   now: Date,
   preferredTickers: string[] = [],
+  version?: PulseGlobalCandidateVersion,
 ): Promise<PulseCandidate[]> {
   const env = filingCatalogEnv();
   const snapshotAt = now.toISOString();
-  const params = {
-    p_env: env,
-    p_snapshot_at: snapshotAt,
-    p_preferred_tickers: preferredTickers.slice(0, 100),
-    p_urgent_limit: 80,
-    p_priority_limit: 100,
-    p_preferred_limit: 80,
-    p_discovery_limit: 40,
-  };
-  const v3 = await supabase.rpc("get_catalog_pulse_filing_candidates_v3", params);
-  if (v3.error) throw v3.error;
-  return (v3.data ?? []).slice(0, MAX_PULSE_FILING_CANDIDATES).map(toCandidate);
+  const cacheVersion = version ?? { globalRevision: "uncached", timeBucket: Math.floor(now.getTime() / 300_000) };
+  const baseKey = pulseGlobalCacheKey({ env, ...cacheVersion });
+  const baseRows = await getOrLoadPulseGlobalCache(baseKey, () =>
+    loadCandidateRows(supabase, {
+      p_env: env,
+      p_snapshot_at: snapshotAt,
+      p_preferred_tickers: [],
+      p_urgent_limit: 24,
+      p_priority_limit: 32,
+      p_preferred_limit: 0,
+      p_discovery_limit: 24,
+    }),
+  );
+  const preferredRows = preferredTickers.length === 0
+    ? []
+    : await loadCandidateRows(supabase, {
+      p_env: env,
+      p_snapshot_at: snapshotAt,
+      p_preferred_tickers: preferredTickers.slice(0, 100),
+      p_urgent_limit: 0,
+      p_priority_limit: 0,
+      p_preferred_limit: 40,
+      p_discovery_limit: 0,
+    });
+
+  return deduplicateCandidateRows([...baseRows, ...preferredRows])
+    .slice(0, MAX_PULSE_FILING_CANDIDATES)
+    .flatMap(toCandidateFromGlobalRow);
+}
+
+async function loadCandidateRows(
+  supabase: SupabaseClient<Database>,
+  params: Database["public"]["Functions"]["get_pulse_global_filing_candidates_v1"]["Args"],
+): Promise<GlobalFilingCandidateRow[]> {
+  const { data, error } = await supabase.rpc("get_pulse_global_filing_candidates_v1", params);
+  if (error) throw error;
+  return (data ?? []) as GlobalFilingCandidateRow[];
+}
+
+function deduplicateCandidateRows(rows: GlobalFilingCandidateRow[]): GlobalFilingCandidateRow[] {
+  const buckets = new Map<GlobalFilingCandidateRow["candidate_bucket"], number>([
+    ["urgent", 0],
+    ["priority", 1],
+    ["preferred", 2],
+    ["discovery", 3],
+  ]);
+  const unique = new Map<string, GlobalFilingCandidateRow>();
+  for (const row of rows) {
+    const current = unique.get(row.filing_event_id);
+    if (!current || (buckets.get(row.candidate_bucket) ?? 9) < (buckets.get(current.candidate_bucket) ?? 9)) {
+      unique.set(row.filing_event_id, row);
+    }
+  }
+  return [...unique.values()].sort((left, right) =>
+    (buckets.get(left.candidate_bucket) ?? 9) - (buckets.get(right.candidate_bucket) ?? 9));
+}
+
+function toCandidateFromGlobalRow(row: GlobalFilingCandidateRow): PulseCandidate[] {
+  if (!isRecord(row.payload)) return [];
+  const candidate = {
+    ...row.payload,
+    filing_event_id: row.filing_event_id,
+    candidate_bucket: row.candidate_bucket,
+  } as FilingRow;
+  if (
+    typeof candidate.ticker !== "string"
+    || typeof candidate.form_type !== "string"
+    || typeof candidate.occurred_at !== "string"
+    || typeof candidate.first_seen_at !== "string"
+  ) return [];
+  return [toCandidate(candidate)];
+}
+
+function isRecord(value: Json): value is Record<string, Json | undefined> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function filingCatalogEnv(): "dev" | "staging" | "prod" {

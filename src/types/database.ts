@@ -636,6 +636,38 @@ export interface SecFilingEventRow extends Record<string, unknown> {
   updated_at: string;
 }
 
+export interface PulseGlobalFilingCandidateRow extends Record<string, unknown> {
+  env: "dev" | "staging" | "prod";
+  filing_event_id: string;
+  ticker: string;
+  covered_tickers: string[];
+  alert_priority: "urgent" | "normal" | "digest";
+  priority_rank: number | null;
+  occurred_at: string;
+  available_at: string;
+  expires_at: string | null;
+  payload: Json;
+  candidate_updated_at: string;
+}
+
+export interface PulseGlobalCandidateTickerRow extends Record<string, unknown> {
+  env: "dev" | "staging" | "prod";
+  filing_event_id: string;
+  ticker: string;
+}
+
+export interface PulseGlobalFeedRevisionRow extends Record<string, unknown> {
+  env: "dev" | "staging" | "prod";
+  revision: number;
+  updated_at: string;
+}
+
+export interface UserPulseFeedRevisionRow extends Record<string, unknown> {
+  user_id: string;
+  revision: number;
+  updated_at: string;
+}
+
 export interface FilingNotificationPreferencesRow extends Record<string, unknown> {
   user_id: string;
   enabled: boolean;
@@ -2778,6 +2810,27 @@ export interface Database {
           referencedColumns: string[];
         }>;
       };
+      pulse_global_filing_candidates: {
+        Row: PulseGlobalFilingCandidateRow;
+        Insert: Pick<PulseGlobalFilingCandidateRow, "env" | "filing_event_id" | "ticker" | "alert_priority" | "occurred_at" | "available_at" | "payload"> &
+          Partial<Omit<PulseGlobalFilingCandidateRow, "env" | "filing_event_id" | "ticker" | "alert_priority" | "occurred_at" | "available_at" | "payload" | "candidate_updated_at">> & {
+            candidate_updated_at?: string;
+          };
+        Update: Partial<Omit<PulseGlobalFilingCandidateRow, "env" | "filing_event_id">>;
+        Relationships: [];
+      };
+      pulse_global_candidate_tickers: {
+        Row: PulseGlobalCandidateTickerRow;
+        Insert: PulseGlobalCandidateTickerRow;
+        Update: Partial<PulseGlobalCandidateTickerRow>;
+        Relationships: [];
+      };
+      pulse_global_feed_revisions: {
+        Row: PulseGlobalFeedRevisionRow;
+        Insert: Pick<PulseGlobalFeedRevisionRow, "env"> & Partial<Omit<PulseGlobalFeedRevisionRow, "env" | "updated_at">> & { updated_at?: string };
+        Update: Partial<Omit<PulseGlobalFeedRevisionRow, "env">>;
+        Relationships: [];
+      };
       filing_notification_preferences: {
         Row: FilingNotificationPreferencesRow;
         Insert: Pick<FilingNotificationPreferencesRow, "user_id"> &
@@ -3084,6 +3137,12 @@ export interface Database {
           referencedRelation: string;
           referencedColumns: string[];
         }>;
+      };
+      user_pulse_feed_revisions: {
+        Row: UserPulseFeedRevisionRow;
+        Insert: Pick<UserPulseFeedRevisionRow, "user_id"> & Partial<Omit<UserPulseFeedRevisionRow, "user_id" | "updated_at">> & { updated_at?: string };
+        Update: Partial<Omit<UserPulseFeedRevisionRow, "user_id">>;
+        Relationships: [];
       };
       user_pulse_item_states: {
         Row: UserPulseItemStateRow;
@@ -4330,10 +4389,14 @@ export interface Database {
         };
         Returns: Json;
       };
-      get_catalog_pulse_filing_candidates_v3: {
+      /**
+       * V3 Pulse global filing read model. This is intentionally catalog-only:
+       * it never receives user IDs or returns personalized state.
+       */
+      get_pulse_global_filing_candidates_v1: {
         Args: {
           p_env: string;
-          p_snapshot_at: string;
+          p_snapshot_at?: string;
           p_preferred_tickers?: string[];
           p_urgent_limit?: number;
           p_priority_limit?: number;
@@ -4342,52 +4405,23 @@ export interface Database {
         };
         Returns: Array<{
           filing_event_id: string;
-          ticker: string;
-          covered_tickers: string[];
-          cik: string;
-          accession_number: string;
-          form_type: SecFilingFormType;
-          is_amendment: boolean;
-          filing_date: string;
-          report_date: string | null;
-          accepted_at: string | null;
-          first_seen_at: string;
-          occurred_at: string;
-          feed_available_at: string | null;
-          feed_expires_at: string | null;
-          feed_lane: number | null;
-          feed_priority_rank: number | null;
-          alert_priority: "urgent" | "normal" | "digest";
-          primary_event_tag: string | null;
-          sec_items: string[];
-          event_tags: string[];
-          filing_detail_url: string;
-          primary_document_url: string | null;
-          source_metadata: Json;
-          processing_status: SecFilingEventRow["processing_status"];
-          form4_reported_purchase_value: number | null;
-          form4_reported_sale_value: number | null;
-          form4_tenb5_one_status: "yes" | "no" | "unknown" | null;
-          form4_has_reported_open_market_trade: boolean | null;
+          payload: Json;
           candidate_bucket: "urgent" | "priority" | "preferred" | "discovery";
-          filing_brief_headline_ko: string | null;
-          filing_brief_summary_sentences: Json | null;
-          filing_brief_facts: Json | null;
-          filing_brief_question_suggestions: Json | null;
-          filing_brief_source_document_url: string | null;
-          filing_brief_generated_at: string | null;
         }>;
       };
-      get_catalog_pulse_feed_status_v1: {
-        Args: {
-          p_env: string;
-          p_since: string;
-          p_snapshot_at?: string;
-        };
+      /** Returns the opaque components used by the private Pulse V3 revision. */
+      get_pulse_feed_revisions_v1: {
+        Args: { p_env: string; p_user_id: string; p_now?: string };
         Returns: Array<{
-          new_filing_count: number;
-          latest_filing_available_at: string | null;
+          global_revision: number;
+          user_revision: number;
+          time_bucket: number;
         }>;
+      };
+      /** Backfills the global candidate model after a catalog release changes. */
+      rebuild_pulse_global_filing_candidates: {
+        Args: { p_env: string; p_snapshot_at?: string };
+        Returns: number;
       };
       complete_sec_filing_notification_fanout: {
         Args: { p_job_id: string; p_claim_token: string; p_progress_json?: Json };

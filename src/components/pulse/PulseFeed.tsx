@@ -17,6 +17,7 @@ import {
   saveDevicePulseSnapshot,
 } from "@/lib/pwa/device-cache";
 import type {
+  PulseFeedDeltaResponse,
   PulseFeedResponse,
   PulseFeedStatusResponse,
   PulseItem,
@@ -33,6 +34,7 @@ const PAGE_SIZE = 20;
 
 function isUnavailablePulseFeed(feed: PulseFeedResponse): boolean {
   return (
+    feed.revision === "unavailable" &&
     feed.items.length === 0 &&
     feed.active_analysis_items.length === 0 &&
     feed.source_statuses.some((source) => source.status === "degraded")
@@ -53,7 +55,6 @@ export default function PulseFeed({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [feedSessionId] = useState(createFeedSessionId);
   const [activeAnalysisCount, setActiveAnalysisCount] = useState(initialFeed.summary.active_analysis_count);
-  const generatedAtRef = useRef(initialFeed.generated_at);
   const mountedRef = useRef(true);
   const firstPageControllerRef = useRef<AbortController | null>(null);
   const statusControllerRef = useRef<AbortController | null>(null);
@@ -116,23 +117,6 @@ export default function PulseFeed({
   }, [draftOwnerId, feed]);
 
   useEffect(() => {
-    let active = true;
-    void readDevicePulseSnapshot(draftOwnerId)
-      .then((snapshot) => {
-        if (!active || !snapshot || !isUnavailablePulseFeed(feedRef.current)) {
-          return;
-        }
-        generatedAtRef.current = snapshot.feed.generated_at;
-        setFeed(snapshot.feed);
-        setActiveAnalysisCount(0);
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, [draftOwnerId, setFeed]);
-
-  useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
@@ -161,8 +145,16 @@ export default function PulseFeed({
     try {
       const response = await fetch(
         `/api/pulse?${new URLSearchParams({ filter: "all", limit: String(PAGE_SIZE) })}`,
-        { cache: "no-store", signal: controller.signal },
+        {
+          cache: "no-store",
+          signal: controller.signal,
+          headers: isUnavailablePulseFeed(feedRef.current)
+            || feedRef.current.source_statuses.some((source) => source.status === "degraded")
+            ? undefined
+            : { "If-None-Match": `"${feedRef.current.revision}"` },
+        },
       );
+      if (response.status === 304) return feedRef.current;
       if (!response.ok) throw new Error("feed_failed");
       const next = await response.json() as PulseFeedResponse;
       if (
@@ -172,7 +164,6 @@ export default function PulseFeed({
       ) {
         return null;
       }
-      generatedAtRef.current = next.generated_at;
       setFeed(next);
       setActiveAnalysisCount(next.summary.active_analysis_count);
       setNewItemCount(0);
@@ -199,19 +190,65 @@ export default function PulseFeed({
     }
   }, [cancelStatusRequest, setFeed]);
 
-  useEffect(() => {
-    if (!loadInitialFeed) return;
-    const loadTimer = window.setTimeout(() => {
-      void fetchFirstPage();
-    }, 0);
-    return () => window.clearTimeout(loadTimer);
-  }, [fetchFirstPage, loadInitialFeed]);
+  const fetchDelta = useCallback(async () => {
+    if (firstPageControllerRef.current || pendingMutationIdsRef.current.size > 0) {
+      return null;
+    }
 
-  const pollStatus = useCallback(async () => {
+    cancelStatusRequest();
+    const controller = new AbortController();
+    const requestId = firstPageRequestIdRef.current + 1;
+    firstPageRequestIdRef.current = requestId;
+    firstPageControllerRef.current = controller;
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      const current = feedRef.current;
+      const response = await fetch("/api/pulse/delta", {
+        method: "POST",
+        cache: "no-store",
+        signal: controller.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          revision: current.revision,
+          item_versions: current.item_versions,
+        }),
+      });
+      if (!response.ok) throw new Error("pulse_delta_failed");
+      const delta = await response.json() as PulseFeedDeltaResponse;
+      if (
+        !mountedRef.current
+        || controller.signal.aborted
+        || requestId !== firstPageRequestIdRef.current
+      ) return null;
+      setFeed((existing) => applyPulseFeedDelta(existing, delta));
+      if (delta.snapshot) setActiveAnalysisCount(delta.snapshot.summary.active_analysis_count);
+      setNewItemCount(0);
+      return delta;
+    } catch (error) {
+      if (isAbortError(error) || !mountedRef.current || requestId !== firstPageRequestIdRef.current) {
+        return null;
+      }
+      setErrorMessage(
+        navigator.onLine
+          ? "피드 변경사항을 불러오지 못했습니다. 현재 목록은 그대로 유지됩니다."
+          : "오프라인 상태입니다. 연결되면 다시 동기화합니다.",
+      );
+      return null;
+    } finally {
+      if (firstPageControllerRef.current === controller) {
+        firstPageControllerRef.current = null;
+        if (mountedRef.current) setLoading(false);
+      }
+    }
+  }, [cancelStatusRequest, setFeed]);
+
+  const pollStatus = useCallback(async (applyImmediately = false) => {
     if (
       document.visibilityState !== "visible" ||
       !navigator.onLine ||
-      firstPageControllerRef.current
+      firstPageControllerRef.current ||
+      isUnavailablePulseFeed(feedRef.current)
     ) {
       return;
     }
@@ -222,7 +259,7 @@ export default function PulseFeed({
     statusRequestIdRef.current = requestId;
     statusControllerRef.current = controller;
     try {
-      const params = new URLSearchParams({ since: generatedAtRef.current });
+      const params = new URLSearchParams({ revision: feedRef.current.revision });
       const response = await fetch(`/api/pulse/status?${params}`, {
         cache: "no-store",
         signal: controller.signal,
@@ -236,16 +273,15 @@ export default function PulseFeed({
       ) {
         return;
       }
-      setNewItemCount(next.new_item_count);
-      setActiveAnalysisCount(next.active_analysis_count);
-      const activeSessionIds = new Set(next.active_analysis_session_ids);
-      setFeed((current) => ({
-        ...current,
-        active_analysis_items: current.active_analysis_items.filter((item) => {
-          const sessionId = typeof item.metadata.session_id === "string" ? item.metadata.session_id : null;
-          return !sessionId || activeSessionIds.has(sessionId);
-        }),
-      }));
+      if (next.changed) {
+        if (applyImmediately) {
+          await fetchDelta();
+        } else {
+          // The exact card count is known only after the user asks for its
+          // delta. Keep polling to one cheap revision read.
+          setNewItemCount(1);
+        }
+      }
     } catch (error) {
       if (!isAbortError(error)) {
         // Background status refreshes stay silent. User-initiated requests surface errors.
@@ -255,7 +291,29 @@ export default function PulseFeed({
         statusControllerRef.current = null;
       }
     }
-  }, [cancelStatusRequest, setFeed]);
+  }, [cancelStatusRequest, fetchDelta]);
+
+  useEffect(() => {
+    if (!loadInitialFeed) return;
+    let active = true;
+    void (async () => {
+      const snapshot = await readDevicePulseSnapshot(draftOwnerId).catch(() => null);
+      if (!active) return;
+      if (snapshot && isUnavailablePulseFeed(feedRef.current)) {
+        setFeed(snapshot.feed);
+        setActiveAnalysisCount(snapshot.feed.summary.active_analysis_count);
+      }
+      if (!active) return;
+      if (isUnavailablePulseFeed(feedRef.current)) {
+        await fetchFirstPage();
+      } else {
+        await pollStatus(true);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [draftOwnerId, fetchFirstPage, loadInitialFeed, pollStatus, setFeed]);
 
   useEffect(() => {
     let interval: number | null = null;
@@ -316,7 +374,7 @@ export default function PulseFeed({
       feed_session_id: feedSessionId,
       item_count: newItemCount,
     });
-    const refreshed = await fetchFirstPage();
+    const refreshed = await fetchDelta();
     if (!refreshed) return;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
@@ -338,6 +396,7 @@ export default function PulseFeed({
 
     const body: { action: PulseMutationAction; snoozed_until?: string } = { action };
     if (action === "snooze") body.snoozed_until = new Date(Date.now() + 24 * 60 * 60 * 1_000).toISOString();
+    let saved = false;
     try {
       const response = await fetch(`/api/pulse/items/${encodeURIComponent(item.id)}`, {
         method: "PATCH",
@@ -345,6 +404,7 @@ export default function PulseFeed({
         body: JSON.stringify(body),
       });
       if (!response.ok) throw new Error("pulse_mutation_failed");
+      saved = true;
     } catch {
       setFeed((current) =>
         rollbackPulseItemMutation(current, snapshot, action, timestamp),
@@ -364,6 +424,10 @@ export default function PulseFeed({
         next.delete(item.id);
         return next;
       });
+      // The optimistic card is already correct for the action the user took,
+      // but the database revision has advanced. Reconcile it immediately so
+      // the device snapshot and the next status check share one revision.
+      if (saved) void fetchDelta();
     }
   }
 
@@ -379,6 +443,9 @@ export default function PulseFeed({
         judgment.updated_at ?? new Date().toISOString(),
       ),
     );
+    // Filing judgments update a separate user read model, which advances the
+    // same private feed revision as item-state mutations.
+    void fetchDelta();
   }
 
   return (
@@ -598,6 +665,37 @@ export function capturePulseItemSnapshot(
         ? feed.active_analysis_items[activeAnalysisIndex]
         : null,
     activeAnalysisIndex,
+  };
+}
+
+/** Applies a sparse V3 delta while preserving cards whose fingerprints match. */
+export function applyPulseFeedDelta(
+  feed: PulseFeedResponse,
+  delta: PulseFeedDeltaResponse,
+): PulseFeedResponse {
+  if (!delta.changed || !delta.snapshot) return feed;
+  const byId = new Map<string, PulseItem>([
+    ...feed.items,
+    ...feed.active_analysis_items,
+  ].map((item) => [item.id, item]));
+  for (const item of delta.upserts) byId.set(item.id, item);
+
+  const orderedItems = delta.ordered_item_ids
+    .map((id) => byId.get(id))
+    .filter((item): item is PulseItem => Boolean(item));
+  const activeItems = delta.active_analysis_item_ids
+    .map((id) => byId.get(id))
+    .filter((item): item is PulseItem => Boolean(item));
+
+  return {
+    ...feed,
+    ...delta.snapshot,
+    revision: delta.revision,
+    generated_at: delta.generated_at,
+    snapshot_at: delta.generated_at,
+    items: orderedItems,
+    active_analysis_items: activeItems,
+    item_versions: delta.item_versions,
   };
 }
 

@@ -1011,8 +1011,8 @@ await assertRequiredArgumentProbe(
 );
 
 const pulseSnapshot = new Date();
-const { error: pulseCandidateV3RpcError } = await supabase.rpc(
-  "get_catalog_pulse_filing_candidates_v3",
+const { error: pulseCandidateReadModelRpcError } = await supabase.rpc(
+  "get_pulse_global_filing_candidates_v1",
   {
     p_env: "prod",
     p_snapshot_at: pulseSnapshot.toISOString(),
@@ -1023,13 +1023,13 @@ const { error: pulseCandidateV3RpcError } = await supabase.rpc(
     p_discovery_limit: 1,
   },
 );
-if (pulseCandidateV3RpcError) {
+if (pulseCandidateReadModelRpcError) {
   console.error(
-    `Schema smoke failed for get_catalog_pulse_filing_candidates_v3 RPC: ${pulseCandidateV3RpcError.message}`,
+    `Schema smoke failed for get_pulse_global_filing_candidates_v1 RPC: ${pulseCandidateReadModelRpcError.message}`,
   );
   process.exit(1);
 }
-console.log("OK schema: get_catalog_pulse_filing_candidates_v3 RPC");
+console.log("OK schema: get_pulse_global_filing_candidates_v1 RPC");
 
 const { data: activationResult, error: activationRpcError } =
   await supabase.rpc("try_record_coverage_activation", {
@@ -1063,21 +1063,21 @@ if (
 }
 console.log("OK schema: close_user_decision_session RPC");
 
-const { error: pulseStatusRpcError } = await supabase.rpc(
-  "get_catalog_pulse_feed_status_v1",
+const { data: pulseRevisionData, error: pulseRevisionRpcError } = await supabase.rpc(
+  "get_pulse_feed_revisions_v1",
   {
     p_env: "prod",
-    p_since: new Date(pulseSnapshot.getTime() - 5 * 60_000).toISOString(),
-    p_snapshot_at: pulseSnapshot.toISOString(),
+    p_user_id: "00000000-0000-0000-0000-000000000000",
+    p_now: pulseSnapshot.toISOString(),
   },
 );
-if (pulseStatusRpcError) {
+if (pulseRevisionRpcError || !Array.isArray(pulseRevisionData) || pulseRevisionData.length !== 1) {
   console.error(
-    `Schema smoke failed for get_catalog_pulse_feed_status_v1 RPC: ${pulseStatusRpcError.message}`,
+    `Schema smoke failed for get_pulse_feed_revisions_v1 RPC: ${pulseRevisionRpcError?.message ?? "invalid result"}`,
   );
   process.exit(1);
 }
-console.log("OK schema: get_catalog_pulse_feed_status_v1 RPC");
+console.log("OK schema: get_pulse_feed_revisions_v1 RPC");
 
 const secLimiterScope = `schema-smoke-${Date.now()}`;
 const { data: secSlot, error: secSlotError } = await supabase.rpc(
@@ -1270,7 +1270,7 @@ await expectAnonRpcBlocked("mark_agent_run_terminal", {
 await expectAnonRpcBlocked("publish_ontology_web_catalog", {
   p_catalog: {},
 });
-await expectAnonRpcBlocked("get_catalog_pulse_filing_candidates_v3", {
+await expectAnonRpcBlocked("get_pulse_global_filing_candidates_v1", {
   p_env: "prod",
   p_snapshot_at: new Date().toISOString(),
   p_preferred_tickers: [],
@@ -1287,10 +1287,10 @@ await expectAnonRpcBlocked("close_user_decision_session", {
   p_feed_session_id: "00000000-0000-4000-8000-000000000000",
   p_timezone: "UTC",
 });
-await expectAnonRpcBlocked("get_catalog_pulse_feed_status_v1", {
+await expectAnonRpcBlocked("get_pulse_feed_revisions_v1", {
   p_env: "prod",
-  p_since: new Date(Date.now() - 5 * 60_000).toISOString(),
-  p_snapshot_at: new Date().toISOString(),
+  p_user_id: zeroUuid,
+  p_now: new Date().toISOString(),
 });
 await expectAnonRpcBlocked("reserve_sec_request_slot", {
   p_scope: "anon-schema-smoke",

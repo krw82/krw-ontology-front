@@ -11,7 +11,6 @@ import type {
 export const PULSE_EDITORIAL_BUCKET = "pulse-editorial";
 
 const MAX_PULSE_EDITORIAL_CANDIDATES = 48;
-const PUBLISHED_EDITORIAL_CACHE_TTL_MS = 5 * 60 * 1_000;
 
 export type PulseEditorialEntryWithAssets = PulseEditorialEntryRow & {
   pulse_editorial_assets: PulseEditorialAssetRow[];
@@ -65,50 +64,17 @@ async function listPublishedPulseEditorialEntries(
   return data ?? [];
 }
 
-let publishedEntriesCache: {
-  expiresAt: number;
-  entries: PulseEditorialPublishedEntry[];
-} | null = null;
-let publishedEntriesLoad: Promise<PulseEditorialPublishedEntry[]> | null = null;
-let publishedEntriesGeneration = 0;
-
 /**
- * Editorial cards are shared, public content. This process-local cache keeps
- * the join out of repeated personalized Pulse requests without importing a
- * Next-only cache API into code also bundled for background workers.
+ * Editorial cards participate in the global Pulse revision. Do not keep a
+ * process-local cache here: a database-triggered revision can be observed by
+ * another web instance before an in-memory cache has been invalidated. Pulse
+ * only calls this after a revision change, so the bounded shared-content read
+ * is preferable to serving a revision/content mismatch.
  */
 export async function getPublishedPulseEditorialEntries(): Promise<
   PulseEditorialPublishedEntry[]
 > {
-  const now = Date.now();
-  if (publishedEntriesCache && publishedEntriesCache.expiresAt > now) {
-    return publishedEntriesCache.entries;
-  }
-  if (publishedEntriesLoad) return publishedEntriesLoad;
-
-  const generation = publishedEntriesGeneration;
-  const load = listPublishedPulseEditorialEntries(getSupabaseAdmin())
-    .then((entries) => {
-      if (generation === publishedEntriesGeneration) {
-        publishedEntriesCache = {
-          entries,
-          expiresAt: Date.now() + PUBLISHED_EDITORIAL_CACHE_TTL_MS,
-        };
-      }
-      return entries;
-    });
-  publishedEntriesLoad = load;
-  try {
-    return await load;
-  } finally {
-    if (publishedEntriesLoad === load) publishedEntriesLoad = null;
-  }
-}
-
-export function invalidatePublishedPulseEditorialEntries(): void {
-  publishedEntriesCache = null;
-  publishedEntriesLoad = null;
-  publishedEntriesGeneration += 1;
+  return listPublishedPulseEditorialEntries(getSupabaseAdmin());
 }
 
 export function editorialPublicUrl(

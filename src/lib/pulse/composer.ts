@@ -42,6 +42,8 @@ import { getFilingCandidates } from "@/lib/pulse/sources/filings";
 import { getQuestionCandidates } from "@/lib/pulse/sources/questions";
 import { getRawResurfaceCandidates, selectResurfaceCandidate } from "@/lib/pulse/sources/resurface";
 import { buildPulseSummary } from "@/lib/pulse/summary";
+import { buildPulseItemVersions } from "@/lib/pulse/delta";
+import { getPulseFeedRevision, type PulseFeedRevision } from "@/lib/pulse/revision";
 import { getPulseFilingDecisionContext } from "@/lib/judgments/read-model";
 import type {
   PulseFeedResponse,
@@ -62,6 +64,8 @@ export interface ComposePulseFeedOptions {
   limit?: number;
   since?: string | null;
   now?: Date;
+  /** The route obtains this once so the snapshot and HTTP ETag cannot diverge. */
+  revision?: PulseFeedRevision;
 }
 
 /**
@@ -76,9 +80,11 @@ export async function composePulseFeed({
   limit = PULSE_PAGE_SIZE,
   since,
   now = new Date(),
+  revision: suppliedRevision,
 }: ComposePulseFeedOptions): Promise<PulseFeedResponse> {
   const snapshotAt = now;
-  const [preferences, userSignals, monitoringRules] = await Promise.all([
+  const [revision, preferences, userSignals, monitoringRules] = await Promise.all([
+    suppliedRevision ?? getPulseFeedRevision(supabase, userId, snapshotAt),
     getPulsePreferences(supabase, userId),
     getPulseUserTickerSignals(supabase, userId, snapshotAt),
     getPulseMonitoringRules(supabase, userId),
@@ -91,7 +97,11 @@ export async function composePulseFeed({
   // the client keeps its last known-good/offline snapshot.
 
   const settled = await Promise.allSettled([
-    loadSource("filing", enabledKinds.has("filing"), () => getFilingCandidates(supabase, snapshotAt, userSignals.preferredTickers)),
+    loadSource(
+      "filing",
+      enabledKinds.has("filing"),
+      () => getFilingCandidates(supabase, snapshotAt, userSignals.preferredTickers, revision),
+    ),
     loadSource("analysis", enabledKinds.has("analysis"), () => getAnalysisCandidates(supabase, userId, snapshotAt)),
     loadSource(
       "question",
@@ -227,7 +237,11 @@ export async function composePulseFeed({
 
   const sinceTime = since && !Number.isNaN(Date.parse(since)) ? Date.parse(since) : null;
 
+  const publicActiveAnalysis = toPublicItems(visibleActiveAnalysis);
+  const publicItems = toPublicItems(displayItems);
+
   return {
+    revision: revision.value,
     generated_at: snapshotAt.toISOString(),
     snapshot_at: snapshotAt.toISOString(),
     ranking_version: "rule_v3",
@@ -235,8 +249,12 @@ export async function composePulseFeed({
     date_label: formatDateLabel(snapshotAt, preferences.timezone),
     filter,
     summary,
-    active_analysis_items: toPublicItems(visibleActiveAnalysis),
-    items: toPublicItems(displayItems),
+    active_analysis_items: publicActiveAnalysis,
+    items: publicItems,
+    item_versions: buildPulseItemVersions({
+      active_analysis_items: publicActiveAnalysis,
+      items: publicItems,
+    }),
     new_item_count: sinceTime === null
       ? 0
       : ranked.filter((item) => item.actionable
@@ -254,6 +272,7 @@ export async function composePulseFeed({
  */
 export function createUnavailablePulseFeed(now = new Date()): PulseFeedResponse {
   return {
+    revision: "unavailable",
     generated_at: now.toISOString(),
     snapshot_at: now.toISOString(),
     ranking_version: "rule_v3",
@@ -268,6 +287,7 @@ export function createUnavailablePulseFeed(now = new Date()): PulseFeedResponse 
     },
     active_analysis_items: [],
     items: [],
+    item_versions: {},
     new_item_count: 0,
     source_statuses: SOURCE_KINDS.map((source) => degradedStatus(source)),
   };

@@ -86,7 +86,6 @@ export async function getAnalysisCandidates(
     sessions,
     latestRuns,
     new Map(messageRows.map((message) => [message.id, message])),
-    now,
   );
 }
 
@@ -94,7 +93,6 @@ export function buildAnalysisCandidates(
   sessions: AnalysisSession[],
   runs: AnalysisRun[],
   messagesById: Map<string, AnalysisMessage>,
-  now = new Date(),
 ): PulseCandidate[] {
   const sessionById = new Map(sessions.map((session) => [session.id, session]));
 
@@ -155,7 +153,9 @@ export function buildAnalysisCandidates(
         run_status: run.status,
         session_id: session.id,
         user_started: true,
-        updated_at: now.toISOString(),
+        // Keep a completed card stable across unchanged V3 snapshots. Using
+        // compose time here made every delta treat the same analysis as new.
+        updated_at: session.updated_at,
       },
     }];
   });

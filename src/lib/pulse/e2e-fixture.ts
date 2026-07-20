@@ -72,6 +72,7 @@ export function createStaticPulseE2EFeed(): PulseFeedResponse {
   };
 
   return {
+    revision: "p3.1.1.1",
     generated_at: FIXTURE_TIMESTAMP,
     snapshot_at: FIXTURE_TIMESTAMP,
     ranking_version: "rule_v3",
@@ -92,6 +93,7 @@ export function createStaticPulseE2EFeed(): PulseFeedResponse {
     },
     active_analysis_items: [],
     items: [item],
+    item_versions: {},
     new_item_count: 0,
     source_statuses: [
       { source: "filing", status: "ready", item_count: 1 },

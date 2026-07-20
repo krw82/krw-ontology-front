@@ -8,7 +8,7 @@ export const DEVICE_CACHE_DB = "krwo-device-cache";
 const DEVICE_CACHE_STORE = "records";
 const DEVICE_CACHE_VERSION = 1;
 const DEVICE_CACHE_SCHEMA_VERSION = 1;
-const PULSE_SNAPSHOT_VERSION = 1;
+const PULSE_SNAPSHOT_VERSION = 2;
 const MAX_CACHED_COMPANY_BROWSE_CARDS = 3_000;
 const MAX_CACHED_PULSE_ITEMS = 50;
 const MAX_CACHED_SESSIONS = 50;
@@ -112,13 +112,22 @@ export function buildDevicePulseSnapshot(
     question: items.filter((item) => item.kind === "question").length,
     resurface: items.filter((item) => item.kind === "resurface").length,
   };
+  const retainedItemIds = new Set(items.map((item) => item.id));
+  const itemVersions = Object.fromEntries(
+    Object.entries(feed.item_versions).filter(([id]) => retainedItemIds.has(id)),
+  );
   return {
     version: PULSE_SNAPSHOT_VERSION,
     synchronized_at: feed.generated_at,
     feed: {
       ...feed,
+      // This is deliberately not a server revision: a privacy-filtered local
+      // snapshot excludes active analysis cards and must force one delta read
+      // before it can be treated as current.
+      revision: "device-partial",
       active_analysis_items: [],
       items,
+      item_versions: itemVersions,
       new_item_count: 0,
       summary: {
         ...feed.summary,

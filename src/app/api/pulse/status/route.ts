@@ -8,9 +8,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const querySchema = z.object({
-  since: z.iso.datetime(),
-});
+  revision: z.string().min(1).max(128).optional(),
+}).strict();
 
+/** V3 lightweight poll: one revision RPC, no candidate or chat scans. */
 export async function GET(request: NextRequest) {
   let user;
   try {
@@ -20,12 +21,10 @@ export async function GET(request: NextRequest) {
   }
   if (!user) return handleAuthError(new Error("No user"));
 
-  const parsed = querySchema.safeParse(
-    Object.fromEntries(request.nextUrl.searchParams),
-  );
+  const parsed = querySchema.safeParse(Object.fromEntries(request.nextUrl.searchParams));
   if (!parsed.success) {
     return Response.json(
-      { error: { code: "validation_error", message: "새 항목 확인 시각이 올바르지 않습니다." } },
+      { error: { code: "validation_error", message: "피드 버전 값이 올바르지 않습니다." } },
       { status: 400 },
     );
   }
@@ -34,14 +33,14 @@ export async function GET(request: NextRequest) {
     const status = await getPulseFeedStatus({
       supabase: getSupabaseAdmin(),
       userId: user.id,
-      since: new Date(parsed.data.since),
+      revision: parsed.data.revision ?? null,
     });
     return Response.json(status, {
       headers: { "Cache-Control": "private, no-store, max-age=0" },
     });
   } catch {
     return Response.json(
-      { error: { code: "service_unavailable", message: "새 피드 항목을 확인하지 못했습니다." } },
+      { error: { code: "service_unavailable", message: "피드 변경 여부를 확인하지 못했습니다." } },
       { status: 503 },
     );
   }

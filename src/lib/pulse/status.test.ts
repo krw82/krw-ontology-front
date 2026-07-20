@@ -2,33 +2,23 @@ import { describe, expect, it } from "vitest";
 import { summarizePulseFeedStatus } from "@/lib/pulse/status";
 
 describe("summarizePulseFeedStatus", () => {
-  it("keeps active work as current state and counts only terminal analysis work as new", () => {
-    const response = summarizePulseFeedStatus({
+  it("only reports whether the caller revision differs from the current private revision", () => {
+    expect(summarizePulseFeedStatus({
       now: new Date("2026-07-17T00:00:00.000Z"),
-      newFilingCount: 3,
-      activeAnalysisCount: 2,
-      activeAnalysisUpdatedAt: "2026-07-16T23:59:00.000Z",
-      activeAnalysisSessionIds: ["session-2", "session-1", "session-2"],
-      completedAnalysisCount: 1,
-    });
-
-    expect(response).toEqual({
+      revision: "p3.8.4.123",
+      knownRevision: "p3.8.4.122",
+    })).toEqual({
       generated_at: "2026-07-17T00:00:00.000Z",
-      new_item_count: 4,
-      active_analysis_count: 2,
-      active_analysis_updated_at: "2026-07-16T23:59:00.000Z",
-      active_analysis_session_ids: ["session-2", "session-1"],
+      revision: "p3.8.4.123",
+      changed: true,
     });
   });
 
-  it("caps the new-items badge without reducing the active analysis count", () => {
+  it("does not turn an equal revision into a fake new-item count", () => {
     expect(summarizePulseFeedStatus({
       now: new Date("2026-07-17T00:00:00.000Z"),
-      newFilingCount: 99,
-      activeAnalysisCount: 123,
-      activeAnalysisUpdatedAt: null,
-      activeAnalysisSessionIds: [],
-      completedAnalysisCount: 10,
-    })).toMatchObject({ new_item_count: 99, active_analysis_count: 123 });
+      revision: "p3.8.4.123",
+      knownRevision: "p3.8.4.123",
+    }).changed).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyPulseFeedDelta,
   applyPulseJudgment,
   applyPulseItemMutation,
   capturePulseItemSnapshot,
@@ -49,6 +50,7 @@ function filing(id: string): PulseItem {
 
 function feed(items: PulseItem[]): PulseFeedResponse {
   return {
+    revision: "p3.1.1.1",
     generated_at: "2026-07-17T00:00:00.000Z",
     snapshot_at: "2026-07-17T00:00:00.000Z",
     ranking_version: "rule_v3",
@@ -68,12 +70,47 @@ function feed(items: PulseItem[]): PulseFeedResponse {
     },
     active_analysis_items: [],
     items,
+    item_versions: {},
     new_item_count: 0,
     source_statuses: [],
   };
 }
 
 describe("PulseFeed item-scoped optimistic rollback", () => {
+  it("applies a sparse V3 delta without dropping a card whose fingerprint did not change", () => {
+    const first = filing("first");
+    const second = filing("second");
+    const current = {
+      ...feed([first, second]),
+      revision: "p3.1.1.1",
+      item_versions: { first: "v1-same", second: "v1-old" },
+    };
+    const next = applyPulseFeedDelta(current, {
+      generated_at: "2026-07-17T02:00:00.000Z",
+      revision: "p3.1.2.1",
+      changed: true,
+      snapshot: {
+        ranking_version: "rule_v3",
+        timezone: "Asia/Seoul",
+        date_label: "7월 17일",
+        filter: "all",
+        summary: current.summary,
+        new_item_count: 1,
+        source_statuses: [],
+      },
+      ordered_item_ids: ["second", "first"],
+      active_analysis_item_ids: [],
+      upserts: [{ ...second, title: "updated second" }],
+      removed_item_ids: [],
+      item_versions: { first: "v1-same", second: "v1-new" },
+    });
+
+    expect(next.items.map((item) => item.id)).toEqual(["second", "first"]);
+    expect(next.items[0]?.title).toBe("updated second");
+    expect(next.items[1]?.title).toBe("first");
+    expect(next.revision).toBe("p3.1.2.1");
+  });
+
   it("does not erase another item's successful review when one review fails", () => {
     const first = filing("first");
     const second = filing("second");

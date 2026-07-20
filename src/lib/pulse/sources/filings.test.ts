@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getFilingCandidates } from "@/lib/pulse/sources/filings";
 import type { Database } from "@/types/database";
 
-function filingRow(filingEventId: string, candidateBucket = "preferred") {
+function filingPayload(filingEventId: string) {
   return {
     filing_event_id: filingEventId,
     ticker: "AAPL",
@@ -33,7 +33,6 @@ function filingRow(filingEventId: string, candidateBucket = "preferred") {
     form4_reported_sale_value: null,
     form4_tenb5_one_status: null,
     form4_has_reported_open_market_trade: null,
-    candidate_bucket: candidateBucket,
     filing_brief_headline_ko: null,
     filing_brief_summary_sentences: null,
     filing_brief_facts: null,
@@ -44,11 +43,17 @@ function filingRow(filingEventId: string, candidateBucket = "preferred") {
 }
 
 describe("Pulse filing source", () => {
-  it("uses the brief-aware bounded candidate RPC instead of following every global feed page", async () => {
-    const rpc = vi.fn(async (name: string) => {
-      if (name !== "get_catalog_pulse_filing_candidates_v3") throw new Error("unexpected rpc");
+  it("reads a shared global candidate slice and a small preferred overlay", async () => {
+    const rpc = vi.fn(async (name: string, params: { p_preferred_tickers?: string[] }) => {
+      if (name !== "get_pulse_global_filing_candidates_v1") throw new Error("unexpected rpc");
       return {
-        data: [filingRow("event-1")],
+        data: params.p_preferred_tickers?.length
+          ? [{
+              filing_event_id: "event-1",
+              payload: filingPayload("event-1"),
+              candidate_bucket: "preferred",
+            }]
+          : [],
         error: null,
       };
     });
@@ -58,13 +63,19 @@ describe("Pulse filing source", () => {
       supabase,
       new Date("2026-07-15T00:00:00.000Z"),
       ["AAPL"],
+      { globalRevision: 4, timeBucket: 10 },
     );
 
-    expect(rpc).toHaveBeenCalledTimes(1);
-    expect(rpc).toHaveBeenCalledWith("get_catalog_pulse_filing_candidates_v3", expect.objectContaining({
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc).toHaveBeenCalledWith("get_pulse_global_filing_candidates_v1", expect.objectContaining({
+      p_preferred_tickers: [],
+      p_urgent_limit: 24,
+      p_priority_limit: 32,
+      p_discovery_limit: 24,
+    }));
+    expect(rpc).toHaveBeenCalledWith("get_pulse_global_filing_candidates_v1", expect.objectContaining({
       p_preferred_tickers: ["AAPL"],
-      p_urgent_limit: 80,
-      p_priority_limit: 100,
+      p_preferred_limit: 40,
     }));
     expect(candidates).toHaveLength(1);
     expect(candidates[0]).toMatchObject({
@@ -76,15 +87,19 @@ describe("Pulse filing source", () => {
 
   it("uses a ready source-grounded brief for the card without changing Form 4 behavior", async () => {
     const rpc = vi.fn(async (name: string) => {
-      if (name !== "get_catalog_pulse_filing_candidates_v3") throw new Error("unexpected rpc");
+      if (name !== "get_pulse_global_filing_candidates_v1") throw new Error("unexpected rpc");
       return {
         data: [{
-          ...filingRow("event-brief"),
-          filing_brief_headline_ko: "AAPL 계약 변경 공시",
-          filing_brief_summary_sentences: ["회사는 계약 변경 사실을 공시했습니다."],
-          filing_brief_facts: [{ fact_ko: "계약 상대방이 명시됐습니다." }],
-          filing_brief_question_suggestions: ["계약 변경의 핵심 조항을 원문 기준으로 정리해줘"],
-          filing_brief_generated_at: "2026-07-15T01:00:00.000Z",
+          filing_event_id: "event-brief",
+          payload: {
+            ...filingPayload("event-brief"),
+            filing_brief_headline_ko: "AAPL 계약 변경 공시",
+            filing_brief_summary_sentences: ["회사는 계약 변경 사실을 공시했습니다."],
+            filing_brief_facts: [{ fact_ko: "계약 상대방이 명시됐습니다." }],
+            filing_brief_question_suggestions: ["계약 변경의 핵심 조항을 원문 기준으로 정리해줘"],
+            filing_brief_generated_at: "2026-07-15T01:00:00.000Z",
+          },
+          candidate_bucket: "priority",
         }],
         error: null,
       };
