@@ -171,10 +171,7 @@ export default function InsiderTradeStackCard({
         <div className="absolute inset-y-0 left-0 w-1 bg-primary" aria-hidden="true" />
         <div className="p-lg pl-[22px] sm:p-xl sm:pl-[26px]">
           <div className="flex items-start justify-between gap-base">
-            <div className="flex min-w-0 items-center gap-sm">
-              <span className="grid size-9 shrink-0 place-items-center rounded-[11px] bg-primary-fixed/50" aria-hidden="true">
-                <span className="material-symbols-outlined text-[19px] text-ink">account_balance</span>
-              </span>
+            <div className="flex min-w-0 items-center">
               <div className="min-w-0">
                 <p className="text-[11px] font-black uppercase tracking-[0.13em] text-muted">내부자 거래</p>
                 <p className="mt-0.5 text-[12px] font-extrabold text-primary">오늘 확인할 묶음</p>
@@ -230,13 +227,7 @@ export default function InsiderTradeStackCard({
               {expanded ? "거래 접기" : `거래 ${items.length}건 모두 보기`}
               <span className="material-symbols-outlined text-[16px]" aria-hidden="true">{expanded ? "expand_less" : "expand_more"}</span>
             </button>
-            <span className="text-[12px] font-semibold text-muted">중요도와 내 리서치 맥락을 우선해 정렬</span>
           </div>
-
-          <details className="mt-base border-t border-hairline pt-sm text-[12px] text-muted">
-            <summary className="inline-flex min-h-11 cursor-pointer select-none items-center font-semibold hover:text-body">왜 이 거래가 묶여 있나요?</summary>
-            <p className="mt-xs leading-5">같은 날짜에 들어온 Form 4 공시를 하나의 흐름으로 묶었습니다. 펼친 뒤 각 거래의 영향, 한 문장 이유와 다음 행동을 따로 저장합니다.</p>
-          </details>
         </div>
       </article>
     </div>

@@ -47,7 +47,7 @@ export default function PulseCard({
   const impressionSent = useRef(false);
   const style = KIND_STYLES[item.kind];
   const isDevelopmentShowcase = item.metadata.development_showcase === true;
-  const showsCompanyLogo = item.kind === "question" && Boolean(item.ticker);
+  const showsCompanyLogo = Boolean(item.ticker);
   const hasSourceGroundedBrief = item.kind === "filing" && item.metadata.filing_brief_ready === true;
   const [expandedReviewedItemId, setExpandedReviewedItemId] = useState<
     string | null
@@ -159,20 +159,18 @@ export default function PulseCard({
     >
       <div className={`absolute inset-y-0 left-0 w-1 ${style.rail}`} aria-hidden="true" />
       <div className="p-lg pl-[22px] sm:p-xl sm:pl-[26px]">
-        <div className="flex items-start justify-between gap-base">
-          <div className="flex min-w-0 items-center gap-sm">
-            <span className={`grid size-9 shrink-0 place-items-center rounded-[11px] ${style.wash}`} aria-hidden="true">
+          <div className="flex items-start justify-between gap-base">
+            <div className="flex min-w-0 items-center gap-sm">
               {showsCompanyLogo && item.ticker ? (
-                <CompanyLogo
-                  ticker={item.ticker}
-                  companyName={item.ticker}
-                  className="size-7 text-[10px] text-ink"
-                  imageSize={48}
-                />
-              ) : (
-                <span className="material-symbols-outlined text-[19px] text-ink">{style.icon}</span>
-              )}
-            </span>
+                <span className={`grid size-9 shrink-0 place-items-center rounded-[11px] ${style.wash}`} aria-hidden="true">
+                  <CompanyLogo
+                    ticker={item.ticker}
+                    companyName={item.ticker}
+                    className="size-7 text-[10px] text-ink"
+                    imageSize={48}
+                  />
+                </span>
+              ) : null}
             <div className="min-w-0">
               <p className="truncate text-[11px] font-black uppercase tracking-[0.13em] text-muted">{item.eyebrow}</p>
               {item.priority === "urgent" ? <p className="mt-0.5 text-[11px] font-black text-[#c43c22]">긴급 · 먼저 확인</p> : null}
@@ -216,6 +214,9 @@ export default function PulseCard({
             ))}
           </div>
         ) : null}
+        {item.kind === "learning" && (item.metadata.learning_kind === "image" || item.metadata.learning_kind === "carousel") ? (
+          <PulseEditorialMedia item={item} />
+        ) : null}
         {item.kind !== "filing" ? (
           <p className="mt-sm text-[14px] leading-6 text-body">{item.body}</p>
         ) : null}
@@ -223,10 +224,12 @@ export default function PulseCard({
         {item.kind === "filing" ? (
           <>
             <FilingSourceStrip item={item} />
-            <p className="mt-sm flex items-start gap-xs rounded-[10px] bg-surface-soft px-sm py-xs text-[12px] font-semibold leading-5 text-muted">
-              <span className="material-symbols-outlined mt-0.5 text-[15px]" aria-hidden="true">filter_alt</span>
-              <span><strong className="font-extrabold text-body">표시 이유</strong> · {item.reason_label}</span>
-            </p>
+            {!isDevelopmentShowcase ? (
+              <p className="mt-sm flex items-start gap-xs rounded-[10px] bg-surface-soft px-sm py-xs text-[12px] font-semibold leading-5 text-muted">
+                <span className="material-symbols-outlined mt-0.5 text-[15px]" aria-hidden="true">filter_alt</span>
+                <span><strong className="font-extrabold text-body">표시 이유</strong> · {item.reason_label}</span>
+              </p>
+            ) : null}
             <FilingJudgmentPanel
               item={item}
               questionHref={questionHref?.type === "link" ? questionHref.href : null}
@@ -279,7 +282,7 @@ export default function PulseCard({
         </div>
         )}
 
-        {item.kind !== "filing" ? (
+        {item.kind !== "filing" && item.trigger !== "editorial" ? (
           <p className="mt-base flex min-h-11 items-center border-t border-hairline pt-sm text-[12px] font-semibold leading-5 text-muted">
             <span><strong className="font-bold text-body">{triggerLabel(item.trigger)}</strong> · {item.reason_label}</span>
           </p>
@@ -298,6 +301,36 @@ export default function PulseCard({
         ) : null}
       </div>
     </article>
+  );
+}
+
+function PulseEditorialMedia({ item }: { item: PulseItem }) {
+  const assetCount = Math.max(0, Math.min(8, Number(item.metadata.asset_count ?? 0)));
+  const assets = Array.from({ length: assetCount }, (_, index) => ({
+    url: String(item.metadata[`asset_${index + 1}`] ?? ""),
+    alt: String(item.metadata[`asset_alt_${index + 1}`] ?? `${item.title} 이미지 ${index + 1}`),
+  })).filter((asset) => asset.url.length > 0);
+  const [activeIndex, setActiveIndex] = useState(0);
+  if (assets.length === 0) return null;
+  const active = assets[Math.min(activeIndex, assets.length - 1)]!;
+  const isCarousel = assets.length > 1;
+
+  return (
+    <section className="mt-base" aria-label={isCarousel ? "편집 이미지 캐러셀" : "편집 이미지"}>
+      <div className="overflow-hidden rounded-[13px] border border-hairline bg-surface-soft">
+        {/* External editorial assets are uploaded through the authenticated server route. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={active.url} alt={active.alt} className="block max-h-[560px] w-full object-contain" />
+      </div>
+      {isCarousel ? (
+        <div className="mt-sm flex items-center justify-between gap-sm">
+          <div className="flex gap-xs" aria-label="캐러셀 페이지">
+            {assets.map((asset, index) => <button key={asset.url} type="button" onClick={() => setActiveIndex(index)} aria-label={`${index + 1}번째 이미지 보기`} aria-current={index === activeIndex ? "true" : undefined} className={`size-8 rounded-full text-[11px] font-black ${index === activeIndex ? "bg-ink text-white" : "bg-surface-soft text-muted hover:bg-primary-fixed"}`}>{index + 1}</button>)}
+          </div>
+          <span className="text-[12px] font-semibold text-muted">{activeIndex + 1} / {assets.length}</span>
+        </div>
+      ) : null}
+    </section>
   );
 }
 

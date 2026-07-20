@@ -58,8 +58,11 @@ const PRODUCT_ROUTE_ROOTS = new Set([
 export function shouldOfferServiceWorkerUpdate(
   worker: ServiceWorker | null | undefined,
   hasActiveController: boolean,
+  isStandalone: boolean,
 ): worker is ServiceWorker {
-  return Boolean(worker && hasActiveController && worker.state === "installed");
+  return Boolean(
+    isStandalone && worker && hasActiveController && worker.state === "installed",
+  );
 }
 
 export function shouldReloadForControllerChange({

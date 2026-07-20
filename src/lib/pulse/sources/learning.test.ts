@@ -1,8 +1,25 @@
-import { describe, expect, it } from "vitest";
-import { buildLearningCandidates, selectLearningCandidate } from "@/lib/pulse/sources/learning";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const editorialMocks = vi.hoisted(() => ({
+  getEditorialLearningCandidates: vi.fn(),
+}));
+
+vi.mock("@/lib/pulse/sources/editorial", () => ({
+  getEditorialLearningCandidates: editorialMocks.getEditorialLearningCandidates,
+}));
+
+import {
+  buildLearningCandidates,
+  getLearningCandidates,
+  selectLearningCandidate,
+} from "@/lib/pulse/sources/learning";
 import { pulseLearningEntrySchema } from "@/lib/pulse/learning-schema";
 
 describe("Pulse learning source", () => {
+  beforeEach(() => {
+    editorialMocks.getEditorialLearningCandidates.mockReset();
+  });
+
   it("rotates exactly one curated entry after per-item state filtering", () => {
     const candidates = buildLearningCandidates(new Date("2026-07-15T00:00:00.000Z"));
     const first = selectLearningCandidate(candidates, "user-1", new Date("2026-07-15T00:00:00.000Z"));
@@ -34,5 +51,16 @@ describe("Pulse learning source", () => {
       active_until: "2027-01-01T00:00:00.000Z",
     };
     expect(pulseLearningEntrySchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it("keeps a static learning card available when editorial retrieval fails", async () => {
+    editorialMocks.getEditorialLearningCandidates.mockRejectedValue(new Error("offline"));
+
+    const candidates = await getLearningCandidates(
+      {} as never,
+      new Date("2026-07-15T00:00:00.000Z"),
+    );
+
+    expect(candidates.length).toBeGreaterThan(0);
   });
 });

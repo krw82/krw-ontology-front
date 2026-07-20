@@ -1,6 +1,9 @@
 import { PULSE_LEARNING_ENTRIES } from "@/content/pulse/learning";
 import { makePulseItemKey, type PulseCandidate } from "@/lib/pulse/contract";
 import { pulseLearningManifestSchema } from "@/lib/pulse/learning-schema";
+import { getEditorialLearningCandidates } from "@/lib/pulse/sources/editorial";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
 
 /** Returns all active static entries; weekly rotation follows item-state filtering. */
 export function buildLearningCandidates(now: Date): PulseCandidate[] {
@@ -47,6 +50,26 @@ export function buildLearningCandidates(now: Date): PulseCandidate[] {
         panel_4: entry.panels?.[3] ?? null,
       },
     }));
+}
+
+/** Prefer published database content, retaining static entries as a safe fallback. */
+export async function getLearningCandidates(
+  supabase: SupabaseClient<Database>,
+  now: Date,
+): Promise<PulseCandidate[]> {
+  try {
+    const editorial = await getEditorialLearningCandidates(supabase, now);
+    return editorial.length > 0 ? editorial : buildLearningCandidates(now);
+  } catch (error) {
+    // Editorial is an optional shared source. A transient cache or database
+    // failure must not remove the established static learning card.
+    console.warn("[pulse] editorial learning source unavailable", {
+      error_code: typeof error === "object" && error && "code" in error
+        ? String(error.code)
+        : "unknown",
+    });
+    return buildLearningCandidates(now);
+  }
 }
 
 export function selectLearningCandidate(

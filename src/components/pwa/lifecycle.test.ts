@@ -22,10 +22,19 @@ function workerWithState(state: ServiceWorkerState): ServiceWorker {
 
 describe("PWA lifecycle guards", () => {
   it("offers only an installed worker when an older controller exists", () => {
-    expect(shouldOfferServiceWorkerUpdate(workerWithState("installed"), true)).toBe(true);
-    expect(shouldOfferServiceWorkerUpdate(workerWithState("installing"), true)).toBe(false);
-    expect(shouldOfferServiceWorkerUpdate(workerWithState("installed"), false)).toBe(false);
-    expect(shouldOfferServiceWorkerUpdate(null, true)).toBe(false);
+    expect(
+      shouldOfferServiceWorkerUpdate(workerWithState("installed"), true, true),
+    ).toBe(true);
+    expect(
+      shouldOfferServiceWorkerUpdate(workerWithState("installing"), true, true),
+    ).toBe(false);
+    expect(
+      shouldOfferServiceWorkerUpdate(workerWithState("installed"), false, true),
+    ).toBe(false);
+    expect(
+      shouldOfferServiceWorkerUpdate(workerWithState("installed"), true, false),
+    ).toBe(false);
+    expect(shouldOfferServiceWorkerUpdate(null, true, true)).toBe(false);
   });
 
   it("reloads every previously controlled tab exactly once after activation", () => {
