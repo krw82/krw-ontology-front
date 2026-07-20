@@ -30,12 +30,16 @@ import {
   CHART_SDK_ALLOWED_TOOLS,
   KRW_FILINGS_MCP_TOOLS,
   KRW_FILINGS_SDK_ALLOWED_TOOLS,
+  KRW_PERSONAL_FILINGS_MCP_TOOLS,
+  KRW_PERSONAL_FILINGS_SDK_ALLOWED_TOOLS,
   getStockNewsSdkAllowedTools,
   getKrwOntologyPluginPath,
   isChartSdkTool,
   isGuruAdvisorSdkTool,
   isKrwFilingsMcpEnabled,
+  isKrwPersonalFilingsMcpEnabled,
   isKrwFilingsSdkTool,
+  isKrwPersonalFilingsSdkTool,
   filingsMcpToken,
   isKrwOntologySdkTool,
   isStockNewsEnabled,
@@ -43,6 +47,10 @@ import {
   isYahooFinanceSdkTool,
   resolveGuruAdvisorPluginPath,
 } from "./mcp-client";
+import {
+  createInternalPersonalFilingsMcpHeader,
+  PERSONAL_FILINGS_MCP_AUTH_HEADER,
+} from "@/filings-mcp/personal-auth";
 import { buildClaudeAgentEnv } from "./env";
 import { resolveClaudeAgentCwd } from "./claude-agent-cwd";
 import {
@@ -119,6 +127,17 @@ const GURU_MCP_TOOL_SET = new Set<string>(GURU_MCP_TOOLS);
 const YAHOO_FINANCE_MCP_TOOL_SET = new Set<string>(YAHOO_FINANCE_MCP_TOOLS);
 const CHART_MCP_TOOL_SET = new Set<string>(CHART_MCP_TOOLS);
 const KRW_FILINGS_MCP_TOOL_SET = new Set<string>(KRW_FILINGS_MCP_TOOLS);
+const KRW_PERSONAL_FILINGS_MCP_TOOL_SET = new Set<string>(
+  KRW_PERSONAL_FILINGS_MCP_TOOLS,
+);
+const KRW_ALL_FILINGS_MCP_TOOL_SET = new Set<string>([
+  ...KRW_FILINGS_MCP_TOOLS,
+  ...KRW_PERSONAL_FILINGS_MCP_TOOLS,
+]);
+type KrwPublicFilingsMCPToolName =
+  (typeof KRW_FILINGS_MCP_TOOLS)[number];
+type KrwPersonalFilingsMCPToolName =
+  (typeof KRW_PERSONAL_FILINGS_MCP_TOOLS)[number];
 const DEFAULT_MAX_TURNS = 40;
 const TOOL_BUDGET_EXCEEDED = "tool_budget_exceeded";
 const TOOL_RESULT_MISSING = "tool_result_missing";
@@ -197,6 +216,8 @@ const DISALLOWED_SDK_TOOLS = [
 
 export interface AgentRunOptions {
   sessionId: string;
+  /** Server-authenticated owner for personal coverage and judgment reads. */
+  userId?: string | null;
   userMessage: string;
   scopeType: "global" | "company";
   defaultTickers: string[];
@@ -355,6 +376,9 @@ export async function runAgent(
   const yahooFinanceRun = isYahooFinanceRunKind(runKind);
   const chartGenerationEnabled = !guruAdvisorRun && isChartGenerationEnabled();
   const hasSourceFilingContext = Boolean(options.sourceFilingEventId);
+  const personalFilingsEnabled = Boolean(
+    options.userId && isKrwPersonalFilingsMcpEnabled(),
+  );
   const toolBudget = getResearchModeToolBudget(researchMode);
   const abortHandler = () => abortController.abort();
   options.abortSignal?.addEventListener("abort", abortHandler, { once: true });
@@ -412,6 +436,7 @@ export async function runAgent(
       runKind,
       options.selectedNewsEventContext,
     ),
+    buildPersonalFilingsPrompt(personalFilingsEnabled),
   ].join("\n\n");
   const allowedTools = allowedSdkToolsForResearchMode(
     researchMode,
@@ -419,6 +444,7 @@ export async function runAgent(
     runKind,
     chartGenerationEnabled,
     hasSourceFilingContext,
+    personalFilingsEnabled,
   );
 
   const requestedModel = getClaudeAgentModel();
@@ -428,6 +454,7 @@ export async function runAgent(
       ? undefined
       : readStrictHttpMcpServerConfigs(ontologyPluginPath, {
           requireFilingsMcp: hasSourceFilingContext,
+          personalUserId: personalFilingsEnabled ? options.userId : null,
         });
   } catch (error) {
     options.abortSignal?.removeEventListener("abort", abortHandler);
@@ -651,6 +678,15 @@ async function runSdkPass(params: {
     options.selectedNewsEventContext,
   );
   const chartGenerationEnabled = isChartGenerationEnabled();
+  const personalFilingsEnabled = Boolean(
+    options.userId && isKrwPersonalFilingsMcpEnabled(),
+  );
+  const budgetReservations = createToolBudgetReservations({
+    acc,
+    maxToolCalls,
+    maxStockNewsCalls,
+    maxYahooFinanceCalls,
+  });
 
   try {
     const passCanUseTool = createToolPermissionGuard(
@@ -661,11 +697,13 @@ async function runSdkPass(params: {
       maxToolCalls,
       maxStockNewsCalls,
       maxYahooFinanceCalls,
+      budgetReservations,
       allowedStockNewsSourceUrls,
       chartGenerationEnabled,
       guruAgentGeneratedBriefEnabled,
       requiredGuruCompanyTicker,
       options.sourceFilingEventId ?? null,
+      personalFilingsEnabled,
     );
     const mcpServers = {
       ...(sdkOptions.mcpServers ?? {}),
@@ -689,6 +727,7 @@ async function runSdkPass(params: {
               acc,
               guruAgentGeneratedBriefEnabled,
               requiredGuruCompanyTicker,
+              budgetReservations,
             )
           : buildResearchToolBoundaryHooks(passCanUseTool),
       canUseTool: passCanUseTool,
@@ -1138,7 +1177,10 @@ function validateHttpMcpServerConfig(
 
 function readStrictHttpMcpServerConfigs(
   pluginPath: string,
-  options: { requireFilingsMcp?: boolean } = {},
+  options: {
+    requireFilingsMcp?: boolean;
+    personalUserId?: string | null;
+  } = {},
 ): Record<string, McpHttpServerConfig> {
   const mcpConfigPath = path.join(pluginPath, ".mcp.json");
   const parsed = JSON.parse(readFileSync(mcpConfigPath, "utf8")) as {
@@ -1148,16 +1190,19 @@ function readStrictHttpMcpServerConfigs(
   if (!rawServers || !rawServers["krw-ontology"]) {
     throw new Error("KRW Ontology plugin is missing mcpServers.krw-ontology");
   }
-  if (options.requireFilingsMcp && !isKrwFilingsMcpEnabled()) {
+  const includeFilingsMcp = Boolean(
+    options.requireFilingsMcp || options.personalUserId,
+  );
+  if (includeFilingsMcp && !isKrwFilingsMcpEnabled()) {
     throw new Error("On-demand filings MCP requires FILINGS_MCP_ENABLED=1 and a filings MCP auth token");
   }
-  if (options.requireFilingsMcp && !rawServers["krw-filings"]) {
+  if (includeFilingsMcp && !rawServers["krw-filings"]) {
     throw new Error("KRW Ontology plugin is missing mcpServers.krw-filings");
   }
 
   const serverConfigs = Object.fromEntries(
     Object.entries(rawServers)
-      .filter(([serverName]) => serverName !== "krw-filings" || options.requireFilingsMcp)
+      .filter(([serverName]) => serverName !== "krw-filings" || includeFilingsMcp)
       .map(([serverName, rawConfig]) => {
       const config = validateHttpMcpServerConfig(serverName, rawConfig);
       const overriddenUrl =
@@ -1172,6 +1217,16 @@ function readStrictHttpMcpServerConfigs(
         ? {
             ...((config as { headers?: Record<string, string> }).headers ?? {}),
             Authorization: `Bearer ${filingsMcpToken() ?? ""}`,
+            ...(options.personalUserId
+              ? {
+                  [PERSONAL_FILINGS_MCP_AUTH_HEADER]:
+                    createInternalPersonalFilingsMcpHeader(
+                      options.personalUserId,
+                      Date.now(),
+                      personalFilingsDelegationTtlSeconds(),
+                    ),
+                }
+              : {}),
           }
         : undefined;
       return [
@@ -1264,6 +1319,7 @@ function buildGuruAdvisorToolBoundaryHooks(
   acc: AccumulatedRun,
   agentGeneratedBriefEnabled: boolean,
   requiredGuruCompanyTicker: string | null,
+  budgetReservations: ToolBudgetReservations,
 ): Options["hooks"] {
   const pluginRoot = guruAdvisorPluginPath
     ? path.resolve(guruAdvisorPluginPath)
@@ -1285,10 +1341,17 @@ function buildGuruAdvisorToolBoundaryHooks(
     PreToolUse: [
       {
         hooks: [
-          async (input) => {
+          async (input, toolUseID) => {
             const record = input as UnknownRecord;
             const toolName =
               typeof record.tool_name === "string" ? record.tool_name : "";
+            const executionToolUseId =
+              toolUseID ??
+              (typeof record.tool_use_id === "string"
+                ? record.tool_use_id
+                : undefined);
+            const reserveGuruToolSlot = () =>
+              budgetReservations.reserve(executionToolUseId);
             const toolInput = isRecord(record.tool_input)
               ? record.tool_input
               : {};
@@ -1316,19 +1379,22 @@ function buildGuruAdvisorToolBoundaryHooks(
                 : 0;
               const callLimitExceeded =
                 typeof callLimit === "number" && callCount >= callLimit;
-              if (
+              const allowCompanyEvidenceCall =
                 isCompanyEvidenceAgent &&
-                ontologyToolName &&
-                !callLimitExceeded
-              ) {
+                Boolean(ontologyToolName) &&
+                isGuruCompanyEvidenceSdkTool(toolName) &&
+                !callLimitExceeded;
+              if (allowCompanyEvidenceCall && !reserveGuruToolSlot()) {
+                return guruAdvisorHookDecision(
+                  "deny",
+                  buildGuruBudgetDenyMessage(),
+                );
+              }
+              if (allowCompanyEvidenceCall && ontologyToolName) {
                 companyEvidenceCallCounts.set(ontologyToolName, callCount + 1);
               }
               return guruAdvisorHookDecision(
-                isCompanyEvidenceAgent &&
-                  isGuruCompanyEvidenceSdkTool(toolName) &&
-                  !callLimitExceeded
-                  ? "allow"
-                  : "deny",
+                allowCompanyEvidenceCall ? "allow" : "deny",
                 (callLimitExceeded
                   ? `Company evidence call limit reached for ${ontologyToolName}. Use the filing evidence already collected and return a compact evidence summary.`
                   : null) ??
@@ -1369,6 +1435,12 @@ function buildGuruAdvisorToolBoundaryHooks(
                     : "The company_evidence_researcher Agent prompt must include the exact dynamic_question_plan JSON and request evidence_by_question answers.",
                 );
               }
+              if (!reserveGuruToolSlot()) {
+                return guruAdvisorHookDecision(
+                  "deny",
+                  buildGuruBudgetDenyMessage(),
+                );
+              }
 
               sawCompanyEvidenceAgent = true;
               return guruAdvisorHookDecision(
@@ -1397,7 +1469,6 @@ function buildGuruAdvisorToolBoundaryHooks(
                     briefInputDecision.message,
                   );
                 }
-                sawCompanyBrief = true;
               }
               if (
                 sawCompanyBrief &&
@@ -1450,6 +1521,12 @@ function buildGuruAdvisorToolBoundaryHooks(
                       "Review requires question-driven company filing evidence.",
                   );
                 }
+                if (!reserveGuruToolSlot()) {
+                  return guruAdvisorHookDecision(
+                    "deny",
+                    buildGuruBudgetDenyMessage(),
+                  );
+                }
                 guruEvidenceReviewAttempts += 1;
                 sawCompanyEvidenceReview = true;
                 return guruAdvisorHookDecision(
@@ -1458,14 +1535,33 @@ function buildGuruAdvisorToolBoundaryHooks(
                   preparedReviewInput.input,
                 );
               }
-              if (briefInputDecision?.behavior === "allow") {
+              if (guruToolName === GURU_COMPANY_BRIEF_TOOL_NAME) {
+                if (!reserveGuruToolSlot()) {
+                  return guruAdvisorHookDecision(
+                    "deny",
+                    buildGuruBudgetDenyMessage(),
+                  );
+                }
+                sawCompanyBrief = true;
                 return guruAdvisorHookDecision(
                   "allow",
                   "The runtime attached the immutable Guru research pack for company-brief sealing.",
-                  briefInputDecision.updatedInput,
+                  briefInputDecision?.behavior === "allow"
+                    ? briefInputDecision.updatedInput
+                    : undefined,
                 );
               }
-              return guruAdvisorMainMcpToolHookDecision(guruToolName);
+              const decision = guruAdvisorMainMcpToolHookDecision(guruToolName);
+              if (
+                decision.hookSpecificOutput.permissionDecision === "allow" &&
+                !reserveGuruToolSlot()
+              ) {
+                return guruAdvisorHookDecision(
+                  "deny",
+                  buildGuruBudgetDenyMessage(),
+                );
+              }
+              return decision;
             }
 
             if (toolName === "Read") {
@@ -1688,6 +1784,7 @@ function allowedSdkToolsForResearchMode(
   runKind: RunKind,
   chartGenerationEnabled = isChartGenerationEnabled(),
   hasSourceFilingContext = false,
+  personalFilingsEnabled = false,
 ): string[] {
   if (runKind === "guru_advisor") {
     return [
@@ -1733,7 +1830,104 @@ function allowedSdkToolsForResearchMode(
     ...(hasSourceFilingContext
       ? KRW_FILINGS_SDK_ALLOWED_TOOLS
       : []),
+    ...(personalFilingsEnabled
+      ? KRW_PERSONAL_FILINGS_SDK_ALLOWED_TOOLS
+      : []),
   ];
+}
+
+type ToolBudgetCategory = "stock_news" | "yahoo_finance";
+
+type ToolBudgetReservations = {
+  reserve: (
+    toolUseId?: string,
+    category?: ToolBudgetCategory | null,
+  ) => boolean;
+};
+
+function createToolBudgetReservations(params: {
+  acc: AccumulatedRun;
+  maxToolCalls: number;
+  maxStockNewsCalls: number;
+  maxYahooFinanceCalls: number;
+}): ToolBudgetReservations {
+  const {
+    acc,
+    maxStockNewsCalls,
+    maxToolCalls,
+    maxYahooFinanceCalls,
+  } = params;
+  const reservedTotalToolUseIds = new Set<string>();
+  const reservedStockNewsToolUseIds = new Set<string>();
+  const reservedYahooFinanceToolUseIds = new Set<string>();
+
+  return {
+    reserve(toolUseId, category = null) {
+      const categoryReservations =
+        category === "stock_news"
+          ? reservedStockNewsToolUseIds
+          : category === "yahoo_finance"
+            ? reservedYahooFinanceToolUseIds
+            : null;
+      const categoryRecordedCount =
+        category === "stock_news"
+          ? countStockNewsToolCalls(acc.toolCalls)
+          : category === "yahoo_finance"
+            ? countYahooFinanceToolCalls(acc.toolCalls)
+            : 0;
+      const categoryLimit =
+        category === "stock_news"
+          ? maxStockNewsCalls
+          : category === "yahoo_finance"
+            ? maxYahooFinanceCalls
+            : Number.POSITIVE_INFINITY;
+
+      // Current Agent SDK permission requests carry toolUseID. Keeping the
+      // recorded-call fallback preserves deterministic probes while real
+      // parallel requests receive an atomic reservation.
+      if (!toolUseId) {
+        return (
+          acc.toolCalls.length + 1 <= maxToolCalls &&
+          categoryRecordedCount + 1 <= categoryLimit
+        );
+      }
+
+      const recordedIds = new Set(acc.toolCalls.map((toolCall) => toolCall.id));
+      const totalAlreadyReserved =
+        recordedIds.has(toolUseId) || reservedTotalToolUseIds.has(toolUseId);
+      const pendingReservations = Array.from(reservedTotalToolUseIds).filter(
+        (reservedId) => !recordedIds.has(reservedId),
+      ).length;
+      if (
+        !totalAlreadyReserved &&
+        acc.toolCalls.length + pendingReservations + 1 > maxToolCalls
+      ) {
+        return false;
+      }
+
+      const categoryAlreadyReserved =
+        !categoryReservations ||
+        recordedIds.has(toolUseId) ||
+        categoryReservations.has(toolUseId);
+      const pendingCategoryReservations = categoryReservations
+        ? Array.from(categoryReservations).filter(
+            (reservedId) => !recordedIds.has(reservedId),
+          ).length
+        : 0;
+      if (
+        !categoryAlreadyReserved &&
+        categoryRecordedCount + pendingCategoryReservations + 1 > categoryLimit
+      ) {
+        return false;
+      }
+
+      // No await occurs between the checks and both reservations. Parallel
+      // tools therefore cannot observe the same total or category slot.
+      reservedTotalToolUseIds.add(toolUseId);
+      categoryReservations?.add(toolUseId);
+      return true;
+    },
+  };
 }
 
 function createToolPermissionGuard(
@@ -1744,16 +1938,27 @@ function createToolPermissionGuard(
   maxToolCalls: number,
   maxStockNewsCalls: number,
   maxYahooFinanceCalls: number,
+  budgetReservations: ToolBudgetReservations,
   allowedStockNewsSourceUrls: string[] = [],
   chartGenerationEnabled = isChartGenerationEnabled(),
   guruAgentGeneratedBriefEnabled = false,
   requiredGuruCompanyTicker: string | null = null,
   sourceFilingEventId: string | null = null,
+  personalFilingsEnabled = false,
 ): CanUseTool {
   let guruSawCompanyBrief = false;
   let guruSawCompanyEvidenceAgent = false;
   let guruSawCompanyEvidenceReview = false;
   let guruEvidenceReviewAttempts = 0;
+  const reserveToolSlots = (
+    permissionContext: Parameters<CanUseTool>[2] | undefined,
+    category: ToolBudgetCategory | null = null,
+  ): boolean =>
+    budgetReservations.reserve(permissionContext?.toolUseID, category);
+
+  const reserveTotalToolSlot = (
+    permissionContext: Parameters<CanUseTool>[2] | undefined,
+  ) => reserveToolSlots(permissionContext);
 
   return async (
     toolName: string,
@@ -1767,6 +1972,19 @@ function createToolPermissionGuard(
             behavior: "deny",
             message: "Inline chart generation is disabled for this runtime.",
           };
+    }
+
+    if (isKrwPersonalFilingsSdkTool(toolName)) {
+      if (!personalFilingsEnabled) {
+        return {
+          behavior: "deny",
+          message: "Personal research memory is available only to the authenticated owner.",
+        };
+      }
+      if (!reserveTotalToolSlot(permissionContext)) {
+        return { behavior: "deny", message: buildToolBudgetDenyMessage() };
+      }
+      return { behavior: "allow" };
     }
 
     if (isKrwFilingsSdkTool(toolName)) {
@@ -1786,14 +2004,14 @@ function createToolPermissionGuard(
           message: "This filing-scoped chat may read only its source filing, not search other filings.",
         };
       }
-      if (acc.toolCalls.length + 1 > maxToolCalls) {
-        return { behavior: "deny", message: buildToolBudgetDenyMessage() };
-      }
       const preparedInput = constrainFilingToolInput(
         filingToolName,
         input,
         sourceFilingEventId,
       );
+      if (!reserveTotalToolSlot(permissionContext)) {
+        return { behavior: "deny", message: buildToolBudgetDenyMessage() };
+      }
       return preparedInput.changed
         ? { behavior: "allow", updatedInput: preparedInput.input }
         : { behavior: "allow" };
@@ -1806,8 +2024,8 @@ function createToolPermissionGuard(
           acc,
           agentID: permissionContext.agentID,
           input,
-          maxToolCalls,
           mode,
+          reserveTotalToolSlot: () => reserveTotalToolSlot(permissionContext),
           toolName,
         });
       }
@@ -1913,7 +2131,7 @@ function createToolPermissionGuard(
         }
       }
 
-      if (acc.toolCalls.length + 1 > maxToolCalls) {
+      if (!reserveTotalToolSlot(permissionContext)) {
         return {
           behavior: "deny",
           message: buildGuruBudgetDenyMessage(),
@@ -1958,12 +2176,13 @@ function createToolPermissionGuard(
         };
       }
 
-      const nextYahooFinanceCalls =
-        countYahooFinanceToolCalls(acc.toolCalls) + 1;
-      if (nextYahooFinanceCalls > maxYahooFinanceCalls) {
+      if (!reserveToolSlots(permissionContext, "yahoo_finance")) {
         return {
           behavior: "deny",
-          message: buildYahooFinanceBudgetDenyMessage(),
+          message:
+            countYahooFinanceToolCalls(acc.toolCalls) >= maxYahooFinanceCalls
+              ? buildYahooFinanceBudgetDenyMessage()
+              : buildToolBudgetDenyMessage(),
         };
       }
 
@@ -1993,14 +2212,8 @@ function createToolPermissionGuard(
         };
       }
 
-      const nextStockNewsCalls = countStockNewsToolCalls(acc.toolCalls) + 1;
-      if (nextStockNewsCalls > maxStockNewsCalls) {
-        return {
-          behavior: "deny",
-          message: buildStockNewsBudgetDenyMessage(),
-        };
-      }
-
+      let preparedStockNewsInput = input;
+      let stockNewsInputChanged = false;
       if (stockNewsToolName === "read_news_sources") {
         const constrainedInput = constrainReadNewsSourcesInput(
           input,
@@ -2013,22 +2226,33 @@ function createToolPermissionGuard(
           };
         }
         if (constrainedInput.changed) {
-          return {
-            behavior: "allow",
-            updatedInput: constrainedInput.input,
-          };
+          preparedStockNewsInput = constrainedInput.input;
+          stockNewsInputChanged = true;
         }
       }
 
       const preparedInput = prepareStockNewsToolInputForRun(
         stockNewsToolName,
-        input,
+        preparedStockNewsInput,
         runKind,
       );
-      if (preparedInput.changed) {
+      preparedStockNewsInput = preparedInput.input;
+      stockNewsInputChanged = stockNewsInputChanged || preparedInput.changed;
+
+      if (!reserveToolSlots(permissionContext, "stock_news")) {
+        return {
+          behavior: "deny",
+          message:
+            countStockNewsToolCalls(acc.toolCalls) >= maxStockNewsCalls
+              ? buildStockNewsBudgetDenyMessage()
+              : buildToolBudgetDenyMessage(),
+        };
+      }
+
+      if (stockNewsInputChanged) {
         return {
           behavior: "allow",
-          updatedInput: preparedInput.input,
+          updatedInput: preparedStockNewsInput,
         };
       }
 
@@ -2059,7 +2283,7 @@ function createToolPermissionGuard(
       };
     }
 
-    if (acc.toolCalls.length + 1 > maxToolCalls) {
+    if (!reserveTotalToolSlot(permissionContext)) {
       return {
         behavior: "deny",
         message: buildToolBudgetDenyMessage(),
@@ -2637,16 +2861,16 @@ function guruSubagentToolPermission(params: {
   acc: AccumulatedRun;
   agentID: string;
   input: Record<string, unknown>;
-  maxToolCalls: number;
   mode: ResearchMode;
+  reserveTotalToolSlot: () => boolean;
   toolName: string;
 }): PermissionResult {
   const {
     acc,
     agentID,
     input,
-    maxToolCalls,
     mode,
+    reserveTotalToolSlot,
     toolName,
   } = params;
   if (!isCompanyEvidenceSubagent(agentID)) {
@@ -2697,7 +2921,7 @@ function guruSubagentToolPermission(params: {
     };
   }
 
-  if (acc.toolCalls.length + 1 > maxToolCalls) {
+  if (!reserveTotalToolSlot()) {
     return {
       behavior: "deny",
       message: buildToolBudgetDenyMessage(),
@@ -2793,6 +3017,19 @@ function stockNewsDenyMessageForRunKind(runKind: RunKind): string {
   return "News tools are only available in news mode.";
 }
 
+function buildPersonalFilingsPrompt(enabled: boolean): string {
+  if (!enabled) return "";
+  return `Personal research-memory tools are available for the authenticated user. Use them only when the user's question depends on their own coverage status, thesis, monitoring rules, prior filing judgments, decision timeline, or open questions. Treat this memory as user-authored context, not objective company fact. Never reveal internal user identifiers or infer personal data that the tools did not return.`;
+}
+
+function personalFilingsDelegationTtlSeconds(): number {
+  const runMinutes = readIntEnv("AGENT_RUN_HARD_TIMEOUT_MINUTES", 10, {
+    min: 1,
+    max: 55,
+  });
+  return (runMinutes + 2) * 60;
+}
+
 function buildSelectedNewsEventContextPrompt(
   runKind: RunKind,
   selectedNewsEventContext: Record<string, unknown> | null | undefined,
@@ -2837,17 +3074,20 @@ function prepareGuruReviewCompanyEvidenceInput(
   const researchContext = latestGuruCompanyResearchContext(acc);
   if (!researchContext) return { input, changed: false };
 
-  const {
-    company_payload: _companyPayload,
-    company_payload_json: _companyPayloadJson,
-    company_research_context: _companyResearchContext,
-    company_research_context_json: _companyResearchContextJson,
-    investigation_brief: _investigationBrief,
-    investigation_brief_json: _investigationBriefJson,
-    agent_analysis: suppliedAnalysis,
-    agent_analysis_json: _agentAnalysisJson,
-    ...publicInput
-  } = input;
+  const suppliedAnalysis = input.agent_analysis;
+  const publicInput = { ...input };
+  for (const internalKey of [
+    "company_payload",
+    "company_payload_json",
+    "company_research_context",
+    "company_research_context_json",
+    "investigation_brief",
+    "investigation_brief_json",
+    "agent_analysis",
+    "agent_analysis_json",
+  ]) {
+    delete publicInput[internalKey];
+  }
   const next: Record<string, unknown> = {
     ...publicInput,
     company_research_context: researchContext,
@@ -2890,6 +3130,9 @@ function prepareToolInputForRun(
     return sourceFilingEventId
       ? constrainFilingToolInput(mcpToolName, input, sourceFilingEventId)
       : { input, changed: false };
+  }
+  if (isKrwPersonalFilingsMcpToolName(mcpToolName)) {
+    return { input, changed: false };
   }
   if (isChartMcpToolName(mcpToolName) || !mcpToolName) {
     return { input, changed: false };
@@ -3482,7 +3725,7 @@ function normalizeKrwFilingsToolName(
 ): KrwFilingsMCPToolName | null {
   if (typeof name !== "string") return null;
   const bareName = name.includes("__") ? name.split("__").at(-1) : name;
-  if (!bareName || !KRW_FILINGS_MCP_TOOL_SET.has(bareName)) return null;
+  if (!bareName || !KRW_ALL_FILINGS_MCP_TOOL_SET.has(bareName)) return null;
   return bareName as KrwFilingsMCPToolName;
 }
 
@@ -3599,8 +3842,16 @@ function isChartMcpToolName(
 
 function isKrwFilingsMcpToolName(
   toolName: MCPToolName | null,
-): toolName is KrwFilingsMCPToolName {
+): toolName is KrwPublicFilingsMCPToolName {
   return Boolean(toolName && KRW_FILINGS_MCP_TOOL_SET.has(toolName));
+}
+
+function isKrwPersonalFilingsMcpToolName(
+  toolName: MCPToolName | null,
+): toolName is KrwPersonalFilingsMCPToolName {
+  return Boolean(
+    toolName && KRW_PERSONAL_FILINGS_MCP_TOOL_SET.has(toolName),
+  );
 }
 
 function isGuruMcpToolName(

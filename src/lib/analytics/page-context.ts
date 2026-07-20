@@ -25,20 +25,111 @@ export interface AnalyticsPageProperties {
   ticker?: string;
 }
 
+const SAFE_ANALYTICS_CATEGORY_KEYS = [
+  "locale",
+  "runKind",
+  "guru",
+  "entry",
+  "feature",
+  "source",
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+] as const;
+const SAFE_ANALYTICS_CATEGORY_VALUE = /^[a-z0-9._-]{1,64}$/i;
+
 export function buildAnalyticsPageProperties(
   pathname: string,
   search: string | URLSearchParams | null | undefined,
 ): AnalyticsPageProperties {
   const params = toSearchParams(search);
+  const analyticsParams = sanitizeAnalyticsSearchParams(params);
   const ticker = tickerFromPathOrSearch(pathname, params);
 
   return {
-    page_path: pathname,
-    page_search: params.toString() ? `?${params.toString()}` : null,
+    page_path: sanitizeAnalyticsPathname(pathname),
+    page_search: analyticsParams.toString()
+      ? `?${analyticsParams.toString()}`
+      : null,
     page_type: pageTypeFromPath(pathname, params),
     is_public: isPublicMarketingPath(pathname),
     ...(ticker ? { ticker } : {}),
   };
+}
+
+/**
+ * Analytics must never receive prompts, search text, session/share tokens, or
+ * other free-form URL state. Only normalized ticker and short categorical
+ * routing dimensions are retained.
+ */
+export function sanitizeAnalyticsSearchParams(
+  search: string | URLSearchParams | null | undefined,
+): URLSearchParams {
+  const input = toSearchParams(search);
+  const output = new URLSearchParams();
+  const ticker = tickerFromPathOrSearch("", input);
+  if (ticker) output.set("ticker", ticker);
+
+  for (const key of SAFE_ANALYTICS_CATEGORY_KEYS) {
+    const value = input.get(key)?.trim();
+    if (value && SAFE_ANALYTICS_CATEGORY_VALUE.test(value)) {
+      output.set(key, value);
+    }
+  }
+
+  return output;
+}
+
+export function sanitizeAnalyticsLocationKey(locationKey: string): string {
+  try {
+    const url = new URL(locationKey, "https://analytics.invalid");
+    const params = sanitizeAnalyticsSearchParams(url.searchParams);
+    const query = params.toString();
+    return `${sanitizeAnalyticsPathname(url.pathname)}${query ? `?${query}` : ""}`;
+  } catch {
+    return "/unknown";
+  }
+}
+
+/**
+ * Share tokens are bearer credentials embedded in the route. Analytics keeps
+ * the route shape for page classification, but never the credential itself.
+ */
+export function sanitizeAnalyticsPathname(pathname: string): string {
+  return pathname.replace(
+    /^\/(?:(ko|en)\/)?share\/[^/]+(?:\/.*)?$/,
+    (_match, locale: string | undefined) =>
+      locale ? `/${locale}/share/:token` : "/share/:token",
+  );
+}
+
+export function sanitizeAnalyticsPath(
+  value: string | null | undefined,
+): string | null {
+  if (!value?.trim()) return null;
+  return sanitizeAnalyticsLocationKey(value.trim());
+}
+
+export function sanitizeAnalyticsReferrer(
+  value: string | null | undefined,
+  currentOrigin?: string,
+): string | null {
+  if (!value?.trim()) return null;
+
+  try {
+    const url = new URL(value, currentOrigin ?? "https://analytics.invalid");
+    if (currentOrigin && url.origin === currentOrigin) {
+      return sanitizeAnalyticsLocationKey(`${url.pathname}${url.search}`);
+    }
+    if (!currentOrigin && url.origin === "https://analytics.invalid") {
+      return sanitizeAnalyticsLocationKey(`${url.pathname}${url.search}`);
+    }
+    // Cross-origin attribution needs only the origin. External paths and
+    // queries can contain searches, document ids, or signed tokens.
+    return url.origin;
+  } catch {
+    return null;
+  }
 }
 
 export function pageTypeFromPath(
@@ -46,23 +137,24 @@ export function pageTypeFromPath(
   search: string | URLSearchParams | null | undefined = null,
 ): AnalyticsPageType {
   const params = toSearchParams(search);
+  const routePathname = stripAnalyticsLocalePrefix(pathname);
 
-  if (pathname === "/") return "home";
-  if (pathname === "/companies") return "companies_index";
-  if (pathname.startsWith("/companies/")) return "company_detail";
-  if (pathname === "/questions") return "questions_index";
-  if (pathname.startsWith("/questions/")) return "question_detail";
-  if (pathname === "/chat/new") return "chat_new";
-  if (pathname === "/chat" && params.has("sessionId")) return "chat_session";
-  if (pathname.startsWith("/chat")) return "chat_new";
-  if (pathname === "/pricing") return "pricing";
-  if (pathname === "/login") return "login";
-  if (pathname.startsWith("/share/")) return "shared_answer";
-  if (pathname.startsWith("/settings")) return "settings";
+  if (routePathname === "/") return "home";
+  if (routePathname === "/companies") return "companies_index";
+  if (routePathname.startsWith("/companies/")) return "company_detail";
+  if (routePathname === "/questions") return "questions_index";
+  if (routePathname.startsWith("/questions/")) return "question_detail";
+  if (routePathname === "/chat/new") return "chat_new";
+  if (routePathname === "/chat" && params.has("sessionId")) return "chat_session";
+  if (routePathname.startsWith("/chat")) return "chat_new";
+  if (routePathname === "/pricing") return "pricing";
+  if (routePathname === "/login") return "login";
+  if (routePathname.startsWith("/share/")) return "shared_answer";
+  if (routePathname.startsWith("/settings")) return "settings";
   if (
-    pathname === "/privacy" ||
-    pathname === "/terms" ||
-    pathname === "/refund"
+    routePathname === "/privacy" ||
+    routePathname === "/terms" ||
+    routePathname === "/refund"
   ) {
     return "legal";
   }
@@ -70,16 +162,17 @@ export function pageTypeFromPath(
 }
 
 export function isPublicMarketingPath(pathname: string): boolean {
+  const routePathname = stripAnalyticsLocalePrefix(pathname);
   return (
-    pathname === "/" ||
-    pathname === "/companies" ||
-    pathname.startsWith("/companies/") ||
-    pathname === "/questions" ||
-    pathname.startsWith("/questions/") ||
-    pathname === "/pricing" ||
-    pathname === "/privacy" ||
-    pathname === "/terms" ||
-    pathname === "/refund"
+    routePathname === "/" ||
+    routePathname === "/companies" ||
+    routePathname.startsWith("/companies/") ||
+    routePathname === "/questions" ||
+    routePathname.startsWith("/questions/") ||
+    routePathname === "/pricing" ||
+    routePathname === "/privacy" ||
+    routePathname === "/terms" ||
+    routePathname === "/refund"
   );
 }
 
@@ -87,7 +180,8 @@ export function tickerFromPathOrSearch(
   pathname: string,
   search: string | URLSearchParams | null | undefined = null,
 ): string | null {
-  const companyTicker = pathname.match(/^\/companies\/([^/?#]+)/)?.[1];
+  const routePathname = stripAnalyticsLocalePrefix(pathname);
+  const companyTicker = routePathname.match(/^\/companies\/([^/?#]+)/)?.[1];
   const candidate = companyTicker ?? toSearchParams(search).get("ticker");
   if (!candidate) return null;
 
@@ -96,6 +190,15 @@ export function tickerFromPathOrSearch(
   } catch {
     return null;
   }
+}
+
+function stripAnalyticsLocalePrefix(pathname: string): string {
+  const normalized = pathname.replace(/^\/(?:ko|en)(?=\/|$)/, "");
+  return normalized
+    ? normalized.startsWith("/")
+      ? normalized
+      : `/${normalized}`
+    : "/";
 }
 
 export function getAnalyticsDeviceType(): AnalyticsDeviceType {

@@ -66,6 +66,12 @@ set -a
 . "$ENV_PATH"
 set +a
 
+MAC_RUNTIME_ROOT=${KRW_MAC_RUNTIME_ROOT:-$FRONT_DIR}
+if [ ! -f "$MAC_RUNTIME_ROOT/scripts/start-stock-news-mcp-production.sh" ]; then
+  echo "Missing Mac runtime Stock News MCP start script: $MAC_RUNTIME_ROOT" >&2
+  exit 1
+fi
+
 truthy_env() {
   case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
     1|true|yes|on) return 0 ;;
@@ -216,7 +222,8 @@ fi
 mkdir -p "$PLIST_DIR" "$MCP_LOG_DIR"
 
 sed \
-  -e "s#__FRONT_DIR__#$FRONT_DIR#g" \
+  -e "s#__FRONT_DIR__#$MAC_RUNTIME_ROOT#g" \
+  -e "s#__ENV_FILE__#$ENV_PATH#g" \
   -e "s#__LOG_DIR__#$MCP_LOG_DIR#g" \
   -e "s#__NICE__#$STOCK_NEWS_MCP_NICE#g" \
   -e "s#__MAXFILES__#$MCP_SERVER_MAXFILES#g" \

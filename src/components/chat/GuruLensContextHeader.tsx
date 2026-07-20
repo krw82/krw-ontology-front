@@ -44,7 +44,7 @@ export default function GuruLensContextHeader({
       {!compact ? (
         <Link
           href={locale === DEFAULT_LOCALE ? "/guru" : `/guru?locale=${locale}`}
-          className="mt-sm inline-flex min-h-10 items-center gap-1 rounded-[8px] border border-hairline bg-canvas px-3 text-[13px] font-extrabold text-body transition-colors hover:border-outline hover:bg-surface-soft hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="mt-sm inline-flex min-h-11 items-center gap-1 rounded-[8px] border border-hairline bg-canvas px-3 text-[13px] font-extrabold text-body transition-colors hover:border-outline hover:bg-surface-soft hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <span aria-hidden="true" className="material-symbols-outlined text-[17px]">
             arrow_back

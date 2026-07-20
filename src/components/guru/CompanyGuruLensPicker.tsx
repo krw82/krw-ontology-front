@@ -30,7 +30,13 @@ export default function CompanyGuruLensPicker({
   ctaLabel,
 }: CompanyGuruLensPickerProps) {
   const [open, setOpen] = useState(false);
+  const [clientReady, setClientReady] = useState(false);
   const isKo = locale === "ko";
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setClientReady(true), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -64,7 +70,9 @@ export default function CompanyGuruLensPicker({
       <button
         type="button"
         onClick={openPicker}
-        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[8px] border border-hairline bg-canvas px-5 py-3 text-[15px] font-extrabold leading-5 text-ink transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+        disabled={!clientReady}
+        data-client-ready={clientReady ? "true" : "false"}
+        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[8px] border border-hairline bg-canvas px-5 py-3 text-[15px] font-extrabold leading-5 text-ink transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-wait disabled:opacity-60"
       >
         <span
           aria-hidden="true"

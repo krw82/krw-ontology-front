@@ -485,6 +485,7 @@ describe("agent job runner", () => {
     );
     expect(runAgent).toHaveBeenCalledWith(
       expect.objectContaining({
+        userId: "user-1",
         analysisMode: "news",
         runKind: "market_move_research",
         selectedNewsEventContext: null,

@@ -102,7 +102,8 @@ const CANCEL_RECONCILE_INTERVAL_MS = readIntEnv(
   { min: 1_000 },
 );
 const AGENT_RUN_HARD_TIMEOUT_MS =
-  readIntEnv("AGENT_RUN_HARD_TIMEOUT_MINUTES", 10, { min: 1 }) * 60_000;
+  readIntEnv("AGENT_RUN_HARD_TIMEOUT_MINUTES", 10, { min: 1, max: 55 }) *
+  60_000;
 const RUN_TIMEOUT_MESSAGE =
   "분석 시간이 초과되었습니다. 다시 시도해주세요.";
 
@@ -320,6 +321,7 @@ export async function runAgentJob(runId: string, workerId: string) {
       runAgent(
         {
           sessionId: job.session.id,
+          userId: job.session.user_id,
           userMessage: userMessageWithDocumentContext,
           scopeType: job.session.scope_type,
           defaultTickers: job.session.default_tickers ?? [],

@@ -1,8 +1,13 @@
 import type { NextRequest } from "next/server";
 import { isUuid } from "@/lib/api/validation";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
+import {
+  invalidOriginResponse,
+  isExpectedMutationOrigin,
+} from "@/lib/filing-notifications/request";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
+  ensureCompanyCoverageForWrite,
   errorResponse,
   parseJsonObject,
   requireIndexedTicker,
@@ -32,6 +37,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ ticker: string; noteId: string }> },
 ) {
+  if (!isExpectedMutationOrigin(request)) return invalidOriginResponse();
   let user;
   try {
     user = await getAuthUser();
@@ -83,6 +89,14 @@ export async function PATCH(
     return errorResponse(400, "validation_error", "수정할 항목이 없습니다.");
   }
 
+  const coverageError = await ensureCompanyCoverageForWrite({
+    userId: user.id,
+    userEmail: user.email,
+    ticker: tickerResult.ticker,
+    source: "note_updated",
+  });
+  if (coverageError) return coverageError;
+
   const { data, error } = await getSupabaseAdmin()
     .from("user_research_notes")
     .update(update)
@@ -99,14 +113,14 @@ export async function PATCH(
     return errorResponse(404, "not_found", "노트를 찾지 못했습니다.");
   }
 
-  await touchMark(user.id, tickerResult.ticker);
   return Response.json({ note: data });
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ ticker: string; noteId: string }> },
 ) {
+  if (!isExpectedMutationOrigin(request)) return invalidOriginResponse();
   let user;
   try {
     user = await getAuthUser();
@@ -122,6 +136,14 @@ export async function DELETE(
     return errorResponse(404, "not_found", "노트를 찾지 못했습니다.");
   }
 
+  const coverageError = await ensureCompanyCoverageForWrite({
+    userId: user.id,
+    userEmail: user.email,
+    ticker: tickerResult.ticker,
+    source: "note_updated",
+  });
+  if (coverageError) return coverageError;
+
   const { error } = await getSupabaseAdmin()
     .from("user_research_notes")
     .delete()
@@ -133,22 +155,5 @@ export async function DELETE(
     return errorResponse(500, "internal_error", "노트를 삭제하지 못했습니다.");
   }
 
-  await touchMark(user.id, tickerResult.ticker);
   return Response.json({ success: true, note_id: noteId });
-}
-
-async function touchMark(userId: string, ticker: string) {
-  const now = new Date().toISOString();
-  await getSupabaseAdmin()
-    .from("user_company_marks")
-    .upsert(
-      {
-        user_id: userId,
-        ticker,
-        is_watchlisted: true,
-        last_activity_at: now,
-        updated_at: now,
-      },
-      { onConflict: "user_id,ticker" },
-    );
 }

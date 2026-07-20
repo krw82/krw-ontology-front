@@ -54,13 +54,18 @@ require_command() {
   fi
 }
 
-require_command uv
 require_path "$ENV_PATH"
 
 set -a
 # shellcheck disable=SC1090
 . "$ENV_PATH"
 set +a
+
+"$SCRIPT_DIR/verify-mac-runtime-target.sh" "$ENV_PATH"
+
+if [ "${KRW_MAC_IMMUTABLE_RUNTIME:-0}" != "1" ]; then
+  require_command uv
+fi
 
 KRW_ONTOLOGY_MCP_HOST=${KRW_ONTOLOGY_MCP_HOST:-127.0.0.1}
 KRW_ONTOLOGY_MCP_PORT=${KRW_ONTOLOGY_MCP_PORT:-8765}
@@ -75,6 +80,18 @@ export KRW_MCP_STORE_POOL_MAX
 
 require_path "$KRW_ONTOLOGY_SOURCE_DIR/pyproject.toml"
 require_path "$KRW_ONTOLOGY_RELEASE_ROOT"
+MCP_RELEASE_ROOT=${KRW_ONTOLOGY_CURRENT_RELEASE_ROOT:-"$(dirname "$KRW_ONTOLOGY_RELEASE_ROOT")/current"}
+require_path "$MCP_RELEASE_ROOT"
+if [ ! -L "$MCP_RELEASE_ROOT" ]; then
+  echo "MCP production server requires prod/current to be a symlink: $MCP_RELEASE_ROOT" >&2
+  exit 1
+fi
+RESOLVED_MCP_RELEASE_ROOT=$(CDPATH= cd -- "$MCP_RELEASE_ROOT" && pwd -P)
+RESOLVED_PINNED_RELEASE_ROOT=$(CDPATH= cd -- "$KRW_ONTOLOGY_RELEASE_ROOT" && pwd -P)
+[ "$RESOLVED_MCP_RELEASE_ROOT" = "$RESOLVED_PINNED_RELEASE_ROOT" ] || {
+  echo "MCP prod/current symlink no longer resolves to the sealed runtime release." >&2
+  exit 1
+}
 require_path "$KRW_ONTOLOGY_MANIFEST_PATH"
 mkdir -p "$FRONT_DIR/logs" "$MCP_LOG_DIR"
 
@@ -84,11 +101,24 @@ if [ "${KRW_ONTOLOGY_ENV:-}" != "prod" ]; then
 fi
 
 echo "Checking KRW Ontology v3 startup contract..."
-uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology release verify \
-  --startup-check \
-  --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
-  --env prod \
-  --require-current-symlink >/dev/null
+if [ "${KRW_MAC_IMMUTABLE_RUNTIME:-0}" = "1" ]; then
+  IMMUTABLE_KRW_CLI="$KRW_ONTOLOGY_SOURCE_DIR/.venv/bin/krw-ontology"
+  test -x "$IMMUTABLE_KRW_CLI" || {
+    echo "Missing immutable KRW Ontology CLI: $IMMUTABLE_KRW_CLI" >&2
+    exit 1
+  }
+  "$IMMUTABLE_KRW_CLI" release verify \
+    --startup-check \
+    --root "$MCP_RELEASE_ROOT" \
+    --env prod \
+    --require-current-symlink >/dev/null
+else
+  uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology release verify \
+    --startup-check \
+    --root "$MCP_RELEASE_ROOT" \
+    --env prod \
+    --require-current-symlink >/dev/null
+fi
 echo "OK KRW Ontology v3 startup contract"
 
 # shellcheck disable=SC1091
@@ -98,17 +128,30 @@ echo "OK MCP v2 source/release fingerprint"
 
 echo "Starting KRW Ontology MCP HTTP server..."
 echo "Source: $KRW_ONTOLOGY_SOURCE_DIR"
-echo "Release root: $KRW_ONTOLOGY_RELEASE_ROOT"
+echo "Release root: $MCP_RELEASE_ROOT"
 echo "MCP URL: http://$KRW_ONTOLOGY_MCP_HOST:$KRW_ONTOLOGY_MCP_PORT$KRW_ONTOLOGY_MCP_PATH"
 echo "MCP log: $MCP_SERVER_LOG_FILE"
 
-exec uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology-mcp \
-  --env prod \
-  --host "$KRW_ONTOLOGY_MCP_HOST" \
-  --port "$KRW_ONTOLOGY_MCP_PORT" \
-  --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
-  --require-current-symlink \
-  --mcp-path "$KRW_ONTOLOGY_MCP_PATH" \
-  --store-mode "$KRW_MCP_STORE_MODE" \
-  --log-file "$MCP_SERVER_LOG_FILE" \
-  --log-level "$MCP_SERVER_LOG_LEVEL"
+if [ "${KRW_MAC_IMMUTABLE_RUNTIME:-0}" = "1" ]; then
+  exec "$KRW_ONTOLOGY_SOURCE_DIR/.venv/bin/krw-ontology-mcp" \
+    --env prod \
+    --host "$KRW_ONTOLOGY_MCP_HOST" \
+    --port "$KRW_ONTOLOGY_MCP_PORT" \
+    --root "$MCP_RELEASE_ROOT" \
+    --require-current-symlink \
+    --mcp-path "$KRW_ONTOLOGY_MCP_PATH" \
+    --store-mode "$KRW_MCP_STORE_MODE" \
+    --log-file "$MCP_SERVER_LOG_FILE" \
+    --log-level "$MCP_SERVER_LOG_LEVEL"
+else
+  exec uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology-mcp \
+    --env prod \
+    --host "$KRW_ONTOLOGY_MCP_HOST" \
+    --port "$KRW_ONTOLOGY_MCP_PORT" \
+    --root "$MCP_RELEASE_ROOT" \
+    --require-current-symlink \
+    --mcp-path "$KRW_ONTOLOGY_MCP_PATH" \
+    --store-mode "$KRW_MCP_STORE_MODE" \
+    --log-file "$MCP_SERVER_LOG_FILE" \
+    --log-level "$MCP_SERVER_LOG_LEVEL"
+fi

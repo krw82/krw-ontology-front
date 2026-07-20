@@ -1,0 +1,16 @@
+{
+  "format": "krw-production-target/v1",
+  "supabaseProjectRef": "deaumgysfwfcctzhbaxb",
+  "siteOrigin": "https://krwontology.com",
+  "siteOrigins": [
+    "https://krwontology.com",
+    "https://www.krwontology.com"
+  ],
+  "gcpProject": "project-6c11ac2d-6c8f-4149-82e",
+  "gcpInstance": "krw-onto-v1",
+  "gcpZone": "asia-northeast3-a",
+  "gcpInstanceId": "5285568228446944489",
+  "remoteFrontDir": "/home/username/krw-ontology-front",
+  "remoteOntologyDir": "/home/username/krw-ontology",
+  "composeProject": "krw-ontology-front"
+}

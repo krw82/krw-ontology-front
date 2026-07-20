@@ -3,6 +3,8 @@ import { headers } from "next/headers";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import AnalyticsBootstrap from "@/components/analytics/AnalyticsBootstrap";
+import WebVitalsReporter from "@/components/analytics/WebVitalsReporter";
+import InteractionPerformanceReporter from "@/components/analytics/InteractionPerformanceReporter";
 import AppShell from "@/components/AppShell";
 import PwaBootstrap from "@/components/pwa/PwaBootstrap";
 import {
@@ -18,6 +20,12 @@ import {
   SITE_DESCRIPTION,
   SITE_NAME,
 } from "@/lib/marketing/site";
+import { getAuthUser } from "@/lib/auth";
+import {
+  shouldPreserveInitialProfile,
+  topNavProfileFromUser,
+} from "@/lib/auth/user-profile";
+import { getWorkspaceShellMode } from "@/lib/navigation/workspace-routes";
 import "./globals.css";
 
 const googleSiteVerification = process.env.GOOGLE_SITE_VERIFICATION?.trim();
@@ -98,9 +106,50 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
   themeColor: "#003ec7",
   colorScheme: "only light",
 };
+
+function RootAppShellFallback({
+  mode,
+}: {
+  mode: ReturnType<typeof getWorkspaceShellMode>;
+}) {
+  const showsPersistentNavigation = mode === "standard";
+
+  return (
+    <div
+      aria-hidden="true"
+      className="flex min-h-[100dvh] w-full flex-col bg-canvas"
+    >
+      <div className="h-[72px] flex-shrink-0 border-b border-hairline bg-canvas md:h-[64px]">
+        <div className="mx-auto flex h-full max-w-[1600px] items-center justify-between px-base sm:px-md">
+          <div className="flex items-center gap-sm">
+            <div className="h-11 w-11 rounded-[8px] bg-surface-soft" />
+            <div className="h-6 w-20 rounded bg-surface-soft" />
+          </div>
+          <div className="h-11 w-11 rounded-[8px] bg-surface-soft" />
+        </div>
+      </div>
+      <div className="mx-auto w-full max-w-[1280px] flex-1 px-base py-lg sm:px-xl">
+        <div className="h-4 w-24 rounded bg-surface-soft" />
+        <div className="mt-3 h-9 w-2/3 max-w-xl rounded bg-surface-soft" />
+        <div className="mt-8 grid gap-base">
+          <div className="h-40 rounded-[16px] border border-hairline bg-surface-soft" />
+          <div className="h-28 rounded-[16px] border border-hairline bg-surface-soft" />
+        </div>
+      </div>
+      {showsPersistentNavigation ? (
+        <div
+          className="h-[calc(64px+env(safe-area-inset-bottom))] flex-shrink-0 border-t border-hairline bg-canvas lg:hidden"
+        />
+      ) : null}
+    </div>
+  );
+}
 
 export default async function RootLayout({
   children,
@@ -112,11 +161,20 @@ export default async function RootLayout({
   const requestHeaders = await headers();
   const requestLocale = requestHeaders.get("x-krw-locale");
   const locale = isLocale(requestLocale) ? requestLocale : DEFAULT_LOCALE;
+  const requestPathname = requestHeaders.get("x-krw-pathname") ?? "/";
+  const workspaceShellMode = getWorkspaceShellMode(requestPathname);
+  const shouldSeedWorkspaceProfile =
+    workspaceShellMode === "standard";
+  const workspaceUser = shouldSeedWorkspaceProfile
+    ? await getAuthUser().catch(() => null)
+    : null;
 
   return (
     <html lang={localeToHtmlLang(locale)} className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-canvas text-on-surface">
         <AnalyticsBootstrap />
+        <WebVitalsReporter />
+        <InteractionPerformanceReporter />
         <PwaBootstrap />
         {/* L-05: Skip to content link for accessibility */}
         <a
@@ -125,8 +183,13 @@ export default async function RootLayout({
         >
           {locale === "ko" ? "메인 콘텐츠로 이동" : "Skip to main content"}
         </a>
-        <Suspense fallback={children}>
-          <AppShell>{children}</AppShell>
+        <Suspense fallback={<RootAppShellFallback mode={workspaceShellMode} />}>
+          <AppShell
+            initialUserProfile={topNavProfileFromUser(workspaceUser)}
+            preserveInitialUserProfile={shouldPreserveInitialProfile(workspaceUser)}
+          >
+            {children}
+          </AppShell>
         </Suspense>
       </body>
     </html>

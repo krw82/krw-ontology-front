@@ -59,11 +59,10 @@ export function applyPulseItemStates(
     if (state.snoozed_until && Date.parse(state.snoozed_until) > now.getTime()) return [];
     if (isOnCooldown(candidate, state, now, timezone)) return [];
 
-    const reviewedAt = state.reviewed_at ?? state.read_at ?? candidate.reviewed_at ?? candidate.read_at;
+    const reviewedAt = state.reviewed_at ?? candidate.reviewed_at;
     return [{
       ...candidate,
       reviewed_at: reviewedAt,
-      read_at: state.read_at ?? reviewedAt ?? candidate.read_at,
       saved_at: state.saved_at ?? candidate.saved_at,
       snoozed_until: state.snoozed_until ?? candidate.snoozed_until,
       is_pinned: Boolean(state.saved_at) || candidate.is_pinned,
@@ -101,6 +100,7 @@ export function hasRecentKindImpression(
   cooldownMs: number,
 ): boolean {
   return [...states.values()].some((state) => state.kind === kind
+    && !(kind === "resurface" && state.source_id.startsWith("monitoring:"))
     && Boolean(state.last_seen_at)
     && Date.parse(state.last_seen_at!) > now.getTime() - cooldownMs
     && (kind !== "learning" || localIsoWeekKey(new Date(state.last_seen_at!), timezone) === localIsoWeekKey(now, timezone)));
@@ -114,7 +114,10 @@ function isOnCooldown(
 ): boolean {
   if (!state.last_seen_at) return false;
   const lastSeen = Date.parse(state.last_seen_at);
-  if (candidate.kind === "resurface") return lastSeen > now.getTime() - RESURFACE_COOLDOWN_MS;
+  if (candidate.kind === "resurface") {
+    if (candidate.source_id.startsWith("monitoring:")) return false;
+    return lastSeen > now.getTime() - RESURFACE_COOLDOWN_MS;
+  }
   if (candidate.kind === "learning") return localIsoWeekKey(new Date(lastSeen), timezone) === localIsoWeekKey(now, timezone);
   if (candidate.kind !== "question") return false;
 

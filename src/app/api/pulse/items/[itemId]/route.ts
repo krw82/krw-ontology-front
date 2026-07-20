@@ -19,7 +19,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
-  action: z.enum(["review", "unreview", "read", "unread", "save", "unsave", "snooze", "dismiss", "impression"]),
+  action: z.enum(["review", "unreview", "save", "unsave", "snooze", "dismiss", "impression"]),
   snoozed_until: z.iso.datetime().optional(),
   feed_session_id: z.string().uuid().optional(),
 }).strict();
@@ -51,7 +51,22 @@ export async function PATCH(
     return Response.json({ error: { code: "validation_error", message: "항목 출처가 올바르지 않습니다." } }, { status: 400 });
   }
 
-  const action = canonicalAction(parsed.data.action);
+  const action = parsed.data.action;
+  if (
+    sourceType === "filing" &&
+    (action === "review" || action === "unreview")
+  ) {
+    return Response.json(
+      {
+        error: {
+          code: "validation_error",
+          message:
+            "공시는 영향, 한 문장 이유와 다음 행동을 함께 저장해야 합니다.",
+        },
+      },
+      { status: 400 },
+    );
+  }
   if (action === "impression" && !parsed.data.feed_session_id) {
     return Response.json({ error: { code: "validation_error", message: "노출 세션 정보가 필요합니다." } }, { status: 400 });
   }
@@ -91,11 +106,27 @@ export async function PATCH(
         properties: { item_kind: sourceType, action },
       });
     }
+    if (
+      sourceType === "resurface" &&
+      sourceId.startsWith("monitoring:") &&
+      (action === "review" || action === "dismiss")
+    ) {
+      void recordAnalyticsEventFromRequest(request, {
+        eventName: "second_opportunity_resolved",
+        userId: user.id,
+        properties: {
+          monitoring_rule_id: sourceId.slice("monitoring:".length),
+          source: "pulse",
+          source_type: "monitoring_rule",
+          trigger: "schedule",
+          resolution: action === "review" ? "reviewed" : "dismissed",
+        },
+      });
+    }
     const response: PulseItemMutationResponse = {
       item_id: itemId,
       action,
       reviewed_at: state.reviewed_at,
-      read_at: state.read_at,
       saved_at: state.saved_at,
       snoozed_until: state.snoozed_until,
       dismissed_at: state.dismissed_at,
@@ -117,12 +148,6 @@ interface MutationContext {
   feedSessionId?: string | null;
 }
 
-function canonicalAction(action: PulseStateMutationAction): PulseStateMutationAction {
-  if (action === "read") return "review";
-  if (action === "unread") return "unreview";
-  return action;
-}
-
 async function mutateSourceIfRequired(context: MutationContext): Promise<boolean> {
   const supabase = getSupabaseAdmin();
   if (context.sourceType === "filing") {
@@ -134,39 +159,7 @@ async function mutateSourceIfRequired(context: MutationContext): Promise<boolean
       .eq("processing_status", "ready")
       .maybeSingle();
     if (eventError) throw eventError;
-    if (event) {
-      await syncLegacyFilingNotificationState(context);
-      return true;
-    }
-
-    // One release of compatibility for item ids emitted by the notification
-    // based feed. New catalog-wide filing cards use the durable event UUID
-    // above and never require a user-owned notification row to exist.
-    const notificationIds = context.sourceId.split(",").filter(Boolean);
-    const { data: notifications, error: notificationError } = await supabase
-      .from("user_filing_notifications")
-      .select("id")
-      .eq("user_id", context.userId)
-      .in("id", notificationIds);
-    if (notificationError) throw notificationError;
-    if (notifications.length !== notificationIds.length) return false;
-    if (context.action === "review" || context.action === "unreview") {
-      const { error: updateError } = await supabase
-        .from("user_filing_notifications")
-        .update({ read_at: context.action === "review" ? context.now : null })
-        .eq("user_id", context.userId)
-        .in("id", notificationIds);
-      if (updateError) throw updateError;
-    }
-    if (context.action === "snooze") {
-      const { error: updateError } = await supabase
-        .from("user_filing_notifications")
-        .update({ snoozed_until: context.snoozedUntil })
-        .eq("user_id", context.userId)
-        .in("id", notificationIds);
-      if (updateError) throw updateError;
-    }
-    return true;
+    return Boolean(event);
   }
   if (context.sourceType === "analysis") return analysisBelongsToUser(context.sourceId, context.userId);
   if (context.sourceType === "question") {
@@ -194,7 +187,9 @@ async function mutateSourceIfRequired(context: MutationContext): Promise<boolean
     const resourceId = context.sourceId.slice(separator + 1);
     const table = resourceType === "note"
       ? "user_research_notes"
-      : resourceType === "notebook" ? "user_company_notebooks" : null;
+      : resourceType === "notebook"
+        ? "user_company_notebooks"
+        : resourceType === "monitoring" ? "user_company_monitoring_rules" : null;
     if (!table || !resourceId) return false;
     const { data, error } = await supabase
       .from(table)
@@ -208,19 +203,6 @@ async function mutateSourceIfRequired(context: MutationContext): Promise<boolean
   if (context.sourceType === "learning") return PULSE_LEARNING_ENTRIES.some((entry) => entry.slug === context.sourceId);
   if (context.sourceType === "checkup") return /^\d{4}-\d{2}-\d{2}$/.test(context.sourceId);
   return false;
-}
-
-async function syncLegacyFilingNotificationState(context: MutationContext): Promise<void> {
-  if (context.action !== "review" && context.action !== "unreview" && context.action !== "snooze") return;
-  const fields = context.action === "snooze"
-    ? { snoozed_until: context.snoozedUntil }
-    : { read_at: context.action === "review" ? context.now : null };
-  const { error } = await getSupabaseAdmin()
-    .from("user_filing_notifications")
-    .update(fields)
-    .eq("user_id", context.userId)
-    .eq("filing_event_id", context.sourceId);
-  if (error) throw error;
 }
 
 async function analysisBelongsToUser(sourceId: string, userId: string): Promise<boolean> {
@@ -246,6 +228,35 @@ async function analysisBelongsToUser(sourceId: string, userId: string): Promise<
 
 async function upsertState(context: MutationContext) {
   const supabase = getSupabaseAdmin();
+  if (
+    context.sourceType === "resurface" &&
+    context.sourceId.startsWith("monitoring:") &&
+    (context.action === "review" || context.action === "dismiss")
+  ) {
+    const ruleId = context.sourceId.slice("monitoring:".length);
+    if (!z.string().uuid().safeParse(ruleId).success) {
+      throw new Error("invalid scheduled monitoring rule");
+    }
+    const { data, error } = await supabase.rpc(
+      "resolve_scheduled_monitoring_pulse_item",
+      {
+        p_user_id: context.userId,
+        p_rule_id: ruleId,
+        p_item_key: context.itemKey,
+        p_action: context.action,
+        p_resolved_at: context.now,
+      },
+    );
+    if (error || !data || typeof data !== "object" || Array.isArray(data)) {
+      throw error ?? new Error("scheduled monitoring resolution failed");
+    }
+    return data as {
+      reviewed_at: string | null;
+      saved_at: string | null;
+      snoozed_until: string | null;
+      dismissed_at: string | null;
+    };
+  }
   if (context.action === "impression") {
     const { error } = await supabase.rpc("record_pulse_item_impression", {
       p_user_id: context.userId,
@@ -259,7 +270,7 @@ async function upsertState(context: MutationContext) {
     if (error) throw error;
     const { data, error: stateError } = await supabase
       .from("user_pulse_item_states")
-      .select("reviewed_at,read_at,saved_at,snoozed_until,dismissed_at")
+      .select("reviewed_at,saved_at,snoozed_until,dismissed_at")
       .eq("user_id", context.userId)
       .eq("item_key", context.itemKey)
       .single();
@@ -276,14 +287,8 @@ async function upsertState(context: MutationContext) {
   if (existingError && existingError.code !== "PGRST116") throw existingError;
 
   const fields: Record<string, string | null> = {};
-  if (context.action === "review") {
-    fields.reviewed_at = context.now;
-    fields.read_at = context.now;
-  }
-  if (context.action === "unreview") {
-    fields.reviewed_at = null;
-    fields.read_at = null;
-  }
+  if (context.action === "review") fields.reviewed_at = context.now;
+  if (context.action === "unreview") fields.reviewed_at = null;
   if (context.action === "save") fields.saved_at = context.now;
   if (context.action === "unsave") fields.saved_at = null;
   if (context.action === "snooze") fields.snoozed_until = context.snoozedUntil;
@@ -300,7 +305,7 @@ async function upsertState(context: MutationContext) {
       first_seen_at: existing?.first_seen_at ?? context.now,
       ...fields,
     }, { onConflict: "user_id,item_key" })
-    .select("reviewed_at,read_at,saved_at,snoozed_until,dismissed_at")
+    .select("reviewed_at,saved_at,snoozed_until,dismissed_at")
     .single();
   if (error) throw error;
   return data;

@@ -117,6 +117,9 @@ export function buildAnalysisCandidates(
       source_type: "analysis" as const,
       source_id: `${run.id}:${phase}`,
       ticker,
+      coverage_status: null,
+      judgment: null,
+      linked_thesis: null,
       eyebrow: active
         ? "내가 시작한 분석 · 진행 중"
         : completed
@@ -132,7 +135,6 @@ export function buildAnalysisCandidates(
       expires_at: active
         ? null
         : new Date(Date.parse(occurredAt) + 30 * 24 * 60 * 60 * 1_000).toISOString(),
-      read_at: null,
       saved_at: null,
       snoozed_until: null,
       phase,

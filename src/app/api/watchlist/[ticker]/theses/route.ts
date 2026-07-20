@@ -1,8 +1,14 @@
 import type { NextRequest } from "next/server";
+import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import { isUuid } from "@/lib/api/validation";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
+import {
+  invalidOriginResponse,
+  isExpectedMutationOrigin,
+} from "@/lib/filing-notifications/request";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
+  ensureCompanyCoverageForWrite,
   errorResponse,
   parseJsonObject,
   requireIndexedTicker,
@@ -16,7 +22,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const THESIS_SELECT =
-  "id, user_id, ticker, title, thesis_text, status, tags, archived_at, source_chat_session_id, source_message_id, created_at, updated_at";
+  "id, user_id, ticker, title, thesis_text, monitored_variables, counter_evidence, decision_change_condition, status, tags, archived_at, source_chat_session_id, source_message_id, created_at, updated_at";
 const VALID_STATUSES = new Set([
   "active",
   "needs_review",
@@ -61,6 +67,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ ticker: string }> },
 ) {
+  if (!isExpectedMutationOrigin(request)) return invalidOriginResponse();
   let user;
   try {
     user = await getAuthUser();
@@ -83,6 +90,9 @@ export async function POST(
     maxLength: 20_000,
     required: true,
   });
+  const monitoredVariables = stringArrayInput(body, "monitored_variables") ?? [];
+  const counterEvidence = textInput(body, "counter_evidence", { maxLength: 8_000 }) ?? "";
+  const decisionChangeCondition = textInput(body, "decision_change_condition", { maxLength: 4_000 }) ?? "";
   const status = stringInput(body, "status") || "active";
   const sourceChatSessionId = stringInput(body, "source_chat_session_id");
   const sourceMessageId = stringInput(body, "source_message_id");
@@ -96,12 +106,23 @@ export async function POST(
   if (!VALID_STATUSES.has(status)) {
     return errorResponse(400, "validation_error", "Thesis 상태가 올바르지 않습니다.");
   }
+  if (monitoredVariables.length > 3) {
+    return errorResponse(400, "validation_error", "확인 변수는 최대 3개까지 저장할 수 있습니다.");
+  }
   if (sourceChatSessionId && !isUuid(sourceChatSessionId)) {
     return errorResponse(400, "validation_error", "채팅 세션 참조가 올바르지 않습니다.");
   }
   if (sourceMessageId && !isUuid(sourceMessageId)) {
     return errorResponse(400, "validation_error", "메시지 참조가 올바르지 않습니다.");
   }
+
+  const coverageError = await ensureCompanyCoverageForWrite({
+    userId: user.id,
+    userEmail: user.email,
+    ticker: tickerResult.ticker,
+    source: "thesis_created",
+  });
+  if (coverageError) return coverageError;
 
   const { data, error } = await getSupabaseAdmin()
     .from("user_company_theses")
@@ -110,6 +131,9 @@ export async function POST(
       ticker: tickerResult.ticker,
       title,
       thesis_text: thesisText,
+      monitored_variables: monitoredVariables,
+      counter_evidence: counterEvidence,
+      decision_change_condition: decisionChangeCondition,
       status: status as UserCompanyThesisRow["status"],
       tags: stringArrayInput(body, "tags") ?? [],
       source_chat_session_id: sourceChatSessionId || null,
@@ -122,22 +146,16 @@ export async function POST(
     return errorResponse(500, "internal_error", "Thesis를 저장하지 못했습니다.");
   }
 
-  await touchMark(user.id, tickerResult.ticker);
+  void recordAnalyticsEventFromRequest(request, {
+    eventName: "thesis_updated",
+    userId: user.id,
+    properties: {
+      thesis_id: data.id,
+      ticker: data.ticker,
+      status: "created",
+      source: "watchlist",
+      source_type: "thesis",
+    },
+  });
   return Response.json({ thesis: data }, { status: 201 });
-}
-
-async function touchMark(userId: string, ticker: string) {
-  const now = new Date().toISOString();
-  await getSupabaseAdmin()
-    .from("user_company_marks")
-    .upsert(
-      {
-        user_id: userId,
-        ticker,
-        is_watchlisted: true,
-        last_activity_at: now,
-        updated_at: now,
-      },
-      { onConflict: "user_id,ticker" },
-    );
 }

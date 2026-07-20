@@ -2,17 +2,17 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PulseCandidate } from "@/lib/pulse/contract";
+import type { UserCompanyCoverageStatus } from "@/types/api-contracts";
 import type { ChatSessionRow, Database, UserCompanyMarkRow } from "@/types/database";
 
-type CompanyMark = Pick<UserCompanyMarkRow, "ticker" | "is_holding" | "is_watchlisted">;
+type CompanyMark = Pick<UserCompanyMarkRow, "ticker" | "coverage_status">;
 type RecentCompanySession = Pick<ChatSessionRow, "default_tickers">;
 
 const RECENT_RESEARCH_WINDOW_MS = 30 * 24 * 60 * 60 * 1_000;
 const MAX_PREFERRED_TICKERS = 100;
 
 export interface PulseUserTickerSignals {
-  holdingTickers: Set<string>;
-  watchlistedTickers: Set<string>;
+  coverageByTicker: Map<string, UserCompanyCoverageStatus>;
   recentResearchTickers: Set<string>;
   preferredTickers: string[];
 }
@@ -26,7 +26,7 @@ export async function getPulseUserTickerSignals(
   const [marksResult, sessionsResult] = await Promise.all([
     supabase
       .from("user_company_marks")
-      .select("ticker,is_holding,is_watchlisted")
+      .select("ticker,coverage_status")
       .eq("user_id", userId)
       .limit(MAX_PREFERRED_TICKERS)
       .returns<CompanyMark[]>(),
@@ -44,14 +44,12 @@ export async function getPulseUserTickerSignals(
   if (marksResult.error) throw marksResult.error;
   if (sessionsResult.error) throw sessionsResult.error;
 
-  const holdingTickers = new Set<string>();
-  const watchlistedTickers = new Set<string>();
+  const coverageByTicker = new Map<string, UserCompanyCoverageStatus>();
   const recentResearchTickers = new Set<string>();
   for (const mark of marksResult.data ?? []) {
     const ticker = normalizeTicker(mark.ticker);
     if (!ticker) continue;
-    if (mark.is_holding) holdingTickers.add(ticker);
-    if (mark.is_watchlisted) watchlistedTickers.add(ticker);
+    coverageByTicker.set(ticker, mark.coverage_status);
   }
   for (const session of sessionsResult.data ?? []) {
     for (const rawTicker of session.default_tickers ?? []) {
@@ -61,12 +59,13 @@ export async function getPulseUserTickerSignals(
   }
 
   return {
-    holdingTickers,
-    watchlistedTickers,
+    coverageByTicker,
     recentResearchTickers,
     preferredTickers: [...new Set([
-      ...holdingTickers,
-      ...watchlistedTickers,
+      ...[...coverageByTicker.entries()]
+        .filter(([, status]) => status !== "closed")
+        .sort((left, right) => coveragePriority(left[1]) - coveragePriority(right[1]))
+        .map(([ticker]) => ticker),
       ...recentResearchTickers,
     ])].slice(0, MAX_PREFERRED_TICKERS),
   };
@@ -76,27 +75,36 @@ export function applyPulseUserTickerSignals(
   candidates: PulseCandidate[],
   signals: PulseUserTickerSignals,
 ): PulseCandidate[] {
-  return candidates.map((candidate) => {
-    const ticker = normalizeTicker(candidate.ticker);
-    const isHolding = Boolean(ticker && signals.holdingTickers.has(ticker));
-    const isWatchlisted = Boolean(ticker && signals.watchlistedTickers.has(ticker));
-    const hasRecentResearch = Boolean(ticker && signals.recentResearchTickers.has(ticker));
-    const personalizedReason = filingReason(candidate, ticker, isHolding, isWatchlisted, hasRecentResearch);
+  return candidates.map((candidate) => personalizeCandidate(candidate, signals));
+}
 
-    return {
-      ...candidate,
-      is_holding: isHolding,
-      is_watchlisted: isWatchlisted,
-      has_recent_research: hasRecentResearch,
-      ...(personalizedReason ?? {}),
-    };
-  });
+/**
+ * A saved filing judgment owns the user's share-class context. Re-composition
+ * must never silently move that immutable decision from GOOGL to GOOG (or the
+ * reverse) just because the SEC event has another canonical ticker.
+ */
+export function applyPulseFilingDecisionTicker(
+  candidate: PulseCandidate,
+  rawTicker: string,
+  signals: PulseUserTickerSignals,
+): PulseCandidate {
+  return personalizeCandidate(candidate, signals, normalizeTicker(rawTicker));
+}
+
+export function pulseCandidateTickerIdentities(
+  candidate: Pick<PulseCandidate, "ticker" | "metadata">,
+): string[] {
+  const coveredTickers = typeof candidate.metadata.covered_tickers_csv === "string"
+    ? candidate.metadata.covered_tickers_csv.split(",")
+    : [];
+  return [...new Set([candidate.ticker, ...coveredTickers]
+    .map(normalizeTicker)
+    .filter((ticker): ticker is string => Boolean(ticker)))];
 }
 
 export function emptyPulseUserTickerSignals(): PulseUserTickerSignals {
   return {
-    holdingTickers: new Set(),
-    watchlistedTickers: new Set(),
+    coverageByTicker: new Map(),
     recentResearchTickers: new Set(),
     preferredTickers: [],
   };
@@ -105,27 +113,38 @@ export function emptyPulseUserTickerSignals(): PulseUserTickerSignals {
 function filingReason(
   candidate: PulseCandidate,
   ticker: string | null,
-  isHolding: boolean,
-  isWatchlisted: boolean,
+  coverageStatus: UserCompanyCoverageStatus | null,
   hasRecentResearch: boolean,
 ): Pick<PulseCandidate, "reason_code" | "reason_label"> | null {
   if (candidate.kind !== "filing" || !ticker) return null;
-  if (isHolding && hasRecentResearch) {
+  if (coverageStatus === "holding" && hasRecentResearch) {
     return {
       reason_code: "holding_research_followup",
       reason_label: `${ticker}은 보유 기업이며 최근 이 기업을 리서치했습니다.`,
     };
   }
-  if (isHolding) {
+  if (coverageStatus === "holding") {
     return {
       reason_code: "holding_new_filing",
       reason_label: `${ticker}은 보유 기업입니다.`,
     };
   }
-  if (isWatchlisted) {
+  if (coverageStatus === "watching") {
     return {
       reason_code: "watchlisted_new_filing",
       reason_label: `${ticker}을 관심 기업으로 저장했습니다.`,
+    };
+  }
+  if (coverageStatus === "exploring") {
+    return {
+      reason_code: "exploring_company_filing",
+      reason_label: `${ticker}을 탐색 중이며 새 근거가 생겼습니다.`,
+    };
+  }
+  if (coverageStatus === "closed") {
+    return {
+      reason_code: "closed_coverage_followup",
+      reason_label: `${ticker}의 종료된 판단 기록과 비교할 수 있습니다.`,
     };
   }
   if (hasRecentResearch) {
@@ -135,6 +154,99 @@ function filingReason(
     };
   }
   return null;
+}
+
+function personalizeCandidate(
+  candidate: PulseCandidate,
+  signals: PulseUserTickerSignals,
+  forcedTicker?: string | null,
+): PulseCandidate {
+  const identities = pulseCandidateTickerIdentities(candidate);
+  const canonicalTicker = normalizeTicker(candidate.ticker);
+  const ticker = forcedTicker
+    ?? selectCoverageTicker(identities, signals.coverageByTicker)
+    ?? identities.find((identity) => signals.recentResearchTickers.has(identity))
+    ?? canonicalTicker;
+  const coverageStatus = ticker ? signals.coverageByTicker.get(ticker) ?? null : null;
+  const hasRecentResearch = identities.some((identity) =>
+    signals.recentResearchTickers.has(identity));
+  const contextualized = candidate.kind === "filing" && ticker
+    ? applyFilingTickerContext(candidate, ticker, canonicalTicker)
+    : candidate;
+  const personalizedReason = filingReason(
+    contextualized,
+    ticker,
+    coverageStatus,
+    hasRecentResearch,
+  );
+
+  return {
+    ...contextualized,
+    coverage_status: coverageStatus,
+    has_recent_research: hasRecentResearch,
+    ...(personalizedReason ?? {}),
+  };
+}
+
+function selectCoverageTicker(
+  identities: string[],
+  coverageByTicker: Map<string, UserCompanyCoverageStatus>,
+): string | null {
+  let selected: { ticker: string; rank: number } | null = null;
+  for (const ticker of identities) {
+    const status = coverageByTicker.get(ticker);
+    if (!status) continue;
+    const rank = coveragePriority(status);
+    if (!selected || rank < selected.rank) selected = { ticker, rank };
+  }
+  return selected?.ticker ?? null;
+}
+
+function applyFilingTickerContext(
+  candidate: PulseCandidate,
+  ticker: string,
+  canonicalTicker: string | null,
+): PulseCandidate {
+  return {
+    ...candidate,
+    ticker,
+    primary_action: rewriteTickerAction(candidate.primary_action, ticker),
+    secondary_actions: candidate.secondary_actions.map((action) =>
+      rewriteTickerAction(action, ticker)),
+    metadata: {
+      ...candidate.metadata,
+      canonical_ticker: canonicalTicker,
+    },
+  };
+}
+
+function rewriteTickerAction(
+  action: PulseCandidate["primary_action"],
+  ticker: string,
+): PulseCandidate["primary_action"] {
+  if (action.type !== "link") return action;
+  let target: URL;
+  try {
+    target = new URL(action.href, "https://krwontology.com");
+  } catch {
+    return action;
+  }
+  if (target.origin !== "https://krwontology.com") return action;
+  if (!target.pathname.startsWith("/filings/") && target.pathname !== "/chat/new") {
+    return action;
+  }
+  target.searchParams.set("ticker", ticker);
+  return {
+    ...action,
+    href: `${target.pathname}${target.search}${target.hash}`,
+  };
+}
+
+function coveragePriority(status: UserCompanyCoverageStatus): number {
+  if (status === "holding") return 0;
+  if (status === "watching") return 1;
+  if (status === "exploring") return 2;
+  return 3;
 }
 
 function normalizeTicker(value: string | null | undefined): string | null {

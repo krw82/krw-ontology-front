@@ -18,6 +18,9 @@ function candidate(kind: PulseCandidate["kind"], key: string): PulseCandidate {
     source_type: kind,
     source_id: key,
     ticker: kind === "learning" ? null : "AAPL",
+    coverage_status: kind === "learning" ? null : "watching",
+    judgment: null,
+    linked_thesis: null,
     eyebrow: "항목",
     title: key,
     body: "body",
@@ -27,7 +30,6 @@ function candidate(kind: PulseCandidate["kind"], key: string): PulseCandidate {
     occurred_at: "2026-07-14T00:00:00.000Z",
     available_at: "2026-07-14T00:00:00.000Z",
     expires_at: null,
-    read_at: null,
     saved_at: null,
     snoozed_until: null,
     group_key: null,
@@ -47,7 +49,6 @@ function state(overrides: Partial<UserPulseItemStateRow> = {}): UserPulseItemSta
     first_seen_at: null,
     last_seen_at: null,
     view_count: 0,
-    read_at: null,
     reviewed_at: null,
     saved_at: null,
     snoozed_until: null,
@@ -107,5 +108,17 @@ describe("Pulse item state", () => {
       last_seen_at: "2026-07-14T01:00:00.000Z",
     })]]);
     expect(hasRecentKindImpression(states, "learning", now, "Asia/Seoul", 7 * 24 * 60 * 60 * 1_000)).toBe(true);
+  });
+
+  it("keeps a due scheduled review visible after an impression until the user resolves it", () => {
+    const review = candidate("resurface", "monitoring:11111111-1111-4111-8111-111111111111");
+    review.source_id = "monitoring:11111111-1111-4111-8111-111111111111";
+    const states = new Map([[review.item_key, state({
+      item_key: review.item_key,
+      source_id: review.source_id,
+      last_seen_at: "2026-07-15T11:00:00.000Z",
+    })]]);
+    expect(applyPulseItemStates([review], states, now, "Asia/Seoul")).toHaveLength(1);
+    expect(hasRecentKindImpression(states, "resurface", now, "Asia/Seoul", 28 * 24 * 60 * 60 * 1_000)).toBe(false);
   });
 });

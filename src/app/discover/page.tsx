@@ -11,5 +11,5 @@ export default async function DiscoverPage() {
     redirect("/login?next=/discover");
   }
 
-  return <ChatPageClient />;
+  return <ChatPageClient draftOwnerId={user.id} />;
 }

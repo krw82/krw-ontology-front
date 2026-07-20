@@ -15,6 +15,10 @@ import {
 import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
 import { dispatchOpenChatSidebar } from "@/lib/chat/sidebar-events";
 import WorkspaceNavigation from "@/components/navigation/WorkspaceNavigation";
+import { Pressable } from "@/components/ui/Pressable";
+import { clearAllComposerDrafts } from "@/lib/chat/composer-draft-store";
+import { clearAllFilingJudgmentDrafts } from "@/lib/pulse/judgment-draft-store";
+import { clearOfflineReadModel } from "@/lib/pwa/offline-read-model";
 import { createClient } from "@/lib/supabase/client";
 import { popoverMenu } from "@/lib/animation";
 import { useEntitlement } from "@/hooks/useEntitlement";
@@ -208,12 +212,22 @@ export default function TopNav({
 
   const handleSignOut = useCallback(async () => {
     if (!supabase) {
+      await Promise.allSettled([
+        clearAllComposerDrafts(),
+        Promise.resolve(clearAllFilingJudgmentDrafts()),
+        clearOfflineReadModel(),
+      ]);
       setAccountMenuOpen(false);
       router.refresh();
       return;
     }
 
-    await supabase.auth.signOut();
+    await Promise.allSettled([
+      supabase.auth.signOut(),
+      clearAllComposerDrafts(),
+      Promise.resolve(clearAllFilingJudgmentDrafts()),
+      clearOfflineReadModel(),
+    ]);
     setUserProfile(null);
     setAccountMenuOpen(false);
     router.replace("/login");
@@ -249,9 +263,9 @@ export default function TopNav({
 
         <div className="flex shrink-0 items-center justify-end gap-xs sm:gap-md">
           {showChatHistoryTrigger ? (
-            <button
-              type="button"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-[8px] border border-hairline bg-canvas text-ink shadow-sm transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-55 lg:w-auto lg:gap-1.5 lg:px-sm lg:text-[13px] lg:font-extrabold"
+            <Pressable
+              className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] border border-hairline bg-canvas text-ink shadow-sm disabled:cursor-not-allowed disabled:opacity-55 lg:w-auto lg:gap-1.5 lg:px-sm lg:text-[13px] lg:font-extrabold"
+              hoverEffect="surface"
               aria-label={currentLocale === "ko" ? "채팅 기록 열기" : "Open chat history"}
               aria-controls="chat-history-panel"
               onClick={() => {
@@ -261,7 +275,7 @@ export default function TopNav({
             >
               <span aria-hidden="true" className="material-symbols-outlined text-[19px]">history</span>
               <span className="hidden lg:inline">{currentLocale === "ko" ? "채팅 기록" : "History"}</span>
-            </button>
+            </Pressable>
           ) : null}
           {actionSlot}
           {showLocaleSwitcher && <LocaleSwitcher compact />}
@@ -272,9 +286,9 @@ export default function TopNav({
             />
           ) : userProfile ? (
             <div ref={accountMenuRef} className="relative">
-              <button
-                type="button"
-                className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-[8px] border border-hairline bg-surface-dark text-[13px] font-semibold text-on-dark shadow-sm transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55 sm:h-10 sm:w-10"
+              <Pressable
+                className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-[8px] border border-hairline bg-surface-dark text-[13px] font-semibold text-on-dark shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55"
+                hoverEffect="primary-border"
                 aria-label={`${userProfile.name ?? userProfile.email} ${
                   currentLocale === "ko" ? "계정 메뉴" : "account menu"
                 }`}
@@ -289,7 +303,7 @@ export default function TopNav({
                   profile={userProfile}
                   onAvatarError={handleAvatarError}
                 />
-              </button>
+              </Pressable>
 
               <AnimatePresence initial={false}>
                 {accountMenuOpen && (
@@ -367,7 +381,7 @@ export default function TopNav({
           ) : (
             <Link
               href={`/login?next=${encodeURIComponent(currentPath)}`}
-              className="inline-flex min-h-10 items-center rounded-[8px] bg-surface-dark px-sm py-xs text-[14px] font-semibold leading-[1.15] text-on-dark transition-colors duration-200 hover:bg-primary-active sm:px-base sm:text-[16px]"
+              className="inline-flex min-h-11 items-center rounded-[8px] bg-surface-dark px-sm py-xs text-[14px] font-semibold leading-[1.15] text-on-dark transition-colors duration-200 hover:bg-primary-active sm:px-base sm:text-[16px]"
               aria-label={currentLocale === "ko" ? "로그인" : "Log in"}
             >
               {currentLocale === "ko" ? "로그인" : "Log in"}

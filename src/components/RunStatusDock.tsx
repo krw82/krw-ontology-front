@@ -77,7 +77,7 @@ export default function RunStatusDock({
         {onCancel && (
           <button
             type="button"
-            className="inline-flex h-8 items-center rounded-[8px] border border-hairline bg-surface px-3 text-[12px] font-bold text-error transition-colors hover:bg-error-container/25 active:scale-95"
+            className="inline-flex h-11 items-center rounded-[8px] border border-hairline bg-surface px-3 text-[12px] font-bold text-error transition-colors hover:bg-error-container/25 active:scale-95"
             onClick={() => void onCancel()}
           >
             중지

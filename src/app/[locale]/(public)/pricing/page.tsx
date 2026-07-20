@@ -30,7 +30,7 @@ const pricingCopy = {
       "유료 플랜은 매월 정기 결제됩니다. Free에서 핵심 탐색 기능을 시작하고, Standard와 Pro에서 더 넓은 리서치 메뉴를 이용할 수 있습니다.",
     serviceNote:
       "공시와 시장 자료를 확인하는 리서치 소프트웨어입니다. 투자자문이나 매수·매도 추천을 제공하지 않으며, 투자 판단은 이용자에게 있습니다.",
-    primaryCta: "첫 분석 시작",
+    primaryCta: "내 커버리지 만들기",
     cardCta: "플랜 시작",
     comparisonHeading: "플랜 비교",
     comparisonRows: [
@@ -71,25 +71,25 @@ const pricingCopy = {
         pro: "포함",
       },
       {
-        label: "리서치 노트북",
-        free: "제한",
-        standard: "제한",
-        pro: "포함",
+        label: "커버리지·판단 기록",
+        free: "기업 3개",
+        standard: "확대",
+        pro: "확대",
       },
     ],
     principlesHeading: "플랜을 나누는 기준",
     principles: [
       {
-        title: "메뉴별 기능 분리",
-        body: "Free는 핵심 탐색 기능, Standard는 와이드 리서치, Pro는 리서치 노트북까지 제공합니다.",
+        title: "기억은 무료로 시작",
+        body: "Free에서도 기업 3개의 가설, 판단, 질문과 다음 확인 조건을 계속 보관할 수 있습니다.",
       },
       {
         title: "먼저 가치를 확인",
-        body: "Free 플랜으로 첫 답변 성공, 근거 확인, 재질문 경험을 먼저 확인한 뒤 필요한 만큼 플랜을 올릴 수 있습니다.",
+        body: "Free 플랜으로 실제 공시를 확인하고 첫 판단을 저장한 뒤 필요한 만큼 커버리지와 분석량을 확장할 수 있습니다.",
       },
       {
         title: "필요한 기능만 확장",
-        body: "Standard에서 와이드 리서치를, Pro에서 리서치 노트북을 추가로 이용할 수 있습니다.",
+        body: "Standard와 Pro는 기억을 잠그는 대신 더 넓은 커버리지, 분석 깊이와 사용량을 제공합니다.",
       },
     ],
   },
@@ -103,7 +103,7 @@ const pricingCopy = {
       "Paid plans renew monthly. Start with core discovery on Free, then unlock wider research menus with Standard and Pro.",
     serviceNote:
       "This is research software for reviewing filings and market materials. It does not provide investment advice or buy/sell recommendations; users make their own decisions.",
-    primaryCta: "Start your first analysis",
+    primaryCta: "Build my coverage",
     cardCta: "Start plan",
     comparisonHeading: "Plan comparison",
     comparisonRows: [
@@ -144,25 +144,25 @@ const pricingCopy = {
         pro: "Included",
       },
       {
-        label: "Research notebook",
-        free: "Limited",
-        standard: "Limited",
-        pro: "Included",
+        label: "Coverage and decision history",
+        free: "3 companies",
+        standard: "Expanded",
+        pro: "Expanded",
       },
     ],
     principlesHeading: "How plans are separated",
     principles: [
       {
-        title: "Menu-based access",
-        body: "Free covers core discovery, Standard adds wide research, and Pro adds the research notebook.",
+        title: "Memory starts free",
+        body: "Free permanently keeps theses, judgments, questions, and review conditions for three companies.",
       },
       {
         title: "Prove value before payment",
-        body: "The Free plan keeps the focus on a successful first answer, visible evidence, and follow-up questions before upgrading.",
+        body: "Use Free to inspect a real filing and save a first decision before expanding coverage and analysis capacity.",
       },
       {
         title: "Expand by workflow",
-        body: "Standard adds wide research, while Pro adds the research notebook.",
+        body: "Standard and Pro charge for scale, research depth, and capacity rather than locking away your memory.",
       },
     ],
   },
@@ -205,14 +205,14 @@ const englishPlanCopy: Record<string, BillingPlanDisplay> = {
     label: "Free",
     statusLabel: "Free",
     description:
-      "Start with company search, filing-based analysis, and institutional holdings research.",
-    featureSummary: "Core discovery features",
+      "Start with three companies of persistent coverage, filing-based decisions, and core discovery.",
+    featureSummary: "3-company coverage + core discovery",
   },
   pro: {
     label: "Pro",
     statusLabel: "Advanced analysis",
-    description: "Unlock every menu, including the research notebook.",
-    featureSummary: "All features + notebook",
+    description: "Use the highest research capacity for broader, more frequent company work.",
+    featureSummary: "Highest research capacity",
   },
   standard: {
     label: "Standard",
@@ -239,16 +239,16 @@ function getPlanDisplay(
     > = {
       free: {
         description:
-          "회사 검색, 공시 기반 분석, 기관 보유 공시 확인을 시작할 수 있습니다.",
-        featureSummary: "핵심 탐색 기능",
+          "기업 3개의 판단 기록과 공시 기반 분석, 핵심 탐색을 시작할 수 있습니다.",
+        featureSummary: "3개 기업 커버리지 + 핵심 탐색",
       },
       standard: {
         description: "Free 기능에 와이드 리서치를 더합니다.",
         featureSummary: "와이드 리서치 포함",
       },
       pro: {
-        description: "모든 기능과 리서치 노트북을 제공합니다.",
-        featureSummary: "전체 메뉴 + 노트북",
+        description: "더 넓고 자주 기업을 리서치할 수 있는 가장 큰 분석량을 제공합니다.",
+        featureSummary: "가장 넉넉한 분석량",
       },
     };
     const copy = koPlanCopy[plan.key] ?? {

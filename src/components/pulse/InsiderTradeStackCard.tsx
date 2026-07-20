@@ -2,15 +2,24 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import FilingJudgmentPanel, {
+  type FilingJudgmentValue,
+} from "@/components/pulse/FilingJudgmentPanel";
 import { trackClientEventSilently } from "@/lib/analytics/client";
-import type { PulseFeedResponse, PulseItem, PulseMutationAction } from "@/types/api-contracts";
+import {
+  persistPulseItemImpression,
+  persistPulseItemImpressions,
+  pulseImpressionStorageKey,
+} from "@/lib/pulse/impression-client";
+import type { PulseFeedResponse, PulseItem } from "@/types/api-contracts";
 
 interface InsiderTradeStackCardProps {
   items: Array<{ item: PulseItem; position: number }>;
   pending: boolean;
   feedSessionId: string;
   rankingVersion: PulseFeedResponse["ranking_version"];
-  onMutation: (item: PulseItem, action: PulseMutationAction) => void;
+  draftOwnerId: string;
+  onJudgmentSaved: (item: PulseItem, judgment: FilingJudgmentValue) => void;
 }
 
 const COLLAPSED_ROW_COUNT = 3;
@@ -20,21 +29,42 @@ export default function InsiderTradeStackCard({
   pending,
   feedSessionId,
   rankingVersion,
-  onMutation,
+  draftOwnerId,
+  onJudgmentSaved,
 }: InsiderTradeStackCardProps) {
   const ref = useRef<HTMLElement>(null);
   const impressionSent = useRef(false);
   const [expanded, setExpanded] = useState(false);
+  const completed = items.every(({ item }) => item.state === "reviewed");
+  const completedKey = completed
+    ? items
+        .map(({ item }) => `${item.id}:${item.reviewed_at ?? item.state}`)
+        .join(",")
+    : null;
+  const [expandedCompletedKey, setExpandedCompletedKey] = useState<
+    string | null
+  >(null);
+  const completedExpanded =
+    completedKey !== null && expandedCompletedKey === completedKey;
   const summary = useMemo(() => buildSummary(items.map(({ item }) => item)), [items]);
   const visibleItems = expanded ? items : items.slice(0, COLLAPSED_ROW_COUNT);
   const hiddenCount = Math.max(0, items.length - visibleItems.length);
   const first = items[0]?.item;
+  const collapsedItemIds = useMemo(
+    () => items.slice(0, COLLAPSED_ROW_COUNT).map(({ item }) => item.id),
+    [items],
+  );
+  const collapsedItemIdsKey = collapsedItemIds.join(",");
 
   useEffect(() => {
     const element = ref.current;
     if (!element || !first) return;
-    const sessionKey = `pulse-insider-stack-impression:${items.map(({ item }) => item.id).join(",")}`;
+    const sessionKey = pulseImpressionStorageKey(
+      feedSessionId,
+      `insider-stack:${items.map(({ item }) => item.id).join(",")}`,
+    );
     if (window.sessionStorage.getItem(sessionKey) === "1") return;
+    const requestController = new AbortController();
     let timer: number | null = null;
     const observer = new IntersectionObserver((entries) => {
       const visible = entries.some((entry) => entry.isIntersecting && entry.intersectionRatio >= 0.5);
@@ -44,8 +74,8 @@ export default function InsiderTradeStackCard({
       }
       if (!visible || impressionSent.current || timer !== null) return;
       timer = window.setTimeout(() => {
+        timer = null;
         impressionSent.current = true;
-        window.sessionStorage.setItem(sessionKey, "1");
         trackClientEventSilently("pulse_item_impression", {
           item_kind: "filing",
           action: "insider_stack",
@@ -58,17 +88,57 @@ export default function InsiderTradeStackCard({
           feed_session_id: feedSessionId,
           ranking_version: rankingVersion,
         });
-        observer.disconnect();
+        // The three visible rows form the collapsed stack exposure. Persist
+        // them atomically; hidden rows are recorded only if they later enter
+        // the viewport after expansion.
+        void persistPulseItemImpressions({
+          itemIds: collapsedItemIds,
+          feedSessionId,
+          signal: requestController.signal,
+        }).then((persisted) => {
+          if (!persisted) {
+            impressionSent.current = false;
+            return;
+          }
+          for (const itemId of collapsedItemIds) {
+            window.sessionStorage.setItem(
+              pulseImpressionStorageKey(feedSessionId, itemId),
+              "1",
+            );
+          }
+          window.sessionStorage.setItem(sessionKey, "1");
+          observer.disconnect();
+        });
       }, 1_000);
     }, { threshold: [0.5] });
     observer.observe(element);
     return () => {
       if (timer !== null) window.clearTimeout(timer);
+      requestController.abort();
       observer.disconnect();
     };
-  }, [feedSessionId, first, items, rankingVersion]);
+  }, [collapsedItemIds, collapsedItemIdsKey, feedSessionId, first, items, rankingVersion]);
 
   if (!first) return null;
+
+  if (completed && !completedExpanded) {
+    return (
+      <article ref={ref} className="relative overflow-hidden rounded-[14px] border border-hairline bg-surface-soft px-base py-sm" data-pulse-kind="filing" data-pulse-state="reviewed-collapsed">
+        <div className="absolute inset-y-0 left-0 w-1 bg-primary opacity-55" aria-hidden="true" />
+        <div className="flex min-w-0 items-center gap-sm pl-xs">
+          <span className="material-symbols-outlined text-[18px] text-muted" aria-hidden="true">task_alt</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-muted">검토 완료 · 내부자 거래</p>
+            <p className="mt-0.5 truncate text-[13px] font-extrabold text-body">{items.length}건의 Form 4 묶음</p>
+          </div>
+          <button type="button" onClick={() => setExpandedCompletedKey(completedKey)} className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-[9px] px-sm text-[12px] font-extrabold text-muted hover:bg-white hover:text-ink" aria-expanded={false}>
+            다시 보기
+            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">expand_more</span>
+          </button>
+        </div>
+      </article>
+    );
+  }
 
   function toggleExpanded() {
     setExpanded((current) => {
@@ -130,16 +200,17 @@ export default function InsiderTradeStackCard({
           <p className="mt-sm text-[13px] leading-6 text-muted">SEC Form 4에 보고된 공개시장 매수·매도만 금액으로 표시합니다. 금액이 없는 거래는 추정하지 않습니다.</p>
 
           <div className="mt-base space-y-xs" aria-label={expanded ? "모든 내부자 거래" : "중요 내부자 거래"}>
-            {visibleItems.map(({ item, position }) => (
+            {visibleItems.map(({ item, position }, index) => (
               <InsiderTradeRow
                 key={item.id}
                 item={item}
                 position={position}
-                pending={pending}
                 expanded={expanded}
                 feedSessionId={feedSessionId}
                 rankingVersion={rankingVersion}
-                onMutation={onMutation}
+                draftOwnerId={draftOwnerId}
+                onJudgmentSaved={onJudgmentSaved}
+                trackImpression={expanded && index >= COLLAPSED_ROW_COUNT}
               />
             ))}
           </div>
@@ -154,7 +225,7 @@ export default function InsiderTradeStackCard({
               onClick={toggleExpanded}
               aria-expanded={expanded}
               disabled={pending}
-              className="inline-flex min-h-10 items-center gap-xs rounded-[10px] bg-ink px-base text-[13px] font-extrabold text-white transition-colors hover:bg-primary disabled:opacity-50"
+              className="inline-flex min-h-11 items-center gap-xs rounded-[10px] bg-ink px-base text-[13px] font-extrabold text-white transition-colors hover:bg-primary disabled:opacity-50"
             >
               {expanded ? "거래 접기" : `거래 ${items.length}건 모두 보기`}
               <span className="material-symbols-outlined text-[16px]" aria-hidden="true">{expanded ? "expand_less" : "expand_more"}</span>
@@ -163,8 +234,8 @@ export default function InsiderTradeStackCard({
           </div>
 
           <details className="mt-base border-t border-hairline pt-sm text-[12px] text-muted">
-            <summary className="cursor-pointer select-none font-semibold hover:text-body">왜 이 거래가 묶여 있나요?</summary>
-            <p className="mt-xs leading-5">같은 날짜에 들어온 Form 4 공시를 하나의 흐름으로 묶었습니다. 각 거래는 펼친 뒤 원문을 열거나 개별 검토할 수 있습니다.</p>
+            <summary className="inline-flex min-h-11 cursor-pointer select-none items-center font-semibold hover:text-body">왜 이 거래가 묶여 있나요?</summary>
+            <p className="mt-xs leading-5">같은 날짜에 들어온 Form 4 공시를 하나의 흐름으로 묶었습니다. 펼친 뒤 각 거래의 영향, 한 문장 이유와 다음 행동을 따로 저장합니다.</p>
           </details>
         </div>
       </article>
@@ -175,24 +246,67 @@ export default function InsiderTradeStackCard({
 function InsiderTradeRow({
   item,
   position,
-  pending,
   expanded,
   feedSessionId,
   rankingVersion,
-  onMutation,
+  draftOwnerId,
+  onJudgmentSaved,
+  trackImpression,
 }: {
   item: PulseItem;
   position: number;
-  pending: boolean;
   expanded: boolean;
   feedSessionId: string;
   rankingVersion: PulseFeedResponse["ranking_version"];
-  onMutation: (item: PulseItem, action: PulseMutationAction) => void;
+  draftOwnerId: string;
+  onJudgmentSaved: (item: PulseItem, judgment: FilingJudgmentValue) => void;
+  trackImpression: boolean;
 }) {
+  const rowRef = useRef<HTMLDivElement>(null);
   const detail = transactionDetail(item);
   const relationship = relationshipLabel(item);
   const primary = item.primary_action;
-  const reviewAction = item.reviewed_at ? "unreview" : "review";
+  const questionAction = item.secondary_actions.find(
+    (action) =>
+      action.type === "link" &&
+      action.analytics_name === "pulse_answer_prefilled",
+  );
+
+  useEffect(() => {
+    const element = rowRef.current;
+    if (!trackImpression || !element) return;
+    const storageKey = pulseImpressionStorageKey(feedSessionId, item.id);
+    if (window.sessionStorage.getItem(storageKey) === "1") return;
+    const controller = new AbortController();
+    let timer: number | null = null;
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries.some((entry) =>
+        entry.isIntersecting && entry.intersectionRatio >= 0.5);
+      if (!visible && timer !== null) {
+        window.clearTimeout(timer);
+        timer = null;
+      }
+      if (!visible || timer !== null) return;
+      timer = window.setTimeout(() => {
+        timer = null;
+        void persistPulseItemImpression({
+          itemId: item.id,
+          feedSessionId,
+          signal: controller.signal,
+        }).then((persisted) => {
+          if (!persisted) return;
+          window.sessionStorage.setItem(storageKey, "1");
+          observer.disconnect();
+        });
+      }, 1_000);
+    }, { threshold: [0.5] });
+    observer.observe(element);
+    return () => {
+      if (timer !== null) window.clearTimeout(timer);
+      controller.abort();
+      observer.disconnect();
+    };
+  }, [feedSessionId, item.id, trackImpression]);
 
   const content = (
     <>
@@ -215,38 +329,41 @@ function InsiderTradeRow({
   );
 
   return (
-    <div className="flex items-center gap-xs rounded-[12px] border border-hairline bg-canvas p-sm transition-colors hover:border-primary/30">
-      {primary.type === "link" ? (
-        <Link
-          href={primary.href}
-          className="flex min-w-0 flex-1 items-start justify-between gap-sm text-left"
-          onClick={() => trackClientEventSilently("pulse_item_opened", {
-            item_kind: item.kind,
-            action: "insider_stack_row",
-            item_state: item.state,
-            phase: item.phase,
-            position,
-            feed_session_id: feedSessionId,
-            ranking_version: rankingVersion,
-            reason_code: item.reason_code,
-          })}
-        >
-          {content}
-        </Link>
-      ) : (
-        <button type="button" disabled={pending} onClick={() => onMutation(item, primary.action)} className="flex min-w-0 flex-1 items-start justify-between gap-sm text-left disabled:opacity-50">
-          {content}
-        </button>
-      )}
+    <div ref={rowRef} className="rounded-[12px] border border-hairline bg-canvas p-sm transition-colors hover:border-primary/30">
+      <div className="flex items-center gap-xs">
+        {primary.type === "link" ? (
+          <Link
+            href={primary.href}
+            className="flex min-h-11 min-w-0 flex-1 items-start justify-between gap-sm text-left"
+            onClick={() => trackClientEventSilently("pulse_item_opened", {
+              item_kind: item.kind,
+              action: "insider_stack_row",
+              item_state: item.state,
+              phase: item.phase,
+              position,
+              feed_session_id: feedSessionId,
+              ranking_version: rankingVersion,
+              reason_code: item.reason_code,
+            })}
+          >
+            {content}
+          </Link>
+        ) : null}
+        {expanded ? (
+          <span className="shrink-0 rounded-full bg-surface-soft px-xs py-1 text-[10px] font-black text-muted">
+            {item.judgment ? "판단 저장됨" : "판단 필요"}
+          </span>
+        ) : null}
+      </div>
       {expanded ? (
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => onMutation(item, reviewAction)}
-          className="shrink-0 rounded-[8px] px-xs py-xs text-[11px] font-extrabold text-muted hover:bg-white hover:text-ink disabled:opacity-45"
-        >
-          {item.reviewed_at ? "다시 미검토" : "검토 완료"}
-        </button>
+        <FilingJudgmentPanel
+          item={item}
+          questionHref={
+            questionAction?.type === "link" ? questionAction.href : null
+          }
+          draftOwnerId={draftOwnerId}
+          onSaved={onJudgmentSaved}
+        />
       ) : null}
     </div>
   );
@@ -259,7 +376,7 @@ function buildSummary(items: PulseItem[]) {
     if (purchase > 0) summary.purchaseCount += 1;
     if (sale > 0) summary.saleCount += 1;
     if (item.priority === "urgent") summary.urgentCount += 1;
-    if (item.metadata.is_holding === true) summary.holdingCount += 1;
+    if (coverageStatus(item) === "holding") summary.holdingCount += 1;
     if (item.metadata.has_recent_research === true) summary.researchCount += 1;
     return summary;
   }, { purchaseCount: 0, saleCount: 0, urgentCount: 0, holdingCount: 0, researchCount: 0 });
@@ -281,10 +398,25 @@ function transactionDetail(item: PulseItem) {
 }
 
 function relationshipLabel(item: PulseItem): string | null {
-  if (item.metadata.is_holding === true) return "보유 기업";
-  if (item.metadata.is_watchlisted === true) return "관심 기업";
+  const status = coverageStatus(item);
+  if (status === "holding") return "보유 중";
+  if (status === "watching") return "관찰 중";
+  if (status === "exploring") return "탐색 중";
+  if (status === "closed") return "커버리지 종료";
   if (item.metadata.has_recent_research === true) return "최근 리서치";
   return null;
+}
+
+function coverageStatus(
+  item: PulseItem,
+): "exploring" | "watching" | "holding" | "closed" | null {
+  const value = (item as PulseItem & { coverage_status?: unknown }).coverage_status;
+  return value === "exploring" ||
+    value === "watching" ||
+    value === "holding" ||
+    value === "closed"
+    ? value
+    : null;
 }
 
 function planLabel(item: PulseItem): string | null {

@@ -325,7 +325,7 @@ export default function ChatSidebar({
                 <button
                   ref={closeButtonRef}
                   type="button"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-canvas hover:text-ink"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-canvas hover:text-ink"
                   aria-label={copy.closeHistory}
                   onClick={closeHistory}
                 >
@@ -361,7 +361,7 @@ export default function ChatSidebar({
               <div className="border-t border-hairline bg-canvas/80 p-xs">
                 <Link
                   href={localeSwitchHref(locale, "/watchlist", "tab=history")}
-                  className="flex h-10 items-center justify-between rounded-[8px] px-sm text-[13px] font-extrabold text-primary transition-colors hover:bg-surface-soft"
+                  className="flex h-11 items-center justify-between rounded-[8px] px-sm text-[13px] font-extrabold text-primary transition-colors hover:bg-surface-soft"
                   onClick={closeHistory}
                 >
                   <span>{locale === "ko" ? "리서치 노트북에서 전체 기록 보기" : "View all in Research Notebook"}</span>
@@ -654,7 +654,7 @@ function SessionRow({
           </label>
           <input
             id={`session-title-${session.id}`}
-            className="h-9 w-full rounded-[6px] border border-hairline bg-surface-soft px-xs text-[13px] font-semibold leading-[1.35] text-ink outline-none transition-colors focus:border-primary"
+            className="h-11 w-full rounded-[6px] border border-hairline bg-surface-soft px-xs text-[13px] font-semibold leading-[1.35] text-ink outline-none transition-colors focus:border-primary"
             value={editingTitle}
             maxLength={200}
             autoFocus
@@ -666,7 +666,7 @@ function SessionRow({
           <div className="mt-xs flex items-center justify-end gap-xxs">
             <button
               type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-[6px] text-muted transition-colors hover:bg-surface hover:text-ink"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-[6px] text-muted transition-colors hover:bg-surface hover:text-ink"
               aria-label={copy.cancelRename}
               onClick={onCancelRename}
               disabled={isBusy}
@@ -677,7 +677,7 @@ function SessionRow({
             </button>
             <button
               type="submit"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-[6px] bg-surface-dark text-on-dark transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:bg-primary-disabled"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-[6px] bg-surface-dark text-on-dark transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:bg-primary-disabled"
               aria-label={copy.saveName}
               disabled={isBusy}
             >
@@ -870,7 +870,7 @@ function DeleteSessionDialog({
             <div className="mt-md flex justify-end gap-xs">
               <button
                 type="button"
-                className="inline-flex h-10 items-center rounded-[8px] border border-hairline bg-canvas px-sm text-[14px] font-bold text-body transition-colors hover:bg-surface"
+                className="inline-flex h-11 items-center rounded-[8px] border border-hairline bg-canvas px-sm text-[14px] font-bold text-body transition-colors hover:bg-surface"
                 onClick={onCancel}
                 disabled={isDeleting}
               >
@@ -878,7 +878,7 @@ function DeleteSessionDialog({
               </button>
               <button
                 type="button"
-                className="inline-flex h-10 items-center rounded-[8px] bg-error px-sm text-[14px] font-bold text-on-error transition-colors hover:bg-on-error-container disabled:cursor-not-allowed disabled:bg-primary-disabled"
+                className="inline-flex h-11 items-center rounded-[8px] bg-error px-sm text-[14px] font-bold text-on-error transition-colors hover:bg-on-error-container disabled:cursor-not-allowed disabled:bg-primary-disabled"
                 onClick={onConfirm}
                 disabled={isDeleting}
               >

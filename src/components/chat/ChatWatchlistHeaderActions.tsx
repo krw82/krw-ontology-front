@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 
 import { normalizeTicker } from "@/lib/ontology/ticker";
-import type { UserCompanyNotebook, UserCompanyMark } from "@/types/api-contracts";
+import type {
+  UserCompanyCoverageStatus,
+  UserCompanyNotebook,
+  UserCompanyMark,
+} from "@/types/api-contracts";
+
+type CoverageStatus = UserCompanyCoverageStatus;
 
 export interface ChatWatchlistHeaderActionsProps {
   ticker: string;
@@ -22,9 +28,7 @@ export default function ChatWatchlistHeaderActions({
     ticker: string;
     hasBeenUsed: boolean;
   } | null>(null);
-  const [pendingAction, setPendingAction] = useState<"watchlist" | "holding" | null>(
-    null,
-  );
+  const [pending, setPending] = useState(false);
 
   useEffect(() => {
     if (!normalizedTicker) return;
@@ -99,28 +103,24 @@ export default function ChatWatchlistHeaderActions({
 
   if (!normalizedTicker) return null;
 
-  async function saveMark(action: "watchlist" | "holding") {
-    if (!normalizedTicker || pendingAction) return;
+  async function saveCoverageStatus(coverageStatus: CoverageStatus) {
+    if (!normalizedTicker || pending) return;
 
-    setPendingAction(action);
+    setPending(true);
     try {
       const response = await fetch(
         `/api/watchlist/${encodeURIComponent(normalizedTicker)}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            action === "holding"
-              ? { is_watchlisted: true, is_holding: true }
-              : { is_watchlisted: true },
-          ),
+          body: JSON.stringify({ coverage_status: coverageStatus }),
         },
       );
       if (!response.ok) throw new Error("Failed to save watchlist mark");
       const payload = (await response.json()) as { mark?: UserCompanyMark };
       if (payload.mark) setMark(payload.mark);
     } finally {
-      setPendingAction(null);
+      setPending(false);
     }
   }
 
@@ -129,27 +129,36 @@ export default function ChatWatchlistHeaderActions({
   const shouldShowNotebookHint =
     showNotebookOnboarding &&
     (forceShowNotebookOnboarding || notebookHasBeenUsed === false);
-  const hasSavedMark = Boolean(mark?.is_watchlisted || mark?.is_holding);
+  const currentCoverageStatus = coverageStatusOf(mark);
+  const hasSavedMark = Boolean(
+    currentCoverageStatus && currentCoverageStatus !== "closed",
+  );
 
   return (
     <div
       className="relative flex items-center gap-1"
       data-onboarding-target="chat-notebook-actions"
     >
-      <ChatHeaderMarkButton
-        active={Boolean(mark?.is_watchlisted)}
-        disabled={pendingAction !== null}
-        icon="bookmark"
-        label={pendingAction === "watchlist" ? "저장" : "관심"}
-        onClick={() => void saveMark("watchlist")}
-      />
-      <ChatHeaderMarkButton
-        active={Boolean(mark?.is_holding)}
-        disabled={pendingAction !== null}
-        icon="inventory_2"
-        label={pendingAction === "holding" ? "저장" : "보유"}
-        onClick={() => void saveMark("holding")}
-      />
+      <label className="relative inline-flex min-h-11 items-center gap-1 rounded-[8px] border border-hairline bg-canvas px-2 text-[12px] font-extrabold text-ink transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 sm:px-3 sm:text-[13px]">
+        <span aria-hidden="true" className="material-symbols-outlined text-[17px] text-primary">radar</span>
+        <select
+          value={currentCoverageStatus ?? ""}
+          disabled={pending}
+          onChange={(event) => {
+            const nextStatus = event.target.value as CoverageStatus;
+            if (nextStatus) void saveCoverageStatus(nextStatus);
+          }}
+          className="min-h-11 appearance-none bg-transparent pr-5 font-extrabold outline-none disabled:cursor-wait"
+          aria-label="이 회사의 커버리지 상태"
+        >
+          <option value="" disabled>{pending ? "저장 중" : "커버리지"}</option>
+          <option value="exploring">탐색 중</option>
+          <option value="watching">관찰 중</option>
+          <option value="holding">보유 중</option>
+          <option value="closed">종료</option>
+        </select>
+        <span aria-hidden="true" className="pointer-events-none absolute right-1 material-symbols-outlined text-[16px] text-muted">expand_more</span>
+      </label>
       {shouldShowNotebookHint ? (
         <div
           className="absolute right-0 top-[calc(100%+8px)] z-30 inline-flex max-w-[calc(100vw-32px)] items-center rounded-[8px] border border-primary/25 bg-canvas px-3 py-2 text-left shadow-[0_12px_28px_rgba(15,23,42,0.16)]"
@@ -161,8 +170,8 @@ export default function ChatWatchlistHeaderActions({
           />
           <p className="min-w-0 whitespace-nowrap text-[12px] font-extrabold leading-5 text-ink">
             {hasSavedMark
-              ? "이 리서치를 노트북에 남기세요"
-              : "저장하고 노트북에서 이어가세요"}
+              ? "이 리서치를 커버리지에 남기세요"
+              : "저장하고 커버리지에서 이어가세요"}
           </p>
         </div>
       ) : null}
@@ -170,35 +179,6 @@ export default function ChatWatchlistHeaderActions({
   );
 }
 
-function ChatHeaderMarkButton({
-  active,
-  disabled,
-  icon,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  disabled: boolean;
-  icon: string;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={[
-        "inline-flex h-9 items-center justify-center gap-1 rounded-[8px] border px-2 text-[12px] font-extrabold leading-4 transition-colors disabled:cursor-not-allowed disabled:opacity-55 sm:h-10 sm:px-3 sm:text-[13px]",
-        active
-          ? "border-primary bg-primary-fixed text-on-primary-fixed"
-          : "border-hairline bg-canvas text-ink hover:border-primary hover:text-primary",
-      ].join(" ")}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <span aria-hidden="true" className="material-symbols-outlined text-[17px]">
-        {icon}
-      </span>
-      <span>{label}</span>
-    </button>
-  );
+function coverageStatusOf(mark: UserCompanyMark | null): CoverageStatus | null {
+  return mark?.coverage_status ?? null;
 }

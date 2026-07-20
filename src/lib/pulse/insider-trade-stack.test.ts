@@ -14,6 +14,9 @@ function filing(
     source_type: "filing",
     source_id: id,
     ticker: id.toUpperCase(),
+    coverage_status: "watching",
+    judgment: null,
+    linked_thesis: null,
     eyebrow: "내부자 거래",
     title: `${id.toUpperCase()} 내부자 거래`,
     body: "SEC Form 4 신고입니다.",
@@ -24,7 +27,6 @@ function filing(
     available_at: occurredAt,
     expires_at: null,
     reviewed_at: options.state === "reviewed" ? occurredAt : null,
-    read_at: options.state === "reviewed" ? occurredAt : null,
     saved_at: null,
     snoozed_until: null,
     state: options.state ?? "new",
@@ -59,14 +61,35 @@ describe("buildPulseFeedDisplayEntries", () => {
     expect(entries[1]).toMatchObject({ type: "item", item: { id: "event" }, position: 2 });
   });
 
-  it("does not combine different local dates or the reviewed history", () => {
+  it("keeps mixed judgment states in one same-day stack and separates local dates", () => {
     const sameDayNew = filing("aaa", "2026-07-16T16:00:00.000Z");
     const sameDayReviewed = filing("bbb", "2026-07-16T17:00:00.000Z", { state: "reviewed" });
     const nextDay = filing("ccc", "2026-07-17T16:00:00.000Z");
 
     const entries = buildPulseFeedDisplayEntries([sameDayNew, sameDayReviewed, nextDay], "Asia/Seoul");
 
-    expect(entries.map((entry) => entry.type)).toEqual(["item", "item", "item"]);
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toMatchObject({
+      type: "insider_trade_stack",
+      state: "new",
+      items: [
+        { item: { id: "aaa", state: "new" } },
+        { item: { id: "bbb", state: "reviewed" } },
+      ],
+    });
+    expect(entries[1]).toMatchObject({
+      type: "item",
+      item: { id: "ccc" },
+    });
+  });
+
+  it("marks a stack reviewed only after every transaction has a judgment", () => {
+    const first = filing("aaa", "2026-07-16T16:00:00.000Z", { state: "reviewed" });
+    const second = filing("bbb", "2026-07-16T17:00:00.000Z", { state: "reviewed" });
+
+    const [entry] = buildPulseFeedDisplayEntries([first, second], "Asia/Seoul");
+
+    expect(entry).toMatchObject({ type: "insider_trade_stack", state: "reviewed" });
   });
 
   it("leaves a single Form 4 as an ordinary filing card", () => {

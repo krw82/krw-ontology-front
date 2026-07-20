@@ -13,6 +13,7 @@ import type {
   SessionSummary,
   UserCompanyCard,
   UserCompanyMark,
+  UserCompanyMonitoringRule,
   UserCompanyNotebook,
   UserCompanyQuestion,
   UserCompanyThesis,
@@ -26,6 +27,7 @@ import type {
   ChatSessionRow,
   UserCompanyCardRow,
   UserCompanyMarkRow,
+  UserCompanyMonitoringRuleRow,
   UserCompanyNotebookRow,
   UserCompanyQuestionRow,
   UserCompanyThesisRow,
@@ -40,7 +42,7 @@ interface VisibleQuestionState {
 }
 
 const MARK_SELECT =
-  "user_id, ticker, is_watchlisted, is_holding, priority, interest_reason, tags, last_activity_at, created_at, updated_at";
+  "user_id, ticker, coverage_status, priority, interest_reason, tags, last_activity_at, created_at, updated_at";
 const QUESTION_SELECT =
   "id, user_id, ticker, question, status, source, source_chat_session_id, source_message_id, answered_at, visible_after_at, created_at, updated_at";
 const NOTE_SELECT =
@@ -52,7 +54,7 @@ const NOTEBOOK_SELECT =
 const NOTEBOOK_OVERVIEW_SELECT =
   "ticker, content_md, updated_at";
 const THESIS_SELECT =
-  "id, user_id, ticker, title, thesis_text, status, tags, archived_at, source_chat_session_id, source_message_id, created_at, updated_at";
+  "id, user_id, ticker, title, thesis_text, monitored_variables, counter_evidence, decision_change_condition, status, tags, archived_at, source_chat_session_id, source_message_id, created_at, updated_at";
 const THESIS_CHECK_SELECT =
   "id, thesis_id, user_id, ticker, result_status, summary, strengthening_points, weakening_points, neutral_points, next_questions, basis_release_id, basis_period, source_chat_session_id, source_message_id, created_at";
 const SESSION_SUMMARY_SELECT =
@@ -66,8 +68,7 @@ export function emptyUserCompanyMark(
   return {
     user_id: userId,
     ticker,
-    is_watchlisted: false,
-    is_holding: false,
+    coverage_status: "exploring",
     priority: 0,
     interest_reason: null,
     tags: [],
@@ -85,7 +86,6 @@ export async function listWatchlistOverview(
     .from("user_company_marks")
     .select(MARK_SELECT)
     .eq("user_id", userId)
-    .or("is_watchlisted.eq.true,is_holding.eq.true,interest_reason.not.is.null")
     .order("updated_at", { ascending: false })
     .returns<UserCompanyMarkRow[]>();
 
@@ -140,8 +140,10 @@ export async function listWatchlistOverview(
     research_inbox: researchInbox,
     stats: {
       total: summaries.length,
-      watchlisted: summaries.filter((company) => company.mark.is_watchlisted).length,
-      holding: summaries.filter((company) => company.mark.is_holding).length,
+      exploring: summaries.filter((company) => company.mark.coverage_status === "exploring").length,
+      watching: summaries.filter((company) => company.mark.coverage_status === "watching").length,
+      holding: summaries.filter((company) => company.mark.coverage_status === "holding").length,
+      closed: summaries.filter((company) => company.mark.coverage_status === "closed").length,
       open_questions: sumQuestionStates(questionStatesByTicker),
       notes: sumMap(notesByTicker),
       recent_activity: summaries.filter((company) => company.latest_activity_at).length,
@@ -164,6 +166,7 @@ export async function getWatchlistCompanyDetail(
     questions,
     card,
     theses,
+    monitoringRules,
     notes,
     recentSessions,
   ] = await Promise.all([
@@ -173,6 +176,7 @@ export async function getWatchlistCompanyDetail(
     listCompanyQuestions(userId, ticker),
     getCompanyCard(userId, ticker),
     listCompanyTheses(userId, ticker),
+    listCompanyMonitoringRules(userId, ticker),
     listCompanyNotes(userId, ticker),
     listRecentTickerSessions(userId, ticker),
   ]);
@@ -221,9 +225,40 @@ export async function getWatchlistCompanyDetail(
     card,
     theses,
     thesis_checks: thesisChecks,
+    monitoring_rules: monitoringRules,
     notes,
     recent_sessions: recentSessions,
   };
+}
+
+export async function listCompanyMonitoringRules(
+  userId: string,
+  rawTicker: string,
+): Promise<UserCompanyMonitoringRule[]> {
+  const ticker = normalizeTicker(rawTicker);
+  if (!ticker) return [];
+  const { data, error } = await getSupabaseAdmin()
+    .from("user_company_monitoring_rules")
+    .select("id,user_id,ticker,rule_type,operator,value,next_review_at,dedupe_key,enabled,created_by_judgment_revision_id,created_at,updated_at")
+    .eq("user_id", userId)
+    .eq("ticker", ticker)
+    .eq("enabled", true)
+    .order("next_review_at", { ascending: true, nullsFirst: false })
+    .order("updated_at", { ascending: false })
+    .returns<UserCompanyMonitoringRuleRow[]>();
+  if (error) throw new Error(`Failed to load company monitoring rules: ${error.message}`);
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    user_id: row.user_id,
+    ticker: row.ticker,
+    rule_type: row.rule_type,
+    operator: row.operator,
+    value: row.value,
+    next_review_at: row.next_review_at,
+    enabled: row.enabled,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }));
 }
 
 export async function getCompanyMark(
@@ -622,8 +657,7 @@ function markFromRow(row: UserCompanyMarkRow): UserCompanyMark {
   return {
     user_id: row.user_id,
     ticker: row.ticker,
-    is_watchlisted: row.is_watchlisted,
-    is_holding: row.is_holding,
+    coverage_status: row.coverage_status,
     priority: row.priority,
     interest_reason: row.interest_reason,
     tags: row.tags ?? [],
@@ -719,6 +753,9 @@ function thesisFromRow(row: UserCompanyThesisRow): UserCompanyThesis {
     ticker: row.ticker,
     title: row.title,
     thesis_text: row.thesis_text,
+    monitored_variables: row.monitored_variables ?? [],
+    counter_evidence: row.counter_evidence ?? "",
+    decision_change_condition: row.decision_change_condition ?? "",
     status: row.status,
     tags: row.tags ?? [],
     archived_at: row.archived_at,

@@ -32,11 +32,11 @@ export default function CompanyFilingTimeline({ ticker }: { ticker: string }) {
 
   if (!timeline) return null;
   return <section className="mt-md rounded-[8px] bg-surface-soft px-sm py-sm">
-    <div className="flex items-center justify-between gap-sm"><p className="text-xs font-extrabold text-ink">공시 타임라인</p>{timeline.unread_count ? <Link href="/filings" className="text-xs font-bold text-primary underline underline-offset-4">읽지 않음 {timeline.unread_count}건</Link> : null}</div>
+    <div className="flex items-center justify-between gap-sm"><p className="text-xs font-extrabold text-ink">공시 타임라인</p>{timeline.unread_count ? <Link href="/filings" className="inline-flex min-h-11 items-center px-xs text-xs font-bold text-primary underline underline-offset-4">읽지 않음 {timeline.unread_count}건</Link> : null}</div>
     <p className="mt-1 text-xs leading-5 text-muted">최근 90일 {timeline.filings_last_90_days}건{timeline.last_filing_at ? ` · 마지막 ${formatDateTime(timeline.last_filing_at)}` : ""}</p>
     {timeline.event_type_counts.length ? <p className="mt-1 text-xs leading-5 text-muted">{timeline.event_type_counts.slice(0, 3).map(({ tag, count }) => `${filingEventTagLabel(tag) ?? "기타"} ${count}`).join(" · ")}</p> : null}
     {timeline.expected_window ? <p className="mt-2 rounded-[5px] border border-primary/20 bg-canvas px-2 py-1 text-xs leading-5 text-muted"><span className="font-extrabold text-ink">다음 실적성 공시 예상 창</span> · {formatDate(timeline.expected_window.startDate)}–{formatDate(timeline.expected_window.endDate)} <span className="text-muted">(과거 {timeline.expected_window.observedFilings}건 주기 기반)</span></p> : null}
-    {timeline.recent_amendments.length ? <div className="mt-2 flex flex-wrap gap-2">{timeline.recent_amendments.map((filing) => <Link key={filing.id} href={`/filings/${encodeURIComponent(filing.id)}`} className="text-xs font-bold text-primary underline underline-offset-4">정정 {filing.form_type} · {formatDate(filing.filing_date)}</Link>)}</div> : null}
+    {timeline.recent_amendments.length ? <div className="mt-2 flex flex-wrap gap-2">{timeline.recent_amendments.map((filing) => <Link key={filing.id} href={`/filings/${encodeURIComponent(filing.id)}`} className="inline-flex min-h-11 items-center px-xs text-xs font-bold text-primary underline underline-offset-4">정정 {filing.form_type} · {formatDate(filing.filing_date)}</Link>)}</div> : null}
   </section>;
 }
 

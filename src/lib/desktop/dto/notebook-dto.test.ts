@@ -7,8 +7,7 @@ import {
 const mark = {
   user_id: "secret-user-id",
   ticker: "AAPL",
-  is_watchlisted: true,
-  is_holding: false,
+  coverage_status: "watching" as const,
   priority: 1,
   interest_reason: "Services",
   tags: ["quality"],
@@ -67,8 +66,10 @@ describe("Desktop notebook DTO", () => {
       ],
       stats: {
         total: 1,
-        watchlisted: 1,
+        exploring: 0,
+        watching: 1,
         holding: 0,
+        closed: 0,
         open_questions: 1,
         notes: 1,
         recent_activity: 1,
@@ -137,6 +138,7 @@ describe("Desktop notebook DTO", () => {
       card: null,
       theses: [],
       thesis_checks: [],
+      monitoring_rules: [],
       recent_sessions: [
         {
           id: "web-session",

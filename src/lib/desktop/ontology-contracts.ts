@@ -79,6 +79,7 @@ export type DesktopErrorCode =
   | "authentication_error"
   | "entitlement_required"
   | "validation_error"
+  | "idempotency_conflict"
   | "not_found"
   | "resource_conflict"
   | "contract_mismatch"

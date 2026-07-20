@@ -7,9 +7,9 @@ import { DEFAULT_LOCALE } from "@/i18n/config";
 import { buildBrandfetchTickerLogoUrl } from "@/lib/brandfetch-logo";
 
 export const DESKTOP_COMPANY_CATALOG_CONTRACT =
-  "desktop-company-catalog/v1" as const;
+  "desktop-company-catalog/v2" as const;
 export const DESKTOP_COMPANY_DETAIL_CONTRACT =
-  "desktop-company-detail/v1" as const;
+  "desktop-company-detail/v2" as const;
 
 export interface DesktopCompanySummaryDto {
   ticker: string;

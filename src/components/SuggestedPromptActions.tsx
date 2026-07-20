@@ -1,11 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import type { MouseEvent } from "react";
 import { useEffect, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { trackClientEventWithTimeout } from "@/lib/analytics/client";
+import { trackClientEventSilently } from "@/lib/analytics/client";
 import { cn } from "@/lib/utils";
 
 const promptCycleIntervalMs = 2200;
@@ -85,7 +83,6 @@ export default function SuggestedPromptActions({
   analytics,
   onSelect,
 }: SuggestedPromptActionsProps) {
-  const router = useRouter();
   const [rawActivePromptIndex, setRawActivePromptIndex] = useState(0);
   const activePromptIndex =
     prompts.length > 0 ? rawActivePromptIndex % prompts.length : 0;
@@ -107,9 +104,9 @@ export default function SuggestedPromptActions({
   const itemClassName =
     "group relative flex w-full items-center gap-3 overflow-hidden rounded-[8px] border border-transparent px-3 py-2.5 text-left text-[14px] font-semibold leading-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60";
 
-  const trackPromptClick = (prompt: string, index: number): Promise<void> => {
-    if (!analytics) return Promise.resolve();
-    return trackClientEventWithTimeout("suggested_question_clicked", {
+  const trackPromptClick = (prompt: string, index: number): void => {
+    if (!analytics) return;
+    trackClientEventSilently("suggested_question_clicked", {
       source_surface: analytics.sourceSurface,
       ticker: analytics.ticker ?? analytics.tickers?.[0] ?? null,
       tickers: analytics.tickers ?? (analytics.ticker ? [analytics.ticker] : []),
@@ -157,17 +154,8 @@ export default function SuggestedPromptActions({
                     event.preventDefault();
                     return;
                   }
-                  const tracking = trackPromptClick(prompt, index);
+                  trackPromptClick(prompt, index);
                   onSelect?.(prompt);
-
-                  if (!shouldHandleClientNavigation(event, href)) {
-                    void tracking;
-                    return;
-                  }
-                  event.preventDefault();
-                  void tracking.finally(() => {
-                    router.push(href);
-                  });
                 }}
               >
                 <PromptContent
@@ -185,7 +173,7 @@ export default function SuggestedPromptActions({
               key={prompt}
               {...sharedProps}
               onClick={() => {
-                void trackPromptClick(prompt, index);
+                trackPromptClick(prompt, index);
                 onSelect?.(prompt);
               }}
               disabled={disabled}
@@ -200,19 +188,5 @@ export default function SuggestedPromptActions({
         })}
       </LayoutGroup>
     </div>
-  );
-}
-
-function shouldHandleClientNavigation(
-  event: MouseEvent<HTMLAnchorElement>,
-  destination: string,
-): boolean {
-  return (
-    event.button === 0 &&
-    !event.metaKey &&
-    !event.altKey &&
-    !event.ctrlKey &&
-    !event.shiftKey &&
-    destination.startsWith("/")
   );
 }

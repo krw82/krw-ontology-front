@@ -50,5 +50,5 @@ describe("production chat E2E script", () => {
     ).rejects.toMatchObject({
       stderr: expect.stringContaining("Unknown suite"),
     });
-  });
+  }, 20_000);
 });

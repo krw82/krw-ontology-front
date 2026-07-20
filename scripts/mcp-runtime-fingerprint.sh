@@ -4,8 +4,19 @@ load_expected_mcp_runtime_fingerprint() {
   : "${KRW_ONTOLOGY_SOURCE_DIR:?Missing KRW_ONTOLOGY_SOURCE_DIR}"
   : "${KRW_ONTOLOGY_RELEASE_ROOT:?Missing KRW_ONTOLOGY_RELEASE_ROOT}"
 
+  if [ "${KRW_MAC_IMMUTABLE_RUNTIME:-0}" = "1" ]; then
+    runtime_python="$KRW_ONTOLOGY_SOURCE_DIR/.venv/bin/python"
+    test -x "$runtime_python" || {
+      echo "Missing immutable ontology Python runtime: $runtime_python" >&2
+      return 1
+    }
+    set -- "$runtime_python"
+  else
+    set -- uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run python
+  fi
+
   fingerprint_exports=$(
-    uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run python - "$KRW_ONTOLOGY_RELEASE_ROOT" <<'PY'
+    "$@" - "$KRW_ONTOLOGY_RELEASE_ROOT" <<'PY'
 import os
 import shlex
 import sys
@@ -22,9 +33,21 @@ fields = {
     "KRW_MCP_EXPECTED_RELEASE_MANIFEST_SHA256": "release_manifest_sha256",
     "KRW_MCP_EXPECTED_SERVICE_FINGERPRINT_SHA256": "service_fingerprint_sha256",
 }
+optional_fields = {"backend_git_sha"}
 for env_name, field in fields.items():
     value = payload.get(field)
     if not isinstance(value, str) or not value:
+        # Immutable source snapshots intentionally omit `.git`. The canonical
+        # build fingerprint still binds the source bytes, so Git SHA remains
+        # optional exactly as the runtime readiness verifier treats it. It may
+        # only be omitted when an operator has not explicitly pinned one.
+        if field in optional_fields:
+            configured = os.environ.get(env_name)
+            if configured and configured.strip():
+                raise SystemExit(
+                    f"configured {env_name} requires runtime fingerprint field: {field}"
+                )
+            continue
         raise SystemExit(f"runtime fingerprint field is missing: {field}")
     configured = os.environ.get(env_name)
     if configured and configured != value:

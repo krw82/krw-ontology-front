@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "crypto";
+import { APP_VERSION } from "@/lib/app-version";
 import { getReadyAgentWorker } from "@/lib/agent/worker-heartbeat";
 import { hasTrustedClientIpConfiguration } from "@/lib/http/client-ip";
 import { getActiveOntologyCatalogRelease } from "@/lib/ontology/catalog";
@@ -114,9 +115,20 @@ async function checkFilingWorker(): Promise<CheckResult> {
     const leaseIsCurrent = !leaseError
       && Boolean(lease)
       && Date.parse(lease?.lease_expires_at ?? "") > Date.now();
+    const expectedDeploymentId =
+      APP_VERSION === "development" ? null : APP_VERSION;
+    const leaseMatchesDeployment =
+      !expectedDeploymentId || lease?.deployment_id === expectedDeploymentId;
+    const schedulerReady = leaseIsCurrent && leaseMatchesDeployment;
     return {
-      ok: true,
+      ok: schedulerReady,
       enabled: true,
+      error: schedulerReady
+        ? undefined
+        : leaseError?.message ??
+          (leaseIsCurrent
+            ? `Filing scheduler deployment mismatch: ${lease?.deployment_id ?? "missing"}`
+            : "No current filing scheduler lease"),
       worker_id: data.worker_id,
       last_seen_at: data.last_seen_at,
       last_success_at: data.last_success_at,
@@ -204,6 +216,7 @@ export async function GET(request: Request) {
   return Response.json(
     {
       status: ok ? "ok" : "error",
+      deployment_id: APP_VERSION,
       timestamp: new Date().toISOString(),
       checks: {
         web: { ok: true },

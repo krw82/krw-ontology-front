@@ -32,7 +32,7 @@ describe("POST /api/desktop/notebook/companies/:ticker/notes", () => {
   it("creates a note with an idempotency key and Desktop provenance", async () => {
     vi.mocked(createDesktopNotebookNote).mockResolvedValue({
       ok: true,
-      contract_version: "desktop-notebook-mutation/v1",
+      contract_version: "desktop-notebook-mutation/v2",
       data: { note: { id: "note-1" } },
       meta: {
         generated_at: "2026-06-23T00:00:00.000Z",
@@ -63,6 +63,7 @@ describe("POST /api/desktop/notebook/companies/:ticker/notes", () => {
     expect(response.status).toBe(201);
     expect(createDesktopNotebookNote).toHaveBeenCalledWith({
       userId: "user-1",
+      userEmail: null,
       deviceId: "device-1",
       ticker: "AAPL",
       idempotencyKey: "operation-123",
@@ -77,7 +78,7 @@ describe("POST /api/desktop/notebook/companies/:ticker/notes", () => {
   it("returns 200 for an idempotent replay", async () => {
     vi.mocked(createDesktopNotebookNote).mockResolvedValue({
       ok: true,
-      contract_version: "desktop-notebook-mutation/v1",
+      contract_version: "desktop-notebook-mutation/v2",
       data: { note: { id: "note-1" } },
       meta: {
         generated_at: "2026-06-23T00:00:00.000Z",

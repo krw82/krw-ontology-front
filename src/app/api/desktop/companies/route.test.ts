@@ -43,7 +43,7 @@ describe("GET /api/desktop/companies", () => {
       etag: '"catalog-etag"',
       payload: {
         ok: true,
-        contract_version: "desktop-company-catalog/v1",
+        contract_version: "desktop-company-catalog/v2",
         data: { companies: [{ ticker: "AAPL", logo_url: null }] },
         meta: {
           catalog_release_id: "release-1",
@@ -65,7 +65,7 @@ describe("GET /api/desktop/companies", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("etag")).toBe('"catalog-etag"');
     expect(await response.json()).toMatchObject({
-      contract_version: "desktop-company-catalog/v1",
+      contract_version: "desktop-company-catalog/v2",
       data: { companies: [{ ticker: "AAPL", logo_url: null }] },
     });
     expect(requireDesktopFeatureAccess).toHaveBeenCalledWith(

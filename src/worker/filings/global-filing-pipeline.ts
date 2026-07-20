@@ -1,5 +1,13 @@
 import { classifyFiling, filingAlertPriority } from "@/lib/filing-notifications/classification";
-import { filingNotificationCopy } from "@/lib/filing-notifications/contract";
+import {
+  filingDecisionContextCopy,
+  filingDecisionDestinationPath,
+  filingNotificationCopy,
+} from "@/lib/filing-notifications/contract";
+import {
+  EMPTY_FILING_DECISION_NOTIFICATION_CONTEXT,
+  loadFilingDecisionNotificationContexts,
+} from "@/lib/filing-notifications/decision-context";
 import { dailyMasterIndexUrl, parseSecDailyMasterIndex } from "@/lib/filing-notifications/sec-daily-index";
 import { isSecXslRenderedDocumentUrl, parseFilingIndexDocuments } from "@/lib/filing-notifications/sec-filing-index";
 import { parseSecAtomCurrentFeed, formTypeFromAtomSourceKey } from "@/lib/filing-notifications/sec-atom";
@@ -569,6 +577,10 @@ async function fanoutEventNotifications(
   const form4Summary = event.form_type.startsWith("4")
     ? await loadForm4Summary(event.id)
     : null;
+  const decisionContextsByUser = await loadFilingDecisionNotificationContexts(
+    event,
+    byUser,
+  );
   const notificationsToInsert = [...byUser.values()]
     .filter((subscription) => shouldCreateNotification({
       event,
@@ -577,19 +589,24 @@ async function fanoutEventNotifications(
       form4Summary,
     }))
     .map((subscription) => {
-      const copy = filingNotificationCopy({
-        ticker: subscription.ticker,
-        formType: event.form_type,
-        isAmendment: event.is_amendment,
-        primaryEventTag: event.primary_event_tag,
-      });
+      const decisionContext = decisionContextsByUser.get(subscription.user_id)
+        ?? EMPTY_FILING_DECISION_NOTIFICATION_CONTEXT;
+      const copy = filingDecisionContextCopy(
+        filingNotificationCopy({
+          ticker: subscription.ticker,
+          formType: event.form_type,
+          isAmendment: event.is_amendment,
+          primaryEventTag: event.primary_event_tag,
+        }),
+        decisionContext,
+      );
       return {
         user_id: subscription.user_id,
         filing_event_id: event.id,
         kind: "filing_received" as const,
         title: copy.title,
         body: copy.body,
-        destination_path: `/filings/${encodeURIComponent(event.id)}`,
+        destination_path: filingDecisionDestinationPath(event.id, decisionContext),
       };
     });
   if (!notificationsToInsert.length) {

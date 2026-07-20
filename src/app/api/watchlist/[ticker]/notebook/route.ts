@@ -1,12 +1,17 @@
 import type { NextRequest } from "next/server";
 import { isUuid } from "@/lib/api/validation";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
+import {
+  invalidOriginResponse,
+  isExpectedMutationOrigin,
+} from "@/lib/filing-notifications/request";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
   defaultCompanyNotebook,
   getCompanyNotebook,
 } from "@/lib/watchlist/workspace";
 import {
+  ensureCompanyCoverageForWrite,
   errorResponse,
   parseJsonObject,
   requireIndexedTicker,
@@ -48,6 +53,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ ticker: string }> },
 ) {
+  if (!isExpectedMutationOrigin(request)) return invalidOriginResponse();
   let user;
   try {
     user = await getAuthUser();
@@ -82,6 +88,14 @@ export async function PUT(
     return errorResponse(400, "validation_error", "메시지 참조가 올바르지 않습니다.");
   }
 
+  const coverageError = await ensureCompanyCoverageForWrite({
+    userId: user.id,
+    userEmail: user.email,
+    ticker: tickerResult.ticker,
+    source: "notebook_saved",
+  });
+  if (coverageError) return coverageError;
+
   const existing = await getCompanyNotebook(user.id, tickerResult.ticker);
   const now = new Date().toISOString();
   const { data, error } = await getSupabaseAdmin()
@@ -107,22 +121,5 @@ export async function PUT(
     return errorResponse(500, "internal_error", "리서치 노트북을 저장하지 못했습니다.");
   }
 
-  await touchMark(user.id, tickerResult.ticker);
   return Response.json({ notebook: data });
-}
-
-async function touchMark(userId: string, ticker: string) {
-  const now = new Date().toISOString();
-  await getSupabaseAdmin()
-    .from("user_company_marks")
-    .upsert(
-      {
-        user_id: userId,
-        ticker,
-        is_watchlisted: true,
-        last_activity_at: now,
-        updated_at: now,
-      },
-      { onConflict: "user_id,ticker" },
-    );
 }

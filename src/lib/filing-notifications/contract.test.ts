@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  filingDecisionContextCopy,
+  filingDecisionDestinationPath,
   filingNotificationCopy,
   isAmendedFilingForm,
   isFilingFormType,
@@ -25,6 +27,32 @@ describe("filing notification contract", () => {
   it("never permits an external push click destination", () => {
     expect(safeInternalDestinationPath("/filings?event=abc")).toBe("/filings?event=abc");
     expect(safeInternalDestinationPath("//attacker.example")).toBe("/filings");
+    expect(safeInternalDestinationPath("/\\attacker.example")).toBe("/filings");
     expect(safeInternalDestinationPath("https://attacker.example")).toBe("/filings");
+  });
+
+  it("connects a filing to prior decisions without accepting personal prose", () => {
+    const copy = filingDecisionContextCopy(
+      { title: "AAPL 새 8-K 공시", body: "SEC에 새 공시가 제출됐습니다." },
+      { hasPreviousJudgment: true, activeMonitoringRuleCount: 2 },
+    );
+
+    expect(copy).toEqual({
+      title: "AAPL 새 8-K 공시",
+      body: "SEC에 새 공시가 제출됐습니다. 이전 판단과 활성 모니터링 규칙 2개에 연결됩니다.",
+    });
+    expect(JSON.stringify(copy)).not.toContain("판단 원문");
+  });
+
+  it("uses a bounded, internal decision-context deep link", () => {
+    const filingEventId = "123e4567-e89b-42d3-a456-426614174000";
+    expect(filingDecisionDestinationPath(filingEventId, {
+      hasPreviousJudgment: true,
+      activeMonitoringRuleCount: 0,
+    })).toBe(`/filings/${filingEventId}?context=decision`);
+    expect(filingDecisionDestinationPath("//attacker.example", {
+      hasPreviousJudgment: true,
+      activeMonitoringRuleCount: 1,
+    })).toBe("/filings");
   });
 });

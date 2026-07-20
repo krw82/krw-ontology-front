@@ -452,13 +452,121 @@ export interface OntologyCompanyRow extends Record<string, unknown> {
 export interface UserCompanyMarkRow extends Record<string, unknown> {
   user_id: string;
   ticker: string;
-  is_watchlisted: boolean;
-  is_holding: boolean;
+  coverage_status: "exploring" | "watching" | "holding" | "closed";
   priority: number;
   interest_reason: string | null;
   tags: string[];
   last_activity_at: string | null;
   created_at: string;
+  updated_at: string;
+}
+
+export interface UserCompanyCoverageEventRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  ticker: string;
+  previous_status: UserCompanyMarkRow["coverage_status"] | null;
+  coverage_status: UserCompanyMarkRow["coverage_status"];
+  changed: boolean;
+  source: string;
+  idempotency_key: string;
+  request_payload: Json;
+  response_payload: Json;
+  created_at: string;
+}
+
+export interface UserFilingJudgmentRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  filing_event_id: string;
+  ticker: string;
+  current_revision_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserFilingJudgmentRevisionRow extends Record<string, unknown> {
+  id: string;
+  judgment_id: string;
+  user_id: string;
+  filing_event_id: string;
+  ticker: string;
+  revision_number: number;
+  impact: "positive" | "neutral" | "negative" | "unclear";
+  next_action: "complete" | "update_thesis" | "create_question" | "review_later";
+  summary: string;
+  rationale: string;
+  is_current: boolean;
+  idempotency_key: string;
+  request_payload: Json;
+  created_at: string;
+}
+
+export interface UserFilingJudgmentThesisLinkRow extends Record<string, unknown> {
+  revision_id: string;
+  judgment_id: string;
+  user_id: string;
+  filing_event_id: string;
+  ticker: string;
+  thesis_id: string;
+  impact: UserFilingJudgmentRevisionRow["impact"];
+  position: number;
+  is_current: boolean;
+  created_at: string;
+}
+
+export interface UserCompanyMonitoringRuleRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  ticker: string;
+  rule_type: "filing_form" | "filing_item" | "keyword" | "scheduled_review";
+  operator: "matches" | "contains" | "on_or_after";
+  value: string | null;
+  next_review_at: string | null;
+  dedupe_key: string;
+  enabled: boolean;
+  created_by_judgment_revision_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserFilingJudgmentMonitoringRuleRow extends Record<string, unknown> {
+  revision_id: string;
+  rule_id: string;
+  user_id: string;
+  position: number;
+  created_at: string;
+}
+
+export interface UserFilingSourceOpenRow extends Record<string, unknown> {
+  user_id: string;
+  filing_event_id: string;
+  ticker: string;
+  first_opened_at: string;
+  last_opened_at: string;
+}
+
+export interface UserRetentionMilestoneRow extends Record<string, unknown> {
+  user_id: string;
+  milestone: "coverage_activated";
+  achieved_at: string;
+  metadata: Json;
+}
+
+export interface UserDecisionSessionRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  local_date: string;
+  timezone: string;
+  feed_session_id: string;
+  snapshot_at: string;
+  judgment_count: number;
+  observation_count: number;
+  thesis_update_count: number;
+  open_question_count: number;
+  next_check_count: number;
+  outcome: "completed" | "deferred";
+  closed_at: string;
   updated_at: string;
 }
 
@@ -831,7 +939,6 @@ export interface UserPulseItemStateRow extends Record<string, unknown> {
   first_seen_at: string | null;
   last_seen_at: string | null;
   view_count: number;
-  read_at: string | null;
   reviewed_at: string | null;
   saved_at: string | null;
   snoozed_until: string | null;
@@ -974,6 +1081,9 @@ export interface UserCompanyThesisRow extends Record<string, unknown> {
   ticker: string;
   title: string;
   thesis_text: string;
+  monitored_variables: string[];
+  counter_evidence: string;
+  decision_change_condition: string;
   status: "active" | "needs_review" | "weakened" | "mixed" | "archived";
   tags: string[];
   archived_at: string | null;
@@ -1626,6 +1736,7 @@ export interface AnalyticsEventRow extends Record<string, unknown> {
     | "subscription_started"
     | "company_followed"
     | "push_permission_requested"
+    | "push_permission_prompted"
     | "push_permission_granted"
     | "push_permission_denied"
     | "push_subscribed"
@@ -1638,7 +1749,53 @@ export interface AnalyticsEventRow extends Record<string, unknown> {
     | "push_notification_clicked"
     | "key_exhibit_opened"
     | "sec_source_opened"
-    | "filing_analysis_started";
+    | "filing_analysis_started"
+    | "filing_history_backfilled"
+    | "historical_filing_opened"
+    | "pwa_install_prompt_seen"
+    | "pwa_installed"
+    | "test_push_requested"
+    | "test_push_received"
+    | "filing_detected"
+    | "filing_notification_created"
+    | "push_provider_accepted"
+    | "sw_push_received"
+    | "notification_show_called"
+    | "notification_clicked"
+    | "filings_inbox_viewed"
+    | "filing_marked_read"
+    | "filing_snoozed"
+    | "filing_pinned"
+    | "filing_archived"
+    | "digest_opened"
+    | "alert_rule_created"
+    | "alert_rule_removed"
+    | "filing_delivery_mode_changed"
+    | "amendment_comparison_opened"
+    | "company_filing_timeline_viewed"
+    | "pulse_viewed"
+    | "pulse_item_impression"
+    | "pulse_item_opened"
+    | "pulse_item_actioned"
+    | "pulse_summary_actioned"
+    | "pulse_filter_changed"
+    | "pulse_preferences_updated"
+    | "pulse_new_items_seen"
+    | "pulse_end_reached"
+    | "pulse_feedback_submitted"
+    | "pulse_source_degraded"
+    | "pulse_answer_prefilled"
+    | "performance_metric_reported"
+    | "coverage_added"
+    | "coverage_status_changed"
+    | "coverage_activated"
+    | "filing_judgment_started"
+    | "filing_judgment_completed"
+    | "filing_judgment_revised"
+    | "thesis_updated"
+    | "monitoring_rule_created"
+    | "decision_session_closed"
+    | "second_opportunity_resolved";
   properties: Json;
   path: string | null;
   referrer: string | null;
@@ -2339,8 +2496,7 @@ export interface Database {
         Row: UserCompanyMarkRow;
         Insert: Omit<
           UserCompanyMarkRow,
-          | "is_watchlisted"
-          | "is_holding"
+          | "coverage_status"
           | "priority"
           | "interest_reason"
           | "tags"
@@ -2348,8 +2504,7 @@ export interface Database {
           | "created_at"
           | "updated_at"
         > & {
-          is_watchlisted?: boolean;
-          is_holding?: boolean;
+          coverage_status?: UserCompanyMarkRow["coverage_status"];
           priority?: number;
           interest_reason?: string | null;
           tags?: string[];
@@ -2358,6 +2513,172 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Omit<UserCompanyMarkRow, "user_id" | "ticker" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_company_coverage_events: {
+        Row: UserCompanyCoverageEventRow;
+        Insert: Pick<
+          UserCompanyCoverageEventRow,
+          | "user_id"
+          | "ticker"
+          | "coverage_status"
+          | "changed"
+          | "source"
+          | "idempotency_key"
+          | "request_payload"
+          | "response_payload"
+        > &
+          Partial<
+            Pick<
+              UserCompanyCoverageEventRow,
+              "id" | "previous_status" | "created_at"
+            >
+          >;
+        Update: Partial<
+          Omit<UserCompanyCoverageEventRow, "id" | "user_id" | "created_at">
+        >;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_filing_judgments: {
+        Row: UserFilingJudgmentRow;
+        Insert: Pick<UserFilingJudgmentRow, "user_id" | "filing_event_id" | "ticker"> &
+          Partial<Pick<UserFilingJudgmentRow, "id" | "current_revision_id" | "created_at" | "updated_at">>;
+        Update: Partial<Omit<UserFilingJudgmentRow, "id" | "user_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_filing_judgment_revisions: {
+        Row: UserFilingJudgmentRevisionRow;
+        Insert: Pick<
+          UserFilingJudgmentRevisionRow,
+          | "judgment_id"
+          | "user_id"
+          | "filing_event_id"
+          | "ticker"
+          | "revision_number"
+          | "impact"
+          | "next_action"
+          | "summary"
+          | "idempotency_key"
+          | "request_payload"
+        > & Partial<Pick<UserFilingJudgmentRevisionRow, "id" | "rationale" | "is_current" | "created_at">>;
+        Update: Partial<Omit<UserFilingJudgmentRevisionRow, "id" | "user_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_filing_judgment_thesis_links: {
+        Row: UserFilingJudgmentThesisLinkRow;
+        Insert: Omit<UserFilingJudgmentThesisLinkRow, "created_at"> & { created_at?: string };
+        Update: Partial<Omit<UserFilingJudgmentThesisLinkRow, "revision_id" | "thesis_id" | "user_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_company_monitoring_rules: {
+        Row: UserCompanyMonitoringRuleRow;
+        Insert: Pick<UserCompanyMonitoringRuleRow, "user_id" | "ticker" | "rule_type" | "operator" | "dedupe_key"> &
+          Partial<Omit<UserCompanyMonitoringRuleRow, "user_id" | "ticker" | "rule_type" | "operator" | "dedupe_key" | "created_at" | "updated_at">> &
+          { created_at?: string; updated_at?: string };
+        Update: Partial<Omit<UserCompanyMonitoringRuleRow, "id" | "user_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_filing_judgment_monitoring_rules: {
+        Row: UserFilingJudgmentMonitoringRuleRow;
+        Insert: Omit<UserFilingJudgmentMonitoringRuleRow, "created_at"> & { created_at?: string };
+        Update: Partial<Omit<UserFilingJudgmentMonitoringRuleRow, "revision_id" | "rule_id" | "user_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_filing_source_opens: {
+        Row: UserFilingSourceOpenRow;
+        Insert: Pick<UserFilingSourceOpenRow, "user_id" | "filing_event_id" | "ticker"> &
+          Partial<Pick<UserFilingSourceOpenRow, "first_opened_at" | "last_opened_at">>;
+        Update: Partial<Pick<UserFilingSourceOpenRow, "ticker" | "last_opened_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_retention_milestones: {
+        Row: UserRetentionMilestoneRow;
+        Insert: Pick<UserRetentionMilestoneRow, "user_id" | "milestone"> &
+          Partial<Pick<UserRetentionMilestoneRow, "achieved_at" | "metadata">>;
+        Update: Partial<Pick<UserRetentionMilestoneRow, "achieved_at" | "metadata">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_decision_sessions: {
+        Row: UserDecisionSessionRow;
+        Insert: Pick<
+          UserDecisionSessionRow,
+          | "user_id"
+          | "local_date"
+          | "timezone"
+          | "feed_session_id"
+          | "snapshot_at"
+          | "outcome"
+        > &
+          Partial<
+            Pick<
+              UserDecisionSessionRow,
+              | "id"
+              | "judgment_count"
+              | "observation_count"
+              | "thesis_update_count"
+              | "open_question_count"
+              | "next_check_count"
+              | "closed_at"
+              | "updated_at"
+            >
+          >;
+        Update: Partial<
+          Omit<UserDecisionSessionRow, "id" | "user_id" | "local_date">
+        >;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];
@@ -3018,6 +3339,9 @@ export interface Database {
           | "id"
           | "status"
           | "tags"
+          | "monitored_variables"
+          | "counter_evidence"
+          | "decision_change_condition"
           | "archived_at"
           | "source_chat_session_id"
           | "source_message_id"
@@ -3027,6 +3351,9 @@ export interface Database {
           id?: string;
           status?: UserCompanyThesisRow["status"];
           tags?: string[];
+          monitored_variables?: string[];
+          counter_evidence?: string;
+          decision_change_condition?: string;
           archived_at?: string | null;
           source_chat_session_id?: string | null;
           source_message_id?: string | null;
@@ -3839,86 +4166,81 @@ export interface Database {
         Args: { p_env: string };
         Returns: number;
       };
-      get_catalog_global_filing_feed: {
+      set_user_company_coverage_status: {
         Args: {
-          p_env: string;
-          p_snapshot_at: string;
-          p_before_occurred_at?: string | null;
-          p_before_filing_event_id?: string | null;
+          p_user_id: string;
+          p_ticker: string;
+          p_coverage_status: UserCompanyMarkRow["coverage_status"];
+          p_idempotency_key: string;
+          p_source?: string;
+          p_priority?: number | null;
+          p_interest_reason?: string | null;
+          p_tags?: string[] | null;
+          p_active_limit?: number | null;
+        };
+        Returns: Json;
+      };
+      reconcile_user_company_coverage_limit: {
+        Args: {
+          p_user_id: string;
+          p_active_limit: number;
+          p_preferred_ticker?: string | null;
+        };
+        Returns: string[];
+      };
+      sweep_expired_company_coverage_limits: {
+        Args: {
+          p_now?: string;
           p_limit?: number;
         };
-        Returns: Array<{
-          filing_event_id: string;
-          ticker: string;
-          covered_tickers: string[];
-          cik: string;
-          accession_number: string;
-          form_type: SecFilingFormType;
-          is_amendment: boolean;
-          filing_date: string;
-          report_date: string | null;
-          accepted_at: string | null;
-          first_seen_at: string;
-          occurred_at: string;
-          feed_available_at: string | null;
-          feed_expires_at: string | null;
-          feed_lane: number | null;
-          feed_priority_rank: number | null;
-          alert_priority: "urgent" | "normal" | "digest";
-          primary_event_tag: string | null;
-          sec_items: string[];
-          event_tags: string[];
-          filing_detail_url: string;
-          primary_document_url: string | null;
-          source_metadata: Json;
-          processing_status: SecFilingEventRow["processing_status"];
-          form4_reported_purchase_value: number | null;
-          form4_reported_sale_value: number | null;
-          form4_tenb5_one_status: "yes" | "no" | "unknown" | null;
-          form4_has_reported_open_market_trade: boolean | null;
-        }>;
+        Returns: number;
       };
-      get_catalog_pulse_filing_candidates_v2: {
+      save_user_filing_judgment_revision: {
         Args: {
-          p_env: string;
-          p_snapshot_at: string;
-          p_preferred_tickers?: string[];
-          p_urgent_limit?: number;
-          p_priority_limit?: number;
-          p_preferred_limit?: number;
-          p_discovery_limit?: number;
+          p_user_id: string;
+          p_filing_event_id: string;
+          p_ticker: string;
+          p_impact: UserFilingJudgmentRevisionRow["impact"];
+          p_next_action: UserFilingJudgmentRevisionRow["next_action"];
+          p_summary: string;
+          p_rationale: string;
+          p_thesis_links: Json;
+          p_monitoring_rules: Json;
+          p_idempotency_key: string;
+          p_expected_revision_number?: number | null;
         };
-        Returns: Array<{
-          filing_event_id: string;
-          ticker: string;
-          covered_tickers: string[];
-          cik: string;
-          accession_number: string;
-          form_type: SecFilingFormType;
-          is_amendment: boolean;
-          filing_date: string;
-          report_date: string | null;
-          accepted_at: string | null;
-          first_seen_at: string;
-          occurred_at: string;
-          feed_available_at: string | null;
-          feed_expires_at: string | null;
-          feed_lane: number | null;
-          feed_priority_rank: number | null;
-          alert_priority: "urgent" | "normal" | "digest";
-          primary_event_tag: string | null;
-          sec_items: string[];
-          event_tags: string[];
-          filing_detail_url: string;
-          primary_document_url: string | null;
-          source_metadata: Json;
-          processing_status: SecFilingEventRow["processing_status"];
-          form4_reported_purchase_value: number | null;
-          form4_reported_sale_value: number | null;
-          form4_tenb5_one_status: "yes" | "no" | "unknown" | null;
-          form4_has_reported_open_market_trade: boolean | null;
-          candidate_bucket: "urgent" | "priority" | "preferred" | "discovery";
-        }>;
+        Returns: Json;
+      };
+      try_record_coverage_activation: {
+        Args: { p_user_id: string };
+        Returns: boolean;
+      };
+      close_user_decision_session: {
+        Args: {
+          p_user_id: string;
+          p_feed_session_id: string;
+          p_timezone: string;
+        };
+        Returns: Json;
+      };
+      record_pulse_item_impressions: {
+        Args: {
+          p_user_id: string;
+          p_items: Json;
+          p_feed_session_id: string;
+          p_seen_at?: string;
+        };
+        Returns: number;
+      };
+      resolve_scheduled_monitoring_pulse_item: {
+        Args: {
+          p_user_id: string;
+          p_rule_id: string;
+          p_item_key: string;
+          p_action: "review" | "dismiss";
+          p_resolved_at?: string;
+        };
+        Returns: Json;
       };
       get_catalog_pulse_filing_candidates_v3: {
         Args: {

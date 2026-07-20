@@ -123,7 +123,7 @@ Responsibilities:
 - Rate limits and usage counters.
 - Audit logs for Desktop ontology tool calls.
 
-The server can internally use Supabase, local service processes, MCP sidecars,
+The server can internally use Supabase, local service processes, MCP services,
 or Python/FastAPI services. That is an implementation detail. The product
 contract is that Desktop receives bounded search results through server APIs,
 not raw index files.

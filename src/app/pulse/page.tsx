@@ -1,13 +1,12 @@
 import { redirect } from "next/navigation";
-import TopNav from "@/components/TopNav";
 import PulseFeed from "@/components/pulse/PulseFeed";
 import { getAuthUser } from "@/lib/auth";
-import {
-  shouldPreserveInitialProfile,
-  topNavProfileFromUser,
-} from "@/lib/auth/user-profile";
 import { canAccessMenuFeature } from "@/lib/billing/feature-access-server";
 import { composePulseFeed, createUnavailablePulseFeed } from "@/lib/pulse/composer";
+import {
+  createStaticPulseE2EFeed,
+  shouldUseStaticPulseE2EFixture,
+} from "@/lib/pulse/e2e-fixture";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -16,6 +15,13 @@ export const dynamic = "force-dynamic";
 export default async function PulsePage() {
   const user = await getAuthUser().catch(() => null);
   if (!user) redirect("/login?next=/pulse");
+  if (await shouldUseStaticPulseE2EFixture()) {
+    return (
+      <div className="bg-canvas text-ink">
+        <PulseFeed initialFeed={createStaticPulseE2EFeed()} draftOwnerId={user.id} />
+      </div>
+    );
+  }
   const includeNotebookSources = await canAccessMenuFeature(
     user.id,
     user.email,
@@ -35,12 +41,8 @@ export default async function PulsePage() {
   });
 
   return (
-    <div className="min-h-[100dvh] bg-canvas text-ink">
-      <TopNav
-        initialUserProfile={topNavProfileFromUser(user)}
-        preserveInitialUserProfile={shouldPreserveInitialProfile(user)}
-      />
-      <PulseFeed initialFeed={initialFeed} />
+    <div className="bg-canvas text-ink">
+      <PulseFeed initialFeed={initialFeed} draftOwnerId={user.id} />
     </div>
   );
 }

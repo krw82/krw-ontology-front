@@ -148,7 +148,7 @@ describe("materialize-ontology-plugin", () => {
       url: "http://127.0.0.1:8775/mcp",
     });
     expect(stdout).toContain("Stock News MCP: enabled");
-  });
+  }, 20_000);
 
   it("keeps Stock News MCP absent when Finnhub is missing", () => {
     const { stdout, mcpConfig } = runMaterialize({

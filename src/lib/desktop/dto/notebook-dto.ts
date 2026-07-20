@@ -12,11 +12,11 @@ import type {
   WatchlistOverviewResponse,
 } from "@/types/api-contracts";
 
-export const DESKTOP_NOTEBOOK_CONTRACT = "desktop-notebook/v1" as const;
+export const DESKTOP_NOTEBOOK_CONTRACT = "desktop-notebook/v2" as const;
 export const DESKTOP_NOTEBOOK_COMPANY_CONTRACT =
-  "desktop-notebook-company/v1" as const;
+  "desktop-notebook-company/v2" as const;
 export const DESKTOP_NOTEBOOK_MUTATION_CONTRACT =
-  "desktop-notebook-mutation/v1" as const;
+  "desktop-notebook-mutation/v2" as const;
 
 export type DesktopNotebookAction =
   | {
@@ -36,8 +36,10 @@ export function toDesktopNotebookOverview(
   return {
     stats: {
       total_companies: overview.stats.total,
-      watchlisted: overview.stats.watchlisted,
+      exploring: overview.stats.exploring,
+      watching: overview.stats.watching,
       holdings: overview.stats.holding,
+      closed: overview.stats.closed,
       open_questions: overview.stats.open_questions,
       notes: overview.stats.notes,
       recent_activity: overview.stats.recent_activity,
@@ -63,8 +65,7 @@ export function toDesktopNotebookCompanyDetail(
 
 export function toDesktopMark(mark: UserCompanyMark) {
   return {
-    is_watchlisted: mark.is_watchlisted,
-    is_holding: mark.is_holding,
+    coverage_status: mark.coverage_status,
     priority: mark.priority,
     interest_reason: mark.interest_reason,
     tags: mark.tags,

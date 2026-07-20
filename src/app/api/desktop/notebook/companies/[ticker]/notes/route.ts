@@ -21,6 +21,7 @@ export async function POST(
     const { ticker } = await params;
     const payload = await createDesktopNotebookNote({
       userId: auth.userId,
+      userEmail: auth.userEmail,
       deviceId: auth.deviceId,
       ticker,
       idempotencyKey: request.headers.get("idempotency-key"),

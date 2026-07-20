@@ -1,8 +1,14 @@
 import type { NextRequest } from "next/server";
+import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import { isUuid } from "@/lib/api/validation";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
+import {
+  invalidOriginResponse,
+  isExpectedMutationOrigin,
+} from "@/lib/filing-notifications/request";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
+  ensureCompanyCoverageForWrite,
   errorResponse,
   parseJsonObject,
   requireIndexedTicker,
@@ -16,7 +22,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const THESIS_SELECT =
-  "id, user_id, ticker, title, thesis_text, status, tags, archived_at, source_chat_session_id, source_message_id, created_at, updated_at";
+  "id, user_id, ticker, title, thesis_text, monitored_variables, counter_evidence, decision_change_condition, status, tags, archived_at, source_chat_session_id, source_message_id, created_at, updated_at";
 const VALID_STATUSES = new Set([
   "active",
   "needs_review",
@@ -29,6 +35,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ ticker: string; thesisId: string }> },
 ) {
+  if (!isExpectedMutationOrigin(request)) return invalidOriginResponse();
   let user;
   try {
     user = await getAuthUser();
@@ -52,13 +59,16 @@ export async function PATCH(
   const update: Partial<
     Pick<
       UserCompanyThesisRow,
-      "title" | "thesis_text" | "status" | "tags" | "archived_at"
+      "title" | "thesis_text" | "monitored_variables" | "counter_evidence" | "decision_change_condition" | "status" | "tags" | "archived_at"
     >
   > = {};
   const title = stringInput(body, "title", { maxLength: 200 });
   const thesisText = textInput(body, "thesis_text", { maxLength: 20_000 });
   const status = stringInput(body, "status");
   const tags = stringArrayInput(body, "tags");
+  const monitoredVariables = stringArrayInput(body, "monitored_variables");
+  const counterEvidence = textInput(body, "counter_evidence", { maxLength: 8_000 });
+  const decisionChangeCondition = textInput(body, "decision_change_condition", { maxLength: 4_000 });
 
   if (body.title !== undefined) {
     if (!title) {
@@ -82,10 +92,30 @@ export async function PATCH(
   if (tags !== undefined) {
     update.tags = tags;
   }
+  if (monitoredVariables !== undefined) {
+    if (monitoredVariables.length > 3) {
+      return errorResponse(400, "validation_error", "확인 변수는 최대 3개까지 저장할 수 있습니다.");
+    }
+    update.monitored_variables = monitoredVariables;
+  }
+  if (body.counter_evidence !== undefined) {
+    update.counter_evidence = counterEvidence ?? "";
+  }
+  if (body.decision_change_condition !== undefined) {
+    update.decision_change_condition = decisionChangeCondition ?? "";
+  }
 
   if (Object.keys(update).length === 0) {
     return errorResponse(400, "validation_error", "수정할 항목이 없습니다.");
   }
+
+  const coverageError = await ensureCompanyCoverageForWrite({
+    userId: user.id,
+    userEmail: user.email,
+    ticker: tickerResult.ticker,
+    source: "thesis_updated",
+  });
+  if (coverageError) return coverageError;
 
   const { data, error } = await getSupabaseAdmin()
     .from("user_company_theses")
@@ -103,14 +133,26 @@ export async function PATCH(
     return errorResponse(404, "not_found", "Thesis를 찾지 못했습니다.");
   }
 
-  await touchMark(user.id, tickerResult.ticker);
+  void recordAnalyticsEventFromRequest(request, {
+    eventName: "thesis_updated",
+    userId: user.id,
+    properties: {
+      thesis_id: data.id,
+      ticker: data.ticker,
+      status: data.status,
+      outcome: "updated",
+      source: "watchlist",
+      source_type: "thesis",
+    },
+  });
   return Response.json({ thesis: data });
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ ticker: string; thesisId: string }> },
 ) {
+  if (!isExpectedMutationOrigin(request)) return invalidOriginResponse();
   let user;
   try {
     user = await getAuthUser();
@@ -126,6 +168,14 @@ export async function DELETE(
     return errorResponse(404, "not_found", "Thesis를 찾지 못했습니다.");
   }
 
+  const coverageError = await ensureCompanyCoverageForWrite({
+    userId: user.id,
+    userEmail: user.email,
+    ticker: tickerResult.ticker,
+    source: "thesis_updated",
+  });
+  if (coverageError) return coverageError;
+
   const { error } = await getSupabaseAdmin()
     .from("user_company_theses")
     .update({
@@ -140,22 +190,17 @@ export async function DELETE(
     return errorResponse(500, "internal_error", "Thesis를 보관하지 못했습니다.");
   }
 
-  await touchMark(user.id, tickerResult.ticker);
+  void recordAnalyticsEventFromRequest(request, {
+    eventName: "thesis_updated",
+    userId: user.id,
+    properties: {
+      thesis_id: thesisId,
+      ticker: tickerResult.ticker,
+      status: "archived",
+      outcome: "updated",
+      source: "watchlist",
+      source_type: "thesis",
+    },
+  });
   return Response.json({ success: true, thesis_id: thesisId });
-}
-
-async function touchMark(userId: string, ticker: string) {
-  const now = new Date().toISOString();
-  await getSupabaseAdmin()
-    .from("user_company_marks")
-    .upsert(
-      {
-        user_id: userId,
-        ticker,
-        is_watchlisted: true,
-        last_activity_at: now,
-        updated_at: now,
-      },
-      { onConflict: "user_id,ticker" },
-    );
 }

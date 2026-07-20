@@ -53,7 +53,7 @@ export default function RecoverableChatErrorCard({
           <button
             type="button"
             onClick={onRetry}
-            className="inline-flex h-10 items-center justify-center rounded-[8px] bg-primary px-4 text-[13px] font-extrabold text-on-primary transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            className="inline-flex h-11 items-center justify-center rounded-[8px] bg-primary px-4 text-[13px] font-extrabold text-on-primary transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             다시 시도
           </button>
@@ -62,7 +62,7 @@ export default function RecoverableChatErrorCard({
           <button
             type="button"
             onClick={onShowPriorEvidence}
-            className="inline-flex h-10 items-center justify-center rounded-[8px] border border-hairline bg-canvas px-4 text-[13px] font-extrabold text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            className="inline-flex h-11 items-center justify-center rounded-[8px] border border-hairline bg-canvas px-4 text-[13px] font-extrabold text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             기존 근거 보기
           </button>

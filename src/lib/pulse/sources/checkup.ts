@@ -32,6 +32,9 @@ export function buildCheckupCandidate(
     source_type: "checkup",
     source_id: localDate,
     ticker: null,
+    coverage_status: null,
+    judgment: null,
+    linked_thesis: null,
     eyebrow: "오늘의 리서치 체크업",
     title: counts.urgentFilings > 0
       ? `먼저 확인할 중요 공시가 ${counts.urgentFilings}건 있습니다`
@@ -43,12 +46,11 @@ export function buildCheckupCandidate(
     occurred_at: now.toISOString(),
     available_at: now.toISOString(),
     expires_at: null,
-    read_at: null,
     saved_at: null,
     snoozed_until: null,
     group_key: `checkup:${localDate}`,
     primary_action: { type: "link", label: "중요 공시 보기", href: "/filings" },
-    secondary_actions: [{ type: "mutation", label: "오늘 체크 완료", action: "read" }],
+    secondary_actions: [{ type: "mutation", label: "오늘 체크 완료", action: "review" }],
     metadata: {
       urgent_filings: counts.urgentFilings,
       unread_filings: counts.unreadFilings,

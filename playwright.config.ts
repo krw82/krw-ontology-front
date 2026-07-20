@@ -7,12 +7,10 @@ const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === "1";
 
 export default defineConfig({
   testDir: "./e2e",
-  // All projects share one cold Next.js webpack dev server. Serial execution
-  // avoids concurrent route compilation corrupting transient manifest reads.
+  // Run release gates serially against an optimized build. Next development
+  // compilation is intentionally excluded because route-on-demand manifests
+  // and HMR are not part of the deployed product lifecycle.
   workers: 1,
-  // Next.js streams the shell before cold dev-route compilation completes.
-  // Keep assertions web-first while allowing the first route in a project to
-  // finish compiling on slower local and CI runners.
   timeout: 90_000,
   expect: {
     timeout: 20_000,
@@ -21,18 +19,20 @@ export default defineConfig({
   outputDir: "output/playwright-results",
   use: {
     baseURL,
+    // App-flow tests do not need a service worker. Keeping it blocked avoids
+    // update/reload work leaking into unrelated hydration assertions; the PWA
+    // lifecycle spec opts back in explicitly.
+    serviceWorkers: "block",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
   webServer: useExternalServer
     ? undefined
     : {
-        command: `rm -rf .next-e2e && DEV_AUTH_BYPASS=1 KRW_E2E_STATIC_CATALOG=1 NEXT_DIST_DIR=.next-e2e npm run dev:web -- --hostname 127.0.0.1 --port ${port} --webpack`,
-        // Use the first protected page as the readiness probe so both its
-        // server and client bundles are compiled before the test clock starts.
-        url: `${baseURL}/companies`,
+        command: "node scripts/run-e2e-production-server.mjs",
+        url: `${baseURL}/api/healthz`,
         reuseExistingServer,
-        timeout: 180_000,
+        timeout: 240_000,
       },
   projects: [
     {

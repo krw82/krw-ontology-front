@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { getReadyAgentWorker } from "@/lib/agent/worker-heartbeat";
+import { APP_VERSION } from "@/lib/app-version";
 import { getActiveOntologyCatalogRelease } from "@/lib/ontology/catalog";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { GET } from "./route";
@@ -56,7 +57,7 @@ function mockSupabaseOk() {
                 maybeSingle: async () => ({
                   data: {
                     worker_id: "filing-worker-1",
-                    deployment_id: "deployment-1",
+                    deployment_id: APP_VERSION,
                     heartbeat_at: now,
                     lease_expires_at: new Date(Date.now() + 60_000).toISOString(),
                   },
@@ -221,6 +222,9 @@ describe("GET /api/healthz/deep", () => {
     expect(body.checks.mcp.sqlite_ok).toBe(true);
     expect(body.checks.mcp.tool_count).toBe(13);
     expect(body.checks.mcp.worker_id).toBe("mac-worker-1");
+    expect(body.checks.filing_worker.scheduler_leader.deployment_id).toBe(
+      APP_VERSION,
+    );
     expect(body.checks.trusted_client_ip.ok).toBe(true);
     expect(getSupabaseAdmin).toHaveBeenCalledTimes(2);
     expect(getActiveOntologyCatalogRelease).toHaveBeenCalledOnce();

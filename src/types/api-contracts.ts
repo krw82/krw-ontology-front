@@ -86,6 +86,8 @@ export type ErrorCode =
   | "claude_api_error"
   | "claude_rate_limited"
   | "rate_limited"
+  | "coverage_limit_reached"
+  | "judgment_revision_conflict"
   | "validation_error"
   | "internal_error";
 
@@ -109,6 +111,8 @@ const VALID_ERROR_CODES: ReadonlySet<string> = new Set<ErrorCode>([
   "claude_api_error",
   "claude_rate_limited",
   "rate_limited",
+  "coverage_limit_reached",
+  "judgment_revision_conflict",
   "validation_error",
   "internal_error",
 ]);
@@ -168,7 +172,11 @@ export type KrwFilingsMCPToolName =
   | "search_catalog_filings"
   | "list_filing_sections"
   | "read_filing_section"
-  | "get_form4_insider_transactions";
+  | "get_form4_insider_transactions"
+  | "get_coverage_state"
+  | "list_filing_judgments"
+  | "get_decision_timeline"
+  | "list_open_questions";
 
 /** Allowed Guru Advisor MCP tool names */
 export type GuruMCPToolName =
@@ -249,6 +257,30 @@ export type UserCompanyQuestionSource =
   | "saved_from_chat";
 export type UserCompanyThesisStatus =
   "active" | "needs_review" | "weakened" | "mixed" | "archived";
+export type UserCompanyCoverageStatus =
+  | "exploring"
+  | "watching"
+  | "holding"
+  | "closed";
+export type FilingJudgmentImpact =
+  | "positive"
+  | "neutral"
+  | "negative"
+  | "unclear";
+export type FilingJudgmentNextAction =
+  | "complete"
+  | "update_thesis"
+  | "create_question"
+  | "review_later";
+export type FilingMonitoringRuleType =
+  | "filing_form"
+  | "filing_item"
+  | "keyword"
+  | "scheduled_review";
+export type FilingMonitoringRuleOperator =
+  | "matches"
+  | "contains"
+  | "on_or_after";
 export type UserThesisCheckResultStatus =
   "strengthened" | "weakened" | "mixed" | "insufficient" | "needs_review";
 export type UserResearchNoteType =
@@ -264,14 +296,96 @@ export type UserResearchNoteType =
 export interface UserCompanyMark {
   user_id: string;
   ticker: string;
-  is_watchlisted: boolean;
-  is_holding: boolean;
+  coverage_status: UserCompanyCoverageStatus;
   priority: number;
   interest_reason: string | null;
   tags: string[];
   last_activity_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface UserCompanyCoverageEvent {
+  id: string;
+  user_id: string;
+  ticker: string;
+  previous_status: UserCompanyCoverageStatus | null;
+  coverage_status: UserCompanyCoverageStatus;
+  changed: boolean;
+  source: string;
+  idempotency_key: string;
+  created_at: string;
+}
+
+export interface UserFilingJudgmentSummary {
+  id: string;
+  filing_event_id: string;
+  ticker: string;
+  current_revision_id: string;
+  revision_number: number;
+  impact: FilingJudgmentImpact;
+  next_action: FilingJudgmentNextAction;
+  summary: string;
+  updated_at: string;
+}
+
+export interface PulseLinkedThesis {
+  id: string;
+  title: string;
+  status: UserCompanyThesisStatus;
+}
+
+export interface UserFilingJudgmentThesisLink extends PulseLinkedThesis {
+  impact: FilingJudgmentImpact;
+  position: number;
+}
+
+export interface UserCompanyMonitoringRule {
+  id: string;
+  user_id: string;
+  ticker: string;
+  rule_type: FilingMonitoringRuleType;
+  operator: FilingMonitoringRuleOperator;
+  value: string | null;
+  next_review_at: string | null;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserFilingJudgment extends UserFilingJudgmentSummary {
+  rationale: string;
+  thesis_links: UserFilingJudgmentThesisLink[];
+  monitoring_rules: UserCompanyMonitoringRule[];
+  created_at: string;
+  revision_created_at: string;
+}
+
+export type CompanyCoverageTimelineItem =
+  | {
+      type: "coverage_change";
+      id: string;
+      occurred_at: string;
+      previous_status: UserCompanyCoverageStatus | null;
+      coverage_status: UserCompanyCoverageStatus;
+      changed: boolean;
+      source: string;
+    }
+  | {
+      type: "filing_judgment";
+      id: string;
+      occurred_at: string;
+      filing_event_id: string;
+      revision_number: number;
+      impact: FilingJudgmentImpact;
+      next_action: FilingJudgmentNextAction;
+      summary: string;
+    };
+
+export interface CompanyCoverageTimelineResponse {
+  ticker: string;
+  items: CompanyCoverageTimelineItem[];
+  next_cursor: string | null;
 }
 
 export interface UserCompanyQuestion {
@@ -348,6 +462,9 @@ export interface UserCompanyThesis {
   ticker: string;
   title: string;
   thesis_text: string;
+  monitored_variables: string[];
+  counter_evidence: string;
+  decision_change_condition: string;
   status: UserCompanyThesisStatus;
   tags: string[];
   archived_at: string | null;
@@ -442,8 +559,10 @@ export interface WatchlistOverviewResponse {
   research_inbox: ResearchInboxItem[];
   stats: {
     total: number;
-    watchlisted: number;
+    exploring: number;
+    watching: number;
     holding: number;
+    closed: number;
     open_questions: number;
     notes: number;
     recent_activity: number;
@@ -457,6 +576,7 @@ export interface WatchlistCompanyDetailResponse {
   card: UserCompanyCard | null;
   theses: UserCompanyThesis[];
   thesis_checks: UserThesisCheck[];
+  monitoring_rules: UserCompanyMonitoringRule[];
   notes: UserResearchNote[];
   recent_sessions: SessionSummary[];
 }
@@ -1680,9 +1800,6 @@ export type PulseAnalysisPhase = "active" | "completed" | "failed";
 export type PulseMutationAction =
   | "review"
   | "unreview"
-  // Legacy aliases remain accepted by the API for one release.
-  | "read"
-  | "unread"
   | "save"
   | "unsave"
   | "snooze"
@@ -1714,6 +1831,9 @@ export interface PulseItemBase<K extends PulseItemKind> {
   source_type: K;
   source_id: string;
   ticker: string | null;
+  coverage_status: UserCompanyCoverageStatus | null;
+  judgment: UserFilingJudgmentSummary | null;
+  linked_thesis: PulseLinkedThesis | null;
   eyebrow: string;
   title: string;
   body: string;
@@ -1724,7 +1844,6 @@ export interface PulseItemBase<K extends PulseItemKind> {
   available_at: string;
   expires_at: string | null;
   reviewed_at: string | null;
-  read_at: string | null;
   saved_at: string | null;
   snoozed_until: string | null;
   state: PulseItemState;
@@ -1773,15 +1892,13 @@ export interface PulseFeedSummary {
 export interface PulseFeedResponse {
   generated_at: string;
   snapshot_at: string;
-  ranking_version: "rule_v1";
+  ranking_version: "rule_v3";
   timezone: string;
   date_label: string;
   filter: PulseFilter;
   summary: PulseFeedSummary;
   active_analysis_items: PulseItem[];
   items: PulseItem[];
-  next_cursor: string | null;
-  has_more: boolean;
   new_item_count: number;
   source_statuses: PulseSourceStatus[];
 }
@@ -1831,7 +1948,6 @@ export interface PulseItemMutationResponse {
   item_id: string;
   action: PulseStateMutationAction;
   reviewed_at: string | null;
-  read_at: string | null;
   saved_at: string | null;
   snoozed_until: string | null;
   dismissed_at: string | null;

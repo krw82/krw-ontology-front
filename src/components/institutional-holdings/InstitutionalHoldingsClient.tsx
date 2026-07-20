@@ -48,7 +48,7 @@ export default function InstitutionalHoldingsClient({
   return (
     <main
       id="main-content"
-      className="px-base pb-[112px] pt-lg sm:px-md md:px-xl md:pb-[96px] md:pt-xl"
+      className="px-base pb-xl pt-lg sm:px-md md:px-xl md:pb-[96px] md:pt-xl"
     >
       <div className="mx-auto w-full max-w-[1240px]">
         <header className="border-b border-hairline pb-5">
@@ -103,7 +103,8 @@ export default function InstitutionalHoldingsClient({
                     search
                   </span>
                   <input
-                    className="h-10 w-full rounded-[8px] border border-hairline bg-canvas pl-10 pr-sm text-[14px] font-semibold leading-5 text-ink shadow-sm placeholder:text-muted focus:border-outline focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim/25"
+                    aria-label="13F 보유 종목 검색"
+                    className="h-11 w-full rounded-[8px] border border-hairline bg-canvas pl-10 pr-sm text-[14px] font-semibold leading-5 text-ink shadow-sm placeholder:text-muted focus:border-outline focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim/25"
                     placeholder="회사명, 티커, CUSIP, 변화 검색"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}

@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import ChatArtifacts from "@/components/ChatArtifacts";
+import ChatAnswerSaveActions, {
+  type ChatAnswerSaveContext,
+} from "@/components/ChatAnswerSaveActions";
 import EvidenceGraphPreview from "@/components/EvidenceGraphPreview";
 import FollowUpQuestionActions from "@/components/FollowUpQuestionActions";
 import QueueRemotionAnimation from "@/components/QueueRemotionAnimation";
@@ -56,6 +59,7 @@ interface ChatMessageProps {
   messageId?: string;
   createdAt?: string;
   status?: MessageStatus;
+  answerSaveContext?: ChatAnswerSaveContext;
 }
 
 const statusTransition = {
@@ -305,7 +309,7 @@ function MessageActions({
     <div className="mt-sm flex flex-wrap items-center gap-xs text-[13px] leading-none text-muted">
       <button
         type="button"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-70"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-70"
         aria-label={shareLabel}
         disabled={shareState === "sharing"}
         onClick={handleShare}
@@ -479,6 +483,7 @@ export default function ChatMessage({
   messageId,
   createdAt,
   status,
+  answerSaveContext,
 }: ChatMessageProps) {
   if (role === "user") {
     const { visibleText, attachments } = parseChatAttachmentContent(content);
@@ -584,6 +589,18 @@ export default function ChatMessage({
               messageId={messageId}
               createdAt={createdAt}
             />
+          ) : null}
+          {messageId &&
+          status === "completed" &&
+          assistantContent &&
+          answerSaveContext ? (
+            <div className="mt-xs flex flex-wrap items-center gap-xs">
+              <ChatAnswerSaveActions
+                messageId={messageId}
+                content={assistantContent}
+                saveContext={answerSaveContext}
+              />
+            </div>
           ) : null}
         </div>
       )}

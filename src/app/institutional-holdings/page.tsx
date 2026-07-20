@@ -1,11 +1,5 @@
 import type { Metadata } from "next";
 import InstitutionalHoldingsClient from "@/components/institutional-holdings/InstitutionalHoldingsClient";
-import TopNav from "@/components/TopNav";
-import { getAuthUser } from "@/lib/auth";
-import {
-  shouldPreserveInitialProfile,
-  topNavProfileFromUser,
-} from "@/lib/auth/user-profile";
 import {
   getInstitutionalHoldingsDashboard,
   getInstitutionalManagerDirectory,
@@ -67,20 +61,10 @@ export default async function InstitutionalHoldingsPage({
 }: InstitutionalHoldingsPageProps) {
   const query = await searchParams;
   const selectedCik = normalizeCik(stringParam(query.cik) ?? "");
-  const [user, pageData] = await Promise.all([
-    getAuthUser().catch(() => null),
-    loadPageData(selectedCik),
-  ]);
+  const pageData = await loadPageData(selectedCik);
 
   return (
-    <div className="min-h-[100dvh] bg-canvas text-ink">
-      <TopNav
-        initialUserProfile={topNavProfileFromUser(user)}
-        preserveInitialUserProfile={shouldPreserveInitialProfile(user)}
-        brandHref="/companies"
-        brandAriaLabel="회사 목록으로 이동"
-        showLocaleSwitcher
-      />
+    <div className="bg-canvas text-ink">
       <InstitutionalHoldingsClient
         managers={pageData.managers}
         initialDashboard={pageData.dashboard}

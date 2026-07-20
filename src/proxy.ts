@@ -42,7 +42,7 @@ function clientIpUnavailableResponse() {
 }
 
 function shouldApplyContentSecurityPolicy(pathname: string) {
-  return !pathname.startsWith("/api/");
+  return pathname !== "/offline.html" && !pathname.startsWith("/api/");
 }
 
 function shouldApplyCanonicalRedirect(pathname: string) {
@@ -153,13 +153,18 @@ function createCspRequestHeaders() {
 function createRequestHeaderOverrides({
   contentSecurityPolicy,
   locale,
+  pathname,
 }: {
   contentSecurityPolicy: ReturnType<typeof createCspRequestHeaders> | null;
   locale: Locale;
+  pathname: string;
 }) {
   const requestHeaderOverrides =
     contentSecurityPolicy?.requestHeaderOverrides ?? new Headers();
   requestHeaderOverrides.set("x-krw-locale", locale);
+  // Always overwrite a browser-provided value. RootLayout uses this trusted
+  // request path to avoid loading workspace identity on public marketing pages.
+  requestHeaderOverrides.set("x-krw-pathname", pathname);
   return requestHeaderOverrides;
 }
 
@@ -190,6 +195,7 @@ export async function proxy(request: NextRequest) {
     requestHeaderOverrides: createRequestHeaderOverrides({
       contentSecurityPolicy: csp,
       locale: requestLocale,
+      pathname: request.nextUrl.pathname,
     }),
   });
   if (csp) {

@@ -1,8 +1,18 @@
 import type { NextRequest } from "next/server";
+import { recordCoverageMutationAnalytics } from "@/lib/coverage/analytics";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
-import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { companyCoverageStatusSchema } from "@/lib/coverage/contracts";
 import {
-  booleanInput,
+  CoverageIdempotencyConflictError,
+  CoverageLimitError,
+  getCompanyCoverageStatus,
+  setCompanyCoverageStatusWithEvent,
+} from "@/lib/coverage/repository";
+import {
+  invalidOriginResponse,
+  isExpectedMutationOrigin,
+} from "@/lib/filing-notifications/request";
+import {
   errorResponse,
   parseJsonObject,
   requireIndexedTicker,
@@ -10,13 +20,9 @@ import {
   stringInput,
 } from "@/lib/watchlist/api";
 import { getWatchlistCompanyDetail } from "@/lib/watchlist/workspace";
-import type { Database, UserCompanyMarkRow } from "@/types/database";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const MARK_SELECT =
-  "user_id, ticker, is_watchlisted, is_holding, priority, interest_reason, tags, last_activity_at, created_at, updated_at";
 
 export async function GET(
   _request: NextRequest,
@@ -49,6 +55,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ ticker: string }> },
 ) {
+  if (!isExpectedMutationOrigin(request)) return invalidOriginResponse();
   let user;
   try {
     user = await getAuthUser();
@@ -66,30 +73,53 @@ export async function PATCH(
     return errorResponse(400, "validation_error", "요청 본문 형식이 올바르지 않습니다.");
   }
 
-  const update: Database["public"]["Tables"]["user_company_marks"]["Insert"] = {
-    user_id: user.id,
-    ticker: tickerResult.ticker,
-    last_activity_at: new Date().toISOString(),
-  };
-  const isWatchlisted = booleanInput(body, "is_watchlisted");
-  const isHolding = booleanInput(body, "is_holding");
+  let existing;
+  try {
+    existing = await getCompanyCoverageStatus(user.id, tickerResult.ticker);
+  } catch {
+    return errorResponse(
+      503,
+      "service_unavailable",
+      "기존 회사 상태를 확인하지 못했습니다. 다시 시도해주세요.",
+    );
+  }
+  const coverageStatus = companyCoverageStatusSchema.safeParse(
+    body.coverage_status ?? existing?.coverage_status ?? "exploring",
+  );
+  if (!coverageStatus.success) {
+    return errorResponse(400, "validation_error", "회사 커버리지 상태를 확인해주세요.");
+  }
   const interestReason = stringInput(body, "interest_reason", { maxLength: 1200 });
   const tags = stringArrayInput(body, "tags");
-
-  if (isWatchlisted !== undefined) update.is_watchlisted = isWatchlisted;
-  if (isHolding !== undefined) update.is_holding = isHolding;
-  if (body.interest_reason !== undefined) update.interest_reason = interestReason || null;
-  if (tags !== undefined) update.tags = tags;
-
-  const { data: mark, error } = await getSupabaseAdmin()
-    .from("user_company_marks")
-    .upsert(update, { onConflict: "user_id,ticker" })
-    .select(MARK_SELECT)
-    .single<UserCompanyMarkRow>();
-
-  if (error || !mark) {
+  try {
+    const result = await setCompanyCoverageStatusWithEvent({
+      userId: user.id,
+      userEmail: user.email,
+      ticker: tickerResult.ticker,
+      coverageStatus: coverageStatus.data,
+      idempotencyKey:
+        typeof body.client_mutation_id === "string"
+          ? body.client_mutation_id
+          : undefined,
+      source: "watchlist_update",
+      interestReason:
+        body.interest_reason !== undefined
+          ? interestReason || null
+          : existing?.interest_reason,
+      tags: tags ?? existing?.tags,
+    });
+    await recordCoverageMutationAnalytics(request, user.id, result, "watchlist");
+    return Response.json({
+      mark: result.mark,
+      idempotent_replay: result.idempotentReplay,
+    });
+  } catch (error) {
+    if (error instanceof CoverageIdempotencyConflictError) {
+      return errorResponse(409, error.code, error.message);
+    }
+    if (error instanceof CoverageLimitError) {
+      return errorResponse(409, error.code, error.message);
+    }
     return errorResponse(500, "internal_error", "종목 상태를 저장하지 못했습니다.");
   }
-
-  return Response.json({ mark });
 }

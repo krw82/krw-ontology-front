@@ -17,7 +17,9 @@ export function buildDevelopmentPulseShowcase(now: Date): PulseCandidate[] {
     available_at: timestamp,
     expires_at: null,
     reviewed_at: null,
-    read_at: null,
+    coverage_status: null,
+    judgment: null,
+    linked_thesis: null,
     saved_at: null,
     snoozed_until: null,
     group_key: null,
@@ -73,7 +75,7 @@ export function buildDevelopmentPulseShowcase(now: Date): PulseCandidate[] {
       reason_code: "development_showcase",
       reason_label: "개발 환경 카드 미리보기입니다.",
       priority: "high" as const,
-      is_holding: true,
+      coverage_status: "holding" as const,
       primary_action: { type: "link" as const, label: "공시 보기", href: "/filings" },
       secondary_actions: [],
       metadata: {
@@ -97,7 +99,7 @@ export function buildDevelopmentPulseShowcase(now: Date): PulseCandidate[] {
       reason_code: "development_showcase",
       reason_label: "개발 환경 카드 미리보기입니다.",
       priority: "high" as const,
-      is_watchlisted: true,
+      coverage_status: "watching" as const,
       primary_action: { type: "link" as const, label: "공시 보기", href: "/filings" },
       secondary_actions: [],
       metadata: {

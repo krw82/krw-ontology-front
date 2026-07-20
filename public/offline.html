@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="theme-color" content="#003ec7" />
+    <title>오프라인 | KRW.O</title>
+    <script src="/offline-shell.js" defer></script>
+    <style>
+      :root { color-scheme: only light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100dvh; background: #f7f8fb; color: #0a0b0d; padding: 24px 18px calc(88px + env(safe-area-inset-bottom)); }
+      main { width: min(100%, 640px); margin: 0 auto; }
+      .status { border: 1px solid #dee1e6; border-radius: 20px; padding: 28px; background: #fff; box-shadow: 0 18px 52px rgba(10, 11, 13, .08); }
+      .brand { color: #003ec7; font-size: 13px; font-weight: 900; letter-spacing: .14em; }
+      h1 { margin: 18px 0 10px; font-size: 28px; line-height: 1.25; letter-spacing: -.035em; }
+      p { margin: 0; color: #5b616e; font-size: 15px; line-height: 1.7; }
+      a { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; margin-top: 24px; border-radius: 12px; background: #0a0b0d; color: #fff; padding: 0 20px; font-size: 14px; font-weight: 800; text-decoration: none; }
+      a:focus-visible { outline: 3px solid #003ec7; outline-offset: 3px; }
+      .saved { margin-top: 18px; border: 1px solid #dee1e6; border-radius: 20px; padding: 24px; background: #fff; }
+      .saved-label { color: #003ec7; font-size: 12px; font-weight: 900; letter-spacing: .08em; }
+      .saved h1 { margin-top: 8px; font-size: 22px; }
+      .sync { margin-top: 6px; font-size: 13px; }
+      ul { display: grid; gap: 12px; margin: 18px 0 0; padding: 0; list-style: none; }
+      li { border-top: 1px solid #eceef2; padding-top: 14px; }
+      .saved-meta { color: #003ec7; font-size: 12px; font-weight: 800; }
+      h2 { margin: 5px 0 0; font-size: 17px; line-height: 1.4; }
+      .saved-body { margin-top: 6px; font-size: 13px; line-height: 1.55; }
+      nav { position: fixed; inset: auto 0 0; display: flex; justify-content: space-around; border-top: 1px solid #dee1e6; background: rgba(255,255,255,.96); padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); }
+      nav a { min-width: 64px; min-height: 48px; margin: 0; background: transparent; color: #5b616e; padding: 0 10px; font-size: 12px; }
+      nav a:first-child { color: #003ec7; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="status">
+        <div class="brand">KRW.O</div>
+        <h1>인터넷 연결을 확인해 주세요.</h1>
+        <p>공시와 리서치 내용은 온라인에서 최신 근거를 확인한 뒤 보여드립니다. 아래 저장된 공개 공시 요약은 마지막 동기화 시점의 내용입니다.</p>
+        <a href="/app?source=offline_retry">다시 시도</a>
+      </section>
+      <section class="saved" id="saved-filings" hidden>
+        <p class="saved-label">OFFLINE READING</p>
+        <h1>저장된 공개 공시 요약</h1>
+        <p class="sync" id="saved-filings-time"></p>
+        <ul id="saved-filing-list"></ul>
+      </section>
+    </main>
+    <nav aria-label="오프라인 앱 메뉴">
+      <a href="/pulse">피드</a>
+      <a href="/companies">탐색</a>
+      <a href="/watchlist">노트</a>
+      <a href="/filings">알림</a>
+    </nav>
+  </body>
+</html>

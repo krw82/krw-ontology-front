@@ -32,5 +32,7 @@ export default async function NewChatPage({
     }
   }
 
-  return <ChatPageClient />;
+  if (!user) redirect("/login?next=/chat/new");
+
+  return <ChatPageClient draftOwnerId={user.id} />;
 }

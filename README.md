@@ -101,23 +101,26 @@ Claude Code native binary: 2.1.204
 npm run prod:deploy:code
 ```
 
-Prod runtime만 갱신:
+`prod:deploy:web`은 GCP web/API와 stateless support worker만, `prod:deploy:runtime`은
+Mac MCP/agent runtime만 갱신합니다. 둘을 함께 반영할 때는 `prod:deploy:code`를
+사용합니다. GCP ontology MCP/agent sidecar는 운영하지 않습니다.
+
+현재 prod/current의 web catalog만 재게시:
 
 ```bash
-npm run prod:deploy:runtime
-```
-
-Prod ontology/index/catalog release 전환:
-
-```bash
-npm run prod:release:publish -- --release-id <release_id>
+npm run prod:release:publish
 ```
 
 전체 배포:
 
 ```bash
-npm run prod:deploy:full -- --release-id <release_id>
+npm run prod:deploy:full
 ```
+
+서로 다른 ontology release를 `prod/current`로 승격하는 자동 경로는 현재
+fail-closed입니다. `--release-id`는 이미 current인 ID만 허용합니다. 운영자가
+symlink를 수동 변경하지 말고, candidate release·plugin·worker를 함께 seal하는
+전용 cutover가 구현되기 전에는 기존 current를 유지합니다.
 
 ## Operations
 

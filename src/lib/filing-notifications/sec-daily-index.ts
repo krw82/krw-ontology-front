@@ -17,7 +17,7 @@ export function parseSecDailyMasterIndex(text: string): SecFilingCandidate[] {
   for (const line of text.split(/\r?\n/)) {
     const columns = line.split("|");
     if (columns.length !== 5) continue;
-    const [rawCik, _companyName, rawFormType, filingDate, filename] = columns.map((value) => value.trim());
+    const [rawCik, , rawFormType, filingDate, filename] = columns.map((value) => value.trim());
     const formType = rawFormType as SecFilingFormType;
     const cik = normalizeCik(rawCik);
     if (!cik || !TRACKED_FORMS.has(formType) || !/^\d{4}-\d{2}-\d{2}$/.test(filingDate)) continue;

@@ -7,6 +7,11 @@ import {
   trackClientEventSilently,
 } from "@/lib/analytics/client";
 import { buildAnalyticsPageProperties } from "@/lib/analytics/page-context";
+import {
+  parseAnalyticsSampleRate,
+  shouldSampleAnalyticsKey,
+} from "@/lib/analytics/sampling";
+import { ANALYTICS_NAVIGATION_COMMITTED_EVENT } from "@/lib/analytics/interaction-performance";
 
 let lastTrackedPageViewKey: string | null = null;
 const PAGE_VIEW_SAMPLE_RATE = readPageViewSampleRate();
@@ -18,13 +23,22 @@ export default function AnalyticsBootstrap() {
     const trackPageView = () => {
       const pagePath = window.location.pathname;
       const pageSearch = window.location.search;
-      const eventKey = `${pagePath}${pageSearch}`;
-      if (eventKey === lastTrackedPageViewKey) return;
-      lastTrackedPageViewKey = eventKey;
-      if (!shouldTrackPageView(eventKey)) return;
+      const rawLocationKey = `${pagePath}${pageSearch}`;
+      window.dispatchEvent(
+        new CustomEvent(ANALYTICS_NAVIGATION_COMMITTED_EVENT, {
+          detail: { locationKey: rawLocationKey },
+        }),
+      );
+      const pageProperties = buildAnalyticsPageProperties(pagePath, pageSearch);
+      const analyticsPageKey = `${pageProperties.page_path}${
+        pageProperties.page_search ?? ""
+      }:${pageProperties.page_type}`;
+      if (analyticsPageKey === lastTrackedPageViewKey) return;
+      lastTrackedPageViewKey = analyticsPageKey;
+      if (!shouldTrackPageView(analyticsPageKey)) return;
 
       trackClientEventSilently("page_viewed", {
-        ...buildAnalyticsPageProperties(pagePath, pageSearch),
+        ...pageProperties,
       });
     };
 
@@ -64,11 +78,7 @@ export default function AnalyticsBootstrap() {
 function readPageViewSampleRate() {
   const raw = process.env.NEXT_PUBLIC_ANALYTICS_PAGE_VIEW_SAMPLE_RATE;
   const fallback = process.env.NODE_ENV === "production" ? 0.1 : 1;
-  if (!raw) return fallback;
-
-  const parsed = Number.parseFloat(raw);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.min(1, Math.max(0, parsed));
+  return parseAnalyticsSampleRate(raw, fallback);
 }
 
 function shouldTrackPageView(eventKey: string) {
@@ -76,14 +86,8 @@ function shouldTrackPageView(eventKey: string) {
   if (PAGE_VIEW_SAMPLE_RATE <= 0) return false;
 
   const anonymousId = getOrCreateAnalyticsAnonymousId();
-  return normalizedHash(`${anonymousId}:${eventKey}`) < PAGE_VIEW_SAMPLE_RATE;
-}
-
-function normalizedHash(value: string) {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0) / 0xffffffff;
+  return shouldSampleAnalyticsKey(
+    `${anonymousId}:${eventKey}`,
+    PAGE_VIEW_SAMPLE_RATE,
+  );
 }

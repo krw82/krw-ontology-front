@@ -21,12 +21,14 @@ ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ARG NEXT_PUBLIC_BRANDFETCH_CLIENT_ID
 ARG NEXT_PUBLIC_ENABLE_EMAIL_LOGIN=1
 ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY
+ARG NEXT_PUBLIC_APP_VERSION
 ARG GOOGLE_SITE_VERIFICATION
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_BRANDFETCH_CLIENT_ID=$NEXT_PUBLIC_BRANDFETCH_CLIENT_ID
 ENV NEXT_PUBLIC_ENABLE_EMAIL_LOGIN=$NEXT_PUBLIC_ENABLE_EMAIL_LOGIN
 ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
+ENV NEXT_PUBLIC_APP_VERSION=$NEXT_PUBLIC_APP_VERSION
 ENV GOOGLE_SITE_VERIFICATION=$GOOGLE_SITE_VERIFICATION
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -49,39 +51,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=krw-ontology-src pyproject.toml /tmp/krw-ontology/pyproject.toml
-COPY --from=krw-ontology-src src /tmp/krw-ontology/src
-COPY --from=krw-ontology-src ontology /tmp/krw-ontology/ontology
 RUN python3 -m venv /opt/krw-ontology-venv \
-    && /opt/krw-ontology-venv/bin/pip install --no-cache-dir /tmp/krw-ontology 'markitdown[pdf]' \
-    && rm -rf /tmp/krw-ontology
+    && /opt/krw-ontology-venv/bin/pip install --no-cache-dir 'markitdown[pdf]'
 
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/.worker ./.worker
+# The agent executor is Mac-only.  Copy only the stateless GCP support
+# workers so the GCP image cannot run the ontology agent-worker as a sidecar.
+COPY --from=builder --chown=nextjs:nodejs /app/.worker/document-worker.mjs ./.worker/document-worker.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/.worker/document-outbox-dispatcher.mjs ./.worker/document-outbox-dispatcher.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/.worker/filing-notification-worker.mjs ./.worker/filing-notification-worker.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/.worker/filing-brief-worker.mjs ./.worker/filing-brief-worker.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/.worker/filings-mcp-server.mjs ./.worker/filings-mcp-server.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/.worker/billing-worker.mjs ./.worker/billing-worker.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/.services ./.services
 COPY --from=prod-deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 # Next standalone file tracing misses the Claude Agent SDK native optional
 # package because the SDK resolves it dynamically at runtime.
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/@anthropic-ai ./node_modules/@anthropic-ai
-COPY --from=builder --chown=nextjs:nodejs /app/ref/plugins/prod/krw-ontology ./krw-ontology/plugins/krw-ontology
 COPY --from=builder --chown=nextjs:nodejs /app/docker/claude-prod /usr/local/bin/claude-prod
 
 RUN chmod 755 /usr/local/bin/claude-prod
 
 RUN <<'EOF'
 set -eu
-node - <<'NODE'
-const fs = require("fs");
-const root = "./krw-ontology/plugins/krw-ontology";
-const config = JSON.parse(fs.readFileSync(`${root}/.mcp.json`, "utf8"));
-const server = config.mcpServers && config.mcpServers["krw-ontology"];
-if (!server || server.type !== "http" || server.url !== "http://ontology-mcp:8000/mcp") {
-  throw new Error("Production ontology plugin must be materialized for http://ontology-mcp:8000/mcp");
-}
-fs.accessSync(`${root}/.krw-ontology-contract.json`, fs.constants.R_OK);
-NODE
 mkdir -p .next/cache /app/agent-workspace /home/nextjs/.claude-prod /srv/krw-document-inbox
 chown -R nextjs:nodejs .next /app/agent-workspace /home/nextjs/.claude-prod /srv/krw-document-inbox
 EOF

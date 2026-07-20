@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { normalizeTicker } from "@/lib/ontology/ticker";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { ensureCompanyCoverage, setCompanyCoverageStatus } from "@/lib/coverage/repository";
 import {
   DESKTOP_NOTEBOOK_COMPANY_CONTRACT,
   DESKTOP_NOTEBOOK_CONTRACT,
@@ -21,7 +22,6 @@ import {
   listWatchlistOverview,
 } from "@/lib/watchlist/workspace";
 import type {
-  UserCompanyMark,
   UserCompanyQuestion,
   UserResearchNote,
 } from "@/types/api-contracts";
@@ -32,8 +32,6 @@ import type {
 } from "@/types/database";
 
 const PRIVATE_CACHE_SECONDS = 300;
-const MARK_SELECT =
-  "user_id, ticker, is_watchlisted, is_holding, priority, interest_reason, tags, last_activity_at, created_at, updated_at";
 const QUESTION_SELECT =
   "id, user_id, ticker, question, status, source, source_chat_session_id, source_message_id, answered_at, visible_after_at, created_at, updated_at";
 const NOTE_SELECT =
@@ -93,6 +91,7 @@ export async function getDesktopNotebookCompany(
 
 export async function updateDesktopNotebookMark(input: {
   userId: string;
+  userEmail?: string | null;
   ticker: string;
   expectedVersion: string | null;
   body: unknown;
@@ -110,51 +109,25 @@ export async function updateDesktopNotebookMark(input: {
     throw validationError("변경할 종목 상태를 입력해주세요.");
   }
 
-  const now = new Date().toISOString();
-  const admin = getSupabaseAdmin();
-  let mark: UserCompanyMarkRow | null = null;
-
-  if (existing) {
-    const result = await admin
-      .from("user_company_marks")
-      .update({
-        ...update,
-        last_activity_at: now,
-      })
-      .eq("user_id", input.userId)
-      .eq("ticker", ticker)
-      .eq("updated_at", existing.updated_at)
-      .select(MARK_SELECT)
-      .maybeSingle<UserCompanyMarkRow>();
-    if (result.error) {
-      throw new Error(`Failed to update Desktop mark: ${result.error.message}`);
-    }
-    mark = result.data;
-  } else {
-    const result = await admin
-      .from("user_company_marks")
-      .insert({
-        user_id: input.userId,
-        ticker,
-        ...update,
-        last_activity_at: now,
-      })
-      .select(MARK_SELECT)
-      .single<UserCompanyMarkRow>();
-    if (result.error) {
-      if (isConflictError(result.error)) throw resourceConflict();
-      throw new Error(`Failed to create Desktop mark: ${result.error.message}`);
-    }
-    mark = result.data;
-  }
-
-  if (!mark) throw resourceConflict();
-  const data = toDesktopMark(markFromRow(mark));
+  const mark = await setCompanyCoverageStatus({
+    userId: input.userId,
+    userEmail: input.userEmail,
+    ticker,
+    coverageStatus: update.coverage_status ?? existing?.coverage_status ?? "exploring",
+    source: "desktop",
+    priority: update.priority ?? existing?.priority ?? null,
+    interestReason: update.interest_reason === undefined
+      ? existing?.interest_reason ?? null
+      : update.interest_reason,
+    tags: update.tags ?? existing?.tags ?? null,
+  });
+  const data = toDesktopMark(mark);
   return mutationPayload("mark", data);
 }
 
 export async function createDesktopNotebookNote(input: {
   userId: string;
+  userEmail?: string | null;
   deviceId: string | null;
   ticker: string;
   idempotencyKey: string | null;
@@ -162,42 +135,48 @@ export async function createDesktopNotebookNote(input: {
 }) {
   const ticker = await requireIndexedTicker(input.ticker);
   const operationId = requireIdempotencyKey(input.idempotencyKey);
+  const body = requireObject(input.body);
+  const note = parseNoteInput(body);
+  const normalizedRequest = {
+    ticker,
+    title: note.title,
+    body: note.body,
+    note_type: note.note_type,
+    tags: note.tags,
+    source_chat_session_id: null,
+    source_message_id: null,
+    source_origin: "desktop" as const,
+    source_device_id: boundedOptional(input.deviceId, 200),
+    source_local_session_id: boundedOptional(
+      body.local_session_id ?? body.localSessionId,
+      200,
+    ),
+    source_local_run_id: boundedOptional(
+      body.local_run_id ?? body.localRunId,
+      200,
+    ),
+    source_local_message_id: boundedOptional(
+      body.local_message_id ?? body.localMessageId,
+      200,
+    ),
+  };
   const admin = getSupabaseAdmin();
   const existing = await findNoteByOperationId(input.userId, operationId);
   if (existing) {
+    requireMatchingNoteRequest(existing, normalizedRequest);
     return mutationPayload("note", toDesktopNote(noteFromRow(existing)), {
       replayed: true,
     });
   }
 
-  const body = requireObject(input.body);
-  const note = parseNoteInput(body);
+  await touchCompanyMark(input.userId, input.userEmail, ticker);
+
   const { data, error } = await admin
     .from("user_research_notes")
     .insert({
       user_id: input.userId,
-      ticker,
-      title: note.title,
-      body: note.body,
-      note_type: note.note_type,
-      tags: note.tags,
-      source_chat_session_id: null,
-      source_message_id: null,
+      ...normalizedRequest,
       client_operation_id: operationId,
-      source_origin: "desktop",
-      source_device_id: boundedOptional(input.deviceId, 200),
-      source_local_session_id: boundedOptional(
-        body.local_session_id ?? body.localSessionId,
-        200,
-      ),
-      source_local_run_id: boundedOptional(
-        body.local_run_id ?? body.localRunId,
-        200,
-      ),
-      source_local_message_id: boundedOptional(
-        body.local_message_id ?? body.localMessageId,
-        200,
-      ),
     })
     .select(NOTE_SELECT)
     .single<UserResearchNoteRow>();
@@ -206,6 +185,7 @@ export async function createDesktopNotebookNote(input: {
     if (error && isConflictError(error)) {
       const replay = await findNoteByOperationId(input.userId, operationId);
       if (replay) {
+        requireMatchingNoteRequest(replay, normalizedRequest);
         return mutationPayload("note", toDesktopNote(noteFromRow(replay)), {
           replayed: true,
         });
@@ -216,7 +196,6 @@ export async function createDesktopNotebookNote(input: {
     );
   }
 
-  await touchCompanyMark(input.userId, ticker);
   return mutationPayload("note", toDesktopNote(noteFromRow(data)), {
     replayed: false,
   });
@@ -360,20 +339,16 @@ function parseMarkUpdate(body: Record<string, unknown>) {
   const update: Partial<
     Pick<
       UserCompanyMarkRow,
-      "is_watchlisted" | "is_holding" | "priority" | "interest_reason" | "tags"
+      "coverage_status" | "priority" | "interest_reason" | "tags"
     >
   > = {};
-  if (body.is_watchlisted !== undefined) {
-    if (typeof body.is_watchlisted !== "boolean") {
-      throw validationError("관심종목 상태가 올바르지 않습니다.");
+  if (body.coverage_status !== undefined) {
+    if (!(["exploring", "watching", "holding", "closed"] as const).includes(
+      body.coverage_status as UserCompanyMarkRow["coverage_status"],
+    )) {
+      throw validationError("커버리지 상태가 올바르지 않습니다.");
     }
-    update.is_watchlisted = body.is_watchlisted;
-  }
-  if (body.is_holding !== undefined) {
-    if (typeof body.is_holding !== "boolean") {
-      throw validationError("보유종목 상태가 올바르지 않습니다.");
-    }
-    update.is_holding = body.is_holding;
+    update.coverage_status = body.coverage_status as UserCompanyMarkRow["coverage_status"];
   }
   if (body.priority !== undefined) {
     if (
@@ -500,6 +475,51 @@ function normalizeTags(value: unknown) {
   ).slice(0, 12);
 }
 
+interface NormalizedDesktopNoteRequest {
+  ticker: string;
+  title: string;
+  body: string;
+  note_type: UserResearchNoteRow["note_type"];
+  tags: string[];
+  source_chat_session_id: null;
+  source_message_id: null;
+  source_origin: "desktop";
+  source_device_id: string | null;
+  source_local_session_id: string | null;
+  source_local_run_id: string | null;
+  source_local_message_id: string | null;
+}
+
+function requireMatchingNoteRequest(
+  existing: UserResearchNoteRow,
+  request: NormalizedDesktopNoteRequest,
+) {
+  const matches =
+    existing.ticker === request.ticker &&
+    existing.title === request.title &&
+    existing.body === request.body &&
+    existing.note_type === request.note_type &&
+    equalStringArrays(existing.tags ?? [], request.tags) &&
+    existing.source_chat_session_id === request.source_chat_session_id &&
+    existing.source_message_id === request.source_message_id &&
+    existing.source_origin === request.source_origin &&
+    (existing.source_device_id ?? null) === request.source_device_id &&
+    (existing.source_local_session_id ?? null) ===
+      request.source_local_session_id &&
+    (existing.source_local_run_id ?? null) === request.source_local_run_id &&
+    (existing.source_local_message_id ?? null) ===
+      request.source_local_message_id;
+
+  if (!matches) throw idempotencyConflict();
+}
+
+function equalStringArrays(left: string[], right: string[]) {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+
 async function findNoteByOperationId(
   userId: string,
   operationId: string,
@@ -516,39 +536,31 @@ async function findNoteByOperationId(
   return data;
 }
 
-async function touchCompanyMark(userId: string, ticker: string) {
+async function touchCompanyMark(
+  userId: string,
+  userEmail: string | null | undefined,
+  ticker: string,
+) {
   const admin = getSupabaseAdmin();
   const existing = await getCompanyMark(userId, ticker);
   const now = new Date().toISOString();
   if (existing) {
-    await admin
+    const { error } = await admin
       .from("user_company_marks")
       .update({ last_activity_at: now })
       .eq("user_id", userId)
       .eq("ticker", ticker);
+    if (error) {
+      throw new Error(`Failed to touch Desktop company coverage: ${error.message}`);
+    }
     return;
   }
-  await admin.from("user_company_marks").insert({
-    user_id: userId,
+  await ensureCompanyCoverage({
+    userId,
+    userEmail,
     ticker,
-    is_watchlisted: true,
-    last_activity_at: now,
+    source: "desktop_notebook",
   });
-}
-
-function markFromRow(row: UserCompanyMarkRow): UserCompanyMark {
-  return {
-    user_id: row.user_id,
-    ticker: row.ticker,
-    is_watchlisted: row.is_watchlisted,
-    is_holding: row.is_holding,
-    priority: row.priority,
-    interest_reason: row.interest_reason,
-    tags: row.tags ?? [],
-    last_activity_at: row.last_activity_at,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-  };
 }
 
 function questionFromRow(row: UserCompanyQuestionRow): UserCompanyQuestion {
@@ -583,6 +595,14 @@ function resourceConflict() {
   return new DesktopContractError("Resource version conflict", {
     code: "resource_conflict",
     publicMessage: "다른 기기에서 내용이 변경되었습니다. 최신 내용을 불러온 뒤 다시 시도해주세요.",
+    status: 409,
+  });
+}
+
+function idempotencyConflict() {
+  return new DesktopContractError("Idempotency key payload conflict", {
+    code: "idempotency_conflict",
+    publicMessage: "같은 저장 요청 번호가 다른 노트에 이미 사용되었습니다.",
     status: 409,
   });
 }

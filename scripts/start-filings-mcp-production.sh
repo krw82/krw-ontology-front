@@ -40,6 +40,8 @@ set -a
 . "$ENV_PATH"
 set +a
 
+"$SCRIPT_DIR/verify-mac-runtime-target.sh" "$ENV_PATH"
+
 case "$(printf '%s' "${FILINGS_MCP_ENABLED:-}" | tr '[:upper:]' '[:lower:]')" in
   1|true|yes|on) ;;
   *)
@@ -57,11 +59,16 @@ require_env() {
   fi
 }
 
-for key in SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY SEC_USER_AGENT FILINGS_MCP_AUTH_TOKEN; do
+for key in SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY SEC_USER_AGENT FILINGS_MCP_AUTH_TOKEN FILINGS_MCP_PERSONAL_SIGNING_SECRET; do
   require_env "$key"
 done
+if [ "$FILINGS_MCP_PERSONAL_SIGNING_SECRET" = "$FILINGS_MCP_AUTH_TOKEN" ]; then
+  echo "FILINGS_MCP_PERSONAL_SIGNING_SECRET must be distinct from FILINGS_MCP_AUTH_TOKEN" >&2
+  exit 1
+fi
 
 FILINGS_MCP_PORT=${FILINGS_MCP_PORT:-8785}
+FILINGS_MCP_HOST=${FILINGS_MCP_HOST:-127.0.0.1}
 case "$FILINGS_MCP_PORT" in
   ''|*[!0-9]*) echo "FILINGS_MCP_PORT must be a port number" >&2; exit 1 ;;
 esac
@@ -79,11 +86,22 @@ KRW_LOG_DIR=${KRW_LOG_DIR:-"$HOME/krw-ontology-log"}
 FILINGS_MCP_LOG_DIR=${FILINGS_MCP_LOG_DIR:-"$KRW_LOG_DIR/filings-mcp/prod"}
 mkdir -p "$FILINGS_MCP_LOG_DIR"
 
-export FILINGS_MCP_PORT
+if [ "$FILINGS_MCP_HOST" != "127.0.0.1" ] && [ "$FILINGS_MCP_HOST" != "::1" ]; then
+  echo "Mac filings MCP must bind to a loopback FILINGS_MCP_HOST" >&2
+  exit 1
+fi
+export FILINGS_MCP_PORT FILINGS_MCP_HOST
 export FILINGS_MCP_ENV="${FILINGS_MCP_ENV:-${FILING_WORKER_ENV:-prod}}"
 
-echo "Starting internal on-demand filings MCP on 127.0.0.1:$FILINGS_MCP_PORT"
+echo "Starting internal on-demand filings MCP on $FILINGS_MCP_HOST:$FILINGS_MCP_PORT"
 echo "Document persistence: disabled (short-lived process memory cache only)"
 
 cd "$FRONT_DIR"
+if [ "${KRW_MAC_IMMUTABLE_RUNTIME:-0}" = "1" ]; then
+  test -x "${KRW_RUNTIME_NODE_EXECUTABLE:-}" || {
+    echo "Missing prepared Node executable for immutable filings MCP." >&2
+    exit 1
+  }
+  exec "$KRW_RUNTIME_NODE_EXECUTABLE" .worker/filings-mcp-server.mjs
+fi
 exec node .worker/filings-mcp-server.mjs

@@ -56,11 +56,11 @@ export default function FilingSubscriptionList() {
         {subscriptions.map((subscription) => (
           <li key={subscription.ticker} className="flex items-center justify-between gap-sm px-base py-sm">
             <span className="min-w-0"><span className="block text-sm font-extrabold text-ink">{subscription.ticker}</span>{subscription.company_name ? <span className="block truncate text-xs text-muted">{subscription.company_name}</span> : null}</span>
-            <button type="button" disabled={pendingTicker === subscription.ticker} onClick={() => void remove(subscription.ticker)} className="min-h-9 shrink-0 rounded-[7px] px-sm text-xs font-extrabold text-muted hover:text-error disabled:opacity-60">{pendingTicker === subscription.ticker ? "해제 중…" : "추적 해제"}</button>
+            <button type="button" disabled={pendingTicker === subscription.ticker} onClick={() => void remove(subscription.ticker)} className="min-h-11 shrink-0 rounded-[7px] px-sm text-xs font-extrabold text-muted hover:text-error disabled:opacity-60">{pendingTicker === subscription.ticker ? "해제 중…" : "추적 해제"}</button>
           </li>
         ))}
       </ul>
-      <Link href="/filings" className="mt-sm inline-flex text-xs font-bold text-primary underline underline-offset-4">공시함 열기</Link>
+      <Link href="/filings" className="mt-sm inline-flex min-h-11 items-center px-xs text-xs font-bold text-primary underline underline-offset-4">공시함 열기</Link>
     </section>
   );
 }

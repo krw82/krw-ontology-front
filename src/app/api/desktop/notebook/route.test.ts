@@ -31,7 +31,7 @@ describe("GET /api/desktop/notebook", () => {
       etag: '"notebook-etag"',
       payload: {
         ok: true,
-        contract_version: "desktop-notebook/v1",
+        contract_version: "desktop-notebook/v2",
         data: {
           stats: { total_companies: 1 },
           companies: [{ ticker: "AAPL" }],
@@ -53,7 +53,7 @@ describe("GET /api/desktop/notebook", () => {
     expect(response.headers.get("etag")).toBe('"notebook-etag"');
     expect(response.headers.get("cache-control")).toContain("private");
     expect(await response.json()).toMatchObject({
-      contract_version: "desktop-notebook/v1",
+      contract_version: "desktop-notebook/v2",
       data: { companies: [{ ticker: "AAPL" }] },
     });
     expect(requireDesktopFeatureAccess).toHaveBeenCalledWith(

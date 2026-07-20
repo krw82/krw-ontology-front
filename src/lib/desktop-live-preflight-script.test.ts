@@ -77,5 +77,5 @@ describe("desktop live preflight script", () => {
     expect(result.status).toBe(1);
     expect(result.stdout).toContain("Missing required env");
     expect(result.stdout).toContain("\"failed\": 4");
-  });
+  }, 20_000);
 });

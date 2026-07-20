@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { isAnalyticsEventName } from "@/lib/analytics/events";
+import { isClientAnalyticsEventName } from "@/lib/analytics/events";
 import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import {
   checkDurableRateLimits,
@@ -7,6 +7,10 @@ import {
 } from "@/lib/api/rate-limit";
 import { getClientIp } from "@/lib/http/client-ip";
 import { getAuthUser } from "@/lib/auth";
+import {
+  E2E_AUTH_HEADER,
+  isDevAuthBypassEnabledForHost,
+} from "@/lib/dev-auth-runtime";
 
 export const runtime = "nodejs";
 
@@ -33,8 +37,23 @@ export async function POST(request: NextRequest) {
       }
     | null;
 
-  if (!body || !isAnalyticsEventName(body.event_name)) {
+  if (!body || !isClientAnalyticsEventName(body.event_name)) {
     return errorResponse(400, "validation_error", "이벤트 이름이 올바르지 않습니다.");
+  }
+
+  // The loopback-only dev/E2E auth identity is intentionally synthetic and
+  // does not exist in auth.users. Treat analytics as a validated local sink so
+  // release tests never write fake users or anonymous noise to the shared DB.
+  if (
+    isDevAuthBypassEnabledForHost(
+      request.nextUrl.hostname,
+      request.headers.get(E2E_AUTH_HEADER),
+    )
+  ) {
+    return Response.json(
+      { ok: true },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   const properties = isRecord(body.properties) ? body.properties : {};

@@ -3,18 +3,35 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 
+import {
+  authenticatePersonalFilingsMcpHeader,
+  PERSONAL_FILINGS_MCP_AUTH_HEADER,
+} from "@/filings-mcp/personal-auth";
 import { createKrwFilingsMcpServer } from "@/filings-mcp/server";
 import { readIntEnv } from "@/lib/env";
 
 const PORT = readIntEnv("FILINGS_MCP_PORT", 8785, { min: 1, max: 65_535 });
+const HOST = filingsMcpHost();
 const MAX_REQUEST_BYTES = 1_000_000;
 
 function filingsMcpEnabled(): boolean {
-  return process.env.FILINGS_MCP_ENABLED === "1";
+  return ["1", "true", "yes", "on"].includes(
+    process.env.FILINGS_MCP_ENABLED?.trim().toLowerCase() ?? "",
+  );
+}
+
+function filingsMcpHost(): string {
+  const host = process.env.FILINGS_MCP_HOST?.trim() || "127.0.0.1";
+  if (!["127.0.0.1", "0.0.0.0", "::1"].includes(host)) {
+    throw new Error("FILINGS_MCP_HOST must be a loopback address or 0.0.0.0 for an isolated container");
+  }
+  return host;
 }
 
 function expectedToken(): string {
-  return process.env.FILINGS_MCP_AUTH_TOKEN?.trim() ?? "";
+  return process.env.KRW_FILINGS_MCP_TOKEN?.trim()
+    || process.env.FILINGS_MCP_AUTH_TOKEN?.trim()
+    || "";
 }
 
 function isAuthorized(request: IncomingMessage): boolean {
@@ -60,7 +77,18 @@ async function handleMcpRequest(request: IncomingMessage, response: ServerRespon
     return;
   }
 
-  const server = createKrwFilingsMcpServer();
+  let personalUserId: string | null = null;
+  try {
+    const personalAuth = await authenticatePersonalFilingsMcpHeader(
+      request.headers[PERSONAL_FILINGS_MCP_AUTH_HEADER],
+    );
+    personalUserId = personalAuth?.userId ?? null;
+  } catch {
+    sendJson(response, 401, { error: "personal_user_unauthorized" });
+    return;
+  }
+
+  const server = createKrwFilingsMcpServer({ userId: personalUserId });
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   try {
     const body = await readJsonBody(request);
@@ -86,11 +114,20 @@ async function handleMcpRequest(request: IncomingMessage, response: ServerRespon
 const app = createServer((request, response) => {
   const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
   if (pathname === "/health") {
-    sendJson(response, 200, { ok: true, enabled: filingsMcpEnabled() });
+    sendJson(response, 200, {
+      ok: true,
+      enabled: filingsMcpEnabled(),
+      personal_auth_configured: Boolean(
+        process.env.FILINGS_MCP_PERSONAL_SIGNING_SECRET?.trim(),
+      ),
+    });
     return;
   }
   if (pathname === "/readyz") {
-    const ready = filingsMcpEnabled() && Boolean(expectedToken()) && Boolean(process.env.SEC_USER_AGENT?.trim());
+    const ready = filingsMcpEnabled()
+      && Boolean(expectedToken())
+      && Boolean(process.env.FILINGS_MCP_PERSONAL_SIGNING_SECRET?.trim())
+      && Boolean(process.env.SEC_USER_AGENT?.trim());
     sendJson(response, ready ? 200 : 503, { ok: ready });
     return;
   }
@@ -101,8 +138,8 @@ const app = createServer((request, response) => {
   void handleMcpRequest(request, response);
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.info(`[filings-mcp] listening on ${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.info(`[filings-mcp] listening on ${HOST}:${PORT}`);
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

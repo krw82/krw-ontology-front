@@ -9,7 +9,6 @@ import {
   useCallback,
   useMemo,
 } from "react";
-import { createPortal } from "react-dom";
 import { flushSync } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
@@ -24,6 +23,17 @@ import type { ResearchToolCallStatus } from "@/lib/chat/research-status";
 import type { ResearchMode } from "@/lib/research-mode";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { PWA_BEFORE_UPDATE_EVENT } from "@/components/pwa/lifecycle";
+import BottomSheet from "@/components/ui/BottomSheet";
+import {
+  clearComposerDraft,
+  loadComposerDraft,
+  saveComposerDraft,
+} from "@/lib/chat/composer-draft-store";
+import {
+  canPollDocumentAttachments,
+  getDocumentAttachmentPollDelay,
+} from "@/lib/chat/attachment-polling";
 import type { ResearchActivityUpdate } from "@/types/api-contracts";
 
 interface ComposerProps {
@@ -38,6 +48,7 @@ interface ComposerProps {
   placeholder?: string;
   toolCalls?: ResearchToolCallStatus[];
   initialValue?: string;
+  draftPersistenceKey?: string;
   draftResetKey?: number;
   runStartedAt?: string | null;
   researchMode?: ResearchMode;
@@ -166,7 +177,7 @@ function useComposerMotionConfig() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const mediaQuery = window.matchMedia("(max-width: 640px)");
+    const mediaQuery = window.matchMedia("(max-width: 639px)");
     const sync = (query: MediaQueryList | MediaQueryListEvent) => {
       setIsMobile(query.matches);
     };
@@ -182,10 +193,6 @@ function useComposerMotionConfig() {
   return {
     duration: reducedMotion ? 0 : 0.16,
     isMobile,
-    overlayTransition: { duration: reducedMotion ? 0 : 0.18 },
-    sheetTransition: reducedMotion
-      ? ({ duration: 0 } as const)
-      : ({ type: "spring", stiffness: 440, damping: 38, mass: 0.9 } as const),
     y: reducedMotion ? 0 : isMobile ? 4 : 6,
     ease: reducedMotion ? ("linear" as const) : ([0.16, 1, 0.3, 1] as const),
   };
@@ -242,6 +249,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
   onFocusChange,
   onReadyChange,
   extraTools = [],
+  draftPersistenceKey,
 }: ComposerProps, ref) {
   const searchParams = useSearchParams();
   const initialDraftValue = initialValue ?? "";
@@ -262,13 +270,30 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const firstUrlInputRef = useRef<HTMLInputElement>(null);
   const documentPollTimersRef = useRef<Map<string, number>>(new Map());
-  const pollDocumentAttachmentRef = useRef<(id: string) => void>(() => {});
+  const documentPollAttemptsRef = useRef<Map<string, number>>(new Map());
+  const documentPollAbortControllersRef = useRef<
+    Map<string, AbortController>
+  >(new Map());
+  const documentAttachmentsRef = useRef<DocumentAttachment[]>([]);
+  const attachmentsRef = useRef<TextAttachment[]>([]);
+  const activeAttachmentTasksRef = useRef(0);
+  const committedUserUrlsRef = useRef<string[]>([]);
+  const runDocumentAttachmentPollRef = useRef<(id: string) => void>(() => {});
+  const isComposerMountedRef = useRef(true);
   const lastFocusRequestKeyRef = useRef(focusRequestKey);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeAttachmentTasks, setActiveAttachmentTasks] = useState(0);
+  const [draftPersistenceReady, setDraftPersistenceReady] = useState(
+    !draftPersistenceKey || Boolean(initialDraftValue.trim()),
+  );
   const [isComposerFocused, setIsComposerFocused] = useState(false);
   const toolsRef = useRef<HTMLDivElement>(null);
-  const toolsSheetRef = useRef<HTMLDivElement>(null);
+  const toolsTriggerRef = useRef<HTMLButtonElement>(null);
   const lastInitialValueRef = useRef(initialDraftValue);
+  const initialDraftForPersistenceRef = useRef(initialDraftValue);
+  const latestInitialValueRef = useRef(initialDraftValue);
+  const draftRestoreGenerationRef = useRef(0);
+  const draftWriteGenerationRef = useRef(0);
   const lastDraftResetKeyRef = useRef(draftResetKey);
   const motionConfig = useComposerMotionConfig();
   const forceCoachmarks = searchParams.get("coach") === "1";
@@ -320,6 +345,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
     (!hasUserUrls || areUserUrlsValid) &&
     !hasPendingDocumentAttachments &&
     !hasFailedDocumentAttachments &&
+    activeAttachmentTasks === 0 &&
     !isOverLimit &&
     !isInputBusy &&
     !isGenerating;
@@ -334,6 +360,15 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
     !hasUserUrls &&
     attachments.length === 0 &&
     documentAttachments.length === 0;
+  const shouldPreventPwaUpdate =
+    Boolean(value.trim()) ||
+    attachments.length > 0 ||
+    documentAttachments.length > 0 ||
+    committedUserUrls.some((url) => Boolean(url.trim())) ||
+    userUrlDrafts.some((draft) => Boolean(draft.value.trim())) ||
+    isSubmitting ||
+    activeAttachmentTasks > 0 ||
+    hasPendingDocumentAttachments;
 
   const syncTextareaValue = useCallback((nextValue: string) => {
     setValue(nextValue);
@@ -343,18 +378,42 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
     return textareaRef.current?.value ?? value;
   }, [value]);
 
-  const clearDocumentPollTimer = useCallback((id: string) => {
-    const timer = documentPollTimersRef.current.get(id);
-    if (timer) window.clearTimeout(timer);
-    documentPollTimersRef.current.delete(id);
-  }, []);
+  const clearDocumentPollTimer = useCallback(
+    (id: string, resetAttempt = true) => {
+      const timer = documentPollTimersRef.current.get(id);
+      if (timer !== undefined) window.clearTimeout(timer);
+      documentPollTimersRef.current.delete(id);
+
+      documentPollAbortControllersRef.current.get(id)?.abort();
+      documentPollAbortControllersRef.current.delete(id);
+
+      if (resetAttempt) {
+        documentPollAttemptsRef.current.delete(id);
+      }
+    },
+    [],
+  );
 
   const clearDocumentPollTimers = useCallback(() => {
-    for (const timer of documentPollTimersRef.current.values()) {
-      window.clearTimeout(timer);
+    const ids = new Set([
+      ...documentPollTimersRef.current.keys(),
+      ...documentPollAbortControllersRef.current.keys(),
+      ...documentPollAttemptsRef.current.keys(),
+    ]);
+    for (const id of ids) {
+      clearDocumentPollTimer(id);
     }
-    documentPollTimersRef.current.clear();
-  }, []);
+  }, [clearDocumentPollTimer]);
+
+  const pauseDocumentPollTimers = useCallback(() => {
+    const ids = new Set([
+      ...documentPollTimersRef.current.keys(),
+      ...documentPollAbortControllersRef.current.keys(),
+    ]);
+    for (const id of ids) {
+      clearDocumentPollTimer(id, false);
+    }
+  }, [clearDocumentPollTimer]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -367,6 +426,22 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
       onReadyChange?.(false);
     };
   }, [onReadyChange]);
+
+  useEffect(() => {
+    if (!shouldPreventPwaUpdate) return;
+
+    const preventUpdateWithComposerWork = (event: Event) => event.preventDefault();
+    window.addEventListener(
+      PWA_BEFORE_UPDATE_EVENT,
+      preventUpdateWithComposerWork,
+    );
+    return () => {
+      window.removeEventListener(
+        PWA_BEFORE_UPDATE_EVENT,
+        preventUpdateWithComposerWork,
+      );
+    };
+  }, [shouldPreventPwaUpdate]);
 
   useEffect(() => {
     if (!attachmentCoachmarkEnabled) return undefined;
@@ -403,8 +478,96 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
   }, [attachmentCoachmarkEnabled, forceCoachmarks]);
 
   useEffect(() => {
-    return () => clearDocumentPollTimers();
+    isComposerMountedRef.current = true;
+    return () => {
+      isComposerMountedRef.current = false;
+      draftWriteGenerationRef.current += 1;
+      clearDocumentPollTimers();
+    };
   }, [clearDocumentPollTimers]);
+
+  useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
+
+  useEffect(() => {
+    documentAttachmentsRef.current = documentAttachments;
+  }, [documentAttachments]);
+
+  useEffect(() => {
+    committedUserUrlsRef.current = committedUserUrls;
+  }, [committedUserUrls]);
+
+  useEffect(() => {
+    latestInitialValueRef.current = initialDraftValue;
+  }, [initialDraftValue]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const restoreGeneration = draftRestoreGenerationRef.current + 1;
+    draftRestoreGenerationRef.current = restoreGeneration;
+
+    if (!draftPersistenceKey) {
+      return undefined;
+    }
+
+    if (initialDraftForPersistenceRef.current.trim()) {
+      return undefined;
+    }
+
+    void loadComposerDraft(draftPersistenceKey).then((record) => {
+      if (
+        cancelled ||
+        !isComposerMountedRef.current ||
+        draftRestoreGenerationRef.current !== restoreGeneration
+      ) {
+        return;
+      }
+
+      const currentText = textareaRef.current?.value ?? "";
+      if (
+        record &&
+        !currentText.trim() &&
+        !latestInitialValueRef.current.trim() &&
+        committedUserUrlsRef.current.length === 0
+      ) {
+        setValue(record.text);
+        committedUserUrlsRef.current = record.urls;
+        setCommittedUserUrls(record.urls);
+        setUserUrlDrafts(
+          record.urls.map((url) => ({ id: createClientId(), value: url })),
+        );
+        onUserUrlsChange?.(record.urls.length > 0);
+      }
+      setDraftPersistenceReady(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [draftPersistenceKey, onUserUrlsChange]);
+
+  useEffect(() => {
+    if (!draftPersistenceKey || !draftPersistenceReady || isSubmitting) return;
+
+    const writeGeneration = draftWriteGenerationRef.current;
+    const timer = window.setTimeout(() => {
+      if (draftWriteGenerationRef.current !== writeGeneration) return;
+      void saveComposerDraft({
+        key: draftPersistenceKey,
+        text: value,
+        urls: committedUserUrls,
+      });
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    committedUserUrls,
+    draftPersistenceKey,
+    draftPersistenceReady,
+    isSubmitting,
+    value,
+  ]);
 
   useEffect(() => {
     const nextInitialValue = initialValue ?? "";
@@ -420,29 +583,27 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
 
     lastDraftResetKeyRef.current = draftResetKey;
     lastInitialValueRef.current = "";
+    draftRestoreGenerationRef.current += 1;
+    draftWriteGenerationRef.current += 1;
+    if (draftPersistenceKey) {
+      void clearComposerDraft(draftPersistenceKey);
+    }
     setValue("");
+    attachmentsRef.current = [];
     setAttachments([]);
     setDocumentAttachments([]);
     clearDocumentPollTimers();
     setIsUrlSheetOpen(false);
+    committedUserUrlsRef.current = [];
     setCommittedUserUrls([]);
     setUserUrlDrafts([]);
     setAttachmentError(null);
+    setDraftPersistenceReady(true);
     if (textareaRef.current) {
       textareaRef.current.value = "";
       textareaRef.current.style.height = "auto";
     }
-  }, [clearDocumentPollTimers, draftResetKey]);
-
-  useEffect(() => {
-    if (!isUrlSheetOpen) return;
-
-    const frameId = window.requestAnimationFrame(() => {
-      firstUrlInputRef.current?.focus();
-    });
-
-    return () => window.cancelAnimationFrame(frameId);
-  }, [isUrlSheetOpen]);
+  }, [clearDocumentPollTimers, draftPersistenceKey, draftResetKey]);
 
   useEffect(() => {
     if (lastFocusRequestKeyRef.current === focusRequestKey) return;
@@ -476,13 +637,12 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
   }, [value, adjustHeight]);
 
   useEffect(() => {
-    if (!isToolsOpen) return;
+    if (!isToolsOpen || motionConfig.isMobile) return;
 
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target;
       if (!(target instanceof Node)) return;
       if (toolsRef.current?.contains(target)) return;
-      if (toolsSheetRef.current?.contains(target)) return;
       setIsToolsOpen(false);
     };
 
@@ -497,106 +657,191 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleEscape);
     };
-  }, [isToolsOpen]);
+  }, [isToolsOpen, motionConfig.isMobile]);
 
-  useEffect(() => {
-    if ((!isToolsOpen || !motionConfig.isMobile) && !isUrlSheetOpen) return;
+  const updateDocumentAttachment = useCallback(
+    (id: string, patch: Partial<DocumentAttachment>) => {
+      if (!isComposerMountedRef.current) return;
+      setDocumentAttachments((current) =>
+        current.map((attachment) =>
+          attachment.id === id ? { ...attachment, ...patch } : attachment,
+        ),
+      );
+    },
+    [],
+  );
 
-    const previousOverflow = document.body.style.overflow;
-    const previousOverscroll =
-      document.documentElement.style.overscrollBehavior;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overscrollBehavior = "none";
+  const scheduleDocumentAttachmentPoll = useCallback(
+    (id: string, attempt = 0) => {
+      clearDocumentPollTimer(id, false);
+      documentPollAttemptsRef.current.set(id, attempt);
 
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.documentElement.style.overscrollBehavior = previousOverscroll;
-    };
-  }, [isToolsOpen, isUrlSheetOpen, motionConfig.isMobile]);
+      if (
+        !isComposerMountedRef.current ||
+        !canPollDocumentAttachments(
+          document.visibilityState,
+          navigator.onLine,
+        )
+      ) {
+        return;
+      }
 
-  const updateDocumentAttachment = (
-    id: string,
-    patch: Partial<DocumentAttachment>,
-  ) => {
-    setDocumentAttachments((current) =>
-      current.map((attachment) =>
-        attachment.id === id ? { ...attachment, ...patch } : attachment,
-      ),
-    );
-  };
-
-  const pollDocumentAttachment = useCallback(
-    (id: string) => {
-      clearDocumentPollTimer(id);
-
-      const runPoll = async () => {
-        try {
-          const response = await fetch(`/api/chat/attachments/${id}`, {
-            method: "GET",
-            cache: "no-store",
-          });
-          const payload = (await response.json().catch(() => null)) as
-            | {
-                attachment?: {
-                  id: string;
-                  file_name: string;
-                  file_size: number;
-                  status: DocumentAttachmentStatus;
-                  error?: string | null;
-                };
-                error?: { message?: string };
-              }
-            | null;
-
-          if (!response.ok || !payload?.attachment) {
-            updateDocumentAttachment(id, {
-              status: "failed",
-              error:
-                payload?.error?.message ??
-                "첨부 문서 상태를 확인하지 못했습니다.",
-            });
-            clearDocumentPollTimer(id);
-            return;
-          }
-
-          updateDocumentAttachment(id, {
-            name: payload.attachment.file_name,
-            size: payload.attachment.file_size,
-            status: payload.attachment.status,
-            error: payload.attachment.error,
-            isOptimistic: false,
-          });
-
-          if (
-            payload.attachment.status === "queued" ||
-            payload.attachment.status === "processing"
-          ) {
-            const timer = window.setTimeout(
-              () => pollDocumentAttachmentRef.current(id),
-              1_500,
-            );
-            documentPollTimersRef.current.set(id, timer);
-          } else {
-            clearDocumentPollTimer(id);
-          }
-        } catch {
-          updateDocumentAttachment(id, {
-            status: "failed",
-            error: "첨부 문서 상태를 확인하지 못했습니다.",
-          });
-          clearDocumentPollTimer(id);
-        }
-      };
-
-      const timer = window.setTimeout(runPoll, 700);
+      const timer = window.setTimeout(() => {
+        documentPollTimersRef.current.delete(id);
+        runDocumentAttachmentPollRef.current(id);
+      }, getDocumentAttachmentPollDelay(attempt));
       documentPollTimersRef.current.set(id, timer);
     },
     [clearDocumentPollTimer],
   );
 
+  const runDocumentAttachmentPoll = useCallback(
+    async (id: string) => {
+      if (
+        !isComposerMountedRef.current ||
+        !canPollDocumentAttachments(
+          document.visibilityState,
+          navigator.onLine,
+        )
+      ) {
+        return;
+      }
+
+      const attempt = documentPollAttemptsRef.current.get(id) ?? 0;
+      const controller = new AbortController();
+      documentPollAbortControllersRef.current.set(id, controller);
+
+      try {
+        const response = await fetch(`/api/chat/attachments/${id}`, {
+          method: "GET",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = (await response.json().catch(() => null)) as
+          | {
+              attachment?: {
+                id: string;
+                file_name: string;
+                file_size: number;
+                status: DocumentAttachmentStatus;
+                error?: string | null;
+              };
+              error?: { message?: string };
+            }
+          | null;
+
+        if (
+          controller.signal.aborted ||
+          !isComposerMountedRef.current ||
+          !canPollDocumentAttachments(
+            document.visibilityState,
+            navigator.onLine,
+          )
+        ) {
+          return;
+        }
+
+        if (!response.ok || !payload?.attachment) {
+          updateDocumentAttachment(id, {
+            status: "failed",
+            error:
+              payload?.error?.message ??
+              "첨부 문서 상태를 확인하지 못했습니다.",
+          });
+          clearDocumentPollTimer(id);
+          return;
+        }
+
+        updateDocumentAttachment(id, {
+          name: payload.attachment.file_name,
+          size: payload.attachment.file_size,
+          status: payload.attachment.status,
+          error: payload.attachment.error,
+          isOptimistic: false,
+        });
+
+        if (
+          payload.attachment.status === "queued" ||
+          payload.attachment.status === "processing"
+        ) {
+          scheduleDocumentAttachmentPoll(id, attempt + 1);
+        } else {
+          clearDocumentPollTimer(id);
+        }
+      } catch (error) {
+        if (
+          controller.signal.aborted ||
+          !isComposerMountedRef.current ||
+          (error instanceof DOMException && error.name === "AbortError")
+        ) {
+          return;
+        }
+
+        if (
+          canPollDocumentAttachments(
+            document.visibilityState,
+            navigator.onLine,
+          )
+        ) {
+          scheduleDocumentAttachmentPoll(id, attempt + 1);
+        }
+      } finally {
+        if (documentPollAbortControllersRef.current.get(id) === controller) {
+          documentPollAbortControllersRef.current.delete(id);
+        }
+      }
+    },
+    [
+      clearDocumentPollTimer,
+      scheduleDocumentAttachmentPoll,
+      updateDocumentAttachment,
+    ],
+  );
+
   useEffect(() => {
-    pollDocumentAttachmentRef.current = pollDocumentAttachment;
-  }, [pollDocumentAttachment]);
+    runDocumentAttachmentPollRef.current = (id) => {
+      void runDocumentAttachmentPoll(id);
+    };
+  }, [runDocumentAttachmentPoll]);
+
+  useEffect(() => {
+    const syncPollingAvailability = () => {
+      if (
+        !canPollDocumentAttachments(
+          document.visibilityState,
+          navigator.onLine,
+        )
+      ) {
+        pauseDocumentPollTimers();
+        return;
+      }
+
+      for (const attachment of documentAttachmentsRef.current) {
+        if (
+          attachment.status !== "queued" &&
+          attachment.status !== "processing"
+        ) {
+          continue;
+        }
+        if (attachment.isOptimistic) continue;
+
+        scheduleDocumentAttachmentPoll(
+          attachment.id,
+          documentPollAttemptsRef.current.get(attachment.id) ?? 0,
+        );
+      }
+    };
+
+    document.addEventListener("visibilitychange", syncPollingAvailability);
+    window.addEventListener("online", syncPollingAvailability);
+    window.addEventListener("offline", syncPollingAvailability);
+
+    return () => {
+      document.removeEventListener("visibilitychange", syncPollingAvailability);
+      window.removeEventListener("online", syncPollingAvailability);
+      window.removeEventListener("offline", syncPollingAvailability);
+    };
+  }, [pauseDocumentPollTimers, scheduleDocumentAttachmentPoll]);
 
   const uploadDocumentAttachment = async (file: File) => {
     const optimisticId = createClientId();
@@ -652,7 +897,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
             : attachment,
         ),
       );
-      pollDocumentAttachment(uploadedAttachment.id);
+      scheduleDocumentAttachmentPoll(uploadedAttachment.id);
     } catch (error) {
       updateDocumentAttachment(optimisticId, {
         status: "failed",
@@ -675,6 +920,11 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
     e.target.value = "";
     if (files.length === 0) return;
 
+    if (activeAttachmentTasksRef.current > 0) {
+      setAttachmentError("이전 첨부 파일을 처리한 뒤 다시 선택해주세요.");
+      return;
+    }
+
     setAttachmentError(null);
 
     const invalidFile = files.find(
@@ -692,7 +942,9 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
     }
 
     if (
-      attachments.length + documentAttachments.length + files.length >
+      attachmentsRef.current.length +
+        documentAttachmentsRef.current.length +
+        files.length >
       MAX_CHAT_ATTACHMENT_COUNT
     ) {
       setAttachmentError(
@@ -701,7 +953,9 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
       trackClientEventSilently("attachment_rejected", {
         reason: "too_many_files",
         incoming_count: files.length,
-        existing_count: attachments.length + documentAttachments.length,
+        existing_count:
+          attachmentsRef.current.length +
+          documentAttachmentsRef.current.length,
       });
       return;
     }
@@ -748,6 +1002,8 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
       (file) => isAcceptedPdfFile(file) && !isAcceptedTextFile(file),
     );
 
+    activeAttachmentTasksRef.current += 1;
+    setActiveAttachmentTasks(activeAttachmentTasksRef.current);
     try {
       const loadedFiles = await Promise.all(
         textFiles.map(async (file) => ({
@@ -757,8 +1013,11 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
           size: file.size,
         })),
       );
-      const nextAttachments = [...attachments, ...loadedFiles];
-      const nextMessage = composeMessage(value, nextAttachments);
+      const nextAttachments = [...attachmentsRef.current, ...loadedFiles];
+      const nextMessage = composeMessage(
+        readTextareaValue(),
+        nextAttachments,
+      );
 
       if (nextMessage.length > MAX_CHAT_PAYLOAD_CHARS) {
         setAttachmentError(
@@ -772,6 +1031,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
         return;
       }
 
+      attachmentsRef.current = nextAttachments;
       setAttachments(nextAttachments);
       if (loadedFiles.length > 0 || pdfFiles.length > 0) {
         onAttachmentsChange?.(true);
@@ -780,10 +1040,15 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
       trackClientEventSilently("attachment_added", {
         file_count: loadedFiles.length + pdfFiles.length,
         total_file_count:
-          nextAttachments.length + documentAttachments.length + pdfFiles.length,
+          nextAttachments.length +
+          documentAttachmentsRef.current.length +
+          pdfFiles.length,
         total_bytes:
           nextAttachments.reduce((sum, file) => sum + file.size, 0) +
-          documentAttachments.reduce((sum, file) => sum + file.size, 0) +
+          documentAttachmentsRef.current.reduce(
+            (sum, file) => sum + file.size,
+            0,
+          ) +
           pdfFiles.reduce((sum, file) => sum + file.size, 0),
       });
     } catch {
@@ -792,11 +1057,21 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
         reason: "read_failed",
         incoming_count: files.length,
       });
+    } finally {
+      activeAttachmentTasksRef.current = Math.max(
+        0,
+        activeAttachmentTasksRef.current - 1,
+      );
+      setActiveAttachmentTasks(activeAttachmentTasksRef.current);
     }
   };
 
   const removeAttachment = (id: string) => {
-    setAttachments((current) => current.filter((file) => file.id !== id));
+    setAttachments((current) => {
+      const next = current.filter((file) => file.id !== id);
+      attachmentsRef.current = next;
+      return next;
+    });
     setAttachmentError(null);
   };
 
@@ -810,10 +1085,12 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
 
   const clearDraft = () => {
     setValue("");
+    attachmentsRef.current = [];
     setAttachments([]);
     setDocumentAttachments([]);
     clearDocumentPollTimers();
     setIsUrlSheetOpen(false);
+    committedUserUrlsRef.current = [];
     setCommittedUserUrls([]);
     setUserUrlDrafts([]);
     setAttachmentError(null);
@@ -830,6 +1107,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
     documents: DocumentAttachment[],
   ) => {
     setValue(draft);
+    attachmentsRef.current = files;
     setAttachments(files);
     setDocumentAttachments(documents);
 
@@ -893,6 +1171,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
   };
 
   const clearUserUrls = () => {
+    committedUserUrlsRef.current = [];
     setCommittedUserUrls([]);
     setUserUrlDrafts([]);
     setIsUrlSheetOpen(false);
@@ -917,6 +1196,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
     }
     const nextUrls = normalized.filter((url): url is string => Boolean(url));
 
+    committedUserUrlsRef.current = nextUrls;
     setCommittedUserUrls(nextUrls);
     setUserUrlDrafts(
       nextUrls.map((url) => ({
@@ -946,6 +1226,10 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
     if (hasUserUrls && !areUserUrlsValid) {
       setAttachmentError("올바른 http 또는 https URL만 입력해주세요.");
       openUrlSheet();
+      return;
+    }
+    if (activeAttachmentTasksRef.current > 0) {
+      setAttachmentError("첨부 파일 처리가 끝난 뒤 전송할 수 있습니다.");
       return;
     }
     if (hasPendingDocumentAttachments) {
@@ -1000,12 +1284,18 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
         Object.keys(sendOptions).length > 0 ? sendOptions : undefined,
       );
 
-      if (!result.ok) {
+      if (result.ok) {
+        draftWriteGenerationRef.current += 1;
+        if (draftPersistenceKey) {
+          await clearComposerDraft(draftPersistenceKey);
+        }
+      } else {
         restoreDraft(
           draftSnapshot,
           attachmentSnapshot,
           documentAttachmentSnapshot,
         );
+        committedUserUrlsRef.current = committedUrlSnapshot;
         setCommittedUserUrls(committedUrlSnapshot);
         setUserUrlDrafts(urlDraftSnapshot);
         setIsUrlSheetOpen(urlSheetOpenSnapshot);
@@ -1017,6 +1307,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
         attachmentSnapshot,
         documentAttachmentSnapshot,
       );
+      committedUserUrlsRef.current = committedUrlSnapshot;
       setCommittedUserUrls(committedUrlSnapshot);
       setUserUrlDrafts(urlDraftSnapshot);
       setIsUrlSheetOpen(urlSheetOpenSnapshot);
@@ -1204,217 +1495,160 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
     );
   };
 
-  const mobileToolsSheet =
-    isClientReady && typeof document !== "undefined"
-      ? createPortal(
-          <AnimatePresence>
-            {isToolsOpen && motionConfig.isMobile && (
-              <motion.div
-                key="composer-tools-mobile"
-                className="fixed inset-0 z-[140] flex items-end sm:hidden"
-                role="presentation"
+  const mobileToolsSheet = (
+    <BottomSheet
+      open={isClientReady && isToolsOpen && motionConfig.isMobile}
+      onClose={() => setIsToolsOpen(false)}
+      ariaLabel="입력 도구"
+      rootClassName="z-[140] sm:hidden"
+      contentClassName="max-h-[min(76dvh,620px)] px-base pt-md"
+      returnFocusRef={toolsTriggerRef}
+      testId="composer-tools-sheet"
+    >
+      <div className="grid gap-2">
+        <div className="flex min-h-11 items-center justify-between gap-3 px-3">
+          <p className="text-[16px] font-black leading-6 text-ink">입력 도구</p>
+          <button
+            type="button"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-dim hover:text-ink"
+            onClick={() => setIsToolsOpen(false)}
+            aria-label="입력 도구 닫기"
+          >
+            <span
+              aria-hidden="true"
+              className="material-symbols-outlined text-[22px]"
+            >
+              close
+            </span>
+          </button>
+        </div>
+        {renderToolsContent("sheet")}
+      </div>
+    </BottomSheet>
+  );
+
+  const urlSheet = (
+    <BottomSheet
+      open={isClientReady && isUrlSheetOpen}
+      onClose={closeUrlSheet}
+      ariaLabel="URL 자료"
+      presentation="responsive-dialog"
+      rootClassName="z-[150]"
+      contentClassName="grid gap-5 px-base pt-md sm:px-lg sm:pb-lg"
+      initialFocusRef={firstUrlInputRef}
+      returnFocusRef={toolsTriggerRef}
+      testId="composer-url-sheet"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[13px] font-black uppercase tracking-[0.18em] text-primary">
+            URL 자료
+          </p>
+          <h2 className="mt-1 text-[24px] font-black leading-[1.12] text-ink">
+            확인할 URL을 넣어주세요.
+          </h2>
+          <p className="mt-2 text-[14px] font-semibold leading-6 text-muted">
+            최대 {MAX_USER_URL_COUNT}개까지 질문에 함께 보냅니다.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-dim hover:text-ink"
+          onClick={closeUrlSheet}
+          disabled={isInputBusy}
+          aria-label="URL 자료 패널 닫기"
+        >
+          <span
+            aria-hidden="true"
+            className="material-symbols-outlined text-[22px]"
+          >
+            close
+          </span>
+        </button>
+      </div>
+
+      <div className="grid gap-2.5">
+        {userUrlDrafts.map((draft, index) => (
+          <div
+            key={draft.id}
+            className="grid min-w-0 grid-cols-[minmax(0,1fr)_44px] items-center gap-2"
+          >
+            <label
+              className="sr-only"
+              htmlFor={`composer-user-url-${draft.id}`}
+            >
+              URL {index + 1}
+            </label>
+            <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center rounded-[18px] border border-hairline bg-surface-soft px-3 focus-within:border-primary focus-within:bg-canvas focus-within:shadow-[0_0_0_3px_rgba(0,82,255,0.10)]">
+              <span
+                aria-hidden="true"
+                className="material-symbols-outlined mr-2 text-[19px] text-primary"
               >
-                <motion.button
-                  type="button"
-                  aria-label="입력 도구 닫기"
-                  className="absolute inset-0 bg-ink/24"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={motionConfig.overlayTransition}
-                  onClick={() => setIsToolsOpen(false)}
-                />
-                <motion.div
-                  ref={toolsSheetRef}
-                  className="relative z-10 w-full overflow-hidden rounded-t-[28px] border-t border-hairline bg-canvas text-ink shadow-[0_-18px_54px_rgba(10,11,13,0.18)]"
-                  initial={{ y: "102%" }}
-                  animate={{ y: 0 }}
-                  exit={{ y: "102%" }}
-                  transition={motionConfig.sheetTransition}
-                  drag={motionConfig.isMobile ? "y" : false}
-                  dragConstraints={{ top: 0, bottom: 0 }}
-                  dragElastic={{ top: 0, bottom: 0.18 }}
-                  onDragEnd={(_, info) => {
-                    if (info.offset.y > 72 || info.velocity.y > 620) {
-                      setIsToolsOpen(false);
-                    }
-                  }}
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label="입력 도구"
-                >
-                  <div className="mx-auto mt-2 h-1.5 w-11 rounded-full bg-outline-variant" />
-                  <div className="max-h-[min(76dvh,620px)] overflow-y-auto px-base pb-[calc(env(safe-area-inset-bottom)+20px)] pt-md">
-                    {renderToolsContent("sheet")}
-                  </div>
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>,
-          document.body,
-        )
-      : null;
-
-  const urlSheet =
-    isClientReady && typeof document !== "undefined"
-      ? createPortal(
-          <AnimatePresence>
-            {isUrlSheetOpen && (
-              <motion.div
-                key="composer-url-sheet"
-                className="fixed inset-0 z-[150] flex items-end sm:items-center sm:justify-center"
-                role="presentation"
+                link
+              </span>
+              <input
+                id={`composer-user-url-${draft.id}`}
+                ref={index === 0 ? firstUrlInputRef : undefined}
+                type="url"
+                inputMode="url"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                className="min-w-0 border-none bg-transparent py-3 text-[15px] font-semibold leading-6 text-ink placeholder:text-muted focus:outline-none focus:ring-0"
+                value={draft.value}
+                onChange={(event) =>
+                  updateUserUrlDraft(draft.id, event.currentTarget.value)
+                }
+                placeholder="https://example.com/news"
+                disabled={isInputBusy}
+              />
+            </div>
+            <button
+              type="button"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-hairline text-muted transition-colors hover:bg-surface-dim hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
+              onClick={() => removeUserUrlDraft(draft.id)}
+              disabled={isInputBusy}
+              aria-label={`${index + 1}번째 URL 제거`}
+            >
+              <span
+                aria-hidden="true"
+                className="material-symbols-outlined text-[20px]"
               >
-                <motion.button
-                  type="button"
-                  aria-label="URL 자료 패널 닫기"
-                  className="absolute inset-0 bg-ink/24"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={motionConfig.overlayTransition}
-                  onClick={closeUrlSheet}
-                />
-                <motion.div
-                  className="relative z-10 w-full overflow-hidden rounded-t-[28px] border-t border-hairline bg-canvas text-ink shadow-[0_-18px_54px_rgba(10,11,13,0.18)] sm:max-w-[520px] sm:rounded-[24px] sm:border sm:shadow-[0_24px_70px_rgba(10,11,13,0.22)]"
-                  initial={{
-                    opacity: motionConfig.isMobile ? 1 : 0,
-                    y: motionConfig.isMobile ? "102%" : 18,
-                    scale: motionConfig.isMobile ? 1 : 0.98,
-                  }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{
-                    opacity: motionConfig.isMobile ? 1 : 0,
-                    y: motionConfig.isMobile ? "102%" : 18,
-                    scale: motionConfig.isMobile ? 1 : 0.98,
-                  }}
-                  transition={motionConfig.sheetTransition}
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label="URL 자료"
-                >
-                  <div className="mx-auto mt-2 h-1.5 w-11 rounded-full bg-outline-variant sm:hidden" />
-                  <div className="grid max-h-[min(82dvh,660px)] gap-5 overflow-y-auto px-base pb-[calc(env(safe-area-inset-bottom)+20px)] pt-md sm:px-lg sm:pb-lg">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-[13px] font-black uppercase tracking-[0.18em] text-primary">
-                          URL 자료
-                        </p>
-                        <h2 className="mt-1 text-[24px] font-black leading-[1.12] text-ink">
-                          확인할 URL을 넣어주세요.
-                        </h2>
-                        <p className="mt-2 text-[14px] font-semibold leading-6 text-muted">
-                          최대 {MAX_USER_URL_COUNT}개까지 질문에 함께 보냅니다.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-dim hover:text-ink"
-                        onClick={closeUrlSheet}
-                        disabled={isInputBusy}
-                        aria-label="URL 자료 패널 닫기"
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="material-symbols-outlined text-[22px]"
-                        >
-                          close
-                        </span>
-                      </button>
-                    </div>
+                remove
+              </span>
+            </button>
+          </div>
+        ))}
+      </div>
 
-                    <div className="grid gap-2.5">
-                      {userUrlDrafts.map((draft, index) => (
-                        <div
-                          key={draft.id}
-                          className="grid min-w-0 grid-cols-[minmax(0,1fr)_44px] items-center gap-2"
-                        >
-                          <label
-                            className="sr-only"
-                            htmlFor={`composer-user-url-${draft.id}`}
-                          >
-                            URL {index + 1}
-                          </label>
-                          <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center rounded-[18px] border border-hairline bg-surface-soft px-3 focus-within:border-primary focus-within:bg-canvas focus-within:shadow-[0_0_0_3px_rgba(0,82,255,0.10)]">
-                            <span
-                              aria-hidden="true"
-                              className="material-symbols-outlined mr-2 text-[19px] text-primary"
-                            >
-                              link
-                            </span>
-                            <input
-                              id={`composer-user-url-${draft.id}`}
-                              ref={index === 0 ? firstUrlInputRef : undefined}
-                              type="url"
-                              inputMode="url"
-                              autoCapitalize="none"
-                              autoCorrect="off"
-                              spellCheck={false}
-                              className="min-w-0 border-none bg-transparent py-3 text-[15px] font-semibold leading-6 text-ink placeholder:text-muted focus:outline-none focus:ring-0"
-                              value={draft.value}
-                              onChange={(event) =>
-                                updateUserUrlDraft(
-                                  draft.id,
-                                  event.currentTarget.value,
-                                )
-                              }
-                              placeholder="https://example.com/news"
-                              disabled={isInputBusy}
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-hairline text-muted transition-colors hover:bg-surface-dim hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
-                            onClick={() => removeUserUrlDraft(draft.id)}
-                            disabled={isInputBusy}
-                            aria-label={`${index + 1}번째 URL 제거`}
-                          >
-                            <span
-                              aria-hidden="true"
-                              className="material-symbols-outlined text-[20px]"
-                            >
-                              remove
-                            </span>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <button
-                        type="button"
-                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] border border-hairline bg-canvas px-4 text-[15px] font-black leading-5 text-ink transition-colors hover:bg-surface-soft disabled:cursor-not-allowed disabled:opacity-45"
-                        onClick={addUserUrlDraft}
-                        disabled={
-                          isInputBusy ||
-                          userUrlDrafts.length >= MAX_USER_URL_COUNT
-                        }
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="material-symbols-outlined text-[20px]"
-                        >
-                          add
-                        </span>
-                        URL 추가
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex min-h-11 flex-1 items-center justify-center rounded-[14px] bg-primary-container px-5 text-[15px] font-black leading-5 text-on-primary transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:opacity-55 sm:flex-none"
-                        onClick={confirmUserUrls}
-                        disabled={isInputBusy}
-                      >
-                        완료
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>,
-          document.body,
-        )
-      : null;
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] border border-hairline bg-canvas px-4 text-[15px] font-black leading-5 text-ink transition-colors hover:bg-surface-soft disabled:cursor-not-allowed disabled:opacity-45"
+          onClick={addUserUrlDraft}
+          disabled={
+            isInputBusy || userUrlDrafts.length >= MAX_USER_URL_COUNT
+          }
+        >
+          <span
+            aria-hidden="true"
+            className="material-symbols-outlined text-[20px]"
+          >
+            add
+          </span>
+          URL 추가
+        </button>
+        <button
+          type="button"
+          className="inline-flex min-h-11 flex-1 items-center justify-center rounded-[14px] bg-primary-container px-5 text-[15px] font-black leading-5 text-on-primary transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:opacity-55 sm:flex-none"
+          onClick={confirmUserUrls}
+          disabled={isInputBusy}
+        >
+          완료
+        </button>
+      </div>
+    </BottomSheet>
+  );
 
   return (
     <div className="pointer-events-none bg-transparent px-xs pb-0 pt-0 sm:px-lg">
@@ -1448,7 +1682,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
               >
                 <button
                   type="button"
-                  className="inline-flex min-w-0 items-center gap-xs px-sm py-xxs transition-colors hover:bg-surface-soft"
+                  className="inline-flex min-h-11 min-w-0 items-center gap-xs px-sm py-xxs transition-colors hover:bg-surface-soft"
                   onClick={openUrlSheet}
                   disabled={isInputBusy}
                   aria-label={`URL ${enteredUserUrls.length}개 수정`}
@@ -1466,7 +1700,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
                 </button>
                 <button
                   type="button"
-                  className="inline-flex h-8 w-8 items-center justify-center border-l border-hairline text-muted transition-colors hover:bg-surface-soft hover:text-ink"
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center border-l border-hairline text-muted transition-colors hover:bg-surface-soft hover:text-ink"
                   aria-label="URL 자료 모두 제거"
                   onClick={clearUserUrls}
                   disabled={isInputBusy}
@@ -1504,7 +1738,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
                 </span>
                 <button
                   type="button"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-[6px] text-muted transition-colors hover:bg-surface-soft hover:text-ink"
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[6px] text-muted transition-colors hover:bg-surface-soft hover:text-ink"
                   aria-label={`${file.name} 첨부 제거`}
                   onClick={() => removeAttachment(file.id)}
                   disabled={isInputBusy}
@@ -1556,7 +1790,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
                 </span>
                 <button
                   type="button"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-[6px] text-muted transition-colors hover:bg-surface-soft hover:text-ink"
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[6px] text-muted transition-colors hover:bg-surface-soft hover:text-ink"
                   aria-label={`${file.name} 첨부 제거`}
                   onClick={() => removeDocumentAttachmentChip(file.id)}
                   disabled={isInputBusy}
@@ -1615,7 +1849,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
                 </span>
                 <button
                   type="button"
-                  className="-mr-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="-m-[10px] grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   aria-label="첨부 안내 닫기"
                   onClick={() => setShowAttachmentCoachmark(false)}
                 >
@@ -1634,8 +1868,9 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
             ) : null}
           </AnimatePresence>
           <button
+            ref={toolsTriggerRef}
             className={[
-              "inline-flex h-9 w-9 items-center justify-center rounded-[8px] border transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40",
+              "inline-flex h-11 w-11 items-center justify-center rounded-[8px] border transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-40",
               isToolsOpen
                 ? "border-outline-variant bg-surface text-ink"
                 : "border-transparent text-muted hover:bg-surface-soft hover:text-ink",
@@ -1690,7 +1925,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
                   : placeholder
             }
             rows={1}
-            style={{ minHeight: 38 }}
+            style={{ minHeight: 44 }}
             value={value}
             data-client-ready={isClientReady ? "true" : "false"}
             onChange={(event) => syncTextareaValue(event.currentTarget.value)}
@@ -1742,7 +1977,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
         {isGenerating && !isComposerFocused && onCancel && (
           <button
             type="button"
-            className="ml-1 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center self-center rounded-full bg-surface text-error transition-colors duration-150 hover:bg-surface-dim active:scale-95 disabled:cursor-not-allowed disabled:opacity-55"
+            className="ml-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center self-center rounded-full bg-surface text-error transition-colors duration-150 hover:bg-surface-dim active:scale-95 disabled:cursor-not-allowed disabled:opacity-55"
             onClick={() => void onCancel?.()}
             disabled={disabled || isSubmitting}
             aria-label="응답 생성 중지"
@@ -1752,7 +1987,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
         )}
         {!isGenerating && (
           <button
-            className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center self-center rounded-full bg-ink text-on-dark transition-colors duration-150 hover:bg-primary-active active:scale-95 disabled:cursor-not-allowed disabled:bg-surface-dim disabled:text-muted"
+            className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center self-center rounded-full bg-ink text-on-dark transition-colors duration-150 hover:bg-primary-active active:scale-95 disabled:cursor-not-allowed disabled:bg-surface-dim disabled:text-muted"
             onClick={handlePrimaryAction}
             disabled={!canSubmit}
             aria-label="메시지 보내기"

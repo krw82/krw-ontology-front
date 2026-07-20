@@ -61,7 +61,7 @@ export default function PulseSettings({ initialPreferences }: PulseSettingsProps
 
   return (
     <main id="main-content" className="mx-auto w-full max-w-[680px] px-base py-2xl sm:px-xl sm:py-3xl">
-      <button type="button" onClick={() => router.back()} className="inline-flex items-center gap-xs text-[13px] font-bold text-muted hover:text-ink">
+      <button type="button" onClick={() => router.back()} className="inline-flex min-h-11 items-center gap-xs px-xs text-[13px] font-bold text-muted hover:text-ink">
         <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>피드로 돌아가기
       </button>
       <p className="mt-xl text-[11px] font-black uppercase tracking-[0.18em] text-primary">Research feed</p>
@@ -99,7 +99,7 @@ export default function PulseSettings({ initialPreferences }: PulseSettingsProps
         <div className="mt-base grid gap-base sm:grid-cols-2">
           <label className="text-[12px] font-semibold text-muted">
             질문
-            <select value={preferences.question_cadence} onChange={(event) => setPreferences((current) => ({ ...current, question_cadence: event.target.value as PulsePreferences["question_cadence"] }))} className="mt-xs h-10 w-full rounded-[9px] border border-hairline bg-white px-sm text-sm text-ink">
+            <select value={preferences.question_cadence} onChange={(event) => setPreferences((current) => ({ ...current, question_cadence: event.target.value as PulsePreferences["question_cadence"] }))} className="mt-xs h-11 w-full rounded-[9px] border border-hairline bg-white px-sm text-sm text-ink">
               <option value="daily">매일</option>
               <option value="three_weekly">주 3회</option>
               <option value="off">표시 안 함</option>
@@ -107,7 +107,7 @@ export default function PulseSettings({ initialPreferences }: PulseSettingsProps
           </label>
           <label className="text-[12px] font-semibold text-muted">
             다시 보기
-            <select value={preferences.resurface_cadence} onChange={(event) => setPreferences((current) => ({ ...current, resurface_cadence: event.target.value as PulsePreferences["resurface_cadence"] }))} className="mt-xs h-10 w-full rounded-[9px] border border-hairline bg-white px-sm text-sm text-ink">
+            <select value={preferences.resurface_cadence} onChange={(event) => setPreferences((current) => ({ ...current, resurface_cadence: event.target.value as PulsePreferences["resurface_cadence"] }))} className="mt-xs h-11 w-full rounded-[9px] border border-hairline bg-white px-sm text-sm text-ink">
               <option value="weekly">매주</option>
               <option value="biweekly">격주</option>
               <option value="off">표시 안 함</option>

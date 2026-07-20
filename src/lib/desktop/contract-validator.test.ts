@@ -24,8 +24,8 @@ describe("Desktop contract validator", () => {
       path.join(tmpdir(), "desktop-contracts-invalid-"),
     );
     temporaryRoots.push(temporaryRoot);
-    const contractRoot = path.join(temporaryRoot, "v1");
-    cpSync("contracts/desktop/v1", contractRoot, { recursive: true });
+    const contractRoot = path.join(temporaryRoot, "v2");
+    cpSync("contracts/desktop/v2", contractRoot, { recursive: true });
 
     const fixturePath = path.join(
       contractRoot,

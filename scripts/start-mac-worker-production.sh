@@ -67,6 +67,8 @@ set -a
 . "$ENV_FILE"
 set +a
 
+"$SCRIPT_DIR/verify-mac-runtime-target.sh" "$ENV_FILE"
+
 if [ -n "$WORKER_ID_OVERRIDE" ]; then
   AGENT_SUPERVISOR_ID=$WORKER_ID_OVERRIDE
 fi
@@ -85,7 +87,12 @@ export KRW_GURU_ADVISOR_PLUGIN_PATH
 export KRW_GURU_DATA_ROOT
 export KRW_GURU_RELEASE_ROOT
 
-if [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ -f "$CLAUDE_CONFIG_DIR/deepseek.env" ]; then
+if [ "${KRW_MAC_IMMUTABLE_RUNTIME:-0}" = "1" ]; then
+  [ "${KRW_SEALED_CLAUDE_ENV:-0}" = "1" ] || {
+    echo "Immutable runtime is missing its sealed Claude provider environment." >&2
+    exit 1
+  }
+elif [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ -f "$CLAUDE_CONFIG_DIR/deepseek.env" ]; then
   set -a
   # shellcheck disable=SC1090
   . "$CLAUDE_CONFIG_DIR/deepseek.env"
@@ -180,6 +187,13 @@ echo "Log file: $LOG_FILE"
 
 (
   cd "$FRONT_DIR"
+  if [ "${KRW_MAC_IMMUTABLE_RUNTIME:-0}" = "1" ]; then
+    test -x "${KRW_RUNTIME_NODE_EXECUTABLE:-}" || {
+      echo "Missing prepared Node executable for immutable Mac worker." >&2
+      exit 1
+    }
+    exec "$KRW_RUNTIME_NODE_EXECUTABLE" .worker/agent-worker.mjs
+  fi
   exec node .worker/agent-worker.mjs
 ) >> "$LOG_FILE" 2>&1 &
 child_pid=$!

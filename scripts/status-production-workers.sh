@@ -37,10 +37,20 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-GCP_INSTANCE=${GCP_INSTANCE:-krw-onto-v1}
-GCP_ZONE=${GCP_ZONE:-asia-northeast3-a}
-REMOTE_FRONT_DIR=${REMOTE_FRONT_DIR:-/home/username/krw-ontology-front}
-COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-krw-ontology-front}
+CANONICAL_TARGET_FILE="$FRONT_DIR/ops/production-target.json"
+target_value() {
+  node -e '
+    const target = require(process.argv[1]);
+    const value = target[process.argv[2]];
+    if (typeof value !== "string" || !value) process.exit(1);
+    process.stdout.write(value);
+  ' "$CANONICAL_TARGET_FILE" "$1"
+}
+GCP_PROJECT=$(target_value gcpProject)
+GCP_INSTANCE=$(target_value gcpInstance)
+GCP_ZONE=$(target_value gcpZone)
+REMOTE_FRONT_DIR=$(target_value remoteFrontDir)
+COMPOSE_PROJECT_NAME=$(target_value composeProject)
 REMOTE_ENV_FILE=${REMOTE_ENV_FILE:-.env}
 
 echo "Local Mac worker/supervisor processes:"
@@ -95,5 +105,6 @@ fi
 echo
 echo "GCP Docker Compose status:"
 gcloud compute ssh "$GCP_INSTANCE" \
+  --project="$GCP_PROJECT" \
   --zone="$GCP_ZONE" \
   --command="cd '$REMOTE_FRONT_DIR' && docker compose --project-name '$COMPOSE_PROJECT_NAME' --env-file '$REMOTE_ENV_FILE' ps"

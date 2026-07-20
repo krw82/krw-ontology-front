@@ -1,18 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { type MouseEvent } from "react";
 import { motion } from "motion/react";
 import CompanyListItem, {
   getCompanyListAccessibleSummary,
   type CompanyListItemData,
 } from "@/components/CompanyListItem";
 import { easeOutExpo, listRow } from "@/lib/animation";
-import { trackClientEventWithTimeout } from "@/lib/analytics/client";
+import { trackClientEventSilently } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
-import { localizedPath } from "@/i18n/routing";
+import { companyCoverageOnboardingHref } from "@/lib/onboarding/coverage-flow";
 import { normalizeTicker } from "@/lib/ontology/ticker";
 
 export interface CompanyCardData
@@ -31,49 +29,54 @@ interface CompanyCardProps {
   company: CompanyCardData;
   motionDelay?: number;
   locale?: Locale;
+  animateRow?: boolean;
+  coverageOnboarding?: boolean;
+  onboardingContinuePath?: string | null;
 }
 
 export default function CompanyCard({
   company,
   motionDelay = 0,
   locale = DEFAULT_LOCALE,
+  animateRow = true,
+  coverageOnboarding = false,
+  onboardingContinuePath = null,
 }: CompanyCardProps) {
-  const router = useRouter();
   const reducedMotion = useReducedMotion();
   const ticker = normalizeTicker(company.ticker);
   if (!ticker) return null;
 
   const accessibleSummary = getCompanyListAccessibleSummary(company, locale);
+  const destination = companyCoverageOnboardingHref(
+    locale,
+    ticker,
+    coverageOnboarding,
+    onboardingContinuePath,
+  );
+  if (!destination) return null;
 
   return (
     <motion.div
-      layout="position"
+      layout={animateRow ? "position" : false}
       variants={listRow}
-      initial="hidden"
+      initial={animateRow ? "hidden" : false}
       animate="visible"
-      exit="exit"
+      exit={animateRow ? "exit" : undefined}
       transition={{
-        duration: reducedMotion ? 0 : 0.16,
-        delay: reducedMotion ? 0 : motionDelay / 1000,
+        duration: reducedMotion || !animateRow ? 0 : 0.16,
+        delay: reducedMotion || !animateRow ? 0 : motionDelay / 1000,
         ease: easeOutExpo,
-        layout: { duration: reducedMotion ? 0 : 0.16, ease: easeOutExpo },
+        layout: {
+          duration: reducedMotion || !animateRow ? 0 : 0.16,
+          ease: easeOutExpo,
+        },
       }}
-      className="border-b border-hairline-soft last:border-b-0"
+      className="border-b border-hairline-soft [contain-intrinsic-size:auto_112px] [content-visibility:auto] last:border-b-0"
     >
       <Link
-        href={localizedPath(locale, `/companies/${encodeURIComponent(ticker)}`)}
-        onClick={(event) => {
-          const destination = localizedPath(
-            locale,
-            `/companies/${encodeURIComponent(ticker)}`,
-          );
-          const shouldNavigateAfterTracking =
-            shouldHandleClientNavigation(event);
-          if (shouldNavigateAfterTracking) {
-            event.preventDefault();
-          }
-
-          const tracking = trackClientEventWithTimeout("cta_clicked", {
+        href={destination}
+        onClick={() => {
+          trackClientEventSilently("cta_clicked", {
             cta_id: "company_card",
             cta_label: ticker,
             surface: "companies_index",
@@ -83,15 +86,6 @@ export default function CompanyCard({
             company_name: company.name ?? null,
             sector: company.sector ?? null,
           });
-
-          if (shouldNavigateAfterTracking) {
-            void tracking.finally(() => {
-              router.push(destination);
-            });
-            return;
-          }
-
-          void tracking;
         }}
         className="group block cursor-pointer"
         aria-label={`${accessibleSummary}. ${
@@ -103,17 +97,5 @@ export default function CompanyCard({
         <CompanyListItem company={company} locale={locale} variant="browse" />
       </Link>
     </motion.div>
-  );
-}
-
-function shouldHandleClientNavigation(
-  event: MouseEvent<HTMLAnchorElement>,
-): boolean {
-  return (
-    event.button === 0 &&
-    !event.metaKey &&
-    !event.altKey &&
-    !event.ctrlKey &&
-    !event.shiftKey
   );
 }

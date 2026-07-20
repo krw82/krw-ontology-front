@@ -57,7 +57,7 @@ export default function FilingFeedControls() {
     <p className="mt-xs text-sm leading-6 text-muted">관심기업의 최근 공시 RSS와 과거 주기 기반 예상 공시 창 ICS를 만듭니다. URL을 아는 사람은 개인 피드를 볼 수 있으므로 공유하지 마세요.</p>
     {urls ? <div className="mt-md space-y-sm"> <FeedUrl label="RSS" url={urls.rss} /><FeedUrl label="예상 공시 창 ICS" url={urls.ics} /></div> : null}
     {message ? <p className="mt-md rounded-[7px] bg-surface-soft px-sm py-sm text-sm leading-6 text-muted" role="status">{message}</p> : null}
-    <div className="mt-md flex flex-wrap gap-sm"><button type="button" onClick={() => void issue()} disabled={working} className="min-h-9 rounded-[7px] border border-hairline px-sm text-sm font-extrabold text-ink transition-colors hover:border-primary hover:text-primary disabled:opacity-60">{working ? "처리 중…" : state?.active ? "새 URL 재발급" : "개인 URL 만들기"}</button>{state?.active ? <button type="button" onClick={() => void revoke()} disabled={working} className="min-h-9 rounded-[7px] px-sm text-sm font-extrabold text-muted transition-colors hover:bg-surface-soft hover:text-ink disabled:opacity-60">URL 폐기</button> : null}</div>
+    <div className="mt-md flex flex-wrap gap-sm"><button type="button" onClick={() => void issue()} disabled={working} className="min-h-11 rounded-[7px] border border-hairline px-sm text-sm font-extrabold text-ink transition-colors hover:border-primary hover:text-primary disabled:opacity-60">{working ? "처리 중…" : state?.active ? "새 URL 재발급" : "개인 URL 만들기"}</button>{state?.active ? <button type="button" onClick={() => void revoke()} disabled={working} className="min-h-11 rounded-[7px] px-sm text-sm font-extrabold text-muted transition-colors hover:bg-surface-soft hover:text-ink disabled:opacity-60">URL 폐기</button> : null}</div>
     {state?.active && !urls ? <p className="mt-sm text-xs leading-5 text-muted">보안을 위해 기존 URL은 다시 표시하지 않습니다. 필요하면 새 URL을 재발급하면 이전 URL은 즉시 무효화됩니다.</p> : null}
   </section>;
 }
@@ -73,5 +73,5 @@ function FeedUrl({ label, url }: { label: string; url: string }) {
       setCopied(false);
     }
   };
-  return <div className="rounded-[7px] border border-hairline px-sm py-sm"><div className="flex items-center justify-between gap-sm"><span className="text-xs font-extrabold text-ink">{label}</span><button type="button" onClick={() => void copy()} className="text-xs font-bold text-primary underline underline-offset-4">{copied ? "복사됨" : "복사"}</button></div><p className="mt-1 break-all text-xs leading-5 text-muted">{url}</p></div>;
+  return <div className="rounded-[7px] border border-hairline px-sm py-sm"><div className="flex items-center justify-between gap-sm"><span className="text-xs font-extrabold text-ink">{label}</span><button type="button" onClick={() => void copy()} className="inline-flex min-h-11 items-center px-xs text-xs font-bold text-primary underline underline-offset-4">{copied ? "복사됨" : "복사"}</button></div><p className="mt-1 break-all text-xs leading-5 text-muted">{url}</p></div>;
 }

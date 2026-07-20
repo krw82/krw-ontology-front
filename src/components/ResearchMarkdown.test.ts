@@ -1,5 +1,7 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import {
+import ResearchMarkdown, {
   getSafeMarkdownHref,
   getSafeMarkdownImageSrc,
   normalizeResearchMarkdown,
@@ -44,6 +46,20 @@ describe("ResearchMarkdown URL sanitization", () => {
       "http://example.com/chart.png",
     );
     expect(getSafeMarkdownImageSrc("mailto:analyst@example.com")).toBeUndefined();
+  });
+
+  it("defers decoding and loading safe answer images", () => {
+    const html = renderToStaticMarkup(
+      createElement(ResearchMarkdown, {
+        content: "![실적 차트](https://example.com/chart.png)",
+        normalizePlainText: false,
+      }),
+    );
+
+    expect(html).toContain('src="https://example.com/chart.png"');
+    expect(html).toContain('alt="실적 차트"');
+    expect(html).toContain('loading="lazy"');
+    expect(html).toContain('decoding="async"');
   });
 });
 

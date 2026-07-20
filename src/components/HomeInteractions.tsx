@@ -186,7 +186,7 @@ export function HomeHeaderActions({
       ) : (
         <Link
           href={secondaryHref}
-          className="hidden min-h-9 items-center rounded-[8px] border border-hairline px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-primary hover:text-primary sm:inline-flex"
+          className="hidden min-h-11 items-center rounded-[8px] border border-hairline px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-primary hover:text-primary sm:inline-flex"
         >
           {secondaryLabel}
         </Link>
@@ -201,7 +201,7 @@ export function HomeHeaderActions({
             destination: companiesHref,
           });
         }}
-        className="rounded-[8px] bg-surface-dark px-4 py-2 text-sm font-extrabold text-on-dark transition-colors hover:bg-primary-active"
+        className="inline-flex min-h-11 items-center rounded-[8px] bg-surface-dark px-4 py-2 text-sm font-extrabold text-on-dark transition-colors hover:bg-primary-active"
       >
         {startLabel}
       </Link>

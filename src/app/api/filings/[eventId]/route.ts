@@ -2,7 +2,10 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
 import { toPublicFilingBrief } from "@/lib/filing-briefs/public";
-import { resolveFilingAccess } from "@/lib/filing-notifications/filing-access";
+import {
+  resolveFilingAccess,
+  resolveFilingContextTicker,
+} from "@/lib/filing-notifications/filing-access";
 import { loadFilingDocuments } from "@/lib/filing-notifications/filing-documents";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { FilingKeywordMatchRow, SecFilingBriefRow, SecFilingEventRow } from "@/types/database";
@@ -11,7 +14,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ eventId: string }> },
 ) {
   let user;
@@ -42,6 +45,17 @@ export async function GET(
   }
   if (!access) {
     return Response.json({ error: { code: "forbidden", message: "내 공시 알림 또는 현재 카탈로그 피드에 있는 공시만 확인할 수 있습니다." } }, { status: 403 });
+  }
+  let displayTicker: string;
+  try {
+    displayTicker = await resolveFilingContextTicker({
+      userId: user.id,
+      filing,
+      access,
+      requestedTicker: request.nextUrl.searchParams.get("ticker"),
+    });
+  } catch {
+    return Response.json({ error: { code: "service_unavailable", message: "공시의 회사 맥락을 확인하지 못했습니다." } }, { status: 503 });
   }
   if (access.notification && !access.notification.read_at) {
     await admin
@@ -87,7 +101,7 @@ export async function GET(
     return Response.json({ error: { code: "service_unavailable", message: "공시 첨부를 불러오지 못했습니다." } }, { status: 503 });
   }
   return Response.json({
-    filing: { ...filing, display_ticker: access.subscription?.ticker ?? filing.ticker, enrichment_status: documentResult.status },
+    filing: { ...filing, display_ticker: displayTicker, enrichment_status: documentResult.status },
     documents: documentResult.documents,
     keyword_matches: keywordMatches,
     brief: toPublicFilingBrief(brief),

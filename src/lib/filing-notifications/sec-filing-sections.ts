@@ -149,7 +149,14 @@ function parseEightKSections(lines: string[]): FilingSection[] {
 
   return [...byItem.values()]
     .sort((left, right) => left.sourceIndex - right.sourceIndex)
-    .map(({ sourceIndex: _sourceIndex, ...section }) => section);
+    .map((section) => ({
+      key: section.key,
+      kind: section.kind,
+      heading: section.heading,
+      itemCode: section.itemCode,
+      text: section.text,
+      confidence: section.confidence,
+    }));
 }
 
 function isLikelySixKHeading(line: string): boolean {

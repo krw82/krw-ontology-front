@@ -37,6 +37,7 @@ describe("temporary plan feature split", () => {
         "recent_chats",
         "institutional_holdings",
         "stock_discovery",
+        "research_notebook",
       ],
       standard: [
         "company_search",
@@ -45,6 +46,7 @@ describe("temporary plan feature split", () => {
         "institutional_holdings",
         "stock_discovery",
         "wide_research",
+        "research_notebook",
       ],
       pro: menuFeatures,
       beta: menuFeatures,

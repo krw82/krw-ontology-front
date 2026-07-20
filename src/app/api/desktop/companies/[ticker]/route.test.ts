@@ -32,7 +32,7 @@ describe("GET /api/desktop/companies/:ticker", () => {
   it("returns the Desktop detail DTO", async () => {
     vi.mocked(getDesktopCompany).mockResolvedValue({
       ok: true,
-      contract_version: "desktop-company-detail/v1",
+      contract_version: "desktop-company-detail/v2",
       data: { company: { ticker: "AAPL" } },
       meta: {
         catalog_release_id: "release-1",
@@ -50,7 +50,7 @@ describe("GET /api/desktop/companies/:ticker", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      contract_version: "desktop-company-detail/v1",
+      contract_version: "desktop-company-detail/v2",
       data: { company: { ticker: "AAPL" } },
     });
   });

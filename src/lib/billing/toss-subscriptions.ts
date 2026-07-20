@@ -424,6 +424,7 @@ async function activatePaidEntitlement({
   periodEnd: string;
   creditAnchorAt: string;
 }) {
+  await assertBillingEntitlementIsMutable(userId);
   const admin = getSupabaseAdmin();
   const { error } = await admin.from("user_entitlements").upsert(
     {
@@ -467,6 +468,33 @@ async function loadExistingEntitlement(
 
   if (error) return null;
   return data ?? null;
+}
+
+async function loadBillingEntitlementPlanKey(
+  userId: string,
+): Promise<UserEntitlementRow["plan_key"] | null> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("user_entitlements")
+    .select("plan_key")
+    .eq("user_id", userId)
+    .maybeSingle<Pick<UserEntitlementRow, "plan_key">>();
+  if (error) {
+    throw new TossBillingFlowError(
+      "billing_entitlement_lookup_failed",
+      "결제 권한 상태를 확인하지 못했습니다.",
+      500,
+    );
+  }
+  return data?.plan_key ?? null;
+}
+
+async function assertBillingEntitlementIsMutable(userId: string) {
+  if ((await loadBillingEntitlementPlanKey(userId)) !== "internal") return;
+  throw new TossBillingFlowError(
+    "internal_entitlement_billing_forbidden",
+    "내부 운영 계정은 유료 구독을 변경할 수 없습니다.",
+    409,
+  );
 }
 
 async function loadOpenSubscription(
@@ -644,6 +672,30 @@ async function activateFreeEntitlement({
   nowIso: string;
 }) {
   const admin = getSupabaseAdmin();
+  if ((await loadBillingEntitlementPlanKey(userId)) === "internal") {
+    const internalAccessEnd = "9999-12-31T23:59:59.000Z";
+    const { error: preserveError } = await admin
+      .from("user_entitlements")
+      .update({
+        status: "active",
+        current_period_end: internalAccessEnd,
+        billing_period_end: internalAccessEnd,
+        grace_until: null,
+        cancel_at_period_end: false,
+        plan_change_pending: null,
+        entitlement_updated_at: nowIso,
+      })
+      .eq("user_id", userId)
+      .eq("plan_key", "internal");
+    if (preserveError) {
+      throw new TossBillingFlowError(
+        "internal_entitlement_preservation_failed",
+        "내부 운영 권한을 보존하지 못했습니다.",
+        500,
+      );
+    }
+    return;
+  }
   const { data: freePlan, error: planError } = await admin
     .from("billing_plan_versions")
     .select(
@@ -855,6 +907,8 @@ export async function startTossBillingCheckout({
     );
   }
 
+  await assertBillingEntitlementIsMutable(userId);
+
   const existingSubscription = await loadOpenSubscription(userId);
   if (existingSubscription) {
     throw new TossBillingFlowError(
@@ -946,6 +1000,7 @@ export async function completeTossBillingCheckout({
       planKey: session.plan_key,
     };
   }
+  await assertBillingEntitlementIsMutable(userId);
   if (new Date(session.expires_at).getTime() < Date.now()) {
     await markCheckoutFailed({
       session,
@@ -1268,7 +1323,7 @@ async function handleRenewalFailure({
   const admin = getSupabaseAdmin();
 
   if (new Date(graceUntil).getTime() <= now.getTime()) {
-    await admin
+    const { error: subscriptionError } = await admin
       .from("billing_toss_subscriptions")
       .update({
         status: "expired",
@@ -1278,6 +1333,13 @@ async function handleRenewalFailure({
         renewal_lease_expires_at: null,
       })
       .eq("id", subscription.id);
+    if (subscriptionError) {
+      throw new TossBillingFlowError(
+        "renewal_expiry_update_failed",
+        "만료된 구독 상태를 저장하지 못했습니다.",
+        500,
+      );
+    }
     await activateFreeEntitlement({
       userId: subscription.user_id,
       customerKey: subscription.customer_key,
@@ -1291,7 +1353,7 @@ async function handleRenewalFailure({
     now,
     attemptCount: subscription.renewal_attempt_count,
   });
-  await admin
+  const { error: subscriptionError } = await admin
     .from("billing_toss_subscriptions")
     .update({
       status: "grace",
@@ -1302,7 +1364,14 @@ async function handleRenewalFailure({
       renewal_lease_expires_at: null,
     })
     .eq("id", subscription.id);
-  await admin
+  if (subscriptionError) {
+    throw new TossBillingFlowError(
+      "renewal_grace_update_failed",
+      "결제 유예 상태를 저장하지 못했습니다.",
+      500,
+    );
+  }
+  const { error: entitlementError } = await admin
     .from("user_entitlements")
     .update({
       status: "grace",
@@ -1311,6 +1380,13 @@ async function handleRenewalFailure({
     })
     .eq("user_id", subscription.user_id)
     .eq("provider_subscription_id", subscription.id);
+  if (entitlementError) {
+    throw new TossBillingFlowError(
+      "renewal_grace_entitlement_update_failed",
+      "결제 유예 권한을 저장하지 못했습니다.",
+      500,
+    );
+  }
 }
 
 async function renewSubscription(
@@ -1325,6 +1401,7 @@ async function renewSubscription(
       409,
     );
   }
+  await assertBillingEntitlementIsMutable(subscription.user_id);
   const targetPlanKey = subscription.pending_plan_key ?? subscription.plan_key;
   const targetPlan =
     (subscription.pending_plan_version_id
@@ -1532,6 +1609,8 @@ export async function changeCurrentTossPlan({
       503,
     );
   }
+
+  await assertBillingEntitlementIsMutable(userId);
 
   const subscription = await loadOpenSubscription(userId);
   if (!subscription) {

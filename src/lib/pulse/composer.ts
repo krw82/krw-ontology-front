@@ -1,11 +1,6 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  encodePulseCursor,
-  isPulseCursorV3,
-  type PulseCursorV3,
-} from "@/lib/pulse/cursor";
 import { isPulseSourceEnabled } from "@/lib/pulse/enabled";
 import {
   buildDevelopmentPulseShowcase,
@@ -14,13 +9,11 @@ import {
 import {
   encodePulseItemId,
   normalizePulseDateTime,
-  PULSE_MAX_PAGE_SIZE,
   PULSE_PAGE_SIZE,
   pulseItemSchema,
   type PulseCandidate,
   type PulseRankedCandidate,
 } from "@/lib/pulse/contract";
-import { decodePulseCursor } from "@/lib/pulse/cursor";
 import {
   applyPulseItemStates,
   getPulseItemStates,
@@ -28,16 +21,20 @@ import {
   markPulseItemsFirstSeen,
 } from "@/lib/pulse/item-state";
 import {
+  applyPulseFilingDecisionTicker,
   applyPulseUserTickerSignals,
-  emptyPulseUserTickerSignals,
   getPulseUserTickerSignals,
+  pulseCandidateTickerIdentities,
 } from "@/lib/pulse/personalization";
+import {
+  applyPulseMonitoringRules,
+  buildDueMonitoringCandidates,
+  getPulseMonitoringRules,
+} from "@/lib/pulse/monitoring";
 import { getPulsePreferences } from "@/lib/pulse/preferences";
 import {
-  comparePulseSortKeys,
   rankPulseCandidates,
-  reorderFirstPageWindow,
-  sortKeyOf,
+  selectFinitePulseQueue,
 } from "@/lib/pulse/ranking";
 import { selectLearningCandidate, buildLearningCandidates } from "@/lib/pulse/sources/learning";
 import { getAnalysisCandidates } from "@/lib/pulse/sources/analysis";
@@ -45,6 +42,7 @@ import { getFilingCandidates } from "@/lib/pulse/sources/filings";
 import { getQuestionCandidates } from "@/lib/pulse/sources/questions";
 import { getRawResurfaceCandidates, selectResurfaceCandidate } from "@/lib/pulse/sources/resurface";
 import { buildPulseSummary } from "@/lib/pulse/summary";
+import { getPulseFilingDecisionContext } from "@/lib/judgments/read-model";
 import type {
   PulseFeedResponse,
   PulseFilter,
@@ -61,7 +59,6 @@ export interface ComposePulseFeedOptions {
   userId: string;
   includeNotebookSources: boolean;
   filter?: PulseFilter;
-  cursor?: string | null;
   limit?: number;
   since?: string | null;
   now?: Date;
@@ -76,24 +73,20 @@ export async function composePulseFeed({
   userId,
   includeNotebookSources,
   filter = "all",
-  cursor,
   limit = PULSE_PAGE_SIZE,
   since,
   now = new Date(),
 }: ComposePulseFeedOptions): Promise<PulseFeedResponse> {
-  const decodedCursor = decodePulseCursor(cursor);
-  const cursorV3 = isPulseCursorV3(decodedCursor) ? decodedCursor : null;
-  const snapshotAt = cursorV3 ? new Date(cursorV3.snapshot_at) : now;
+  const snapshotAt = now;
   const preferences = await getPulsePreferences(supabase, userId);
   const enabledKinds = new Set(preferences.enabled_kinds);
   const resurfaceCadence = preferences.resurface_cadence === "biweekly" ? "biweekly" : "weekly";
-  const userSignals = await getPulseUserTickerSignals(supabase, userId, snapshotAt)
-    .catch((error) => {
-      console.warn("[pulse] failed to load user ticker signals", {
-        error_code: typeof error === "object" && error && "code" in error ? String(error.code) : "unknown",
-      });
-      return emptyPulseUserTickerSignals();
-    });
+  // These reads are correctness state, not optional ranking enhancements. If
+  // they are unavailable, returning a normal-looking feed could resurrect
+  // hidden cards or erase an existing judgment. Let the API fail closed while
+  // the client keeps its last known-good/offline snapshot.
+  const userSignals = await getPulseUserTickerSignals(supabase, userId, snapshotAt);
+  const monitoringRules = await getPulseMonitoringRules(supabase, userId);
 
   const settled = await Promise.allSettled([
     loadSource("filing", enabledKinds.has("filing"), () => getFilingCandidates(supabase, snapshotAt, userSignals.preferredTickers)),
@@ -112,7 +105,10 @@ export async function composePulseFeed({
         && preferences.resurface_cadence !== "off"
         && preferences.resurfacing_enabled
         && enabledKinds.has("resurface"),
-      () => getRawResurfaceCandidates(supabase, userId, snapshotAt),
+      async () => [
+        ...await getRawResurfaceCandidates(supabase, userId, snapshotAt),
+        ...buildDueMonitoringCandidates(monitoringRules, snapshotAt),
+      ],
     ),
     loadSource(
       "learning",
@@ -131,21 +127,46 @@ export async function composePulseFeed({
   const mutedTickers = new Set(preferences.muted_tickers);
   const sourceCandidates = sources
     .flatMap((source) => source.items)
-    .filter((item) => !item.ticker || !mutedTickers.has(item.ticker))
+    .filter((item) => !pulseCandidateTickerIdentities(item)
+      .some((ticker) => mutedTickers.has(ticker)))
     .filter((item) => filter === "all" || item.kind === filter);
 
-  const personalized = applyPulseUserTickerSignals(sourceCandidates, userSignals);
-  const states = await getPulseItemStates(supabase, userId, personalized.map((item) => item.item_key))
-    .catch((error) => {
-      console.warn("[pulse] failed to load item state", {
-        error_code: typeof error === "object" && error && "code" in error ? String(error.code) : "unknown",
-      });
-      return new Map();
-    });
-  const stateful = applyPulseItemStates(personalized, states, snapshotAt, preferences.timezone);
+  const personalized = applyPulseMonitoringRules(
+    applyPulseUserTickerSignals(sourceCandidates, userSignals),
+    monitoringRules,
+  );
+  const [states, filingDecisions] = await Promise.all([
+    getPulseItemStates(supabase, userId, personalized.map((item) => item.item_key)),
+    getPulseFilingDecisionContext(
+      supabase,
+      userId,
+      personalized.filter((item) => item.kind === "filing").map((item) => item.source_id),
+    ),
+  ]);
+  const contextualized = personalized.map((item) => {
+    if (item.kind !== "filing") return item;
+    const context = filingDecisions.get(item.source_id);
+    if (!context) return item;
+    const contextualizedItem = applyPulseFilingDecisionTicker(
+      item,
+      context.judgment.ticker,
+      userSignals,
+    );
+    return {
+      ...contextualizedItem,
+      judgment: {
+        ...context.judgment,
+        updated_at: normalizePulseDateTime(context.judgment.updated_at),
+      },
+      linked_thesis: context.linked_thesis,
+    };
+  });
+  const stateful = applyPulseItemStates(contextualized, states, snapshotAt, preferences.timezone);
 
   // Rotation follows per-item hidden/snoozed/fatigue state, ensuring a hidden
   // first candidate never makes the whole resurface/learning source disappear.
+  const scheduledReviews = stateful.filter((item) =>
+    item.kind === "resurface" && item.metadata.monitoring_rule_type === "scheduled_review");
   const resurface = hasRecentKindImpression(
     states,
     "resurface",
@@ -155,7 +176,7 @@ export async function composePulseFeed({
   )
     ? []
     : selectResurfaceCandidate(
-      stateful.filter((item) => item.kind === "resurface"),
+      stateful.filter((item) => item.kind === "resurface" && item.metadata.monitoring_rule_type !== "scheduled_review"),
       userId,
       snapshotAt,
       resurfaceCadence,
@@ -175,12 +196,12 @@ export async function composePulseFeed({
     );
   const candidates = [
     ...stateful.filter((item) => item.kind !== "resurface" && item.kind !== "learning"),
+    ...scheduledReviews,
     ...resurface,
     ...learning,
   ];
   const ranked = rankPulseCandidates(candidates, snapshotAt);
-  const summary = buildPulseSummary(ranked);
-  const developmentShowcase = isPulseDevelopmentShowcaseEnabled() && !cursorV3 && !since
+  const developmentShowcase = isPulseDevelopmentShowcaseEnabled() && !since
     ? rankPulseCandidates(buildDevelopmentPulseShowcase(snapshotAt), snapshotAt)
     : [];
   const activeAnalysis = ranked.filter(isActiveAnalysis);
@@ -188,39 +209,32 @@ export async function composePulseFeed({
   const developmentFeed = developmentShowcase.filter((item) => !isActiveAnalysis(item));
   const developmentActiveAnalysis = developmentShowcase.filter(isActiveAnalysis);
 
-  const afterBoundary = cursorV3
-    ? rankedFeed.filter((item) => comparePulseSortKeys(item, cursorV3.boundary) > 0)
-    : rankedFeed;
-  const boundedLimit = Math.max(1, Math.min(limit, PULSE_MAX_PAGE_SIZE));
-  const rawWindow = afterBoundary.slice(0, boundedLimit);
-  const displayItems = cursorV3
-    ? rawWindow
-    : [...developmentFeed, ...reorderFirstPageWindow(rawWindow)];
+  const boundedLimit = Math.max(1, Math.min(limit, PULSE_PAGE_SIZE));
+  const displayItems = selectFinitePulseQueue(
+    [...developmentFeed, ...rankedFeed],
+    boundedLimit,
+  );
 
   const visibleActiveAnalysis = [...developmentActiveAnalysis, ...activeAnalysis].slice(0, 2);
-  await markPulseItemsFirstSeen(supabase, userId, [...rawWindow, ...visibleActiveAnalysis], snapshotAt).catch((error) => {
+  const summary = buildPulseSummary([...displayItems, ...visibleActiveAnalysis]);
+  await markPulseItemsFirstSeen(supabase, userId, [...displayItems, ...visibleActiveAnalysis], snapshotAt).catch((error) => {
     console.warn("[pulse] failed to mark first delivered", {
       error_code: typeof error === "object" && error && "code" in error ? String(error.code) : "unknown",
     });
   });
 
-  const nextCursor = rawWindow.length > 0 && afterBoundary.length > rawWindow.length
-    ? encodePulseCursor(makeCursor(snapshotAt, sortKeyOf(rawWindow[rawWindow.length - 1])))
-    : null;
   const sinceTime = since && !Number.isNaN(Date.parse(since)) ? Date.parse(since) : null;
 
   return {
     generated_at: snapshotAt.toISOString(),
     snapshot_at: snapshotAt.toISOString(),
-    ranking_version: "rule_v1",
+    ranking_version: "rule_v3",
     timezone: preferences.timezone,
     date_label: formatDateLabel(snapshotAt, preferences.timezone),
     filter,
     summary,
     active_analysis_items: toPublicItems(visibleActiveAnalysis),
     items: toPublicItems(displayItems),
-    next_cursor: nextCursor,
-    has_more: nextCursor !== null,
     new_item_count: sinceTime === null
       ? 0
       : ranked.filter((item) => item.actionable
@@ -240,7 +254,7 @@ export function createUnavailablePulseFeed(now = new Date()): PulseFeedResponse 
   return {
     generated_at: now.toISOString(),
     snapshot_at: now.toISOString(),
-    ranking_version: "rule_v1",
+    ranking_version: "rule_v3",
     timezone: "Asia/Seoul",
     date_label: formatDateLabel(now, "Asia/Seoul"),
     filter: "all",
@@ -252,8 +266,6 @@ export function createUnavailablePulseFeed(now = new Date()): PulseFeedResponse 
     },
     active_analysis_items: [],
     items: [],
-    next_cursor: null,
-    has_more: false,
     new_item_count: 0,
     source_statuses: SOURCE_KINDS.map((source) => degradedStatus(source)),
   };
@@ -269,42 +281,31 @@ function toPublicItems(candidates: PulseRankedCandidate[]): PulseItem[] {
 function toPublicItem(candidate: PulseRankedCandidate): PulseItem | null {
   const {
     item_key,
-    is_holding,
-    is_watchlisted,
     has_recent_research,
     is_pinned,
     lane,
     rank_score,
     priority_rank,
-    holding_rank,
+    coverage_rank,
     saved_rank,
     ...item
   } = candidate;
-  void is_holding;
-  void is_watchlisted;
   void has_recent_research;
   void is_pinned;
   void lane;
   void rank_score;
   void priority_rank;
-  void holding_rank;
+  void coverage_rank;
   void saved_rank;
   const parsed = pulseItemSchema.safeParse({
     ...item,
     id: encodePulseItemId(item_key),
-    metadata: {
-      ...item.metadata,
-      is_holding: Boolean(is_holding),
-      is_watchlisted: Boolean(is_watchlisted),
-      has_recent_research: Boolean(has_recent_research),
-      is_pinned: Boolean(is_pinned),
-    },
+    metadata: item.metadata,
     phase: item.phase ?? null,
     occurred_at: normalizePulseDateTime(item.occurred_at),
     available_at: normalizePulseDateTime(item.available_at),
     expires_at: normalizePulseDateTime(item.expires_at),
     reviewed_at: normalizePulseDateTime(item.reviewed_at),
-    read_at: normalizePulseDateTime(item.read_at),
     saved_at: normalizePulseDateTime(item.saved_at),
     snoozed_until: normalizePulseDateTime(item.snoozed_until),
   });
@@ -314,16 +315,6 @@ function toPublicItem(candidate: PulseRankedCandidate): PulseItem | null {
     issue_count: parsed.error.issues.length,
   });
   return null;
-}
-
-function makeCursor(snapshotAt: Date, boundary: PulseCursorV3["boundary"]): PulseCursorV3 {
-  return {
-    version: 3,
-    snapshot_at: snapshotAt.toISOString(),
-    filter: "all",
-    ranking_version: "rule_v1",
-    boundary,
-  };
 }
 
 async function loadSource(

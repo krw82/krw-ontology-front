@@ -4,21 +4,7 @@ node_modules
 out
 
 _workspace
-krw-ontology/.agents
-krw-ontology/.claude
-krw-ontology/.git
-krw-ontology/.venv
-krw-ontology/.venv311
-krw-ontology/.pytest_cache
-krw-ontology/.ruff_cache
-krw-ontology/.env
-krw-ontology/.env.*
-krw-ontology/ceo-plans
-krw-ontology/designs
-krw-ontology/html-effectiveness-artifacts
-krw-ontology/tests
-krw-ontology/**/__pycache__
-krw-ontology/**/*.pyc
+krw-ontology
 
 .git
 .claude
@@ -35,7 +21,6 @@ output/
 
 *.md
 !README.md
-!krw-ontology/plugins/**/*.md
 
 .env
 .env.*

@@ -57,9 +57,9 @@ export const MENU_FEATURE_DEFINITIONS: readonly MenuFeatureDefinition[] = [
   },
   {
     key: "research_notebook",
-    label: "리서치 노트북",
-    description: "관심·보유 기업별 질문, 노트, 리서치 흐름을 관리합니다.",
-    required_plan: "pro",
+    label: "내 커버리지",
+    description: "기업별 판단, 가설, 질문과 다음 확인 조건을 계속 관리합니다.",
+    required_plan: "free",
   },
 ] as const;
 
@@ -69,6 +69,7 @@ const FREE_REVIEW_FEATURES: readonly MenuFeatureKey[] = [
   "recent_chats",
   "institutional_holdings",
   "stock_discovery",
+  "research_notebook",
 ];
 
 const STANDARD_REVIEW_FEATURES: readonly MenuFeatureKey[] = [
@@ -78,7 +79,6 @@ const STANDARD_REVIEW_FEATURES: readonly MenuFeatureKey[] = [
 
 const PRO_REVIEW_FEATURES: readonly MenuFeatureKey[] = [
   ...STANDARD_REVIEW_FEATURES,
-  "research_notebook",
 ];
 
 const REVIEW_FEATURES_BY_PLAN: Record<

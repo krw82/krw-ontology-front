@@ -10,6 +10,17 @@ import {
   readFilingSection,
   searchCatalogFilings,
 } from "./on-demand-filing-reader";
+import {
+  getCoverageState,
+  getDecisionTimeline,
+  listFilingJudgments,
+  listOpenQuestions,
+  PERSONAL_MCP_LIST_DEFAULT_LIMIT,
+  PERSONAL_MCP_LIST_MAX_LIMIT,
+  PERSONAL_MCP_TIMELINE_DEFAULT_LIMIT,
+  PERSONAL_MCP_TIMELINE_MAX_LIMIT,
+  serializePersonalMcpResult,
+} from "./personal-filing-reader";
 
 const FILING_EVENT_ID_SCHEMA = z.string().uuid().describe("UUID of a filing event already present in the KRW catalog.");
 const FORM_TYPE_SCHEMA = z.enum(["8-K", "8-K/A", "6-K", "6-K/A", "4", "4/A"]);
@@ -25,7 +36,23 @@ export const KRW_FILINGS_MCP_TOOL_NAMES = [
 
 export type KrwFilingsMcpToolName = typeof KRW_FILINGS_MCP_TOOL_NAMES[number];
 
-export function createKrwFilingsMcpServer(): McpServer {
+export const KRW_PERSONAL_FILINGS_MCP_TOOL_NAMES = [
+  "get_coverage_state",
+  "list_filing_judgments",
+  "get_decision_timeline",
+  "list_open_questions",
+] as const;
+
+export type KrwPersonalFilingsMcpToolName =
+  typeof KRW_PERSONAL_FILINGS_MCP_TOOL_NAMES[number];
+
+export interface KrwFilingsMcpServerOptions {
+  userId?: string | null;
+}
+
+export function createKrwFilingsMcpServer(
+  options: KrwFilingsMcpServerOptions = {},
+): McpServer {
   const server = new McpServer({
     name: "krw-filings",
     version: process.env.npm_package_version ?? "0.1.0",
@@ -85,7 +112,69 @@ export function createKrwFilingsMcpServer(): McpServer {
     inputSchema: { filing_event_id: FILING_EVENT_ID_SCHEMA },
   }, async ({ filing_event_id }) => toolResult(() => getForm4InsiderTransactions(filing_event_id)));
 
+  const userId = options.userId?.trim() || null;
+  if (userId) registerPersonalTools(server, userId);
+
   return server;
+}
+
+function registerPersonalTools(server: McpServer, userId: string): void {
+  server.registerTool("get_coverage_state", {
+    title: "Get my company coverage state",
+    description: "Returns only the authenticated user's coverage status, active monitoring rules, and open-question count for one ticker. This private state is separate from global filing briefs.",
+    inputSchema: {
+      ticker: z.string().min(1).max(16).describe("Ticker in the user's research coverage."),
+    },
+  }, async ({ ticker }) => personalToolResult(() => getCoverageState(userId, { ticker })));
+
+  server.registerTool("list_filing_judgments", {
+    title: "List my filing judgments",
+    description: "Lists the authenticated user's current filing judgments and rationale. It never returns another user's notes and must not be treated as a public or global filing brief.",
+    inputSchema: {
+      ticker: z.string().min(1).max(16).optional().describe("Optional ticker filter."),
+      filing_event_id: FILING_EVENT_ID_SCHEMA.optional().describe("Optional filing-event filter."),
+      limit: z.number().int().min(1).max(PERSONAL_MCP_LIST_MAX_LIMIT).optional().describe(
+        `Maximum results; defaults to ${PERSONAL_MCP_LIST_DEFAULT_LIMIT}. Responses include pagination and explicit truncation metadata.`,
+      ),
+    },
+  }, async ({ ticker, filing_event_id, limit }) => personalToolResult(() => listFilingJudgments(userId, {
+    ticker,
+    filingEventId: filing_event_id,
+    limit,
+  })));
+
+  server.registerTool("get_decision_timeline", {
+    title: "Get my company decision timeline",
+    description: "Combines only the authenticated user's filing-judgment revisions, company questions, and thesis checks for one ticker, newest first.",
+    inputSchema: {
+      ticker: z.string().min(1).max(16).describe("Ticker in the user's research coverage."),
+      limit: z.number().int().min(1).max(PERSONAL_MCP_TIMELINE_MAX_LIMIT).optional().describe(
+        `Maximum combined timeline items; defaults to ${PERSONAL_MCP_TIMELINE_DEFAULT_LIMIT}. Responses include pagination and explicit truncation metadata.`,
+      ),
+    },
+  }, async ({ ticker, limit }) => personalToolResult(() => getDecisionTimeline(userId, { ticker, limit })));
+
+  server.registerTool("list_open_questions", {
+    title: "List my open company questions",
+    description: "Lists only currently visible, open questions owned by the authenticated user. The optional ticker filter never widens the user boundary.",
+    inputSchema: {
+      ticker: z.string().min(1).max(16).optional().describe("Optional ticker filter."),
+      limit: z.number().int().min(1).max(PERSONAL_MCP_LIST_MAX_LIMIT).optional().describe(
+        `Maximum results; defaults to ${PERSONAL_MCP_LIST_DEFAULT_LIMIT}. Responses include pagination and explicit truncation metadata.`,
+      ),
+    },
+  }, async ({ ticker, limit }) => personalToolResult(() => listOpenQuestions(userId, { ticker, limit })));
+}
+
+async function personalToolResult<T>(operation: () => Promise<T>) {
+  try {
+    const result = await operation();
+    return {
+      content: [{ type: "text" as const, text: serializePersonalMcpResult(result) }],
+    };
+  } catch (error) {
+    return toolErrorResult(error);
+  }
 }
 
 async function toolResult<T>(operation: () => Promise<T>) {
@@ -95,14 +184,18 @@ async function toolResult<T>(operation: () => Promise<T>) {
       content: [{ type: "text" as const, text: JSON.stringify(result) }],
     };
   } catch (error) {
-    const message = error instanceof FilingReaderError
-      ? `${error.code}: ${error.message}`
-      : error instanceof Error
-        ? error.message
-        : "Filing tool failed";
-    return {
-      content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }],
-      isError: true,
-    };
+    return toolErrorResult(error);
   }
+}
+
+function toolErrorResult(error: unknown) {
+  const message = error instanceof FilingReaderError
+    ? `${error.code}: ${error.message}`
+    : error instanceof Error
+      ? error.message
+      : "Filing tool failed";
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }],
+    isError: true,
+  };
 }

@@ -101,6 +101,28 @@ AGENT_SUPERVISOR_CONCURRENCY=${AGENT_SUPERVISOR_CONCURRENCY:-${MAC_WORKER_COUNT:
 MAC_WORKER_NICE=${MAC_WORKER_NICE:--5}
 AGENT_WORKER_ID_PREFIX=${AGENT_WORKER_ID_PREFIX:-mac-worker-jwc}
 AGENT_WORKER_ID_PREFIX=${AGENT_WORKER_ID_PREFIX%-1}
+KRW_DEPLOYMENT_ID=${KRW_DEPLOYMENT_ID:?Missing KRW_DEPLOYMENT_ID for the Mac worker launchd service}
+KRW_WORKER_BUNDLE_SHA256=${KRW_WORKER_BUNDLE_SHA256:?Missing KRW_WORKER_BUNDLE_SHA256 for the Mac worker launchd service}
+KRW_RUNTIME_IDENTITY_SHA256=${KRW_RUNTIME_IDENTITY_SHA256:?Missing KRW_RUNTIME_IDENTITY_SHA256 for the Mac worker launchd service}
+MAC_RUNTIME_ROOT=${KRW_MAC_RUNTIME_ROOT:-$FRONT_DIR}
+test -f "$MAC_RUNTIME_ROOT/scripts/start-mac-worker-production.sh" || {
+  echo "Missing Mac runtime worker start script: $MAC_RUNTIME_ROOT" >&2
+  exit 1
+}
+case "$KRW_DEPLOYMENT_ID" in
+  ''|*[!A-Za-z0-9._-]*)
+    echo "Invalid KRW_DEPLOYMENT_ID: $KRW_DEPLOYMENT_ID" >&2
+    exit 1
+    ;;
+esac
+printf '%s' "$KRW_WORKER_BUNDLE_SHA256" | grep -Eq '^[a-f0-9]{64}$' || {
+  echo "Invalid KRW_WORKER_BUNDLE_SHA256." >&2
+  exit 1
+}
+printf '%s' "$KRW_RUNTIME_IDENTITY_SHA256" | grep -Eq '^[a-f0-9]{64}$' || {
+  echo "Invalid KRW_RUNTIME_IDENTITY_SHA256." >&2
+  exit 1
+}
 KRW_LOG_DIR=${KRW_LOG_DIR:-"$HOME/krw-ontology-log"}
 WORKER_LOG_DIR=${AGENT_WORKER_LOG_DIR:-"$KRW_LOG_DIR/agent-worker/prod"}
 export AGENT_SUPERVISOR_ID
@@ -143,8 +165,11 @@ sed \
   -e "s#__WORKER_ID__#$AGENT_SUPERVISOR_ID#g" \
   -e "s#__NICE__#$MAC_WORKER_NICE#g" \
   -e "s#__ENV_FILE__#$ENV_PATH#g" \
-  -e "s#__FRONT_DIR__#$FRONT_DIR#g" \
+  -e "s#__FRONT_DIR__#$MAC_RUNTIME_ROOT#g" \
   -e "s#__WORKER_LOG_DIR__#$WORKER_LOG_DIR#g" \
+  -e "s#__DEPLOYMENT_ID__#$KRW_DEPLOYMENT_ID#g" \
+  -e "s#__WORKER_BUNDLE_SHA256__#$KRW_WORKER_BUNDLE_SHA256#g" \
+  -e "s#__RUNTIME_IDENTITY_SHA256__#$KRW_RUNTIME_IDENTITY_SHA256#g" \
   "$TEMPLATE" > "$PLIST"
 echo "Installed $PLIST for supervisor $AGENT_SUPERVISOR_ID"
 

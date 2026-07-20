@@ -1,0 +1,38 @@
+{
+  "ok": true,
+  "contract_version": "desktop-company-catalog/v2",
+  "data": {
+    "companies": [
+      {
+        "ticker": "AAPL",
+        "name": "Apple Inc.",
+        "display_name": "애플",
+        "localized_name": "애플",
+        "sector": "기술",
+        "description": "소비자 기기와 서비스 생태계를 운영합니다.",
+        "core_strength": "기기와 서비스의 결합",
+        "critical_risk": "지역별 수요와 규제",
+        "latest_period": "FY2025",
+        "document_count": 4,
+        "document_types": ["10-K", "10-Q"],
+        "coverage_label": "10-K, 10-Q",
+        "logo_url": null,
+        "suggested_prompts": [
+          "서비스 매출 성장률을 공시 기준으로 정리해줘.",
+          "아이폰 교체 수요가 매출·마진에 미치는 영향을 설명해줘.",
+          "중국 수요 둔화 리스크가 어떤 항목으로 나타나는지 확인해줘."
+        ]
+      }
+    ]
+  },
+  "meta": {
+    "catalog_release_id": "fixture-release",
+    "generated_at": "2026-06-23T00:00:00.000Z",
+    "query": "apple",
+    "total_count": 1,
+    "returned_count": 1,
+    "next_cursor": null,
+    "has_more": false,
+    "max_age_seconds": 300
+  }
+}

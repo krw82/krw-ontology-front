@@ -7,6 +7,8 @@ const PUBLIC_ERROR_MESSAGES: Record<ErrorCode, string> = {
   service_unavailable: "서비스가 일시적으로 응답하지 않습니다. 잠시 후 다시 시도해주세요.",
   not_found: "요청한 항목을 찾지 못했습니다.",
   forbidden: "이 작업을 할 권한이 없습니다.",
+  coverage_limit_reached: "Free 플랜에서는 기업 3개까지 커버리지에 추가할 수 있습니다.",
+  judgment_revision_conflict: "다른 화면에서 판단이 먼저 수정되었습니다. 최신 내용을 확인한 뒤 다시 저장해주세요.",
   active_run_exists: "이미 응답을 생성 중입니다.",
   no_active_run: "진행 중인 응답이 없습니다.",
   quota_exceeded: "주간 분석 한도에 도달했습니다.",

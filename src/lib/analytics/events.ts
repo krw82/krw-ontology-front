@@ -1,4 +1,8 @@
 import type { AnalyticsEventRow, Database, Json } from "@/types/database";
+import {
+  sanitizeAnalyticsPath,
+  sanitizeAnalyticsReferrer,
+} from "@/lib/analytics/page-context";
 
 export const ANALYTICS_EVENT_NAMES = [
   "page_viewed",
@@ -80,9 +84,40 @@ export const ANALYTICS_EVENT_NAMES = [
   "pulse_feedback_submitted",
   "pulse_source_degraded",
   "pulse_answer_prefilled",
+  "performance_metric_reported",
+  "coverage_added",
+  "coverage_status_changed",
+  "coverage_activated",
+  "filing_judgment_started",
+  "filing_judgment_completed",
+  "filing_judgment_revised",
+  "thesis_updated",
+  "monitoring_rule_created",
+  "decision_session_closed",
+  "second_opportunity_resolved",
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENT_NAMES)[number];
+
+// Outcome events are written only after their authoritative server mutation
+// succeeds. Keeping them off the browser ingestion endpoint prevents clients
+// from fabricating activation and retention cohorts.
+export const SERVER_ONLY_ANALYTICS_EVENT_NAMES = [
+  "coverage_added",
+  "coverage_status_changed",
+  "coverage_activated",
+  "filing_judgment_completed",
+  "filing_judgment_revised",
+  "thesis_updated",
+  "monitoring_rule_created",
+  "decision_session_closed",
+  "second_opportunity_resolved",
+  "sec_source_opened",
+] as const satisfies readonly AnalyticsEventName[];
+
+const serverOnlyEventNameSet = new Set<string>(
+  SERVER_ONLY_ANALYTICS_EVENT_NAMES,
+);
 
 export type AnalyticsUtmContext = Partial<
   Pick<
@@ -145,8 +180,102 @@ const FORBIDDEN_PROPERTY_KEYS = new Set([
 
 const eventNameSet = new Set<string>(ANALYTICS_EVENT_NAMES);
 
+export const DECISION_LOOP_ANALYTICS_EVENT_NAMES = [
+  "coverage_added",
+  "coverage_status_changed",
+  "coverage_activated",
+  "filing_judgment_started",
+  "filing_judgment_completed",
+  "filing_judgment_revised",
+  "thesis_updated",
+  "monitoring_rule_created",
+  "decision_session_closed",
+  "second_opportunity_resolved",
+] as const satisfies readonly AnalyticsEventName[];
+
+type DecisionLoopAnalyticsEventName =
+  (typeof DECISION_LOOP_ANALYTICS_EVENT_NAMES)[number];
+
+const decisionLoopEventNameSet = new Set<string>(
+  DECISION_LOOP_ANALYTICS_EVENT_NAMES,
+);
+
+const DECISION_LOOP_IDENTIFIER_KEYS = new Set([
+  "company_mark_id",
+  "coverage_event_id",
+  "decision_session_id",
+  "filing_event_id",
+  "judgment_id",
+  "monitoring_rule_id",
+  "revision_id",
+  "thesis_id",
+]);
+
+const DECISION_LOOP_CATEGORY_KEYS = new Set([
+  "coverage_status",
+  "form_type",
+  "impact",
+  "next_action",
+  "outcome",
+  "previous_coverage_status",
+  "previous_impact",
+  "previous_next_action",
+  "previous_status",
+  "resolution",
+  "rule_type",
+  "source",
+  "source_type",
+  "status",
+  "trigger",
+]);
+
+const DECISION_LOOP_CATEGORY_VALUES: Readonly<Record<string, readonly string[]>> = {
+  coverage_status: ["exploring", "watching", "holding", "closed"],
+  form_type: ["8-k", "8-k/a", "6-k", "6-k/a", "4", "4/a"],
+  impact: ["positive", "neutral", "negative", "unclear"],
+  next_action: ["complete", "update_thesis", "create_question", "review_later"],
+  outcome: ["completed", "updated", "unchanged", "dismissed", "deferred", "resolved", "failed"],
+  previous_coverage_status: ["none", "exploring", "watching", "holding", "closed"],
+  previous_impact: ["none", "positive", "neutral", "negative", "unclear"],
+  previous_next_action: ["none", "complete", "update_thesis", "create_question", "review_later"],
+  previous_status: ["none", "exploring", "watching", "holding", "closed", "active", "completed", "resolved"],
+  resolution: ["answered", "dismissed", "converted", "reviewed", "deferred", "expired", "resolved"],
+  rule_type: ["filing_form", "filing_item", "keyword", "scheduled_review"],
+  source: ["pulse", "filing_detail", "watchlist", "companies", "notification", "mcp", "desktop", "api", "system", "onboarding"],
+  source_type: ["filing", "question", "thesis", "monitoring_rule", "coverage", "decision_session"],
+  status: [
+    "started", "completed", "revised", "created", "active", "needs_review",
+    "weakened", "mixed", "archived", "closed", "resolved", "dismissed",
+    "deferred", "pending", "failed",
+  ],
+  trigger: ["event", "schedule", "state", "editorial", "manual", "notification"],
+};
+
+const DECISION_LOOP_NUMBER_KEYS = new Set([
+  "age_days",
+  "coverage_count",
+  "duration_ms",
+  "evidence_count",
+  "judgment_count",
+  "monitoring_rule_count",
+  "open_question_count",
+  "revision_number",
+]);
+
+const DECISION_LOOP_BOOLEAN_KEYS = new Set([
+  "has_monitoring_rule",
+  "has_previous_judgment",
+  "is_amendment",
+]);
+
 export function isAnalyticsEventName(value: unknown): value is AnalyticsEventName {
   return typeof value === "string" && eventNameSet.has(value);
+}
+
+export function isClientAnalyticsEventName(
+  value: unknown,
+): value is AnalyticsEventName {
+  return isAnalyticsEventName(value) && !serverOnlyEventNameSet.has(value);
 }
 
 export function normalizeAnalyticsText(
@@ -179,9 +308,14 @@ export function buildAnalyticsEventInsert(
     user_id: userId,
     anonymous_id: anonymousId,
     event_name: payload.eventName,
-    properties: sanitizeAnalyticsProperties(payload.properties),
-    path: normalizeAnalyticsText(payload.path),
-    referrer: normalizeAnalyticsText(payload.referrer),
+    properties: sanitizeAnalyticsEventProperties(
+      payload.eventName,
+      payload.properties,
+    ),
+    path: sanitizeAnalyticsPath(normalizeAnalyticsText(payload.path)),
+    referrer: sanitizeAnalyticsReferrer(
+      normalizeAnalyticsText(payload.referrer),
+    ),
     utm_source: normalizeAnalyticsText(payload.utm?.utm_source, 160),
     utm_medium: normalizeAnalyticsText(payload.utm?.utm_medium, 160),
     utm_campaign: normalizeAnalyticsText(payload.utm?.utm_campaign, 240),
@@ -192,6 +326,82 @@ export function buildAnalyticsEventInsert(
     run_id: normalizeAnalyticsText(payload.runId, 128),
     created_at: payload.createdAt,
   };
+}
+
+/**
+ * Decision-loop events deliberately use a narrow schema. They describe state
+ * transitions, not the user's thesis, judgment, question, or monitoring-rule
+ * prose. Unknown keys and values that look like free text are discarded before
+ * the service-role analytics insert is built.
+ */
+export function sanitizeAnalyticsEventProperties(
+  eventName: AnalyticsEventName,
+  value: Record<string, unknown> | undefined,
+): Json {
+  if (!decisionLoopEventNameSet.has(eventName)) {
+    return sanitizeAnalyticsProperties(value);
+  }
+  return sanitizeDecisionLoopAnalyticsProperties(
+    eventName as DecisionLoopAnalyticsEventName,
+    value,
+  );
+}
+
+function sanitizeDecisionLoopAnalyticsProperties(
+  _eventName: DecisionLoopAnalyticsEventName,
+  value: Record<string, unknown> | undefined,
+): Json {
+  if (!value) return {};
+  const result: Record<string, Json> = {};
+
+  const ticker = sanitizeTicker(value.ticker);
+  if (ticker) result.ticker = ticker;
+
+  for (const key of DECISION_LOOP_IDENTIFIER_KEYS) {
+    const identifier = sanitizeOpaqueIdentifier(value[key]);
+    if (identifier) result[key] = identifier;
+  }
+  for (const key of DECISION_LOOP_CATEGORY_KEYS) {
+    const category = sanitizeCategory(key, value[key]);
+    if (category) result[key] = category;
+  }
+  for (const key of DECISION_LOOP_NUMBER_KEYS) {
+    const number = sanitizeNonNegativeNumber(value[key]);
+    if (number !== null) result[key] = number;
+  }
+  for (const key of DECISION_LOOP_BOOLEAN_KEYS) {
+    if (typeof value[key] === "boolean") result[key] = value[key];
+  }
+
+  return result;
+}
+
+function sanitizeTicker(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const ticker = value.trim().toUpperCase();
+  return /^[A-Z0-9][A-Z0-9.-]{0,15}$/.test(ticker) ? ticker : null;
+}
+
+function sanitizeOpaqueIdentifier(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const identifier = value.trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier)
+    ? identifier
+    : null;
+}
+
+function sanitizeCategory(key: string, value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const category = value.trim().toLowerCase();
+  if (!DECISION_LOOP_CATEGORY_VALUES[key]?.includes(category)) return null;
+  return key === "form_type" ? category.toUpperCase() : category;
+}
+
+function sanitizeNonNegativeNumber(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return null;
+  }
+  return Math.min(value, Number.MAX_SAFE_INTEGER);
 }
 
 function sanitizeJsonValue(value: unknown, depth: number): Json | undefined {

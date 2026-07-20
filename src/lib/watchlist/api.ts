@@ -3,6 +3,11 @@ import "server-only";
 import { isPlainObject } from "@/lib/api/validation";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { normalizeTicker } from "@/lib/ontology/ticker";
+import {
+  CoverageIdempotencyConflictError,
+  CoverageLimitError,
+  ensureCompanyCoverage,
+} from "@/lib/coverage/repository";
 
 export function errorResponse(status: number, code: string, message: string) {
   return Response.json({ error: { code, message } }, { status });
@@ -101,4 +106,32 @@ export async function requireIndexedTicker(rawTicker: string | null | undefined)
   }
 
   return { ok: true as const, ticker, company };
+}
+
+export async function ensureCompanyCoverageForWrite(input: {
+  userId: string;
+  userEmail?: string | null;
+  ticker: string;
+  source: string;
+  requireActive?: boolean;
+}): Promise<Response | null> {
+  try {
+    const mark = await ensureCompanyCoverage(input);
+    if (input.requireActive && mark.coverage_status === "closed") {
+      return errorResponse(
+        409,
+        "coverage_reactivation_required",
+        "종료한 회사입니다. 커버리지를 다시 시작한 뒤 다음 확인 조건을 저장해주세요.",
+      );
+    }
+    return null;
+  } catch (error) {
+    if (error instanceof CoverageIdempotencyConflictError) {
+      return errorResponse(409, error.code, error.message);
+    }
+    if (error instanceof CoverageLimitError) {
+      return errorResponse(409, error.code, error.message);
+    }
+    return errorResponse(500, "internal_error", "회사 커버리지를 준비하지 못했습니다.");
+  }
 }

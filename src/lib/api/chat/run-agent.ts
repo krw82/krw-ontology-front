@@ -53,7 +53,8 @@ import { cancelledAssistantContent } from "@/lib/chat/message-status";
 const EXISTING_RUN_POLL_INTERVAL_MS = 800;
 const EXISTING_RUN_MAX_POLL_MS = 120_000;
 const AGENT_RUN_HARD_TIMEOUT_MS =
-  readIntEnv("AGENT_RUN_HARD_TIMEOUT_MINUTES", 10, { min: 1 }) * 60_000;
+  readIntEnv("AGENT_RUN_HARD_TIMEOUT_MINUTES", 10, { min: 1, max: 55 }) *
+  60_000;
 const RUN_TIMEOUT_MESSAGE =
   "분석 시간이 초과되었습니다. 다시 시도해주세요.";
 
@@ -284,6 +285,7 @@ export function executeRun(params: RunAgentParams): Response {
         const result = await runAgent(
           {
             sessionId: session.id,
+            userId: session.userId,
             userMessage: content,
             scopeType: session.scopeType,
             defaultTickers: session.defaultTickers,

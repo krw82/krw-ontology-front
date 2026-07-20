@@ -5,7 +5,7 @@ export PATH
 
 usage() {
   cat <<'EOF'
-Usage: scripts/mac-worker-preflight.sh [--env-file FILE] [--worker-id ID] [--skip-worker-duplicate-check] [--allow-local-queue-writer] [--deep]
+Usage: scripts/mac-worker-preflight.sh [--env-file FILE] [--worker-id ID] [--skip-worker-duplicate-check] [--skip-worker-build] [--skip-live-mcp-fingerprint] [--allow-local-queue-writer] [--deep]
 
 Validate this Mac before it is allowed to run the production agent worker.
 
@@ -28,6 +28,8 @@ EOF
 ENV_FILE=.env.mac-worker.production
 WORKER_ID_OVERRIDE=
 SKIP_WORKER_DUPLICATE_CHECK=0
+SKIP_WORKER_BUILD=0
+SKIP_LIVE_MCP_FINGERPRINT=0
 ALLOW_LOCAL_QUEUE_WRITER=${ALLOW_LOCAL_QUEUE_WRITER:-0}
 DEEP_CHECK=0
 
@@ -43,6 +45,12 @@ while [ "$#" -gt 0 ]; do
       ;;
     --skip-worker-duplicate-check)
       SKIP_WORKER_DUPLICATE_CHECK=1
+      ;;
+    --skip-worker-build)
+      SKIP_WORKER_BUILD=1
+      ;;
+    --skip-live-mcp-fingerprint)
+      SKIP_LIVE_MCP_FINGERPRINT=1
       ;;
     --allow-local-queue-writer)
       ALLOW_LOCAL_QUEUE_WRITER=1
@@ -99,6 +107,8 @@ set -a
 . "$ENV_FILE"
 set +a
 
+"$SCRIPT_DIR/verify-mac-runtime-target.sh" "$ENV_FILE"
+
 if [ -n "$WORKER_ID_OVERRIDE" ]; then
   AGENT_SUPERVISOR_ID=$WORKER_ID_OVERRIDE
 fi
@@ -116,8 +126,15 @@ KRW_GURU_ADVISOR_PLUGIN_SOURCE_PATH=${KRW_GURU_ADVISOR_PLUGIN_SOURCE_PATH:-"${KR
 KRW_GURU_ADVISOR_PLUGIN_PATH=${KRW_GURU_ADVISOR_PLUGIN_PATH:-"$FRONT_DIR/ref/plugins/prod/krw-guru-advisor"}
 KRW_GURU_DATA_ROOT=${KRW_GURU_DATA_ROOT:-"$HOME/krw-ontology-guru-data"}
 KRW_GURU_RELEASE_ROOT=${KRW_GURU_RELEASE_ROOT:-"$KRW_GURU_DATA_ROOT/releases/prod/current"}
+KRW_MAC_IMMUTABLE_RUNTIME=${KRW_MAC_IMMUTABLE_RUNTIME:-0}
+WORKER_RUNTIME_ROOT=${KRW_MAC_RUNTIME_ROOT:-$FRONT_DIR}
 
-if [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ -f "$CLAUDE_CONFIG_DIR/deepseek.env" ]; then
+if [ "${KRW_MAC_IMMUTABLE_RUNTIME:-0}" = "1" ]; then
+  [ "${KRW_SEALED_CLAUDE_ENV:-0}" = "1" ] || {
+    echo "Immutable runtime is missing its sealed Claude provider environment." >&2
+    exit 1
+  }
+elif [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ -f "$CLAUDE_CONFIG_DIR/deepseek.env" ]; then
   set -a
   # shellcheck disable=SC1090
   . "$CLAUDE_CONFIG_DIR/deepseek.env"
@@ -186,14 +203,16 @@ if [ "$KRW_ONTOLOGY_ENV" != "prod" ]; then
   exit 1
 fi
 
-case "$KRW_ONTOLOGY_RELEASE_ROOT" in
-  */releases/prod/current) ;;
-  *)
-    echo "Mac production worker requires KRW_ONTOLOGY_RELEASE_ROOT to end with /releases/prod/current." >&2
-    echo "Got: $KRW_ONTOLOGY_RELEASE_ROOT" >&2
-    exit 1
-    ;;
-esac
+if [ "$KRW_MAC_IMMUTABLE_RUNTIME" != "1" ]; then
+  case "$KRW_ONTOLOGY_RELEASE_ROOT" in
+    */releases/prod/current) ;;
+    *)
+      echo "Mac production worker requires KRW_ONTOLOGY_RELEASE_ROOT to end with /releases/prod/current." >&2
+      echo "Got: $KRW_ONTOLOGY_RELEASE_ROOT" >&2
+      exit 1
+      ;;
+  esac
+fi
 
 if [ "$KRW_ONTOLOGY_ROOT" != "$KRW_ONTOLOGY_RELEASE_ROOT" ]; then
   echo "Mac production worker requires KRW_ONTOLOGY_ROOT to equal KRW_ONTOLOGY_RELEASE_ROOT." >&2
@@ -214,11 +233,15 @@ if [ "$GLOBAL_CONCURRENT_RUN_LIMIT" -lt "$AGENT_SUPERVISOR_CONCURRENCY" ]; then
   exit 1
 fi
 
-require_command npm
 require_command node
+if [ "$SKIP_WORKER_BUILD" != "1" ]; then
+  require_command npm
+fi
 require_command ps
 require_command awk
-require_command uv
+if [ "$KRW_MAC_IMMUTABLE_RUNTIME" != "1" ]; then
+  require_command uv
+fi
 require_command "$CLAUDE_CODE_EXECUTABLE"
 
 require_path "$KRW_ONTOLOGY_ROOT"
@@ -233,23 +256,37 @@ require_path "$KRW_GURU_ADVISOR_PLUGIN_PATH/.claude-plugin/plugin.json"
 require_path "$KRW_GURU_RELEASE_ROOT"
 mkdir -p "$CLAUDE_AGENT_CWD" "$CLAUDE_CONFIG_DIR"
 
-if [ ! -L "$KRW_ONTOLOGY_RELEASE_ROOT" ]; then
+if [ "$KRW_MAC_IMMUTABLE_RUNTIME" != "1" ] && [ ! -L "$KRW_ONTOLOGY_RELEASE_ROOT" ]; then
   echo "KRW_ONTOLOGY_RELEASE_ROOT must be the prod/current symlink: $KRW_ONTOLOGY_RELEASE_ROOT" >&2
   exit 1
 fi
 
 echo "Checking prod v3 release startup contract..."
-uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology release verify \
-  --startup-check \
-  --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
-  --env prod \
-  --require-current-symlink >/dev/null
+if [ "$KRW_MAC_IMMUTABLE_RUNTIME" = "1" ]; then
+  require_path "$KRW_ONTOLOGY_SOURCE_DIR/.venv/bin/krw-ontology"
+  "$KRW_ONTOLOGY_SOURCE_DIR/.venv/bin/krw-ontology" release verify \
+    --startup-check \
+    --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
+    --env prod >/dev/null
+else
+  uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology release verify \
+    --startup-check \
+    --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
+    --env prod \
+    --require-current-symlink >/dev/null
+fi
 echo "OK prod v3 release startup contract"
 
 echo "Checking local ontology queue status..."
-queue_status_json=$(uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology queue status \
-  --root "$KRW_ONTOLOGY_QUEUE_ROOT" \
-  --json)
+if [ "$KRW_MAC_IMMUTABLE_RUNTIME" = "1" ]; then
+  queue_status_json=$("$KRW_ONTOLOGY_SOURCE_DIR/.venv/bin/krw-ontology" queue status \
+    --root "$KRW_ONTOLOGY_QUEUE_ROOT" \
+    --json)
+else
+  queue_status_json=$(uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology queue status \
+    --root "$KRW_ONTOLOGY_QUEUE_ROOT" \
+    --json)
+fi
 QUEUE_STATUS_JSON="$queue_status_json" \
 ALLOW_LOCAL_QUEUE_WRITER="$ALLOW_LOCAL_QUEUE_WRITER" \
 KRW_ONTOLOGY_QUEUE_ROOT="$KRW_ONTOLOGY_QUEUE_ROOT" \
@@ -470,10 +507,25 @@ if [ "$DEEP_CHECK" = "1" ]; then
   echo "Deep check requested; KRW Ontology v3 deep checks are release-publish offline gates."
 fi
 
-echo "Building worker bundle..."
-(cd "$FRONT_DIR" && npm run build:worker >/dev/null)
-require_path "$FRONT_DIR/.worker/agent-worker.mjs"
-echo "OK worker bundle"
+if [ "$SKIP_WORKER_BUILD" = "1" ]; then
+  echo "Verifying sealed prebuilt worker bundles..."
+else
+  echo "Building worker bundle..."
+  (cd "$WORKER_RUNTIME_ROOT" && npm run build:worker >/dev/null)
+fi
+for worker_bundle in \
+  agent-worker.mjs \
+  document-worker.mjs \
+  document-outbox-dispatcher.mjs \
+  filing-notification-worker.mjs \
+  filing-brief-worker.mjs \
+  filings-mcp-server.mjs \
+  billing-worker.mjs
+do
+  require_path "$WORKER_RUNTIME_ROOT/.worker/$worker_bundle"
+  node --check "$WORKER_RUNTIME_ROOT/.worker/$worker_bundle" >/dev/null
+done
+echo "OK worker bundles"
 
 echo "Checking Claude executable..."
 claude_version=$("$CLAUDE_CODE_EXECUTABLE" --version 2>&1)
@@ -620,8 +672,16 @@ if payload.get("global_spine_present") is not True:
 PY
 fi
 
-echo "Checking MCP v2 tool/schema/build fingerprint..."
-"$SCRIPT_DIR/verify-mcp-server-production.sh" --env-file "$ENV_FILE"
+if [ "$SKIP_LIVE_MCP_FINGERPRINT" = "1" ]; then
+  # The fast runtime switch validates the new listener after launchd restarts
+  # it. Before that point 8765 is intentionally still served by the previous
+  # runtime, so comparing it to the new source fingerprint would reject every
+  # real source upgrade.
+  echo "Skipping live MCP fingerprint verification before runtime swap."
+else
+  echo "Checking MCP v2 tool/schema/build fingerprint..."
+  "$SCRIPT_DIR/verify-mcp-server-production.sh" --env-file "$ENV_FILE"
+fi
 
 echo "Checking Supabase service-role read access..."
 (cd "$FRONT_DIR" && node <<'NODE')

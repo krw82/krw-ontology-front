@@ -159,9 +159,11 @@ describe("production deploy scripts", () => {
     }
   });
 
-  it("routes production code deploys through split web and Mac worker lanes", () => {
+  it("routes normal production aliases through the fast web and Mac path", () => {
     const deployProd = read("scripts/deploy-production.sh");
+    const deployFast = read("scripts/deploy-production-fast.sh");
     const deployAll = read("scripts/deploy-all-production.sh");
+    const deployQueue = read("scripts/deploy-production-simple.sh");
     const deployWeb = read("scripts/deploy-web-production.sh");
     const compose = read("docker-compose.yml");
     const packageJson = read("package.json");
@@ -170,26 +172,103 @@ describe("production deploy scripts", () => {
     const verifyMcpRuntime = read("scripts/verify-mcp-runtime.mjs");
     const fingerprintMcpRuntime = read("scripts/mcp-runtime-fingerprint.sh");
 
-    expect(deployProd).toContain("deploy-web-production.sh");
-    expect(deployProd).toContain("deploy-plugin-worker-production.sh");
-    expect(deployProd).toContain("supabase-cli.sh\" db push --dry-run");
-    expect(deployProd).toContain("npm run supabase:schema:smoke");
-    expect(deployProd).toContain("intentionally does not start the GCP agent-worker");
+    expect(deployProd).toContain("deploy-production-fast.sh");
+    expect(deployProd).toContain("--apply-migrations");
+    expect(deployFast).toContain("krw-ontology-front-web:candidate-");
+    expect(deployFast).toContain("Fast activation failed; restoring the previous VM image.");
+    expect(deployFast).toContain("docker compose");
+    expect(deployFast).toContain("db push --dry-run");
+    expect(deployFast).toContain("run_remote_deep_verify");
+    expect(deployFast).toContain("Removing retired GCP ontology sidecars.");
+    expect(deployFast).not.toContain("ONTOLOGY_ARCHIVE");
+    expect(deployFast).not.toContain("KRW_ONTOLOGY_SOURCE_DIR=\"$REMOTE_STAGE/ontology\"");
+    expect(deployFast).not.toContain("pause-production-cutover.sh");
+    expect(deployFast).not.toContain("deploy-all-production.sh");
 
     expect(deployAll).toContain("deploy-web-production.sh");
     expect(deployAll).toContain("deploy-plugin-worker-production.sh");
+    expect(deployAll).toContain(
+      '/bin/sh "$SCRIPT_DIR/deploy-plugin-worker-production.sh"',
+    );
+    expect(deployAll).toContain(
+      '/bin/sh "$SCRIPT_DIR/deploy-web-production.sh"',
+    );
+    expect(deployQueue).toContain(
+      '/bin/sh "$SCRIPT_DIR/deploy-all-production.sh"',
+    );
+    expect(deployQueue).toContain('/bin/sh "$0" "$@"');
     expect(deployAll).toContain("deploy-data-release-production.sh");
-    expect(deployAll).toContain("Mac worker/plugin validation");
+    expect(deployAll).toContain("--skip-release-gates");
+    expect(deployAll).toContain("Skipping slow local release gates");
+    expect(read("scripts/run-production-release-gates.sh")).toContain(
+      "run_isolated_gate_with_sigterm_retry",
+    );
+    expect(read("scripts/run-production-release-gates.sh")).toContain(
+      "Retrying $gate_label after a transient SIGTERM",
+    );
+    expect(read("scripts/run-production-release-gates.sh")).toContain(
+      "run_isolated_browser_gate_with_single_retry",
+    );
+    expect(read("scripts/run-production-release-gates.sh")).toContain(
+      "Retrying production-mode browser/PWA gate once after a failed local test-server run",
+    );
+    expect(deployAll).toContain(
+      "Retrying the sealed Supabase migration dry run once after a transient CLI failure",
+    );
+    expect(read("scripts/deploy-web-production.sh")).toContain(
+      "gcloud_scp_with_retry",
+    );
+    expect(read("scripts/deploy-web-production.sh")).toContain(
+      '--project-directory "\\$REMOTE_FRONT_DIR"',
+    );
+    expect(read("scripts/deploy-web-production.sh")).toContain(
+      "'abandon-prepared'",
+    );
+    expect(deployQueue).toContain(
+      "recover_prepared_local_cutover_if_needed",
+    );
+    expect(deployQueue).toContain(
+      "Cleaning up an unactivated prepared candidate",
+    );
+    expect(deployQueue).toContain("--recover-prepared-local-only");
+    expect(compose).toContain("WEB_COMMIT=${WEB_COMMIT:-}");
+    expect(compose).toContain("KRW_ONTOLOGY_COMMIT=${KRW_ONTOLOGY_COMMIT:-}");
+    expect(read("scripts/deploy-web-production.sh")).toContain(
+      "Retrying $scp_label upload after a transient GCP SSH copy failure",
+    );
     expect(deployAll).toContain("Deferring Mac runtime restart until the final plugin/worker deployment step.");
     expect(deployAll).toContain("plugin while the MCP/runtime fingerprints have already changed");
-    expect(deployAll.indexOf("Applying Supabase migrations")).toBeLessThan(
-      deployAll.indexOf("deploy-web-production.sh"),
+    expect(deployAll.indexOf("run-production-release-gates.sh")).toBeLessThan(
+      deployAll.indexOf('deploy-web-production.sh" --prepare-only'),
     );
-    expect(deployAll.indexOf("npm run supabase:schema:smoke")).toBeLessThan(
-      deployAll.indexOf("deploy-web-production.sh"),
+    expect(deployAll.indexOf('deploy-web-production.sh" --prepare-only')).toBeLessThan(
+      deployAll.indexOf("Applying Supabase migrations"),
+    );
+    expect(deployAll.indexOf("Applying Supabase migrations")).toBeLessThan(
+      deployAll.indexOf("Running Supabase schema smoke test"),
+    );
+    expect(deployAll.indexOf("Running Supabase schema smoke test")).toBeLessThan(
+      deployAll.indexOf('deploy-web-production.sh" --activate-prepared'),
+    );
+    expect(deployAll).toContain(
+      'KRW_FILINGS_MCP_DEFER_PERSONAL_DATA_SMOKE="$MIGRATIONS_PENDING"',
     );
     expect(deployWeb).toContain("redis document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker billing-worker");
-    expect(compose).toContain('profiles: ["legacy-gcp-agent"]');
+    expect(deployWeb).toContain(
+      "GCP instance identity probe timed out after 30 seconds",
+    );
+    expect(deployWeb).toContain(
+      "Retrying GCP instance identity probe",
+    );
+    expect(compose).not.toContain('profiles: ["legacy-gcp-agent"]');
+    expect(compose).not.toContain("  agent-worker:");
+    expect(compose).not.toContain("  ontology-mcp:");
+    expect(compose).not.toContain("krw-ontology-src");
+    const reverseProxySection = compose.slice(
+      compose.indexOf("  reverse-proxy:"),
+      compose.indexOf("\n  web:\n"),
+    );
+    expect(reverseProxySection).not.toContain("llm-gateway:");
     expect(compose).not.toContain(
       "- DESKTOP_ONTOLOGY_EXECUTOR=mcp",
     );
@@ -199,26 +278,52 @@ describe("production deploy scripts", () => {
         compose.indexOf("  llm-gateway:"),
       ),
     ).not.toContain("ontology-mcp:");
-    expect(restartCompose).toContain("document-outbox-dispatcher");
+    expect(restartCompose).toContain("Direct production Compose restarts are disabled");
     expect(read("scripts/deploy-plugin-worker-production.sh")).toContain(
       'runtime/plugins/prod/$ACTIVE_RELEASE_ID-canonical/krw-ontology',
     );
+    expect(read("scripts/deploy-plugin-worker-production.sh")).toContain(
+      'KRW_ONTOLOGY_MCP_HEALTH_URL "http://127.0.0.1:$CANDIDATE_MCP_PORT/health"',
+    );
+    expect(read("scripts/deploy-plugin-worker-production.sh")).toContain(
+      'KRW_ONTOLOGY_MCP_READY_URL "http://127.0.0.1:$CANDIDATE_MCP_PORT/readyz"',
+    );
+    expect(read("scripts/deploy-plugin-worker-production.sh")).toContain(
+      'KRW_ONTOLOGY_SOURCE_DIR="$RUNTIME_ONTOLOGY_SOURCE"',
+    );
+    expect(read("scripts/deploy-plugin-worker-production.sh")).toContain(
+      'KRW_ONTOLOGY_RELEASE_ROOT="$ACTIVE_RELEASE_ROOT"',
+    );
+    expect(read("scripts/deploy-plugin-worker-production.sh")).toContain(
+      'KRW_FILINGS_MCP_DEFER_PERSONAL_DATA_SMOKE 1',
+    );
+    expect(read("scripts/deploy-plugin-worker-production.sh")).toContain(
+      "--exclude '/.venv*/'",
+    );
+    expect(read("scripts/deploy-vm-compose.sh")).toContain(
+      "--exclude '/.venv*/'",
+    );
+    expect(read("scripts/verify-filings-mcp-production.sh")).toContain(
+      "Deferred personal filing data smoke until the post-migration production verification.",
+    );
 
-    expect(packageJson).toContain('"prod:status": "npm run mcp:prod:status && npm run worker:prod:status"');
-    expect(packageJson).toContain('"prod:deploy:web": "scripts/deploy-web-production.sh"');
-    expect(packageJson).toContain('"prod:deploy:runtime": "scripts/deploy-plugin-worker-production.sh"');
-    expect(packageJson).toContain('"prod:deploy:code": "scripts/deploy-production.sh"');
-    expect(packageJson).toContain('"prod:deploy:full": "scripts/deploy-all-production.sh --apply-migrations"');
-    expect(packageJson).toContain('"prod:deploy:safe": "scripts/deploy-with-queue-pause.sh"');
-    expect(packageJson).toContain('"prod:release:publish": "scripts/deploy-data-release-production.sh"');
-    expect(packageJson).toContain('"deploy:data": "scripts/deploy-data-release-production.sh"');
-    expect(packageJson).toContain('"deploy:worker": "scripts/deploy-worker-production.sh"');
-    expect(packageJson).toContain('"deploy:plugin": "scripts/deploy-plugin-worker-production.sh"');
-    expect(packageJson).toContain('"deploy:mcp": "scripts/deploy-plugin-worker-production.sh"');
-    expect(packageJson).toContain('"legacy:gcp-mcp": "scripts/deploy-plugin-production.sh"');
+    expect(packageJson).toContain('"prod:status": "scripts/status-production-fast.sh"');
+    expect(packageJson).toContain('"prod:preflight": "scripts/run-production-release-gates.sh"');
+    expect(packageJson).toContain('"prod:deploy:web": "scripts/deploy-production-fast.sh --skip-mac"');
+    expect(packageJson).toContain('"prod:deploy:runtime": "scripts/deploy-production-fast.sh --skip-web"');
+    expect(packageJson).toContain('"prod:deploy:code": "scripts/deploy-production-fast.sh --apply-migrations"');
+    expect(packageJson).toContain('"prod:deploy:full": "scripts/deploy-production-fast.sh --apply-migrations --with-data"');
+    expect(packageJson).toContain('"prod:deploy:dry": "scripts/deploy-production-fast.sh --dry-run --apply-migrations"');
+    expect(packageJson).toContain('"prod:deploy:safe": "scripts/deploy-production-fast.sh --apply-migrations --with-data"');
+    expect(packageJson).toContain('"prod:release:publish": "scripts/deploy-production-fast.sh --with-data --skip-web --skip-mac"');
+    expect(packageJson).toContain('"deploy:data": "scripts/deploy-production-fast.sh --with-data --skip-web --skip-mac"');
+    expect(packageJson).toContain('"deploy:worker": "scripts/deploy-production-fast.sh --skip-web"');
+    expect(packageJson).toContain('"deploy:plugin": "scripts/deploy-production-fast.sh --skip-web"');
+    expect(packageJson).toContain('"deploy:mcp": "scripts/deploy-production-fast.sh --skip-web"');
+    expect(packageJson).not.toContain("legacy:gcp-mcp");
     expect(packageJson).not.toContain("deploy-data-production.sh");
-    expect(packageJson).toContain('"deploy:plugin:gcp": "scripts/deploy-plugin-production.sh"');
-    expect(packageJson).toContain('"deploy:legacy:gcp-mcp": "scripts/deploy-plugin-production.sh"');
+    expect(packageJson).not.toContain("deploy:plugin:gcp");
+    expect(packageJson).not.toContain("deploy:legacy:gcp-mcp");
     expect(packageJson).toContain('"publish:web-catalog": "node scripts/publish-web-catalog.mjs"');
     expect(packageJson).toContain('"verify:web-catalog": "node scripts/verify-web-catalog-release.mjs"');
     expect(packageJson).toContain('"billing:prod:readiness": "scripts/verify-billing-production-readiness.sh"');
@@ -246,6 +351,10 @@ describe("production deploy scripts", () => {
     );
     expect(verifyMcp).toContain("load_expected_mcp_runtime_fingerprint");
     expect(fingerprintMcpRuntime).toContain("runtime_fingerprint_payload");
+    expect(fingerprintMcpRuntime).toContain('optional_fields = {"backend_git_sha"}');
+    expect(fingerprintMcpRuntime).toContain(
+      "configured {env_name} requires runtime fingerprint field: {field}",
+    );
     expect(fingerprintMcpRuntime).toContain(
       "KRW_MCP_EXPECTED_TOOL_SCHEMA_SHA256",
     );
@@ -261,32 +370,40 @@ describe("production deploy scripts", () => {
     expect(packageJson).toContain('"stock-news:coverage:export": "node scripts/export-stock-news-coverage.mjs"');
     expect(packageJson).toContain('"@modelcontextprotocol/sdk"');
 
-    expect(restartCompose).toContain("restart reverse-proxy web");
-    expect(restartCompose).not.toContain("restart reverse-proxy web agent-worker");
+    expect(restartCompose).not.toContain("docker compose");
+    expect(restartCompose).toContain("version-bound health and proxy-last activation");
   });
 
-  it("drains remote document workers before applying pending migrations", () => {
+  it("keeps the legacy sealed pause controller available for recovery", () => {
     const deployAll = read("scripts/deploy-all-production.sh");
-    const drain = read("scripts/drain-document-workers-for-migration.sh");
+    const pause = read("scripts/pause-production-cutover.sh");
     const operations = read("docs/OPERATIONS.md");
     const commandDocs = read("docs/DEPLOY_COMMANDS.md");
+    const migrationBlock = deployAll.slice(
+      deployAll.indexOf('echo "Applying Supabase migrations..."'),
+      deployAll.indexOf('if [ "$DB_CHECK" = "1" ]; then', deployAll.indexOf('echo "Applying Supabase migrations..."')),
+    );
 
-    expect(deployAll).toContain("DOCUMENT_INGESTION_V2_MIGRATION_PENDING=1");
-    expect(deployAll).toContain(
-      "20260710002000_document_ingestion_claim_tokens_cleanup",
-    );
+    expect(deployAll).toContain("Pending schema migrations require a prepared code cutover");
     expect(deployAll).toContain("do not use --skip-code");
-    expect(deployAll).toContain("drain-document-workers-for-migration.sh");
+    expect(deployAll).toContain("run_sealed_pause_controller pause");
     expect(
-      deployAll.indexOf("drain-document-workers-for-migration.sh"),
+      deployAll.indexOf("run_sealed_pause_controller pause"),
     ).toBeLessThan(deployAll.indexOf('echo "Applying Supabase migrations..."'));
-    expect(drain).toContain("docker compose");
-    expect(drain).toContain(
-      "stop --timeout '$DOCUMENT_WORKER_DRAIN_TIMEOUT_SECONDS' document-worker document-outbox-dispatcher",
+    const pinnedDbPushIndex = migrationBlock.indexOf(
+      '"$MIGRATION_EXECUTABLE" db push',
     );
-    expect(drain).toContain("document workers are stopped");
-    expect(operations).toContain("drain-document-workers-for-migration.sh");
-    expect(commandDocs).toContain("이전 worker를 수동으로 다시 시작하지 않는다");
+    expect(pinnedDbPushIndex).toBeGreaterThan(-1);
+    expect(migrationBlock.indexOf("ROLLBACK_UNSAFE=1")).toBeLessThan(
+      pinnedDbPushIndex,
+    );
+    expect(pause).toContain("REMOTE_PAUSE_SERVICES");
+    expect(pause).not.toContain("agent-worker ontology-mcp");
+    expect(pause).toContain("document-worker document-outbox-dispatcher");
+    expect(pause).toContain("filings-mcp filing-notification-worker filing-brief-worker billing-worker");
+    expect(pause).toContain("lsof -nP -iTCP");
+    expect(operations).toContain("scripts/deploy-production-fast.sh");
+    expect(commandDocs).toContain("새 GCP image build");
   });
 
   it("keeps dev data publish local and catalog-only", () => {
@@ -301,7 +418,12 @@ describe("production deploy scripts", () => {
     expect(packageJson).toContain('"dev:release:publish": "scripts/deploy-dev-data-release.sh"');
     expect(commandDocs).toContain("npm run dev:runtime");
     expect(commandDocs).toContain("npm run dev:release:publish -- --release-id <release_id>");
-    expect(commandDocs).toContain("npm run prod:release:publish -- --release-id <release_id>");
+    expect(commandDocs).toContain(
+      "cross-release promotion은 아직 자동화하지 않았으며",
+    );
+    expect(commandDocs).not.toContain(
+      "npm run prod:release:publish -- --release-id <release_id>",
+    );
     expect(commandDocs).toContain("deploy:data             -> prod:release:publish");
 
     expect(script).toContain("release export-web-catalog");
@@ -327,9 +449,10 @@ describe("production deploy scripts", () => {
     expect(script).toContain("release export-web-catalog");
     expect(script).toContain("publish-web-catalog.mjs");
     expect(script).toContain("verify-web-catalog-release.mjs");
-    expect(script).toContain("deploy-worker-production.sh");
-    expect(script).toContain('Release is already prod/current; skipping promote.');
-    expect(script).toContain("--release-id \"$ACTIVE_RELEASE_ID\"");
+    expect(script).not.toContain("deploy-worker-production.sh");
+    expect(script).toContain('Release is already prod/current; no promotion required.');
+    expect(script).toContain("Refusing to promote prod/current from the data-only deployment path.");
+    expect(script).toContain("Catalog publication does not restart prod MCP or Mac workers.");
     expect(script).toContain("This script does not upload full ontology data to GCP");
     expect(script).not.toContain("gcloud");
     expect(script).not.toContain("/srv/krw-ontology-data");
@@ -343,39 +466,37 @@ describe("production deploy scripts", () => {
     expect(verifyScript).toContain("Active web catalog mismatch");
   });
 
-  it("validates agent-worker after VM compose deployments", () => {
-    const script = read("scripts/deploy-vm-compose.sh");
+  it("keeps the GCP application Compose free of ontology execution", () => {
+    const compose = read("docker-compose.yml");
+    const fastDeploy = read("scripts/deploy-production-fast.sh");
+    const dockerfileWeb = read("Dockerfile.web");
 
-    expect(script).toContain("ps -q agent-worker");
-    expect(script).toContain("agent-worker did not become healthy");
-    expect(script).toContain("ps -q document-worker");
-    expect(script).toContain("document-worker did not become healthy");
-    expect(script).toContain("ps -q document-outbox-dispatcher");
-    expect(script).toContain("document-outbox-dispatcher did not become healthy");
-    expect(script).toContain("ps -q filings-mcp");
-    expect(script).toContain("filings-mcp did not become healthy");
-    expect(script).toContain("ps -q filing-notification-worker");
-    expect(script).toContain("filing-notification-worker did not become healthy");
-    expect(script).toContain("ps -q filing-brief-worker");
-    expect(script).toContain("filing-brief-worker did not become healthy");
-    expect(script).toContain("document-worker must run BullMQ backend in production");
-    expect(script).toContain("document-outbox-dispatcher missing Redis queue URL");
-    expect(script).toContain("exec -T agent-worker node");
-    expect(script).toContain("exec -T document-worker node");
-    expect(script).toContain("exec -T document-outbox-dispatcher node");
-    expect(script).toContain("exec -T filings-mcp node");
-    expect(script).toContain("exec -T filing-notification-worker node");
-    expect(script).toContain("exec -T filing-brief-worker node");
-    expect(script).toContain(".worker/agent-worker.mjs");
-    expect(script).toContain(".worker/document-worker.mjs");
-    expect(script).toContain(".worker/document-outbox-dispatcher.mjs");
-    expect(script).toContain(".worker/filings-mcp-server.mjs");
-    expect(script).toContain(".worker/filing-notification-worker.mjs");
-    expect(script).toContain(".worker/filing-brief-worker.mjs");
-    expect(script).toContain("KRW_ONTOLOGY_PLUGIN_PATH");
-    expect(script).toContain("OK web ontology data boundary: Supabase catalog only");
-    expect(script).toContain('"KRW_ONTOLOGY_MCP_URL"');
-    expect(script).not.toContain("OK plugin HTTP MCP URL");
+    expect(compose).not.toContain("  agent-worker:");
+    expect(compose).not.toContain("  ontology-mcp:");
+    expect(compose).not.toContain("KRW_ONTOLOGY_PLUGIN_PATH");
+    expect(compose).not.toContain("KRW_ONTOLOGY_MCP_URL");
+    expect(fastDeploy).not.toContain("ONTOLOGY_ARCHIVE");
+    expect(fastDeploy).not.toContain("KRW_ONTOLOGY_SOURCE_DIR");
+    expect(fastDeploy).toContain("Removing retired GCP ontology sidecars.");
+    expect(fastDeploy).toContain('"x-krw-client-ip":"127.0.0.1"');
+    expect(fastDeploy).toContain("deep health returned ${response.status}");
+    expect(fastDeploy).toContain('NEXT_PUBLIC_APP_VERSION="$RELEASE_ID" \\');
+    expect(fastDeploy).toContain(
+      'PRODUCTION_ORCHESTRATOR_ATTESTATION="$RELEASE_ID:$DATA_LOCK_OWNER"',
+    );
+    expect(dockerfileWeb).not.toContain("krw-ontology-src");
+    expect(dockerfileWeb).not.toContain("ontology-mcp:8000");
+    expect(dockerfileWeb).not.toContain("agent-worker.mjs");
+    expect(dockerfileWeb).not.toContain(
+      "COPY --from=builder --chown=nextjs:nodejs /app/.worker ./.worker",
+    );
+    expect(dockerfileWeb).toContain("/app/.worker/document-worker.mjs");
+    expect(dockerfileWeb).toContain("markitdown[pdf]");
+    expect(compose).toContain("  document-worker:");
+    expect(compose).toContain("  document-outbox-dispatcher:");
+    expect(compose).toContain("  filings-mcp:");
+    expect(compose).toContain("  filing-notification-worker:");
+    expect(compose).toContain("  filing-brief-worker:");
   });
 
   it("keeps the production client IP boundary owned by Caddy", () => {
@@ -420,12 +541,13 @@ describe("production deploy scripts", () => {
     expect(billingContract).toContain("npm run billing:prod:readiness");
     expect(billingContract).toContain("live_sk_");
     expect(commandDocs).toContain("Production billing");
-    expect(commandDocs).toContain("scripts/restart-production-compose.sh");
+    expect(commandDocs).toContain("npm run prod:deploy:code");
+    expect(commandDocs).not.toContain("scripts/restart-production-compose.sh");
     expect(commandDocs).toContain("npm run billing:prod:readiness");
   });
 
-  it("passes all production deploy switches through the safe queue wrapper", () => {
-    const script = read("scripts/deploy-with-queue-pause.sh");
+  it("keeps the normal deploy wrapper small and queue-safe", () => {
+    const script = read("scripts/deploy-production-simple.sh");
 
     for (const flag of [
       "--apply-migrations",
@@ -435,10 +557,11 @@ describe("production deploy scripts", () => {
       "--skip-worker-restart",
     ]) {
       expect(script).toContain(flag);
-      expect(script).toContain(`DEPLOY_ARGS="$DEPLOY_ARGS ${flag}"`);
     }
+    expect(script).toContain('DEPLOY_ARGS="$DEPLOY_ARGS $1"');
+    expect(script).toContain("--skip-release-gates");
     expect(script).toContain("--release-id");
-    expect(script).toContain("DEPLOY_ARGS=\"$DEPLOY_ARGS --release-id $1\"");
+    expect(script).toContain("RELEASE_ID=${2:?Missing value for --release-id}");
     expect(script).toContain("--no-publish-prod");
     expect(script).toContain("--no-refresh-index");
     expect(script).not.toContain("--no-rebuild-agent-index");
@@ -453,10 +576,10 @@ describe("production deploy scripts", () => {
     expect(script).not.toContain("agent_index.sqlite");
   });
 
-  it("fails the safe deploy when its stopped queue cannot be restarted", () => {
-    const script = read("scripts/deploy-with-queue-pause.sh");
-    const functionStart = script.indexOf("restart_queue_on_exit() {");
-    const functionEnd = script.indexOf("\n}\ntrap restart_queue_on_exit EXIT", functionStart);
+  it("fails the normal deploy when its stopped queue cannot be restarted", () => {
+    const script = read("scripts/deploy-production-simple.sh");
+    const functionStart = script.indexOf("cleanup() {");
+    const functionEnd = script.indexOf("\n}\ntrap cleanup EXIT", functionStart);
 
     expect(functionStart).toBeGreaterThanOrEqual(0);
     expect(functionEnd).toBeGreaterThan(functionStart);
@@ -472,6 +595,7 @@ RESTART_QUEUE=1
 QUEUE_WAS_RUNNING=1
 QUEUE_STOPPED_BY_SCRIPT=1
 DEPLOY_SUCCEEDED=1
+LOCK_OWNED=0
 ONTOLOGY_SOURCE_DIR=/tmp/ontology
 QUEUE_ROOT=/tmp/queue
 QUEUE_POLL_INTERVAL=1
@@ -479,7 +603,7 @@ start_queue() { return ${restartExit}; }
 queue_status() { return 0; }
 ${restartFunction}
 (exit ${priorExit})
-restart_queue_on_exit
+cleanup
 `,
         ],
         { encoding: "utf8" },
@@ -487,7 +611,7 @@ restart_queue_on_exit
 
     const failedRestart = runRestartTrap(1, 0);
     expect(failedRestart.status).toBe(1);
-    expect(failedRestart.stderr).toContain("Failed to restart queue worker");
+    expect(failedRestart.stderr).toContain("Queue restart failed");
 
     const priorFailure = runRestartTrap(1, 42);
     expect(priorFailure.status).toBe(42);
@@ -495,13 +619,13 @@ restart_queue_on_exit
     const successfulRestart = runRestartTrap(0, 0);
     expect(successfulRestart.status).toBe(0);
 
-    expect(script).toContain("trap restart_queue_on_exit EXIT");
+    expect(script).toContain("trap cleanup EXIT");
     expect(script).toContain("trap 'exit 130' INT");
     expect(script).toContain("trap 'exit 143' TERM");
-    expect(script).not.toContain("trap restart_queue_on_exit EXIT INT TERM");
+    expect(script).not.toContain("trap cleanup EXIT INT TERM");
   });
 
-  it("defines a compose healthcheck for agent-worker", () => {
+  it("keeps agent execution exclusively on the Mac runtime", () => {
     const compose = read("docker-compose.yml");
     const webStart = compose.indexOf("\n  web:\n");
     const llmGatewayStart = compose.indexOf("\n  llm-gateway:\n");
@@ -509,44 +633,20 @@ restart_queue_on_exit
       webStart,
       llmGatewayStart,
     );
-    const workerSection = compose.slice(compose.indexOf("  agent-worker:"));
-
     expect(compose).toContain(
       "AGENT_RUN_HARD_TIMEOUT_MINUTES=${AGENT_RUN_HARD_TIMEOUT_MINUTES:-10}",
     );
     expect(compose).toContain("LEASE_TIMEOUT_MINUTES=${LEASE_TIMEOUT_MINUTES:-10}");
-    expect(workerSection).toContain(
-      "LEASE_HEARTBEAT_INTERVAL_MS=${LEASE_HEARTBEAT_INTERVAL_MS:-30000}",
-    );
     expect(webSection).toContain(
       "AGENT_RUN_EVENT_LISTEN_DATABASE_URL=${AGENT_RUN_EVENT_LISTEN_DATABASE_URL:-}",
     );
     expect(webSection).toContain(
       "AGENT_EVENT_RECONCILE_INTERVAL_MS=${AGENT_EVENT_RECONCILE_INTERVAL_MS:-15000}",
     );
-    expect(workerSection).toContain(
-      "AGENT_QUEUE_LISTEN_DATABASE_URL=${AGENT_QUEUE_LISTEN_DATABASE_URL:-}",
-    );
-    expect(workerSection).toContain(
-      "AGENT_QUEUE_RECONCILE_INTERVAL_MS=${AGENT_QUEUE_RECONCILE_INTERVAL_MS:-60000}",
-    );
-    expect(workerSection).toContain(
-      "AGENT_RUN_CANCEL_LISTEN_DATABASE_URL=${AGENT_RUN_CANCEL_LISTEN_DATABASE_URL:-}",
-    );
-    expect(workerSection).toContain(
-      "AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS=${AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS:-10000}",
-    );
-    expect(workerSection).not.toContain("AGENT_WORKER_POLL_INTERVAL_MS");
-    expect(workerSection).toContain("healthcheck:");
-    expect(workerSection).toContain(".worker/agent-worker.mjs");
-    expect(workerSection).not.toContain("global_spine.sqlite");
-    expect(workerSection).not.toContain("shard_manifest.json");
-    expect(workerSection).not.toContain("agent_index.sqlite");
-    expect(workerSection).toContain(".mcp.json");
-    expect(workerSection).toContain(".krw-ontology-contract.json");
-    expect(workerSection).toContain("http://ontology-mcp:8000/mcp");
-    expect(compose).toContain("  ontology-mcp:");
-    expect(compose).toContain("Dockerfile.mcp");
+    expect(compose).not.toContain("  agent-worker:");
+    expect(compose).not.toContain("  ontology-mcp:");
+    expect(compose).not.toContain("http://ontology-mcp:8000/mcp");
+    expect(existsSync("Dockerfile.mcp")).toBe(false);
     expect(compose).toContain("  redis:");
     expect(compose).toContain("redis-server");
     expect(compose).toContain("redis_data:");
@@ -579,8 +679,10 @@ restart_queue_on_exit
     expect(webSection).not.toContain("agent_index.sqlite");
     expect(webSection).not.toContain("/srv/krw-ontology-data:/srv/krw-ontology-data");
     const dockerfileWeb = read("Dockerfile.web");
-    expect(dockerfileWeb).toContain("http://ontology-mcp:8000/mcp");
-    expect(dockerfileWeb).toContain(".krw-ontology-contract.json");
+    expect(dockerfileWeb).not.toContain("http://ontology-mcp:8000/mcp");
+    expect(dockerfileWeb).not.toContain(".krw-ontology-contract.json");
+    expect(dockerfileWeb).not.toContain("krw-ontology-src");
+    expect(dockerfileWeb).toContain("markitdown[pdf]");
     expect(dockerfileWeb).not.toContain('"command": "/opt/krw-ontology-venv/bin/krw-ontology-mcp"');
     expect(dockerfileWeb).not.toContain('"stock-news"');
     expect(dockerfileWeb).not.toContain('"http://127.0.0.1:8775/mcp"');
@@ -589,6 +691,7 @@ restart_queue_on_exit
 
   it("keeps Mac worker cutover scripts conservative", () => {
     const preflight = read("scripts/mac-worker-preflight.sh");
+    const fastDeploy = read("scripts/deploy-production-fast.sh");
     const start = read("scripts/start-mac-worker-production.sh");
     const installLaunchd = read("scripts/install-mac-worker-launchd.sh");
     const uninstallLaunchd = read("scripts/uninstall-mac-worker-launchd.sh");
@@ -598,10 +701,11 @@ restart_queue_on_exit
     const uninstallMcpLaunchd = read("scripts/uninstall-mcp-server-launchd.sh");
     const deployWorker = read("scripts/deploy-worker-production.sh");
     const deployPluginWorker = read("scripts/deploy-plugin-worker-production.sh");
+    const verifyMacRuntime = read("scripts/verify-mac-runtime-target.sh");
+    const startFilingsMcp = read("scripts/start-filings-mcp-production.sh");
+    const startStockNewsMcp = read("scripts/start-stock-news-mcp-production.sh");
     const verifyHeartbeats = read("scripts/verify-mac-worker-heartbeats.mjs");
     const statusWorkers = read("scripts/status-production-workers.sh");
-    const stopGcp = read("scripts/stop-gcp-agent-worker.sh");
-    const startGcp = read("scripts/start-gcp-agent-worker.sh");
     const packageJson = read("package.json");
 
     expect(preflight).toContain("GLOBAL_CONCURRENT_RUN_LIMIT");
@@ -615,6 +719,11 @@ restart_queue_on_exit
     expect(preflight).toContain("OK local ontology queue status via CLI");
     expect(preflight).toContain("A Mac agent supervisor with id");
     expect(preflight).toContain("--skip-worker-duplicate-check");
+    expect(preflight).toContain("--skip-live-mcp-fingerprint");
+    expect(preflight).toContain(
+      "Skipping live MCP fingerprint verification before runtime swap.",
+    );
+    expect(fastDeploy).toContain("--skip-live-mcp-fingerprint");
     expect(preflight).toContain("Checking Postgres LISTEN config");
     expect(preflight).toContain("AGENT_QUEUE_LISTEN_DATABASE_URL");
     expect(preflight).toContain("OK Postgres LISTEN smoke");
@@ -647,7 +756,20 @@ restart_queue_on_exit
     expect(start).toContain("DEEPSEEK_API_KEY");
     expect(start).toContain("mac-worker-preflight.sh");
     expect(start).toContain(".worker/agent-worker.mjs");
+    expect(start).toContain('exec "$KRW_RUNTIME_NODE_EXECUTABLE" .worker/agent-worker.mjs');
     expect(start).toContain(">> \"$LOG_FILE\" 2>&1");
+
+    expect(verifyMacRuntime).toContain("KRW_RUNTIME_NODE_EXECUTABLE");
+    expect(verifyMacRuntime).toContain('"$RUNTIME_NODE_EXECUTABLE" - "$IDENTITY_FILE"');
+    expect(verifyMacRuntime).toContain(
+      '"$RUNTIME_NODE_EXECUTABLE" "$SCRIPT_DIR/verify-prepared-runtime-artifacts.mjs"',
+    );
+    expect(startFilingsMcp).toContain(
+      'exec "$KRW_RUNTIME_NODE_EXECUTABLE" .worker/filings-mcp-server.mjs',
+    );
+    expect(startStockNewsMcp).toContain(
+      'exec "$KRW_RUNTIME_NODE_EXECUTABLE" dist/server.js',
+    );
 
     const initEnv = read("scripts/init-mac-worker-env.sh");
     expect(initEnv).toContain("~/.local/bin/claude-krw");
@@ -705,6 +827,8 @@ restart_queue_on_exit
     expect(startMcp).toContain("--store-mode");
     expect(startMcp).toContain("--log-file");
     expect(startMcp).toContain("--require-current-symlink");
+    expect(startMcp).toContain("KRW_ONTOLOGY_CURRENT_RELEASE_ROOT");
+    expect(startMcp).toContain("MCP prod/current symlink no longer resolves to the sealed runtime release.");
     const legacyMcpCommand = ["krw", "ontology", "mcp", "http"].join("-");
     expect(startMcp).not.toContain(legacyMcpCommand);
     expect(startMcp).toContain("--mcp-path");
@@ -759,10 +883,18 @@ restart_queue_on_exit
     expect(deployWorker).toContain("does not deploy or restart the GCP web container");
     expect(deployWorker).toContain("MCP HTTP server must already be healthy");
 
-    expect(deployPluginWorker).toContain("KRW_ONTOLOGY_PLUGIN_PATH mismatch");
+    expect(deployPluginWorker).toContain("KRW_ONTOLOGY_PLUGIN_PATH is not the canonical active-release plugin path");
+    expect(deployPluginWorker).toContain("KRW_ONTOLOGY_CURRENT_RELEASE_ROOT");
+    expect(deployPluginWorker).toContain("Prepared runtime current release link mismatch.");
     expect(deployPluginWorker).toContain("materialize-ontology-plugin.mjs");
     expect(deployPluginWorker).toContain("materialize-guru-advisor-plugin.mjs");
-    expect(deployPluginWorker).toContain("Guru plugin path");
+    expect(deployPluginWorker).toContain(
+      'append_env_value "$RUNTIME_ENV_PATH" KRW_RUNTIME_NODE_EXECUTABLE "$NODE_PATH"',
+    );
+    expect(read("scripts/deploy-web-production.sh")).toContain(
+      'ps -o state= -p "$gcp_probe_pid"',
+    );
+    expect(deployPluginWorker).toContain("KRW_GURU_ADVISOR_PLUGIN_PATH is not the canonical source plugin path");
     expect(deployPluginWorker).toContain("export-stock-news-coverage.mjs");
     expect(deployPluginWorker).toContain("stock-news/coverage_companies.json");
     expect(deployPluginWorker).toContain("install-mcp-server-launchd.sh");
@@ -771,7 +903,30 @@ restart_queue_on_exit
     expect(deployPluginWorker).not.toContain(
       "News discovery will still work, but fallback cards may stay in English",
     );
-    expect(deployPluginWorker).toContain("does not sync plugin code to the GCP VM");
+    expect(deployPluginWorker).toContain("versioned, immutable Mac runtime");
+    expect(deployPluginWorker).toContain("candidate runtime dependency and isolated MCP health checks");
+    expect(deployPluginWorker).toContain(
+      'npm ci --include=dev --no-audit --no-fund && npm run build:worker',
+    );
+    expect(deployPluginWorker).toContain('npm ci --omit=dev');
+    expect(deployPluginWorker).toContain("KRW_RUNTIME_IDENTITY_SHA256");
+    expect(deployPluginWorker).toContain(
+      "Retrying isolated ontology environment sync after a transient SIGTERM",
+    );
+    expect(deployPluginWorker).toContain('[ "$runtime_sync_status" -ne 143 ]');
+    const runtimeEnvCopy = deployPluginWorker.indexOf(
+      'cp "$ENV_PATH" "$RUNTIME_ENV_PATH"',
+    );
+    const runtimeEnvWritable = deployPluginWorker.indexOf(
+      'chmod 600 "$RUNTIME_ENV_PATH"',
+      runtimeEnvCopy,
+    );
+    const deepSeekMaterialization = deployPluginWorker.indexOf(
+      'node - "$CLAUDE_CONFIG_DIR/deepseek.env" "$RUNTIME_ENV_PATH"',
+    );
+    expect(runtimeEnvCopy).toBeGreaterThan(-1);
+    expect(runtimeEnvWritable).toBeGreaterThan(runtimeEnvCopy);
+    expect(deepSeekMaterialization).toBeGreaterThan(runtimeEnvWritable);
     expect(read("scripts/export-stock-news-coverage.mjs")).toContain("ontology_companies");
     expect(read("scripts/start-stock-news-mcp-production.sh")).toContain("STOCK_NEWS_COVERAGE_PATH");
     expect(read("scripts/start-stock-news-mcp-dev.sh")).toContain("STOCK_NEWS_COVERAGE_PATH");
@@ -785,15 +940,9 @@ restart_queue_on_exit
     expect(statusWorkers).toContain("AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS");
     expect(statusWorkers).toContain("MAC_WORKER_NICE");
 
-    expect(stopGcp).toContain("stop agent-worker");
-    expect(stopGcp).toContain("OK GCP agent-worker stopped");
-
-    expect(startGcp).toContain("up -d agent-worker");
-    expect(startGcp).toContain("agent-worker did not become healthy");
-
     expect(packageJson).toContain("worker:mac:preflight");
-    expect(packageJson).toContain("worker:prod:stop-gcp");
-    expect(packageJson).toContain("worker:prod:start-gcp");
+    expect(packageJson).not.toContain("worker:prod:stop-gcp");
+    expect(packageJson).not.toContain("worker:prod:start-gcp");
     expect(packageJson).toContain("mcp:prod:launchd:install");
     expect(packageJson).toContain("deploy:worker");
   });
@@ -828,5 +977,21 @@ restart_queue_on_exit
     );
     expect(mcpClient).toContain("verifyMaterializedOntologyPluginContract");
     expect(mcpClient).not.toContain("runStdioMcpHealth");
+  });
+
+  it("keeps source directories named coverage in the fast deployment archive", () => {
+    const fastDeploy = read("scripts/deploy-production-fast.sh");
+
+    expect(fastDeploy).toContain("tar --no-xattrs -C \"$FRONT_DIR\"");
+    expect(fastDeploy).not.toContain("--exclude=coverage");
+    expect(fastDeploy).toContain("--exclude=marketing-video");
+    expect(fastDeploy).toContain("--exclude=.playwright-mcp");
+    expect(fastDeploy).toContain("--exclude=.lazyweb");
+    expect(fastDeploy).toContain("--exclude=.vendor");
+    expect(fastDeploy).toContain("--exclude=krw-ontology");
+    expect(fastDeploy).not.toContain("ONTOLOGY_ARCHIVE");
+    expect(fastDeploy).not.toContain("KRW_ONTOLOGY_SOURCE_DIR");
+    expect(fastDeploy).toContain("upload_archive");
+    expect(fastDeploy).toContain("ServerAliveInterval=15");
   });
 });

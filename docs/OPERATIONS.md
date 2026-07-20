@@ -28,34 +28,23 @@ The detailed deploy command reference is
 
 ## Deployment Gate
 
-Production deploys must pass these checks before traffic is considered healthy.
+Run the broad local release gate when the change warrants it:
 
 ```bash
-npm run verify:sdk-freeze
-npm run supabase:db:push:dry
-npm run supabase:schema:smoke
-npm run check
-npm run test:e2e
+npm run prod:preflight
 ```
 
-`scripts/deploy-all-production.sh` runs migration drift checks and schema smoke by default. Use `--skip-db-check` only for emergency static asset rollback where no DB-dependent code changed.
-The GCP compose deploy also starts the persistent Redis document queue,
-BullMQ `document-worker`, and `document-outbox-dispatcher`; treat the deploy as
-incomplete if either document service is not running.
+For a no-mutation target and migration check, run:
 
-When `--apply-migrations` finds the document-ingestion claim-token migration,
-the production deploy first stops and verifies the remote document worker and
-outbox dispatcher through `scripts/drain-document-workers-for-migration.sh`.
-Apply the migration only after that gate passes; the following compose deploy
-starts the new worker binary. Do not manually restart the old document worker
-between the drain and the migration. This migration rejects `--skip-code`,
-because the worker must restart with the v2 binary immediately afterwards.
+```bash
+npm run prod:deploy:dry
+```
 
-The repository currently verifies this migration with focused unit/static tests;
-it does not bundle a disposable local Supabase integration harness. Before the
-production cutover, run the migration on staging, verify the duplicate-job
-preflight, complete one document, force one cleanup retry, and confirm an
-expired failed attachment is cleaned by the reconciliation loop.
+The fast deploy path runs a Supabase migration dry-run before an actual
+`db push`, then runs the schema smoke after it. GCP image builds happen while
+the current containers continue to serve traffic. Redis remains persistent;
+the document, filing, billing, and LLM application services are recreated with
+the new web image.
 
 ## Data Deploy
 
@@ -70,7 +59,7 @@ uv run krw-ontology quality check
 uv run krw-ontology release materialize-prod <release_id>
 
 cd ~/krw-ontology-front
-npm run prod:release:publish -- --release-id <release_id>
+npm run prod:release:publish
 ```
 
 The expected production index paths are:
@@ -81,41 +70,75 @@ The expected production index paths are:
 ~/krw-ontology-data/releases/prod/current/indexes/companies/<TICKER>.sqlite
 ```
 
-`prod:release:publish` verifies the release, exports a compact
-`web_catalog.json`, publishes that catalog to Supabase, restarts prod MCP, then
-restarts Mac workers.
+`prod:release:publish` verifies the already-active `prod/current`, exports a
+compact `web_catalog.json`, and publishes that catalog to Supabase. It does not
+promote another release or restart prod MCP/Mac workers.
 
 It does not upload the v3 SQLite indexes to GCP.
 
 ## Web And Plugin Deploy
 
-For GCP web/API only:
+The normal deploy driver is `scripts/deploy-production-fast.sh`. It retains the
+legacy sealed scripts only for bootstrap and interrupted-cutover recovery.
+
+For GCP web/API and application worker containers only:
 
 ```bash
 npm run prod:deploy:web
 ```
 
-For plugin/skills/MCP/worker runtime only:
-
 ```bash
 npm run prod:deploy:runtime
 ```
 
-For routine code deploys without ontology release changes:
+This restarts only the Mac MCP/worker runtime.
+
+For routine code deploys with pending migrations but without catalog publication:
 
 ```bash
 npm run prod:deploy:code
 ```
 
-For DB migration, ontology release, web, and runtime together:
+For DB migration, active catalog publication, web, and runtime together:
 
 ```bash
-npm run prod:deploy:full -- --release-id <release_id>
+npm run prod:deploy:full
 ```
 
-This path applies pending Supabase migrations before code deploy, then brings up
-GCP web/API, Redis, `document-worker`, `document-outbox-dispatcher`, billing,
-the filing-notification worker, and the prod runtime.
+The full path builds the new GCP image before it applies a migration, publishes
+only the already-active catalog, switches the application containers, restarts
+the Mac runtime, and checks private deep health plus both public origins.
+If public GCP health fails during the switch, it retags and starts the previous
+GCP image automatically. Database migrations are not automatically reversed.
+
+If this Mac is still running the legacy mutable launchd paths and has no sealed
+immutable runtime pointer, the first cutover must instead be:
+
+```bash
+npm run prod:deploy:bootstrap
+```
+
+This is a one-time full cutover. It prepares and seals the new Mac runtime and
+the exact GCP rollback before stopping legacy launchd. The legacy Mac runtime is
+never restarted after that boundary: a pre-migration failure restores GCP only
+and leaves Mac fail-closed; a post-migration failure leaves both lanes
+fail-closed. Never delete the permanent bootstrap marker or repeat this command
+after a successful immutable activation.
+
+If the orchestrator is killed or the host reboots before the migration marker,
+recover under a new kernel lock by adopting the owner recorded in
+`.deploy/cutover-phase-<deployment_id>.env`:
+
+```bash
+npm run prod:deploy:recover -- \
+  --recover-cutover <deployment_id> \
+  --recovery-action resume \
+  --previous-lock-owner <recorded_lock_owner>
+```
+
+Use `resume-remote` instead of `resume` for the one-time unsealed bootstrap
+boundary. Recovery revalidates every local and remote seal before changing the
+durable owner and is refused after migration has started.
 
 ## Health Checks
 
@@ -198,16 +221,39 @@ Do not leave old VM IP redirect URLs in hosted Auth settings.
 
 ## Rollback
 
-Rollback order:
+If the fast GCP container switch or public health check fails, the script
+retags the previous `krw-ontology-front-web:local` image and recreates the
+application services using the previous simple release configuration (or the
+standard live Compose configuration on the first fast deploy). Do not manually
+restart containers while that rollback is in progress.
 
-1. If the issue is ontology/index related, roll back `prod/current` to the
-   previous release and run `npm run prod:deploy:runtime`.
-2. If the issue is catalog publication, republish the previous release with
-   `npm run prod:release:publish -- --release-id <previous_release_id>`.
-3. If the issue is web/runtime code, deploy the previous Git revision with
-   `npm run prod:deploy:code`.
-4. Verify `npm run prod:status`, `/api/healthz`, and a real chat smoke test
-   before declaring recovery.
+After `supabase db push`, schema rollback is deliberately manual: use a
+forward-compatible follow-up migration or the legacy recovery process if the
+incident requires a sealed runtime investigation. Do not manually repoint
+`prod/current`. For current-release catalog publication only, rerun
+`npm run prod:release:publish`.
+
+Before declaring recovery, verify `npm run prod:status`, both public
+`/api/healthz` origins, private deep health, exact worker deployment/runtime
+identity, and one real chat smoke test.
+
+## Deployment Lock And Recovery
+
+Normal production mutation enters through `scripts/deploy-production-fast.sh`.
+It holds a macOS kernel `lockf` lock and does not pause the local ontology queue:
+normal code deploys do not change `prod/current`. The large
+`deploy-production-simple.sh` and `deploy-with-queue-pause.sh` paths are
+reserved for sealed bootstrap or interrupted-cutover recovery, not everyday
+deployment. Do not invoke low-level GCP, Mac runtime, data, Compose, or restart
+scripts as bypass lanes.
+
+## Schema Cache Gate
+
+The post-migration smoke test uses bounded requests and exact non-mutating RPC
+signature probes for document ingestion claims. A stale PostgREST schema cache
+that would surface as `PGRST202` blocks the container switch. The orchestrator
+retries the smoke briefly for cache convergence; if it still fails, the current
+GCP runtime remains running and the operator must assess the applied schema.
 
 ## Incident Notes
 

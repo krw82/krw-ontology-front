@@ -566,14 +566,14 @@ export default function ProductOnboardingTour({
               <div className="mt-base flex items-center justify-between gap-xs">
                 <button
                   type="button"
-                  className="inline-flex h-10 items-center rounded-[8px] px-sm text-[13px] font-bold text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="inline-flex h-11 items-center rounded-[8px] px-sm text-[13px] font-bold text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   onClick={completeTour}
                 >
                   {copy.skip}
                 </button>
                 <button
                   type="button"
-                  className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-surface-dark px-sm text-[13px] font-bold text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  className="inline-flex h-11 items-center gap-2 rounded-[8px] bg-surface-dark px-sm text-[13px] font-bold text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                   onClick={goToNextStep}
                 >
                   <span>{isLastStep ? copy.done : copy.next}</span>

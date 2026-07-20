@@ -5,9 +5,7 @@ import { makePulseItemKey, type PulseCandidate } from "@/lib/pulse/contract";
 import type { Database, Json, SecFilingFormType } from "@/types/database";
 
 type PulseFilingRowV3 = Database["public"]["Functions"]["get_catalog_pulse_filing_candidates_v3"]["Returns"][number];
-type PulseFilingRowV2 = Database["public"]["Functions"]["get_catalog_pulse_filing_candidates_v2"]["Returns"][number];
-type LegacyGlobalFilingRow = Database["public"]["Functions"]["get_catalog_global_filing_feed"]["Returns"][number];
-type FilingRow = PulseFilingRowV3 | PulseFilingRowV2 | LegacyGlobalFilingRow;
+type FilingRow = PulseFilingRowV3;
 
 type FilingBriefPreview = {
   headline: string;
@@ -17,11 +15,10 @@ type FilingBriefPreview = {
   generatedAt: string | null;
 };
 
-const LEGACY_FILING_READ_BATCH_SIZE = 200;
 export const MAX_PULSE_FILING_CANDIDATES = 300;
 
 /**
- * Global, catalog-scoped filing source. The v2 RPC returns a bounded blend of
+ * Global, catalog-scoped filing source. The v3 RPC returns a bounded blend of
  * urgent, high-priority, preferred-company, and discovery candidates. It keeps
  * the source cheap while the shared composer applies user state and final rank.
  */
@@ -42,62 +39,8 @@ export async function getFilingCandidates(
     p_discovery_limit: 40,
   };
   const v3 = await supabase.rpc("get_catalog_pulse_filing_candidates_v3", params);
-  if (!v3.error) return (v3.data ?? []).slice(0, MAX_PULSE_FILING_CANDIDATES).map(toCandidate);
-  if (!isMissingCandidateRpc(v3.error, "get_catalog_pulse_filing_candidates_v3")) throw v3.error;
-
-  const v2 = await supabase.rpc("get_catalog_pulse_filing_candidates_v2", params);
-  if (!v2.error) return (v2.data ?? []).slice(0, MAX_PULSE_FILING_CANDIDATES).map(toCandidate);
-  if (!isMissingCandidateRpc(v2.error, "get_catalog_pulse_filing_candidates_v2")) throw v2.error;
-
-  // Additive migrations are deployed before the web image. This bounded
-  // fallback keeps Pulse readable during the brief schema-cache propagation
-  // window without reintroducing the historical unbounded traversal.
-  return getLegacyBoundedCandidates(supabase, env, snapshotAt);
-}
-
-async function getLegacyBoundedCandidates(
-  supabase: SupabaseClient<Database>,
-  env: "dev" | "staging" | "prod",
-  snapshotAt: string,
-): Promise<PulseCandidate[]> {
-  const rows: LegacyGlobalFilingRow[] = [];
-  let beforeOccurredAt: string | null = null;
-  let beforeFilingEventId: string | null = null;
-
-  while (rows.length < MAX_PULSE_FILING_CANDIDATES) {
-    const result = await supabase.rpc("get_catalog_global_filing_feed", {
-      p_env: env,
-      p_snapshot_at: snapshotAt,
-      p_before_occurred_at: beforeOccurredAt,
-      p_before_filing_event_id: beforeFilingEventId,
-      p_limit: Math.min(LEGACY_FILING_READ_BATCH_SIZE, MAX_PULSE_FILING_CANDIDATES - rows.length),
-    }) as unknown as { data: LegacyGlobalFilingRow[] | null; error: { message?: string; code?: string } | null };
-    if (result.error) throw result.error;
-    const page: LegacyGlobalFilingRow[] = result.data ?? [];
-    rows.push(...page);
-    if (page.length < LEGACY_FILING_READ_BATCH_SIZE) break;
-    const boundary = page.at(-1);
-    if (!boundary) break;
-    beforeOccurredAt = boundary.occurred_at;
-    beforeFilingEventId = boundary.filing_event_id;
-  }
-
-  return rows.map(toCandidate);
-}
-
-/**
- * Compatibility helper for legacy notification-card grouping. Global catalog
- * feed cards intentionally no longer call it: one durable filing-event UUID
- * maps to one user-state key.
- */
-export function filingGroupKey(
-  event: { alert_priority: "urgent" | "normal" | "digest"; cik: string },
-  notificationId: string,
-  eventTime: number,
-): string {
-  return event.alert_priority === "urgent"
-    ? `urgent:${notificationId}`
-    : `${event.cik}:${Math.floor(eventTime / 600_000)}`;
+  if (v3.error) throw v3.error;
+  return (v3.data ?? []).slice(0, MAX_PULSE_FILING_CANDIDATES).map(toCandidate);
 }
 
 function filingCatalogEnv(): "dev" | "staging" | "prod" {
@@ -124,6 +67,9 @@ function toCandidate(event: FilingRow): PulseCandidate {
     source_type: "filing",
     source_id: event.filing_event_id,
     ticker: event.ticker,
+    coverage_status: null,
+    judgment: null,
+    linked_thesis: null,
     eyebrow: form4
       ? (event.is_amendment ? "내부자 거래 정정" : "내부자 거래")
       : (event.is_amendment ? `${event.form_type} 정정 공시` : `${event.form_type} 새 공시`),
@@ -135,14 +81,12 @@ function toCandidate(event: FilingRow): PulseCandidate {
     occurred_at: event.occurred_at,
     available_at: event.feed_available_at ?? event.first_seen_at,
     expires_at: event.feed_expires_at,
-    read_at: null,
     saved_at: null,
     snoozed_until: null,
     group_key: null,
     primary_action: { type: "link", label: "공시 보기", href: `/filings/${encodeURIComponent(event.filing_event_id)}?source=pulse` },
     secondary_actions: [
       { type: "link", label: brief ? "이 요약으로 질문" : "이 공시로 질문", href: `/chat/new?${prompt}`, analytics_name: "pulse_answer_prefilled" },
-      { type: "mutation", label: "검토 완료", action: "review" },
       { type: "mutation", label: "내일 다시 보기", action: "snooze" },
     ],
     metadata: {
@@ -150,12 +94,13 @@ function toCandidate(event: FilingRow): PulseCandidate {
       alert_priority: event.alert_priority,
       primary_event_tag: event.primary_event_tag,
       covered_ticker_count: event.covered_tickers.length,
+      covered_tickers_csv: event.covered_tickers.join(","),
       is_amendment: event.is_amendment,
       form4_has_reported_open_market_trade: event.form4_has_reported_open_market_trade,
       form4_reported_purchase_value: event.form4_reported_purchase_value,
       form4_reported_sale_value: event.form4_reported_sale_value,
       form4_tenb5_one_status: event.form4_tenb5_one_status,
-      candidate_bucket: "candidate_bucket" in event ? event.candidate_bucket : "legacy_bounded",
+      candidate_bucket: event.candidate_bucket,
       filing_brief_ready: Boolean(brief),
       filing_brief_fact_count: brief?.factCount ?? 0,
       filing_brief_generated_at: brief?.generatedAt ?? null,
@@ -247,12 +192,4 @@ function formatUsd(value: number | null): string | null {
 
 export function isGlobalFilingForm(value: string): value is SecFilingFormType {
   return ["8-K", "8-K/A", "6-K", "6-K/A", "4", "4/A"].includes(value);
-}
-
-function isMissingCandidateRpc(
-  error: { code?: string | null; message?: string | null },
-  functionName: string,
-): boolean {
-  return error.code === "PGRST202"
-    || Boolean(error.message?.includes(functionName));
 }

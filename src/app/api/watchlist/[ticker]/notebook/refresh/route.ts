@@ -10,8 +10,16 @@ import {
   releaseExecutionBudget,
   settleExecutionBudget,
 } from "@/lib/concurrency/execution-budget";
+import {
+  invalidOriginResponse,
+  isExpectedMutationOrigin,
+} from "@/lib/filing-notifications/request";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { errorResponse, requireIndexedTicker } from "@/lib/watchlist/api";
+import {
+  ensureCompanyCoverageForWrite,
+  errorResponse,
+  requireIndexedTicker,
+} from "@/lib/watchlist/api";
 import {
   generateResearchNotebookMarkdown,
   generateResearchNotebookOpenQuestions,
@@ -95,9 +103,10 @@ export async function GET(
 }
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ ticker: string }> },
 ) {
+  if (!isExpectedMutationOrigin(request)) return invalidOriginResponse();
   let user;
   try {
     user = await getAuthUser();
@@ -131,6 +140,14 @@ export async function POST(
       "노트북에 반영할 완료된 최근 대화가 없습니다.",
     );
   }
+
+  const coverageError = await ensureCompanyCoverageForWrite({
+    userId: user.id,
+    userEmail: user.email,
+    ticker: tickerResult.ticker,
+    source: "notebook_refreshed",
+  });
+  if (coverageError) return coverageError;
 
   const creditRequestId = randomUUID();
   const budgetResult = await reserveBudgetStep(
@@ -289,7 +306,6 @@ async function runNotebookRefreshJob(
       });
     }
 
-    await touchMark(context.userId, context.ticker);
     await admin
       .from("user_company_notebook_refresh_jobs")
       .update({
@@ -455,20 +471,4 @@ async function expireStaleRefreshJob(
 
   if (error || !data) return job;
   return data;
-}
-
-async function touchMark(userId: string, ticker: string) {
-  const now = new Date().toISOString();
-  await getSupabaseAdmin()
-    .from("user_company_marks")
-    .upsert(
-      {
-        user_id: userId,
-        ticker,
-        is_watchlisted: true,
-        last_activity_at: now,
-        updated_at: now,
-      },
-      { onConflict: "user_id,ticker" },
-    );
 }

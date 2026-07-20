@@ -1,7 +1,12 @@
 import type { NextRequest } from "next/server";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
+import {
+  invalidOriginResponse,
+  isExpectedMutationOrigin,
+} from "@/lib/filing-notifications/request";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
+  ensureCompanyCoverageForWrite,
   errorResponse,
   parseJsonObject,
   requireIndexedTicker,
@@ -45,6 +50,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ ticker: string }> },
 ) {
+  if (!isExpectedMutationOrigin(request)) return invalidOriginResponse();
   let user;
   try {
     user = await getAuthUser();
@@ -70,6 +76,14 @@ export async function POST(
     return errorResponse(400, "validation_error", "질문을 입력해주세요.");
   }
 
+  const coverageError = await ensureCompanyCoverageForWrite({
+    userId: user.id,
+    userEmail: user.email,
+    ticker: tickerResult.ticker,
+    source: "question_created",
+  });
+  if (coverageError) return coverageError;
+
   const { data, error } = await getSupabaseAdmin()
     .from("user_company_questions")
     .insert({
@@ -85,22 +99,5 @@ export async function POST(
     return errorResponse(500, "internal_error", "열린 질문을 저장하지 못했습니다.");
   }
 
-  await touchMark(user.id, tickerResult.ticker);
   return Response.json({ question: data }, { status: 201 });
-}
-
-async function touchMark(userId: string, ticker: string) {
-  const now = new Date().toISOString();
-  await getSupabaseAdmin()
-    .from("user_company_marks")
-    .upsert(
-      {
-        user_id: userId,
-        ticker,
-        is_watchlisted: true,
-        last_activity_at: now,
-        updated_at: now,
-      },
-      { onConflict: "user_id,ticker" },
-    );
 }

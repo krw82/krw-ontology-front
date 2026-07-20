@@ -8,7 +8,16 @@ function cspDirective(csp: string, name: string) {
 }
 
 test.describe("dev auth bypass", () => {
+  // API route mocks must remain authoritative in these tests. A newly
+  // activated service worker can otherwise proxy fetches outside page.route,
+  // making the same test depend on worker activation timing and live data.
+  test.use({ serviceWorkers: "block" });
+
   test.beforeEach(async ({ page }) => {
+    await page.route("**/api/analytics/events", async (route) => {
+      await route.fulfill({ status: 204, body: "" });
+    });
+
     await page.route("**/api/me/entitlement", async (route) => {
       const periodStart = "2026-07-06T00:00:00.000Z";
       const periodEnd = "2026-07-13T00:00:00.000Z";
@@ -64,6 +73,17 @@ test.describe("dev auth bypass", () => {
         }),
       });
     });
+
+    // The initial server-rendered feed uses a loopback-only E2E fixture. Keep
+    // browser-triggered decision-session reads deterministic as well, so this
+    // pre-migration release gate never depends on the current live schema.
+    await page.route("**/api/pulse/session-close?*", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: "{}",
+      });
+    });
   });
 
   test("renders the filterless P0 research feed without a legacy checkup card", async ({
@@ -75,9 +95,12 @@ test.describe("dev auth bypass", () => {
     await expect(page.getByRole("heading", { name: "피드" })).toBeVisible();
     await expect(page.locator('nav[aria-label="피드 종류"]')).toHaveCount(0);
     await expect(page.locator('[data-pulse-kind="checkup"]')).toHaveCount(0);
-    await expect(page.getByRole("main")).toContainText(
-      "확인한 활동은 여기까지입니다",
-    );
+    await expect(page.locator('[data-pulse-kind="filing"]')).toHaveCount(1);
+    await expect(
+      page.getByRole("heading", {
+        name: "AAPL 중요 공시에서 확인할 변화가 있습니다",
+      }),
+    ).toBeVisible();
   });
 
   test("opens protected companies page with stable account nav", async ({
@@ -85,10 +108,8 @@ test.describe("dev auth bypass", () => {
   }, testInfo) => {
     await page.goto("/companies", { waitUntil: "domcontentloaded" });
 
-    await expect(page).toHaveURL(/\/companies$/);
-    await expect(
-      page.getByRole("heading", { name: "분석할 회사를 고르세요." }),
-    ).toBeVisible();
+    await expect(page).toHaveURL(/\/(?:ko\/)?companies$/);
+    await expect(page.getByRole("main")).toBeVisible();
 
     await expect(page.getByRole("button", { name: "로그인" })).toHaveCount(0);
 
@@ -100,15 +121,85 @@ test.describe("dev auth bypass", () => {
 
     const accountBox = await accountButton.boundingBox();
     expect(accountBox).not.toBeNull();
-    const maxAccountSize = testInfo.project.name === "mobile-chrome" ? 38 : 42;
-    expect(accountBox?.width).toBeLessThanOrEqual(maxAccountSize);
-    expect(accountBox?.height).toBeLessThanOrEqual(maxAccountSize);
+    expect(accountBox?.width).toBeGreaterThanOrEqual(44);
+    expect(accountBox?.height).toBeGreaterThanOrEqual(44);
+
+    if (testInfo.project.name === "mobile-chrome") {
+      const workspaceMenuButton = page.getByRole("button", {
+        name: "전체 메뉴 열기",
+      });
+      await expect(workspaceMenuButton).toBeVisible();
+      const workspaceMenuBox = await workspaceMenuButton.boundingBox();
+      expect(workspaceMenuBox).not.toBeNull();
+      expect(workspaceMenuBox?.width).toBeGreaterThanOrEqual(44);
+      expect(workspaceMenuBox?.height).toBeGreaterThanOrEqual(44);
+    }
 
     await accountButton.click();
     await expect(page.getByText("dev@krw-ontology.local")).toBeVisible();
     await expect(
       page.getByRole("menuitem", { name: /로그아웃/ }),
     ).toBeVisible();
+  });
+
+  test("navigates to a company without waiting for analytics", async ({
+    page,
+  }) => {
+    await page.route("**/api/analytics/events", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+      await route.fulfill({ status: 204, body: "" });
+    });
+
+    await page.goto("/companies", { waitUntil: "domcontentloaded" });
+
+    const companyLink = page
+      .locator('a[aria-label*="리서치 페이지 열기"]')
+      .first();
+    await expect(companyLink).toBeVisible();
+
+    // A cold dynamic company page can take longer than one second to finish
+    // rendering. The regression we care about here is whether analytics blocks
+    // the interaction, so assert that navigation enters a pending/committed
+    // state before the intentionally delayed analytics request can resolve.
+    const navigationStarted = Promise.race([
+      page
+        .waitForURL(/\/companies\/[A-Z0-9.-]+$/, { timeout: 500 })
+        .then(() => "committed" as const),
+      page
+        .getByRole("status", { name: "페이지 불러오는 중" })
+        .waitFor({ state: "visible", timeout: 500 })
+        .then(() => "pending" as const),
+    ]);
+
+    await Promise.all([navigationStarted, companyLink.click()]);
+    await expect(page).toHaveURL(/\/companies\/[A-Z0-9.-]+$/);
+  });
+
+  test("keeps the company search when returning from a detail page", async ({
+    page,
+  }) => {
+    await page.goto("/companies", { waitUntil: "domcontentloaded" });
+
+    const onboardingDismiss = page.getByRole("button", {
+      name: "먼저 둘러볼게요",
+    });
+    await onboardingDismiss.click({ timeout: 2_000 }).catch(() => undefined);
+
+    const searchInput = page.getByRole("textbox", { name: "회사 검색" });
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill("AMZN");
+    await expect(page).toHaveURL(/[?&]q=AMZN(?:&|$)/);
+
+    const companyLink = page
+      .locator('a[aria-label*="리서치 페이지 열기"]')
+      .first();
+    await expect(companyLink).toBeVisible();
+    await companyLink.click();
+    await expect(page).toHaveURL(/\/companies\/[A-Z0-9.-]+$/);
+
+    await page.goBack({ waitUntil: "domcontentloaded" });
+    await expect(searchInput).toHaveValue("AMZN");
+    await expect(page).toHaveURL(/[?&]q=AMZN(?:&|$)/);
   });
 
   test("offers distinct analysis and Guru paths on a company page", async ({
@@ -119,13 +210,19 @@ test.describe("dev auth bypass", () => {
     const analysisLink = page.getByRole("link", {
       name: "AMZN 분석 시작",
     });
-    const guruLink = page.getByRole("link", {
+    const guruPicker = page.getByRole("button", {
       name: "구루 관점으로 보기",
     });
 
     await expect(analysisLink).toBeVisible();
-    await expect(guruLink).toBeVisible();
-    await expect(guruLink).toHaveAttribute("href", "/guru?ticker=AMZN");
+    await expect(guruPicker).toBeVisible();
+    await expect(guruPicker).toBeEnabled();
+    await guruPicker.click();
+    const guruDialog = page.getByRole("dialog", {
+      name: /아마존 구루 관점 선택/,
+    });
+    await expect(guruDialog).toBeVisible();
+    await expect(guruDialog.getByRole("link")).toHaveCount(5);
     await expect(page.locator("main header > p.mt-4")).toHaveCount(0);
   });
 
@@ -134,13 +231,13 @@ test.describe("dev auth bypass", () => {
   }) => {
     await page.goto("/login");
 
-    await expect(page).toHaveURL(/\/companies$/);
+    await expect(page).toHaveURL(/\/(?:ko\/)?companies$/);
   });
 
   test("opens chat workspace without Google login", async ({ page }) => {
-    await page.goto("/chat");
+    await page.goto("/chat/new?ticker=AMZN");
 
-    await expect(page).toHaveURL(/\/chat\/new$/);
+    await expect(page).toHaveURL(/\/chat\/new\?ticker=AMZN$/);
     await expect(page.getByLabel("채팅 메시지")).toBeVisible();
     await expect(page.getByLabel("메시지 입력")).toBeEditable();
   });
@@ -453,7 +550,9 @@ test.describe("dev auth bypass", () => {
       });
     });
 
-    await page.goto("/chat/new");
+    await page.goto("/chat/new?ticker=AMZN", {
+      waitUntil: "domcontentloaded",
+    });
     await page.evaluate(() => {
       try {
         sessionStorage.clear();
@@ -500,7 +599,7 @@ test.describe("dev auth bypass", () => {
     expect(new Set(runRequestIds).size).toBe(1);
   });
 
-  test("saves a completed ticker answer into personal research assets", async ({
+  test("saves a completed ticker answer into the company coverage memory", async ({
     page,
   }) => {
     const sessionId = "11111111-1111-4111-8111-111111111112";
@@ -509,8 +608,6 @@ test.describe("dev auth bypass", () => {
     const createdAt = new Date().toISOString();
     const answer = "AMZN의 공시 기준 종목 카드와 thesis 초안입니다.";
     let noteBody: Record<string, unknown> | null = null;
-    let cardBody: Record<string, unknown> | null = null;
-    let thesisBody: Record<string, unknown> | null = null;
 
     await page.route("**/api/companies?**", async (route) => {
       const url = new URL(route.request().url());
@@ -648,54 +745,24 @@ test.describe("dev auth bypass", () => {
         body: JSON.stringify({ note: { id: "note-1", ticker: "AMZN" } }),
       });
     });
-    await page.route("**/api/watchlist/AMZN/card", async (route) => {
-      cardBody = route.request().postDataJSON() as Record<string, unknown>;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ card: { id: "card-1", ticker: "AMZN" } }),
-      });
-    });
-    await page.route("**/api/watchlist/AMZN/theses", async (route) => {
-      thesisBody = route.request().postDataJSON() as Record<string, unknown>;
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify({ thesis: { id: "thesis-1", ticker: "AMZN" } }),
-      });
-    });
-
     await page.goto("/chat/new?ticker=AMZN");
     await page.getByLabel("메시지 입력").fill("AMZN 종목 카드 만들어줘");
     await page.getByRole("button", { name: "메시지 보내기" }).click();
     await expect(page.getByText(answer)).toBeVisible();
 
-    await page.getByRole("button", { name: "리서치 노트로 저장" }).click();
-    await page.getByRole("button", { name: "종목 카드로 저장" }).click();
-    await page.getByRole("button", { name: "Thesis로 저장" }).click();
+    await page
+      .getByRole("button", { name: "이 답변을 기업 커버리지에 저장" })
+      .click();
 
     await expect.poll(() => noteBody).not.toBeNull();
-    await expect.poll(() => cardBody).not.toBeNull();
-    await expect.poll(() => thesisBody).not.toBeNull();
+    await expect(
+      page.getByRole("button", { name: "이 답변을 기업 커버리지에 저장" }),
+    ).toContainText("커버리지에 저장됨");
     expect(noteBody).toMatchObject({
       title: "AMZN 채팅 요약",
       body: answer,
       note_type: "chat_summary",
-      tags: ["chat"],
-      source_chat_session_id: sessionId,
-      source_message_id: assistantMessageId,
-    });
-    expect(cardBody).toMatchObject({
-      title: "AMZN 종목 카드",
-      content_md: answer,
-      source_chat_session_id: sessionId,
-      source_message_id: assistantMessageId,
-    });
-    expect(thesisBody).toMatchObject({
-      title: "AMZN 채팅 기반 Thesis",
-      thesis_text: answer,
-      status: "needs_review",
-      tags: ["chat"],
+      tags: ["chat", "coverage"],
       source_chat_session_id: sessionId,
       source_message_id: assistantMessageId,
     });

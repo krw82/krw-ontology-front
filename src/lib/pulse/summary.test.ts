@@ -11,6 +11,9 @@ function candidate(kind: PulseCandidate["kind"], key: string, overrides: Partial
     source_type: kind,
     source_id: key,
     ticker: kind === "learning" ? null : "AAPL",
+    coverage_status: kind === "learning" ? null : "watching",
+    judgment: null,
+    linked_thesis: null,
     eyebrow: "항목",
     title: key,
     body: "body",
@@ -20,7 +23,6 @@ function candidate(kind: PulseCandidate["kind"], key: string, overrides: Partial
     occurred_at: "2026-07-15T00:00:00.000Z",
     available_at: "2026-07-15T00:00:00.000Z",
     expires_at: null,
-    read_at: null,
     saved_at: null,
     snoozed_until: null,
     group_key: null,
@@ -38,7 +40,7 @@ describe("Pulse summary", () => {
       candidate("analysis", "active", { phase: "active", metadata: { run_status: "running" } }),
       candidate("analysis", "done", { phase: "completed", metadata: { run_status: "completed" } }),
       candidate("filing", "filing", { priority: "urgent" }),
-      candidate("question", "reviewed", { reviewed_at: "2026-07-15T01:00:00.000Z", read_at: "2026-07-15T01:00:00.000Z" }),
+      candidate("question", "reviewed", { reviewed_at: "2026-07-15T01:00:00.000Z" }),
     ], new Date("2026-07-15T12:00:00.000Z"));
 
     expect(buildPulseSummary(ranked)).toEqual({

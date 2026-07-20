@@ -65,6 +65,12 @@ set -a
 . "$ENV_PATH"
 set +a
 
+MAC_RUNTIME_ROOT=${KRW_MAC_RUNTIME_ROOT:-$FRONT_DIR}
+if [ ! -f "$MAC_RUNTIME_ROOT/scripts/start-mcp-server-production.sh" ]; then
+  echo "Missing Mac runtime MCP start script: $MAC_RUNTIME_ROOT" >&2
+  exit 1
+fi
+
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "Missing required command: $1" >&2
@@ -192,7 +198,7 @@ sed \
   -e "s#__MAXFILES__#$MCP_SERVER_MAXFILES#g" \
   -e "s#__ENV_FILE__#$ENV_PATH#g" \
   -e "s#__LOG_DIR__#$MCP_LOG_DIR#g" \
-  -e "s#__FRONT_DIR__#$FRONT_DIR#g" \
+  -e "s#__FRONT_DIR__#$MAC_RUNTIME_ROOT#g" \
   "$TEMPLATE" > "$PLIST"
 echo "Installed $PLIST"
 
@@ -203,7 +209,6 @@ if [ "$LOAD" != "1" ]; then
   exit 0
 fi
 
-require_command uv
 require_env KRW_ONTOLOGY_SOURCE_DIR
 require_env KRW_ONTOLOGY_RELEASE_ROOT
 if [ "${KRW_ONTOLOGY_ENV:-}" != "prod" ]; then
@@ -216,14 +221,37 @@ if [ ! -f "$KRW_ONTOLOGY_SOURCE_DIR/pyproject.toml" ]; then
 fi
 
 PREFLIGHT_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/krw-mcp-prod-preflight.XXXXXX")
-if ! uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology release verify \
-  --startup-check \
-  --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
-  --env prod \
-  --require-current-symlink >"$PREFLIGHT_OUTPUT" 2>&1; then
+if [ "${KRW_MAC_IMMUTABLE_RUNTIME:-0}" = "1" ]; then
+  IMMUTABLE_KRW_CLI="$KRW_ONTOLOGY_SOURCE_DIR/.venv/bin/krw-ontology"
+  test -x "$IMMUTABLE_KRW_CLI" || {
+    echo "Missing immutable KRW Ontology CLI: $IMMUTABLE_KRW_CLI" >&2
+    rm -f "$PREFLIGHT_OUTPUT"
+    exit 1
+  }
+  if ! "$IMMUTABLE_KRW_CLI" release verify \
+    --startup-check \
+    --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
+    --env prod >"$PREFLIGHT_OUTPUT" 2>&1; then
+    preflight_failed=1
+  else
+    preflight_failed=0
+  fi
+else
+  require_command uv
+  if ! uv --directory "$KRW_ONTOLOGY_SOURCE_DIR" run krw-ontology release verify \
+    --startup-check \
+    --root "$KRW_ONTOLOGY_RELEASE_ROOT" \
+    --env prod \
+    --require-current-symlink >"$PREFLIGHT_OUTPUT" 2>&1; then
+    preflight_failed=1
+  else
+    preflight_failed=0
+  fi
+fi
+if [ "$preflight_failed" = "1" ]; then
   cat "$PREFLIGHT_OUTPUT" >&2
   rm -f "$PREFLIGHT_OUTPUT"
-  echo "Refusing to restart MCP: target prod/current is not a valid v3 startup release." >&2
+  echo "Refusing to restart MCP: pinned production release is not a valid v3 startup release." >&2
   exit 1
 fi
 TARGET_RELEASE_ID=$(awk -F': ' '/^release_id:/{print $2; exit}' "$PREFLIGHT_OUTPUT")

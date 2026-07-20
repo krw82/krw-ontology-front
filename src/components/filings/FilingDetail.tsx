@@ -5,6 +5,10 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { filingClassificationReason, filingEventTagLabel } from "@/lib/filing-notifications/classification";
 import { trackClientEventSilently } from "@/lib/analytics/client";
+import FilingOnboardingDecision from "@/components/filings/FilingOnboardingDecision";
+import { DEFAULT_LOCALE, isLocale } from "@/i18n/config";
+import { localizedPath } from "@/i18n/routing";
+import { normalizeCoverageContinuePath } from "@/lib/onboarding/coverage-flow";
 
 type Filing = {
   id: string;
@@ -80,6 +84,15 @@ export default function FilingDetail({ eventId }: { eventId: string }) {
   const searchParams = useSearchParams();
   const notificationId = searchParams.get("notification");
   const fromPulse = searchParams.get("source") === "pulse";
+  const coverageOnboarding = searchParams.get("onboarding") === "coverage";
+  const requestedContextTicker = searchParams.get("ticker");
+  const requestedLocale = searchParams.get("locale");
+  const onboardingLocale = isLocale(requestedLocale)
+    ? requestedLocale
+    : DEFAULT_LOCALE;
+  const onboardingContinuePath = normalizeCoverageContinuePath(
+    searchParams.get("continue"),
+  );
   const [filing, setFiling] = useState<Filing | null>(null);
   const [documents, setDocuments] = useState<FilingDocument[]>([]);
   const [keywordMatches, setKeywordMatches] = useState<KeywordMatch[]>([]);
@@ -90,7 +103,15 @@ export default function FilingDetail({ eventId }: { eventId: string }) {
 
   useEffect(() => {
     let active = true;
-    void fetch(`/api/filings/${encodeURIComponent(eventId)}`, { cache: "no-store" })
+    const detailParams = new URLSearchParams();
+    if (requestedContextTicker) {
+      detailParams.set("ticker", requestedContextTicker);
+    }
+    const detailQuery = detailParams.toString();
+    void fetch(
+      `/api/filings/${encodeURIComponent(eventId)}${detailQuery ? `?${detailQuery}` : ""}`,
+      { cache: "no-store" },
+    )
       .then(async (response) => {
         if (!response.ok) throw new Error("filing_unavailable");
         return response.json() as Promise<{ filing: Filing; documents: FilingDocument[]; keyword_matches?: KeywordMatch[]; brief?: FilingBrief | null; unread_count?: number }>;
@@ -111,7 +132,7 @@ export default function FilingDetail({ eventId }: { eventId: string }) {
         if (active) setError("공시 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
       });
     return () => { active = false; };
-  }, [eventId, notificationId]);
+  }, [eventId, notificationId, requestedContextTicker]);
 
   if (error) return <p className="rounded-[8px] bg-surface-soft p-md text-sm text-muted">{error}</p>;
   if (!filing) return <p className="text-sm text-muted">공시 정보를 불러오는 중…</p>;
@@ -139,9 +160,15 @@ export default function FilingDetail({ eventId }: { eventId: string }) {
       setLoadingComparison(false);
     }
   };
+  const onboardingParams = new URLSearchParams({ onboarding: "coverage" });
+  if (onboardingContinuePath) {
+    onboardingParams.set("continue", onboardingContinuePath);
+  }
+  const onboardingCompanyHref = `${localizedPath(onboardingLocale, `/companies/${encodeURIComponent(filing.display_ticker)}`)}?${onboardingParams.toString()}`;
+  const onboardingCompaniesHref = `${localizedPath(onboardingLocale, "/companies")}?${onboardingParams.toString()}`;
 
   return <article>
-    <Link href={fromPulse ? "/pulse" : "/filings"} className="inline-flex text-sm font-bold text-primary underline underline-offset-4">← {fromPulse ? "피드" : "공시함"}</Link>
+    <Link href={coverageOnboarding ? onboardingCompanyHref : fromPulse ? "/pulse" : "/filings"} className="inline-flex min-h-11 items-center px-xs text-sm font-bold text-primary underline underline-offset-4">← {coverageOnboarding ? `${filing.display_ticker} 회사` : fromPulse ? "피드" : "공시함"}</Link>
     <div className="mt-lg rounded-[10px] border border-hairline bg-canvas p-lg shadow-sm">
       <div className="flex flex-wrap items-center gap-2 text-xs font-black tracking-[0.04em] text-primary"><span>{filing.display_ticker}</span><span className="rounded-[5px] border border-current/20 px-1.5 py-0.5">{filing.form_type}</span></div>
       <h1 className="mt-sm text-2xl font-black tracking-[-0.04em] text-ink">{eventLabel ?? "새 SEC 공시"}</h1>
@@ -151,41 +178,43 @@ export default function FilingDetail({ eventId }: { eventId: string }) {
       {keywordMatches.length ? <div className="mt-md rounded-[7px] bg-surface-soft px-sm py-sm"><p className="text-xs font-extrabold text-ink">내 키워드 규칙 일치</p>{keywordMatches.slice(0, 2).map((match) => <p key={match.id} className="mt-1 text-xs leading-5 text-muted">{match.matched_context}</p>)}</div> : null}
     </div>
 
-    {brief ? <FilingBriefPanel brief={brief} filingEventId={filing.id} /> : null}
+    {coverageOnboarding ? <FilingOnboardingDecision filingEventId={filing.id} ticker={filing.display_ticker} formType={filing.form_type} sourceHref={outboundFilingHref(filing.id, { target: filing.primary_document_url ? "primary" : "index", context_ticker: filing.display_ticker })} companiesHref={onboardingCompaniesHref} continueHref={onboardingContinuePath} /> : null}
+
+    {brief ? <FilingBriefPanel brief={brief} filingEventId={filing.id} contextTicker={filing.display_ticker} /> : null}
 
     <section className="mt-lg rounded-[10px] border border-hairline bg-canvas p-lg">
       <h2 className="text-base font-extrabold text-ink">권장 첨부문서</h2>
-      {recommended ? <DocumentLink document={recommended} eventId={filing.id} recommended /> : <p className="mt-sm text-sm leading-6 text-muted">{filing.enrichment_status === "failed" ? "첨부 목록을 불러오지 못했습니다. SEC 제출목록에서 원문을 확인해주세요." : "추천할 별도 첨부가 없거나, SEC 제출목록에서 원문을 확인해야 합니다."}</p>}
-      {filing.primary_document_url ? <a href={outboundFilingHref(filing.id, { target: "primary" })} target="_blank" rel="noreferrer" className="mt-md inline-flex min-h-10 items-center rounded-[7px] border border-hairline px-base text-sm font-extrabold text-ink transition-colors hover:border-primary hover:text-primary">주요 제출문서 열기<span aria-hidden="true" className="material-symbols-outlined ml-1 text-[16px]">open_in_new</span></a> : null}
-      {documents.length ? <details className="mt-md"><summary className="cursor-pointer text-sm font-bold text-primary">전체 제출문서 {documents.length}개</summary><div className="mt-sm space-y-sm">{documents.map((document) => <DocumentLink key={document.id} document={document} eventId={filing.id} />)}</div></details> : null}
-      <a href={outboundFilingHref(filing.id, { target: "index" })} target="_blank" rel="noreferrer" className="mt-md inline-flex min-h-10 items-center rounded-[7px] border border-hairline px-base text-sm font-extrabold text-ink transition-colors hover:border-primary hover:text-primary">전체 SEC 제출목록 열기<span aria-hidden="true" className="material-symbols-outlined ml-1 text-[16px]">open_in_new</span></a>
+      {recommended ? <DocumentLink document={recommended} eventId={filing.id} contextTicker={filing.display_ticker} recommended /> : <p className="mt-sm text-sm leading-6 text-muted">{filing.enrichment_status === "failed" ? "첨부 목록을 불러오지 못했습니다. SEC 제출목록에서 원문을 확인해주세요." : "추천할 별도 첨부가 없거나, SEC 제출목록에서 원문을 확인해야 합니다."}</p>}
+      {filing.primary_document_url ? <a href={outboundFilingHref(filing.id, { target: "primary", context_ticker: filing.display_ticker })} target="_blank" rel="noreferrer" className="mt-md inline-flex min-h-11 items-center rounded-[7px] border border-hairline px-base text-sm font-extrabold text-ink transition-colors hover:border-primary hover:text-primary">주요 제출문서 열기<span aria-hidden="true" className="material-symbols-outlined ml-1 text-[16px]">open_in_new</span></a> : null}
+      {documents.length ? <details className="mt-md"><summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-bold text-primary">전체 제출문서 {documents.length}개</summary><div className="mt-sm space-y-sm">{documents.map((document) => <DocumentLink key={document.id} document={document} eventId={filing.id} contextTicker={filing.display_ticker} />)}</div></details> : null}
+      <a href={outboundFilingHref(filing.id, { target: "index", context_ticker: filing.display_ticker })} target="_blank" rel="noreferrer" className="mt-md inline-flex min-h-11 items-center rounded-[7px] border border-hairline px-base text-sm font-extrabold text-ink transition-colors hover:border-primary hover:text-primary">전체 SEC 제출목록 열기<span aria-hidden="true" className="material-symbols-outlined ml-1 text-[16px]">open_in_new</span></a>
     </section>
 
     {filing.is_amendment ? <section className="mt-lg rounded-[10px] border border-hairline bg-canvas p-lg">
-      <div className="flex flex-wrap items-center justify-between gap-sm"><div><h2 className="text-base font-extrabold text-ink">정정 전과 비교</h2><p className="mt-xs text-sm leading-6 text-muted">SEC가 원본을 명확히 연결할 수 있을 때만 원본과 정정본의 문서 차이를 보여줍니다.</p></div>{!amendmentComparison ? <button type="button" onClick={() => void loadAmendmentComparison()} disabled={loadingComparison} className="min-h-10 rounded-[7px] border border-hairline px-base text-sm font-extrabold text-ink transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60">{loadingComparison ? "비교 준비 중…" : "원본과 비교"}</button> : null}</div>
-      {amendmentComparison ? <AmendmentComparisonPanel comparison={amendmentComparison} /> : null}
+      <div className="flex flex-wrap items-center justify-between gap-sm"><div><h2 className="text-base font-extrabold text-ink">정정 전과 비교</h2><p className="mt-xs text-sm leading-6 text-muted">SEC가 원본을 명확히 연결할 수 있을 때만 원본과 정정본의 문서 차이를 보여줍니다.</p></div>{!amendmentComparison ? <button type="button" onClick={() => void loadAmendmentComparison()} disabled={loadingComparison} className="min-h-11 rounded-[7px] border border-hairline px-base text-sm font-extrabold text-ink transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60">{loadingComparison ? "비교 준비 중…" : "원본과 비교"}</button> : null}</div>
+      {amendmentComparison ? <AmendmentComparisonPanel comparison={amendmentComparison} contextTicker={filing.display_ticker} /> : null}
     </section> : null}
 
     <section className="mt-lg rounded-[10px] border border-primary/25 bg-primary-fixed p-lg">
       <h2 className="text-base font-extrabold text-ink">이 공시를 KRW.O로 더 확인하기</h2>
       <p className="mt-xs text-sm leading-6 text-muted">원문 기반 자동 요약은 투자 판단을 대신하지 않습니다. 필요할 때만 SEC 원문을 다시 확인하는 질문을 시작합니다.</p>
-      <Link href={`/chat/new?${new URLSearchParams({ ticker: filing.display_ticker, filing_event_id: filing.id, query: analysisQuery }).toString()}`} onClick={() => trackClientEventSilently("filing_analysis_started", { filing_event_id: filing.id, ticker: filing.display_ticker })} className="mt-md inline-flex min-h-10 items-center rounded-[7px] bg-primary px-base text-sm font-extrabold text-on-primary hover:bg-primary-active">이 공시 분석 시작</Link>
+      <Link href={`/chat/new?${new URLSearchParams({ ticker: filing.display_ticker, filing_event_id: filing.id, query: analysisQuery }).toString()}`} onClick={() => trackClientEventSilently("filing_analysis_started", { filing_event_id: filing.id, ticker: filing.display_ticker })} className="mt-md inline-flex min-h-11 items-center rounded-[7px] bg-primary px-base text-sm font-extrabold text-on-primary hover:bg-primary-active">이 공시 분석 시작</Link>
     </section>
   </article>;
 }
 
-function FilingBriefPanel({ brief, filingEventId }: { brief: FilingBrief; filingEventId: string }) {
+function FilingBriefPanel({ brief, filingEventId, contextTicker }: { brief: FilingBrief; filingEventId: string; contextTicker: string }) {
   return <section className="mt-lg rounded-[10px] border border-[#cbdcff] bg-[#f6f9ff] p-lg">
     <div className="flex flex-wrap items-start justify-between gap-sm">
       <div>
         <p className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-[0.08em] text-primary"><span className="material-symbols-outlined text-[15px]" aria-hidden="true">format_quote</span>원문 기반 자동 요약</p>
         <h2 className="mt-sm text-lg font-black tracking-[-0.03em] text-ink">{brief.headline_ko}</h2>
       </div>
-      <a href={brief.source_document_url} target="_blank" rel="noreferrer" onClick={() => trackClientEventSilently("sec_source_opened", { filing_event_id: filingEventId, source: "filing_brief" })} className="inline-flex min-h-9 shrink-0 items-center rounded-[7px] border border-primary/30 bg-white px-sm text-xs font-extrabold text-primary hover:bg-primary-fixed">원문 열기<span aria-hidden="true" className="material-symbols-outlined ml-1 text-[15px]">open_in_new</span></a>
+      <a href={outboundFilingHref(filingEventId, { target: "brief", context_ticker: contextTicker })} target="_blank" rel="noreferrer" className="inline-flex min-h-11 shrink-0 items-center rounded-[7px] border border-primary/30 bg-white px-sm text-xs font-extrabold text-primary hover:bg-primary-fixed">원문 열기<span aria-hidden="true" className="material-symbols-outlined ml-1 text-[15px]">open_in_new</span></a>
     </div>
     <div className="mt-md space-y-2 text-sm leading-6 text-body">{brief.summary_sentences.map((sentence) => <p key={sentence}>{sentence}</p>)}</div>
     <details className="mt-md rounded-[8px] border border-primary/15 bg-white px-sm py-sm">
-      <summary className="cursor-pointer text-sm font-extrabold text-ink">근거 인용 {brief.facts.length}개</summary>
+      <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-extrabold text-ink">근거 인용 {brief.facts.length}개</summary>
       <div className="mt-sm space-y-sm">{brief.facts.map((fact, index) => <div key={`${fact.section_key}-${index}`} className="border-l-2 border-primary/40 pl-sm"><p className="text-sm font-bold text-ink">{fact.fact_ko}</p><p className="mt-1 text-xs font-semibold text-muted">{fact.section_heading}</p><blockquote className="mt-1 text-xs leading-5 text-muted">“{fact.source_quote}”</blockquote></div>)}</div>
     </details>
     {brief.uncertainty_notes.length ? <p className="mt-sm text-xs leading-5 text-muted">{brief.uncertainty_notes.join(" · ")}</p> : null}
@@ -193,19 +222,19 @@ function FilingBriefPanel({ brief, filingEventId }: { brief: FilingBrief; filing
   </section>;
 }
 
-function AmendmentComparisonPanel({ comparison }: { comparison: AmendmentComparison }) {
+function AmendmentComparisonPanel({ comparison, contextTicker }: { comparison: AmendmentComparison; contextTicker: string }) {
   if (!comparison.available) return <p className="mt-md rounded-[7px] bg-surface-soft px-sm py-sm text-sm leading-6 text-muted">{comparison.message ?? "비교 가능한 원본 공시를 찾지 못했습니다."}</p>;
   const textDiff = comparison.text_diff;
   return <div className="mt-md space-y-sm">
-    {comparison.original ? <Link href={`/filings/${encodeURIComponent(comparison.original.id)}`} className="inline-flex text-sm font-bold text-primary underline underline-offset-4">원본 {comparison.original.form_type} · {formatDate(comparison.original.filing_date)} 보기</Link> : null}
+    {comparison.original ? <Link href={`/filings/${encodeURIComponent(comparison.original.id)}?${new URLSearchParams({ ticker: contextTicker }).toString()}`} className="inline-flex min-h-11 items-center px-xs text-sm font-bold text-primary underline underline-offset-4">원본 {comparison.original.form_type} · {formatDate(comparison.original.filing_date)} 보기</Link> : null}
     {textDiff ? <div className="rounded-[7px] bg-surface-soft px-sm py-sm"><p className="text-sm font-extrabold text-ink">원본 대비 <span className="text-emerald-700">{textDiff.addedLines}줄 추가</span> · <span className="text-rose-700">{textDiff.removedLines}줄 삭제</span></p><p className="mt-1 text-xs leading-5 text-muted">원본 {textDiff.comparedOriginalLines}줄과 정정본 {textDiff.comparedAmendmentLines}줄의 정규화된 앞부분을 비교했습니다.</p>{textDiff.lines.length ? <div className="mt-sm space-y-1">{textDiff.lines.map((line, index) => <p key={`${line.kind}-${index}`} className={`rounded-[5px] px-2 py-1 text-xs leading-5 ${line.kind === "added" ? "bg-emerald-50 text-emerald-900" : "bg-rose-50 text-rose-900"}`}><span className="mr-1 font-black" aria-hidden="true">{line.kind === "added" ? "+" : "−"}</span>{line.text}</p>)}</div> : null}</div> : null}
     {comparison.document_changes && (comparison.document_changes.added.length || comparison.document_changes.removed.length) ? <div className="rounded-[7px] border border-hairline px-sm py-sm text-xs leading-5 text-muted">{comparison.document_changes.added.length ? <p>새 첨부: {comparison.document_changes.added.join(", ")}</p> : null}{comparison.document_changes.removed.length ? <p>제외된 첨부: {comparison.document_changes.removed.join(", ")}</p> : null}</div> : null}
     {comparison.note ? <p className="text-xs leading-5 text-muted">{comparison.note}</p> : null}
   </div>;
 }
 
-function DocumentLink({ document, eventId, recommended = false }: { document: FilingDocument; eventId: string; recommended?: boolean }) {
-  return <a href={outboundFilingHref(eventId, { document: document.id })} target="_blank" rel="noreferrer" className={`flex items-center justify-between gap-sm rounded-[8px] border px-base py-sm transition-colors hover:border-primary ${recommended ? "border-primary/35 bg-primary-fixed" : "border-hairline"}`}><span className="min-w-0"><span className="block truncate text-sm font-extrabold text-ink">{recommended ? "주요 첨부문서 · " : ""}{document.description || document.document_name}</span><span className="mt-0.5 block truncate text-xs text-muted">{document.document_type || "SEC 문서"} · {document.document_name}</span></span><span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[18px] text-muted">open_in_new</span></a>;
+function DocumentLink({ document, eventId, contextTicker, recommended = false }: { document: FilingDocument; eventId: string; contextTicker: string; recommended?: boolean }) {
+  return <a href={outboundFilingHref(eventId, { document: document.id, context_ticker: contextTicker })} target="_blank" rel="noreferrer" className={`flex items-center justify-between gap-sm rounded-[8px] border px-base py-sm transition-colors hover:border-primary ${recommended ? "border-primary/35 bg-primary-fixed" : "border-hairline"}`}><span className="min-w-0"><span className="block truncate text-sm font-extrabold text-ink">{recommended ? "주요 첨부문서 · " : ""}{document.description || document.document_name}</span><span className="mt-0.5 block truncate text-xs text-muted">{document.document_type || "SEC 문서"} · {document.document_name}</span></span><span aria-hidden="true" className="material-symbols-outlined shrink-0 text-[18px] text-muted">open_in_new</span></a>;
 }
 
 function outboundFilingHref(eventId: string, params: Record<string, string>) {

@@ -20,13 +20,28 @@ vi.mock("@/lib/ontology/catalog", () => ({
   getIndexedCompanies: vi.fn(),
   getIndexedCompany: vi.fn(),
 }));
-vi.mock("@/lib/supabase/admin", () => ({
-  getSupabaseAdmin: vi.fn(),
+vi.mock("@/lib/coverage/repository", () => ({
+  CoverageIdempotencyConflictError: class CoverageIdempotencyConflictError extends Error {
+    readonly code = "idempotency_conflict";
+  },
+  CoverageLimitError: class CoverageLimitError extends Error {
+    readonly code = "coverage_limit_reached";
+  },
+  setCompanyCoverageStatusWithEvent: vi.fn(),
+}));
+vi.mock("@/lib/coverage/analytics", () => ({
+  recordCoverageMutationAnalytics: vi.fn(),
+}));
+vi.mock("@/lib/filing-notifications/request", () => ({
+  isExpectedMutationOrigin: vi.fn(() => true),
+  invalidOriginResponse: vi.fn(() =>
+    Response.json({ error: { code: "forbidden" } }, { status: 403 }),
+  ),
 }));
 
 import { getAuthUser } from "@/lib/auth";
+import { setCompanyCoverageStatusWithEvent } from "@/lib/coverage/repository";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
-import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { POST } from "./route";
 
 function postRequest(body: unknown) {
@@ -35,44 +50,6 @@ function postRequest(body: unknown) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-}
-
-function createAdmin() {
-  const writes: Array<{ table: string; payload: unknown; options: unknown }> = [];
-  const admin = {
-    from(table: string) {
-      return {
-        upsert(payload: unknown, options: unknown) {
-          writes.push({ table, payload, options });
-          return {
-            select() {
-              return {
-                single() {
-                  return Promise.resolve({
-                    data: {
-                      user_id: "user-1",
-                      ticker: "AAPL",
-                      is_watchlisted: true,
-                      is_holding: true,
-                      priority: 0,
-                      interest_reason: "제품 전환 확인",
-                      tags: ["long-term", "ai"],
-                      last_activity_at: "2026-06-13T00:00:00.000Z",
-                      created_at: "2026-06-13T00:00:00.000Z",
-                      updated_at: "2026-06-13T00:00:00.000Z",
-                    },
-                    error: null,
-                  });
-                },
-              };
-            },
-          };
-        },
-      };
-    },
-  } as unknown as ReturnType<typeof getSupabaseAdmin>;
-
-  return { admin, writes };
 }
 
 async function json(response: Response) {
@@ -96,14 +73,29 @@ describe("POST /api/watchlist", () => {
       ticker: "AAPL",
       name: "Apple Inc.",
     } as Awaited<ReturnType<typeof getIndexedCompany>>);
-    const fake = createAdmin();
-    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+    vi.mocked(setCompanyCoverageStatusWithEvent).mockResolvedValue({
+      mark: {
+        user_id: "user-1",
+        ticker: "AAPL",
+        coverage_status: "holding",
+        priority: 0,
+        interest_reason: "제품 전환 확인",
+        tags: ["long-term", "ai"],
+        last_activity_at: "2026-06-13T00:00:00.000Z",
+        created_at: "2026-06-13T00:00:00.000Z",
+        updated_at: "2026-06-13T00:00:00.000Z",
+      },
+      eventId: "00000000-0000-4000-8000-000000000010",
+      previousStatus: null,
+      changed: true,
+      idempotentReplay: false,
+    });
 
     const response = await POST(
       postRequest({
         ticker: " aapl ",
-        is_watchlisted: true,
-        is_holding: true,
+        coverage_status: "holding",
+        client_mutation_id: "coverage-AAPL-1",
         interest_reason: "제품 전환 확인",
         tags: ["long-term", "ai", "ai"],
       }),
@@ -114,26 +106,20 @@ describe("POST /api/watchlist", () => {
       mark: { ticker: "AAPL", tags: ["long-term", "ai"] },
     });
     expect(getIndexedCompany).toHaveBeenCalledWith("AAPL");
-    expect(fake.writes).toHaveLength(1);
-    expect(fake.writes[0]).toMatchObject({
-      table: "user_company_marks",
-      options: { onConflict: "user_id,ticker" },
-      payload: {
-        user_id: "user-1",
-        ticker: "AAPL",
-        is_watchlisted: true,
-        is_holding: true,
-        interest_reason: "제품 전환 확인",
-        tags: ["long-term", "ai"],
-      },
+    expect(setCompanyCoverageStatusWithEvent).toHaveBeenCalledWith({
+      userId: "user-1",
+      userEmail: "user@example.test",
+      ticker: "AAPL",
+      coverageStatus: "holding",
+      idempotencyKey: "coverage-AAPL-1",
+      source: "watchlist_create",
+      interestReason: "제품 전환 확인",
+      tags: ["long-term", "ai"],
     });
   });
 
   it("rejects unknown tickers before writing user data", async () => {
     vi.mocked(getIndexedCompany).mockResolvedValue(null);
-    const fake = createAdmin();
-    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
-
     const response = await POST(postRequest({ ticker: "NOPE" }));
 
     expect(response.status).toBe(400);
@@ -143,14 +129,11 @@ describe("POST /api/watchlist", () => {
         message: "현재 온톨로지 인덱스에 없는 회사입니다: NOPE",
       },
     });
-    expect(fake.writes).toEqual([]);
+    expect(setCompanyCoverageStatusWithEvent).not.toHaveBeenCalled();
   });
 
   it("returns a service error when ticker validation cannot reach the catalog", async () => {
     vi.mocked(getIndexedCompany).mockRejectedValue(new Error("catalog down"));
-    const fake = createAdmin();
-    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
-
     const response = await POST(postRequest({ ticker: "AAPL" }));
 
     expect(response.status).toBe(503);
@@ -160,6 +143,6 @@ describe("POST /api/watchlist", () => {
         message: "온톨로지 인덱스를 확인하지 못했습니다.",
       },
     });
-    expect(fake.writes).toEqual([]);
+    expect(setCompanyCoverageStatusWithEvent).not.toHaveBeenCalled();
   });
 });

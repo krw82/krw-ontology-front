@@ -35,6 +35,14 @@ const pulseV2MigrationPath = join(
   process.cwd(),
   "supabase/migrations/20260715009000_research_pulse_p0_v2.sql",
 );
+const performanceAnalyticsMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260717040000_add_client_performance_analytics.sql",
+);
+const decisionLoopAnalyticsMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260718009000_add_decision_loop_analytics.sql",
+);
 const FILING_NOTIFICATION_EVENT_NAMES = [
   "company_followed",
   "push_permission_requested",
@@ -72,6 +80,17 @@ const pulseEventNames = [
 const postInitialAnalyticsEventNameSet = new Set<string>([
   ...filingNotificationEventNameSet,
   ...pulseEventNames,
+  "performance_metric_reported",
+  "coverage_added",
+  "coverage_status_changed",
+  "coverage_activated",
+  "filing_judgment_started",
+  "filing_judgment_completed",
+  "filing_judgment_revised",
+  "thesis_updated",
+  "monitoring_rule_created",
+  "decision_session_closed",
+  "second_opportunity_resolved",
 ]);
 
 describe("analytics events migration", () => {
@@ -155,6 +174,41 @@ describe("analytics events migration", () => {
     for (const eventName of pulseEventNames) {
       expect(`${pulseMigration}\n${pulseV2Migration}`).toContain(`'${eventName}'`);
     }
+  });
+
+  it("adds sampled client performance metrics to already-created databases", () => {
+    const performanceMigration = readFileSync(
+      performanceAnalyticsMigrationPath,
+      "utf8",
+    );
+    expect(performanceMigration).toContain(
+      "drop constraint if exists analytics_events_event_name_check",
+    );
+    expect(performanceMigration).toContain("'performance_metric_reported'");
+  });
+
+  it("adds the decision-loop lifecycle events without storing source prose", () => {
+    const decisionLoopMigration = readFileSync(
+      decisionLoopAnalyticsMigrationPath,
+      "utf8",
+    );
+    for (const eventName of [
+      "coverage_added",
+      "coverage_status_changed",
+      "coverage_activated",
+      "filing_judgment_started",
+      "filing_judgment_completed",
+      "filing_judgment_revised",
+      "thesis_updated",
+      "monitoring_rule_created",
+      "decision_session_closed",
+      "second_opportunity_resolved",
+    ]) {
+      expect(decisionLoopMigration).toContain(`'${eventName}'`);
+    }
+    expect(decisionLoopMigration).toContain(
+      "never copied into analytics_events.properties",
+    );
   });
 
   it("keeps analytics server-owned and indexed for dashboard queries", () => {

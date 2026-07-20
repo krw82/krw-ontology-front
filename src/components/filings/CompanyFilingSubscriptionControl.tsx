@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import CompanyFilingTimeline from "@/components/filings/CompanyFilingTimeline";
+import { signalPwaInstallEngagement } from "@/components/pwa/lifecycle";
 
 type Subscription = { ticker: string; enabled: boolean };
 
@@ -46,7 +47,7 @@ export default function CompanyFilingSubscriptionControl({
   if (!isAuthenticated) {
     return (
       <p className="mt-3 text-[13px] font-semibold leading-5 text-muted">
-        <Link href={loginHref} className="text-primary underline underline-offset-4">로그인하고 새 8-K·6-K·Form 4 공시 알림 받기</Link>
+        <Link href={loginHref} className="inline-flex min-h-11 items-center px-xs text-primary underline underline-offset-4">로그인하고 새 8-K·6-K·Form 4 공시 알림 받기</Link>
       </p>
     );
   }
@@ -71,6 +72,10 @@ export default function CompanyFilingSubscriptionControl({
           setMessage(count ? `최근 공시 ${count}건을 준비했습니다.` : "첫 동기화가 진행 중입니다. 공시함에서 다시 확인해주세요.");
         });
         trackClientEventSilently("filing_subscription_created", { ticker, surface: "company_hero" });
+        signalPwaInstallEngagement(
+          "filing_subscription_created",
+          "company_hero",
+        );
       } else {
         setMessage("이 기업의 새 공시 알림을 중지했습니다.");
         setRecentCount(null);
@@ -95,12 +100,12 @@ export default function CompanyFilingSubscriptionControl({
           disabled={loading || saving}
           onClick={() => void toggle()}
           aria-pressed={enabled}
-          className="min-h-9 rounded-[7px] border border-hairline px-sm text-sm font-extrabold text-ink transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-h-11 rounded-[7px] border border-hairline px-sm text-sm font-extrabold text-ink transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? "확인 중…" : saving ? "저장 중…" : enabled ? "알림 끄기" : "알림 받기"}
         </button>
       </div>
-      {enabled ? <div className="mt-2 flex flex-wrap gap-x-sm gap-y-1"><Link href="/filings" className="inline-flex text-xs font-bold text-primary underline underline-offset-4">{recentCount ? "최근 공시 확인하기" : "공시함 열기"}</Link><Link href="/settings/notifications" className="inline-flex text-xs font-bold text-primary underline underline-offset-4">알림 설치·테스트</Link></div> : null}
+      {enabled ? <div className="mt-2 flex flex-wrap gap-x-sm gap-y-1"><Link href="/filings" className="inline-flex min-h-11 items-center px-xs text-xs font-bold text-primary underline underline-offset-4">{recentCount ? "최근 공시 확인하기" : "공시함 열기"}</Link><Link href="/settings/notifications" className="inline-flex min-h-11 items-center px-xs text-xs font-bold text-primary underline underline-offset-4">알림 설치·테스트</Link></div> : null}
       {message ? <p className="mt-2 text-xs leading-5 text-muted" role="status">{message}</p> : null}
       {enabled ? <CompanyFilingTimeline ticker={ticker} /> : null}
     </div>

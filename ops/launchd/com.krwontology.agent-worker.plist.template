@@ -42,6 +42,12 @@
   <dict>
     <key>NODE_ENV</key>
     <string>production</string>
+    <key>KRW_DEPLOYMENT_ID</key>
+    <string>__DEPLOYMENT_ID__</string>
+    <key>KRW_WORKER_BUNDLE_SHA256</key>
+    <string>__WORKER_BUNDLE_SHA256__</string>
+    <key>KRW_RUNTIME_IDENTITY_SHA256</key>
+    <string>__RUNTIME_IDENTITY_SHA256__</string>
   </dict>
 </dict>
 </plist>

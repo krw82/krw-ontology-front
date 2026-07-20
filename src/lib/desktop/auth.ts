@@ -3,39 +3,10 @@ import "server-only";
 import { getEntitlementStatus } from "@/lib/billing/entitlement";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { EntitlementStatus } from "@/types/entitlement";
+import { DesktopAuthError, type DesktopAuthContext } from "./auth-context";
 import { authenticateDesktopAccessToken } from "./device-auth";
-import type { DesktopErrorCode } from "./ontology-contracts";
 
-export interface DesktopAuthContext {
-  userId: string;
-  userEmail: string | null;
-  deviceId: string | null;
-  authMethod: "desktop_access_token" | "dev_token";
-}
-
-export class DesktopAuthError extends Error {
-  code: DesktopErrorCode;
-  publicMessage: string;
-  status: number;
-  retryable: boolean;
-
-  constructor(
-    message: string,
-    options: {
-      code?: DesktopErrorCode;
-      publicMessage?: string;
-      status?: number;
-      retryable?: boolean;
-    } = {},
-  ) {
-    super(message);
-    this.name = "DesktopAuthError";
-    this.code = options.code ?? "authentication_error";
-    this.publicMessage = options.publicMessage ?? message;
-    this.status = options.status ?? 401;
-    this.retryable = Boolean(options.retryable);
-  }
-}
+export { DesktopAuthError, type DesktopAuthContext } from "./auth-context";
 
 export async function authenticateDesktopRequest(
   request: Request,

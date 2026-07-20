@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { trackClientEventSilently } from "@/lib/analytics/client";
+import {
+  persistPulseItemImpression,
+  pulseImpressionStorageKey,
+} from "@/lib/pulse/impression-client";
 import type { PulseFeedResponse, PulseItem } from "@/types/api-contracts";
 
 interface ActiveAnalysisPulseCardProps {
@@ -20,12 +24,14 @@ export default function ActiveAnalysisPulseCard({
 }: ActiveAnalysisPulseCardProps) {
   const ref = useRef<HTMLElement>(null);
   const impressionSent = useRef(false);
+  const progress = analysisProgress(item);
 
   useEffect(() => {
     const element = ref.current;
     if (!element) return;
-    const sessionKey = `pulse-impression:${item.id}`;
+    const sessionKey = pulseImpressionStorageKey(feedSessionId, item.id);
     if (window.sessionStorage.getItem(sessionKey) === "1") return;
+    const requestController = new AbortController();
 
     let impressionTimer: number | null = null;
     const observer = new IntersectionObserver((entries) => {
@@ -40,8 +46,8 @@ export default function ActiveAnalysisPulseCard({
         return;
 
       impressionTimer = window.setTimeout(() => {
+        impressionTimer = null;
         impressionSent.current = true;
-        window.sessionStorage.setItem(sessionKey, "1");
         trackClientEventSilently("pulse_item_impression", {
           item_kind: item.kind,
           position,
@@ -55,21 +61,25 @@ export default function ActiveAnalysisPulseCard({
           ranking_version: rankingVersion,
           reason_code: item.reason_code,
         });
-        void fetch(`/api/pulse/items/${encodeURIComponent(item.id)}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "impression",
-            feed_session_id: feedSessionId,
-          }),
-        }).catch(() => undefined);
-        observer.disconnect();
+        void persistPulseItemImpression({
+          itemId: item.id,
+          feedSessionId,
+          signal: requestController.signal,
+        }).then((persisted) => {
+          if (!persisted) {
+            impressionSent.current = false;
+            return;
+          }
+          window.sessionStorage.setItem(sessionKey, "1");
+          observer.disconnect();
+        });
       }, 1_000);
     }, { threshold: [0.5] });
 
     observer.observe(element);
     return () => {
       if (impressionTimer !== null) window.clearTimeout(impressionTimer);
+      requestController.abort();
       observer.disconnect();
     };
   }, [feedSessionId, item.id, item.kind, item.phase, item.priority, item.reason_code, item.state, item.ticker, position, rankingVersion]);
@@ -99,18 +109,41 @@ export default function ActiveAnalysisPulseCard({
             ) : null}
           </div>
           <span className="shrink-0 text-[11px] font-semibold text-muted">
-            {analysisStatusLabel(item)}
+            {progress.statusLabel}
           </span>
         </div>
 
         <h2 className="mt-base text-[19px] font-black leading-[1.35] tracking-[-0.025em] text-ink sm:text-[21px]">
-          {item.title}
+          {item.ticker ? `${item.ticker} 분석을 진행하고 있습니다` : "분석을 진행하고 있습니다"}
         </h2>
-        <p className="mt-sm text-[14px] leading-6 text-body">{item.body}</p>
+        <p className="mt-xs line-clamp-2 text-[13px] font-semibold leading-5 text-muted">
+          요청 · {item.title}
+        </p>
+
+        <ol className="mt-base grid grid-cols-3 gap-xs" aria-label="분석 진행 단계">
+          {progress.steps.map((step, index) => (
+            <li
+              key={step}
+              className={[
+                "rounded-[9px] border px-xs py-xs text-center text-[11px] font-extrabold",
+                index < progress.activeStep
+                  ? "border-primary/15 bg-primary-fixed/45 text-primary"
+                  : index === progress.activeStep
+                    ? "border-[#8b83ff]/35 bg-[#eef0ff] text-[#4338ca]"
+                    : "border-hairline bg-white text-muted",
+              ].join(" ")}
+            >
+              {index === progress.activeStep ? (
+                <span className="mr-1 inline-block size-1.5 animate-pulse rounded-full bg-current motion-reduce:animate-none" aria-hidden="true" />
+              ) : null}
+              {step}
+            </li>
+          ))}
+        </ol>
 
         <Link
           href={item.primary_action.href}
-          className="mt-lg inline-flex min-h-10 items-center gap-xs rounded-[10px] bg-ink px-base text-[13px] font-extrabold text-white transition-colors hover:bg-primary"
+          className="mt-lg inline-flex min-h-11 items-center gap-xs rounded-[10px] bg-ink px-base text-[13px] font-extrabold text-white transition-colors hover:bg-primary"
           onClick={() =>
             trackClientEventSilently("pulse_item_opened", {
               item_kind: item.kind,
@@ -124,7 +157,7 @@ export default function ActiveAnalysisPulseCard({
             })
           }
         >
-          대화로 돌아가기
+          분석 화면 열기
           <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
             arrow_forward
           </span>
@@ -134,8 +167,29 @@ export default function ActiveAnalysisPulseCard({
   );
 }
 
-function analysisStatusLabel(item: PulseItem): string {
+function analysisProgress(item: PulseItem): {
+  statusLabel: string;
+  activeStep: number;
+  steps: [string, string, string];
+} {
   const status = String(item.metadata.run_status ?? "");
-  if (status === "pending" || status === "queued") return "대기 중";
-  return "근거 확인 중";
+  if (status === "pending" || status === "queued") {
+    return {
+      statusLabel: "대기 중",
+      activeStep: 0,
+      steps: ["요청 확인", "근거 검증", "답변 정리"],
+    };
+  }
+  if (status === "answering" || status === "composing") {
+    return {
+      statusLabel: "답변 정리 중",
+      activeStep: 2,
+      steps: ["요청 확인", "근거 검증", "답변 정리"],
+    };
+  }
+  return {
+    statusLabel: "근거 확인 중",
+    activeStep: 1,
+    steps: ["요청 확인", "근거 검증", "답변 정리"],
+  };
 }

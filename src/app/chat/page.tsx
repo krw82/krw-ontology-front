@@ -1,5 +1,6 @@
 import ChatPageClient from "./ChatPageClient";
 import { redirect } from "next/navigation";
+import { getAuthUser } from "@/lib/auth";
 
 type ChatPageProps = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -31,12 +32,16 @@ function buildDraftRedirectHref(
 }
 
 export default async function ChatPage({ searchParams }: ChatPageProps) {
-  const resolvedSearchParams = await searchParams;
+  const [resolvedSearchParams, user] = await Promise.all([
+    searchParams,
+    getAuthUser().catch(() => null),
+  ]);
+  if (!user) redirect("/login?next=/chat");
   const sessionId = firstParam(resolvedSearchParams.sessionId);
 
   if (!sessionId) {
     redirect(buildDraftRedirectHref(resolvedSearchParams));
   }
 
-  return <ChatPageClient />;
+  return <ChatPageClient draftOwnerId={user.id} />;
 }

@@ -1,6 +1,159 @@
 /* global self, clients */
 
 const DEFAULT_DESTINATION = "/filings";
+const CACHE_PREFIX = "krwo-pwa";
+const WORKER_SCRIPT_URL = new URL(
+  self.location.href || self.location.origin,
+  self.location.origin,
+);
+const SW_VERSION =
+  WORKER_SCRIPT_URL.searchParams.get("v") || "2026-07-17-v1";
+const APP_SHELL_CACHE = `${CACHE_PREFIX}:shell:${SW_VERSION}`;
+const STATIC_CACHE = `${CACHE_PREFIX}:static:${SW_VERSION}`;
+const STATIC_CACHE_ENTRY_LIMIT = 96;
+const OFFLINE_URL = "/offline.html";
+const FILING_UNREAD_SERVICE_WORKER_MESSAGE = "KRWO_FILING_UNREAD_CHANGED";
+const APP_SHELL_URLS = [
+  OFFLINE_URL,
+  "/offline-shell.js",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/apple-icon.png",
+  "/krw-logo.svg",
+  "/fonts/material-symbols-outlined.woff2",
+];
+const SAFE_PUBLIC_ASSET_PATHS = new Set([
+  "/offline-shell.js",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/apple-icon.png",
+  "/krw-logo.svg",
+  "/krw-logo-120.png",
+  "/fonts/material-symbols-outlined.woff2",
+]);
+const NETWORK_ONLY_PATH_PREFIXES = [
+  "/api",
+  "/app",
+  "/auth",
+  "/chat",
+  "/companies",
+  "/desktop",
+  "/discover",
+  "/filings",
+  "/guru",
+  "/institutional-holdings",
+  "/login",
+  "/pulse",
+  "/settings",
+  "/share",
+  "/watchlist",
+];
+
+// The worker intentionally waits after installation. A visible in-app prompt
+// asks the user before sending SKIP_WAITING, so an active research session is
+// never reloaded merely because a deployment completed.
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(APP_SHELL_CACHE).then((cache) => cache.addAll(APP_SHELL_URLS)),
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys()
+      .then((cacheNames) => Promise.all(
+        cacheNames
+          .filter((cacheName) => (
+            cacheName.startsWith(`${CACHE_PREFIX}:`) &&
+            cacheName !== APP_SHELL_CACHE &&
+            cacheName !== STATIC_CACHE
+          ))
+          .map((cacheName) => caches.delete(cacheName)),
+      ))
+      .then(() => clients.claim()),
+  );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    event.waitUntil(self.skipWaiting());
+    return;
+  }
+  if (event.data?.type === "GET_VERSION") {
+    event.ports?.[0]?.postMessage({ version: SW_VERSION });
+  }
+});
+
+self.addEventListener("fetch", (event) => {
+  const request = event.request;
+  if (request.method !== "GET") return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin || !url.protocol.startsWith("http")) return;
+
+  if (request.mode === "navigate") {
+    event.respondWith(networkNavigationWithOfflineFallback(request));
+    return;
+  }
+
+  // Authenticated app data, RSC payloads, chat, billing, and every API request
+  // remain browser-managed network requests. They are never written to Cache
+  // Storage by this worker.
+  if (isNetworkOnlyPath(url.pathname)) return;
+
+  if (isSafeStaticAsset(request, url.pathname)) {
+    event.respondWith(cacheFirstStaticAsset(request));
+  }
+});
+
+function isNetworkOnlyPath(pathname) {
+  return NETWORK_ONLY_PATH_PREFIXES.some((prefix) => (
+    pathname === prefix || pathname.startsWith(`${prefix}/`)
+  ));
+}
+
+function isSafeStaticAsset(request, pathname) {
+  if (pathname.startsWith("/_next/static/")) return true;
+  if (!SAFE_PUBLIC_ASSET_PATHS.has(pathname)) return false;
+  return ["font", "image", "script", "style"].includes(request.destination);
+}
+
+async function cacheFirstStaticAsset(request) {
+  const precached = await caches.match(request);
+  if (precached) return precached;
+
+  const cache = await caches.open(STATIC_CACHE);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+
+  const response = await fetch(request);
+  if (response.ok && response.type === "basic") {
+    await cache.put(request, response.clone());
+    await trimCache(cache, STATIC_CACHE_ENTRY_LIMIT);
+  }
+  return response;
+}
+
+async function trimCache(cache, maxEntries) {
+  const keys = await cache.keys();
+  const overflow = keys.length - maxEntries;
+  if (overflow <= 0) return;
+  await Promise.all(keys.slice(0, overflow).map((key) => cache.delete(key)));
+}
+
+async function networkNavigationWithOfflineFallback(request) {
+  try {
+    // Deliberately do not cache HTML. Product routes can contain authenticated
+    // data and an obsolete financial screen is more dangerous than no screen.
+    return await fetch(request);
+  } catch {
+    const cachedOfflinePage = await caches.match(OFFLINE_URL);
+    return cachedOfflinePage ?? new Response(
+      "Internet connection required.",
+      { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } },
+    );
+  }
+}
 
 self.addEventListener("push", (event) => {
   const payload = readPayload(event);
@@ -22,12 +175,26 @@ self.addEventListener("push", (event) => {
     reportReceipt(payload.notificationId, receivedType),
     self.registration.showNotification(payload.title, options)
       .then(() => reportReceipt(payload.notificationId, "notification_show_called")),
+    notifyVisibleClientsOfFiling(payload.unreadCount),
   ];
   if (typeof payload.unreadCount === "number" && self.navigator && typeof self.navigator.setAppBadge === "function") {
     work.push(self.navigator.setAppBadge(payload.unreadCount));
   }
   event.waitUntil(Promise.all(work));
 });
+
+async function notifyVisibleClientsOfFiling(unreadCount) {
+  const windows = await clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+  windows.forEach((client) => {
+    client.postMessage({
+      type: FILING_UNREAD_SERVICE_WORKER_MESSAGE,
+      unreadCount,
+    });
+  });
+}
 
 function urlBase64ToUint8Array(value) {
   const padding = "=".repeat((4 - (value.length % 4)) % 4);

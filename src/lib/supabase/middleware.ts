@@ -1,7 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireEnv } from "@/lib/env";
-import { isDevAuthBypassEnabledForHost } from "@/lib/dev-auth-runtime";
+import {
+  E2E_AUTH_HEADER,
+  isDevAuthBypassEnabledForHost,
+} from "@/lib/dev-auth-runtime";
 import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
 import type { Database } from "@/types/database";
 
@@ -44,7 +47,12 @@ export async function updateSession(
     return NextResponse.redirect(url);
   }
 
-  if (isDevAuthBypassEnabledForHost(request.nextUrl.hostname)) {
+  if (
+    isDevAuthBypassEnabledForHost(
+      request.nextUrl.hostname,
+      request.headers.get(E2E_AUTH_HEADER),
+    )
+  ) {
     if (request.nextUrl.pathname === "/login" && !isDesktopLoginApproval) {
       const url = new URL(
         normalizeInternalNextPath(request.nextUrl.searchParams.get("next")),

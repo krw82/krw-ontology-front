@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 
@@ -10,46 +9,33 @@ interface FirstResearchChoiceProps {
   onDismiss: () => void;
 }
 
-type ChoiceId = "company" | "discover" | "guru" | "browse";
+type ChoiceId = "company" | "browse";
 
 const copyByLocale = {
   ko: {
-    eyebrow: "첫 리서치 시작",
-    heading: "오늘 무엇을 확인하고 싶나요?",
+    eyebrow: "첫 판단 만들기",
+    heading: "회사 한 곳부터 판단해볼까요?",
     intro:
-      "한 가지만 고르면 바로 시작할 수 있어요. 나머지 도구는 필요할 때 꺼내 보세요.",
-    primaryLabel: "가장 간단한 시작",
-    companyTitle: "회사 분석",
+      "처음부터 여러 기능을 고를 필요는 없습니다. 회사 한 곳을 정하면 새 공시의 변화와 근거를 보고, 내 판단과 다음 행동까지 남길 수 있어요.",
+    primaryLabel: "1개 회사로 시작",
+    companyTitle: "확인할 회사 선택",
     companyDescription:
-      "이미 관심 있는 회사가 있다면, 티커나 회사명으로 바로 확인하세요.",
-    companyAction: "회사 검색 시작",
-    discoverTitle: "조건으로 기업 검색",
-    discoverDescription:
-      "산업, 실적 변화, 리스크 키워드로 확인할 회사를 좁혀보세요.",
-    discoverAction: "기업 검색 시작",
-    guruTitle: "관점별 분석",
-    guruDescription:
-      "공개된 질문 원칙으로 회사나 아이디어의 논리를 점검해 보세요.",
-    guruAction: "분석 관점 선택",
+      "티커나 회사명으로 한 곳을 찾으세요. 선택한 회사는 커버리지에 담아 계속 이어서 볼 수 있습니다.",
+    companyAction: "첫 회사 찾기",
+    steps: ["무엇이 변했는지 확인", "SEC 원문 근거 확인", "내 판단과 다음 행동 기록"],
     browse: "먼저 둘러볼게요",
   },
   en: {
-    eyebrow: "Start your first research",
-    heading: "What would you like to check today?",
-    intro: "Choose one way to begin. The rest will be here when you need them.",
-    primaryLabel: "Simplest start",
-    companyTitle: "Analyze a company",
+    eyebrow: "Make your first judgment",
+    heading: "Start with one company",
+    intro:
+      "You do not need to choose among every tool. Pick one company, review what changed and its source, then record your judgment and next action.",
+    primaryLabel: "Start with one company",
+    companyTitle: "Choose a company to review",
     companyDescription:
-      "If you already have a company in mind, start with its name or ticker.",
-    companyAction: "Search a company",
-    discoverTitle: "Search companies by criteria",
-    discoverDescription:
-      "Narrow the companies to review through industries, earnings changes, or risk keywords.",
-    discoverAction: "Start company search",
-    guruTitle: "Perspective analysis",
-    guruDescription:
-      "Use public question frames to check the reasoning behind an idea or company.",
-    guruAction: "Choose a perspective",
+      "Find one by ticker or name. It will stay in Coverage so you can continue from the next relevant event.",
+    companyAction: "Find my first company",
+    steps: ["See what changed", "Check the SEC source", "Record judgment and next action"],
     browse: "I'll look around first",
   },
 } as const;
@@ -73,13 +59,6 @@ export default function FirstResearchChoice({
     onStartCompany();
   }
 
-  function handleNavigation(choice: ChoiceId) {
-    return () => {
-      trackChoice(choice);
-      onDismiss();
-    };
-  }
-
   return (
     <section
       aria-labelledby="first-research-heading"
@@ -100,11 +79,11 @@ export default function FirstResearchChoice({
         </p>
       </div>
 
-      <div className="mt-6 grid gap-3 lg:grid-cols-3">
+      <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)] lg:items-stretch">
         <button
           type="button"
           onClick={handleCompanyStart}
-          className="group relative flex min-h-[184px] flex-col rounded-[10px] border border-primary bg-canvas p-4 text-left shadow-[0_0_0_1px_rgba(0,62,199,0.08)] transition-colors duration-150 hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+          className="group relative flex min-h-[212px] flex-col rounded-[12px] border border-primary bg-primary-fixed/20 p-5 text-left shadow-[0_10px_30px_rgba(0,62,199,0.08)] transition-colors duration-150 hover:bg-primary-fixed/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
         >
           <span className="font-mono text-[10px] font-black uppercase tracking-[0.14em] text-primary">
             {copy.primaryLabel}
@@ -125,56 +104,16 @@ export default function FirstResearchChoice({
             </span>
           </span>
         </button>
-
-        <Link
-          href="/discover?entry=onboarding"
-          onClick={handleNavigation("discover")}
-          className="group flex min-h-[184px] flex-col rounded-[10px] border border-hairline bg-canvas p-4 transition-colors duration-150 hover:border-outline hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-        >
-          <span className="font-mono text-[10px] font-black uppercase tracking-[0.14em] text-muted">
-            02
-          </span>
-          <span className="mt-4 text-[18px] font-black leading-6 text-ink">
-            {copy.discoverTitle}
-          </span>
-          <span className="mt-2 text-[13px] font-semibold leading-5 text-body">
-            {copy.discoverDescription}
-          </span>
-          <span className="mt-auto pt-5 text-[13px] font-black text-ink group-hover:text-primary">
-            {copy.discoverAction}
-            <span
-              aria-hidden="true"
-              className="ml-2 transition-transform duration-150 group-hover:translate-x-0.5"
-            >
-              →
-            </span>
-          </span>
-        </Link>
-
-        <Link
-          href="/guru?entry=onboarding"
-          onClick={handleNavigation("guru")}
-          className="group flex min-h-[184px] flex-col rounded-[10px] border border-hairline bg-canvas p-4 transition-colors duration-150 hover:border-outline hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-        >
-          <span className="font-mono text-[10px] font-black uppercase tracking-[0.14em] text-muted">
-            03
-          </span>
-          <span className="mt-4 text-[18px] font-black leading-6 text-ink">
-            {copy.guruTitle}
-          </span>
-          <span className="mt-2 text-[13px] font-semibold leading-5 text-body">
-            {copy.guruDescription}
-          </span>
-          <span className="mt-auto pt-5 text-[13px] font-black text-ink group-hover:text-primary">
-            {copy.guruAction}
-            <span
-              aria-hidden="true"
-              className="ml-2 transition-transform duration-150 group-hover:translate-x-0.5"
-            >
-              →
-            </span>
-          </span>
-        </Link>
+        <ol className="grid content-center gap-3 rounded-[12px] border border-hairline bg-surface-soft p-5" aria-label={locale === "ko" ? "첫 판단 과정" : "First judgment flow"}>
+          {copy.steps.map((step, index) => (
+            <li key={step} className="flex items-center gap-3 text-[13px] font-extrabold leading-5 text-body">
+              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-canvas font-mono text-[11px] font-black text-primary shadow-sm" aria-hidden="true">
+                {index + 1}
+              </span>
+              {step}
+            </li>
+          ))}
+        </ol>
       </div>
 
       <button

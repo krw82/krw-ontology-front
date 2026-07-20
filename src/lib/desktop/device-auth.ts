@@ -7,7 +7,7 @@ import type {
   DesktopDeviceLoginCodeRow,
   DesktopDeviceRow,
 } from "@/types/database";
-import { DesktopAuthError, type DesktopAuthContext } from "./auth";
+import { DesktopAuthError, type DesktopAuthContext } from "./auth-context";
 
 const DEVICE_CODE_BYTES = 32;
 const TOKEN_BYTES = 32;

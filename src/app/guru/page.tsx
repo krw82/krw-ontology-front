@@ -98,7 +98,7 @@ export default async function GuruPage({ searchParams }: GuruPageProps) {
   if (shouldOpenChat) {
     return (
       <>
-        <ChatPageClient workspace="guru" />
+        <ChatPageClient workspace="guru" draftOwnerId={user.id} />
         <ProductOnboardingTour
           pathname={onboardingPathname}
           tour="guru-chat"

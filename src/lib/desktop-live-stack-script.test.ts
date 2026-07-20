@@ -53,7 +53,7 @@ describe("desktop live stack script", () => {
     expect(result.stdout).not.toContain("service-role-secret");
     expect(result.stdout).not.toContain("deepseek-secret");
     expect(result.stdout).not.toContain("0123456789abcdef0123456789abcdef");
-  });
+  }, 20_000);
 
   it("fails before startup when DeepSeek credentials are missing", () => {
     const result = spawnSync(

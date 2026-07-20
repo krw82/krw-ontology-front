@@ -7,17 +7,16 @@ usage() {
   cat <<'EOF'
 Usage: scripts/deploy-data-release-production.sh [--release-id ID] [--releases-root DIR] [--env-file FILE] [--dry-run] [--skip-runtime-restart] [--skip-worker-restart] [--catalog-file FILE]
 
-Publish the active local prod ontology release to the GCP web control plane and
-restart Mac production workers onto the same release.
+Publish the active local prod ontology release to the web control plane without
+restarting any production runtime.
 
 Flow:
-  1. Optionally promote a local immutable release to prod/current.
+  1. Verify that the requested release is already prod/current. Cross-release
+     promotion is intentionally rejected until a sealed candidate cutover can
+     update data, plugin, MCP, and worker state atomically.
   2. Verify /releases/prod/current and its manifest/index.
   3. Export a compact web_catalog.json from the release.
   4. Publish the catalog to Supabase and mark it active.
-  5. Restart the local prod MCP sidecar onto the promoted release.
-  6. Restart Mac workers and verify heartbeats report the same release_id.
-
 This script does not upload full ontology data to GCP. The full SQLite index
 stays on the Mac worker release root.
 EOF
@@ -29,7 +28,6 @@ ONTOLOGY_SOURCE_DIR=${KRW_ONTOLOGY_SOURCE_DIR:-"$HOME/krw-ontology"}
 RELEASE_ID=""
 CATALOG_FILE=""
 DRY_RUN=0
-SKIP_RUNTIME_RESTART=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -50,7 +48,7 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     --skip-runtime-restart|--skip-worker-restart)
-      SKIP_RUNTIME_RESTART=1
+      : # Retained as a compatibility no-op; publication never restarts runtime.
       ;;
     --dry-run)
       DRY_RUN=1
@@ -141,8 +139,73 @@ cleanup() {
   if [ "${CLEAN_CATALOG:-0}" = "1" ]; then
     rm -f "$CATALOG_FILE"
   fi
+  if [ "${CHILD_OWNS_DEPLOY_LOCK:-0}" = "1" ]; then
+    rm -f "$DEPLOY_LOCK_DIR/owner"
+    rmdir "$DEPLOY_LOCK_DIR" 2>/dev/null || true
+  fi
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+mkdir -p "$FRONT_DIR/.deploy"
+DEPLOY_LOCK_DIR="$FRONT_DIR/.deploy/production-deploy.lock"
+CHILD_OWNS_DEPLOY_LOCK=0
+if [ "$DRY_RUN" = "1" ]; then
+  : # No production mutation and no child-lane lock requirement.
+elif [ -n "${PRODUCTION_DEPLOY_LOCK_OWNER:-}" ]; then
+  test -f "$DEPLOY_LOCK_DIR/owner" || {
+    echo "Production deploy lock owner file is missing." >&2
+    exit 1
+  }
+  lock_owner=$(sed -n '1p' "$DEPLOY_LOCK_DIR/owner")
+  if [ "$lock_owner" != "$PRODUCTION_DEPLOY_LOCK_OWNER" ]; then
+    echo "Production deploy lock ownership mismatch." >&2
+    exit 1
+  fi
+  [ "${PRODUCTION_OS_LOCK_HELD:-0}" = "1" ] || {
+    echo "Missing kernel-held production deploy lock." >&2
+    exit 1
+  }
+  expected_attestation="${NEXT_PUBLIC_APP_VERSION:-}:$PRODUCTION_DEPLOY_LOCK_OWNER"
+  [ "${PRODUCTION_ORCHESTRATOR_ATTESTATION:-}" = "$expected_attestation" ] || {
+    echo "Missing or invalid production orchestrator attestation." >&2
+    exit 1
+  }
+else
+  echo "The production data lane is internal; invoke the queue-safe production orchestrator." >&2
+  exit 1
+fi
+
+# This entry point is callable without the full orchestrator, so it must prove
+# the same canonical production target on its own before publishing anything.
+require_path "$FRONT_DIR/ops/production-target.json"
+require_path "$SCRIPT_DIR/verify-supabase-production-target.mjs"
+node "$SCRIPT_DIR/verify-supabase-production-target.mjs" \
+  "$ENV_PATH" \
+  "$FRONT_DIR/supabase/.temp/project-ref" \
+  "$FRONT_DIR/ops/production-target.json"
+PINNED_ENV_SHA256=$(node -e '
+  const fs = require("fs");
+  const crypto = require("crypto");
+  process.stdout.write(crypto.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex"));
+' "$ENV_PATH")
+assert_env_unchanged() {
+  phase=$1
+  current_sha256=$(node -e '
+    const fs = require("fs");
+    const crypto = require("crypto");
+    process.stdout.write(crypto.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex"));
+  ' "$ENV_PATH")
+  if [ "$current_sha256" != "$PINNED_ENV_SHA256" ]; then
+    echo "Production environment changed before $phase; refusing to publish." >&2
+    exit 1
+  fi
+  node "$SCRIPT_DIR/verify-supabase-production-target.mjs" \
+    "$ENV_PATH" \
+    "$FRONT_DIR/supabase/.temp/project-ref" \
+    "$FRONT_DIR/ops/production-target.json" >/dev/null
+}
 
 echo "Ontology source: $ONTOLOGY_SOURCE_DIR"
 echo "Releases root: $RELEASES_ROOT"
@@ -165,26 +228,27 @@ if [ -f "$RELEASE_ROOT/manifest.json" ]; then
   CURRENT_RELEASE_ID=$(read_manifest_release_id "$RELEASE_ROOT/manifest.json")
 fi
 
+if [ -n "$RELEASE_ID" ] && [ "$CURRENT_RELEASE_ID" != "$RELEASE_ID" ]; then
+  echo "Refusing to promote prod/current from the data-only deployment path." >&2
+  echo "  active:    ${CURRENT_RELEASE_ID:-unknown}" >&2
+  echo "  requested: $RELEASE_ID" >&2
+  echo "Use a sealed candidate-release cutover that prepares the matching plugin and worker before promotion." >&2
+  exit 1
+fi
+
 if [ "$DRY_RUN" = "1" ]; then
-  if [ -n "$RELEASE_ID" ] && [ "$CURRENT_RELEASE_ID" = "$RELEASE_ID" ]; then
-    echo "Dry run: release is already prod/current; would skip promote."
+  if [ -z "$RELEASE_ID" ]; then
+    echo "Dry run: would keep the existing prod/current release."
   else
-    echo "Dry run: would promote release."
+    echo "Dry run: release is already prod/current; would not promote."
   fi
-  echo "Dry run: would export web catalog, publish to Supabase, restart prod MCP, and restart Mac workers."
+  echo "Dry run: would export the web catalog and publish it to Supabase without restarting prod MCP or Mac workers."
   echo "Dry run target current: $RELEASE_ROOT"
   exit 0
 fi
 
 if [ -n "$RELEASE_ID" ]; then
-  if [ "$CURRENT_RELEASE_ID" = "$RELEASE_ID" ]; then
-    echo "Release is already prod/current; skipping promote."
-  else
-    echo "Promoting prod release..."
-    run_krw_ontology release promote "$RELEASE_ID" \
-      --releases-root "$RELEASES_ROOT" \
-      --env prod
-  fi
+  echo "Release is already prod/current; no promotion required."
 fi
 
 echo "Verifying prod/current release..."
@@ -204,25 +268,15 @@ run_krw_ontology release export-web-catalog \
   --out "$CATALOG_FILE"
 
 echo "Publishing web catalog to Supabase..."
+assert_env_unchanged "web catalog publication"
 node "$SCRIPT_DIR/publish-web-catalog.mjs" \
   --file "$CATALOG_FILE" \
   --env-file "$ENV_PATH"
 
-if [ "$SKIP_RUNTIME_RESTART" = "1" ]; then
-  echo "Skipping prod MCP and Mac worker restart by request."
-else
-  echo "Restarting prod MCP sidecar onto active release..."
-  "$SCRIPT_DIR/install-mcp-server-launchd.sh" \
-    --env-file "$ENV_PATH" \
-    --load
-
-  echo "Restarting Mac workers and verifying release heartbeat..."
-  "$SCRIPT_DIR/deploy-worker-production.sh" \
-    --env-file "$ENV_PATH" \
-    --release-id "$ACTIVE_RELEASE_ID"
-fi
+echo "Catalog publication does not restart prod MCP or Mac workers."
 
 echo "Verifying active front web catalog release..."
+assert_env_unchanged "web catalog verification"
 node "$SCRIPT_DIR/verify-web-catalog-release.mjs" \
   --env prod \
   --release-id "$ACTIVE_RELEASE_ID" \

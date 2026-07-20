@@ -4,9 +4,18 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import ResearchMarkdown from "@/components/ResearchMarkdown";
+import CoverageMemoryPanel from "@/components/watchlist/CoverageMemoryPanel";
+import { PWA_BEFORE_UPDATE_EVENT } from "@/components/pwa/lifecycle";
 import { buildChatSessionHref } from "@/lib/chat/history-state";
+import {
+  buildComposerDraftKey,
+  clearComposerDraft,
+  loadComposerDraft,
+  saveComposerDraft,
+} from "@/lib/chat/composer-draft-store";
 import type {
   SessionSummary,
+  UserCompanyCoverageStatus,
   UserCompanyMark,
   UserCompanyNotebook,
   UserCompanyNotebookRefreshJob,
@@ -19,6 +28,7 @@ interface WatchlistWorkspaceClientProps {
 }
 
 type ApiPayload = Record<string, unknown> | null;
+type CoverageStatus = UserCompanyCoverageStatus;
 
 const NOTEBOOK_MAX_LENGTH = 100_000;
 const NOTEBOOK_REFRESH_POLL_MS = 1_500;
@@ -29,6 +39,7 @@ export default function WatchlistWorkspaceClient({
   const [company, setCompany] = useState(detail.company);
   const [notebook, setNotebook] = useState<UserCompanyNotebook>(detail.notebook);
   const [draft, setDraft] = useState(detail.notebook.content_md);
+  const [draftHydrated, setDraftHydrated] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshingNotebook, setIsRefreshingNotebook] = useState(false);
@@ -36,12 +47,22 @@ export default function WatchlistWorkspaceClient({
   const [isPending, startTransition] = useTransition();
 
   const ticker = company.ticker;
+  const notebookDraftKey = useMemo(
+    () => buildComposerDraftKey({
+      ownerId: detail.company.mark.user_id,
+      workspace: "company-notebook",
+      ticker,
+    }),
+    [detail.company.mark.user_id, ticker],
+  );
   const notebookTitle = notebook.title || `${ticker} 리서치 노트북`;
   const companyTitle = company.companyNameKo ?? company.name;
   const showTickerInTitle = companyTitle.trim().toUpperCase() !== ticker;
   const activeContent = isEditing ? draft : notebook.content_md;
   const hasChanges = draft !== notebook.content_md;
   const isBusy = isPending || isRefreshingNotebook;
+  const shouldPreventPwaUpdate =
+    hasChanges || isPending || isRefreshingNotebook || Boolean(refreshJobId);
   const previewContent = activeContent.trim()
     ? activeContent
     : buildEmptyNotebookContent();
@@ -50,6 +71,49 @@ export default function WatchlistWorkspaceClient({
     () => detail.recent_sessions.slice(0, 6),
     [detail.recent_sessions],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadComposerDraft(notebookDraftKey).then((savedDraft) => {
+      if (cancelled) return;
+      if (savedDraft?.text && savedDraft.text !== notebook.content_md) {
+        setDraft(savedDraft.text);
+        setIsEditing(true);
+      }
+      setDraftHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [notebook.content_md, notebookDraftKey]);
+
+  useEffect(() => {
+    if (!draftHydrated) return;
+    const timeoutId = window.setTimeout(() => {
+      if (draft === notebook.content_md) {
+        void clearComposerDraft(notebookDraftKey);
+        return;
+      }
+      void saveComposerDraft({ key: notebookDraftKey, text: draft, urls: [] });
+    }, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, [draft, draftHydrated, notebook.content_md, notebookDraftKey]);
+
+  useEffect(() => {
+    if (!shouldPreventPwaUpdate) return;
+
+    const preventUpdateWithNotebookWork = (event: Event) => event.preventDefault();
+    window.addEventListener(
+      PWA_BEFORE_UPDATE_EVENT,
+      preventUpdateWithNotebookWork,
+    );
+    return () => {
+      window.removeEventListener(
+        PWA_BEFORE_UPDATE_EVENT,
+        preventUpdateWithNotebookWork,
+      );
+    };
+  }, [shouldPreventPwaUpdate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,6 +196,7 @@ export default function WatchlistWorkspaceClient({
         if (refreshedNotebook) {
           setNotebook(refreshedNotebook);
           setDraft(refreshedNotebook.content_md);
+          void clearComposerDraft(notebookDraftKey);
           setIsEditing(false);
           setCompany(touchNotebookActivity);
         }
@@ -149,16 +214,16 @@ export default function WatchlistWorkspaceClient({
       cancelled = true;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [refreshJobId, ticker]);
+  }, [notebookDraftKey, refreshJobId, ticker]);
 
-  const updateMark = (patch: Partial<UserCompanyMark>) => {
+  const updateCoverageStatus = (coverageStatus: CoverageStatus) => {
     setError(null);
     startTransition(() => {
       void (async () => {
         const response = await fetch(`/api/watchlist/${ticker}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(patch),
+          body: JSON.stringify({ coverage_status: coverageStatus }),
         });
         const payload = await readPayload(response);
         if (!response.ok) {
@@ -206,6 +271,7 @@ export default function WatchlistWorkspaceClient({
         if (savedNotebook) {
           setNotebook(savedNotebook);
           setDraft(savedNotebook.content_md);
+          void clearComposerDraft(notebookDraftKey);
           setIsEditing(false);
           setCompany(touchNotebookActivity);
         }
@@ -247,6 +313,7 @@ export default function WatchlistWorkspaceClient({
 
   const handleCancel = () => {
     setDraft(notebook.content_md);
+    void clearComposerDraft(notebookDraftKey);
     setIsEditing(false);
     setError(null);
   };
@@ -254,7 +321,7 @@ export default function WatchlistWorkspaceClient({
   return (
     <main
       id="main-content"
-      className="px-base pb-[112px] pt-xl sm:px-md md:px-xl md:pb-[96px] md:pt-[72px]"
+      className="px-base pb-xl pt-xl sm:px-md md:px-xl md:pb-[96px] md:pt-[72px]"
     >
       <div className="mx-auto w-full max-w-[1240px]">
         <header className="border-b border-hairline pb-7">
@@ -268,7 +335,7 @@ export default function WatchlistWorkspaceClient({
             >
               arrow_back
             </span>
-            리서치 노트북
+            기업 커버리지
           </Link>
 
           <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
@@ -286,30 +353,23 @@ export default function WatchlistWorkspaceClient({
               )}
             </div>
 
-            <div className="flex flex-wrap gap-2 lg:justify-end">
-              <ToggleButton
-                active={company.mark.is_watchlisted}
+            <label className="relative inline-flex min-h-11 items-center gap-2 rounded-[8px] border border-hairline bg-canvas px-sm text-[14px] font-extrabold text-ink focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 lg:justify-self-end">
+              <span className="material-symbols-outlined text-[18px] text-primary" aria-hidden="true">radar</span>
+              <span className="text-[12px] font-bold text-muted">커버리지</span>
+              <select
+                value={coverageStatusOf(company.mark)}
                 disabled={isBusy}
-                icon="bookmark"
-                label="즐겨찾기"
-                onClick={() =>
-                  updateMark({
-                    is_watchlisted: !company.mark.is_watchlisted,
-                  })
-                }
-              />
-              <ToggleButton
-                active={company.mark.is_holding}
-                disabled={isBusy}
-                icon="inventory_2"
-                label="보유"
-                onClick={() =>
-                  updateMark({
-                    is_holding: !company.mark.is_holding,
-                  })
-                }
-              />
-            </div>
+                onChange={(event) => updateCoverageStatus(event.target.value as CoverageStatus)}
+                className="min-h-11 appearance-none bg-transparent pr-6 font-extrabold outline-none disabled:cursor-wait"
+                aria-label="커버리지 상태"
+              >
+                <option value="exploring">탐색 중</option>
+                <option value="watching">관찰 중</option>
+                <option value="holding">보유 중</option>
+                <option value="closed">종료</option>
+              </select>
+              <span className="pointer-events-none absolute right-2 material-symbols-outlined text-[17px] text-muted" aria-hidden="true">expand_more</span>
+            </label>
           </div>
         </header>
 
@@ -320,6 +380,16 @@ export default function WatchlistWorkspaceClient({
             {error}
           </div>
         )}
+
+        <div className="mt-6">
+          <CoverageMemoryPanel
+            ticker={ticker}
+            initialTheses={detail.theses}
+            thesisChecks={detail.thesis_checks}
+            initialMonitoringRules={detail.monitoring_rules}
+            questions={detail.questions}
+          />
+        </div>
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_336px] xl:items-start">
           <section
@@ -336,7 +406,7 @@ export default function WatchlistWorkspaceClient({
                     <>
                       <button
                         type="button"
-                        className="inline-flex h-10 items-center gap-1 rounded-[8px] border border-hairline bg-canvas px-3 text-[13px] font-extrabold text-ink transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-55"
+                        className="inline-flex h-11 items-center gap-1 rounded-[8px] border border-hairline bg-canvas px-3 text-[13px] font-extrabold text-ink transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-55"
                         disabled={isBusy}
                         onClick={handleCancel}
                       >
@@ -344,7 +414,7 @@ export default function WatchlistWorkspaceClient({
                       </button>
                       <button
                         type="button"
-                        className="inline-flex h-10 items-center gap-1 rounded-[8px] bg-surface-dark px-3 text-[13px] font-extrabold text-on-dark transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:opacity-55"
+                        className="inline-flex h-11 items-center gap-1 rounded-[8px] bg-surface-dark px-3 text-[13px] font-extrabold text-on-dark transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:opacity-55"
                         disabled={isBusy || !hasChanges}
                         onClick={handleSaveNotebook}
                       >
@@ -362,7 +432,7 @@ export default function WatchlistWorkspaceClient({
                       <div className="relative">
                         <button
                           type="button"
-                          className="inline-flex h-10 items-center gap-1 rounded-[8px] border border-hairline bg-canvas px-2.5 text-[13px] font-extrabold text-ink transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-65 sm:px-sm"
+                          className="inline-flex h-11 items-center gap-1 rounded-[8px] border border-hairline bg-canvas px-2.5 text-[13px] font-extrabold text-ink transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-65 sm:px-sm"
                           disabled={isBusy || recentSessions.length === 0}
                           onClick={handleRefreshNotebook}
                         >
@@ -394,7 +464,7 @@ export default function WatchlistWorkspaceClient({
                       </div>
                       <button
                         type="button"
-                        className="inline-flex h-10 items-center gap-1 rounded-[8px] bg-surface-dark px-3 text-[13px] font-extrabold text-on-dark transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:opacity-55 sm:px-sm"
+                        className="inline-flex h-11 items-center gap-1 rounded-[8px] bg-surface-dark px-3 text-[13px] font-extrabold text-on-dark transition-colors hover:bg-primary-active disabled:cursor-not-allowed disabled:opacity-55 sm:px-sm"
                         disabled={isBusy}
                         onClick={() => {
                           setError(null);
@@ -497,40 +567,6 @@ function NotebookRefreshOverlay() {
   );
 }
 
-function ToggleButton({
-  active,
-  disabled,
-  icon,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  disabled: boolean;
-  icon: string;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={[
-        "inline-flex h-11 items-center gap-1 rounded-[8px] border px-sm text-[14px] font-extrabold transition-colors disabled:cursor-not-allowed disabled:opacity-55",
-        active
-          ? "border-primary bg-primary-fixed text-on-primary-fixed"
-          : "border-hairline bg-canvas text-ink hover:border-primary hover:text-primary",
-      ].join(" ")}
-      aria-pressed={active}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
-        {icon}
-      </span>
-      {label}
-    </button>
-  );
-}
-
 function SidebarSection({
   title,
   children,
@@ -580,11 +616,14 @@ function touchNotebookActivity(
     latest_activity_at: now,
     mark: {
       ...company.mark,
-      is_watchlisted: true,
       last_activity_at: now,
       updated_at: now,
     },
   };
+}
+
+function coverageStatusOf(mark: UserCompanyMark): CoverageStatus {
+  return mark.coverage_status;
 }
 
 function buildEmptyNotebookContent(): string {

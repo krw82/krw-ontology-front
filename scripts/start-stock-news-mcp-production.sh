@@ -49,6 +49,8 @@ set -a
 . "$ENV_PATH"
 set +a
 
+"$SCRIPT_DIR/verify-mac-runtime-target.sh" "$ENV_PATH"
+
 truthy_env() {
   case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
     1|true|yes|on) return 0 ;;
@@ -104,5 +106,14 @@ echo "MCP URL: http://$STOCK_NEWS_MCP_HOST:$STOCK_NEWS_MCP_PORT$STOCK_NEWS_MCP_P
 echo "Coverage: ${STOCK_NEWS_COVERAGE_PATH:-$STOCK_NEWS_MCP_ROOT/data/coverage_companies.json}"
 
 cd "$STOCK_NEWS_MCP_ROOT"
-npm run build >/dev/null
+if [ "${KRW_MAC_IMMUTABLE_RUNTIME:-0}" != "1" ]; then
+  npm run build >/dev/null
+fi
+if [ "${KRW_MAC_IMMUTABLE_RUNTIME:-0}" = "1" ]; then
+  test -x "${KRW_RUNTIME_NODE_EXECUTABLE:-}" || {
+    echo "Missing prepared Node executable for immutable Stock News MCP." >&2
+    exit 1
+  }
+  exec "$KRW_RUNTIME_NODE_EXECUTABLE" dist/server.js
+fi
 exec node dist/server.js

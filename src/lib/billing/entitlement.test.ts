@@ -12,6 +12,7 @@ vi.mock("./plan-store", () => ({
 }));
 
 import { createClient } from "@/lib/supabase/server";
+import { isAdminEntitlementEmail } from "./admin-emails";
 import { getBillingPlanFromStore } from "./plan-store";
 import { getEntitlementStatus } from "./entitlement";
 import type { BillingPlan } from "./plans";
@@ -117,6 +118,7 @@ function mockSupabaseForEntitlement(
 describe("getEntitlementStatus", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(isAdminEntitlementEmail).mockReturnValue(false);
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-10T12:00:00.000Z"));
     vi.mocked(getBillingPlanFromStore).mockResolvedValue(dailyPlan);
@@ -216,6 +218,35 @@ describe("getEntitlementStatus", () => {
     expect(status.usage.budget_used_usd).toBe(3);
     expect(status.usage.daily_budget_used_usd).toBe(1);
     expect(status.usage.run_count).toBe(7);
+  });
+
+  it("keeps admin access independent from usage ledger availability", async () => {
+    const from = vi.fn(() => {
+      throw new Error("usage ledger must not be queried for an admin");
+    });
+    vi.mocked(createClient).mockResolvedValue({
+      from,
+    } as unknown as Awaited<ReturnType<typeof createClient>>);
+    vi.mocked(isAdminEntitlementEmail).mockReturnValue(true);
+    vi.mocked(getBillingPlanFromStore).mockResolvedValue({
+      ...dailyPlan,
+      key: "internal",
+      label: "Internal",
+      statusLabel: "Internal",
+      planVersion: "internal-test",
+      unlimited: true,
+      public: false,
+    });
+
+    const status = await getEntitlementStatus(
+      "admin-user",
+      "admin@example.test",
+    );
+
+    expect(from).not.toHaveBeenCalled();
+    expect(status.status).toBe("admin");
+    expect(status.usage.unlimited).toBe(true);
+    expect(status.usage.can_run).toBe(true);
   });
 
   it("loads weekly credit usage by the containing period instead of exact timestamp equality", async () => {

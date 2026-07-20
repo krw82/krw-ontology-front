@@ -7,7 +7,6 @@ describe("createUnavailablePulseFeed", () => {
 
     expect(feed.items).toEqual([]);
     expect(feed.active_analysis_items).toEqual([]);
-    expect(feed.has_more).toBe(false);
     expect(feed.source_statuses.every((source) => source.status === "degraded")).toBe(true);
   });
 });

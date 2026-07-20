@@ -60,17 +60,33 @@ async function expireStaleCreditReservations(): Promise<number> {
   return Number(data ?? 0);
 }
 
+async function reconcileExpiredCoverageLimits(): Promise<number> {
+  const { data, error } = await getSupabaseAdmin().rpc(
+    "sweep_expired_company_coverage_limits",
+    { p_now: new Date().toISOString(), p_limit: 250 },
+  );
+  if (error) {
+    throw new Error(`coverage expiry reconciliation failed: ${error.message}`);
+  }
+  return Number(data ?? 0);
+}
+
 async function reconcileOnce() {
   const expiredReservations = await expireStaleCreditReservations();
   const renewals = await renewDueTossSubscriptions({ workerId: WORKER_ID });
+  // A due paid subscription must get its renewal/grace transition first. Only
+  // then may the entitlement expiry sweep archive over-limit coverage.
+  const reconciledCoverageUsers = await reconcileExpiredCoverageLimits();
   if (
     expiredReservations > 0 ||
+    reconciledCoverageUsers > 0 ||
     renewals.checked > 0 ||
     renewals.expired > 0
   ) {
     console.info("[billing-worker] reconciled", {
       workerId: WORKER_ID,
       expiredReservations,
+      reconciledCoverageUsers,
       ...renewals,
     });
   }

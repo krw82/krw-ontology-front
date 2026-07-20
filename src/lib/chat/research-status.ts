@@ -62,6 +62,10 @@ const toolLabels: Partial<Record<MCPToolName, string>> = {
   list_filing_sections: "공시 원문 항목 확인",
   read_filing_section: "공시 원문 근거 확인",
   get_form4_insider_transactions: "내부자 거래 내역 확인",
+  get_coverage_state: "내 커버리지와 가설 확인",
+  list_filing_judgments: "이전 공시 판단 확인",
+  get_decision_timeline: "판단 변화 흐름 확인",
+  list_open_questions: "열린 리서치 질문 확인",
 };
 
 const toolStepMap: Record<MCPToolName, ResearchStepId> = {
@@ -108,6 +112,10 @@ const toolStepMap: Record<MCPToolName, ResearchStepId> = {
   list_filing_sections: "search",
   read_filing_section: "search",
   get_form4_insider_transactions: "search",
+  get_coverage_state: "scope",
+  list_filing_judgments: "search",
+  get_decision_timeline: "trace",
+  list_open_questions: "scope",
 };
 
 const baseSteps: Array<{ id: ResearchStepId; label: string }> = [

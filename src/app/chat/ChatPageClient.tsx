@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useRef,
+  useCallback,
+  useState,
+  type ComponentPropsWithoutRef,
+} from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -44,6 +51,11 @@ import {
   storeDraftMessage,
 } from "@/lib/chat/draft-message";
 import {
+  buildComposerDraftKey,
+  clearComposerDraft,
+  type ComposerDraftKeyParts,
+} from "@/lib/chat/composer-draft-store";
+import {
   isChatInputError,
   isWeeklyAnalysisLimitError,
   toUserFacingChatError,
@@ -56,6 +68,10 @@ import {
   getGuruLens,
   normalizeGuruLensKey,
 } from "@/lib/guru-lenses";
+import {
+  PWA_BEFORE_UPDATE_EVENT,
+  signalPwaInstallEngagement,
+} from "@/components/pwa/lifecycle";
 import type { ResearchMode } from "@/lib/research-mode";
 import type {
   CreateSessionRequest,
@@ -78,7 +94,32 @@ function supportCodeFor(runId: string | null, sessionId: string | null): string 
 
 type ChatWorkspace = "chat" | "guru";
 
-function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
+type ContextualComposerProps = ComponentPropsWithoutRef<typeof Composer> & {
+  draftContext: ComposerDraftKeyParts;
+};
+
+const ContextualComposer = forwardRef<
+  ComposerHandle,
+  ContextualComposerProps
+>(function ContextualComposer({ draftContext, ...composerProps }, ref) {
+  const draftPersistenceKey = buildComposerDraftKey(draftContext);
+  return (
+    <Composer
+      key={draftPersistenceKey}
+      {...composerProps}
+      ref={ref}
+      draftPersistenceKey={draftPersistenceKey}
+    />
+  );
+});
+
+function ChatContent({
+  workspace = "chat",
+  draftOwnerId,
+}: {
+  workspace?: ChatWorkspace;
+  draftOwnerId: string;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -201,6 +242,16 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
   const isRunning = chat.status === "running";
   const isActiveRun = isQueued || isRunning;
 
+  useEffect(() => {
+    if (!isActiveRun) return;
+
+    const preventUpdateDuringRun = (event: Event) => event.preventDefault();
+    window.addEventListener(PWA_BEFORE_UPDATE_EVENT, preventUpdateDuringRun);
+    return () => {
+      window.removeEventListener(PWA_BEFORE_UPDATE_EVENT, preventUpdateDuringRun);
+    };
+  }, [isActiveRun]);
+
   const contextTickers = getSessionTickers(chat.session, activeTicker);
   const contextTickersKey = contextTickers.join(",");
   const { companyMetaByTicker, setCompanyMetaByTicker } = useChatCompanyMeta({
@@ -289,6 +340,46 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
         message.status === "completed" &&
         message.content.trim().length > 0,
     );
+  const installEngagementRunRef = useRef({
+    wasActive: false,
+    baselineMessageId: null as string | null,
+    awaitingAnswer: false,
+  });
+
+  useEffect(() => {
+    const tracker = installEngagementRunRef.current;
+    const latestMessageId = latestCompletedAssistantMessage?.id ?? null;
+
+    if (isActiveRun && !tracker.wasActive) {
+      tracker.baselineMessageId = latestMessageId;
+      tracker.awaitingAnswer = false;
+    }
+    if (!isActiveRun && tracker.wasActive) {
+      tracker.awaitingAnswer = !chat.error;
+    }
+    if (
+      !isActiveRun &&
+      tracker.awaitingAnswer &&
+      latestMessageId &&
+      latestMessageId !== tracker.baselineMessageId
+    ) {
+      signalPwaInstallEngagement(
+        "analysis_completed",
+        isGuruWorkspace ? "guru" : isDiscoverRoute ? "discover" : "chat",
+      );
+      tracker.awaitingAnswer = false;
+    }
+    if (!isActiveRun && chat.error) {
+      tracker.awaitingAnswer = false;
+    }
+    tracker.wasActive = isActiveRun;
+  }, [
+    chat.error,
+    isActiveRun,
+    isDiscoverRoute,
+    isGuruWorkspace,
+    latestCompletedAssistantMessage?.id,
+  ]);
   const retryPrompt =
     chat.lastAttemptedContent ??
     [...chat.messages]
@@ -550,8 +641,19 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
   );
 
   async function handlePromptSend(prompt: string) {
-    setComposerDraftResetKey((current) => current + 1);
-    await handleSend(prompt);
+    const draftPersistenceKey = buildComposerDraftKey({
+      ownerId: draftOwnerId,
+      workspace: isGuruWorkspace ? "guru" : workspace,
+      sessionId,
+      ticker: activeTicker,
+      runKind: requestedRunKind,
+      locale: responseLocale,
+    });
+    const result = await handleSend(prompt);
+    if (result.ok) {
+      await clearComposerDraft(draftPersistenceKey);
+      setComposerDraftResetKey((current) => current + 1);
+    }
   }
 
   const discoverGuide = useDiscoverGuide({
@@ -788,6 +890,11 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
                         messageId={msg.role === "assistant" ? msg.id : undefined}
                         createdAt={
                           msg.role === "assistant" ? msg.created_at : undefined
+                        }
+                        answerSaveContext={
+                          msg.role === "assistant" && activeTicker && sessionId
+                            ? { ticker: activeTicker, sessionId }
+                            : undefined
                         }
                         citations={
                           isLatestAssistantMessage ? chat.citations : undefined
@@ -1095,8 +1202,16 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
             }
             onPointerDownCapture={handleComposerPointerDown}
           >
-            <Composer
+            <ContextualComposer
               ref={composerRef}
+              draftContext={{
+                ownerId: draftOwnerId,
+                workspace: isGuruWorkspace ? "guru" : workspace,
+                sessionId,
+                ticker: activeTicker,
+                runKind: requestedRunKind,
+                locale: responseLocale,
+              }}
               onSend={handleSend}
               onCancel={handleCancel}
               activity={chat.activity}
@@ -1196,7 +1311,7 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
                 <div className="pointer-events-auto flex items-center gap-1 rounded-[14px] border border-hairline bg-canvas p-1.5 shadow-sm">
                   <button
                     type="button"
-                    className="inline-flex h-9 items-center gap-2 rounded-[10px] px-3 text-[13px] font-bold text-ink active:bg-surface-dim"
+                    className="inline-flex min-h-11 items-center gap-2 rounded-[10px] px-3 text-[13px] font-bold text-ink active:bg-surface-dim"
                     onClick={isActiveRun ? revealComposer : revealComposerForTyping}
                     aria-label={isActiveRun ? "분석 상태 보기" : "질문 입력"}
                   >
@@ -1221,7 +1336,7 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
                   {isActiveRun && (
                     <button
                       type="button"
-                      className="inline-flex h-9 items-center rounded-[10px] border border-hairline bg-surface px-3 text-[12px] font-bold text-error active:scale-95"
+                      className="inline-flex min-h-11 items-center rounded-[10px] border border-hairline bg-surface px-3 text-[12px] font-bold text-error active:scale-95"
                       onClick={handleCancel}
                       aria-label="응답 생성 중지"
                     >
@@ -1254,8 +1369,10 @@ function ChatContent({ workspace = "chat" }: { workspace?: ChatWorkspace }) {
 
 export default function ChatPage({
   workspace = "chat",
+  draftOwnerId,
 }: {
   workspace?: ChatWorkspace;
+  draftOwnerId: string;
 }) {
   return (
     <Suspense
@@ -1265,7 +1382,7 @@ export default function ChatPage({
         </div>
       }
     >
-      <ChatContent workspace={workspace} />
+      <ChatContent workspace={workspace} draftOwnerId={draftOwnerId} />
     </Suspense>
   );
 }

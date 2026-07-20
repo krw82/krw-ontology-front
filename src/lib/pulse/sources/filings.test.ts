@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  filingGroupKey,
-  getFilingCandidates,
-} from "@/lib/pulse/sources/filings";
+import { getFilingCandidates } from "@/lib/pulse/sources/filings";
 import type { Database } from "@/types/database";
 
 function filingRow(filingEventId: string, candidateBucket = "preferred") {
@@ -46,20 +43,7 @@ function filingRow(filingEventId: string, candidateBucket = "preferred") {
   };
 }
 
-describe("Pulse filing grouping", () => {
-  const time = Date.parse("2026-07-15T00:04:00.000Z");
-
-  it("groups normal filings for the same CIK in the same ten-minute bucket", () => {
-    const event = { cik: "0000320193", alert_priority: "normal" as const };
-    expect(filingGroupKey(event, "n1", time)).toBe(filingGroupKey(event, "n2", time + 5 * 60_000));
-    expect(filingGroupKey(event, "n1", time)).not.toBe(filingGroupKey(event, "n2", time + 10 * 60_000));
-  });
-
-  it("never groups urgent notifications", () => {
-    const event = { cik: "0000320193", alert_priority: "urgent" as const };
-    expect(filingGroupKey(event, "n1", time)).not.toBe(filingGroupKey(event, "n2", time));
-  });
-
+describe("Pulse filing source", () => {
   it("uses the brief-aware bounded candidate RPC instead of following every global feed page", async () => {
     const rpc = vi.fn(async (name: string) => {
       if (name !== "get_catalog_pulse_filing_candidates_v3") throw new Error("unexpected rpc");
@@ -88,36 +72,6 @@ describe("Pulse filing grouping", () => {
       reason_code: "catalog_sec_filing",
       metadata: { candidate_bucket: "preferred" },
     });
-  });
-
-  it("uses v2 and then at most two legacy pages while additive candidate RPCs propagate", async () => {
-    let legacyPage = 0;
-    const calls: Array<[string, Record<string, unknown>]> = [];
-    const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
-      calls.push([name, args]);
-      if (name === "get_catalog_pulse_filing_candidates_v3" || name === "get_catalog_pulse_filing_candidates_v2") {
-        return { data: null, error: { code: "PGRST202" } };
-      }
-      if (name !== "get_catalog_global_filing_feed") throw new Error("unexpected rpc");
-      const size = legacyPage++ === 0 ? 200 : 100;
-      return {
-        data: Array.from({ length: size }, (_, index) => {
-          const { candidate_bucket: candidateBucket, ...legacyRow } = filingRow(`legacy-${legacyPage}-${index}`);
-          void candidateBucket;
-          return legacyRow;
-        }),
-        error: null,
-      };
-    });
-    const supabase = { rpc } as unknown as SupabaseClient<Database>;
-
-    const candidates = await getFilingCandidates(supabase, new Date("2026-07-15T00:00:00.000Z"));
-
-    const legacyCalls = calls.filter(([name]) => name === "get_catalog_global_filing_feed");
-    expect(candidates).toHaveLength(300);
-    expect(legacyCalls).toHaveLength(2);
-    expect(legacyCalls.map(([, args]) => args?.p_limit)).toEqual([200, 100]);
-    expect(candidates.at(-1)?.metadata.candidate_bucket).toBe("legacy_bounded");
   });
 
   it("uses a ready source-grounded brief for the card without changing Form 4 behavior", async () => {

@@ -21,8 +21,9 @@ export type PulseFeedDisplayEntry = PulseFeedItemEntry | PulseInsiderTradeStackE
 
 /**
  * Keeps server ordering and pagination intact while presenting repeated Form 4
- * filings as one card in the client. Groups never span a local calendar day or
- * the reviewed divider, so the visual summary remains truthful.
+ * filings as one card in the client. Groups never span a local calendar day;
+ * each row retains its own judgment state and the stack becomes reviewed only
+ * after every transaction has a judgment.
  */
 export function buildPulseFeedDisplayEntries(
   items: PulseItem[],
@@ -45,7 +46,11 @@ export function buildPulseFeedDisplayEntries(
     if (group.length < 2) continue;
     const first = group[0];
     if (!first) continue;
-    const state = first.item.state;
+    const state = group.every(({ item }) => item.state === "reviewed")
+      ? "reviewed"
+      : group.some(({ item }) => item.state === "seen")
+        ? "seen"
+        : "new";
     stackByFirstItemId.set(first.item.id, {
       type: "insider_trade_stack",
       id: `insider-stack:${groupKey}`,
@@ -83,6 +88,5 @@ function insiderTradeGroupKey(item: PulseItem, timezone: string): string {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date(item.occurred_at));
-  const reviewBucket = item.state === "reviewed" ? "reviewed" : "open";
-  return `${reviewBucket}:${day}`;
+  return day;
 }

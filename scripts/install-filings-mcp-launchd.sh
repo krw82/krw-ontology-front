@@ -47,6 +47,12 @@ set -a
 . "$ENV_PATH"
 set +a
 
+MAC_RUNTIME_ROOT=${KRW_MAC_RUNTIME_ROOT:-$FRONT_DIR}
+if [ ! -f "$MAC_RUNTIME_ROOT/scripts/start-filings-mcp-production.sh" ]; then
+  echo "Missing Mac runtime filings MCP start script: $MAC_RUNTIME_ROOT" >&2
+  exit 1
+fi
+
 is_enabled=0
 case "$(printf '%s' "${FILINGS_MCP_ENABLED:-}" | tr '[:upper:]' '[:lower:]')" in
   1|true|yes|on) is_enabled=1 ;;
@@ -71,15 +77,20 @@ require_env() {
     exit 1
   fi
 }
-for key in SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY SEC_USER_AGENT FILINGS_MCP_AUTH_TOKEN; do
+for key in SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY SEC_USER_AGENT FILINGS_MCP_AUTH_TOKEN FILINGS_MCP_PERSONAL_SIGNING_SECRET; do
   require_env "$key"
 done
+if [ "$FILINGS_MCP_PERSONAL_SIGNING_SECRET" = "$FILINGS_MCP_AUTH_TOKEN" ]; then
+  echo "FILINGS_MCP_PERSONAL_SIGNING_SECRET must be distinct from FILINGS_MCP_AUTH_TOKEN" >&2
+  exit 1
+fi
 if [ ! -f "$TEMPLATE" ]; then
   echo "Missing launchd template: $TEMPLATE" >&2
   exit 1
 fi
 
 FILINGS_MCP_PORT=${FILINGS_MCP_PORT:-8785}
+FILINGS_MCP_HOST=${FILINGS_MCP_HOST:-127.0.0.1}
 FILINGS_MCP_NICE=${FILINGS_MCP_NICE:-${MAC_WORKER_NICE:--5}}
 KRW_LOG_DIR=${KRW_LOG_DIR:-"$HOME/krw-ontology-log"}
 FILINGS_MCP_LOG_DIR=${FILINGS_MCP_LOG_DIR:-"$KRW_LOG_DIR/filings-mcp/prod"}
@@ -91,10 +102,13 @@ if [ "$FILINGS_MCP_PORT" -lt 1 ] || [ "$FILINGS_MCP_PORT" -gt 65535 ]; then
   exit 1
 fi
 KRW_FILINGS_MCP_URL=${KRW_FILINGS_MCP_URL:-"http://127.0.0.1:$FILINGS_MCP_PORT/mcp"}
-export KRW_FILINGS_MCP_URL FILINGS_MCP_PORT
+export KRW_FILINGS_MCP_URL FILINGS_MCP_PORT FILINGS_MCP_HOST
 node <<'NODE'
 const url = new URL(process.env.KRW_FILINGS_MCP_URL);
 const expectedPort = String(process.env.FILINGS_MCP_PORT);
+if (!["127.0.0.1", "::1"].includes(process.env.FILINGS_MCP_HOST)) {
+  throw new Error("Mac FILINGS_MCP_HOST must be a loopback address");
+}
 if (!["http:", "https:"].includes(url.protocol) || !["127.0.0.1", "localhost", "::1", "[::1]"].includes(url.hostname)) {
   throw new Error("KRW_FILINGS_MCP_URL must be a local HTTP(S) URL");
 }
@@ -138,7 +152,7 @@ mkdir -p "$PLIST_DIR" "$FILINGS_MCP_LOG_DIR"
 sed \
   -e "s#__NICE__#$FILINGS_MCP_NICE#g" \
   -e "s#__ENV_FILE__#$ENV_PATH#g" \
-  -e "s#__FRONT_DIR__#$FRONT_DIR#g" \
+  -e "s#__FRONT_DIR__#$MAC_RUNTIME_ROOT#g" \
   -e "s#__LOG_DIR__#$FILINGS_MCP_LOG_DIR#g" \
   "$TEMPLATE" > "$PLIST"
 echo "Installed $PLIST"

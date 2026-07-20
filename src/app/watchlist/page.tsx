@@ -1,14 +1,9 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import TopNav from "@/components/TopNav";
 import WatchlistHomeClient from "@/components/watchlist/WatchlistHomeClient";
 import { getAuthUser } from "@/lib/auth";
 import { getEntitlementStatus } from "@/lib/billing/entitlement";
 import { isEntitlementFeatureEnabled } from "@/lib/billing/feature-access";
-import {
-  shouldPreserveInitialProfile,
-  topNavProfileFromUser,
-} from "@/lib/auth/user-profile";
 import { listWatchlistOverview } from "@/lib/watchlist/workspace";
 import type { WatchlistOverviewResponse } from "@/types/api-contracts";
 
@@ -25,8 +20,10 @@ const EMPTY_OVERVIEW: WatchlistOverviewResponse = {
   research_inbox: [],
   stats: {
     total: 0,
-    watchlisted: 0,
+    exploring: 0,
+    watching: 0,
     holding: 0,
+    closed: 0,
     open_questions: 0,
     notes: 0,
     recent_activity: 0,
@@ -64,13 +61,7 @@ export default async function WatchlistPage() {
   const { overview, loadError } = await loadWatchlistPageData(user.id);
 
   return (
-    <div className="min-h-[100dvh] bg-canvas text-ink">
-      <TopNav
-        initialUserProfile={topNavProfileFromUser(user)}
-        preserveInitialUserProfile={shouldPreserveInitialProfile(user)}
-        brandHref="/companies"
-        brandAriaLabel="회사 목록으로 이동"
-      />
+    <div className="bg-canvas text-ink">
       <WatchlistHomeClient overview={overview} loadError={loadError} />
     </div>
   );

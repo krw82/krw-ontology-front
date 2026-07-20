@@ -71,7 +71,7 @@ describe("Desktop company catalog service", () => {
 
     expect(first.payload).toMatchObject({
       ok: true,
-      contract_version: "desktop-company-catalog/v1",
+      contract_version: "desktop-company-catalog/v2",
       data: {
         companies: [
           {
@@ -139,7 +139,7 @@ describe("Desktop company catalog service", () => {
     const result = await getDesktopCompany("aapl");
 
     expect(result).toMatchObject({
-      contract_version: "desktop-company-detail/v1",
+      contract_version: "desktop-company-detail/v2",
       data: {
         company: {
           ticker: "AAPL",

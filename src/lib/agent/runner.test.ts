@@ -90,6 +90,12 @@ vi.mock("./mcp-client", () => {
     "read_filing_section",
     "get_form4_insider_transactions",
   ];
+  const personalFilingsTools = [
+    "get_coverage_state",
+    "list_filing_judgments",
+    "get_decision_timeline",
+    "list_open_questions",
+  ];
   const guruTools = [
     "krw_guru_status",
     "krw_guru_search",
@@ -111,6 +117,7 @@ vi.mock("./mcp-client", () => {
     YAHOO_FINANCE_MCP_TOOLS: yahooFinanceTools,
     CHART_MCP_TOOLS: chartTools,
     KRW_FILINGS_MCP_TOOLS: filingsTools,
+    KRW_PERSONAL_FILINGS_MCP_TOOLS: personalFilingsTools,
     GURU_MCP_TOOLS: guruTools,
     KRW_ONTOLOGY_SDK_ALLOWED_TOOLS: tools.map(
       (toolName) => `mcp__krw-ontology__${toolName}`,
@@ -128,6 +135,9 @@ vi.mock("./mcp-client", () => {
       (toolName) => `mcp__krw_presentation__${toolName}`,
     ),
     KRW_FILINGS_SDK_ALLOWED_TOOLS: filingsTools.map(
+      (toolName) => `mcp__krw-filings__${toolName}`,
+    ),
+    KRW_PERSONAL_FILINGS_SDK_ALLOWED_TOOLS: personalFilingsTools.map(
       (toolName) => `mcp__krw-filings__${toolName}`,
     ),
     GURU_ADVISOR_SDK_ALLOWED_TOOLS: guruTools.map(
@@ -157,8 +167,18 @@ vi.mock("./mcp-client", () => {
     isKrwFilingsMcpEnabled: () =>
       process.env.FILINGS_MCP_ENABLED === "1" &&
       Boolean(process.env.FILINGS_MCP_AUTH_TOKEN),
+    isKrwPersonalFilingsMcpEnabled: () =>
+      process.env.FILINGS_MCP_ENABLED === "1" &&
+      Boolean(process.env.FILINGS_MCP_AUTH_TOKEN) &&
+      Boolean(process.env.FILINGS_MCP_PERSONAL_SIGNING_SECRET),
     isKrwFilingsSdkTool: (toolName: string) =>
-      toolName.startsWith("mcp__krw-filings__"),
+      filingsTools.some(
+        (candidate) => toolName === `mcp__krw-filings__${candidate}`,
+      ),
+    isKrwPersonalFilingsSdkTool: (toolName: string) =>
+      personalFilingsTools.some(
+        (candidate) => toolName === `mcp__krw-filings__${candidate}`,
+      ),
     filingsMcpToken: () => process.env.FILINGS_MCP_AUTH_TOKEN ?? null,
   };
 });
@@ -570,12 +590,351 @@ describe("agent runner research budget recovery", () => {
     delete process.env.CLAUDE_SDK_DIAGNOSTIC_TIMEOUT_MS;
     delete process.env.GURU_AGENT_GENERATED_BRIEF_ENABLED;
     delete process.env.RESEARCH_ANSWER_ENVELOPE_ENABLED;
+    delete process.env.AGENT_MAX_TOOL_CALLS;
+    delete process.env.FILINGS_MCP_ENABLED;
+    delete process.env.FILINGS_MCP_AUTH_TOKEN;
+    delete process.env.FILINGS_MCP_PERSONAL_SIGNING_SECRET;
   });
 
   it("keeps the deep mode total tool budget unchanged", () => {
     expect(getResearchModeToolBudget("deep")).toEqual({
       maxToolCalls: 32,
     });
+  });
+
+  it("exposes only the authenticated user's personal filing memory to web chat", async () => {
+    process.env.FILINGS_MCP_ENABLED = "1";
+    process.env.FILINGS_MCP_AUTH_TOKEN = "test-filings-service-secret";
+    process.env.FILINGS_MCP_PERSONAL_SIGNING_SECRET =
+      "test-personal-signing-secret";
+    process.env.AGENT_MAX_TOOL_CALLS = "1";
+    writeFileSync(
+      "/tmp/krw-ontology-plugin/.mcp.json",
+      JSON.stringify({
+        mcpServers: {
+          "krw-ontology": {
+            type: "http",
+            url: "http://127.0.0.1:8765/mcp",
+            alwaysLoad: true,
+          },
+          "krw-filings": {
+            type: "http",
+            url: "http://127.0.0.1:8785/mcp",
+            alwaysLoad: true,
+          },
+        },
+      }),
+    );
+    let firstPermission: Awaited<ReturnType<typeof canUseTool>> | null = null;
+    let secondPermission: Awaited<ReturnType<typeof canUseTool>> | null = null;
+    sdkMocks.query.mockImplementationOnce(
+      (call: { options: { canUseTool?: typeof canUseTool } }) =>
+        makeSdkQueryFromGenerator(async function* () {
+          const guard = call.options.canUseTool;
+          if (!guard) throw new Error("missing personal-memory permission guard");
+          firstPermission = await guard(
+            "mcp__krw-filings__get_coverage_state",
+            { ticker: "AAPL" },
+          );
+          yield sdkToolUseMessage(
+            "mcp__krw-filings__get_coverage_state",
+            1,
+            { ticker: "AAPL" },
+          );
+          yield sdkToolResultMessage(1, {
+            scope: "personal",
+            ticker: "AAPL",
+          });
+          secondPermission = await guard(
+            "mcp__krw-filings__list_open_questions",
+            { ticker: "AAPL" },
+          );
+          yield {
+            type: "result",
+            subtype: "success",
+            result: "이전 판단을 반영한 답변입니다.",
+            usage: { input_tokens: 10, output_tokens: 12 },
+          };
+        }),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111126",
+        userId: "123e4567-e89b-42d3-a456-426614174000",
+        userMessage: "내가 이 회사를 왜 보고 있었지?",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(firstPermission).toEqual({ behavior: "allow" });
+    expect(secondPermission).toMatchObject({ behavior: "deny" });
+    expect(result.acc.toolCalls).toHaveLength(1);
+    expect(result.acc.toolCalls[0]).toMatchObject({
+      toolName: "get_coverage_state",
+      finishedAt: expect.any(String),
+    });
+    const options = sdkMocks.query.mock.calls[0]?.[0].options;
+    expect(options.allowedTools).toEqual(
+      expect.arrayContaining([
+        "mcp__krw-filings__get_coverage_state",
+        "mcp__krw-filings__list_filing_judgments",
+        "mcp__krw-filings__get_decision_timeline",
+        "mcp__krw-filings__list_open_questions",
+      ]),
+    );
+    expect(options.allowedTools).not.toContain("mcp__krw-filings__get_filing");
+    expect(options.mcpServers["krw-filings"].headers).toMatchObject({
+      Authorization: "Bearer test-filings-service-secret",
+      "x-krw-user-authorization": expect.stringMatching(/^Internal /),
+    });
+    await expect(
+      options.canUseTool("mcp__krw-filings__get_filing", {}),
+    ).resolves.toMatchObject({ behavior: "deny" });
+  });
+
+  it("atomically reserves the last personal tool slot across parallel permission requests", async () => {
+    process.env.FILINGS_MCP_ENABLED = "1";
+    process.env.FILINGS_MCP_AUTH_TOKEN = "test-filings-service-secret";
+    process.env.FILINGS_MCP_PERSONAL_SIGNING_SECRET =
+      "test-personal-signing-secret";
+    process.env.AGENT_MAX_TOOL_CALLS = "1";
+    writeFileSync(
+      "/tmp/krw-ontology-plugin/.mcp.json",
+      JSON.stringify({
+        mcpServers: {
+          "krw-ontology": {
+            type: "http",
+            url: "http://127.0.0.1:8765/mcp",
+            alwaysLoad: true,
+          },
+          "krw-filings": {
+            type: "http",
+            url: "http://127.0.0.1:8785/mcp",
+            alwaysLoad: true,
+          },
+        },
+      }),
+    );
+
+    let decisions: Array<Awaited<ReturnType<typeof canUseTool>>> = [];
+    let retryDecision: Awaited<ReturnType<typeof canUseTool>> | null = null;
+    sdkMocks.query.mockImplementationOnce(
+      (call: { options: { canUseTool?: typeof canUseTool } }) =>
+        makeSdkQueryFromGenerator(async function* () {
+          const guard = call.options.canUseTool;
+          if (!guard) throw new Error("missing personal-memory permission guard");
+          const guarded = guard as unknown as (
+            toolName: string,
+            input: Record<string, unknown>,
+            context: {
+              signal: AbortSignal;
+              toolUseID: string;
+              requestId: string;
+            },
+          ) => Promise<Awaited<ReturnType<typeof canUseTool>>>;
+          const permissionContext = (toolUseID: string) => ({
+            signal: new AbortController().signal,
+            toolUseID,
+            requestId: `request-${toolUseID}`,
+          });
+          decisions = await Promise.all([
+            guarded(
+              "mcp__krw-filings__get_coverage_state",
+              { ticker: "AAPL" },
+              permissionContext("parallel-personal-1"),
+            ),
+            guarded(
+              "mcp__krw-filings__list_open_questions",
+              { ticker: "AAPL" },
+              permissionContext("parallel-personal-2"),
+            ),
+          ]) as Array<Awaited<ReturnType<typeof canUseTool>>>;
+          retryDecision = await guarded(
+            "mcp__krw-filings__get_coverage_state",
+            { ticker: "AAPL" },
+            permissionContext("parallel-personal-1"),
+          ) as Awaited<ReturnType<typeof canUseTool>>;
+          yield {
+            type: "result",
+            subtype: "success",
+            result: "병렬 권한 예약을 검증했습니다.",
+            usage: { input_tokens: 10, output_tokens: 12 },
+          };
+        }),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111127",
+        userId: "123e4567-e89b-42d3-a456-426614174000",
+        userMessage: "내 개인 메모를 확인해줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(decisions[0]).toEqual({ behavior: "allow" });
+    expect(decisions[1]).toMatchObject({ behavior: "deny" });
+    expect(retryDecision).toEqual({ behavior: "allow" });
+  });
+
+  it("atomically shares the total tool budget across personal and Yahoo tools", async () => {
+    process.env.FILINGS_MCP_ENABLED = "1";
+    process.env.FILINGS_MCP_AUTH_TOKEN = "test-filings-service-secret";
+    process.env.FILINGS_MCP_PERSONAL_SIGNING_SECRET =
+      "test-personal-signing-secret";
+    process.env.AGENT_MAX_TOOL_CALLS = "1";
+    process.env.YAHOO_FINANCE_MAX_CALLS = "4";
+    writeFileSync(
+      "/tmp/krw-ontology-plugin/.mcp.json",
+      JSON.stringify({
+        mcpServers: {
+          "krw-ontology": {
+            type: "http",
+            url: "http://127.0.0.1:8765/mcp",
+            alwaysLoad: true,
+          },
+          "krw-filings": {
+            type: "http",
+            url: "http://127.0.0.1:8785/mcp",
+            alwaysLoad: true,
+          },
+        },
+      }),
+    );
+
+    let decisions: Array<Awaited<ReturnType<typeof canUseTool>>> = [];
+    sdkMocks.query.mockImplementationOnce(
+      (call: { options: { canUseTool?: typeof canUseTool } }) =>
+        makeSdkQueryFromGenerator(async function* () {
+          const guard = call.options.canUseTool;
+          if (!guard) throw new Error("missing cross-tool permission guard");
+          const guarded = guard as unknown as (
+            toolName: string,
+            input: Record<string, unknown>,
+            context: {
+              signal: AbortSignal;
+              toolUseID: string;
+              requestId: string;
+            },
+          ) => Promise<Awaited<ReturnType<typeof canUseTool>>>;
+          const permissionContext = (toolUseID: string) => ({
+            signal: new AbortController().signal,
+            toolUseID,
+            requestId: `request-${toolUseID}`,
+          });
+          decisions = await Promise.all([
+            guarded(
+              "mcp__krw-filings__get_coverage_state",
+              { ticker: "AAPL" },
+              permissionContext("parallel-cross-personal"),
+            ),
+            guarded(
+              yahooFinanceSdkToolName("get_yahoo_finance_news"),
+              { ticker: "AAPL" },
+              permissionContext("parallel-cross-yahoo"),
+            ),
+          ]);
+          yield {
+            type: "result",
+            subtype: "success",
+            result: "교차 도구 총예산 예약을 검증했습니다.",
+            usage: { input_tokens: 10, output_tokens: 12 },
+          };
+        }),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111128",
+        userId: "123e4567-e89b-42d3-a456-426614174000",
+        userMessage: "내 메모와 최신 뉴스를 함께 확인해줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        analysisMode: "news",
+        runKind: "news_discovery",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(decisions[0]).toEqual({ behavior: "allow" });
+    expect(decisions[1]).toMatchObject({ behavior: "deny" });
+  });
+
+  it("atomically enforces the Yahoo category budget across parallel requests", async () => {
+    process.env.AGENT_MAX_TOOL_CALLS = "3";
+    process.env.YAHOO_FINANCE_MAX_CALLS = "1";
+    let decisions: Array<Awaited<ReturnType<typeof canUseTool>>> = [];
+    sdkMocks.query.mockImplementationOnce(
+      (call: { options: { canUseTool?: typeof canUseTool } }) =>
+        makeSdkQueryFromGenerator(async function* () {
+          const guard = call.options.canUseTool;
+          if (!guard) throw new Error("missing Yahoo permission guard");
+          const guarded = guard as unknown as (
+            toolName: string,
+            input: Record<string, unknown>,
+            context: {
+              signal: AbortSignal;
+              toolUseID: string;
+              requestId: string;
+            },
+          ) => Promise<Awaited<ReturnType<typeof canUseTool>>>;
+          const permissionContext = (toolUseID: string) => ({
+            signal: new AbortController().signal,
+            toolUseID,
+            requestId: `request-${toolUseID}`,
+          });
+          decisions = await Promise.all([
+            guarded(
+              yahooFinanceSdkToolName("get_yahoo_finance_news"),
+              { ticker: "AAPL" },
+              permissionContext("parallel-yahoo-1"),
+            ),
+            guarded(
+              yahooFinanceSdkToolName("get_stock_info"),
+              { ticker: "AAPL" },
+              permissionContext("parallel-yahoo-2"),
+            ),
+          ]);
+          yield {
+            type: "result",
+            subtype: "success",
+            result: "Yahoo 종류별 예산 예약을 검증했습니다.",
+            usage: { input_tokens: 10, output_tokens: 12 },
+          };
+        }),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111129",
+        userMessage: "AAPL 최신 뉴스를 확인해줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        analysisMode: "news",
+        runKind: "news_discovery",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(decisions[0]).toEqual({ behavior: "allow" });
+    expect(decisions[1]).toMatchObject({ behavior: "deny" });
   });
 
   it("captures system init and samples context only after the SDK result", async () => {
@@ -2042,6 +2401,89 @@ describe("agent runner research budget recovery", () => {
     expect(hookUpdatedInput(decisions.subagentVerifyLarge)).toBeUndefined();
     expect(hookDecision(decisions.subagentGuruTool)).toBe("deny");
     expect(hookDecision(decisions.subagentRecursiveAgent)).toBe("deny");
+  });
+
+  it("atomically enforces the total budget in the authoritative Guru hook", async () => {
+    process.env.AGENT_MAX_TOOL_CALLS = "1";
+    let decisions: unknown[] = [];
+    sdkMocks.query.mockImplementationOnce(
+      (call: {
+        options: {
+          hooks?: {
+            PreToolUse?: Array<{
+              hooks: Array<
+                (
+                  input: Record<string, unknown>,
+                  toolUseID: string,
+                  options: { signal: AbortSignal },
+                ) => Promise<unknown>
+              >;
+            }>;
+          };
+        };
+      }) =>
+        makeSdkQueryFromGenerator(async function* () {
+          const hook = call.options.hooks?.PreToolUse?.[0]?.hooks?.[0];
+          if (!hook) throw new Error("missing Guru Advisor PreToolUse hook");
+          const invokeHook = (
+            toolUseID: string,
+            toolName: string,
+            toolInput: Record<string, unknown>,
+          ) =>
+            hook(
+              {
+                hook_event_name: "PreToolUse",
+                session_id: "11111111-1111-4111-8111-111111111111",
+                transcript_path: "/tmp/transcript.jsonl",
+                cwd: "/tmp",
+                tool_use_id: toolUseID,
+                tool_name: toolName,
+                tool_input: toolInput,
+              },
+              toolUseID,
+              { signal: new AbortController().signal },
+            );
+
+          // This exercises only the PreToolUse hook. Guru MCP tools can be
+          // auto-approved through allowedTools, so canUseTool is deliberately
+          // not called here.
+          decisions = await Promise.all([
+            invokeHook(
+              "guru-budget-1",
+              guruSdkToolName("krw_guru_select_lenses"),
+              { question: "AAPL business quality" },
+            ),
+            invokeHook(
+              "guru-budget-2",
+              guruSdkToolName("krw_guru_query_context"),
+              { question: "AAPL business quality" },
+            ),
+          ]);
+          yield {
+            type: "result",
+            subtype: "success",
+            result: "구루 실행 경계 예산을 검증했습니다.",
+            usage: { input_tokens: 10, output_tokens: 12 },
+          };
+        }),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111130",
+        userMessage: "버핏 관점에서 AAPL을 봐줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        runKind: "guru_advisor",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(hookDecision(decisions[0])).toBe("allow");
+    expect(hookDecision(decisions[1])).toBe("deny");
   });
 
   it("attaches the verified runtime evidence pack and caps Guru review corrections in canUseTool", async () => {

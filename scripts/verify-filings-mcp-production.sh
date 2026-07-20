@@ -8,7 +8,7 @@ usage() {
 Usage: scripts/verify-filings-mcp-production.sh [--env-file FILE]
 
 Verify the authenticated local on-demand SEC filings MCP /readyz endpoint and
-its exact six-tool contract.
+its exact public six-tool and authenticated personal four-tool contracts.
 EOF
 }
 
@@ -45,10 +45,12 @@ esac
 
 KRW_FILINGS_MCP_URL=${KRW_FILINGS_MCP_URL:-"http://127.0.0.1:${FILINGS_MCP_PORT:-8785}/mcp"}
 FILINGS_MCP_AUTH_TOKEN=${FILINGS_MCP_AUTH_TOKEN:-}
-export KRW_FILINGS_MCP_URL FILINGS_MCP_AUTH_TOKEN
+FILINGS_MCP_PERSONAL_SIGNING_SECRET=${FILINGS_MCP_PERSONAL_SIGNING_SECRET:-}
+export KRW_FILINGS_MCP_URL FILINGS_MCP_AUTH_TOKEN FILINGS_MCP_PERSONAL_SIGNING_SECRET
 
 cd "$FRONT_DIR"
 node --input-type=module <<'NODE'
+import { createHmac } from "node:crypto";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
@@ -60,8 +62,22 @@ const expected = [
   "read_filing_section",
   "get_form4_insider_transactions",
 ];
+const expectedPersonal = [
+  "get_coverage_state",
+  "list_filing_judgments",
+  "get_decision_timeline",
+  "list_open_questions",
+];
+const deferPersonalDataSmoke = ["1", "true", "yes", "on"].includes(
+  process.env.KRW_FILINGS_MCP_DEFER_PERSONAL_DATA_SMOKE?.trim().toLowerCase() ?? "",
+);
 const token = process.env.FILINGS_MCP_AUTH_TOKEN;
 if (!token) throw new Error("FILINGS_MCP_AUTH_TOKEN is required");
+const personalSigningSecret = process.env.FILINGS_MCP_PERSONAL_SIGNING_SECRET;
+if (!personalSigningSecret) throw new Error("FILINGS_MCP_PERSONAL_SIGNING_SECRET is required");
+if (personalSigningSecret === token) {
+  throw new Error("FILINGS_MCP_PERSONAL_SIGNING_SECRET must be distinct from FILINGS_MCP_AUTH_TOKEN");
+}
 const mcpUrl = process.env.KRW_FILINGS_MCP_URL;
 const readyUrl = new URL(mcpUrl);
 readyUrl.pathname = "/readyz";
@@ -84,5 +100,59 @@ try {
 } finally {
   await client.close().catch(() => undefined);
 }
-console.log("OK on-demand filings MCP readiness and tool parity");
+
+const issuedAt = Math.floor(Date.now() / 1000);
+const delegationPayload = Buffer.from(JSON.stringify({
+  sub: "00000000-0000-4000-8000-000000000000",
+  iat: issuedAt,
+  exp: issuedAt + 12 * 60,
+  aud: "krw-filings-personal",
+  iss: "krw-web-agent",
+  ver: 1,
+}), "utf8").toString("base64url");
+const signature = createHmac("sha256", personalSigningSecret).update(delegationPayload).digest("base64url");
+const personalHeaders = {
+  ...headers,
+  "x-krw-user-authorization": `Internal ${delegationPayload}.${signature}`,
+};
+const tamperedSignature = `${signature.slice(0, -1)}${signature.endsWith("A") ? "B" : "A"}`;
+const tamperedResponse = await fetch(mcpUrl, {
+  method: "POST",
+  headers: {
+    ...headers,
+    "content-type": "application/json",
+    "x-krw-user-authorization": `Internal ${delegationPayload}.${tamperedSignature}`,
+  },
+  body: "{}",
+  signal: AbortSignal.timeout(timeout),
+});
+if (tamperedResponse.status !== 401) {
+  throw new Error(`Tampered personal MCP credential was not rejected: ${tamperedResponse.status}`);
+}
+const personalClient = new Client({ name: "krw-filings-personal-production-verify", version: "1.0.0" });
+const personalTransport = new StreamableHTTPClientTransport(new URL(mcpUrl), {
+  requestInit: { headers: personalHeaders },
+});
+try {
+  await personalClient.connect(personalTransport, { timeout });
+  const result = await personalClient.listTools(undefined, { timeout, maxTotalTimeout: timeout });
+  const names = result.tools.map((tool) => tool.name).sort();
+  const allExpected = [...expected, ...expectedPersonal];
+  if (names.length !== allExpected.length || allExpected.some((name) => !names.includes(name))) {
+    throw new Error(`Personal filings MCP tool parity mismatch: ${names.join(", ")}`);
+  }
+  if (deferPersonalDataSmoke) {
+    console.log("Deferred personal filing data smoke until the post-migration production verification.");
+  } else {
+    const coverage = await personalClient.callTool(
+      { name: "get_coverage_state", arguments: { ticker: "AAPL" } },
+      undefined,
+      { timeout, maxTotalTimeout: timeout },
+    );
+    if (coverage.isError) throw new Error("Personal coverage-state smoke returned an MCP error");
+  }
+} finally {
+  await personalClient.close().catch(() => undefined);
+}
+console.log("OK on-demand filings MCP readiness, public tools, and personal-memory tools");
 NODE

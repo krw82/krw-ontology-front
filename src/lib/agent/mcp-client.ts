@@ -81,6 +81,13 @@ export const KRW_FILINGS_MCP_TOOLS = [
   "get_form4_insider_transactions",
 ] as const satisfies readonly KrwFilingsMCPToolName[];
 
+export const KRW_PERSONAL_FILINGS_MCP_TOOLS = [
+  "get_coverage_state",
+  "list_filing_judgments",
+  "get_decision_timeline",
+  "list_open_questions",
+] as const satisfies readonly KrwFilingsMCPToolName[];
+
 export const GURU_MCP_TOOLS = [
   "krw_guru_status",
   "krw_guru_search",
@@ -127,12 +134,20 @@ export const KRW_FILINGS_SDK_ALLOWED_TOOLS = KRW_FILINGS_MCP_TOOLS.map(
   (toolName) => `${KRW_FILINGS_DIRECT_TOOL_PREFIX}${toolName}`,
 );
 
+export const KRW_PERSONAL_FILINGS_SDK_ALLOWED_TOOLS =
+  KRW_PERSONAL_FILINGS_MCP_TOOLS.map(
+    (toolName) => `${KRW_FILINGS_DIRECT_TOOL_PREFIX}${toolName}`,
+  );
+
 const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const STOCK_NEWS_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_MCP_TOOLS);
 const GURU_MCP_TOOL_SET = new Set<string>(GURU_MCP_TOOLS);
 const YAHOO_FINANCE_MCP_TOOL_SET = new Set<string>(YAHOO_FINANCE_MCP_TOOLS);
 const CHART_MCP_TOOL_SET = new Set<string>(CHART_MCP_TOOLS);
 const KRW_FILINGS_MCP_TOOL_SET = new Set<string>(KRW_FILINGS_MCP_TOOLS);
+const KRW_PERSONAL_FILINGS_MCP_TOOL_SET = new Set<string>(
+  KRW_PERSONAL_FILINGS_MCP_TOOLS,
+);
 const DEFAULT_MCP_HEALTH_TIMEOUT_MS = 30_000;
 type McpProbeKind = "health" | "ready";
 
@@ -177,10 +192,29 @@ export function isKrwFilingsSdkTool(toolName: string): boolean {
   return Boolean(bareName && KRW_FILINGS_MCP_TOOL_SET.has(bareName));
 }
 
+export function isKrwPersonalFilingsSdkTool(toolName: string): boolean {
+  if (!toolName.startsWith(KRW_FILINGS_DIRECT_TOOL_PREFIX)) return false;
+  const bareName = toolName.slice(KRW_FILINGS_DIRECT_TOOL_PREFIX.length);
+  return Boolean(bareName && KRW_PERSONAL_FILINGS_MCP_TOOL_SET.has(bareName));
+}
+
 export function isKrwFilingsMcpEnabled(
   env: Record<string, string | undefined> = process.env,
 ): boolean {
   return truthyEnv(env.FILINGS_MCP_ENABLED) && Boolean(filingsMcpToken(env));
+}
+
+export function isKrwPersonalFilingsMcpEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return isKrwFilingsMcpEnabled(env)
+    && Boolean(personalFilingsMcpSigningSecret(env));
+}
+
+export function personalFilingsMcpSigningSecret(
+  env: Record<string, string | undefined> = process.env,
+): string | null {
+  return env.FILINGS_MCP_PERSONAL_SIGNING_SECRET?.trim() || null;
 }
 
 export function filingsMcpToken(

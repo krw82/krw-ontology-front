@@ -78,7 +78,7 @@ export default function MessageAttachments({
               rel="noreferrer"
               title={`URL 자료 열기: ${display.shortUrl}`}
               aria-label={`URL 자료 열기: ${display.shortUrl}`}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] border border-hairline bg-canvas text-primary shadow-[0_1px_2px_rgba(15,23,42,0.08)] transition-colors hover:border-primary-fixed-dim hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] border border-hairline bg-canvas text-primary shadow-[0_1px_2px_rgba(15,23,42,0.08)] transition-colors hover:border-primary-fixed-dim hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <span
                 aria-hidden="true"

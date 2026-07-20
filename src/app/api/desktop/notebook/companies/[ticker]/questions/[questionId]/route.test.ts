@@ -29,7 +29,7 @@ describe("PATCH /api/desktop/notebook/companies/:ticker/questions/:id", () => {
     vi.mocked(requireDesktopFeatureAccess).mockResolvedValue({} as never);
     vi.mocked(updateDesktopNotebookQuestion).mockResolvedValue({
       ok: true,
-      contract_version: "desktop-notebook-mutation/v1",
+      contract_version: "desktop-notebook-mutation/v2",
       data: { question: { id: "question-1", status: "answered" } },
       meta: { generated_at: "2026-06-23T00:00:00.000Z" },
     } as never);

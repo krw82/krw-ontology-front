@@ -1,4 +1,5 @@
 import "server-only";
+import { isProductionE2ERuntimeConfigured } from "@/lib/dev-auth-runtime";
 
 import { getOntologyEnv, type OntologyEnv } from "@/lib/env";
 import { normalizeTicker, normalizeTickers } from "@/lib/ontology/ticker";
@@ -212,10 +213,13 @@ function clampCompanySearchLimit(limit: number | undefined): number {
 }
 
 function shouldUseStaticE2ECatalog(): boolean {
+  const isDevelopmentE2E = process.env.NODE_ENV !== "production";
+  const isProductionE2E = isProductionE2ERuntimeConfigured();
+
   return (
     process.env.KRW_E2E_STATIC_CATALOG === "1" &&
     process.env.DEV_AUTH_BYPASS === "1" &&
-    process.env.NODE_ENV !== "production"
+    (isDevelopmentE2E || isProductionE2E)
   );
 }
 

@@ -29,7 +29,7 @@ describe("PATCH /api/desktop/notebook/companies/:ticker/mark", () => {
     vi.mocked(requireDesktopFeatureAccess).mockResolvedValue({} as never);
     vi.mocked(updateDesktopNotebookMark).mockResolvedValue({
       ok: true,
-      contract_version: "desktop-notebook-mutation/v1",
+      contract_version: "desktop-notebook-mutation/v2",
       data: { mark: { version: "version-2" } },
       meta: { generated_at: "2026-06-23T00:00:00.000Z" },
     } as never);
@@ -46,7 +46,7 @@ describe("PATCH /api/desktop/notebook/companies/:ticker/mark", () => {
             "content-type": "application/json",
             "if-match": '"version-1"',
           },
-          body: JSON.stringify({ is_watchlisted: true }),
+          body: JSON.stringify({ coverage_status: "watching" }),
         },
       ),
       { params: Promise.resolve({ ticker: "AAPL" }) },
@@ -55,9 +55,10 @@ describe("PATCH /api/desktop/notebook/companies/:ticker/mark", () => {
     expect(response.status).toBe(200);
     expect(updateDesktopNotebookMark).toHaveBeenCalledWith({
       userId: "user-1",
+      userEmail: null,
       ticker: "AAPL",
       expectedVersion: '"version-1"',
-      body: { is_watchlisted: true },
+      body: { coverage_status: "watching" },
     });
   });
 });

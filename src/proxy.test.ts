@@ -84,6 +84,20 @@ describe("proxy", () => {
     expect(updateSession).toHaveBeenCalledOnce();
   });
 
+  it("does not let E2E auth flags weaken the trusted client-IP boundary", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("DEV_AUTH_BYPASS", "1");
+    vi.stubEnv("KRW_E2E_PRODUCTION_AUTH_BYPASS", "1");
+    vi.stubEnv("KRW_E2E_SERVER_BIND", "127.0.0.1");
+    vi.stubEnv("KRW_E2E_AUTH_TOKEN", "a".repeat(64));
+    vi.stubEnv("TRUSTED_CLIENT_IP_HEADER", "x-krw-client-ip");
+
+    const response = await proxy(request("/sw.js"));
+
+    expect(response.status).toBe(503);
+    expect(updateSession).not.toHaveBeenCalled();
+  });
+
   it("rejects an alternate trusted-header configuration in production", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("TRUSTED_CLIENT_IP_HEADER", "x-forwarded-for");
@@ -182,6 +196,19 @@ describe("proxy", () => {
 
     const pageOptions = vi.mocked(updateSession).mock.calls.at(-1)?.[1];
     expect(pageOptions?.requestHeaderOverrides?.get("x-krw-locale")).toBe("en");
+  });
+
+  it("forwards the trusted request pathname and overwrites client input", async () => {
+    await proxy(
+      request("/en/companies/AAPL?tab=overview", {
+        "x-krw-pathname": "/pulse",
+      }),
+    );
+
+    const pageOptions = vi.mocked(updateSession).mock.calls.at(-1)?.[1];
+    expect(pageOptions?.requestHeaderOverrides?.get("x-krw-pathname")).toBe(
+      "/en/companies/AAPL",
+    );
   });
 
   it("forwards an explicit locale header for chat run API requests", async () => {

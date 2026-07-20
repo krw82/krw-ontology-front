@@ -9,10 +9,15 @@ vi.mock("@/lib/analytics/server", () => ({
   recordAnalyticsEventFromRequest: vi.fn(),
 }));
 vi.mock("@/lib/auth", () => ({ getAuthUser: vi.fn() }));
+vi.mock("@/lib/dev-auth-runtime", () => ({
+  E2E_AUTH_HEADER: "x-krw-e2e-auth",
+  isDevAuthBypassEnabledForHost: vi.fn(),
+}));
 
 import { checkDurableRateLimits } from "@/lib/api/rate-limit";
 import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import { getAuthUser } from "@/lib/auth";
+import { isDevAuthBypassEnabledForHost } from "@/lib/dev-auth-runtime";
 import { POST } from "./route";
 
 describe("POST /api/analytics/events", () => {
@@ -21,6 +26,24 @@ describe("POST /api/analytics/events", () => {
     vi.mocked(checkDurableRateLimits).mockResolvedValue({ ok: true });
     vi.mocked(recordAnalyticsEventFromRequest).mockResolvedValue({ ok: true });
     vi.mocked(getAuthUser).mockResolvedValue(null);
+    vi.mocked(isDevAuthBypassEnabledForHost).mockReturnValue(false);
+  });
+
+  it("uses a no-op sink for an approved local dev/E2E auth request", async () => {
+    vi.mocked(isDevAuthBypassEnabledForHost).mockReturnValue(true);
+    const request = new NextRequest("http://127.0.0.1/api/analytics/events", {
+      method: "POST",
+      headers: { "x-krw-e2e-auth": "test-token" },
+      body: JSON.stringify({ event_name: "pulse_viewed", anonymous_id: "anon-1" }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(checkDurableRateLimits).not.toHaveBeenCalled();
+    expect(getAuthUser).not.toHaveBeenCalled();
+    expect(recordAnalyticsEventFromRequest).not.toHaveBeenCalled();
   });
 
   it("derives an authenticated analytics identity from the session", async () => {
@@ -62,6 +85,22 @@ describe("POST /api/analytics/events", () => {
       messageId: null,
       runId: null,
     });
+  });
+
+  it("rejects browser-forged authoritative decision outcomes", async () => {
+    vi.mocked(getAuthUser).mockResolvedValue({ id: "user-1" } as Awaited<ReturnType<typeof getAuthUser>>);
+    const response = await POST(
+      new NextRequest("https://app.example.com/api/analytics/events", {
+        method: "POST",
+        body: JSON.stringify({
+          event_name: "coverage_activated",
+          properties: { coverage_count: 99 },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(recordAnalyticsEventFromRequest).not.toHaveBeenCalled();
   });
 
   it("rate limits public analytics writes", async () => {

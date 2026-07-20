@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import BillingPlanAction from "@/components/BillingPlanAction";
-import TopNav from "@/components/TopNav";
 import { getAuthUser } from "@/lib/auth";
 import { getEntitlementStatus } from "@/lib/billing/entitlement";
 import { MENU_FEATURE_DEFINITIONS } from "@/lib/billing/feature-access";
@@ -14,10 +13,6 @@ export const dynamic = "force-dynamic";
 type BillingSettingsPageProps = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
-
-function stringValue(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
 
 function firstParam(value: string | string[] | undefined): string | null {
   if (Array.isArray(value)) return value[0] ?? null;
@@ -118,22 +113,6 @@ export default async function BillingSettingsPage({
     redirect("/login?next=/settings/billing");
   }
 
-  const metadata = user.user_metadata;
-  const initialUserProfile = user.email
-    ? {
-        email: user.email,
-        name:
-          stringValue(metadata?.full_name) ??
-          stringValue(metadata?.name) ??
-          stringValue(metadata?.display_name),
-        avatarUrl:
-          stringValue(metadata?.avatar_url) ??
-          stringValue(metadata?.picture) ??
-          stringValue(metadata?.photo_url),
-      }
-    : null;
-  const preserveInitialUserProfile =
-    user.app_metadata?.provider === "dev-auth-bypass";
   const entitlement = await getEntitlementStatus(user.id, user.email ?? null);
   const plans = await listPublicBillingPlansFromStore();
   const subscription = await getCurrentTossSubscriptionSummary(user.id).catch(
@@ -146,14 +125,10 @@ export default async function BillingSettingsPage({
   const billingProviderReady = isTossPaymentsConfigured();
   const notice = billingNotice(resolvedSearchParams);
   return (
-    <div className="min-h-[100dvh] bg-canvas">
-      <TopNav
-        initialUserProfile={initialUserProfile}
-        preserveInitialUserProfile={preserveInitialUserProfile}
-      />
+    <div className="bg-canvas">
       <main
         id="main-content"
-        className="px-base pb-[112px] pt-xl sm:px-md md:px-xl md:pb-[96px] md:pt-[72px]"
+        className="px-base pb-xl pt-xl sm:px-md md:px-xl md:pb-[96px] md:pt-[72px]"
       >
         <div className="mx-auto w-full max-w-6xl">
           <header className="mx-auto max-w-3xl text-center">

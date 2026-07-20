@@ -19,7 +19,7 @@ import { createClient } from "@/lib/supabase/client";
 import { easeOutExpo } from "@/lib/animation";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
-import { localizedPath } from "@/i18n/routing";
+import { localizedPath, queryLocalizedPath } from "@/i18n/routing";
 
 function GoogleMark() {
   return (
@@ -187,7 +187,7 @@ function LoginContent() {
   const copy = loginCopy[loginLocale];
   const nextPath = normalizeInternalNextPath(
     rawNextPath,
-    localizedPath(loginLocale, "/companies"),
+    queryLocalizedPath(loginLocale, "/pulse"),
   );
   const desktopCode = normalizeDesktopCode(searchParams.get("desktop_code"));
   const desktopNextPath = desktopCode

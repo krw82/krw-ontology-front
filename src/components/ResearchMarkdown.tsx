@@ -1,9 +1,10 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import { memo, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import KrwChartCard from "@/components/KrwChartCard";
 import { normalizeTicker } from "@/lib/ontology/ticker";
 import type { ChatMessageChart } from "@/types/api-contracts";
 
@@ -30,6 +31,20 @@ const HEADING_START_PATTERN =
 const SENTENCE_END_PATTERN =
   /([.!。！？]|다\.?|니다\.?|습니다\.?|입니다\.?|합니다\.?|됩니다\.?|했습니다\.?|있습니다\.?|없습니다\.?|보입니다\.?)$/;
 const QUESTION_END_PATTERN = /([?？]|나요\??|인가요\??|까요\??|습니까\??)$/;
+const EMPTY_CHARTS: ChatMessageChart[] = [];
+const RESEARCH_MARKDOWN_PLUGINS = [remarkGfm];
+
+const LazyKrwChartCard = dynamic(() => import("@/components/KrwChartCard"), {
+  loading: () => (
+    <div
+      className="my-lg flex min-h-[360px] w-full max-w-[820px] items-center justify-center rounded-[8px] border border-hairline bg-surface/55 sm:min-h-[400px]"
+      role="status"
+      aria-live="polite"
+    >
+      <span className="text-[13px] font-semibold text-muted">차트 불러오는 중…</span>
+    </div>
+  ),
+});
 
 function getSafeMarkdownUrl(
   value: unknown,
@@ -312,6 +327,8 @@ const RESEARCH_MARKDOWN_COMPONENTS = {
         className="my-md h-auto max-w-full rounded-[8px] border border-hairline"
         src={safeSrc}
         alt={alt ?? ""}
+        loading="lazy"
+        decoding="async"
       />
     );
   },
@@ -349,59 +366,92 @@ const GURU_RESEARCH_MARKDOWN_COMPONENTS = {
   ),
 } satisfies Components;
 
-export default function ResearchMarkdown({
+interface MarkdownBlockProps {
+  content: string;
+  isGuru: boolean;
+}
+
+const MarkdownBlock = memo(function MarkdownBlock({
+  content,
+  isGuru,
+}: MarkdownBlockProps) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={RESEARCH_MARKDOWN_PLUGINS}
+      components={
+        isGuru
+          ? GURU_RESEARCH_MARKDOWN_COMPONENTS
+          : RESEARCH_MARKDOWN_COMPONENTS
+      }
+    >
+      {content}
+    </ReactMarkdown>
+  );
+});
+
+function ResearchMarkdown({
   content,
   className,
   normalizePlainText = true,
-  charts = [],
+  charts = EMPTY_CHARTS,
   presentation = "default",
 }: ResearchMarkdownProps) {
   const isGuru = presentation === "guru";
-  const classes = [
-    isGuru
-      ? "w-full max-w-[760px] break-words text-ink [&>p:first-of-type]:border-b [&>p:first-of-type]:border-hairline [&>p:first-of-type]:pb-md [&>p:first-of-type]:text-[17px] [&>p:first-of-type]:font-semibold [&>p:first-of-type]:leading-[1.74] [&>p:first-of-type]:text-ink sm:[&>p:first-of-type]:pb-lg sm:[&>p:first-of-type]:text-[19px] sm:[&>p:first-of-type]:leading-[1.78]"
-      : "w-full max-w-[820px] break-words text-body",
-    className,
-  ]
-    .filter(Boolean)
-    .join(" ");
-  const markdownContent = normalizePlainText
-    ? normalizeResearchMarkdown(content)
-    : content;
-  const parts = splitChartTokens(markdownContent);
-  const chartsByRef = new Map<string, ChatMessageChart>();
-  for (const chart of charts) {
-    chartsByRef.set(chart.chart_ref, chart);
-    chartsByRef.set(chart.insert_token, chart);
-    chartsByRef.set(chart.id, chart);
-  }
+  const classes = useMemo(
+    () =>
+      [
+        isGuru
+          ? "w-full max-w-[760px] break-words text-ink [&>p:first-of-type]:border-b [&>p:first-of-type]:border-hairline [&>p:first-of-type]:pb-md [&>p:first-of-type]:text-[17px] [&>p:first-of-type]:font-semibold [&>p:first-of-type]:leading-[1.74] [&>p:first-of-type]:text-ink sm:[&>p:first-of-type]:pb-lg sm:[&>p:first-of-type]:text-[19px] sm:[&>p:first-of-type]:leading-[1.78]"
+          : "w-full max-w-[820px] break-words text-body",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" "),
+    [className, isGuru],
+  );
+  const markdownContent = useMemo(
+    () =>
+      normalizePlainText ? normalizeResearchMarkdown(content) : content,
+    [content, normalizePlainText],
+  );
+  const parts = useMemo(
+    () => splitChartTokens(markdownContent),
+    [markdownContent],
+  );
+  const chartsByRef = useMemo(() => {
+    const chartMap = new Map<string, ChatMessageChart>();
+    for (const chart of charts) {
+      chartMap.set(chart.chart_ref, chart);
+      chartMap.set(chart.insert_token, chart);
+      chartMap.set(chart.id, chart);
+    }
+    return chartMap;
+  }, [charts]);
 
   return (
     <div className={classes}>
       {parts.map((part, index) => {
         if (part.type === "chart") {
           const chart = chartsByRef.get(part.ref);
-          return chart ? <KrwChartCard key={`${part.ref}-${index}`} chart={chart} /> : null;
+          return chart ? (
+            <LazyKrwChartCard key={`${part.ref}-${index}`} chart={chart} />
+          ) : null;
         }
 
         if (!part.content.trim()) return null;
         return (
-          <ReactMarkdown
+          <MarkdownBlock
             key={`markdown-${index}`}
-            remarkPlugins={[remarkGfm]}
-            components={
-              isGuru
-                ? GURU_RESEARCH_MARKDOWN_COMPONENTS
-                : RESEARCH_MARKDOWN_COMPONENTS
-            }
-          >
-            {part.content}
-          </ReactMarkdown>
+            content={part.content}
+            isGuru={isGuru}
+          />
         );
       })}
     </div>
   );
 }
+
+export default memo(ResearchMarkdown);
 
 function splitChartTokens(
   content: string,

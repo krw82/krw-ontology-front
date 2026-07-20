@@ -42,12 +42,29 @@ describe("security headers", () => {
 
     expect(headers).toEqual([
       {
+        source: "/offline.html",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value:
+              "default-src 'self'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+          },
+          { key: "Cache-Control", value: "no-cache" },
+        ],
+      },
+      {
         source: "/sw.js",
         headers: [
-          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          {
+            key: "Content-Type",
+            value: "application/javascript; charset=utf-8",
+          },
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
           { key: "Service-Worker-Allowed", value: "/" },
-          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
+          {
+            key: "Content-Security-Policy",
+            value: "default-src 'self'; script-src 'self'",
+          },
         ],
       },
       {

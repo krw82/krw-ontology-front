@@ -202,7 +202,7 @@ export default async function QuestionsIndexPage({
                     </div>
                     <Link
                       href={localizedPath(locale, `/questions/${topic.slug}`)}
-                      className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-[8px] border border-hairline bg-surface px-sm py-xs text-[13px] font-extrabold leading-5 text-ink transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                      className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-[8px] border border-hairline bg-surface px-sm py-xs text-[13px] font-extrabold leading-5 text-ink transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                     >
                       {copy.graphLink}
                     </Link>

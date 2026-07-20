@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { FilingBriefSourceEvidence, FilingBriefSourceSection } from "./contract";
-import { FilingBriefValidationError, normalizedContains, validateFilingBriefOutput } from "./validation";
+import { normalizedContains, validateFilingBriefOutput } from "./validation";
 
 const sections: FilingBriefSourceSection[] = [{
   key: "item:1.01",

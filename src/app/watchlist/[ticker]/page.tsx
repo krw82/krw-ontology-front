@@ -1,14 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
-import TopNav from "@/components/TopNav";
 import WatchlistWorkspaceClient from "@/components/watchlist/WatchlistWorkspaceClient";
 import { getAuthUser } from "@/lib/auth";
 import { getEntitlementStatus } from "@/lib/billing/entitlement";
 import { isEntitlementFeatureEnabled } from "@/lib/billing/feature-access";
-import {
-  shouldPreserveInitialProfile,
-  topNavProfileFromUser,
-} from "@/lib/auth/user-profile";
 import { normalizeTicker } from "@/lib/ontology/ticker";
 import { getWatchlistCompanyDetail } from "@/lib/watchlist/workspace";
 
@@ -49,13 +44,7 @@ export default async function WatchlistCompanyPage({
   if (!detail) notFound();
 
   return (
-    <div className="min-h-[100dvh] bg-canvas text-ink">
-      <TopNav
-        initialUserProfile={topNavProfileFromUser(user)}
-        preserveInitialUserProfile={shouldPreserveInitialProfile(user)}
-        brandHref="/companies"
-        brandAriaLabel="회사 목록으로 이동"
-      />
+    <div className="bg-canvas text-ink">
       <WatchlistWorkspaceClient detail={detail} />
     </div>
   );

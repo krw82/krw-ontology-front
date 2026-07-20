@@ -35,19 +35,13 @@ processes only when queued work is claimed.
    Preflight requires the pinned local `claude-krw` Claude Code version. The
    current Mac worker pin is `2.1.204`.
 
-4. Stop the GCP worker:
-
-   ```sh
-   scripts/stop-gcp-agent-worker.sh
-   ```
-
-5. Start the Mac supervisor in the foreground:
+4. Start the Mac supervisor in the foreground:
 
    ```sh
    scripts/start-mac-worker-production.sh
    ```
 
-6. For stable operation, install the launchd supervisor:
+5. For stable operation, install the launchd supervisor:
 
    ```sh
    scripts/install-mac-worker-launchd.sh --load
@@ -56,7 +50,7 @@ processes only when queued work is claimed.
    This starts one `com.krwontology.agent-worker` launchd service. The
    supervisor controls concurrency with `AGENT_SUPERVISOR_CONCURRENCY`.
 
-7. Test `1Q -> 3Q -> 30Q` from `https://krwontology.com`.
+6. Test `1Q -> 3Q -> 30Q` from `https://krwontology.com`.
 
 ## Deployment Lanes
 
@@ -67,19 +61,18 @@ Use the env-first aliases for routine work:
 
 ```sh
 npm run prod:deploy:web      # GCP web/API only
-npm run prod:deploy:runtime  # plugin/skills + MCP sidecar + Mac workers
+npm run prod:deploy:runtime  # plugin/skills + Mac-local MCP service + Mac workers
 npm run prod:deploy:code     # web + runtime, no ontology release switch
 npm run prod:release:publish -- --release-id <release_id>
-npm run prod:deploy:full -- --release-id <release_id>  # includes GCP Redis/document ingestion workers
+npm run prod:deploy:full -- --release-id <release_id>  # web + Mac runtime + migrations + catalog
 ```
 
 Compatibility aliases such as `npm run deploy:runtime`, `npm run deploy:mcp`,
 and `npm run deploy:plugin` are still kept, but new automation and runbooks
 should use `prod:deploy:runtime`.
 
-The old VM plugin sync is kept as `npm run legacy:gcp-mcp` only for
-compatibility. Normal plugin, skill, and MCP changes should use
-`npm run prod:deploy:runtime`.
+GCP ontology MCP and GCP agent-worker sidecars are retired. Normal plugin,
+skill, and MCP changes always use `npm run prod:deploy:runtime`.
 
 ## Rollback
 
@@ -89,11 +82,8 @@ Stop the Mac foreground supervisor with `Ctrl-C`, or stop launchd:
 scripts/uninstall-mac-worker-launchd.sh
 ```
 
-Then restart the GCP worker:
-
-```sh
-scripts/start-gcp-agent-worker.sh
-```
+The Mac runtime is the only production agent executor; do not start a GCP
+agent-worker as a fallback.
 
 ## Stable Operation
 
@@ -108,6 +98,5 @@ Keep these invariants:
 - worker wakeup uses Postgres `LISTEN/NOTIFY`; Supabase Realtime is not used for
   worker wakeup
 - local queue writer is stopped while Mac worker serves production
-- GCP web keeps valid plugin/data until web admission no longer depends on local
-  MCP health
-- GCP `agent-worker` stays stopped while the Mac supervisor owns production execution
+- GCP web never mounts the ontology plugin or full ontology data
+- only the Mac supervisor owns production execution

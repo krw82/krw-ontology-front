@@ -21,6 +21,7 @@ export async function PATCH(
     const { ticker } = await params;
     const payload = await updateDesktopNotebookMark({
       userId: auth.userId,
+      userEmail: auth.userEmail,
       ticker,
       expectedVersion: request.headers.get("if-match"),
       body: await request.json().catch(() => null),

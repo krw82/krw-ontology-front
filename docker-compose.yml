@@ -17,34 +17,42 @@ services:
     depends_on:
       web:
         condition: service_started
-      llm-gateway:
-        condition: service_healthy
+      # Pulse, filings, and the primary web application must remain available
+      # even when the optional LLM brief path is unavailable. The /llm route
+      # can fail independently; only filing-brief-worker depends on the
+      # private gateway below.
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "caddy", "validate", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
   web:
     image: krw-ontology-front-web:local
     build:
       context: .
       dockerfile: Dockerfile.web
-      additional_contexts:
-        krw-ontology-src: ${KRW_ONTOLOGY_SOURCE_DIR:-../krw-ontology}
       args:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
-        NEXT_PUBLIC_BRANDFETCH_CLIENT_ID: ${NEXT_PUBLIC_BRANDFETCH_CLIENT_ID}
+        NEXT_PUBLIC_BRANDFETCH_CLIENT_ID: ${NEXT_PUBLIC_BRANDFETCH_CLIENT_ID:-}
         NEXT_PUBLIC_ENABLE_EMAIL_LOGIN: ${NEXT_PUBLIC_ENABLE_EMAIL_LOGIN:-1}
         NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
-        GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION}
+        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION}
+        GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
-      - NEXT_PUBLIC_BRANDFETCH_CLIENT_ID=${NEXT_PUBLIC_BRANDFETCH_CLIENT_ID}
+      - NEXT_PUBLIC_BRANDFETCH_CLIENT_ID=${NEXT_PUBLIC_BRANDFETCH_CLIENT_ID:-}
       - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
       - NEXT_PUBLIC_ENABLE_EMAIL_LOGIN=${NEXT_PUBLIC_ENABLE_EMAIL_LOGIN:-1}
       - NEXT_PUBLIC_VAPID_PUBLIC_KEY=${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
-      - GOOGLE_SITE_VERIFICATION=${GOOGLE_SITE_VERIFICATION}
+      - NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}
+      - GOOGLE_SITE_VERIFICATION=${GOOGLE_SITE_VERIFICATION:-}
       - PLAN_FEATURE_SPLIT_MODE=${PLAN_FEATURE_SPLIT_MODE:-review}
       - BUSINESS_NAME=${BUSINESS_NAME:-테스트컴퍼니}
       - BUSINESS_REPRESENTATIVE=${BUSINESS_REPRESENTATIVE:-홍길동}
@@ -77,11 +85,12 @@ services:
       - AGENT_RUN_EVENT_LISTEN_RECONNECT_INTERVAL_MS=${AGENT_RUN_EVENT_LISTEN_RECONNECT_INTERVAL_MS:-5000}
       - AGENT_EVENT_RECONCILE_INTERVAL_MS=${AGENT_EVENT_RECONCILE_INTERVAL_MS:-15000}
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
+      - FILING_DETECTION_ENABLED=${FILING_DETECTION_ENABLED:-1}
       - CLAUDE_AGENT_CWD=/app/agent-workspace
       - CLAUDE_CODE_EXECUTABLE=/usr/local/bin/claude-prod
       - CLAUDE_CONFIG_DIR=/home/nextjs/.claude-prod
-      - WEB_COMMIT=${WEB_COMMIT}
-      - KRW_ONTOLOGY_COMMIT=${KRW_ONTOLOGY_COMMIT}
+      - WEB_COMMIT=${WEB_COMMIT:-}
+      - KRW_ONTOLOGY_COMMIT=${KRW_ONTOLOGY_COMMIT:-}
       - ADMIN_EMAILS=${ADMIN_EMAILS:-}
       - ANALYSIS_CREDIT_ENFORCEMENT_MODE=${ANALYSIS_CREDIT_ENFORCEMENT_MODE:-enforced}
       - TOSS_PAYMENTS_CLIENT_KEY=${TOSS_PAYMENTS_CLIENT_KEY:-}
@@ -175,48 +184,6 @@ services:
       retries: 3
       start_period: 5s
 
-  ontology-mcp:
-    profiles: ["legacy-gcp-agent"]
-    image: krw-ontology-mcp:local
-    build:
-      context: .
-      dockerfile: Dockerfile.mcp
-      additional_contexts:
-        krw-ontology-src: ${KRW_ONTOLOGY_SOURCE_DIR:-../krw-ontology}
-    read_only: true
-    tmpfs:
-      - /tmp:size=128m,mode=1777
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    pids_limit: 256
-    environment:
-      - KRW_ONTOLOGY_ENV=prod
-      - KRW_ONTOLOGY_RELEASE_ROOT=/srv/krw-ontology-data/current
-      - KRW_ONTOLOGY_ROOT=/srv/krw-ontology-data/current
-      - KRW_ONTOLOGY_MANIFEST_PATH=/srv/krw-ontology-data/current/manifest.json
-      - KRW_ONTOLOGY_GLOBAL_SPINE_PATH=/srv/krw-ontology-data/current/indexes/global_spine.sqlite
-      - KRW_ONTOLOGY_SHARD_MANIFEST_PATH=/srv/krw-ontology-data/current/indexes/shard_manifest.json
-      - KRW_MCP_EXPECTED_CONTRACT_VERSION=${KRW_MCP_EXPECTED_CONTRACT_VERSION:-krw-ontology-mcp/v2}
-      - KRW_MCP_EXPECTED_BUILD_ID=${KRW_MCP_EXPECTED_BUILD_ID:-}
-      - KRW_MCP_EXPECTED_BACKEND_GIT_SHA=${KRW_MCP_EXPECTED_BACKEND_GIT_SHA:-}
-      - KRW_MCP_EXPECTED_TOOL_SCHEMA_SHA256=${KRW_MCP_EXPECTED_TOOL_SCHEMA_SHA256:-}
-      - KRW_MCP_EXPECTED_BUILD_FINGERPRINT_SHA256=${KRW_MCP_EXPECTED_BUILD_FINGERPRINT_SHA256:-}
-      - KRW_MCP_EXPECTED_RELEASE_MANIFEST_SHA256=${KRW_MCP_EXPECTED_RELEASE_MANIFEST_SHA256:-}
-      - KRW_MCP_EXPECTED_SERVICE_FINGERPRINT_SHA256=${KRW_MCP_EXPECTED_SERVICE_FINGERPRINT_SHA256:-}
-      - MCP_HOST=0.0.0.0
-      - MCP_PORT=8000
-      - MCP_PATH=/mcp
-      - MCP_ALLOWED_HOSTS=127.0.0.1:*,localhost:*,[::1]:*,ontology-mcp:*,agent-worker:*,web:*
-      - MCP_ALLOWED_ORIGINS=http://ontology-mcp:8000,http://agent-worker:*,http://web:3000
-      - MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-INFO}
-    volumes:
-      - ${KRW_ONTOLOGY_DATA_HOST_ROOT:-/srv/krw-ontology-data}:/srv/krw-ontology-data:ro
-    networks:
-      - app-network
-    restart: unless-stopped
-
   # Internal-only, stateless MCP for reading one verified SEC filing on
   # demand. It intentionally has no volume for document bodies.
   filings-mcp:
@@ -236,6 +203,8 @@ services:
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - FILINGS_MCP_ENABLED=${FILINGS_MCP_ENABLED:-0}
       - FILINGS_MCP_AUTH_TOKEN=${FILINGS_MCP_AUTH_TOKEN:-}
+      - FILINGS_MCP_PERSONAL_SIGNING_SECRET=${FILINGS_MCP_PERSONAL_SIGNING_SECRET:-}
+      - FILINGS_MCP_HOST=0.0.0.0
       - FILINGS_MCP_PORT=8785
       - FILINGS_MCP_ENV=${FILING_WORKER_ENV:-prod}
       - FILINGS_MCP_MAX_DOCUMENT_BYTES=${FILINGS_MCP_MAX_DOCUMENT_BYTES:-10485760}
@@ -253,93 +222,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-
-  agent-worker:
-    profiles: ["legacy-gcp-agent"]
-    image: krw-ontology-front-web:local
-    command: ["node", ".worker/agent-worker.mjs"]
-    environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
-      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
-      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
-      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
-      - AUTH_REDIRECT_ORIGIN=${AUTH_REDIRECT_ORIGIN}
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-      - SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD:-}
-      - OPENFIGI_API_KEY=${OPENFIGI_API_KEY:-}
-      - AGENT_QUEUE_LISTEN_DATABASE_URL=${AGENT_QUEUE_LISTEN_DATABASE_URL:-}
-      - AGENT_QUEUE_LISTEN_ENABLED=${AGENT_QUEUE_LISTEN_ENABLED:-1}
-      - AGENT_QUEUE_LISTEN_CHANNEL=${AGENT_QUEUE_LISTEN_CHANNEL:-agent_run_queued}
-      - AGENT_QUEUE_LISTEN_RECONNECT_INTERVAL_MS=${AGENT_QUEUE_LISTEN_RECONNECT_INTERVAL_MS:-5000}
-      - AGENT_QUEUE_RECONCILE_INTERVAL_MS=${AGENT_QUEUE_RECONCILE_INTERVAL_MS:-60000}
-      - AGENT_RUN_CANCEL_LISTEN_DATABASE_URL=${AGENT_RUN_CANCEL_LISTEN_DATABASE_URL:-}
-      - AGENT_RUN_CANCEL_LISTEN_ENABLED=${AGENT_RUN_CANCEL_LISTEN_ENABLED:-1}
-      - AGENT_RUN_CANCEL_LISTEN_CHANNEL=${AGENT_RUN_CANCEL_LISTEN_CHANNEL:-agent_run_cancel}
-      - AGENT_RUN_CANCEL_LISTEN_RECONNECT_INTERVAL_MS=${AGENT_RUN_CANCEL_LISTEN_RECONNECT_INTERVAL_MS:-5000}
-      - AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS=${AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS:-10000}
-      - AGENT_SUPERVISOR_SHUTDOWN_GRACE_MS=${AGENT_SUPERVISOR_SHUTDOWN_GRACE_MS:-120000}
-      - AGENT_SUPERVISOR_ID=${AGENT_SUPERVISOR_ID:-gcp-agent-supervisor}
-      - AGENT_SUPERVISOR_CONCURRENCY=${AGENT_SUPERVISOR_CONCURRENCY:-1}
-      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
-      - KRW_ONTOLOGY_ENV=prod
-      - KRW_ONTOLOGY_PLUGIN_PATH=/app/krw-ontology/plugins/krw-ontology
-      - KRW_ONTOLOGY_MCP_URL=http://ontology-mcp:8000/mcp
-      - KRW_ONTOLOGY_MCP_HEALTH_URL=http://ontology-mcp:8000/health
-      - KRW_ONTOLOGY_MCP_READY_URL=http://ontology-mcp:8000/readyz
-      - FILINGS_MCP_ENABLED=${FILINGS_MCP_ENABLED:-0}
-      - KRW_FILINGS_MCP_URL=http://filings-mcp:8785/mcp
-      - KRW_FILINGS_MCP_TOKEN=${FILINGS_MCP_AUTH_TOKEN:-}
-      - KRW_MCP_EXPECTED_CONTRACT_VERSION=${KRW_MCP_EXPECTED_CONTRACT_VERSION:-krw-ontology-mcp/v2}
-      - KRW_MCP_EXPECTED_BUILD_ID=${KRW_MCP_EXPECTED_BUILD_ID:-}
-      - KRW_MCP_EXPECTED_BACKEND_GIT_SHA=${KRW_MCP_EXPECTED_BACKEND_GIT_SHA:-}
-      - KRW_MCP_EXPECTED_TOOL_SCHEMA_SHA256=${KRW_MCP_EXPECTED_TOOL_SCHEMA_SHA256:-}
-      - KRW_MCP_EXPECTED_BUILD_FINGERPRINT_SHA256=${KRW_MCP_EXPECTED_BUILD_FINGERPRINT_SHA256:-}
-      - KRW_MCP_EXPECTED_RELEASE_MANIFEST_SHA256=${KRW_MCP_EXPECTED_RELEASE_MANIFEST_SHA256:-}
-      - KRW_MCP_EXPECTED_SERVICE_FINGERPRINT_SHA256=${KRW_MCP_EXPECTED_SERVICE_FINGERPRINT_SHA256:-}
-      - CLAUDE_AGENT_CWD=/app/agent-workspace
-      - CLAUDE_CODE_EXECUTABLE=/usr/local/bin/claude-prod
-      - CLAUDE_CONFIG_DIR=/home/nextjs/.claude-prod
-      - WEB_COMMIT=${WEB_COMMIT}
-      - KRW_ONTOLOGY_COMMIT=${KRW_ONTOLOGY_COMMIT}
-      - ADMIN_EMAILS=${ADMIN_EMAILS:-}
-      - ANALYSIS_CREDIT_ENFORCEMENT_MODE=${ANALYSIS_CREDIT_ENFORCEMENT_MODE:-enforced}
-      - GLOBAL_CONCURRENT_RUN_LIMIT=${GLOBAL_CONCURRENT_RUN_LIMIT:-8}
-      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-6}
-      - CLAUDE_AGENT_MAX_TURNS=${CLAUDE_AGENT_MAX_TURNS:-20}
-      - AGENT_MAX_TOOL_CALLS=${AGENT_MAX_TOOL_CALLS:-18}
-      - AGENT_MAX_TOOL_RESULT_CHARS=${AGENT_MAX_TOOL_RESULT_CHARS:-100000}
-      - AGENT_RUN_HARD_TIMEOUT_MINUTES=${AGENT_RUN_HARD_TIMEOUT_MINUTES:-10}
-      - LEASE_TIMEOUT_MINUTES=${LEASE_TIMEOUT_MINUTES:-10}
-      - LEASE_HEARTBEAT_INTERVAL_MS=${LEASE_HEARTBEAT_INTERVAL_MS:-30000}
-      - MCP_HEALTH_TIMEOUT_MS=${MCP_HEALTH_TIMEOUT_MS:-30000}
-      - MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-INFO}
-    volumes:
-      - ${CLAUDE_PROD_CONFIG_DIR:-/srv/claude-prod}:/home/nextjs/.claude-prod
-    networks:
-      - app-network
-    depends_on:
-      web:
-        condition: service_healthy
-      ontology-mcp:
-        condition: service_healthy
-      filings-mcp:
-        condition: service_healthy
-    restart: unless-stopped
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "const fs=require('fs'); for (const p of ['.worker/agent-worker.mjs', process.env.KRW_ONTOLOGY_PLUGIN_PATH + '/.mcp.json', process.env.KRW_ONTOLOGY_PLUGIN_PATH + '/.krw-ontology-contract.json']) fs.accessSync(p, fs.constants.R_OK); fetch(process.env.KRW_ONTOLOGY_MCP_READY_URL).then(r=>{if(!r.ok) throw new Error('ontology MCP not ready')}).catch(e=>{console.error(e);process.exit(1)});",
-        ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
 
   document-worker:
     image: krw-ontology-front-web:local
@@ -454,7 +336,7 @@ services:
       - FILING_NOTIFICATION_CREATION_ENABLED=${FILING_NOTIFICATION_CREATION_ENABLED:-0}
       - FILING_PUSH_ENABLED=${FILING_PUSH_ENABLED:-0}
       - FILING_NOTIFICATION_WORKER_ID=${FILING_NOTIFICATION_WORKER_ID:-gcp-filing-notification-worker}
-      - FILING_WORKER_DEPLOYMENT_ID=${FILING_WORKER_DEPLOYMENT_ID:-gcp-compose-prod}
+      - FILING_WORKER_DEPLOYMENT_ID=${NEXT_PUBLIC_APP_VERSION}
       - FILING_WORKER_ENV=${FILING_WORKER_ENV:-prod}
       - FILING_WORKER_TICK_MS=${FILING_WORKER_TICK_MS:-15000}
       - SEC_CIK_POLL_INTERVAL_MS=${SEC_CIK_POLL_INTERVAL_MS:-300000}

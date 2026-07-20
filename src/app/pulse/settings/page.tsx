@@ -1,8 +1,6 @@
 import { redirect } from "next/navigation";
-import TopNav from "@/components/TopNav";
 import PulseSettings from "@/components/pulse/PulseSettings";
 import { getAuthUser } from "@/lib/auth";
-import { shouldPreserveInitialProfile, topNavProfileFromUser } from "@/lib/auth/user-profile";
 import { getPulsePreferences } from "@/lib/pulse/preferences";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -14,8 +12,7 @@ export default async function PulseSettingsPage() {
   if (!user) redirect("/login?next=/pulse/settings");
   const preferences = await getPulsePreferences(getSupabaseAdmin(), user.id);
   return (
-    <div className="min-h-[100dvh] bg-canvas text-ink">
-      <TopNav initialUserProfile={topNavProfileFromUser(user)} preserveInitialUserProfile={shouldPreserveInitialProfile(user)} />
+    <div className="bg-canvas text-ink">
       <PulseSettings initialPreferences={preferences} />
     </div>
   );

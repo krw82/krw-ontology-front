@@ -19,19 +19,38 @@ vi.mock("@/lib/auth", () => ({
 vi.mock("@/lib/ontology/catalog", () => ({
   getIndexedCompany: vi.fn(),
 }));
+vi.mock("@/lib/coverage/repository", () => ({
+  CoverageIdempotencyConflictError: class CoverageIdempotencyConflictError extends Error {
+    readonly code = "idempotency_conflict";
+  },
+  CoverageLimitError: class CoverageLimitError extends Error {
+    readonly code = "coverage_limit_reached";
+
+    constructor() {
+      super("무료 플랜에서는 진행 중인 회사 커버리지를 최대 3개까지 둘 수 있습니다.");
+    }
+  },
+  ensureCompanyCoverage: vi.fn(),
+}));
 vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: vi.fn(),
 }));
 
 import { getAuthUser } from "@/lib/auth";
+import {
+  CoverageLimitError,
+  ensureCompanyCoverage,
+} from "@/lib/coverage/repository";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { PUT } from "./route";
 
-function putRequest(body: unknown) {
+function putRequest(body: unknown, origin?: string) {
+  const headers = new Headers({ "content-type": "application/json" });
+  if (origin) headers.set("origin", origin);
   return new NextRequest("http://localhost/api/watchlist/AAPL/card", {
     method: "PUT",
-    headers: { "content-type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
 }
@@ -95,6 +114,17 @@ describe("PUT /api/watchlist/[ticker]/card", () => {
       ticker: "AAPL",
       name: "Apple Inc.",
     } as Awaited<ReturnType<typeof getIndexedCompany>>);
+    vi.mocked(ensureCompanyCoverage).mockResolvedValue({
+      user_id: "user-1",
+      ticker: "AAPL",
+      coverage_status: "exploring",
+      priority: 0,
+      interest_reason: null,
+      tags: [],
+      last_activity_at: null,
+      created_at: "2026-06-13T00:00:00.000Z",
+      updated_at: "2026-06-13T00:00:00.000Z",
+    });
   });
 
   it("upserts a user-owned company card and touches the mark", async () => {
@@ -122,7 +152,7 @@ describe("PUT /api/watchlist/[ticker]/card", () => {
         content_md: "사업 구조\n\n핵심 변수",
       },
     });
-    expect(fake.writes).toHaveLength(2);
+    expect(fake.writes).toHaveLength(1);
     expect(fake.writes[0]).toMatchObject({
       table: "user_company_cards",
       options: { onConflict: "user_id,ticker" },
@@ -138,14 +168,11 @@ describe("PUT /api/watchlist/[ticker]/card", () => {
         source_message_id: "70000000-0000-4000-8000-000000000001",
       },
     });
-    expect(fake.writes[1]).toMatchObject({
-      table: "user_company_marks",
-      options: { onConflict: "user_id,ticker" },
-      payload: {
-        user_id: "user-1",
-        ticker: "AAPL",
-        is_watchlisted: true,
-      },
+    expect(ensureCompanyCoverage).toHaveBeenCalledWith({
+      userId: "user-1",
+      userEmail: "user@example.test",
+      ticker: "AAPL",
+      source: "company_card_saved",
     });
   });
 
@@ -168,6 +195,38 @@ describe("PUT /api/watchlist/[ticker]/card", () => {
         code: "validation_error",
         message: "메시지 참조가 올바르지 않습니다.",
       },
+    });
+    expect(fake.writes).toEqual([]);
+    expect(ensureCompanyCoverage).not.toHaveBeenCalled();
+  });
+
+  it("blocks cross-origin card writes before authentication", async () => {
+    const fake = createAdmin();
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+
+    const response = await PUT(
+      putRequest({ title: "AAPL 종목 카드" }, "https://evil.example"),
+      { params: Promise.resolve({ ticker: "AAPL" }) },
+    );
+
+    expect(response.status).toBe(403);
+    expect(getAuthUser).not.toHaveBeenCalled();
+    expect(fake.writes).toEqual([]);
+  });
+
+  it("does not upsert a card after a coverage-limit rejection", async () => {
+    const fake = createAdmin();
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+    vi.mocked(ensureCompanyCoverage).mockRejectedValueOnce(new CoverageLimitError());
+
+    const response = await PUT(
+      putRequest({ title: "AAPL 종목 카드" }),
+      { params: Promise.resolve({ ticker: "AAPL" }) },
+    );
+
+    expect(response.status).toBe(409);
+    expect(await json(response)).toMatchObject({
+      error: { code: "coverage_limit_reached" },
     });
     expect(fake.writes).toEqual([]);
   });

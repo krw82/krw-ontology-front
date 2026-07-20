@@ -12,6 +12,8 @@
     <string>-n</string>
     <string>__NICE__</string>
     <string>__FRONT_DIR__/scripts/start-stock-news-mcp-production.sh</string>
+    <string>--env-file</string>
+    <string>__ENV_FILE__</string>
   </array>
 
   <key>WorkingDirectory</key>

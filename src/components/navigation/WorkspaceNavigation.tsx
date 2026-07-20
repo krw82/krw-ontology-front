@@ -16,6 +16,7 @@ import {
 } from "@/lib/navigation/workspace-routes";
 import { OPEN_WORKSPACE_MENU_EVENT } from "@/lib/navigation/workspace-menu-events";
 import { sidebarBackdrop } from "@/lib/animation";
+import { Pressable } from "@/components/ui/Pressable";
 import type { Locale } from "@/i18n/config";
 
 interface WorkspaceNavigationProps {
@@ -72,7 +73,8 @@ export default function WorkspaceNavigation({
   }, [openMenu]);
 
   useEffect(() => {
-    setClientReady(true);
+    const timeoutId = window.setTimeout(() => setClientReady(true), 0);
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   useEffect(() => {
@@ -123,17 +125,17 @@ export default function WorkspaceNavigation({
                 <p className="text-[16px] font-black tracking-[-0.02em] text-ink">
                   {copy.menu}
                 </p>
-                <button
+                <Pressable
                   ref={closeButtonRef}
-                  type="button"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  hoverEffect="surface"
                   aria-label={copy.close}
                   onClick={closeMenu}
                 >
                   <span aria-hidden="true" className="material-symbols-outlined text-[21px]">
                     close
                   </span>
-                </button>
+                </Pressable>
               </div>
               <nav className="flex-1 space-y-base p-base" aria-label={copy.menu}>
                 {groups.map((group) => (
@@ -177,11 +179,11 @@ export default function WorkspaceNavigation({
 
   return (
     <>
-      <button
-        type="button"
+      <Pressable
         data-onboarding-target="workspace-menu-trigger"
         data-workspace-menu-ready={clientReady ? "true" : "false"}
-        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] text-ink transition-colors hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas lg:hidden"
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas lg:hidden"
+        hoverEffect="surface"
         aria-label={copy.open}
         aria-controls="workspace-navigation-menu"
         aria-expanded={menuOpen}
@@ -189,7 +191,7 @@ export default function WorkspaceNavigation({
         onClick={openMenu}
       >
         <span aria-hidden="true" className="material-symbols-outlined text-[23px]">menu</span>
-      </button>
+      </Pressable>
       <nav className="hidden items-center gap-1 lg:flex" aria-label="Primary">
         {items.filter((item) => item.desktop).map((item) => (
           <Link

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { AuthError } from "@supabase/supabase-js";
 import type { User } from "@supabase/supabase-js";
+import { cache } from "react";
 import {
   DEV_AUTH_EMAIL,
   DEV_AUTH_NAME,
@@ -8,7 +9,7 @@ import {
 } from "@/lib/dev-auth";
 import { isDevAuthBypassEnabled } from "@/lib/dev-auth-server";
 
-export async function getAuthUser(): Promise<User | null> {
+async function resolveAuthUser(): Promise<User | null> {
   if (await isDevAuthBypassEnabled()) {
     return {
       id: DEV_AUTH_USER_ID,
@@ -46,6 +47,11 @@ export async function getAuthUser(): Promise<User | null> {
 
   return user;
 }
+
+// Layouts and pages frequently need the same authenticated user during one
+// render pass. React cache keeps that request-scoped while avoiding duplicate
+// Supabase auth round trips; it does not persist one user's result globally.
+export const getAuthUser = cache(resolveAuthUser);
 
 export function authError(requestId?: string) {
   return Response.json(

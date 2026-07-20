@@ -239,7 +239,7 @@ export default function BillingPlanAction({
           cancelAtPeriodEnd ||
           (!scriptReady && canSubscribe)
         }
-        className={`inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[8px] px-sm text-[13px] font-black leading-5 transition ${
+        className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[8px] px-sm text-[13px] font-black leading-5 transition ${
           isCurrent
             ? "border border-hairline bg-canvas text-ink hover:bg-surface-soft"
             : "bg-primary text-on-primary hover:bg-primary-active"

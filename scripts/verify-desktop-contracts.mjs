@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const defaultRoot = fileURLToPath(
-  new URL("../contracts/desktop/v1/", import.meta.url),
+  new URL("../contracts/desktop/v2/", import.meta.url),
 );
 const root = path.resolve(process.env.DESKTOP_CONTRACTS_ROOT ?? defaultRoot);
 const fixtureRoot = path.join(root, "fixtures");
@@ -41,7 +41,7 @@ for (const name of schemaFiles) {
   );
   assert(
     typeof schema.$id === "string" &&
-      schema.$id.includes("/contracts/desktop/v1/"),
+      schema.$id.includes("/contracts/desktop/v2/"),
     `${name}: invalid $id`,
   );
   assert(

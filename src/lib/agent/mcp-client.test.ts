@@ -38,6 +38,8 @@ import {
   KRW_ONTOLOGY_MCP_TOOLS,
   checkMcpHealth,
   checkMcpReady,
+  isKrwFilingsMcpEnabled,
+  isKrwPersonalFilingsMcpEnabled,
   isKrwOntologySdkTool,
   resolveGuruAdvisorPluginPath,
 } from "@/lib/agent/mcp-client";
@@ -104,6 +106,28 @@ describe("mcp-client readiness probes", () => {
       mcpConfigSha256: "c".repeat(64),
       errors: [],
     });
+  });
+
+  it.each(["1", "true", "yes", "on"])(
+    "keeps public and personal filings enablement in parity for %s",
+    (enabled) => {
+      const env = {
+        FILINGS_MCP_ENABLED: enabled,
+        FILINGS_MCP_AUTH_TOKEN: "service-secret",
+        FILINGS_MCP_PERSONAL_SIGNING_SECRET: "personal-secret",
+      };
+      expect(isKrwFilingsMcpEnabled(env)).toBe(true);
+      expect(isKrwPersonalFilingsMcpEnabled(env)).toBe(true);
+    },
+  );
+
+  it("does not grant personal-memory delegation with only the public service token", () => {
+    const env = {
+      FILINGS_MCP_ENABLED: "1",
+      FILINGS_MCP_AUTH_TOKEN: "service-secret",
+    };
+    expect(isKrwFilingsMcpEnabled(env)).toBe(true);
+    expect(isKrwPersonalFilingsMcpEnabled(env)).toBe(false);
   });
 
   it("checks /readyz for worker readiness", async () => {

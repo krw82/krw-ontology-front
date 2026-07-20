@@ -1,5 +1,9 @@
 import type { NextRequest } from "next/server";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
+import {
+  invalidOriginResponse,
+  isExpectedMutationOrigin,
+} from "@/lib/filing-notifications/request";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getCompanyNotebook } from "@/lib/watchlist/workspace";
 import { errorResponse, requireIndexedTicker } from "@/lib/watchlist/api";
@@ -12,9 +16,10 @@ const NOTEBOOK_SELECT =
   "id, user_id, ticker, title, content_md, previous_content_md, basis_release_id, basis_period, last_source_chat_session_id, last_source_message_id, created_at, updated_at";
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ ticker: string }> },
 ) {
+  if (!isExpectedMutationOrigin(request)) return invalidOriginResponse();
   let user;
   try {
     user = await getAuthUser();

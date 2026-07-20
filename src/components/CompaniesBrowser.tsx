@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
@@ -11,12 +17,14 @@ import FirstResearchChoice from "@/components/FirstResearchChoice";
 import { easeOutExpo } from "@/lib/animation";
 import { filterAndSortCompanies } from "@/lib/companies/filter";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 
 interface CompaniesBrowserProps {
   initialCompanies: CompanyCardData[];
   locale?: Locale;
-  onboardingUserId?: string | null;
+  isAuthenticated?: boolean;
+  coverageOnboardingActivated?: boolean;
 }
 
 /* ─── Flow Animation ─────────────────────────────────────────────
@@ -28,7 +36,6 @@ const FLOW_CYCLE = 4.5; // total seconds per loop
 const LINE_MOVE = 1.0; // how long lines travel
 const ARROW_NUDGE_DELAY = 0.9; // when the arrow kicks
 const SEARCH_COACHMARK_STORAGE_KEY = "krw:companies-search-coachmark-seen:v1";
-const FIRST_RESEARCH_CHOICE_STORAGE_KEY = "krw:first-research-choice-seen:v1";
 const IS_DEV_ENV = process.env.NODE_ENV === "development";
 
 function FlowAnimation({ disabled }: { disabled: boolean }) {
@@ -89,17 +96,28 @@ function FlowAnimation({ disabled }: { disabled: boolean }) {
 export default function CompaniesBrowser({
   initialCompanies,
   locale = DEFAULT_LOCALE,
-  onboardingUserId = null,
+  isAuthenticated = false,
+  coverageOnboardingActivated = false,
 }: CompaniesBrowserProps) {
   const searchParams = useSearchParams();
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [showSearchCoachmark, setShowSearchCoachmark] = useState(false);
   const [showFirstResearchChoice, setShowFirstResearchChoice] = useState(false);
+  const [coverageOnboardingActive, setCoverageOnboardingActive] = useState(
+    () => searchParams.get("onboarding") === "coverage",
+  );
   const searchInputRef = useRef<HTMLInputElement>(null);
   const reducedMotion = useReducedMotion();
+  const coarsePointer = useCoarsePointer();
+  const deferredSearch = useDeferredValue(search);
   const normalizedSearch = search.trim();
+  const animateCompanyRows =
+    !reducedMotion && !coarsePointer && normalizedSearch.length === 0;
   const forceCoachmarks = searchParams.get("coach") === "1";
   const forceFirstResearchChoice = searchParams.get("onboarding") === "1";
+  const coverageOnboardingRequested =
+    searchParams.get("onboarding") === "coverage";
+  const onboardingContinuePath = searchParams.get("continue");
   const copy = locale === "ko"
       ? {
         eyebrow: "회사 찾기",
@@ -149,8 +167,8 @@ export default function CompaniesBrowser({
       };
 
   const filteredCompanies = useMemo(() => {
-    return filterAndSortCompanies(initialCompanies, search);
-  }, [initialCompanies, search]);
+    return filterAndSortCompanies(initialCompanies, deferredSearch);
+  }, [deferredSearch, initialCompanies]);
 
   useEffect(() => {
     if (forceCoachmarks) {
@@ -184,7 +202,9 @@ export default function CompaniesBrowser({
   }, [forceCoachmarks]);
 
   useEffect(() => {
-    if (!onboardingUserId && !forceFirstResearchChoice) return;
+    if (!isAuthenticated && !forceFirstResearchChoice) return;
+    if (coverageOnboardingActivated && !forceFirstResearchChoice) return;
+    if (coverageOnboardingRequested) return;
 
     if (forceFirstResearchChoice) {
       const showTimer = window.setTimeout(
@@ -194,54 +214,69 @@ export default function CompaniesBrowser({
       return () => window.clearTimeout(showTimer);
     }
 
-    try {
-      const storageKey = `${FIRST_RESEARCH_CHOICE_STORAGE_KEY}:${onboardingUserId}`;
-      if (window.localStorage.getItem(storageKey) === "1") return;
-    } catch {
-      // Show the choice for this visit when storage is unavailable.
-    }
-
     const showTimer = window.setTimeout(
       () => setShowFirstResearchChoice(true),
       0,
     );
     return () => window.clearTimeout(showTimer);
-  }, [forceFirstResearchChoice, onboardingUserId]);
+  }, [
+    coverageOnboardingActivated,
+    coverageOnboardingRequested,
+    forceFirstResearchChoice,
+    isAuthenticated,
+  ]);
 
   function dismissSearchCoachmark() {
     setShowSearchCoachmark(false);
   }
 
-  function completeFirstResearchChoice() {
-    if (onboardingUserId) {
-      try {
-        window.localStorage.setItem(
-          `${FIRST_RESEARCH_CHOICE_STORAGE_KEY}:${onboardingUserId}`,
-          "1",
-        );
-      } catch {
-        // The screen remains usable if browser storage is unavailable.
-      }
-    }
+  function dismissFirstResearchChoice() {
     setShowFirstResearchChoice(false);
   }
 
   function startCompanySearch() {
-    completeFirstResearchChoice();
+    setCoverageOnboardingActive(true);
+    setShowFirstResearchChoice(false);
+    const params = new URLSearchParams(window.location.search);
+    params.set("onboarding", "coverage");
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}?${params.toString()}`,
+    );
     window.requestAnimationFrame(() => searchInputRef.current?.focus());
+  }
+
+  function updateSearch(nextSearch: string) {
+    setSearch(nextSearch);
+
+    // Keep the URL in sync during the input event, not after a debounce. This
+    // is a native, no-navigation history update, so filtering can remain
+    // deferred while an immediate tap on a company card still preserves the
+    // query for browser back/forward and refresh.
+    const params = new URLSearchParams(window.location.search);
+    if (nextSearch.trim()) params.set("q", nextSearch);
+    else params.delete("q");
+    const query = params.toString();
+    const nextLocation = `${window.location.pathname}${
+      query ? `?${query}` : ""
+    }`;
+    if (`${window.location.pathname}${window.location.search}` !== nextLocation) {
+      window.history.replaceState(window.history.state, "", nextLocation);
+    }
   }
 
   return (
     <div className="relative mx-auto w-full max-w-[1440px]">
       <main
         id="main-content"
-        className="w-full px-base pb-[112px] pt-lg sm:px-md md:px-xl md:pb-[96px] md:pt-xl"
+        className="w-full px-base pb-xl pt-lg sm:px-md md:px-xl md:pb-[96px] md:pt-xl"
       >
         {showFirstResearchChoice ? (
           <FirstResearchChoice
             locale={locale}
             onStartCompany={startCompanySearch}
-            onDismiss={completeFirstResearchChoice}
+            onDismiss={dismissFirstResearchChoice}
           />
         ) : (
         <header className="border-b border-hairline pb-5">
@@ -274,7 +309,7 @@ export default function CompaniesBrowser({
                     <span className="min-w-0 truncate">{copy.searchCoachmark}</span>
                     <button
                       type="button"
-                      className="-mr-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      className="-my-2 -mr-2 grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       aria-label={copy.dismissCoachmarkAria}
                       onClick={dismissSearchCoachmark}
                     >
@@ -315,7 +350,7 @@ export default function CompaniesBrowser({
                     placeholder={copy.searchPlaceholder}
                     type="text"
                     value={search}
-                    onChange={(event) => setSearch(event.target.value)}
+                    onChange={(event) => updateSearch(event.target.value)}
                     aria-label={copy.searchAria}
                   />
                 </div>
@@ -336,11 +371,11 @@ export default function CompaniesBrowser({
                   <Link
                     href="/guru"
                     data-onboarding-target="guru-advisor-cta"
-                    className="group inline-flex h-10 min-w-0 shrink-0 items-center justify-between gap-2 rounded-[8px] bg-ink px-3 text-[13px] font-bold leading-5 text-canvas shadow-sm transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                    className="group inline-flex h-11 min-w-0 shrink-0 items-center justify-between gap-2 rounded-[8px] bg-ink px-3 text-[13px] font-bold leading-5 text-canvas shadow-sm transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                     aria-label={copy.discoveryCta}
                   >
                     <span className="truncate">{copy.discoveryCta}</span>
-                    <FlowAnimation disabled={reducedMotion} />
+                    <FlowAnimation disabled={reducedMotion || coarsePointer} />
                   </Link>
                 </div>
               </div>
@@ -377,7 +412,7 @@ export default function CompaniesBrowser({
               </p>
             </div>
             <motion.div
-              layout
+              layout={animateCompanyRows}
               className="overflow-hidden rounded-[8px] border border-hairline bg-canvas"
               transition={{
                 duration: reducedMotion ? 0 : 0.18,
@@ -396,7 +431,10 @@ export default function CompaniesBrowser({
                     key={company.ticker}
                     company={company}
                     locale={locale}
-                    motionDelay={Math.min(index * 24, 120)}
+                    motionDelay={index < 8 ? Math.min(index * 24, 120) : 0}
+                    animateRow={animateCompanyRows}
+                    coverageOnboarding={coverageOnboardingActive}
+                    onboardingContinuePath={onboardingContinuePath}
                   />
                 ))}
               </AnimatePresence>

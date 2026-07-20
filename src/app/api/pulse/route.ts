@@ -3,28 +3,21 @@ import { z } from "zod";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
 import { canAccessMenuFeature } from "@/lib/billing/feature-access-server";
 import { composePulseFeed } from "@/lib/pulse/composer";
-import { decodePulseCursor, isPulseCursorV3 } from "@/lib/pulse/cursor";
+import { PULSE_MAX_PAGE_SIZE, PULSE_PAGE_SIZE } from "@/lib/pulse/contract";
+import {
+  createStaticPulseE2EFeed,
+  shouldUseStaticPulseE2EFixture,
+} from "@/lib/pulse/e2e-fixture";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const querySchema = z.object({
-  filter: z
-    .enum([
-      "all",
-      "filing",
-      "analysis",
-      "checkup",
-      "question",
-      "resurface",
-      "learning",
-    ])
-    .default("all"),
-  cursor: z.string().max(2_000).optional(),
-  limit: z.coerce.number().int().min(1).max(30).default(20),
+  filter: z.literal("all").default("all"),
+  limit: z.coerce.number().int().min(1).max(PULSE_MAX_PAGE_SIZE).default(PULSE_PAGE_SIZE),
   since: z.iso.datetime().optional(),
-});
+}).strict();
 
 export async function GET(request: NextRequest) {
   let user;
@@ -49,55 +42,11 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     );
   }
-  if (parsed.data.filter !== "all") {
-    return Response.json(
-      {
-        error: {
-          code: "validation_error",
-          message: "P0 피드는 별도 필터를 지원하지 않습니다.",
-        },
-      },
-      { status: 400 },
-    );
+  if (await shouldUseStaticPulseE2EFixture()) {
+    return Response.json(createStaticPulseE2EFeed(), {
+      headers: { "Cache-Control": "private, no-store, max-age=0" },
+    });
   }
-  const decodedCursor = parsed.data.cursor
-    ? decodePulseCursor(parsed.data.cursor)
-    : null;
-  if (parsed.data.cursor && !decodedCursor) {
-    return Response.json(
-      {
-        error: {
-          code: "validation_error",
-          message: "피드 커서가 올바르지 않습니다.",
-        },
-      },
-      { status: 400 },
-    );
-  }
-  if (decodedCursor && !isPulseCursorV3(decodedCursor)) {
-    return Response.json(
-      {
-        error: {
-          code: "cursor_version_expired",
-          message:
-            "피드 순서가 업데이트되었습니다. 처음부터 다시 불러와주세요.",
-        },
-      },
-      { status: 409 },
-    );
-  }
-  if (decodedCursor && decodedCursor.filter !== parsed.data.filter) {
-    return Response.json(
-      {
-        error: {
-          code: "validation_error",
-          message: "커서와 필터가 일치하지 않습니다.",
-        },
-      },
-      { status: 400 },
-    );
-  }
-
   try {
     const includeNotebookSources = await canAccessMenuFeature(
       user.id,

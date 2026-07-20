@@ -70,6 +70,9 @@ export async function heartbeatAgentWorker(params: {
     plugin_path: params.mcpHealth.pluginPath,
     error: params.error ?? params.mcpHealth.error ?? null,
     metadata: {
+      deploymentId: process.env.KRW_DEPLOYMENT_ID ?? null,
+      workerBundleSha256: process.env.KRW_WORKER_BUNDLE_SHA256 ?? null,
+      runtimeIdentitySha256: process.env.KRW_RUNTIME_IDENTITY_SHA256 ?? null,
       connected: params.mcpHealth.connected,
       staticOk: params.mcpHealth.staticOk,
       commandOk: params.mcpHealth.commandOk,

@@ -58,13 +58,20 @@ export async function getEntitlementStatus(
       : getCurrentBillingPeriod(plan.budgetPeriod, now);
   const monthlyPeriod = getCurrentMonthlyBillingPeriod(now);
   const dailyPeriod = getCurrentDailyBillingPeriod(now);
-  const budget = await loadExecutionBudgetSnapshot(
-    supabase,
-    userId,
-    monthlyPeriod,
-    dailyPeriod,
-  );
-  const credit = await loadCreditBudgetSnapshot(supabase, userId, now);
+  // Admin access is intentionally unlimited. Do not make that access depend
+  // on operational usage ledgers being available; those values cannot change
+  // the resulting entitlement and a ledger outage must not lock admins out.
+  const budget = isAdmin
+    ? emptyExecutionBudgetSnapshot()
+    : await loadExecutionBudgetSnapshot(
+        supabase,
+        userId,
+        monthlyPeriod,
+        dailyPeriod,
+      );
+  const credit = isAdmin
+    ? null
+    : await loadCreditBudgetSnapshot(supabase, userId, now);
 
   return buildEntitlementStatus({
     planKey,
@@ -193,6 +200,16 @@ interface BudgetSnapshotPart {
   settledCostUsd: number;
   reservedCostUsd: number;
   runCount: number;
+}
+
+function emptyExecutionBudgetSnapshot(): {
+  monthly: BudgetSnapshotPart;
+  daily: BudgetSnapshotPart;
+} {
+  return {
+    monthly: { settledCostUsd: 0, reservedCostUsd: 0, runCount: 0 },
+    daily: { settledCostUsd: 0, reservedCostUsd: 0, runCount: 0 },
+  };
 }
 
 async function loadExecutionBudgetSnapshot(

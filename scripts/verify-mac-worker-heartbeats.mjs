@@ -7,9 +7,13 @@ let envFile = ".env.mac-worker.production";
 let timeoutMs = 120_000;
 let intervalMs = 2_000;
 let expectedReleaseId = "";
+let seenAfter = "";
+let expectedDeploymentId = "";
+let expectedWorkerBundleSha256 = "";
+let expectedRuntimeIdentitySha256 = "";
 
 function usage() {
-  console.log(`Usage: scripts/verify-mac-worker-heartbeats.mjs [--env-file FILE] [--timeout-ms MS] [--interval-ms MS] [--release-id ID]
+  console.log(`Usage: scripts/verify-mac-worker-heartbeats.mjs [--env-file FILE] [--timeout-ms MS] [--interval-ms MS] [--release-id ID] [--seen-after ISO] [--deployment-id ID] [--worker-bundle-sha256 SHA256] [--runtime-identity-sha256 SHA256]
 
 Verify that the configured Mac production supervisor has a fresh Supabase
 heartbeat. Secrets are read from the env file but never printed.`);
@@ -25,6 +29,14 @@ for (let index = 0; index < args.length; index += 1) {
     intervalMs = Number(args[++index]);
   } else if (arg === "--release-id") {
     expectedReleaseId = args[++index] || "";
+  } else if (arg === "--seen-after") {
+    seenAfter = args[++index] || "";
+  } else if (arg === "--deployment-id") {
+    expectedDeploymentId = args[++index] || "";
+  } else if (arg === "--worker-bundle-sha256") {
+    expectedWorkerBundleSha256 = args[++index] || "";
+  } else if (arg === "--runtime-identity-sha256") {
+    expectedRuntimeIdentitySha256 = args[++index] || "";
   } else if (arg === "--help" || arg === "-h") {
     usage();
     process.exit(0);
@@ -79,6 +91,22 @@ const expectedWorkerId =
   process.env.AGENT_WORKER_ID ||
   "mac-supervisor-jwc";
 const expectedWorkerIds = [expectedWorkerId];
+const seenAfterMs = seenAfter ? Date.parse(seenAfter) : Number.NaN;
+if (seenAfter && !Number.isFinite(seenAfterMs)) {
+  throw new Error(`Invalid --seen-after timestamp: ${seenAfter}`);
+}
+if (
+  expectedWorkerBundleSha256 &&
+  !/^[a-f0-9]{64}$/.test(expectedWorkerBundleSha256)
+) {
+  throw new Error("Invalid --worker-bundle-sha256 digest");
+}
+if (
+  expectedRuntimeIdentitySha256 &&
+  !/^[a-f0-9]{64}$/.test(expectedRuntimeIdentitySha256)
+) {
+  throw new Error("Invalid --runtime-identity-sha256 digest");
+}
 
 const client = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -88,7 +116,7 @@ async function readHeartbeats() {
   const { data, error } = await client
     .from("agent_worker_heartbeats")
     .select(
-      "worker_id,status,last_seen_at,heartbeat_expires_at,claude_code_version,error,worker_env,ontology_env,ontology_release_id,manifest_valid,manifest_path,index_path,root,plugin_path",
+      "worker_id,status,last_seen_at,heartbeat_expires_at,claude_code_version,error,worker_env,ontology_env,ontology_release_id,manifest_valid,manifest_path,index_path,root,plugin_path,metadata",
     )
     .in("worker_id", expectedWorkerIds)
     .order("worker_id", { ascending: true });
@@ -110,6 +138,12 @@ function validate(rows) {
     }
 
     const expiresAt = Date.parse(row.heartbeat_expires_at);
+    const lastSeenAt = Date.parse(row.last_seen_at);
+    if (!Number.isFinite(lastSeenAt)) {
+      problems.push(`${workerId}: invalid last_seen_at`);
+    } else if (Number.isFinite(seenAfterMs) && lastSeenAt < seenAfterMs) {
+      problems.push(`${workerId}: heartbeat predates activation`);
+    }
     if (!Number.isFinite(expiresAt) || expiresAt <= now) {
       problems.push(`${workerId}: expired heartbeat`);
     }
@@ -134,6 +168,34 @@ function validate(rows) {
     }
     if (row.manifest_valid !== true) {
       problems.push(`${workerId}: manifest_valid=${String(row.manifest_valid)}`);
+    }
+    const metadata =
+      row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+        ? row.metadata
+        : {};
+    if (
+      expectedDeploymentId &&
+      metadata.deploymentId !== expectedDeploymentId
+    ) {
+      problems.push(
+        `${workerId}: deployment_id=${metadata.deploymentId || "missing"}, expected=${expectedDeploymentId}`,
+      );
+    }
+    if (
+      expectedWorkerBundleSha256 &&
+      metadata.workerBundleSha256 !== expectedWorkerBundleSha256
+    ) {
+      problems.push(
+        `${workerId}: worker_bundle_sha256=${metadata.workerBundleSha256 || "missing"}, expected=${expectedWorkerBundleSha256}`,
+      );
+    }
+    if (
+      expectedRuntimeIdentitySha256 &&
+      metadata.runtimeIdentitySha256 !== expectedRuntimeIdentitySha256
+    ) {
+      problems.push(
+        `${workerId}: runtime_identity_sha256=${metadata.runtimeIdentitySha256 || "missing"}, expected=${expectedRuntimeIdentitySha256}`,
+      );
     }
     if (
       expectedClaudeVersion &&

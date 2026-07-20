@@ -1,9 +1,12 @@
 import type {
+  FilingJudgmentImpact,
+  FilingJudgmentNextAction,
   PulseAnalysisPhase,
   PulseItemBase,
   PulseItemKind,
   PulseItemPriority,
   PulseItemState,
+  UserCompanyCoverageStatus,
 } from "@/types/api-contracts";
 import { z } from "zod";
 
@@ -17,7 +20,7 @@ export const PULSE_ITEM_KINDS = [
 ] as const satisfies readonly PulseItemKind[];
 
 export const PULSE_PAGE_SIZE = 20;
-export const PULSE_MAX_PAGE_SIZE = 30;
+export const PULSE_MAX_PAGE_SIZE = 20;
 
 const pulseLinkActionSchema = z.object({
   type: z.literal("link"),
@@ -29,7 +32,7 @@ const pulseLinkActionSchema = z.object({
 const pulseMutationActionSchema = z.object({
   type: z.literal("mutation"),
   label: z.string().min(1).max(80),
-  action: z.enum(["review", "unreview", "read", "unread", "save", "unsave", "snooze", "dismiss"]),
+  action: z.enum(["review", "unreview", "save", "unsave", "snooze", "dismiss"]),
   analytics_name: z.string().max(80).optional(),
 });
 
@@ -43,6 +46,23 @@ const pulseItemBaseSchema = z.object({
   trigger: z.enum(["event", "schedule", "state", "editorial"]),
   source_id: z.string().min(1),
   ticker: z.string().nullable(),
+  coverage_status: z.enum(["exploring", "watching", "holding", "closed"] satisfies readonly UserCompanyCoverageStatus[]).nullable(),
+  judgment: z.object({
+    id: z.string().uuid(),
+    filing_event_id: z.string().uuid(),
+    ticker: z.string().min(1),
+    current_revision_id: z.string().uuid(),
+    revision_number: z.number().int().positive(),
+    impact: z.enum(["positive", "neutral", "negative", "unclear"] satisfies readonly FilingJudgmentImpact[]),
+    next_action: z.enum(["complete", "update_thesis", "create_question", "review_later"] satisfies readonly FilingJudgmentNextAction[]),
+    summary: z.string(),
+    updated_at: z.iso.datetime(),
+  }).nullable(),
+  linked_thesis: z.object({
+    id: z.string().uuid(),
+    title: z.string().min(1),
+    status: z.enum(["active", "needs_review", "weakened", "mixed", "archived"]),
+  }).nullable(),
   eyebrow: z.string().min(1),
   title: z.string().min(1),
   body: z.string(),
@@ -53,7 +73,6 @@ const pulseItemBaseSchema = z.object({
   available_at: z.iso.datetime(),
   expires_at: z.iso.datetime().nullable(),
   reviewed_at: z.iso.datetime().nullable(),
-  read_at: z.iso.datetime().nullable(),
   saved_at: z.iso.datetime().nullable(),
   snoozed_until: z.iso.datetime().nullable(),
   state: z.enum(["new", "seen", "reviewed"] satisfies readonly PulseItemState[]),
@@ -87,8 +106,6 @@ export interface PulseCandidate extends Omit<
   state?: PulseItemState;
   actionable?: boolean;
   phase?: PulseAnalysisPhase | null;
-  is_holding?: boolean;
-  is_watchlisted?: boolean;
   has_recent_research?: boolean;
   is_pinned?: boolean;
 }
@@ -97,7 +114,7 @@ export interface PulseSortKey {
   lane: number;
   rank_score: number;
   priority_rank: number;
-  holding_rank: number;
+  coverage_rank: number;
   saved_rank: number;
   occurred_at: string;
   item_key: string;

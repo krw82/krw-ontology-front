@@ -8,9 +8,9 @@ Usage: scripts/deploy-full-production-logged.sh [OPTIONS] [DEPLOY_ALL_ARGS...]
 Run the full production deployment with a persistent local log file.
 
 Default behavior:
-  - build/promote a local release through ~/krw-ontology/scripts/deploy-with-local-release.sh
-  - publish the compact web catalog to Supabase
-  - deploy frontend, plugin, and MCP code
+  - stop and verify the local ontology queue
+  - run the one sealed data/schema/GCP/Mac cutover
+  - never promote prod/current outside that sealed cutover
   - write all output to ~/krw-ontology-log/deploy/deploy-full-<timestamp>.log
 
 Options:
@@ -20,13 +20,13 @@ Options:
 Examples:
   scripts/deploy-full-production-logged.sh
   scripts/deploy-full-production-logged.sh --apply-migrations
+  scripts/deploy-full-production-logged.sh --bootstrap-unsealed-mac-runtime
   scripts/deploy-full-production-logged.sh --queue-timeout 7200 --apply-migrations
 
 Environment:
   KRW_LOG_DIR                        Defaults to $HOME/krw-ontology-log
   KRW_DEPLOY_LOG_DIR                 Defaults to $KRW_LOG_DIR/deploy
-  KRW_ONTOLOGY_DEPLOY_WITH_RELEASE   Defaults to $HOME/krw-ontology/scripts/deploy-with-local-release.sh
-  KRW_FRONT_DEPLOY_ALL               Defaults to this repo's scripts/deploy-all-production.sh
+  KRW_FRONT_DEPLOY_ALL               Defaults to this repo's queue-safe production wrapper
 EOF
 }
 
@@ -57,8 +57,7 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-DEPLOY_WITH_RELEASE=${KRW_ONTOLOGY_DEPLOY_WITH_RELEASE:-"$HOME/krw-ontology/scripts/deploy-with-local-release.sh"}
-DEPLOY_ALL=${KRW_FRONT_DEPLOY_ALL:-"$FRONT_DIR/scripts/deploy-all-production.sh"}
+DEPLOY_ALL=${KRW_FRONT_DEPLOY_ALL:-"$FRONT_DIR/scripts/deploy-production-simple.sh"}
 KRW_LOG_DIR=${KRW_LOG_DIR:-"$HOME/krw-ontology-log"}
 LOG_DIR=${KRW_DEPLOY_LOG_DIR:-"$KRW_LOG_DIR/deploy"}
 LOG_FILE="$LOG_DIR/deploy-full-$(date +%Y%m%d-%H%M%S).log"
@@ -69,16 +68,14 @@ run_deploy() {
   echo "Deployment started: $(date '+%Y-%m-%d %H:%M:%S %Z')"
   echo "Log file: $LOG_FILE"
   echo "Frontend repo: $FRONT_DIR"
-  echo "Deploy release script: $DEPLOY_WITH_RELEASE"
-  echo "Deploy all script: $DEPLOY_ALL"
+  echo "Queue-safe deploy script: $DEPLOY_ALL"
   echo "Queue timeout: $QUEUE_TIMEOUT"
   echo "Deploy all args: ${DEPLOY_ALL_ARGS[*]:-(none)}"
   echo
 
-  "$DEPLOY_WITH_RELEASE" \
+  "$DEPLOY_ALL" \
     --queue-timeout "$QUEUE_TIMEOUT" \
-    -- \
-    "$DEPLOY_ALL" \
+    --apply-migrations \
     "${DEPLOY_ALL_ARGS[@]}"
 }
 

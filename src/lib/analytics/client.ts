@@ -16,6 +16,8 @@ import {
 import {
   buildAnalyticsPageProperties,
   getAnalyticsDeviceType,
+  sanitizeAnalyticsLocationKey,
+  sanitizeAnalyticsReferrer,
 } from "@/lib/analytics/page-context";
 
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
@@ -74,8 +76,13 @@ export async function trackClientEvent(
     event_name: eventName,
     anonymous_id: anonymousId,
     properties: mergedProperties,
-    path: `${window.location.pathname}${window.location.search}`,
-    referrer: document.referrer || null,
+    path: sanitizeAnalyticsLocationKey(
+      `${window.location.pathname}${window.location.search}`,
+    ),
+    referrer: sanitizeAnalyticsReferrer(
+      document.referrer,
+      window.location.origin,
+    ),
     utm: getStoredUtmContext(),
   };
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAnalyticsEventInsert,
+  isClientAnalyticsEventName,
   isAnalyticsEventName,
   sanitizeAnalyticsProperties,
 } from "@/lib/analytics/events";
@@ -12,8 +13,120 @@ describe("analytics event schema helpers", () => {
     expect(isAnalyticsEventName("question_prefilled")).toBe(true);
     expect(isAnalyticsEventName("suggested_question_clicked")).toBe(true);
     expect(isAnalyticsEventName("question_submitted")).toBe(true);
+    expect(isAnalyticsEventName("performance_metric_reported")).toBe(true);
+    expect(isAnalyticsEventName("coverage_added")).toBe(true);
+    expect(isAnalyticsEventName("filing_judgment_completed")).toBe(true);
+    expect(isAnalyticsEventName("second_opportunity_resolved")).toBe(true);
     expect(isAnalyticsEventName("Question Submitted")).toBe(false);
     expect(isAnalyticsEventName("raw_question_saved")).toBe(false);
+  });
+
+  it("keeps authoritative decision outcomes off the browser endpoint", () => {
+    expect(isClientAnalyticsEventName("filing_judgment_started")).toBe(true);
+    expect(isClientAnalyticsEventName("pulse_viewed")).toBe(true);
+    for (const eventName of [
+      "coverage_added",
+      "coverage_activated",
+      "filing_judgment_completed",
+      "filing_judgment_revised",
+      "monitoring_rule_created",
+      "decision_session_closed",
+      "second_opportunity_resolved",
+      "sec_source_opened",
+    ]) {
+      expect(isClientAnalyticsEventName(eventName)).toBe(false);
+    }
+  });
+
+  it("stores only bounded categorical facts for decision-loop events", () => {
+    const insert = buildAnalyticsEventInsert({
+      eventName: "filing_judgment_completed",
+      userId: "user-1",
+      properties: {
+        ticker: " aapl ",
+        filing_event_id: "11111111-1111-4111-8111-111111111111",
+        judgment_id: "22222222-2222-4222-8222-222222222222",
+        impact: "Positive",
+        next_action: "update_thesis",
+        evidence_count: 3,
+        has_monitoring_rule: true,
+        summary: "실적 공시를 보고 사용자가 작성한 자유문 판단",
+        reason: "이 문장은 분석 속성에 절대 남으면 안 됩니다",
+        thesis: "사용자의 비공개 thesis",
+        rule_text: "매출이 특정 값 아래로 내려가면 알림",
+        source: "filing detail",
+        status: "confidential",
+        revision_id: "this-is-not-a-database-id",
+      },
+    });
+
+    expect(insert?.properties).toEqual({
+      ticker: "AAPL",
+      filing_event_id: "11111111-1111-4111-8111-111111111111",
+      judgment_id: "22222222-2222-4222-8222-222222222222",
+      impact: "positive",
+      next_action: "update_thesis",
+      evidence_count: 3,
+      has_monitoring_rule: true,
+    });
+    expect(JSON.stringify(insert?.properties)).not.toContain("사용자");
+    expect(JSON.stringify(insert?.properties)).not.toContain("특정 값");
+  });
+
+  it("applies the no-free-text contract to every decision-loop event", () => {
+    for (const eventName of [
+      "coverage_added",
+      "coverage_status_changed",
+      "coverage_activated",
+      "filing_judgment_started",
+      "filing_judgment_completed",
+      "filing_judgment_revised",
+      "thesis_updated",
+      "monitoring_rule_created",
+      "decision_session_closed",
+      "second_opportunity_resolved",
+    ] as const) {
+      const insert = buildAnalyticsEventInsert({
+        eventName,
+        userId: "user-1",
+        properties: {
+          ticker: "AAPL",
+          status: "completed",
+          question: "자유문 질문",
+          judgment: "자유문 판단",
+          note: "자유문 메모",
+          monitoring_rule: "자유문 규칙",
+        },
+      });
+
+      expect(insert?.properties).toEqual({
+        ticker: "AAPL",
+        status: "completed",
+      });
+    }
+  });
+
+  it("keeps only milestone identifiers and bounded counts for activation", () => {
+    const insert = buildAnalyticsEventInsert({
+      eventName: "coverage_activated",
+      userId: "user-1",
+      properties: {
+        coverage_event_id: "33333333-3333-4333-8333-333333333333",
+        coverage_count: 3,
+        judgment_count: 1,
+        monitoring_rule_count: 1,
+        source: "system",
+        private_thesis: "기록하면 안 되는 가설",
+      },
+    });
+
+    expect(insert?.properties).toEqual({
+      coverage_event_id: "33333333-3333-4333-8333-333333333333",
+      source: "system",
+      coverage_count: 3,
+      judgment_count: 1,
+      monitoring_rule_count: 1,
+    });
   });
 
   it("builds a normalized insert payload without requiring raw content", () => {
@@ -43,7 +156,7 @@ describe("analytics event schema helpers", () => {
       session_id: "session-1",
       message_id: "message-1",
       path: "/chat?ticker=AAPL",
-      referrer: "https://example.com/path",
+      referrer: "https://example.com",
       utm_source: "naver",
       utm_medium: "search",
       properties: {

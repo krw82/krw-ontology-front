@@ -22,8 +22,7 @@ import {
 const MARK_AAPL = {
   user_id: "user-1",
   ticker: "AAPL",
-  is_watchlisted: true,
-  is_holding: true,
+  coverage_status: "holding",
   priority: 0,
   interest_reason: "서비스 매출과 자사주를 확인 중",
   tags: ["service", "buyback"],
@@ -35,8 +34,7 @@ const MARK_AAPL = {
 const MARK_MSFT = {
   user_id: "user-1",
   ticker: "MSFT",
-  is_watchlisted: true,
-  is_holding: false,
+  coverage_status: "watching",
   priority: 0,
   interest_reason: null,
   tags: [],
@@ -185,6 +183,9 @@ function createAdmin() {
         ticker: "AAPL",
         title: "서비스 매출 방어력",
         thesis_text: "서비스 매출과 자사주가 EPS를 방어할 수 있는지 본다.",
+        monitored_variables: ["서비스 매출", "FCF"],
+        counter_evidence: "중국 수요 약화가 서비스 성장까지 번질 수 있다.",
+        decision_change_condition: "서비스 성장률이 두 분기 연속 둔화하면 재검토한다.",
         status: "active",
         tags: ["service", "buyback"],
         archived_at: null,
@@ -213,6 +214,7 @@ function createAdmin() {
         created_at: "2026-06-13T00:00:00.000Z",
       },
     ],
+    user_company_monitoring_rules: [],
     chat_sessions: [
       {
         id: "60000000-0000-4000-8000-000000000001",
@@ -426,8 +428,10 @@ describe("watchlist workspace helpers", () => {
     expect(getIndexedCompanies).toHaveBeenCalledWith(["AAPL", "MSFT"]);
     expect(overview.stats).toEqual({
       total: 2,
-      watchlisted: 2,
+      exploring: 0,
+      watching: 1,
       holding: 1,
+      closed: 0,
       open_questions: 2,
       notes: 1,
       recent_activity: 2,
@@ -460,7 +464,7 @@ describe("watchlist workspace helpers", () => {
       research_status: "has_open_questions",
       research_status_reason: "open_questions",
       mark: {
-        is_holding: true,
+        coverage_status: "holding",
         interest_reason: "서비스 매출과 자사주를 확인 중",
       },
     });
@@ -516,8 +520,7 @@ describe("watchlist workspace helpers", () => {
 
     expect(detail?.company.latest_activity_at).toBeNull();
     expect(detail?.company.mark).toMatchObject({
-      is_watchlisted: false,
-      is_holding: false,
+      coverage_status: "exploring",
       last_activity_at: null,
     });
     expect(detail?.company).toMatchObject({

@@ -11,12 +11,14 @@
 
 ```text
 1. dev/prod는 명령어 맨 앞에서 구분한다.
-2. plugin + skills + MCP sidecar + Mac workers는 runtime으로 묶는다.
+2. plugin + skills + Mac-local MCP + Mac workers는 runtime으로 묶는다.
 3. ontology/index/catalog 전환은 data가 아니라 release로 부른다.
 ```
 
-기존 `deploy:*` 명령어는 호환용으로 남겨둔다. 새 작업에서는 아래의
-`dev:*`, `prod:*`, `legacy:*` 명령어를 우선 사용한다.
+기존 `deploy:*` 명령어는 호환용으로 남겨둔다. 일반 production deploy는
+`scripts/deploy-production-fast.sh` 하나로 실행한다. 이 경로는 새 GCP 이미지를
+현재 서비스가 살아 있는 동안 빌드하고, 전환 실패 시 이전 이미지를 다시 올린다.
+정확한 봉인 런타임 복구와 일회성 bootstrap만 legacy recovery 경로를 사용한다.
 
 ## Mental Model
 
@@ -31,7 +33,7 @@ web
 runtime
   local plugin files
   local skills
-  prod/dev MCP HTTP sidecar
+  Mac-local prod/dev MCP HTTP server (GCP sidecar 없음)
   Mac agent worker bundle/processes
 
 release
@@ -43,8 +45,9 @@ release
   Supabase web catalog publish
 ```
 
-GCP web은 full SQLite index를 직접 읽지 않는다. Web은 Supabase의 compact
-catalog만 보고, full SQLite index는 Mac MCP/worker runtime만 읽는다.
+GCP web은 full SQLite index를 직접 읽지 않고 ontology MCP/agent sidecar도
+실행하지 않는다. Web은 Supabase의 compact catalog만 보고, full SQLite index와
+agent execution은 Mac MCP/worker runtime만 담당한다.
 
 ## Daily Commands
 
@@ -62,7 +65,7 @@ Next dev server와 dev agent worker를 같이 띄운다. 기본 dev MCP는
 npm run dev:runtime
 ```
 
-dev plugin/skills를 다시 materialize하고 dev MCP sidecar를 재시작한다.
+dev plugin/skills를 다시 materialize하고 Mac-local dev MCP 서비스를 재시작한다.
 prod MCP나 prod workers는 건드리지 않는다.
 
 ```bash
@@ -77,50 +80,65 @@ release root에만 남는다.
 
 ### Production code
 
+배포 전의 느린 로컬 검증은 필요할 때 별도로 실행한다.
+
+```bash
+npm run prod:preflight
+```
+
+이 명령은 typecheck, lint, unit/build, Desktop 계약, production-mode
+browser/PWA 검증을 수행한다. 일반 배포 명령은 이 검증을 다시 실행하지 않는다.
+
 ```bash
 npm run prod:deploy:web
 ```
 
-GCP web/API만 배포한다. Mac runtime과 ontology release는 건드리지 않는다.
+GCP web/API와 그 안의 application worker containers만 전환한다. Mac runtime과
+Supabase migration은 건드리지 않는다.
 
 ```bash
 npm run prod:deploy:runtime
 ```
 
-prod plugin/skills를 materialize하고, prod MCP sidecar를 재시작한 뒤, Mac
-production workers를 재시작한다. GCP web/API는 배포하지 않는다.
+Mac MCP, filings MCP, optional Stock News MCP, agent supervisor만 재시작한다.
+GCP web/API와 Supabase migration은 건드리지 않는다.
 
 ```bash
 npm run prod:deploy:code
 ```
 
-평소 코드 배포 경로다.
+평소 코드 배포의 canonical 경로다. GCP와 Mac runtime을 모두 전환하고 pending
+Supabase migration을 적용한다. catalog publication은 포함하지 않는다.
 
 ```text
-Supabase migration dry-run
--> schema smoke
--> GCP web/API deploy
--> prod runtime deploy
+canonical Supabase/GCP target 검증
+-> Supabase migration dry-run
+-> 새 GCP image build (현재 컨테이너는 계속 서비스)
+-> migration apply + schema smoke
+-> application containers 전환
+-> public deployment-id health
+-> Mac MCP/worker restart
+-> private deep health + public health
 ```
 
-ontology release, prod/current, Supabase web catalog는 바꾸지 않는다.
+컨테이너 전환 또는 public health가 실패하면 이전 GCP image와 이전 Compose
+configuration을 자동으로 다시 올린다. migration은 되돌리지 않는다. schema
+rollback이 필요한 변경은 별도 migration으로 처리해야 한다.
 
 ### Production release
 
 ```bash
-npm run prod:release:publish -- --release-id <release_id>
+npm run prod:release:publish
 ```
 
-운영 ontology/index/catalog release 전환 경로다.
+현재 활성 release의 compact catalog만 다시 게시하는 경로다. 다른 release를
+`prod/current`로 바꾸는 cross-release promotion은 아직 자동화하지 않았으며
+fail-closed된다.
 
 ```text
-optional prod/current promote
--> release verify
+active release verify
 -> export web_catalog.json
 -> publish active catalog to Supabase
--> restart prod MCP sidecar
--> restart Mac production workers
--> verify worker heartbeat release_id
 ```
 
 이 명령은 v3 SQLite indexes를 GCP로 올리지 않는다. global spine과 company
@@ -130,38 +148,84 @@ GCP web/API는 Supabase catalog만 본다.
 ### Full production deploy
 
 ```bash
-npm run prod:deploy:full -- --release-id <release_id>
+npm run prod:deploy:full
 ```
 
-가장 큰 작업이다.
+가장 넓은 일반 배포 명령이다.
 
 ```text
-Supabase migration apply
--> prod release publish
--> GCP web/API + Redis document queue deploy
--> document-worker + document-outbox-dispatcher restart
--> prod runtime deploy
+새 GCP image build (현재 runtime 계속 서비스)
+-> Supabase migration apply + schema smoke
+-> active web catalog publish
+-> GCP web/API + application workers switch
+-> prod Mac runtime restart
 ```
 
-DB migration, ontology release, web code, runtime code가 모두 바뀌는 경우에만
-쓴다. 문서 ingestion은 GCP compose의 persistent Redis service와 BullMQ
-`document-worker`, `document-outbox-dispatcher`를 같이 올린다.
+DB migration, 현재 active-release catalog, web code, Mac runtime code를 함께
+반영할 때 쓴다. SQLite release의 `prod/current` pointer를 다른 release로
+promote하지는 않는다. Redis는 persistent service로 유지되고, document worker,
+outbox dispatcher, filing/billing worker는 새 image로 재생성된다.
 
-document-ingestion claim-token migration이 pending이면 배포 스크립트는 먼저
-`scripts/drain-document-workers-for-migration.sh`로 원격
-`document-worker`와 `document-outbox-dispatcher`를 중지·검증한 뒤 DB migration을
-적용한다. 이 구간에는 이전 worker를 수동으로 다시 시작하지 않는다. migration
-직후 compose 배포가 v2 worker를 다시 시작한다. 이 migration은 `--skip-code`와
-함께 적용할 수 없다.
+### One-time immutable Mac bootstrap
+
+현재 Mac production launchd가 아직 mutable repository 경로를 직접 실행하고
+immutable runtime `current` pointer가 없다면, 최초 1회만 다음 명령을 사용한다.
+
+```bash
+npm run prod:deploy:bootstrap
+```
+
+이 명령은 `prod:deploy:full`의 전체 code/data/schema cutover이면서, legacy Mac
+runtime을 immutable runtime으로 옮기는 단 한 번의 경계다. 새 GCP rollback
+transaction과 새 Mac candidate를 먼저 봉인·검증한 뒤 legacy launchd를 멈춘다.
+legacy runtime의 실행 중 bytes를 정확히 재구성할 수 없으므로 이 경계를 지난
+후에는 legacy Mac을 절대 다시 시작하지 않는다.
+
+- migration 시작 전 실패: 봉인된 이전 GCP만 복원하고 Mac은 fail-closed
+- migration 시작 후 실패: GCP와 Mac 모두 fail-closed
+- 성공: `.immutable-bootstrap-complete` marker를 영구 기록
+
+marker를 삭제하거나 bootstrap 명령을 반복하지 않는다. 최초 성공 이후 모든
+배포는 `npm run prod:deploy:full` 또는 `npm run prod:deploy:code`를 사용한다.
+
+### Recover an interrupted cutover
+
+SIGKILL 또는 재부팅으로 orchestrator가 사라졌고 durable phase가 migration
+시작 전임을 확인한 경우에만 새 kernel lock 아래에서 sealed owner를 명시적으로
+adopt한다. 이전 owner는 `.deploy/cutover-phase-<deployment_id>.env`의
+`LOCK_OWNER`에서 읽는다.
+
+```bash
+npm run prod:deploy:recover -- \
+  --recover-cutover <deployment_id> \
+  --recovery-action resume \
+  --previous-lock-owner <recorded_lock_owner>
+```
+
+최초 immutable bootstrap 경계에서는 legacy Mac을 재시작할 수 없으므로
+`--recovery-action resume-remote`를 사용한다. recovery entrypoint는 normal
+deploy로 fall through하지 않으며, source/env/CLI, launchd snapshots, candidate
+Mac runtime, GCP release/rollback cross-seal과 image availability가 모두 맞아야
+owner를 교체한다. migration-started marker가 있으면 두 recovery action 모두
+거부된다.
 
 ### Safe production deploy
 
 ```bash
-npm run prod:deploy:safe -- --release-id <release_id> --apply-migrations
+npm run prod:deploy:safe
 ```
 
-local ontology queue를 잠깐 멈춘 뒤 전체 배포하고 다시 시작하는 경로다.
-queue writer와 prod release 전환이 겹칠 위험이 있을 때 사용한다.
+`prod:deploy:full`의 명시적 alias다. migration, active catalog, GCP, Mac
+runtime을 같은 순서로 처리한다.
+
+### Planning without mutation
+
+```bash
+npm run prod:deploy:dry
+```
+
+canonical target, GCP instance identity, pending migration과 data-release target을
+확인한다. GCP upload, Docker/launchd mutation, migration apply는 하지 않는다.
 
 ### Production status
 
@@ -169,7 +233,8 @@ queue writer와 prod release 전환이 겹칠 위험이 있을 때 사용한다.
 npm run prod:status
 ```
 
-prod MCP health와 prod Mac worker heartbeat 상태를 확인한다.
+현재 활성 Mac runtime의 `runtime.env`를 찾아 MCP fingerprint, filings MCP,
+Mac supervisor heartbeat와 GCP Compose 상태를 확인한다.
 
 ## Ontology Release Build Flow
 
@@ -222,15 +287,18 @@ uv run krw-ontology release materialize-prod <release_id>
 검증된 dev v3 release를 prod release space로 복사한다. 이 단계는 아직
 `prod/current`를 바꾸지 않는다.
 
-5. Prod publish
+5. Prod candidate 보관
+
+검증된 candidate는 immutable release directory에 보관한다. 현재 production
+orchestrator는 다른 release로의 atomic `prod/current` promotion을 의도적으로
+거부한다. symlink를 수동 변경하거나 `prod:release:publish`로 우회하지 않는다.
+
+현재 active release의 catalog 재게시만 필요하면 다음을 실행한다.
 
 ```bash
 cd ~/krw-ontology-front
-npm run prod:release:publish -- --release-id <release_id>
+npm run prod:release:publish
 ```
-
-이 단계에서만 prod/current, Supabase web catalog, prod MCP, prod workers가
-같은 release로 전환된다.
 
 ### Production billing
 
@@ -243,11 +311,11 @@ TOSS_PAYMENTS_SECRET_KEY=live_sk_...
 ANALYSIS_CREDIT_ENFORCEMENT_MODE=enforced
 ```
 
-After changing the VM env, restart the GCP compose services and run the paid
-billing readiness gate:
+VM env 변경은 독립 restart로 반영하지 않는다. 다음 sealed code cutover에
+포함한 뒤 paid billing readiness gate를 실행한다.
 
 ```bash
-scripts/restart-production-compose.sh
+npm run prod:deploy:code
 npm run billing:prod:readiness
 ```
 
@@ -263,7 +331,7 @@ npm run mcp:prod:launchd:install
 npm run mcp:prod:launchd:uninstall
 ```
 
-prod MCP sidecar 명령어다. 기본 포트는 `8765`다.
+Mac-local prod MCP 서비스 명령어다. 기본 포트는 `8765`다.
 
 ```bash
 npm run mcp:dev:status
@@ -272,7 +340,7 @@ npm run mcp:dev:launchd:install
 npm run mcp:dev:launchd:uninstall
 ```
 
-dev MCP sidecar 명령어다. 기본 포트는 `8766`이다.
+Mac-local dev MCP 서비스 명령어다. 기본 포트는 `8766`이다.
 
 ```bash
 npm run worker:mac:preflight
@@ -296,8 +364,9 @@ Supabase CLI는 `scripts/supabase-cli.sh`를 통해 실행한다. 이 wrapper는
 경로 순서로 CLI를 찾는다. `npx supabase`는 darwin-arm64 native package
 해결이 불안정할 수 있어 배포 경로에서 직접 사용하지 않는다.
 
-`prod:deploy:code`는 migration dry-run만 수행한다.
-`prod:deploy:full`은 `--apply-migrations`가 포함되어 migration을 실제 apply한다.
+`prod:deploy:code`와 `prod:deploy:full`은 migration dry-run 후 pending
+migration을 적용하고 schema smoke를 수행한다. `prod:deploy:web`과
+`prod:deploy:runtime`은 migration을 적용하지 않는다.
 
 ## Verification
 
@@ -332,21 +401,11 @@ dev:catalog             -> dev:release:publish
 deploy:runtime:dev      -> dev:runtime
 ```
 
-## Legacy GCP Plugin Command
+## Retired GCP Sidecar
 
-정상 운영에서는 Mac worker가 production agent execution을 담당한다. 아래 명령은
-예전 GCP MCP/plugin 배포용이다. GCP ontology data upload 경로는 삭제되었다.
-
-```bash
-npm run legacy:gcp-mcp
-```
-
-GCP plugin 호환용 이름:
-
-```bash
-npm run deploy:legacy:gcp-mcp
-npm run deploy:plugin:gcp
-```
+GCP ontology MCP와 GCP agent worker sidecar는 운영 토폴로지에서 제거됐다.
+관련 Dockerfile, Compose service, npm alias는 제공하지 않는다. production agent
+execution과 ontology MCP는 항상 Mac launchd runtime에서만 실행한다.
 
 ## Decision Table
 
@@ -360,20 +419,20 @@ dev MCP/plugin만 갱신한다
 dev catalog만 local Supabase에 publish한다
   npm run dev:release:publish -- --release-id <release_id>
 
-GCP web/API만 올린다
+GCP web/API만 전환한다
   npm run prod:deploy:web
 
-prod plugin/skills/MCP/workers만 재시작한다
+Mac runtime만 전환한다
   npm run prod:deploy:runtime
 
 평소 코드 배포를 한다
   npm run prod:deploy:code
 
-prod ontology/index/catalog release를 바꾼다
-  npm run prod:release:publish -- --release-id <release_id>
+현재 active release catalog를 다시 게시한다
+  npm run prod:release:publish
 
-DB migration, release, web, runtime을 모두 바꾼다
-  npm run prod:deploy:full -- --release-id <release_id>
+DB migration, active catalog, web, runtime을 모두 검증·배포한다
+  npm run prod:deploy:full
 
 상태를 본다
   npm run prod:status

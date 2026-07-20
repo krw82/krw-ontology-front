@@ -46,7 +46,7 @@ export default function PublicTopNav({
             <Link
               key={item.href}
               href={localizedPath(locale, item.href)}
-              className="rounded-[8px] px-sm py-xs text-[13px] font-extrabold leading-5 text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+              className="inline-flex min-h-11 items-center rounded-[8px] px-sm py-xs text-[13px] font-extrabold leading-5 text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
             >
               {item.label}
             </Link>
@@ -60,7 +60,7 @@ export default function PublicTopNav({
             ctaId="public_nav_start"
             ctaLabel={ctaLabel}
             surface="public_nav"
-            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-[8px] bg-surface-dark px-sm py-xs text-[13px] font-extrabold leading-5 text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-[8px] bg-surface-dark px-sm py-xs text-[13px] font-extrabold leading-5 text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             {ctaLabel}
           </MarketingCtaLink>

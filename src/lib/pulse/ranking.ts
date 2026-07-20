@@ -12,7 +12,9 @@ const URGENT_FRESH_MS = 72 * HOUR_MS;
 const FILING_FRESH_MS = 7 * DAY_MS;
 const DIGEST_FRESH_MS = 3 * DAY_MS;
 const TERMINAL_ANALYSIS_FRESH_MS = 7 * DAY_MS;
-const DISCOVERY_WINDOW_SIZE = 10;
+
+export const PULSE_SESSION_MAX_ITEMS = 20;
+export const PULSE_SESSION_MAX_GLOBAL_FILINGS = 2;
 
 /**
  * Lane order is intentionally categorical rather than a weighted score. A
@@ -33,7 +35,7 @@ export function toRankedCandidate(
   now = new Date(),
 ): PulseRankedCandidate {
   const phase = getAnalysisPhase(candidate);
-  const reviewedAt = candidate.reviewed_at ?? candidate.read_at;
+  const reviewedAt = candidate.reviewed_at ?? candidate.judgment?.updated_at ?? null;
   const actionable = candidate.actionable ?? isActionableCandidate(candidate, phase, reviewedAt);
   const state = candidate.state ?? (reviewedAt ? "reviewed" : "new");
   const lane = reviewedAt ? 90 : getPulseLane(candidate, phase, now);
@@ -42,13 +44,12 @@ export function toRankedCandidate(
     ...candidate,
     phase,
     reviewed_at: reviewedAt,
-    read_at: candidate.read_at ?? reviewedAt,
     state,
     actionable,
     lane,
     rank_score: getRankScore(candidate, phase, actionable, reviewedAt, now),
     priority_rank: PULSE_PRIORITY_RANK[candidate.priority],
-    holding_rank: candidate.is_holding ? 0 : 1,
+    coverage_rank: coverageRank(candidate.coverage_status),
     saved_rank: candidate.is_pinned || candidate.saved_at ? 0 : 1,
   };
 }
@@ -65,7 +66,7 @@ export function getAnalysisPhase(candidate: PulseCandidate): PulseAnalysisPhase 
 export function isActionableCandidate(
   candidate: PulseCandidate,
   phase = getAnalysisPhase(candidate),
-  reviewedAt = candidate.reviewed_at ?? candidate.read_at,
+  reviewedAt = candidate.reviewed_at ?? candidate.judgment?.updated_at ?? null,
 ): boolean {
   if (reviewedAt) return false;
   if (candidate.kind === "filing" || candidate.kind === "question" || candidate.kind === "resurface") return true;
@@ -79,17 +80,25 @@ export function getPulseLane(
 ): number {
   const ageMs = Math.max(0, now.getTime() - Date.parse(candidate.occurred_at));
   if (candidate.kind === "filing") {
-    if (candidate.priority === "urgent" && ageMs <= URGENT_FRESH_MS) return 0;
-    if (isDigestFiling(candidate) && ageMs <= DIGEST_FRESH_MS) return 12;
-    if (!isDigestFiling(candidate) && ageMs <= FILING_FRESH_MS) return 10;
+    const covered = isActiveCoverage(candidate.coverage_status);
+    if (candidate.judgment) return 90;
+    if (covered && candidate.priority === "urgent" && ageMs <= URGENT_FRESH_MS) return 0;
+    if (covered && candidate.state === "seen") return 5;
+    if (candidate.linked_thesis || hasMonitoringRuleMatch(candidate)) return 10;
+    if (covered && ageMs <= FILING_FRESH_MS) return 12;
+    if (isDigestFiling(candidate) && ageMs <= DIGEST_FRESH_MS) return 18;
     return 15;
   }
   if (candidate.kind === "analysis") {
     if (phase === "active") return 30;
     return ageMs <= TERMINAL_ANALYSIS_FRESH_MS ? 20 : 25;
   }
-  if (candidate.kind === "question") return 25;
-  if (candidate.kind === "resurface") return 40;
+  if (candidate.kind === "question") return hasQuestionEvidence(candidate) ? 25 : 35;
+  if (candidate.kind === "resurface") {
+    return candidate.metadata.monitoring_rule_type === "scheduled_review"
+      ? 38
+      : 40;
+  }
   if (candidate.kind === "learning") return 50;
   return 90;
 }
@@ -108,7 +117,7 @@ export function comparePulseSortKeys(
   if (left.lane !== right.lane) return left.lane - right.lane;
   if (left.rank_score !== right.rank_score) return right.rank_score - left.rank_score;
   if (left.priority_rank !== right.priority_rank) return left.priority_rank - right.priority_rank;
-  if (left.holding_rank !== right.holding_rank) return left.holding_rank - right.holding_rank;
+  if (left.coverage_rank !== right.coverage_rank) return left.coverage_rank - right.coverage_rank;
   if (left.saved_rank !== right.saved_rank) return left.saved_rank - right.saved_rank;
   const occurredDiff = Date.parse(right.occurred_at) - Date.parse(left.occurred_at);
   if (occurredDiff !== 0) return occurredDiff;
@@ -120,12 +129,12 @@ export function sortKeyOf(candidate: PulseRankedCandidate): PulseSortKey {
     lane,
     rank_score,
     priority_rank,
-    holding_rank,
+    coverage_rank,
     saved_rank,
     occurred_at,
     item_key,
   } = candidate;
-  return { lane, rank_score, priority_rank, holding_rank, saved_rank, occurred_at, item_key };
+  return { lane, rank_score, priority_rank, coverage_rank, saved_rank, occurred_at, item_key };
 }
 
 /**
@@ -165,41 +174,56 @@ export function reorderFirstPageWindow(
     if (candidate.kind === "learning") learningCount += 1;
   }
 
-  return reserveDiscoverySlot([...protectedWindow, ...deferred]);
+  return [...protectedWindow, ...deferred];
 }
-
-// Compatibility export retained for tests and any temporary callers. New code
-// must only call it with a bounded first-page window.
-export const enforceFirstPageDiversity = reorderFirstPageWindow;
 
 /**
- * One catalog-discovery item earns a late first-screen slot when the bounded
- * candidate RPC supplied one. It never moves ahead of an urgent filing, so the
- * feed remains an inbox before it becomes a discovery surface.
+ * Builds one finite decision session. User-owned work always receives the
+ * protected slots; catalog-wide filings are discovery, not an infinite inbox,
+ * and therefore cannot occupy more than two of the twenty cards.
  */
-function reserveDiscoverySlot(
+export function selectFinitePulseQueue(
   candidates: PulseRankedCandidate[],
+  requestedLimit = PULSE_SESSION_MAX_ITEMS,
 ): PulseRankedCandidate[] {
-  if (candidates.slice(0, DISCOVERY_WINDOW_SIZE).some(isDiscoveryCandidate)) return candidates;
-  const discoveryIndex = candidates.findIndex(isDiscoveryCandidate);
-  if (discoveryIndex < DISCOVERY_WINDOW_SIZE) return candidates;
+  const limit = Math.max(
+    1,
+    Math.min(PULSE_SESSION_MAX_ITEMS, Math.floor(requestedLimit)),
+  );
+  const personal = reorderFirstPageWindow(
+    candidates.filter(isProtectedDecisionCandidate),
+  );
+  const globalFilings = candidates
+    .filter(isGlobalDiscoveryFiling)
+    .slice(0, PULSE_SESSION_MAX_GLOBAL_FILINGS);
+  const supplemental = reorderFirstPageWindow(
+    candidates.filter(
+      (candidate) =>
+        !isProtectedDecisionCandidate(candidate) &&
+        !isGlobalDiscoveryFiling(candidate),
+    ),
+  );
 
-  const destination = candidates
-    .slice(0, DISCOVERY_WINDOW_SIZE)
-    .map((candidate, index) => ({ candidate, index }))
-    .filter(({ candidate }) => candidate.priority !== "urgent")
-    .at(-1)?.index;
-  if (destination === undefined) return candidates;
-
-  const next = [...candidates];
-  const [discovery] = next.splice(discoveryIndex, 1);
-  if (!discovery) return candidates;
-  next.splice(destination, 0, discovery);
-  return next;
+  return [...personal, ...globalFilings, ...supplemental].slice(0, limit);
 }
 
-function isDiscoveryCandidate(candidate: PulseRankedCandidate): boolean {
-  return candidate.kind === "filing" && candidate.metadata.candidate_bucket === "discovery";
+function isProtectedDecisionCandidate(
+  candidate: PulseRankedCandidate,
+): boolean {
+  if (candidate.reviewed_at) return false;
+  if (isActiveCoverage(candidate.coverage_status)) return true;
+  if (candidate.kind === "question" || candidate.kind === "resurface") return true;
+  if (candidate.kind === "analysis" || candidate.kind === "checkup") return true;
+  return candidate.kind === "filing" &&
+    (Boolean(candidate.linked_thesis) || hasMonitoringRuleMatch(candidate));
+}
+
+function isGlobalDiscoveryFiling(candidate: PulseRankedCandidate): boolean {
+  return candidate.kind === "filing" &&
+    !candidate.reviewed_at &&
+    !isActiveCoverage(candidate.coverage_status) &&
+    !candidate.linked_thesis &&
+    !hasMonitoringRuleMatch(candidate);
 }
 
 function isAvailable(candidate: PulseCandidate, now: Date): boolean {
@@ -227,14 +251,42 @@ function getRankScore(
     : candidate.priority === "high" ? 25 : candidate.priority === "normal" ? 15 : 8;
   const userRelevance = Math.min(
     30,
-    (candidate.is_holding ? 18 : 0)
-      + (candidate.is_watchlisted ? 10 : 0)
+    coverageScore(candidate.coverage_status)
       + (candidate.has_recent_research ? 8 : 0)
       + (candidate.saved_at || candidate.is_pinned ? 5 : 0),
   );
   const actionValue = actionable ? 10 : phase === "active" ? 6 : 0;
 
   return materiality + userRelevance + actionValue + freshnessScore(candidate.occurred_at, now);
+}
+
+function isActiveCoverage(status: PulseCandidate["coverage_status"]): boolean {
+  return status === "exploring" || status === "watching" || status === "holding";
+}
+
+function coverageRank(status: PulseCandidate["coverage_status"]): number {
+  if (status === "holding") return 0;
+  if (status === "watching") return 1;
+  if (status === "exploring") return 2;
+  if (status === "closed") return 3;
+  return 4;
+}
+
+function coverageScore(status: PulseCandidate["coverage_status"]): number {
+  if (status === "holding") return 18;
+  if (status === "watching") return 12;
+  if (status === "exploring") return 6;
+  return 0;
+}
+
+function hasMonitoringRuleMatch(candidate: PulseCandidate): boolean {
+  const value = candidate.metadata.monitoring_rule_match_count ?? candidate.metadata.rule_match_count;
+  return typeof value === "number" ? value > 0 : value === true || value === "true";
+}
+
+function hasQuestionEvidence(candidate: PulseCandidate): boolean {
+  const value = candidate.metadata.evidence_count ?? candidate.metadata.has_new_evidence;
+  return typeof value === "number" ? value > 0 : value === true || value === "true";
 }
 
 function freshnessScore(occurredAt: string, now: Date): number {
