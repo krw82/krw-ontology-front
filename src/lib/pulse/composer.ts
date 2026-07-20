@@ -36,7 +36,7 @@ import {
   rankPulseCandidates,
   selectFinitePulseQueue,
 } from "@/lib/pulse/ranking";
-import { selectLearningCandidate, buildLearningCandidates } from "@/lib/pulse/sources/learning";
+import { getLearningCandidates, selectLearningCandidate } from "@/lib/pulse/sources/learning";
 import { getAnalysisCandidates } from "@/lib/pulse/sources/analysis";
 import { getFilingCandidates } from "@/lib/pulse/sources/filings";
 import { getQuestionCandidates } from "@/lib/pulse/sources/questions";
@@ -116,7 +116,7 @@ export async function composePulseFeed({
         && preferences.learning_cadence !== "off"
         && preferences.learning_enabled
         && enabledKinds.has("learning"),
-      async () => buildLearningCandidates(snapshotAt),
+      async () => getLearningCandidates(supabase, snapshotAt),
     ),
   ] as const);
 

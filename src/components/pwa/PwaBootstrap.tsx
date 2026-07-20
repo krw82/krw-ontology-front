@@ -231,6 +231,13 @@ export default function PwaBootstrap() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
+    const standalone = isStandalonePwa({
+      displayModeStandalone:
+        typeof window.matchMedia === "function" &&
+        window.matchMedia("(display-mode: standalone)").matches,
+      navigatorStandalone: (navigator as Navigator & { standalone?: boolean })
+        .standalone,
+    });
     hadControllerRef.current = Boolean(navigator.serviceWorker.controller);
     let disposed = false;
     let registration: ServiceWorkerRegistration | null = null;
@@ -242,6 +249,7 @@ export default function PwaBootstrap() {
         !shouldOfferServiceWorkerUpdate(
           worker,
           Boolean(navigator.serviceWorker.controller),
+          standalone,
         )
       ) {
         return;

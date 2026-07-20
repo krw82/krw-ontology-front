@@ -1818,6 +1818,36 @@ export interface AnalyticsEventRow extends Record<string, unknown> {
   created_at: string;
 }
 
+export interface PulseEditorialEntryRow extends Record<string, unknown> {
+  id: string;
+  slug: string;
+  status: "draft" | "published" | "archived";
+  format: "single_image" | "carousel" | "text";
+  title: string;
+  body: string;
+  ticker: string | null;
+  action_label: string | null;
+  action_href: string | null;
+  publish_at: string | null;
+  expires_at: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PulseEditorialAssetRow extends Record<string, unknown> {
+  id: string;
+  entry_id: string;
+  position: number;
+  storage_path: string;
+  alt_text: string;
+  mime_type: "image/jpeg" | "image/png" | "image/webp";
+  byte_size: number;
+  width: number | null;
+  height: number | null;
+  created_at: string;
+}
+
 // Supabase Database type for createClient generic
 export interface Database {
   public: {
@@ -3973,6 +4003,47 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<Omit<AnalyticsEventRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      pulse_editorial_entries: {
+        Row: PulseEditorialEntryRow;
+        Insert: Omit<PulseEditorialEntryRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          status?: PulseEditorialEntryRow["status"];
+          format?: PulseEditorialEntryRow["format"];
+          body?: string;
+          ticker?: string | null;
+          action_label?: string | null;
+          action_href?: string | null;
+          publish_at?: string | null;
+          expires_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<PulseEditorialEntryRow, "id" | "created_at" | "created_by">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      pulse_editorial_assets: {
+        Row: PulseEditorialAssetRow;
+        Insert: Omit<PulseEditorialAssetRow, "id" | "created_at" | "width" | "height"> & {
+          id?: string;
+          width?: number | null;
+          height?: number | null;
+          created_at?: string;
+        };
+        Update: Partial<Omit<PulseEditorialAssetRow, "id" | "entry_id" | "created_at">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];
