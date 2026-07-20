@@ -47,6 +47,10 @@ const coverageLevelMigrationPath = join(
   process.cwd(),
   "supabase/migrations/20260720010000_simplify_company_coverage_levels.sql",
 );
+const productionSchemaRepairMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260720030000_repair_production_schema_drift.sql",
+);
 const FILING_NOTIFICATION_EVENT_NAMES = [
   "company_followed",
   "push_permission_requested",
@@ -221,6 +225,19 @@ describe("analytics events migration", () => {
     expect(coverageLevelMigration).toContain("when 'coverage_status_changed' then 'coverage_level_changed'");
     expect(coverageLevelMigration).toContain("'coverage_level_changed'");
     expect(coverageLevelMigration).toContain("'coverage_cleared'");
+  });
+
+  it("repairs production schema drift without dropping current analytics events", () => {
+    const repairMigration = readFileSync(
+      productionSchemaRepairMigrationPath,
+      "utf8",
+    );
+    for (const eventName of ANALYTICS_EVENT_NAMES) {
+      expect(repairMigration).toContain(`'${eventName}'`);
+    }
+    expect(repairMigration).toContain("mark.coverage_level is not null");
+    expect(repairMigration).toContain("browse_core_strength");
+    expect(repairMigration).toContain("browse_critical_risk");
   });
 
   it("keeps analytics server-owned and indexed for dashboard queries", () => {
