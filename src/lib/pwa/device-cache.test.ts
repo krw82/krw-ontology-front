@@ -11,6 +11,7 @@ function pulseItem(kind: PulseItem["kind"], title: string): PulseItem {
     source_id: title,
     ticker: "AAPL",
     coverage_status: null,
+    coverage_level: null,
     judgment: null,
     linked_thesis: null,
     eyebrow: `${kind} event`,
