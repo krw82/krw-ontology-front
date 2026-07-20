@@ -14,6 +14,7 @@ import {
   normalizeStringList,
   parsePositiveIntParam,
 } from "@/lib/api/validation";
+import { ServerTiming } from "@/lib/performance/server-timing";
 
 function internalError(message: string) {
   return Response.json(
@@ -23,9 +24,10 @@ function internalError(message: string) {
 }
 
 export async function GET(request: NextRequest) {
+  const timing = new ServerTiming();
   let user;
   try {
-    user = await getAuthUser();
+    user = await timing.measure("auth", () => getAuthUser());
   } catch (err) {
     return handleAuthError(err);
   }
@@ -39,17 +41,20 @@ export async function GET(request: NextRequest) {
   });
   const offset = (page - 1) * limit;
 
-  const { data: sessionRows, error } = await supabase
-    .from("chat_sessions")
-    .select(
-      "id, title, scope_type, default_tickers, last_message_preview, last_message_at, latest_run_status, created_at, updated_at",
-    )
-    .eq("user_id", user.id)
-    .is("deleted_at", null)
-    .or("last_message_at.not.is.null,latest_run_status.in.(pending,queued,running)")
-    .order("updated_at", { ascending: false })
-    .range(offset, offset + limit)
-    .returns<ChatSessionRow[]>();
+  const { data: sessionRows, error } = await timing.measure(
+    "sessions",
+    () => supabase
+      .from("chat_sessions")
+      .select(
+        "id, title, scope_type, default_tickers, last_message_preview, last_message_at, latest_run_status, created_at, updated_at",
+      )
+      .eq("user_id", user.id)
+      .is("deleted_at", null)
+      .or("last_message_at.not.is.null,latest_run_status.in.(pending,queued,running)")
+      .order("updated_at", { ascending: false })
+      .range(offset, offset + limit)
+      .returns<ChatSessionRow[]>(),
+  );
 
   if (error) {
     return internalError("채팅 목록을 불러오지 못했습니다.");
@@ -76,7 +81,7 @@ export async function GET(request: NextRequest) {
     total: offset + summaries.length + (hasMore ? 1 : 0),
     page,
     limit,
-  });
+  }, { headers: timing.headers({ "Cache-Control": "private, no-store" }) });
 }
 
 export async function POST(request: NextRequest) {

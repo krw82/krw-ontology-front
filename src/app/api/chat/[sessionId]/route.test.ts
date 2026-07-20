@@ -264,7 +264,7 @@ describe("GET /api/chat/[sessionId]", () => {
       charts: [],
       artifact_selections: [],
       message_pagination: {
-        limit: 200,
+        limit: 50,
         has_more: false,
         before: null,
         next_before: null,

@@ -9,6 +9,7 @@ import {
   shouldUseStaticPulseE2EFixture,
 } from "@/lib/pulse/e2e-fixture";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { ServerTiming } from "@/lib/performance/server-timing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,9 +21,10 @@ const querySchema = z.object({
 }).strict();
 
 export async function GET(request: NextRequest) {
+  const timing = new ServerTiming();
   let user;
   try {
-    user = await getAuthUser();
+    user = await timing.measure("auth", () => getAuthUser());
   } catch (error) {
     return handleAuthError(error);
   }
@@ -44,24 +46,27 @@ export async function GET(request: NextRequest) {
   }
   if (await shouldUseStaticPulseE2EFixture()) {
     return Response.json(createStaticPulseE2EFeed(), {
-      headers: { "Cache-Control": "private, no-store, max-age=0" },
+      headers: timing.headers({ "Cache-Control": "private, no-store, max-age=0" }),
     });
   }
   try {
-    const includeNotebookSources = await canAccessMenuFeature(
-      user.id,
-      user.email,
-      "research_notebook",
-    ).catch(() => false);
+    const includeNotebookSources = await timing.measure(
+      "access",
+      () => canAccessMenuFeature(
+        user.id,
+        user.email,
+        "research_notebook",
+      ).catch(() => false),
+    );
     const options = {
       supabase: getSupabaseAdmin(),
       userId: user.id,
       includeNotebookSources,
       ...parsed.data,
     };
-    const response = await composePulseFeed(options);
+    const response = await timing.measure("compose", () => composePulseFeed(options));
     return Response.json(response, {
-      headers: { "Cache-Control": "private, no-store, max-age=0" },
+      headers: timing.headers({ "Cache-Control": "private, no-store, max-age=0" }),
     });
   } catch {
     return Response.json(

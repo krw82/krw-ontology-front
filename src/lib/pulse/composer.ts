@@ -78,15 +78,17 @@ export async function composePulseFeed({
   now = new Date(),
 }: ComposePulseFeedOptions): Promise<PulseFeedResponse> {
   const snapshotAt = now;
-  const preferences = await getPulsePreferences(supabase, userId);
+  const [preferences, userSignals, monitoringRules] = await Promise.all([
+    getPulsePreferences(supabase, userId),
+    getPulseUserTickerSignals(supabase, userId, snapshotAt),
+    getPulseMonitoringRules(supabase, userId),
+  ]);
   const enabledKinds = new Set(preferences.enabled_kinds);
   const resurfaceCadence = preferences.resurface_cadence === "biweekly" ? "biweekly" : "weekly";
   // These reads are correctness state, not optional ranking enhancements. If
   // they are unavailable, returning a normal-looking feed could resurrect
   // hidden cards or erase an existing judgment. Let the API fail closed while
   // the client keeps its last known-good/offline snapshot.
-  const userSignals = await getPulseUserTickerSignals(supabase, userId, snapshotAt);
-  const monitoringRules = await getPulseMonitoringRules(supabase, userId);
 
   const settled = await Promise.allSettled([
     loadSource("filing", enabledKinds.has("filing"), () => getFilingCandidates(supabase, snapshotAt, userSignals.preferredTickers)),

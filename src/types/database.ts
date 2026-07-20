@@ -437,6 +437,8 @@ export interface OntologyCompanyRow extends Record<string, unknown> {
   document_count: number;
   document_types: string[];
   periods: string[];
+  browse_core_strength: string | null;
+  browse_critical_risk: string | null;
   coverage_json: Json;
   documents_json: Json;
   company_json: Json;
@@ -4042,6 +4044,10 @@ export interface Database {
           p_discovery_source: "atom" | "submissions" | "daily_index";
           p_seen_at?: string;
         };
+        Returns: Array<{ filing_event_id: string; inserted: boolean }>;
+      };
+      record_catalog_sec_filing_discoveries: {
+        Args: { p_candidates: Json };
         Returns: Array<{ filing_event_id: string; inserted: boolean }>;
       };
       claim_sec_filing_processing_jobs: {

@@ -1,4 +1,5 @@
 import type { PulseFeedResponse } from "@/types/api-contracts";
+import { clearDeviceCache } from "@/lib/pwa/device-cache";
 
 export const OFFLINE_READ_MODEL_DB = "krwo-offline-read-model";
 export const OFFLINE_READ_MODEL_STORE = "snapshots";
@@ -67,6 +68,13 @@ export async function saveOfflinePulseSnapshot(
 }
 
 export async function clearOfflineReadModel(): Promise<void> {
+  await Promise.all([
+    clearDeviceCache(),
+    clearPublicPulseReadModel(),
+  ]);
+}
+
+async function clearPublicPulseReadModel(): Promise<void> {
   if (typeof indexedDB === "undefined") return;
   await new Promise<void>((resolve) => {
     const request = indexedDB.deleteDatabase(OFFLINE_READ_MODEL_DB);

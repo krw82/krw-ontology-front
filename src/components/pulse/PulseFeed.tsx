@@ -12,6 +12,10 @@ import PulseSummaryBar from "@/components/pulse/PulseSummaryBar";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import { buildPulseFeedDisplayEntries } from "@/lib/pulse/insider-trade-stack";
 import { saveOfflinePulseSnapshot } from "@/lib/pwa/offline-read-model";
+import {
+  readDevicePulseSnapshot,
+  saveDevicePulseSnapshot,
+} from "@/lib/pwa/device-cache";
 import type {
   PulseFeedResponse,
   PulseFeedStatusResponse,
@@ -22,11 +26,24 @@ import type {
 interface PulseFeedProps {
   initialFeed: PulseFeedResponse;
   draftOwnerId: string;
+  loadInitialFeed?: boolean;
 }
 
 const PAGE_SIZE = 20;
 
-export default function PulseFeed({ initialFeed, draftOwnerId }: PulseFeedProps) {
+function isUnavailablePulseFeed(feed: PulseFeedResponse): boolean {
+  return (
+    feed.items.length === 0 &&
+    feed.active_analysis_items.length === 0 &&
+    feed.source_statuses.some((source) => source.status === "degraded")
+  );
+}
+
+export default function PulseFeed({
+  initialFeed,
+  draftOwnerId,
+  loadInitialFeed = false,
+}: PulseFeedProps) {
   const [feed, setFeedState] = useState(initialFeed);
   const feedRef = useRef(initialFeed);
   const [loading, setLoading] = useState(false);
@@ -95,7 +112,25 @@ export default function PulseFeed({ initialFeed, draftOwnerId }: PulseFeedProps)
 
   useEffect(() => {
     void saveOfflinePulseSnapshot(feed).catch(() => undefined);
-  }, [feed]);
+    void saveDevicePulseSnapshot(draftOwnerId, feed).catch(() => undefined);
+  }, [draftOwnerId, feed]);
+
+  useEffect(() => {
+    let active = true;
+    void readDevicePulseSnapshot(draftOwnerId)
+      .then((snapshot) => {
+        if (!active || !snapshot || !isUnavailablePulseFeed(feedRef.current)) {
+          return;
+        }
+        generatedAtRef.current = snapshot.feed.generated_at;
+        setFeed(snapshot.feed);
+        setActiveAnalysisCount(0);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [draftOwnerId, setFeed]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -163,6 +198,14 @@ export default function PulseFeed({ initialFeed, draftOwnerId }: PulseFeedProps)
       }
     }
   }, [cancelStatusRequest, setFeed]);
+
+  useEffect(() => {
+    if (!loadInitialFeed) return;
+    const loadTimer = window.setTimeout(() => {
+      void fetchFirstPage();
+    }, 0);
+    return () => window.clearTimeout(loadTimer);
+  }, [fetchFirstPage, loadInitialFeed]);
 
   const pollStatus = useCallback(async () => {
     if (

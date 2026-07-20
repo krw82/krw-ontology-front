@@ -13,6 +13,7 @@ import { getWorkspaceShellMode } from "@/lib/navigation/workspace-routes";
 interface AppShellProps {
   children: React.ReactNode;
   initialUserProfile?: TopNavUserProfile | null;
+  initialAuthResolved?: boolean;
   preserveInitialUserProfile?: boolean;
 }
 
@@ -115,6 +116,7 @@ function ChatWorkspaceFallback({ children }: { children: React.ReactNode }) {
 export default function AppShell({
   children,
   initialUserProfile = null,
+  initialAuthResolved = false,
   preserveInitialUserProfile = false,
 }: AppShellProps) {
   const pathname = usePathname();
@@ -136,6 +138,7 @@ export default function AppShell({
         <Suspense fallback={<WorkspaceHeaderFallback />}>
           <TopNav
             initialUserProfile={initialUserProfile}
+            initialAuthResolved={initialAuthResolved}
             preserveInitialUserProfile={preserveInitialUserProfile}
             brandHref="/companies"
             brandAriaLabel={

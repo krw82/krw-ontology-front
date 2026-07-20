@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/ontology/catalog", () => ({
-  getIndexedCompanies: vi.fn(),
+  getIndexedCompanyBrowseCards: vi.fn(),
   getIndexedCompany: vi.fn(),
 }));
 vi.mock("@/lib/supabase/admin", () => ({
@@ -10,7 +10,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 import {
-  getIndexedCompanies,
+  getIndexedCompanyBrowseCards,
   getIndexedCompany,
 } from "@/lib/ontology/catalog";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -413,10 +413,10 @@ describe("watchlist workspace helpers", () => {
     vi.clearAllMocks();
     const fake = createAdmin();
     vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
-    vi.mocked(getIndexedCompanies).mockResolvedValue([
+    vi.mocked(getIndexedCompanyBrowseCards).mockResolvedValue([
       COMPANY_AAPL,
       COMPANY_MSFT,
-    ] as Awaited<ReturnType<typeof getIndexedCompanies>>);
+    ] as Awaited<ReturnType<typeof getIndexedCompanyBrowseCards>>);
     vi.mocked(getIndexedCompany).mockResolvedValue(
       COMPANY_AAPL as Awaited<ReturnType<typeof getIndexedCompany>>,
     );
@@ -425,7 +425,10 @@ describe("watchlist workspace helpers", () => {
   it("aggregates personal research state for the watchlist overview", async () => {
     const overview = await listWatchlistOverview("user-1");
 
-    expect(getIndexedCompanies).toHaveBeenCalledWith(["AAPL", "MSFT"]);
+    expect(getIndexedCompanyBrowseCards).toHaveBeenCalledWith([
+      "AAPL",
+      "MSFT",
+    ]);
     expect(overview.stats).toEqual({
       total: 2,
       interest: 1,

@@ -19,21 +19,28 @@ import {
   stringInput,
 } from "@/lib/watchlist/api";
 import { listWatchlistOverview } from "@/lib/watchlist/workspace";
+import { ServerTiming } from "@/lib/performance/server-timing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const timing = new ServerTiming();
   let user;
   try {
-    user = await getAuthUser();
+    user = await timing.measure("auth", () => getAuthUser());
   } catch (err) {
     return handleAuthError(err);
   }
   if (!user) return handleAuthError(new Error("No user"));
 
   try {
-    return Response.json(await listWatchlistOverview(user.id));
+    const overview = await timing.measure("overview", () =>
+      listWatchlistOverview(user.id),
+    );
+    return Response.json(overview, {
+      headers: timing.headers({ "Cache-Control": "private, no-store" }),
+    });
   } catch {
     return errorResponse(500, "internal_error", "리서치 노트북을 불러오지 못했습니다.");
   }

@@ -14,6 +14,7 @@ export function topNavProfileFromUser(
 
   const metadata = user.user_metadata;
   return {
+    id: user.id,
     email: user.email,
     name:
       stringValue(metadata?.full_name) ??

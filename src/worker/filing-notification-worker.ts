@@ -437,6 +437,8 @@ async function runCycle() {
       filingEnv: FILING_WORKER_ENV,
       schedulerLeader: global.schedulerLeader,
       filingsDiscovered: global.discovered,
+      filingDiscoveryCandidates: global.discoveryCandidates,
+      filingDiscoveryRpcCalls: global.discoveryRpcCalls,
       filingsEnriched: global.enriched,
       notificationsCreated: global.notificationsCreated,
       digestsCreated,

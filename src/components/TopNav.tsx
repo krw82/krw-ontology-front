@@ -19,6 +19,10 @@ import { Pressable } from "@/components/ui/Pressable";
 import { clearAllComposerDrafts } from "@/lib/chat/composer-draft-store";
 import { clearAllFilingJudgmentDrafts } from "@/lib/pulse/judgment-draft-store";
 import { clearOfflineReadModel } from "@/lib/pwa/offline-read-model";
+import {
+  clearDeviceCacheOwner,
+  setDeviceCacheOwner,
+} from "@/lib/pwa/device-cache-owner";
 import { createClient } from "@/lib/supabase/client";
 import { popoverMenu } from "@/lib/animation";
 import { useEntitlement } from "@/hooks/useEntitlement";
@@ -26,6 +30,7 @@ import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 
 export interface TopNavUserProfile {
+  id: string;
   email: string;
   name: string | null;
   avatarUrl: string | null;
@@ -33,6 +38,7 @@ export interface TopNavUserProfile {
 
 interface TopNavProps {
   initialUserProfile?: TopNavUserProfile | null;
+  initialAuthResolved?: boolean;
   brandHref?: string;
   brandAriaLabel?: string;
   hideAccountMenu?: boolean;
@@ -58,6 +64,7 @@ function profileFromUser(user: User | null | undefined): TopNavUserProfile | nul
     stringValue(metadata.display_name);
 
   return {
+    id: user.id,
     email: user.email,
     name,
     avatarUrl,
@@ -99,6 +106,7 @@ function UserAvatar({
 
 export default function TopNav({
   initialUserProfile,
+  initialAuthResolved = false,
   brandHref = "/companies",
   brandAriaLabel,
   hideAccountMenu = false,
@@ -123,13 +131,18 @@ export default function TopNav({
     initialUserProfile ?? null,
   );
   const [authChecked, setAuthChecked] = useState(
-    Boolean(initialUserProfile) || hideAccountMenu,
+    Boolean(initialUserProfile) || initialAuthResolved || hideAccountMenu,
   );
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [clientReady, setClientReady] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const shouldLoadAccount = !hideAccountMenu;
-  const { entitlement } = useEntitlement(shouldLoadAccount && Boolean(userProfile));
+  // Entitlement is only rendered inside the account menu. Deferring this
+  // request keeps ordinary workspace navigation free of an authorization
+  // round-trip while preserving a live decision when the user opens billing.
+  const { entitlement } = useEntitlement(
+    shouldLoadAccount && accountMenuOpen && Boolean(userProfile),
+  );
 
   // M-07: useMemo to cache Supabase client
   const supabase = useMemo(
@@ -167,24 +180,44 @@ export default function TopNav({
       }
     );
 
-    // Initial check
-    supabase.auth
-      .getUser()
-      .then(({ data: { user } }) => {
-        if (isMounted) setUserProfile(profileFromUser(user) ?? fallbackProfile);
-      })
-      .catch(() => {
-        if (isMounted) setUserProfile(fallbackProfile);
-      })
-      .finally(() => {
-        if (isMounted) setAuthChecked(true);
-      });
+    // Standard workspace requests already supplied the server-verified
+    // profile. The auth subscription still receives subsequent sign-in/out
+    // changes, so avoid repeating `getUser()` during hydration. A page with
+    // no server profile still checks the browser session (for example, a
+    // direct client transition after sign-in).
+    if (!initialUserProfile && !initialAuthResolved) {
+      supabase.auth
+        .getUser()
+        .then(({ data: { user } }) => {
+          if (isMounted) setUserProfile(profileFromUser(user) ?? fallbackProfile);
+        })
+        .catch(() => {
+          if (isMounted) setUserProfile(fallbackProfile);
+        })
+        .finally(() => {
+          if (isMounted) setAuthChecked(true);
+        });
+    }
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [initialUserProfile, preserveInitialUserProfile, shouldLoadAccount, supabase]);
+  }, [
+    initialAuthResolved,
+    initialUserProfile,
+    preserveInitialUserProfile,
+    shouldLoadAccount,
+    supabase,
+  ]);
+
+  useEffect(() => {
+    if (userProfile?.id) {
+      setDeviceCacheOwner(userProfile.id);
+      return;
+    }
+    clearDeviceCacheOwner();
+  }, [userProfile?.id]);
 
   useEffect(() => {
     if (!accountMenuOpen) return;

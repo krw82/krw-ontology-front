@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import AnalyticsBootstrap from "@/components/analytics/AnalyticsBootstrap";
+import ApiPerformanceReporter from "@/components/analytics/ApiPerformanceReporter";
 import WebVitalsReporter from "@/components/analytics/WebVitalsReporter";
 import InteractionPerformanceReporter from "@/components/analytics/InteractionPerformanceReporter";
 import AppShell from "@/components/AppShell";
@@ -151,6 +152,28 @@ function RootAppShellFallback({
   );
 }
 
+async function ResolvedAppShell({
+  children,
+  shouldSeedWorkspaceProfile,
+}: {
+  children: React.ReactNode;
+  shouldSeedWorkspaceProfile: boolean;
+}) {
+  const workspaceUser = shouldSeedWorkspaceProfile
+    ? await getAuthUser().catch(() => null)
+    : null;
+
+  return (
+    <AppShell
+      initialUserProfile={topNavProfileFromUser(workspaceUser)}
+      initialAuthResolved={shouldSeedWorkspaceProfile}
+      preserveInitialUserProfile={shouldPreserveInitialProfile(workspaceUser)}
+    >
+      {children}
+    </AppShell>
+  );
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -165,14 +188,15 @@ export default async function RootLayout({
   const workspaceShellMode = getWorkspaceShellMode(requestPathname);
   const shouldSeedWorkspaceProfile =
     workspaceShellMode === "standard";
-  const workspaceUser = shouldSeedWorkspaceProfile
-    ? await getAuthUser().catch(() => null)
-    : null;
 
   return (
-    <html lang={localeToHtmlLang(locale)} className="h-full antialiased">
+    <html
+      lang={localeToHtmlLang(locale)}
+      className="h-full antialiased"
+    >
       <body className="min-h-full flex flex-col bg-canvas text-on-surface">
         <AnalyticsBootstrap />
+        <ApiPerformanceReporter />
         <WebVitalsReporter />
         <InteractionPerformanceReporter />
         <PwaBootstrap />
@@ -184,12 +208,11 @@ export default async function RootLayout({
           {locale === "ko" ? "메인 콘텐츠로 이동" : "Skip to main content"}
         </a>
         <Suspense fallback={<RootAppShellFallback mode={workspaceShellMode} />}>
-          <AppShell
-            initialUserProfile={topNavProfileFromUser(workspaceUser)}
-            preserveInitialUserProfile={shouldPreserveInitialProfile(workspaceUser)}
+          <ResolvedAppShell
+            shouldSeedWorkspaceProfile={shouldSeedWorkspaceProfile}
           >
             {children}
-          </AppShell>
+          </ResolvedAppShell>
         </Suspense>
       </body>
     </html>
