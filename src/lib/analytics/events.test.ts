@@ -14,7 +14,7 @@ describe("analytics event schema helpers", () => {
     expect(isAnalyticsEventName("suggested_question_clicked")).toBe(true);
     expect(isAnalyticsEventName("question_submitted")).toBe(true);
     expect(isAnalyticsEventName("performance_metric_reported")).toBe(true);
-    expect(isAnalyticsEventName("coverage_added")).toBe(true);
+    expect(isAnalyticsEventName("coverage_level_changed")).toBe(true);
     expect(isAnalyticsEventName("filing_judgment_completed")).toBe(true);
     expect(isAnalyticsEventName("second_opportunity_resolved")).toBe(true);
     expect(isAnalyticsEventName("Question Submitted")).toBe(false);
@@ -25,7 +25,7 @@ describe("analytics event schema helpers", () => {
     expect(isClientAnalyticsEventName("filing_judgment_started")).toBe(true);
     expect(isClientAnalyticsEventName("pulse_viewed")).toBe(true);
     for (const eventName of [
-      "coverage_added",
+      "coverage_level_changed",
       "coverage_activated",
       "filing_judgment_completed",
       "filing_judgment_revised",
@@ -75,8 +75,8 @@ describe("analytics event schema helpers", () => {
 
   it("applies the no-free-text contract to every decision-loop event", () => {
     for (const eventName of [
-      "coverage_added",
-      "coverage_status_changed",
+      "coverage_level_changed",
+      "coverage_cleared",
       "coverage_activated",
       "filing_judgment_started",
       "filing_judgment_completed",

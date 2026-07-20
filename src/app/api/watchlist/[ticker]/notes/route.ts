@@ -7,7 +7,6 @@ import {
 } from "@/lib/filing-notifications/request";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
-  ensureCompanyCoverageForWrite,
   errorResponse,
   parseJsonObject,
   requireIndexedTicker,
@@ -97,14 +96,6 @@ export async function POST(
   if (sourceMessageId && !isUuid(sourceMessageId)) {
     return errorResponse(400, "validation_error", "메시지 참조가 올바르지 않습니다.");
   }
-
-  const coverageError = await ensureCompanyCoverageForWrite({
-    userId: user.id,
-    userEmail: user.email,
-    ticker: tickerResult.ticker,
-    source: "note_created",
-  });
-  if (coverageError) return coverageError;
 
   const { data, error } = await getSupabaseAdmin()
     .from("user_research_notes")

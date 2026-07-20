@@ -17,8 +17,6 @@ export type FilingAccess = {
   notification: FilingNotificationAccessRow | null;
 };
 
-const ACTIVE_COVERAGE_STATUSES = ["exploring", "watching", "holding"] as const;
-
 /**
  * A filing can be opened either because the user explicitly follows its
  * company, or because it is still an eligible event in the active ontology
@@ -161,12 +159,12 @@ export async function resolveFilingContextTicker(params: {
     if (coveredTickers.length > 0) {
       const { data: marks, error: marksError } = await admin
         .from("user_company_marks")
-        .select("ticker,coverage_status")
+        .select("ticker,coverage_level")
         .eq("user_id", params.userId)
         .in("ticker", coveredTickers)
-        .in("coverage_status", [...ACTIVE_COVERAGE_STATUSES])
+        .not("coverage_level", "is", null)
         .order("updated_at", { ascending: false })
-        .returns<Array<{ ticker: string; coverage_status: string }>>();
+        .returns<Array<{ ticker: string; coverage_level: string }>>();
       if (marksError) throw new Error("personal_filing_context_unavailable");
       const activeTickers = (marks ?? [])
         .map((row) => normalizeTicker(row.ticker))

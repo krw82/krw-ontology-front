@@ -14,7 +14,7 @@ function filing(
     source_type: "filing",
     source_id: id,
     ticker: id.toUpperCase(),
-    coverage_status: "watching",
+    coverage_level: "interest",
     judgment: null,
     linked_thesis: null,
     eyebrow: "내부자 거래",

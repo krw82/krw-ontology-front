@@ -6,7 +6,6 @@ import {
 } from "@/lib/filing-notifications/request";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
-  ensureCompanyCoverageForWrite,
   errorResponse,
   parseJsonObject,
   requireIndexedTicker,
@@ -75,14 +74,6 @@ export async function POST(
   if (!question) {
     return errorResponse(400, "validation_error", "질문을 입력해주세요.");
   }
-
-  const coverageError = await ensureCompanyCoverageForWrite({
-    userId: user.id,
-    userEmail: user.email,
-    ticker: tickerResult.ticker,
-    source: "question_created",
-  });
-  if (coverageError) return coverageError;
 
   const { data, error } = await getSupabaseAdmin()
     .from("user_company_questions")

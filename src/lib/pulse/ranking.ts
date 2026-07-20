@@ -49,7 +49,7 @@ export function toRankedCandidate(
     lane,
     rank_score: getRankScore(candidate, phase, actionable, reviewedAt, now),
     priority_rank: PULSE_PRIORITY_RANK[candidate.priority],
-    coverage_rank: coverageRank(candidate.coverage_status),
+    coverage_rank: coverageRank(candidate.coverage_level),
     saved_rank: candidate.is_pinned || candidate.saved_at ? 0 : 1,
   };
 }
@@ -80,7 +80,7 @@ export function getPulseLane(
 ): number {
   const ageMs = Math.max(0, now.getTime() - Date.parse(candidate.occurred_at));
   if (candidate.kind === "filing") {
-    const covered = isActiveCoverage(candidate.coverage_status);
+    const covered = isActiveCoverage(candidate.coverage_level);
     if (candidate.judgment) return 90;
     if (covered && candidate.priority === "urgent" && ageMs <= URGENT_FRESH_MS) return 0;
     if (covered && candidate.state === "seen") return 5;
@@ -211,7 +211,7 @@ function isProtectedDecisionCandidate(
   candidate: PulseRankedCandidate,
 ): boolean {
   if (candidate.reviewed_at) return false;
-  if (isActiveCoverage(candidate.coverage_status)) return true;
+  if (isActiveCoverage(candidate.coverage_level)) return true;
   if (candidate.kind === "question" || candidate.kind === "resurface") return true;
   if (candidate.kind === "analysis" || candidate.kind === "checkup") return true;
   return candidate.kind === "filing" &&
@@ -221,7 +221,7 @@ function isProtectedDecisionCandidate(
 function isGlobalDiscoveryFiling(candidate: PulseRankedCandidate): boolean {
   return candidate.kind === "filing" &&
     !candidate.reviewed_at &&
-    !isActiveCoverage(candidate.coverage_status) &&
+    !isActiveCoverage(candidate.coverage_level) &&
     !candidate.linked_thesis &&
     !hasMonitoringRuleMatch(candidate);
 }
@@ -251,7 +251,7 @@ function getRankScore(
     : candidate.priority === "high" ? 25 : candidate.priority === "normal" ? 15 : 8;
   const userRelevance = Math.min(
     30,
-    coverageScore(candidate.coverage_status)
+    coverageScore(candidate.coverage_level)
       + (candidate.has_recent_research ? 8 : 0)
       + (candidate.saved_at || candidate.is_pinned ? 5 : 0),
   );
@@ -260,22 +260,19 @@ function getRankScore(
   return materiality + userRelevance + actionValue + freshnessScore(candidate.occurred_at, now);
 }
 
-function isActiveCoverage(status: PulseCandidate["coverage_status"]): boolean {
-  return status === "exploring" || status === "watching" || status === "holding";
+function isActiveCoverage(level: PulseCandidate["coverage_level"]): boolean {
+  return level !== null;
 }
 
-function coverageRank(status: PulseCandidate["coverage_status"]): number {
-  if (status === "holding") return 0;
-  if (status === "watching") return 1;
-  if (status === "exploring") return 2;
-  if (status === "closed") return 3;
-  return 4;
+function coverageRank(level: PulseCandidate["coverage_level"]): number {
+  if (level === "holding") return 0;
+  if (level === "interest") return 1;
+  return 2;
 }
 
-function coverageScore(status: PulseCandidate["coverage_status"]): number {
-  if (status === "holding") return 18;
-  if (status === "watching") return 12;
-  if (status === "exploring") return 6;
+function coverageScore(level: PulseCandidate["coverage_level"]): number {
+  if (level === "holding") return 18;
+  if (level === "interest") return 12;
   return 0;
 }
 

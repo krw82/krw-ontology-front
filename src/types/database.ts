@@ -452,7 +452,8 @@ export interface OntologyCompanyRow extends Record<string, unknown> {
 export interface UserCompanyMarkRow extends Record<string, unknown> {
   user_id: string;
   ticker: string;
-  coverage_status: "exploring" | "watching" | "holding" | "closed";
+  coverage_level: "interest" | "holding" | null;
+  coverage_cleared_at: string | null;
   priority: number;
   interest_reason: string | null;
   tags: string[];
@@ -465,8 +466,15 @@ export interface UserCompanyCoverageEventRow extends Record<string, unknown> {
   id: string;
   user_id: string;
   ticker: string;
-  previous_status: UserCompanyMarkRow["coverage_status"] | null;
-  coverage_status: UserCompanyMarkRow["coverage_status"];
+  previous_coverage_level: UserCompanyMarkRow["coverage_level"];
+  coverage_level: UserCompanyMarkRow["coverage_level"];
+  event_type:
+    | "selected"
+    | "level_changed"
+    | "cleared"
+    | "unchanged"
+    | "plan_reconciliation"
+    | "legacy";
   changed: boolean;
   source: string;
   idempotency_key: string;
@@ -1786,8 +1794,8 @@ export interface AnalyticsEventRow extends Record<string, unknown> {
     | "pulse_source_degraded"
     | "pulse_answer_prefilled"
     | "performance_metric_reported"
-    | "coverage_added"
-    | "coverage_status_changed"
+    | "coverage_level_changed"
+    | "coverage_cleared"
     | "coverage_activated"
     | "filing_judgment_started"
     | "filing_judgment_completed"
@@ -2496,7 +2504,8 @@ export interface Database {
         Row: UserCompanyMarkRow;
         Insert: Omit<
           UserCompanyMarkRow,
-          | "coverage_status"
+          | "coverage_level"
+          | "coverage_cleared_at"
           | "priority"
           | "interest_reason"
           | "tags"
@@ -2504,7 +2513,8 @@ export interface Database {
           | "created_at"
           | "updated_at"
         > & {
-          coverage_status?: UserCompanyMarkRow["coverage_status"];
+          coverage_level?: UserCompanyMarkRow["coverage_level"];
+          coverage_cleared_at?: string | null;
           priority?: number;
           interest_reason?: string | null;
           tags?: string[];
@@ -2527,7 +2537,7 @@ export interface Database {
           UserCompanyCoverageEventRow,
           | "user_id"
           | "ticker"
-          | "coverage_status"
+          | "coverage_level"
           | "changed"
           | "source"
           | "idempotency_key"
@@ -2537,7 +2547,8 @@ export interface Database {
           Partial<
             Pick<
               UserCompanyCoverageEventRow,
-              "id" | "previous_status" | "created_at"
+              "id" | "previous_coverage_level" | "created_at"
+              | "event_type"
             >
           >;
         Update: Partial<
@@ -4166,11 +4177,11 @@ export interface Database {
         Args: { p_env: string };
         Returns: number;
       };
-      set_user_company_coverage_status: {
+      set_user_company_coverage_level: {
         Args: {
           p_user_id: string;
           p_ticker: string;
-          p_coverage_status: UserCompanyMarkRow["coverage_status"];
+          p_coverage_level: UserCompanyMarkRow["coverage_level"];
           p_idempotency_key: string;
           p_source?: string;
           p_priority?: number | null;

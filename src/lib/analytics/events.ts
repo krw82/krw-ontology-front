@@ -85,8 +85,8 @@ export const ANALYTICS_EVENT_NAMES = [
   "pulse_source_degraded",
   "pulse_answer_prefilled",
   "performance_metric_reported",
-  "coverage_added",
-  "coverage_status_changed",
+  "coverage_level_changed",
+  "coverage_cleared",
   "coverage_activated",
   "filing_judgment_started",
   "filing_judgment_completed",
@@ -103,8 +103,8 @@ export type AnalyticsEventName = (typeof ANALYTICS_EVENT_NAMES)[number];
 // succeeds. Keeping them off the browser ingestion endpoint prevents clients
 // from fabricating activation and retention cohorts.
 export const SERVER_ONLY_ANALYTICS_EVENT_NAMES = [
-  "coverage_added",
-  "coverage_status_changed",
+  "coverage_level_changed",
+  "coverage_cleared",
   "coverage_activated",
   "filing_judgment_completed",
   "filing_judgment_revised",
@@ -181,8 +181,8 @@ const FORBIDDEN_PROPERTY_KEYS = new Set([
 const eventNameSet = new Set<string>(ANALYTICS_EVENT_NAMES);
 
 export const DECISION_LOOP_ANALYTICS_EVENT_NAMES = [
-  "coverage_added",
-  "coverage_status_changed",
+  "coverage_level_changed",
+  "coverage_cleared",
   "coverage_activated",
   "filing_judgment_started",
   "filing_judgment_completed",
@@ -212,12 +212,12 @@ const DECISION_LOOP_IDENTIFIER_KEYS = new Set([
 ]);
 
 const DECISION_LOOP_CATEGORY_KEYS = new Set([
-  "coverage_status",
+  "coverage_level",
   "form_type",
   "impact",
   "next_action",
   "outcome",
-  "previous_coverage_status",
+  "previous_coverage_level",
   "previous_impact",
   "previous_next_action",
   "previous_status",
@@ -230,15 +230,15 @@ const DECISION_LOOP_CATEGORY_KEYS = new Set([
 ]);
 
 const DECISION_LOOP_CATEGORY_VALUES: Readonly<Record<string, readonly string[]>> = {
-  coverage_status: ["exploring", "watching", "holding", "closed"],
+  coverage_level: ["interest", "holding", "none"],
   form_type: ["8-k", "8-k/a", "6-k", "6-k/a", "4", "4/a"],
   impact: ["positive", "neutral", "negative", "unclear"],
   next_action: ["complete", "update_thesis", "create_question", "review_later"],
   outcome: ["completed", "updated", "unchanged", "dismissed", "deferred", "resolved", "failed"],
-  previous_coverage_status: ["none", "exploring", "watching", "holding", "closed"],
+  previous_coverage_level: ["none", "interest", "holding"],
   previous_impact: ["none", "positive", "neutral", "negative", "unclear"],
   previous_next_action: ["none", "complete", "update_thesis", "create_question", "review_later"],
-  previous_status: ["none", "exploring", "watching", "holding", "closed", "active", "completed", "resolved"],
+  previous_status: ["none", "active", "completed", "resolved"],
   resolution: ["answered", "dismissed", "converted", "reviewed", "deferred", "expired", "resolved"],
   rule_type: ["filing_form", "filing_item", "keyword", "scheduled_review"],
   source: ["pulse", "filing_detail", "watchlist", "companies", "notification", "mcp", "desktop", "api", "system", "onboarding"],

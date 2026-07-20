@@ -22,7 +22,7 @@ import {
 const MARK_AAPL = {
   user_id: "user-1",
   ticker: "AAPL",
-  coverage_status: "holding",
+  coverage_level: "holding",
   priority: 0,
   interest_reason: "서비스 매출과 자사주를 확인 중",
   tags: ["service", "buyback"],
@@ -34,7 +34,7 @@ const MARK_AAPL = {
 const MARK_MSFT = {
   user_id: "user-1",
   ticker: "MSFT",
-  coverage_status: "watching",
+  coverage_level: "interest",
   priority: 0,
   interest_reason: null,
   tags: [],
@@ -428,10 +428,8 @@ describe("watchlist workspace helpers", () => {
     expect(getIndexedCompanies).toHaveBeenCalledWith(["AAPL", "MSFT"]);
     expect(overview.stats).toEqual({
       total: 2,
-      exploring: 0,
-      watching: 1,
+      interest: 1,
       holding: 1,
-      closed: 0,
       open_questions: 2,
       notes: 1,
       recent_activity: 2,
@@ -464,7 +462,7 @@ describe("watchlist workspace helpers", () => {
       research_status: "has_open_questions",
       research_status_reason: "open_questions",
       mark: {
-        coverage_status: "holding",
+        coverage_level: "holding",
         interest_reason: "서비스 매출과 자사주를 확인 중",
       },
     });
@@ -520,7 +518,7 @@ describe("watchlist workspace helpers", () => {
 
     expect(detail?.company.latest_activity_at).toBeNull();
     expect(detail?.company.mark).toMatchObject({
-      coverage_status: "exploring",
+      coverage_level: null,
       last_activity_at: null,
     });
     expect(detail?.company).toMatchObject({

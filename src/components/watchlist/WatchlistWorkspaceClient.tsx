@@ -15,7 +15,7 @@ import {
 } from "@/lib/chat/composer-draft-store";
 import type {
   SessionSummary,
-  UserCompanyCoverageStatus,
+  UserCompanyCoverageLevel,
   UserCompanyMark,
   UserCompanyNotebook,
   UserCompanyNotebookRefreshJob,
@@ -28,7 +28,7 @@ interface WatchlistWorkspaceClientProps {
 }
 
 type ApiPayload = Record<string, unknown> | null;
-type CoverageStatus = UserCompanyCoverageStatus;
+type CoverageLevel = UserCompanyCoverageLevel;
 
 const NOTEBOOK_MAX_LENGTH = 100_000;
 const NOTEBOOK_REFRESH_POLL_MS = 1_500;
@@ -216,14 +216,14 @@ export default function WatchlistWorkspaceClient({
     };
   }, [notebookDraftKey, refreshJobId, ticker]);
 
-  const updateCoverageStatus = (coverageStatus: CoverageStatus) => {
+  const updateCoverageLevel = (coverageLevel: CoverageLevel | null) => {
     setError(null);
     startTransition(() => {
       void (async () => {
         const response = await fetch(`/api/watchlist/${ticker}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ coverage_status: coverageStatus }),
+          body: JSON.stringify({ coverage_level: coverageLevel }),
         });
         const payload = await readPayload(response);
         if (!response.ok) {
@@ -357,16 +357,17 @@ export default function WatchlistWorkspaceClient({
               <span className="material-symbols-outlined text-[18px] text-primary" aria-hidden="true">radar</span>
               <span className="text-[12px] font-bold text-muted">커버리지</span>
               <select
-                value={coverageStatusOf(company.mark)}
+                value={coverageLevelOf(company.mark) ?? ""}
                 disabled={isBusy}
-                onChange={(event) => updateCoverageStatus(event.target.value as CoverageStatus)}
+                onChange={(event) => updateCoverageLevel(
+                  event.target.value === "" ? null : event.target.value as CoverageLevel,
+                )}
                 className="min-h-11 appearance-none bg-transparent pr-6 font-extrabold outline-none disabled:cursor-wait"
-                aria-label="커버리지 상태"
+                aria-label="커버리지 수준"
               >
-                <option value="exploring">탐색 중</option>
-                <option value="watching">관찰 중</option>
+                <option value="">미선택</option>
+                <option value="interest">관심</option>
                 <option value="holding">보유 중</option>
-                <option value="closed">종료</option>
               </select>
               <span className="pointer-events-none absolute right-2 material-symbols-outlined text-[17px] text-muted" aria-hidden="true">expand_more</span>
             </label>
@@ -622,8 +623,8 @@ function touchNotebookActivity(
   };
 }
 
-function coverageStatusOf(mark: UserCompanyMark): CoverageStatus {
-  return mark.coverage_status;
+function coverageLevelOf(mark: UserCompanyMark): CoverageLevel | null {
+  return mark.coverage_level;
 }
 
 function buildEmptyNotebookContent(): string {

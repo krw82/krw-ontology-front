@@ -9,7 +9,7 @@ import { localeSwitchHref, resolveRouteLocale } from "@/i18n/routing";
 import type {
   ResearchInboxItem,
   SessionSummary,
-  UserCompanyCoverageStatus,
+  UserCompanyCoverageLevel,
   WatchlistCompanySummary,
   WatchlistOverviewResponse,
 } from "@/types/api-contracts";
@@ -97,13 +97,11 @@ export default function WatchlistHomeClient({
   const companySections = useMemo(() => {
     return [
       { key: "holding", title: "보유 중" },
-      { key: "watching", title: "관찰 중" },
-      { key: "exploring", title: "탐색 중" },
-      { key: "closed", title: "종료" },
+      { key: "interest", title: "관심" },
     ].map((section) => ({
       ...section,
       companies: filteredCompanies.filter(
-        (company) => coverageStatusOf(company) === section.key,
+        (company) => coverageLevelOf(company) === section.key,
       ),
     }));
   }, [filteredCompanies]);
@@ -700,10 +698,10 @@ function EmptyWatchlist() {
   );
 }
 
-type CoverageStatus = UserCompanyCoverageStatus;
+type CoverageLevel = UserCompanyCoverageLevel;
 
-function coverageStatusOf(company: WatchlistCompanySummary): CoverageStatus {
-  return company.mark.coverage_status;
+function coverageLevelOf(company: WatchlistCompanySummary): CoverageLevel | null {
+  return company.mark.coverage_level;
 }
 
 function formatDate(value: string | null): string {

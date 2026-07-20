@@ -23,7 +23,7 @@ function candidate(
     source_type: kind,
     source_id: itemKey,
     ticker: "AAPL",
-    coverage_status: null,
+    coverage_level: null,
     judgment: null,
     linked_thesis: null,
     eyebrow: "공시",
@@ -94,23 +94,23 @@ describe("pulse lane ranking", () => {
     const ranked = rankPulseCandidates([
       candidate("filing:holding", {
         ticker: "AAPL",
-        coverage_status: "holding",
+        coverage_level: "holding",
         priority: "normal",
         has_recent_research: true,
       }),
       candidate("filing:watchlisted", {
         ticker: "NVDA",
-        coverage_status: "watching",
+        coverage_level: "interest",
         has_recent_research: true,
       }),
-      candidate("filing:ordinary", { ticker: "MSFT", coverage_status: "exploring", priority: "high" }),
-      candidate("filing:plain", { ticker: "GOOG", coverage_status: "exploring" }),
+      candidate("filing:ordinary", { ticker: "MSFT", coverage_level: "interest", priority: "high" }),
+      candidate("filing:plain", { ticker: "GOOG", coverage_level: "interest" }),
     ], now);
 
     expect(ranked.map((item) => item.item_key)).toEqual([
       "filing:holding",
-      "filing:watchlisted",
       "filing:ordinary",
+      "filing:watchlisted",
       "filing:plain",
     ]);
     expect(ranked[0].rank_score).toBeGreaterThan(ranked[1].rank_score);
@@ -139,7 +139,7 @@ describe("pulse lane ranking", () => {
       ),
       candidate("filing:holding", {
         ticker: "AAPL",
-        coverage_status: "holding",
+        coverage_level: "holding",
       }),
       candidate("question:open", {
         kind: "question",

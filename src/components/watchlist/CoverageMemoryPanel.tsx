@@ -407,13 +407,14 @@ function EmptyMemory({ text }: { text: string }) {
 function TimelineRow({ item }: { item: CompanyCoverageTimelineItem }) {
   const date = formatDateTime(item.occurred_at);
   if (item.type === "coverage_change") {
-    return <li className="border-l-2 border-hairline pl-3"><p className="text-[12px] font-black text-ink">커버리지 · {coverageStatusLabel(item.coverage_status)}</p><p className="mt-1 text-[11px] text-muted">{date}</p></li>;
+    return <li className="border-l-2 border-hairline pl-3"><p className="text-[12px] font-black text-ink">커버리지 · {coverageLevelLabel(item.coverage_level)}</p><p className="mt-1 text-[11px] text-muted">{date}</p></li>;
   }
   return <li className="border-l-2 border-primary pl-3"><Link href={`/filings/${encodeURIComponent(item.filing_event_id)}`} className="text-[12px] font-black leading-5 text-ink hover:text-primary">{item.summary}</Link><p className="mt-1 text-[11px] text-muted">{impactLabel(item.impact)} · {date}</p></li>;
 }
 
-function coverageStatusLabel(status: string) {
-  return ({ exploring: "탐색", watching: "관찰", holding: "보유", closed: "종료" } as Record<string, string>)[status] ?? status;
+function coverageLevelLabel(level: string | null) {
+  if (level === null) return "해제";
+  return ({ interest: "관심", holding: "보유" } as Record<string, string>)[level] ?? level;
 }
 
 function impactLabel(impact: string) {

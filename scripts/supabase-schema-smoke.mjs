@@ -346,12 +346,12 @@ const checks = [
   {
     table: "user_company_marks",
     select:
-      "user_id,ticker,coverage_status,priority,interest_reason,tags,last_activity_at,created_at,updated_at",
+      "user_id,ticker,coverage_level,coverage_cleared_at,priority,interest_reason,tags,last_activity_at,created_at,updated_at",
   },
   {
     table: "user_company_coverage_events",
     select:
-      "id,user_id,ticker,previous_status,coverage_status,changed,source,idempotency_key,created_at",
+      "id,user_id,ticker,previous_coverage_level,coverage_level,event_type,changed,source,idempotency_key,created_at",
   },
   {
     table: "user_filing_judgments",
@@ -657,7 +657,7 @@ async function runCoverageAndJudgmentWriteSmoke() {
     const coverageArgs = {
       p_user_id: userId,
       p_ticker: coverageTicker,
-      p_coverage_status: "exploring",
+      p_coverage_level: "interest",
       p_idempotency_key: `schema-smoke-coverage-${suffix}`,
       p_source: "schema_smoke",
       p_priority: 0,
@@ -666,32 +666,32 @@ async function runCoverageAndJudgmentWriteSmoke() {
       p_active_limit: null,
     };
     const { data: coverageResult, error: coverageError } = await supabase.rpc(
-      "set_user_company_coverage_status",
+      "set_user_company_coverage_level",
       coverageArgs,
     );
     if (
       coverageError ||
-      coverageResult?.coverage_status !== "exploring" ||
+      coverageResult?.coverage_level !== "interest" ||
       coverageResult?.idempotent_replay !== false
     ) {
       throw new Error(
-        `set_user_company_coverage_status service-role write failed: ${coverageError?.message ?? JSON.stringify(coverageResult)}`,
+        `set_user_company_coverage_level service-role write failed: ${coverageError?.message ?? JSON.stringify(coverageResult)}`,
       );
     }
     console.log(
-      "OK schema: set_user_company_coverage_status service-role write",
+      "OK schema: set_user_company_coverage_level service-role write",
     );
 
     for (const [index, ticker] of ["SMOKEAAA", "SMOKEBBB"].entries()) {
       const { data: extraCoverage, error: extraCoverageError } =
-        await supabase.rpc("set_user_company_coverage_status", {
+        await supabase.rpc("set_user_company_coverage_level", {
           ...coverageArgs,
           p_ticker: ticker,
           p_idempotency_key: `schema-smoke-coverage-${index + 2}-${suffix}`,
         });
       if (
         extraCoverageError ||
-        extraCoverage?.coverage_status !== "exploring"
+        extraCoverage?.coverage_level !== "interest"
       ) {
         throw new Error(
           `coverage activation setup failed for ${ticker}: ${extraCoverageError?.message ?? JSON.stringify(extraCoverage)}`,
@@ -797,36 +797,37 @@ async function runCoverageAndJudgmentWriteSmoke() {
       );
     }
 
-    // Closing a coverage deliberately disables its monitoring rules. Exercise
-    // the closed/reopened negative path with an auxiliary mark so the primary
+    // Clearing coverage deliberately disables its monitoring rules. Exercise
+    // the cleared/reselected negative path with an auxiliary mark so the primary
     // judgment rule remains the coherent loop under test.
     const activationLimitProbeArgs = {
       ...coverageArgs,
       p_ticker: "SMOKEAAA",
     };
-    const { error: closeCoverageError } = await supabase.rpc(
-      "set_user_company_coverage_status",
+    const { error: clearCoverageError } = await supabase.rpc(
+      "set_user_company_coverage_level",
       {
         ...activationLimitProbeArgs,
-        p_coverage_status: "closed",
-        p_idempotency_key: `schema-smoke-coverage-close-${suffix}`,
+        p_coverage_level: null,
+        p_idempotency_key: `schema-smoke-coverage-clear-${suffix}`,
       },
     );
-    if (closeCoverageError) {
-      throw new Error(`coverage close setup failed: ${closeCoverageError.message}`);
+    if (clearCoverageError) {
+      throw new Error(`coverage clear setup failed: ${clearCoverageError.message}`);
     }
-    await expectActivation(false, "closed coverage negative check");
+    await expectActivation(false, "cleared coverage negative check");
 
-    const { error: reopenCoverageError } = await supabase.rpc(
-      "set_user_company_coverage_status",
+    const { error: reselectCoverageError } = await supabase.rpc(
+      "set_user_company_coverage_level",
       {
         ...activationLimitProbeArgs,
-        p_idempotency_key: `schema-smoke-coverage-reopen-${suffix}`,
+        p_coverage_level: "interest",
+        p_idempotency_key: `schema-smoke-coverage-reselect-${suffix}`,
       },
     );
-    if (reopenCoverageError) {
+    if (reselectCoverageError) {
       throw new Error(
-        `coverage reopen setup failed: ${reopenCoverageError.message}`,
+        `coverage reselect setup failed: ${reselectCoverageError.message}`,
       );
     }
     await expectActivation(true, "coherent coverage loop positive check");
@@ -866,7 +867,7 @@ async function runCoverageAndJudgmentWriteSmoke() {
     await assertRpcBlocked(
       anonSupabase,
       "anon",
-      "set_user_company_coverage_status",
+      "set_user_company_coverage_level",
       {
         ...coverageArgs,
         p_idempotency_key: `${coverageArgs.p_idempotency_key}-anon`,
@@ -875,7 +876,7 @@ async function runCoverageAndJudgmentWriteSmoke() {
     await assertRpcBlocked(
       authenticatedSupabase,
       "authenticated",
-      "set_user_company_coverage_status",
+      "set_user_company_coverage_level",
       {
         ...coverageArgs,
         p_idempotency_key: `${coverageArgs.p_idempotency_key}-auth`,

@@ -11,7 +11,7 @@ function candidate(kind: PulseCandidate["kind"], key: string, overrides: Partial
     source_type: kind,
     source_id: key,
     ticker: kind === "learning" ? null : "AAPL",
-    coverage_status: kind === "learning" ? null : "watching",
+    coverage_level: kind === "learning" ? null : "interest",
     judgment: null,
     linked_thesis: null,
     eyebrow: "항목",

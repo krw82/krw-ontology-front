@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       .from("user_company_marks")
       .select("ticker", { count: "exact", head: true })
       .eq("user_id", user.id)
-      .in("coverage_status", ["exploring", "watching", "holding"]),
+      .not("coverage_level", "is", null),
     admin
       .from("user_filing_judgments")
       .select("id", { count: "exact", head: true })

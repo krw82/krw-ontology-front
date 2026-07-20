@@ -8,7 +8,7 @@ const validItem = {
   source_type: "filing",
   source_id: "notification-id",
   ticker: "AAPL",
-  coverage_status: "holding",
+  coverage_level: "holding",
   judgment: null,
   linked_thesis: null,
   eyebrow: "8-K 새 공시",

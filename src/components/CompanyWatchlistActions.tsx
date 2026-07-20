@@ -9,16 +9,16 @@ import CompanyFilingSubscriptionControl from "@/components/filings/CompanyFiling
 import { signalPwaInstallEngagement } from "@/components/pwa/lifecycle";
 import type { Locale } from "@/i18n/config";
 import type { CoverageOnboardingFiling } from "@/lib/onboarding/coverage-flow";
-import type { UserCompanyCoverageStatus } from "@/types/api-contracts";
+import type { UserCompanyCoverageLevel } from "@/types/api-contracts";
 
-type CoverageStatus = UserCompanyCoverageStatus;
+type CoverageLevel = UserCompanyCoverageLevel;
 
 type CompanyWatchlistActionsProps = {
   ticker: string;
   isAuthenticated: boolean;
   loginHref: string;
   destinationHref: string;
-  initialCoverageStatus?: CoverageStatus | null;
+  initialCoverageLevel?: CoverageLevel | null;
   labels: {
     watchlist: string;
     holding: string;
@@ -41,14 +41,14 @@ export default function CompanyWatchlistActions({
   isAuthenticated,
   loginHref,
   destinationHref,
-  initialCoverageStatus,
+  initialCoverageLevel,
   labels,
   analyticsProperties,
   onboarding = null,
 }: CompanyWatchlistActionsProps) {
   const [pending, setPending] = useState(false);
-  const [coverageStatus, setCoverageStatus] = useState<CoverageStatus | null>(
-    initialCoverageStatus ?? null,
+  const [coverageLevel, setCoverageLevel] = useState<CoverageLevel | null>(
+    initialCoverageLevel ?? null,
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -63,17 +63,17 @@ export default function CompanyWatchlistActions({
     );
   }
 
-  const saveCoverageStatus = async (nextStatus: CoverageStatus) => {
+  const saveCoverageLevel = async (nextLevel: CoverageLevel | null) => {
     setPending(true);
     setError(null);
 
     try {
-      const response = await fetch("/api/watchlist", {
-        method: "POST",
+      const response = await fetch(`/api/watchlist/${encodeURIComponent(ticker)}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ticker,
-          coverage_status: nextStatus,
+          coverage_level: nextLevel,
         }),
       });
 
@@ -82,25 +82,25 @@ export default function CompanyWatchlistActions({
       }
 
       void trackClientEventWithTimeout("cta_clicked", {
-        cta_id: "company_coverage_status_changed",
-        cta_label: coverageStatusLabel(nextStatus),
+        cta_id: "company_coverage_level_changed",
+        cta_label: coverageLevelLabel(nextLevel),
         surface: "company_hero",
         ticker,
-        coverage_status: nextStatus,
+        coverage_level: nextLevel ?? "none",
         destination: destinationHref,
         ...analyticsProperties,
       });
-      if (coverageStatus === null && nextStatus !== "closed") {
+      if (coverageLevel === null && nextLevel !== null) {
         void trackClientEventWithTimeout("company_followed", {
           ticker,
           surface: "company_hero",
         });
       }
-      if (nextStatus !== "closed") {
+      if (nextLevel !== null) {
         signalPwaInstallEngagement("watch_added", "company_hero");
       }
 
-      setCoverageStatus(nextStatus);
+      setCoverageLevel(nextLevel);
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : labels.error);
     } finally {
@@ -113,35 +113,27 @@ export default function CompanyWatchlistActions({
       {onboarding ? (
         <CoverageOnboardingBanner
           ticker={ticker}
-          coverageStatus={coverageStatus}
+          coverageLevel={coverageLevel}
           locale={onboarding.locale}
           latestImportantFiling={onboarding.latestImportantFiling}
           memoryHref={onboarding.memoryHref}
           continuePath={onboarding.continuePath}
         />
       ) : null}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <label className="relative inline-flex min-h-12 items-center gap-2 rounded-[8px] border border-hairline bg-canvas px-4 text-[14px] font-extrabold text-ink transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
-          <span className="material-symbols-outlined text-[18px] text-primary" aria-hidden="true">radar</span>
-          <span className="sr-only">커버리지 상태</span>
-          <select
-            value={coverageStatus ?? ""}
-            disabled={pending}
-            onChange={(event) => {
-              const nextStatus = event.target.value as CoverageStatus;
-              if (nextStatus) void saveCoverageStatus(nextStatus);
-            }}
-            className="min-h-11 appearance-none bg-transparent pr-7 text-inherit outline-none disabled:cursor-wait"
-            aria-label="커버리지 상태"
-          >
-            <option value="" disabled>{pending ? labels.saving : "커버리지에 추가"}</option>
-            <option value="exploring">탐색 중</option>
-            <option value="watching">관찰 중</option>
-            <option value="holding">보유 중</option>
-            <option value="closed">커버리지 종료</option>
-          </select>
-          <span className="pointer-events-none absolute right-3 material-symbols-outlined text-[18px] text-muted" aria-hidden="true">expand_more</span>
-        </label>
+      <div className="flex flex-wrap gap-2 sm:items-center" role="group" aria-label="커버리지 수준">
+        <button type="button" disabled={pending} onClick={() => void saveCoverageLevel("interest")} className={actionClassName(false, coverageLevel === "interest")}>
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">radar</span>
+          {labels.watchlist}
+        </button>
+        <button type="button" disabled={pending} onClick={() => void saveCoverageLevel("holding")} className={actionClassName(false, coverageLevel === "holding")}>
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">account_balance_wallet</span>
+          {labels.holding}
+        </button>
+        {coverageLevel !== null ? (
+          <button type="button" disabled={pending} onClick={() => void saveCoverageLevel(null)} className="inline-flex min-h-12 items-center rounded-[8px] px-3 py-3 text-[13px] font-extrabold text-muted transition-colors hover:text-error disabled:cursor-not-allowed disabled:opacity-60">
+            커버리지 해제
+          </button>
+        ) : null}
       </div>
       <CompanyFilingSubscriptionControl ticker={ticker} loginHref={loginHref} isAuthenticated />
       {error ? (
@@ -155,21 +147,21 @@ export default function CompanyWatchlistActions({
 
 function CoverageOnboardingBanner({
   ticker,
-  coverageStatus,
+  coverageLevel,
   locale,
   latestImportantFiling,
   memoryHref,
   continuePath,
 }: {
   ticker: string;
-  coverageStatus: CoverageStatus | null;
+  coverageLevel: CoverageLevel | null;
   locale: Locale;
   latestImportantFiling: CoverageOnboardingFiling | null;
   memoryHref: string;
   continuePath: string | null;
 }) {
   const hasActiveCoverage = Boolean(
-    coverageStatus && coverageStatus !== "closed",
+    coverageLevel !== null,
   );
   const filingHref = latestImportantFiling
       ? `/filings/${encodeURIComponent(latestImportantFiling.id)}?${new URLSearchParams({
@@ -185,7 +177,7 @@ function CoverageOnboardingBanner({
         eyebrow: "첫 판단 준비 · 1/3",
         pendingTitle: "이 회사를 어떤 상태로 볼까요?",
         pendingDescription:
-          "탐색·관찰·보유 중 하나를 고르면, 이 회사에서 먼저 확인할 실제 근거로 이어집니다.",
+          "관심 또는 보유 중 하나를 고르면, 이 회사에서 먼저 확인할 실제 근거로 이어집니다.",
         savedTitle: `${ticker} 커버리지 상태를 저장했습니다`,
         filingDescription: latestImportantFiling
           ? `${formatOnboardingDate(latestImportantFiling.filing_date, locale)} ${latestImportantFiling.form_type} · ${latestImportantFiling.label}`
@@ -197,7 +189,7 @@ function CoverageOnboardingBanner({
         eyebrow: "First judgment · 1 of 3",
         pendingTitle: "How are you following this company?",
         pendingDescription:
-          "Choose Exploring, Watching, or Holding, then continue to the first real piece of evidence.",
+          "Choose Interest or Holding, then continue to the first real piece of evidence.",
         savedTitle: `${ticker} coverage status saved`,
         filingDescription: latestImportantFiling
           ? `${formatOnboardingDate(latestImportantFiling.filing_date, locale)} ${latestImportantFiling.form_type} · ${latestImportantFiling.label}`
@@ -293,11 +285,10 @@ function actionClassName(emphasis: boolean, selected = false) {
   );
 }
 
-function coverageStatusLabel(status: CoverageStatus): string {
-  if (status === "exploring") return "탐색 중";
-  if (status === "watching") return "관찰 중";
-  if (status === "holding") return "보유 중";
-  return "커버리지 종료";
+function coverageLevelLabel(level: CoverageLevel | null): string {
+  if (level === "interest") return "관심";
+  if (level === "holding") return "보유 중";
+  return "커버리지 해제";
 }
 
 async function readErrorMessage(response: Response): Promise<string | null> {

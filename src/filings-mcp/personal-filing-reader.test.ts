@@ -68,7 +68,7 @@ beforeEach(() => {
 describe("personal filing reader user boundary", () => {
   it("scopes coverage, monitoring rules, and question count to one user and ticker", async () => {
     database.responses.set("user_company_marks", {
-      data: { ticker: "AAPL", coverage_status: "holding" },
+      data: { ticker: "AAPL", coverage_level: "holding" },
       error: null,
     });
     database.responses.set("user_company_monitoring_rules", {
@@ -193,7 +193,7 @@ describe("personal filing reader user boundary", () => {
     database.responses.set("user_company_marks", {
       data: {
         ticker: "AAPL",
-        coverage_status: "holding",
+        coverage_level: "holding",
         interest_reason: "관심 이유".repeat(300),
         tags: ["x".repeat(100)],
       },

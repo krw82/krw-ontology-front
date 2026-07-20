@@ -7,7 +7,7 @@ import {
 const mark = {
   user_id: "secret-user-id",
   ticker: "AAPL",
-  coverage_status: "watching" as const,
+  coverage_level: "interest" as const,
   priority: 1,
   interest_reason: "Services",
   tags: ["quality"],
@@ -66,10 +66,8 @@ describe("Desktop notebook DTO", () => {
       ],
       stats: {
         total: 1,
-        exploring: 0,
-        watching: 1,
+        interest: 1,
         holding: 0,
-        closed: 0,
         open_questions: 1,
         notes: 1,
         recent_activity: 1,

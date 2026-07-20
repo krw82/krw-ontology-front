@@ -41,7 +41,7 @@ const THESIS_CHECK_POINT_LIMIT = 6;
 type CoverageView = Pick<
   UserCompanyMarkRow,
   | "ticker"
-  | "coverage_status"
+  | "coverage_level"
   | "priority"
   | "interest_reason"
   | "tags"
@@ -157,7 +157,7 @@ export async function getCoverageState(
   const [coverageResult, rulesResult, questionsResult, thesesResult] = await Promise.all([
     admin
       .from("user_company_marks")
-      .select("ticker, coverage_status, priority, interest_reason, tags, last_activity_at, created_at, updated_at")
+      .select("ticker, coverage_level, priority, interest_reason, tags, last_activity_at, created_at, updated_at")
       .eq("user_id", userId)
       .eq("ticker", ticker)
       .maybeSingle<CoverageView>(),

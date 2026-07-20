@@ -30,7 +30,7 @@ export async function listCompanyCoverageTimeline(input: {
 
   let coverageQuery = admin
     .from("user_company_coverage_events")
-    .select("id,user_id,ticker,previous_status,coverage_status,changed,source,idempotency_key,created_at")
+    .select("id,user_id,ticker,previous_coverage_level,coverage_level,changed,source,idempotency_key,created_at")
     .eq("user_id", input.userId)
     .eq("ticker", ticker)
     .order("created_at", { ascending: false })
@@ -62,8 +62,8 @@ export async function listCompanyCoverageTimeline(input: {
       type: "coverage_change" as const,
       id: row.id,
       occurred_at: row.created_at,
-      previous_status: row.previous_status,
-      coverage_status: row.coverage_status,
+      previous_coverage_level: row.previous_coverage_level,
+      coverage_level: row.coverage_level,
       changed: row.changed,
       source: row.source,
     })),

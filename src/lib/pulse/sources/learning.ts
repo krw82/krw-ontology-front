@@ -17,7 +17,7 @@ export function buildLearningCandidates(now: Date): PulseCandidate[] {
       source_type: "learning",
       source_id: entry.slug,
       ticker: null,
-      coverage_status: null,
+      coverage_level: null,
       judgment: null,
       linked_thesis: null,
       eyebrow: entry.kind === "checklist" ? "이번 주 체크리스트" : "3분 공시 습관",

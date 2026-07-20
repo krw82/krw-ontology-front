@@ -257,11 +257,7 @@ export type UserCompanyQuestionSource =
   | "saved_from_chat";
 export type UserCompanyThesisStatus =
   "active" | "needs_review" | "weakened" | "mixed" | "archived";
-export type UserCompanyCoverageStatus =
-  | "exploring"
-  | "watching"
-  | "holding"
-  | "closed";
+export type UserCompanyCoverageLevel = "interest" | "holding";
 export type FilingJudgmentImpact =
   | "positive"
   | "neutral"
@@ -296,7 +292,7 @@ export type UserResearchNoteType =
 export interface UserCompanyMark {
   user_id: string;
   ticker: string;
-  coverage_status: UserCompanyCoverageStatus;
+  coverage_level: UserCompanyCoverageLevel | null;
   priority: number;
   interest_reason: string | null;
   tags: string[];
@@ -309,8 +305,8 @@ export interface UserCompanyCoverageEvent {
   id: string;
   user_id: string;
   ticker: string;
-  previous_status: UserCompanyCoverageStatus | null;
-  coverage_status: UserCompanyCoverageStatus;
+  previous_coverage_level: UserCompanyCoverageLevel | null;
+  coverage_level: UserCompanyCoverageLevel | null;
   changed: boolean;
   source: string;
   idempotency_key: string;
@@ -366,8 +362,8 @@ export type CompanyCoverageTimelineItem =
       type: "coverage_change";
       id: string;
       occurred_at: string;
-      previous_status: UserCompanyCoverageStatus | null;
-      coverage_status: UserCompanyCoverageStatus;
+      previous_coverage_level: UserCompanyCoverageLevel | null;
+      coverage_level: UserCompanyCoverageLevel | null;
       changed: boolean;
       source: string;
     }
@@ -559,10 +555,8 @@ export interface WatchlistOverviewResponse {
   research_inbox: ResearchInboxItem[];
   stats: {
     total: number;
-    exploring: number;
-    watching: number;
+    interest: number;
     holding: number;
-    closed: number;
     open_questions: number;
     notes: number;
     recent_activity: number;
@@ -1831,7 +1825,7 @@ export interface PulseItemBase<K extends PulseItemKind> {
   source_type: K;
   source_id: string;
   ticker: string | null;
-  coverage_status: UserCompanyCoverageStatus | null;
+  coverage_level: UserCompanyCoverageLevel | null;
   judgment: UserFilingJudgmentSummary | null;
   linked_thesis: PulseLinkedThesis | null;
   eyebrow: string;

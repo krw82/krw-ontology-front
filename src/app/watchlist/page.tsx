@@ -20,10 +20,8 @@ const EMPTY_OVERVIEW: WatchlistOverviewResponse = {
   research_inbox: [],
   stats: {
     total: 0,
-    exploring: 0,
-    watching: 0,
+    interest: 0,
     holding: 0,
-    closed: 0,
     open_questions: 0,
     notes: 0,
     recent_activity: 0,

@@ -16,7 +16,6 @@ import {
 } from "@/lib/filing-notifications/request";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
-  ensureCompanyCoverageForWrite,
   errorResponse,
   requireIndexedTicker,
 } from "@/lib/watchlist/api";
@@ -140,14 +139,6 @@ export async function POST(
       "노트북에 반영할 완료된 최근 대화가 없습니다.",
     );
   }
-
-  const coverageError = await ensureCompanyCoverageForWrite({
-    userId: user.id,
-    userEmail: user.email,
-    ticker: tickerResult.ticker,
-    source: "notebook_refreshed",
-  });
-  if (coverageError) return coverageError;
 
   const creditRequestId = randomUUID();
   const budgetResult = await reserveBudgetStep(

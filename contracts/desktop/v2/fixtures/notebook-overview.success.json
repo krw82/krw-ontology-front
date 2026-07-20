@@ -4,10 +4,8 @@
   "data": {
     "stats": {
       "total_companies": 1,
-      "exploring": 0,
-      "watching": 1,
+      "interest": 1,
       "holdings": 0,
-      "closed": 0,
       "open_questions": 1,
       "notes": 1,
       "recent_activity": 1
@@ -35,7 +33,7 @@
         "notebook_updated_at": "2026-06-23T00:00:00.000Z",
         "notebook_age_days": 0,
         "mark": {
-          "coverage_status": "watching",
+          "coverage_level": "interest",
           "priority": 1,
           "interest_reason": "서비스 성장",
           "tags": ["품질"],

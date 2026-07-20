@@ -82,7 +82,7 @@ export function buildDueMonitoringCandidates(
       source_type: "resurface" as const,
       source_id: `monitoring:${rule.id}`,
       ticker: normalize(rule.ticker),
-      coverage_status: null,
+      coverage_level: null,
       judgment: null,
       linked_thesis: null,
       eyebrow: "판단 다시 보기",

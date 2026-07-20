@@ -2,17 +2,17 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PulseCandidate } from "@/lib/pulse/contract";
-import type { UserCompanyCoverageStatus } from "@/types/api-contracts";
+import type { UserCompanyCoverageLevel } from "@/types/api-contracts";
 import type { ChatSessionRow, Database, UserCompanyMarkRow } from "@/types/database";
 
-type CompanyMark = Pick<UserCompanyMarkRow, "ticker" | "coverage_status">;
+type CompanyMark = Pick<UserCompanyMarkRow, "ticker" | "coverage_level">;
 type RecentCompanySession = Pick<ChatSessionRow, "default_tickers">;
 
 const RECENT_RESEARCH_WINDOW_MS = 30 * 24 * 60 * 60 * 1_000;
 const MAX_PREFERRED_TICKERS = 100;
 
 export interface PulseUserTickerSignals {
-  coverageByTicker: Map<string, UserCompanyCoverageStatus>;
+  coverageByTicker: Map<string, UserCompanyCoverageLevel>;
   recentResearchTickers: Set<string>;
   preferredTickers: string[];
 }
@@ -26,7 +26,7 @@ export async function getPulseUserTickerSignals(
   const [marksResult, sessionsResult] = await Promise.all([
     supabase
       .from("user_company_marks")
-      .select("ticker,coverage_status")
+      .select("ticker,coverage_level")
       .eq("user_id", userId)
       .limit(MAX_PREFERRED_TICKERS)
       .returns<CompanyMark[]>(),
@@ -44,12 +44,12 @@ export async function getPulseUserTickerSignals(
   if (marksResult.error) throw marksResult.error;
   if (sessionsResult.error) throw sessionsResult.error;
 
-  const coverageByTicker = new Map<string, UserCompanyCoverageStatus>();
+  const coverageByTicker = new Map<string, UserCompanyCoverageLevel>();
   const recentResearchTickers = new Set<string>();
   for (const mark of marksResult.data ?? []) {
     const ticker = normalizeTicker(mark.ticker);
     if (!ticker) continue;
-    coverageByTicker.set(ticker, mark.coverage_status);
+    if (mark.coverage_level) coverageByTicker.set(ticker, mark.coverage_level);
   }
   for (const session of sessionsResult.data ?? []) {
     for (const rawTicker of session.default_tickers ?? []) {
@@ -63,7 +63,6 @@ export async function getPulseUserTickerSignals(
     recentResearchTickers,
     preferredTickers: [...new Set([
       ...[...coverageByTicker.entries()]
-        .filter(([, status]) => status !== "closed")
         .sort((left, right) => coveragePriority(left[1]) - coveragePriority(right[1]))
         .map(([ticker]) => ticker),
       ...recentResearchTickers,
@@ -113,38 +112,26 @@ export function emptyPulseUserTickerSignals(): PulseUserTickerSignals {
 function filingReason(
   candidate: PulseCandidate,
   ticker: string | null,
-  coverageStatus: UserCompanyCoverageStatus | null,
+  coverageLevel: UserCompanyCoverageLevel | null,
   hasRecentResearch: boolean,
 ): Pick<PulseCandidate, "reason_code" | "reason_label"> | null {
   if (candidate.kind !== "filing" || !ticker) return null;
-  if (coverageStatus === "holding" && hasRecentResearch) {
+  if (coverageLevel === "holding" && hasRecentResearch) {
     return {
       reason_code: "holding_research_followup",
       reason_label: `${ticker}은 보유 기업이며 최근 이 기업을 리서치했습니다.`,
     };
   }
-  if (coverageStatus === "holding") {
+  if (coverageLevel === "holding") {
     return {
       reason_code: "holding_new_filing",
       reason_label: `${ticker}은 보유 기업입니다.`,
     };
   }
-  if (coverageStatus === "watching") {
+  if (coverageLevel === "interest") {
     return {
       reason_code: "watchlisted_new_filing",
       reason_label: `${ticker}을 관심 기업으로 저장했습니다.`,
-    };
-  }
-  if (coverageStatus === "exploring") {
-    return {
-      reason_code: "exploring_company_filing",
-      reason_label: `${ticker}을 탐색 중이며 새 근거가 생겼습니다.`,
-    };
-  }
-  if (coverageStatus === "closed") {
-    return {
-      reason_code: "closed_coverage_followup",
-      reason_label: `${ticker}의 종료된 판단 기록과 비교할 수 있습니다.`,
     };
   }
   if (hasRecentResearch) {
@@ -167,7 +154,7 @@ function personalizeCandidate(
     ?? selectCoverageTicker(identities, signals.coverageByTicker)
     ?? identities.find((identity) => signals.recentResearchTickers.has(identity))
     ?? canonicalTicker;
-  const coverageStatus = ticker ? signals.coverageByTicker.get(ticker) ?? null : null;
+  const coverageLevel = ticker ? signals.coverageByTicker.get(ticker) ?? null : null;
   const hasRecentResearch = identities.some((identity) =>
     signals.recentResearchTickers.has(identity));
   const contextualized = candidate.kind === "filing" && ticker
@@ -176,13 +163,13 @@ function personalizeCandidate(
   const personalizedReason = filingReason(
     contextualized,
     ticker,
-    coverageStatus,
+    coverageLevel,
     hasRecentResearch,
   );
 
   return {
     ...contextualized,
-    coverage_status: coverageStatus,
+    coverage_level: coverageLevel,
     has_recent_research: hasRecentResearch,
     ...(personalizedReason ?? {}),
   };
@@ -190,7 +177,7 @@ function personalizeCandidate(
 
 function selectCoverageTicker(
   identities: string[],
-  coverageByTicker: Map<string, UserCompanyCoverageStatus>,
+  coverageByTicker: Map<string, UserCompanyCoverageLevel>,
 ): string | null {
   let selected: { ticker: string; rank: number } | null = null;
   for (const ticker of identities) {
@@ -242,11 +229,9 @@ function rewriteTickerAction(
   };
 }
 
-function coveragePriority(status: UserCompanyCoverageStatus): number {
+function coveragePriority(status: UserCompanyCoverageLevel): number {
   if (status === "holding") return 0;
-  if (status === "watching") return 1;
-  if (status === "exploring") return 2;
-  return 3;
+  return 1;
 }
 
 function normalizeTicker(value: string | null | undefined): string | null {

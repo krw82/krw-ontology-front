@@ -46,7 +46,7 @@ describe("PATCH /api/desktop/notebook/companies/:ticker/mark", () => {
             "content-type": "application/json",
             "if-match": '"version-1"',
           },
-          body: JSON.stringify({ coverage_status: "watching" }),
+          body: JSON.stringify({ coverage_level: "interest" }),
         },
       ),
       { params: Promise.resolve({ ticker: "AAPL" }) },
@@ -58,7 +58,7 @@ describe("PATCH /api/desktop/notebook/companies/:ticker/mark", () => {
       userEmail: null,
       ticker: "AAPL",
       expectedVersion: '"version-1"',
-      body: { coverage_status: "watching" },
+      body: { coverage_level: "interest" },
     });
   });
 });

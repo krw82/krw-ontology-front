@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 
 import { normalizeTicker } from "@/lib/ontology/ticker";
 import type {
-  UserCompanyCoverageStatus,
+  UserCompanyCoverageLevel,
   UserCompanyNotebook,
   UserCompanyMark,
 } from "@/types/api-contracts";
 
-type CoverageStatus = UserCompanyCoverageStatus;
+type CoverageLevel = UserCompanyCoverageLevel;
 
 export interface ChatWatchlistHeaderActionsProps {
   ticker: string;
@@ -103,7 +103,7 @@ export default function ChatWatchlistHeaderActions({
 
   if (!normalizedTicker) return null;
 
-  async function saveCoverageStatus(coverageStatus: CoverageStatus) {
+  async function saveCoverageLevel(coverageLevel: CoverageLevel | null) {
     if (!normalizedTicker || pending) return;
 
     setPending(true);
@@ -113,7 +113,7 @@ export default function ChatWatchlistHeaderActions({
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ coverage_status: coverageStatus }),
+          body: JSON.stringify({ coverage_level: coverageLevel }),
         },
       );
       if (!response.ok) throw new Error("Failed to save watchlist mark");
@@ -129,9 +129,9 @@ export default function ChatWatchlistHeaderActions({
   const shouldShowNotebookHint =
     showNotebookOnboarding &&
     (forceShowNotebookOnboarding || notebookHasBeenUsed === false);
-  const currentCoverageStatus = coverageStatusOf(mark);
+  const currentCoverageLevel = coverageLevelOf(mark);
   const hasSavedMark = Boolean(
-    currentCoverageStatus && currentCoverageStatus !== "closed",
+    currentCoverageLevel,
   );
 
   return (
@@ -139,26 +139,11 @@ export default function ChatWatchlistHeaderActions({
       className="relative flex items-center gap-1"
       data-onboarding-target="chat-notebook-actions"
     >
-      <label className="relative inline-flex min-h-11 items-center gap-1 rounded-[8px] border border-hairline bg-canvas px-2 text-[12px] font-extrabold text-ink transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 sm:px-3 sm:text-[13px]">
-        <span aria-hidden="true" className="material-symbols-outlined text-[17px] text-primary">radar</span>
-        <select
-          value={currentCoverageStatus ?? ""}
-          disabled={pending}
-          onChange={(event) => {
-            const nextStatus = event.target.value as CoverageStatus;
-            if (nextStatus) void saveCoverageStatus(nextStatus);
-          }}
-          className="min-h-11 appearance-none bg-transparent pr-5 font-extrabold outline-none disabled:cursor-wait"
-          aria-label="이 회사의 커버리지 상태"
-        >
-          <option value="" disabled>{pending ? "저장 중" : "커버리지"}</option>
-          <option value="exploring">탐색 중</option>
-          <option value="watching">관찰 중</option>
-          <option value="holding">보유 중</option>
-          <option value="closed">종료</option>
-        </select>
-        <span aria-hidden="true" className="pointer-events-none absolute right-1 material-symbols-outlined text-[16px] text-muted">expand_more</span>
-      </label>
+      <div className="inline-flex items-center rounded-[8px] border border-hairline bg-canvas p-1" role="group" aria-label="이 회사의 커버리지 수준">
+        <button type="button" disabled={pending} onClick={() => void saveCoverageLevel("interest")} className={`min-h-9 rounded-[6px] px-2 text-[12px] font-extrabold ${currentCoverageLevel === "interest" ? "bg-primary-fixed text-on-primary-fixed" : "text-muted hover:text-primary"}`}>관심</button>
+        <button type="button" disabled={pending} onClick={() => void saveCoverageLevel("holding")} className={`min-h-9 rounded-[6px] px-2 text-[12px] font-extrabold ${currentCoverageLevel === "holding" ? "bg-primary-fixed text-on-primary-fixed" : "text-muted hover:text-primary"}`}>보유</button>
+        {currentCoverageLevel !== null ? <button type="button" disabled={pending} onClick={() => void saveCoverageLevel(null)} className="min-h-9 px-2 text-[11px] font-extrabold text-muted hover:text-error">해제</button> : null}
+      </div>
       {shouldShowNotebookHint ? (
         <div
           className="absolute right-0 top-[calc(100%+8px)] z-30 inline-flex max-w-[calc(100vw-32px)] items-center rounded-[8px] border border-primary/25 bg-canvas px-3 py-2 text-left shadow-[0_12px_28px_rgba(15,23,42,0.16)]"
@@ -179,6 +164,6 @@ export default function ChatWatchlistHeaderActions({
   );
 }
 
-function coverageStatusOf(mark: UserCompanyMark | null): CoverageStatus | null {
-  return mark?.coverage_status ?? null;
+function coverageLevelOf(mark: UserCompanyMark | null): CoverageLevel | null {
+  return mark?.coverage_level ?? null;
 }

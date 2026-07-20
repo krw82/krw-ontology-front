@@ -36,10 +36,8 @@ export function toDesktopNotebookOverview(
   return {
     stats: {
       total_companies: overview.stats.total,
-      exploring: overview.stats.exploring,
-      watching: overview.stats.watching,
+      interest: overview.stats.interest,
       holdings: overview.stats.holding,
-      closed: overview.stats.closed,
       open_questions: overview.stats.open_questions,
       notes: overview.stats.notes,
       recent_activity: overview.stats.recent_activity,
@@ -65,7 +63,7 @@ export function toDesktopNotebookCompanyDetail(
 
 export function toDesktopMark(mark: UserCompanyMark) {
   return {
-    coverage_status: mark.coverage_status,
+    coverage_level: mark.coverage_level,
     priority: mark.priority,
     interest_reason: mark.interest_reason,
     tags: mark.tags,

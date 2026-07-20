@@ -13,7 +13,7 @@ function item(
     source_type: kind,
     source_id: title,
     ticker: "AAPL",
-    coverage_status: null,
+    coverage_level: null,
     judgment: null,
     linked_thesis: null,
     eyebrow: `${kind} event`,

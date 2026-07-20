@@ -117,7 +117,7 @@ export function buildAnalysisCandidates(
       source_type: "analysis" as const,
       source_id: `${run.id}:${phase}`,
       ticker,
-      coverage_status: null,
+      coverage_level: null,
       judgment: null,
       linked_thesis: null,
       eyebrow: active

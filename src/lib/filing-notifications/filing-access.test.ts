@@ -103,6 +103,7 @@ function fakeAdmin(options: {
         select: () => chain,
         eq: () => chain,
         in: () => chain,
+        not: () => chain,
         order: () => chain,
         maybeSingle: () => {
           if (table === "user_filing_judgments") {
@@ -142,7 +143,7 @@ function fakeAdmin(options: {
             return Promise.resolve({
               data: (options.activeTickers ?? []).map((ticker) => ({
                 ticker,
-                coverage_status: "watching",
+                coverage_level: "interest",
               })),
               error: null,
             });

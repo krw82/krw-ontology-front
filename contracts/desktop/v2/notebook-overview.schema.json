@@ -18,20 +18,16 @@
           "additionalProperties": false,
           "required": [
             "total_companies",
-            "exploring",
-            "watching",
+            "interest",
             "holdings",
-            "closed",
             "open_questions",
             "notes",
             "recent_activity"
           ],
           "properties": {
             "total_companies": { "type": "integer", "minimum": 0 },
-            "exploring": { "type": "integer", "minimum": 0 },
-            "watching": { "type": "integer", "minimum": 0 },
+            "interest": { "type": "integer", "minimum": 0 },
             "holdings": { "type": "integer", "minimum": 0 },
-            "closed": { "type": "integer", "minimum": 0 },
             "open_questions": { "type": "integer", "minimum": 0 },
             "notes": { "type": "integer", "minimum": 0 },
             "recent_activity": { "type": "integer", "minimum": 0 }
@@ -63,7 +59,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "coverage_status",
+        "coverage_level",
         "priority",
         "interest_reason",
         "tags",
@@ -73,8 +69,9 @@
         "version"
       ],
       "properties": {
-        "coverage_status": {
-          "enum": ["exploring", "watching", "holding", "closed"]
+        "coverage_level": {
+          "type": ["string", "null"],
+          "enum": ["interest", "holding", null]
         },
         "priority": { "type": "integer" },
         "interest_reason": { "type": ["string", "null"] },

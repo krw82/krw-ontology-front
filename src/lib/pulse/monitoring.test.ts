@@ -15,7 +15,7 @@ function filing(overrides: Partial<PulseCandidate> = {}): PulseCandidate {
     source_type: "filing",
     source_id: "event-1",
     ticker: "AAPL",
-    coverage_status: "holding",
+    coverage_level: "holding",
     judgment: null,
     linked_thesis: null,
     eyebrow: "8-K",

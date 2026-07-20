@@ -24,7 +24,7 @@
       "notebook_updated_at": "2026-06-23T00:00:00.000Z",
       "notebook_age_days": 0,
       "mark": {
-        "coverage_status": "watching",
+        "coverage_level": "interest",
         "priority": 1,
         "interest_reason": "서비스 성장",
         "tags": ["품질"],

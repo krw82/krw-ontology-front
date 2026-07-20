@@ -42,7 +42,7 @@ interface VisibleQuestionState {
 }
 
 const MARK_SELECT =
-  "user_id, ticker, coverage_status, priority, interest_reason, tags, last_activity_at, created_at, updated_at";
+  "user_id, ticker, coverage_level, priority, interest_reason, tags, last_activity_at, created_at, updated_at";
 const QUESTION_SELECT =
   "id, user_id, ticker, question, status, source, source_chat_session_id, source_message_id, answered_at, visible_after_at, created_at, updated_at";
 const NOTE_SELECT =
@@ -68,7 +68,7 @@ export function emptyUserCompanyMark(
   return {
     user_id: userId,
     ticker,
-    coverage_status: "exploring",
+    coverage_level: null,
     priority: 0,
     interest_reason: null,
     tags: [],
@@ -86,6 +86,7 @@ export async function listWatchlistOverview(
     .from("user_company_marks")
     .select(MARK_SELECT)
     .eq("user_id", userId)
+    .not("coverage_level", "is", null)
     .order("updated_at", { ascending: false })
     .returns<UserCompanyMarkRow[]>();
 
@@ -140,10 +141,8 @@ export async function listWatchlistOverview(
     research_inbox: researchInbox,
     stats: {
       total: summaries.length,
-      exploring: summaries.filter((company) => company.mark.coverage_status === "exploring").length,
-      watching: summaries.filter((company) => company.mark.coverage_status === "watching").length,
-      holding: summaries.filter((company) => company.mark.coverage_status === "holding").length,
-      closed: summaries.filter((company) => company.mark.coverage_status === "closed").length,
+      interest: summaries.filter((company) => company.mark.coverage_level === "interest").length,
+      holding: summaries.filter((company) => company.mark.coverage_level === "holding").length,
       open_questions: sumQuestionStates(questionStatesByTicker),
       notes: sumMap(notesByTicker),
       recent_activity: summaries.filter((company) => company.latest_activity_at).length,
@@ -657,7 +656,7 @@ function markFromRow(row: UserCompanyMarkRow): UserCompanyMark {
   return {
     user_id: row.user_id,
     ticker: row.ticker,
-    coverage_status: row.coverage_status,
+    coverage_level: row.coverage_level,
     priority: row.priority,
     interest_reason: row.interest_reason,
     tags: row.tags ?? [],

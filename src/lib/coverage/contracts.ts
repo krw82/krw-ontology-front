@@ -1,15 +1,13 @@
-import type { UserCompanyCoverageStatus } from "@/types/api-contracts";
+import type { UserCompanyCoverageLevel } from "@/types/api-contracts";
 import { z } from "zod";
 
-export const companyCoverageStatusSchema = z.enum([
-  "exploring",
-  "watching",
+export const companyCoverageLevelSchema = z.enum([
+  "interest",
   "holding",
-  "closed",
-] satisfies readonly UserCompanyCoverageStatus[]);
+] satisfies readonly UserCompanyCoverageLevel[]).nullable();
 
 export const setCompanyCoverageSchema = z.object({
-  coverage_status: companyCoverageStatusSchema,
+  coverage_level: companyCoverageLevelSchema,
   idempotency_key: z.string().trim().min(8).max(200).optional(),
   source: z.string().trim().min(1).max(80).optional(),
   priority: z.number().int().min(0).max(100).optional(),
@@ -19,6 +17,6 @@ export const setCompanyCoverageSchema = z.object({
 
 export type SetCompanyCoverageInput = z.infer<typeof setCompanyCoverageSchema>;
 
-export function isActiveCoverageStatus(status: UserCompanyCoverageStatus) {
-  return status !== "closed";
+export function isActiveCoverageLevel(level: UserCompanyCoverageLevel | null) {
+  return level !== null;
 }

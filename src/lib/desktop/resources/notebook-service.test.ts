@@ -8,8 +8,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: vi.fn(),
 }));
 vi.mock("@/lib/coverage/repository", () => ({
-  ensureCompanyCoverage: vi.fn(),
-  setCompanyCoverageStatus: vi.fn(),
+  setCompanyCoverageLevel: vi.fn(),
 }));
 vi.mock("@/lib/watchlist/workspace", () => ({
   getCompanyMark: vi.fn(),
@@ -17,12 +16,15 @@ vi.mock("@/lib/watchlist/workspace", () => ({
   listWatchlistOverview: vi.fn(),
 }));
 
-import { ensureCompanyCoverage } from "@/lib/coverage/repository";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
+import { setCompanyCoverageLevel } from "@/lib/coverage/repository";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getCompanyMark } from "@/lib/watchlist/workspace";
 import type { UserResearchNoteRow } from "@/types/database";
-import { createDesktopNotebookNote } from "./notebook-service";
+import {
+  createDesktopNotebookNote,
+  updateDesktopNotebookMark,
+} from "./notebook-service";
 
 const EXISTING_NOTE: UserResearchNoteRow = {
   id: "20000000-0000-4000-8000-000000000001",
@@ -65,7 +67,11 @@ function noteInput(overrides: Record<string, unknown> = {}) {
 
 function createAdmin(existing: UserResearchNoteRow | null) {
   const maybeSingle = vi.fn().mockResolvedValue({ data: existing, error: null });
-  const insert = vi.fn();
+  const insert = vi.fn().mockReturnValue({
+    select: () => ({
+      single: () => Promise.resolve({ data: EXISTING_NOTE, error: null }),
+    }),
+  });
   const query = {
     select: vi.fn(),
     eq: vi.fn(),
@@ -89,7 +95,6 @@ describe("createDesktopNotebookNote", () => {
     vi.clearAllMocks();
     vi.mocked(getIndexedCompany).mockResolvedValue({ ticker: "AAPL" } as never);
     vi.mocked(getCompanyMark).mockResolvedValue(null);
-    vi.mocked(ensureCompanyCoverage).mockResolvedValue({} as never);
   });
 
   it("returns an existing note only when the normalized request is identical", async () => {
@@ -101,7 +106,6 @@ describe("createDesktopNotebookNote", () => {
     expect(result.meta.replayed).toBe(true);
     expect(result.data.note.id).toBe(EXISTING_NOTE.id);
     expect(fake.insert).not.toHaveBeenCalled();
-    expect(ensureCompanyCoverage).not.toHaveBeenCalled();
   });
 
   it("rejects a reused idempotency key when any normalized note payload differs", async () => {
@@ -116,25 +120,51 @@ describe("createDesktopNotebookNote", () => {
       status: 409,
     });
     expect(fake.insert).not.toHaveBeenCalled();
-    expect(ensureCompanyCoverage).not.toHaveBeenCalled();
   });
 
-  it("checks coverage before insert so a coverage failure cannot leave an orphan note", async () => {
+  it("does not create coverage before inserting a desktop note", async () => {
     const fake = createAdmin(null);
-    const coverageError = new Error("coverage_limit_reached");
     vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin as never);
-    vi.mocked(ensureCompanyCoverage).mockRejectedValueOnce(coverageError);
 
-    await expect(createDesktopNotebookNote(noteInput())).rejects.toBe(
-      coverageError,
-    );
+    await createDesktopNotebookNote(noteInput());
 
-    expect(ensureCompanyCoverage).toHaveBeenCalledWith({
-      userId: "user-1",
-      userEmail: undefined,
+    expect(fake.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it("forwards an explicit null coverage level to clear a desktop mark", async () => {
+    vi.mocked(getCompanyMark).mockResolvedValue({
+      user_id: "user-1",
       ticker: "AAPL",
-      source: "desktop_notebook",
+      coverage_level: "holding",
+      priority: 0,
+      interest_reason: null,
+      tags: [],
+      last_activity_at: null,
+      created_at: "2026-07-20T00:00:00.000Z",
+      updated_at: "2026-07-20T00:00:00.000Z",
     });
-    expect(fake.insert).not.toHaveBeenCalled();
+    vi.mocked(setCompanyCoverageLevel).mockResolvedValue({
+      user_id: "user-1",
+      ticker: "AAPL",
+      coverage_level: null,
+      priority: 0,
+      interest_reason: null,
+      tags: [],
+      last_activity_at: null,
+      created_at: "2026-07-20T00:00:00.000Z",
+      updated_at: "2026-07-20T00:00:00.000Z",
+    });
+
+    await updateDesktopNotebookMark({
+      userId: "user-1",
+      userEmail: null,
+      ticker: "AAPL",
+      expectedVersion: '"2026-07-20T00:00:00.000Z"',
+      body: { coverage_level: null },
+    });
+
+    expect(setCompanyCoverageLevel).toHaveBeenCalledWith(
+      expect.objectContaining({ coverageLevel: null, ticker: "AAPL" }),
+    );
   });
 });

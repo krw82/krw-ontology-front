@@ -4,11 +4,11 @@ import { tryRecordCoverageActivation } from "@/lib/coverage/activation";
 import { getEntitlementStatus } from "@/lib/billing/entitlement";
 import { normalizeTicker } from "@/lib/ontology/ticker";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import type { UserCompanyCoverageStatus, UserCompanyMark } from "@/types/api-contracts";
+import type { UserCompanyCoverageLevel, UserCompanyMark } from "@/types/api-contracts";
 import type { UserCompanyMarkRow } from "@/types/database";
 
 const MARK_SELECT =
-  "user_id,ticker,coverage_status,priority,interest_reason,tags,last_activity_at,created_at,updated_at";
+  "user_id,ticker,coverage_level,priority,interest_reason,tags,last_activity_at,created_at,updated_at";
 
 export class CoverageLimitError extends Error {
   readonly code = "coverage_limit_reached";
@@ -28,11 +28,11 @@ export class CoverageIdempotencyConflictError extends Error {
   }
 }
 
-export interface SetCompanyCoverageStatusInput {
+export interface SetCompanyCoverageLevelInput {
   userId: string;
   userEmail?: string | null;
   ticker: string;
-  coverageStatus: UserCompanyCoverageStatus;
+  coverageLevel: UserCompanyCoverageLevel | null;
   idempotencyKey?: string;
   source?: string;
   priority?: number | null;
@@ -43,7 +43,7 @@ export interface SetCompanyCoverageStatusInput {
 export interface CompanyCoverageMutationResult {
   mark: UserCompanyMark;
   eventId: string;
-  previousStatus: UserCompanyCoverageStatus | null;
+  previousLevel: UserCompanyCoverageLevel | null;
   changed: boolean;
   idempotentReplay: boolean;
 }
@@ -51,20 +51,20 @@ export interface CompanyCoverageMutationResult {
 interface CoverageMutationRpcResult {
   mark: UserCompanyMarkRow;
   event_id: string;
-  previous_status: UserCompanyCoverageStatus | null;
-  coverage_status: UserCompanyCoverageStatus;
+  previous_coverage_level: UserCompanyCoverageLevel | null;
+  coverage_level: UserCompanyCoverageLevel | null;
   changed: boolean;
   idempotent_replay: boolean;
 }
 
-export async function setCompanyCoverageStatus(
-  input: SetCompanyCoverageStatusInput,
+export async function setCompanyCoverageLevel(
+  input: SetCompanyCoverageLevelInput,
 ): Promise<UserCompanyMark> {
-  return (await setCompanyCoverageStatusWithEvent(input)).mark;
+  return (await setCompanyCoverageLevelWithEvent(input)).mark;
 }
 
-export async function setCompanyCoverageStatusWithEvent(
-  input: SetCompanyCoverageStatusInput,
+export async function setCompanyCoverageLevelWithEvent(
+  input: SetCompanyCoverageLevelInput,
 ): Promise<CompanyCoverageMutationResult> {
   const ticker = normalizeTicker(input.ticker);
   if (!ticker) throw new Error("invalid_ticker");
@@ -74,10 +74,10 @@ export async function setCompanyCoverageStatusWithEvent(
     supabase: admin,
   });
   const activeLimit = entitlement.plan.key === "free" ? 3 : null;
-  const { data, error } = await admin.rpc("set_user_company_coverage_status", {
+  const { data, error } = await admin.rpc("set_user_company_coverage_level", {
     p_user_id: input.userId,
     p_ticker: ticker,
-    p_coverage_status: input.coverageStatus,
+    p_coverage_level: input.coverageLevel,
     p_idempotency_key: input.idempotencyKey ?? crypto.randomUUID(),
     p_source: input.source ?? "api",
     p_priority: input.priority ?? null,
@@ -105,13 +105,13 @@ export async function setCompanyCoverageStatusWithEvent(
   return {
     mark: companyMarkFromRow(result.mark),
     eventId: result.event_id,
-    previousStatus: result.previous_status,
+    previousLevel: result.previous_coverage_level,
     changed: Boolean(result.changed),
     idempotentReplay: Boolean(result.idempotent_replay),
   };
 }
 
-export async function getCompanyCoverageStatus(
+export async function getCompanyCoverage(
   userId: string,
   rawTicker: string,
 ): Promise<UserCompanyMark | null> {
@@ -127,28 +127,11 @@ export async function getCompanyCoverageStatus(
   return data ? companyMarkFromRow(data) : null;
 }
 
-export async function ensureCompanyCoverage(input: {
-  userId: string;
-  userEmail?: string | null;
-  ticker: string;
-  source: string;
-}): Promise<UserCompanyMark> {
-  const existing = await getCompanyCoverageStatus(input.userId, input.ticker);
-  if (existing) return existing;
-  return setCompanyCoverageStatus({
-    userId: input.userId,
-    userEmail: input.userEmail,
-    ticker: input.ticker,
-    coverageStatus: "exploring",
-    source: input.source,
-  });
-}
-
 export function companyMarkFromRow(row: UserCompanyMarkRow): UserCompanyMark {
   return {
     user_id: row.user_id,
     ticker: row.ticker,
-    coverage_status: row.coverage_status,
+    coverage_level: row.coverage_level,
     priority: row.priority,
     interest_reason: row.interest_reason,
     tags: row.tags ?? [],

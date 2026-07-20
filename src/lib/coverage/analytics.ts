@@ -11,15 +11,15 @@ export async function recordCoverageMutationAnalytics(
 ) {
   if (result.idempotentReplay || !result.changed) return;
   await recordAnalyticsEventFromRequest(request, {
-    eventName: result.previousStatus === null
-      ? "coverage_added"
-      : "coverage_status_changed",
+    eventName: result.mark.coverage_level === null
+      ? "coverage_cleared"
+      : "coverage_level_changed",
     userId,
     properties: {
       coverage_event_id: result.eventId,
       ticker: result.mark.ticker,
-      previous_coverage_status: result.previousStatus ?? "none",
-      coverage_status: result.mark.coverage_status,
+      previous_coverage_level: result.previousLevel ?? "none",
+      coverage_level: result.mark.coverage_level ?? "none",
       source,
     },
   });

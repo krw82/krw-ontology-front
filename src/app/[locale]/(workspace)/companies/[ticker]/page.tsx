@@ -123,15 +123,15 @@ export default async function CompanyLandingPage({
 
   let savedMark: Pick<
     UserCompanyMarkRow,
-    "coverage_status"
+    "coverage_level"
   > | null = null;
   if (user) {
     const { data } = await getSupabaseAdmin()
       .from("user_company_marks")
-      .select("coverage_status")
+      .select("coverage_level")
       .eq("user_id", user.id)
       .eq("ticker", company.ticker)
-      .maybeSingle<Pick<UserCompanyMarkRow, "coverage_status">>();
+      .maybeSingle<Pick<UserCompanyMarkRow, "coverage_level">>();
     savedMark = data ?? null;
   }
 
@@ -309,7 +309,7 @@ export default async function CompanyLandingPage({
                   isAuthenticated={Boolean(user)}
                   loginHref={watchlistLoginHref}
                   destinationHref={watchlistPath}
-                  initialCoverageStatus={savedMark?.coverage_status ?? null}
+                  initialCoverageLevel={savedMark?.coverage_level ?? null}
                   labels={{
                     watchlist: pageCopy.watchlistInterestCta,
                     holding: pageCopy.watchlistHoldingCta,

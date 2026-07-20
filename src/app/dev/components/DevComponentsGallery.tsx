@@ -542,7 +542,7 @@ const watchlistOverview: WatchlistOverviewResponse = {
     mark: {
       user_id: "dev-user",
       ticker: company.ticker,
-      coverage_status: index === 0 ? "holding" : "watching",
+      coverage_level: index === 0 ? "holding" : "interest",
       priority: index,
       interest_reason: "핵심 리서치 대상",
       tags: index === 0 ? ["서비스", "마진"] : ["AI", "데이터센터"],
@@ -583,10 +583,8 @@ const watchlistOverview: WatchlistOverviewResponse = {
   ],
   stats: {
     total: 2,
-    exploring: 0,
-    watching: 1,
+    interest: 1,
     holding: 1,
-    closed: 0,
     open_questions: 1,
     notes: 5,
     recent_activity: 2,
@@ -1104,7 +1102,7 @@ export default function DevComponentsGallery() {
                   isAuthenticated
                   loginHref="/login"
                   destinationHref="/ko/companies/AAPL"
-                  initialCoverageStatus="watching"
+                  initialCoverageLevel="interest"
                   labels={{
                     watchlist: "관심",
                     holding: "보유",
@@ -1121,7 +1119,7 @@ export default function DevComponentsGallery() {
                   isAuthenticated
                   loginHref="/login"
                   destinationHref="/ko/companies/AAPL"
-                  initialCoverageStatus="holding"
+                  initialCoverageLevel="holding"
                   labels={{
                     watchlist: "관심",
                     holding: "보유",

@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { normalizeTicker } from "@/lib/ontology/ticker";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { ensureCompanyCoverage, setCompanyCoverageStatus } from "@/lib/coverage/repository";
+import { setCompanyCoverageLevel } from "@/lib/coverage/repository";
 import {
   DESKTOP_NOTEBOOK_COMPANY_CONTRACT,
   DESKTOP_NOTEBOOK_CONTRACT,
@@ -109,11 +109,13 @@ export async function updateDesktopNotebookMark(input: {
     throw validationError("변경할 종목 상태를 입력해주세요.");
   }
 
-  const mark = await setCompanyCoverageStatus({
+  const mark = await setCompanyCoverageLevel({
     userId: input.userId,
     userEmail: input.userEmail,
     ticker,
-    coverageStatus: update.coverage_status ?? existing?.coverage_status ?? "exploring",
+    coverageLevel: update.coverage_level === undefined
+      ? existing?.coverage_level ?? null
+      : update.coverage_level,
     source: "desktop",
     priority: update.priority ?? existing?.priority ?? null,
     interestReason: update.interest_reason === undefined
@@ -169,7 +171,7 @@ export async function createDesktopNotebookNote(input: {
     });
   }
 
-  await touchCompanyMark(input.userId, input.userEmail, ticker);
+  await touchCompanyMark(input.userId, ticker);
 
   const { data, error } = await admin
     .from("user_research_notes")
@@ -339,16 +341,16 @@ function parseMarkUpdate(body: Record<string, unknown>) {
   const update: Partial<
     Pick<
       UserCompanyMarkRow,
-      "coverage_status" | "priority" | "interest_reason" | "tags"
+      "coverage_level" | "priority" | "interest_reason" | "tags"
     >
   > = {};
-  if (body.coverage_status !== undefined) {
-    if (!(["exploring", "watching", "holding", "closed"] as const).includes(
-      body.coverage_status as UserCompanyMarkRow["coverage_status"],
+  if (body.coverage_level !== undefined) {
+    if (body.coverage_level !== null && !(["interest", "holding"] as const).includes(
+      body.coverage_level as Exclude<UserCompanyMarkRow["coverage_level"], null>,
     )) {
       throw validationError("커버리지 상태가 올바르지 않습니다.");
     }
-    update.coverage_status = body.coverage_status as UserCompanyMarkRow["coverage_status"];
+    update.coverage_level = body.coverage_level as UserCompanyMarkRow["coverage_level"];
   }
   if (body.priority !== undefined) {
     if (
@@ -536,11 +538,7 @@ async function findNoteByOperationId(
   return data;
 }
 
-async function touchCompanyMark(
-  userId: string,
-  userEmail: string | null | undefined,
-  ticker: string,
-) {
+async function touchCompanyMark(userId: string, ticker: string) {
   const admin = getSupabaseAdmin();
   const existing = await getCompanyMark(userId, ticker);
   const now = new Date().toISOString();
@@ -555,12 +553,6 @@ async function touchCompanyMark(
     }
     return;
   }
-  await ensureCompanyCoverage({
-    userId,
-    userEmail,
-    ticker,
-    source: "desktop_notebook",
-  });
 }
 
 function questionFromRow(row: UserCompanyQuestionRow): UserCompanyQuestion {

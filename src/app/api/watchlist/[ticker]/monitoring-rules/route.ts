@@ -9,7 +9,6 @@ import {
 } from "@/lib/filing-notifications/request";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
-  ensureCompanyCoverageForWrite,
   errorResponse,
   requireIndexedTicker,
 } from "@/lib/watchlist/api";
@@ -51,15 +50,6 @@ export async function POST(
   if (!parsed.success) {
     return errorResponse(400, "validation_error", "다음 확인 조건을 확인해주세요.");
   }
-
-  const coverageError = await ensureCompanyCoverageForWrite({
-    userId: user.id,
-    userEmail: user.email,
-    ticker: tickerResult.ticker,
-    source: "monitoring_rule_created",
-    requireActive: true,
-  });
-  if (coverageError) return coverageError;
 
   const now = Date.now();
   let operator: UserCompanyMonitoringRuleRow["operator"];

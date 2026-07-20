@@ -67,7 +67,7 @@ function toCandidate(event: FilingRow): PulseCandidate {
     source_type: "filing",
     source_id: event.filing_event_id,
     ticker: event.ticker,
-    coverage_status: null,
+    coverage_level: null,
     judgment: null,
     linked_thesis: null,
     eyebrow: form4

@@ -1,12 +1,12 @@
 import type { NextRequest } from "next/server";
 import { recordCoverageMutationAnalytics } from "@/lib/coverage/analytics";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
-import { companyCoverageStatusSchema } from "@/lib/coverage/contracts";
+import { companyCoverageLevelSchema } from "@/lib/coverage/contracts";
 import {
   CoverageIdempotencyConflictError,
   CoverageLimitError,
-  getCompanyCoverageStatus,
-  setCompanyCoverageStatusWithEvent,
+  getCompanyCoverage,
+  setCompanyCoverageLevelWithEvent,
 } from "@/lib/coverage/repository";
 import {
   invalidOriginResponse,
@@ -75,7 +75,7 @@ export async function PATCH(
 
   let existing;
   try {
-    existing = await getCompanyCoverageStatus(user.id, tickerResult.ticker);
+    existing = await getCompanyCoverage(user.id, tickerResult.ticker);
   } catch {
     return errorResponse(
       503,
@@ -83,20 +83,23 @@ export async function PATCH(
       "기존 회사 상태를 확인하지 못했습니다. 다시 시도해주세요.",
     );
   }
-  const coverageStatus = companyCoverageStatusSchema.safeParse(
-    body.coverage_status ?? existing?.coverage_status ?? "exploring",
+  const requestedCoverageLevel = Object.hasOwn(body, "coverage_level")
+    ? body.coverage_level
+    : existing?.coverage_level ?? null;
+  const coverageLevel = companyCoverageLevelSchema.safeParse(
+    requestedCoverageLevel,
   );
-  if (!coverageStatus.success) {
+  if (!coverageLevel.success) {
     return errorResponse(400, "validation_error", "회사 커버리지 상태를 확인해주세요.");
   }
   const interestReason = stringInput(body, "interest_reason", { maxLength: 1200 });
   const tags = stringArrayInput(body, "tags");
   try {
-    const result = await setCompanyCoverageStatusWithEvent({
+    const result = await setCompanyCoverageLevelWithEvent({
       userId: user.id,
       userEmail: user.email,
       ticker: tickerResult.ticker,
-      coverageStatus: coverageStatus.data,
+      coverageLevel: coverageLevel.data,
       idempotencyKey:
         typeof body.client_mutation_id === "string"
           ? body.client_mutation_id

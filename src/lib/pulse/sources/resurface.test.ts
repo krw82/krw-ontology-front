@@ -5,7 +5,7 @@ import { selectResurfaceCandidate } from "@/lib/pulse/sources/resurface";
 function fixture(index: number): PulseCandidate {
   return {
     item_key: `resurface:note:${index}`, kind: "resurface", trigger: "state", source_type: "resurface",
-    source_id: `note:${index}`, ticker: "AAPL", coverage_status: "watching", judgment: null, linked_thesis: null,
+    source_id: `note:${index}`, ticker: "AAPL", coverage_level: "interest", judgment: null, linked_thesis: null,
     eyebrow: "다시 보기", title: `메모 ${index}`,
     body: "body", reason_code: "resurface", reason_label: "오래된 메모", priority: "low",
     occurred_at: "2026-01-01T00:00:00.000Z", available_at: "2026-01-01T00:00:00.000Z",

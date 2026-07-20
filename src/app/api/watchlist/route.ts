@@ -1,11 +1,11 @@
 import type { NextRequest } from "next/server";
 import { recordCoverageMutationAnalytics } from "@/lib/coverage/analytics";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
-import { companyCoverageStatusSchema } from "@/lib/coverage/contracts";
+import { companyCoverageLevelSchema } from "@/lib/coverage/contracts";
 import {
   CoverageIdempotencyConflictError,
   CoverageLimitError,
-  setCompanyCoverageStatusWithEvent,
+  setCompanyCoverageLevelWithEvent,
 } from "@/lib/coverage/repository";
 import {
   invalidOriginResponse,
@@ -57,20 +57,20 @@ export async function POST(request: NextRequest) {
   const tickerResult = await requireIndexedTicker(stringInput(body, "ticker"));
   if (!tickerResult.ok) return tickerResult.response;
 
-  const coverageStatus = companyCoverageStatusSchema.safeParse(
-    body.coverage_status ?? "watching",
+  const coverageLevel = companyCoverageLevelSchema.safeParse(
+    body.coverage_level ?? "interest",
   );
-  if (!coverageStatus.success) {
+  if (!coverageLevel.success || coverageLevel.data === null) {
     return errorResponse(400, "validation_error", "회사 커버리지 상태를 확인해주세요.");
   }
   const interestReason = stringInput(body, "interest_reason", { maxLength: 1200 });
   const tags = stringArrayInput(body, "tags") ?? [];
   try {
-    const result = await setCompanyCoverageStatusWithEvent({
+    const result = await setCompanyCoverageLevelWithEvent({
       userId: user.id,
       userEmail: user.email,
       ticker: tickerResult.ticker,
-      coverageStatus: coverageStatus.data,
+      coverageLevel: coverageLevel.data,
       idempotencyKey:
         typeof body.client_mutation_id === "string"
           ? body.client_mutation_id

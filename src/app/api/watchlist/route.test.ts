@@ -27,7 +27,7 @@ vi.mock("@/lib/coverage/repository", () => ({
   CoverageLimitError: class CoverageLimitError extends Error {
     readonly code = "coverage_limit_reached";
   },
-  setCompanyCoverageStatusWithEvent: vi.fn(),
+  setCompanyCoverageLevelWithEvent: vi.fn(),
 }));
 vi.mock("@/lib/coverage/analytics", () => ({
   recordCoverageMutationAnalytics: vi.fn(),
@@ -40,7 +40,7 @@ vi.mock("@/lib/filing-notifications/request", () => ({
 }));
 
 import { getAuthUser } from "@/lib/auth";
-import { setCompanyCoverageStatusWithEvent } from "@/lib/coverage/repository";
+import { setCompanyCoverageLevelWithEvent } from "@/lib/coverage/repository";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { POST } from "./route";
 
@@ -73,11 +73,11 @@ describe("POST /api/watchlist", () => {
       ticker: "AAPL",
       name: "Apple Inc.",
     } as Awaited<ReturnType<typeof getIndexedCompany>>);
-    vi.mocked(setCompanyCoverageStatusWithEvent).mockResolvedValue({
+    vi.mocked(setCompanyCoverageLevelWithEvent).mockResolvedValue({
       mark: {
         user_id: "user-1",
         ticker: "AAPL",
-        coverage_status: "holding",
+        coverage_level: "holding",
         priority: 0,
         interest_reason: "제품 전환 확인",
         tags: ["long-term", "ai"],
@@ -86,7 +86,7 @@ describe("POST /api/watchlist", () => {
         updated_at: "2026-06-13T00:00:00.000Z",
       },
       eventId: "00000000-0000-4000-8000-000000000010",
-      previousStatus: null,
+      previousLevel: null,
       changed: true,
       idempotentReplay: false,
     });
@@ -94,7 +94,7 @@ describe("POST /api/watchlist", () => {
     const response = await POST(
       postRequest({
         ticker: " aapl ",
-        coverage_status: "holding",
+        coverage_level: "holding",
         client_mutation_id: "coverage-AAPL-1",
         interest_reason: "제품 전환 확인",
         tags: ["long-term", "ai", "ai"],
@@ -106,11 +106,11 @@ describe("POST /api/watchlist", () => {
       mark: { ticker: "AAPL", tags: ["long-term", "ai"] },
     });
     expect(getIndexedCompany).toHaveBeenCalledWith("AAPL");
-    expect(setCompanyCoverageStatusWithEvent).toHaveBeenCalledWith({
+    expect(setCompanyCoverageLevelWithEvent).toHaveBeenCalledWith({
       userId: "user-1",
       userEmail: "user@example.test",
       ticker: "AAPL",
-      coverageStatus: "holding",
+      coverageLevel: "holding",
       idempotencyKey: "coverage-AAPL-1",
       source: "watchlist_create",
       interestReason: "제품 전환 확인",
@@ -129,7 +129,7 @@ describe("POST /api/watchlist", () => {
         message: "현재 온톨로지 인덱스에 없는 회사입니다: NOPE",
       },
     });
-    expect(setCompanyCoverageStatusWithEvent).not.toHaveBeenCalled();
+    expect(setCompanyCoverageLevelWithEvent).not.toHaveBeenCalled();
   });
 
   it("returns a service error when ticker validation cannot reach the catalog", async () => {
@@ -143,6 +143,6 @@ describe("POST /api/watchlist", () => {
         message: "온톨로지 인덱스를 확인하지 못했습니다.",
       },
     });
-    expect(setCompanyCoverageStatusWithEvent).not.toHaveBeenCalled();
+    expect(setCompanyCoverageLevelWithEvent).not.toHaveBeenCalled();
   });
 });

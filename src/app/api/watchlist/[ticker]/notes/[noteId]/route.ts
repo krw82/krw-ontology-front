@@ -7,7 +7,6 @@ import {
 } from "@/lib/filing-notifications/request";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
-  ensureCompanyCoverageForWrite,
   errorResponse,
   parseJsonObject,
   requireIndexedTicker,
@@ -89,14 +88,6 @@ export async function PATCH(
     return errorResponse(400, "validation_error", "수정할 항목이 없습니다.");
   }
 
-  const coverageError = await ensureCompanyCoverageForWrite({
-    userId: user.id,
-    userEmail: user.email,
-    ticker: tickerResult.ticker,
-    source: "note_updated",
-  });
-  if (coverageError) return coverageError;
-
   const { data, error } = await getSupabaseAdmin()
     .from("user_research_notes")
     .update(update)
@@ -135,14 +126,6 @@ export async function DELETE(
   if (!isUuid(noteId)) {
     return errorResponse(404, "not_found", "노트를 찾지 못했습니다.");
   }
-
-  const coverageError = await ensureCompanyCoverageForWrite({
-    userId: user.id,
-    userEmail: user.email,
-    ticker: tickerResult.ticker,
-    source: "note_updated",
-  });
-  if (coverageError) return coverageError;
 
   const { error } = await getSupabaseAdmin()
     .from("user_research_notes")

@@ -14,7 +14,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 import { getEntitlementStatus } from "@/lib/billing/entitlement";
 import { tryRecordCoverageActivation } from "@/lib/coverage/activation";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { setCompanyCoverageStatusWithEvent } from "./repository";
+import { setCompanyCoverageLevelWithEvent } from "./repository";
 
 describe("company coverage repository", () => {
   beforeEach(() => {
@@ -30,7 +30,7 @@ describe("company coverage repository", () => {
         mark: {
           user_id: "10000000-0000-4000-8000-000000000001",
           ticker: "AAPL",
-          coverage_status: "exploring",
+          coverage_level: "interest",
           priority: 0,
           interest_reason: null,
           tags: [],
@@ -39,8 +39,8 @@ describe("company coverage repository", () => {
           updated_at: "2026-07-18T00:00:00.000Z",
         },
         event_id: "20000000-0000-4000-8000-000000000001",
-        previous_status: null,
-        coverage_status: "exploring",
+        previous_coverage_level: null,
+        coverage_level: "interest",
         changed: true,
         idempotent_replay: false,
       },
@@ -48,10 +48,10 @@ describe("company coverage repository", () => {
     });
     vi.mocked(getSupabaseAdmin).mockReturnValue({ rpc } as never);
 
-    await setCompanyCoverageStatusWithEvent({
+    await setCompanyCoverageLevelWithEvent({
       userId: "10000000-0000-4000-8000-000000000001",
       ticker: "aapl",
-      coverageStatus: "exploring",
+      coverageLevel: "interest",
       source: "desktop",
     });
 

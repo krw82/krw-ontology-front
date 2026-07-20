@@ -35,7 +35,7 @@ export async function getQuestionCandidates(
       source_type: "question" as const,
       source_id: question.id,
       ticker: question.ticker,
-      coverage_status: null,
+      coverage_level: null,
       judgment: null,
       linked_thesis: null,
       eyebrow: "다음 질문",

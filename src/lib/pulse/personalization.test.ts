@@ -22,7 +22,7 @@ function filing(ticker: string): PulseCandidate {
     occurred_at: "2026-07-15T00:00:00.000Z",
     available_at: "2026-07-15T00:00:00.000Z",
     expires_at: null,
-    coverage_status: null,
+    coverage_level: null,
     judgment: null,
     linked_thesis: null,
     saved_at: null,
@@ -43,7 +43,7 @@ describe("Pulse user ticker signals", () => {
     const [item] = applyPulseUserTickerSignals([filing("aapl")], signals);
 
     expect(item).toMatchObject({
-      coverage_status: "holding",
+      coverage_level: "holding",
       has_recent_research: true,
       reason_code: "holding_research_followup",
       reason_label: "AAPL은 보유 기업이며 최근 이 기업을 리서치했습니다.",
@@ -74,7 +74,7 @@ describe("Pulse user ticker signals", () => {
 
     expect(item).toMatchObject({
       ticker: "GOOGL",
-      coverage_status: "holding",
+      coverage_level: "holding",
       has_recent_research: true,
       reason_code: "holding_research_followup",
       reason_label: "GOOGL은 보유 기업이며 최근 이 기업을 리서치했습니다.",

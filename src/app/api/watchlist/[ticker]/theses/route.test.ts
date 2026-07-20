@@ -22,19 +22,6 @@ vi.mock("@/lib/ontology/catalog", () => ({
 vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: vi.fn(),
 }));
-vi.mock("@/lib/coverage/repository", () => ({
-  CoverageIdempotencyConflictError: class CoverageIdempotencyConflictError extends Error {
-    readonly code = "idempotency_conflict";
-  },
-  CoverageLimitError: class CoverageLimitError extends Error {
-    readonly code = "coverage_limit_reached";
-
-    constructor() {
-      super("무료 플랜에서는 진행 중인 회사 커버리지를 최대 3개까지 둘 수 있습니다.");
-    }
-  },
-  ensureCompanyCoverage: vi.fn().mockResolvedValue({ coverage_status: "exploring" }),
-}));
 vi.mock("@/lib/analytics/server", () => ({
   recordAnalyticsEventFromRequest: vi.fn().mockResolvedValue({ ok: true }),
 }));
@@ -46,10 +33,6 @@ vi.mock("@/lib/filing-notifications/request", () => ({
 }));
 
 import { getAuthUser } from "@/lib/auth";
-import {
-  CoverageLimitError,
-  ensureCompanyCoverage,
-} from "@/lib/coverage/repository";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { POST } from "./route";
@@ -213,23 +196,4 @@ describe("POST /api/watchlist/[ticker]/theses", () => {
     expect(fake.writes).toEqual([]);
   });
 
-  it("does not insert a thesis after a coverage-limit rejection", async () => {
-    const fake = createAdmin();
-    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
-    vi.mocked(ensureCompanyCoverage).mockRejectedValueOnce(new CoverageLimitError());
-
-    const response = await POST(
-      postRequest({
-        title: "서비스 매출 방어력",
-        thesis_text: "서비스 매출과 자사주를 본다.",
-      }),
-      { params: Promise.resolve({ ticker: "AAPL" }) },
-    );
-
-    expect(response.status).toBe(409);
-    expect(await json(response)).toMatchObject({
-      error: { code: "coverage_limit_reached" },
-    });
-    expect(fake.writes).toEqual([]);
-  });
 });

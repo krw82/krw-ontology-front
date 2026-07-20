@@ -19,19 +19,6 @@ vi.mock("@/lib/auth", () => ({
 vi.mock("@/lib/ontology/catalog", () => ({
   getIndexedCompany: vi.fn(),
 }));
-vi.mock("@/lib/coverage/repository", () => ({
-  CoverageIdempotencyConflictError: class CoverageIdempotencyConflictError extends Error {
-    readonly code = "idempotency_conflict";
-  },
-  CoverageLimitError: class CoverageLimitError extends Error {
-    readonly code = "coverage_limit_reached";
-
-    constructor() {
-      super("무료 플랜에서는 진행 중인 회사 커버리지를 최대 3개까지 둘 수 있습니다.");
-    }
-  },
-  ensureCompanyCoverage: vi.fn(),
-}));
 vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: vi.fn(),
 }));
@@ -40,10 +27,6 @@ vi.mock("@/lib/watchlist/workspace", () => ({
 }));
 
 import { getAuthUser } from "@/lib/auth";
-import {
-  CoverageLimitError,
-  ensureCompanyCoverage,
-} from "@/lib/coverage/repository";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { POST } from "./route";
@@ -115,20 +98,9 @@ describe("POST /api/watchlist/[ticker]/questions", () => {
       ticker: "AAPL",
       name: "Apple Inc.",
     } as Awaited<ReturnType<typeof getIndexedCompany>>);
-    vi.mocked(ensureCompanyCoverage).mockResolvedValue({
-      user_id: "user-1",
-      ticker: "AAPL",
-      coverage_status: "exploring",
-      priority: 0,
-      interest_reason: null,
-      tags: [],
-      last_activity_at: null,
-      created_at: "2026-06-13T00:00:00.000Z",
-      updated_at: "2026-06-13T00:00:00.000Z",
-    });
   });
 
-  it("stores a manual open question and touches the company mark", async () => {
+  it("stores a manual open question without creating coverage", async () => {
     const fake = createAdmin();
     vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
 
@@ -155,12 +127,6 @@ describe("POST /api/watchlist/[ticker]/questions", () => {
         source: "manual",
       },
     });
-    expect(ensureCompanyCoverage).toHaveBeenCalledWith({
-      userId: "user-1",
-      userEmail: "user@example.test",
-      ticker: "AAPL",
-      source: "question_created",
-    });
   });
 
   it("rejects blank questions", async () => {
@@ -179,7 +145,6 @@ describe("POST /api/watchlist/[ticker]/questions", () => {
       },
     });
     expect(fake.writes).toEqual([]);
-    expect(ensureCompanyCoverage).not.toHaveBeenCalled();
   });
 
   it("blocks cross-origin question writes before authentication", async () => {
@@ -199,20 +164,4 @@ describe("POST /api/watchlist/[ticker]/questions", () => {
     expect(fake.writes).toEqual([]);
   });
 
-  it("does not insert a question when coverage cannot be created", async () => {
-    const fake = createAdmin();
-    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
-    vi.mocked(ensureCompanyCoverage).mockRejectedValueOnce(new CoverageLimitError());
-
-    const response = await POST(
-      postRequest({ question: "마진 하락이 일회성인가?" }),
-      { params: Promise.resolve({ ticker: "AAPL" }) },
-    );
-
-    expect(response.status).toBe(409);
-    expect(await json(response)).toMatchObject({
-      error: { code: "coverage_limit_reached" },
-    });
-    expect(fake.writes).toEqual([]);
-  });
 });

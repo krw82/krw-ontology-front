@@ -22,7 +22,7 @@ function filing(id: string): PulseItem {
     source_type: "filing",
     source_id: id,
     ticker: id.toUpperCase(),
-    coverage_status: "watching",
+    coverage_level: "interest",
     judgment: null,
     linked_thesis: null,
     eyebrow: "새 공시",

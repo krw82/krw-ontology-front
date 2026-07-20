@@ -32,7 +32,7 @@ export function buildCheckupCandidate(
     source_type: "checkup",
     source_id: localDate,
     ticker: null,
-    coverage_status: null,
+    coverage_level: null,
     judgment: null,
     linked_thesis: null,
     eyebrow: "오늘의 리서치 체크업",

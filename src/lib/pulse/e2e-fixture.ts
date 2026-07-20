@@ -38,7 +38,7 @@ export function createStaticPulseE2EFeed(): PulseFeedResponse {
     source_type: "filing",
     source_id: "00000000-0000-4000-8000-000000000001",
     ticker: "AAPL",
-    coverage_status: "holding",
+    coverage_level: "holding",
     judgment: null,
     linked_thesis: null,
     eyebrow: "8-K 새 공시 · E2E fixture",

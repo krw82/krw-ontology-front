@@ -376,7 +376,7 @@ function buildSummary(items: PulseItem[]) {
     if (purchase > 0) summary.purchaseCount += 1;
     if (sale > 0) summary.saleCount += 1;
     if (item.priority === "urgent") summary.urgentCount += 1;
-    if (coverageStatus(item) === "holding") summary.holdingCount += 1;
+    if (coverageLevel(item) === "holding") summary.holdingCount += 1;
     if (item.metadata.has_recent_research === true) summary.researchCount += 1;
     return summary;
   }, { purchaseCount: 0, saleCount: 0, urgentCount: 0, holdingCount: 0, researchCount: 0 });
@@ -398,23 +398,18 @@ function transactionDetail(item: PulseItem) {
 }
 
 function relationshipLabel(item: PulseItem): string | null {
-  const status = coverageStatus(item);
-  if (status === "holding") return "보유 중";
-  if (status === "watching") return "관찰 중";
-  if (status === "exploring") return "탐색 중";
-  if (status === "closed") return "커버리지 종료";
+  const level = coverageLevel(item);
+  if (level === "holding") return "보유 중";
+  if (level === "interest") return "관심";
   if (item.metadata.has_recent_research === true) return "최근 리서치";
   return null;
 }
 
-function coverageStatus(
+function coverageLevel(
   item: PulseItem,
-): "exploring" | "watching" | "holding" | "closed" | null {
-  const value = (item as PulseItem & { coverage_status?: unknown }).coverage_status;
-  return value === "exploring" ||
-    value === "watching" ||
-    value === "holding" ||
-    value === "closed"
+): "interest" | "holding" | null {
+  const value = (item as PulseItem & { coverage_level?: unknown }).coverage_level;
+  return value === "interest" || value === "holding"
     ? value
     : null;
 }

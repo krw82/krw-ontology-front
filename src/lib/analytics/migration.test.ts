@@ -43,6 +43,10 @@ const decisionLoopAnalyticsMigrationPath = join(
   process.cwd(),
   "supabase/migrations/20260718009000_add_decision_loop_analytics.sql",
 );
+const coverageLevelMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260720010000_simplify_company_coverage_levels.sql",
+);
 const FILING_NOTIFICATION_EVENT_NAMES = [
   "company_followed",
   "push_permission_requested",
@@ -81,8 +85,8 @@ const postInitialAnalyticsEventNameSet = new Set<string>([
   ...filingNotificationEventNameSet,
   ...pulseEventNames,
   "performance_metric_reported",
-  "coverage_added",
-  "coverage_status_changed",
+  "coverage_level_changed",
+  "coverage_cleared",
   "coverage_activated",
   "filing_judgment_started",
   "filing_judgment_completed",
@@ -209,6 +213,14 @@ describe("analytics events migration", () => {
     expect(decisionLoopMigration).toContain(
       "never copied into analytics_events.properties",
     );
+  });
+
+  it("replaces legacy coverage analytics names with level changes and clears", () => {
+    const coverageLevelMigration = readFileSync(coverageLevelMigrationPath, "utf8");
+    expect(coverageLevelMigration).toContain("when 'coverage_added' then 'coverage_level_changed'");
+    expect(coverageLevelMigration).toContain("when 'coverage_status_changed' then 'coverage_level_changed'");
+    expect(coverageLevelMigration).toContain("'coverage_level_changed'");
+    expect(coverageLevelMigration).toContain("'coverage_cleared'");
   });
 
   it("keeps analytics server-owned and indexed for dashboard queries", () => {

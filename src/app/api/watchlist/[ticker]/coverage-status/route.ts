@@ -5,8 +5,8 @@ import { setCompanyCoverageSchema } from "@/lib/coverage/contracts";
 import {
   CoverageIdempotencyConflictError,
   CoverageLimitError,
-  getCompanyCoverageStatus,
-  setCompanyCoverageStatusWithEvent,
+  getCompanyCoverage,
+  setCompanyCoverageLevelWithEvent,
 } from "@/lib/coverage/repository";
 import {
   invalidOriginResponse,
@@ -32,8 +32,8 @@ export async function GET(
   const tickerResult = await requireIndexedTicker((await params).ticker);
   if (!tickerResult.ok) return tickerResult.response;
   try {
-    const mark = await getCompanyCoverageStatus(user.id, tickerResult.ticker);
-    return Response.json({ coverage_status: mark?.coverage_status ?? null, mark });
+    const mark = await getCompanyCoverage(user.id, tickerResult.ticker);
+    return Response.json({ coverage_level: mark?.coverage_level ?? null, mark });
   } catch {
     return errorResponse(500, "internal_error", "회사 커버리지 상태를 불러오지 못했습니다.");
   }
@@ -59,20 +59,20 @@ export async function PUT(
     return errorResponse(400, "validation_error", "회사 커버리지 입력을 확인해주세요.");
   }
   try {
-    const result = await setCompanyCoverageStatusWithEvent({
+    const result = await setCompanyCoverageLevelWithEvent({
       userId: user.id,
       userEmail: user.email,
       ticker: tickerResult.ticker,
-      coverageStatus: input.data.coverage_status,
+      coverageLevel: input.data.coverage_level,
       idempotencyKey: input.data.idempotency_key,
-      source: input.data.source ?? "coverage_status_api",
+      source: input.data.source ?? "coverage_level_api",
       priority: input.data.priority,
       interestReason: input.data.interest_reason,
       tags: input.data.tags,
     });
     await recordCoverageMutationAnalytics(request, user.id, result, "companies");
     return Response.json({
-      coverage_status: result.mark.coverage_status,
+      coverage_level: result.mark.coverage_level,
       mark: result.mark,
       idempotent_replay: result.idempotentReplay,
     });

@@ -6,7 +6,7 @@ import type {
   PulseItemKind,
   PulseItemPriority,
   PulseItemState,
-  UserCompanyCoverageStatus,
+  UserCompanyCoverageLevel,
 } from "@/types/api-contracts";
 import { z } from "zod";
 
@@ -46,7 +46,7 @@ const pulseItemBaseSchema = z.object({
   trigger: z.enum(["event", "schedule", "state", "editorial"]),
   source_id: z.string().min(1),
   ticker: z.string().nullable(),
-  coverage_status: z.enum(["exploring", "watching", "holding", "closed"] satisfies readonly UserCompanyCoverageStatus[]).nullable(),
+  coverage_level: z.enum(["interest", "holding"] satisfies readonly UserCompanyCoverageLevel[]).nullable(),
   judgment: z.object({
     id: z.string().uuid(),
     filing_event_id: z.string().uuid(),
