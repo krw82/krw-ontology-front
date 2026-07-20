@@ -116,12 +116,25 @@ begin
     return 0;
   end if;
 
-  insert into public.user_pulse_feed_revisions as revision (user_id, revision, updated_at)
-  values (p_user_id, 1, now())
-  on conflict (user_id) do update
-  set revision = revision.revision + 1,
-      updated_at = now()
-  returning revision.revision into v_revision;
+  -- A delete of auth.users cascades through the personal Pulse tables. Their
+  -- after-delete triggers can still run while the parent is being removed;
+  -- never recreate a revision row for an account that is leaving.
+  if not exists (select 1 from auth.users where id = p_user_id) then
+    return 0;
+  end if;
+
+  begin
+    insert into public.user_pulse_feed_revisions as revision (user_id, revision, updated_at)
+    values (p_user_id, 1, now())
+    on conflict (user_id) do update
+    set revision = revision.revision + 1,
+        updated_at = now()
+    returning revision.revision into v_revision;
+  exception when foreign_key_violation then
+    -- The auth row can disappear between the existence check and the write
+    -- during cascading cleanup. No revision is needed for a deleted account.
+    return 0;
+  end;
 
   return v_revision;
 end;
