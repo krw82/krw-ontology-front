@@ -137,15 +137,15 @@ describe("service worker cache and update policy", () => {
     expect(harness.put).not.toHaveBeenCalled();
   });
 
-  it("caches only allowlisted same-origin static assets", async () => {
+  it("caches only allowlisted same-origin PWA shell assets", async () => {
     const harness = createWorkerHarness();
     let responseWork: Promise<Response> | undefined;
     singleHandler(harness, "fetch")({
       request: {
         method: "GET",
-        url: "https://krwontology.com/_next/static/chunks/app.abc123.js",
+        url: "https://krwontology.com/icons/icon-192.png",
         mode: "cors",
-        destination: "script",
+        destination: "image",
       },
       respondWith(work: Promise<Response>) {
         responseWork = work;
@@ -155,6 +155,21 @@ describe("service worker cache and update policy", () => {
     await responseWork;
     expect(harness.fetch).toHaveBeenCalledTimes(1);
     expect(harness.put).toHaveBeenCalledTimes(1);
+  });
+
+  it("never intercepts Next.js build or development chunks", () => {
+    const harness = createWorkerHarness();
+    const respondWith = vi.fn();
+    singleHandler(harness, "fetch")({
+      request: new Request(
+        "https://krwontology.com/_next/static/chunks/app.abc123.js",
+        { method: "GET" },
+      ),
+      respondWith,
+    });
+
+    expect(respondWith).not.toHaveBeenCalled();
+    expect(harness.put).not.toHaveBeenCalled();
   });
 
   it("falls back to the offline shell without storing navigation HTML", async () => {

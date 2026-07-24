@@ -40,7 +40,8 @@ export async function createImmediateAssistantResponse(params: {
     rich_answers: [],
     artifacts: [],
     chat_artifacts: [],
-    charts: [],
+    visualizations: [],
+    presentation: null,
     release: null,
     usage: {
       input_tokens: 0,

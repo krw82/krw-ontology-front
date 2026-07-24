@@ -75,7 +75,7 @@ export function buildDevelopmentPulseShowcase(now: Date): PulseCandidate[] {
       reason_code: "development_showcase",
       reason_label: "개발 환경 카드 미리보기입니다.",
       priority: "high" as const,
-      coverage_level: "holding" as const,
+      coverage_level: "interest" as const,
       primary_action: { type: "link" as const, label: "공시 보기", href: "/filings" },
       secondary_actions: [],
       metadata: {

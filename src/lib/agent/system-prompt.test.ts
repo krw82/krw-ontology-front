@@ -107,6 +107,25 @@ describe("buildSystemPrompt", () => {
     expect(researchPrompt).not.toContain("krw-ontology-news-research");
   });
 
+  it("uses the source-filing skill before the ordinary research skill", () => {
+    const researchPrompt = buildResearchPassPrompt(
+      "이 공시가 투자 가설에 어떤 의미가 있어?",
+      "company",
+      "company_research",
+      "ko",
+      null,
+      true,
+    );
+
+    expect(researchPrompt).toContain(
+      "/krw-ontology:krw-ontology-filing-follow-up 이 공시가 투자 가설에 어떤 의미가 있어?",
+    );
+    expect(researchPrompt).toContain("해당 공시만 읽고 해석합니다");
+    expect(researchPrompt).not.toContain(
+      "/krw-ontology:krw-ontology-research 이 공시가 투자 가설에",
+    );
+  });
+
   it("uses the idea generation skill with a Markdown-only candidate brief", () => {
     const researchPrompt = buildResearchPassPrompt(
       "AI 데이터센터 전력 수혜 기업을 찾아줘",
@@ -203,18 +222,17 @@ describe("buildSystemPrompt", () => {
     );
   });
 
-  it("omits chart instructions unless chart generation is explicitly enabled", () => {
+  it("omits visualization instructions unless generation is explicitly enabled", () => {
     const disabledPrompt = buildSystemPrompt();
-    expect(disabledPrompt).not.toContain("Inline chart policy");
-    expect(disabledPrompt).not.toContain("create_chart_v1");
-    expect(disabledPrompt).not.toContain("[[krw-chart:");
+    expect(disabledPrompt).not.toContain("Structured visualization policy");
+    expect(disabledPrompt).not.toContain("compose_visualization");
 
     const enabledPrompt = buildSystemPrompt(undefined, [], {
-      chartGenerationEnabled: true,
+      visualizationGenerationEnabled: true,
     });
-    expect(enabledPrompt).toContain("Inline chart policy");
-    expect(enabledPrompt).toContain("create_chart_v1");
-    expect(enabledPrompt).toContain("insert_token");
+    expect(enabledPrompt).toContain("Structured visualization policy");
+    expect(enabledPrompt).toContain("compose_visualization");
+    expect(enabledPrompt).toContain("Markdown placement tokens");
   });
 
   it("adds an English-only final answer policy when requested", () => {

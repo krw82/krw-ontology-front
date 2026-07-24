@@ -7,6 +7,8 @@ import {
   resolveFilingAccess,
   resolveFilingContextTicker,
 } from "@/lib/filing-notifications/filing-access";
+import { recordOnboardingStateAction } from "@/lib/onboarding/state";
+import { isOnboardingStartEntry } from "@/lib/onboarding/start-flow";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type {
   SecFilingBriefRow,
@@ -151,8 +153,38 @@ export async function GET(
   await recordAnalyticsEvent({
     eventName: source === "recommended_exhibit" ? "key_exhibit_opened" : "sec_source_opened",
     userId: user.id,
-    properties: { filing_event_id: filing.id, ticker, source, document_id: documentId },
+    properties: {
+      filing_event_id: filing.id,
+      ticker,
+      source,
+      document_id: documentId,
+      ...(isOnboardingStartEntry(request.nextUrl.searchParams.get("entry"))
+        ? { entry: "onboarding_v2" }
+        : {}),
+    },
   });
+  if (isOnboardingStartEntry(request.nextUrl.searchParams.get("entry"))) {
+    try {
+      const onboardingResult = await recordOnboardingStateAction(
+        admin,
+        user.id,
+        "evidence_opened",
+      );
+      if (onboardingResult.changed && onboardingResult.state) {
+        await recordAnalyticsEvent({
+          eventName: "onboarding_evidence_opened",
+          userId: user.id,
+          properties: { filing_event_id: filing.id, ticker },
+        });
+      }
+    } catch (error) {
+      // The source-open record above remains the durable evidence action. A
+      // secondary onboarding state write must not stop the SEC redirect.
+      console.warn("[onboarding] failed to complete after SEC source open", {
+        message: error instanceof Error ? error.message : null,
+      });
+    }
+  }
   await tryRecordCoverageActivation(user.id);
   return Response.redirect(url, 302);
 }

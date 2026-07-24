@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useSessions } from "@/hooks/useSessions";
 import { buildChatSessionHref } from "@/lib/chat/history-state";
-import { localeSwitchHref, resolveRouteLocale } from "@/i18n/routing";
+import { resolveRouteLocale } from "@/i18n/routing";
 import {
   readDeviceWatchlistOverview,
   saveDeviceWatchlistOverview,
@@ -50,18 +50,6 @@ export default function WatchlistHomeClient({
   const deferredQuery = useDeferredValue(query);
   const locale = resolveRouteLocale(pathname, searchParams.get("locale"));
   const activeTab = searchParams.get("tab") === "history" ? "history" : "notebook";
-  const notebookHref = useMemo(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("tab");
-    params.delete("q");
-    return localeSwitchHref(locale, "/watchlist", params.toString());
-  }, [locale, searchParams]);
-  const historyHref = useMemo(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", "history");
-    params.delete("q");
-    return localeSwitchHref(locale, "/watchlist", params.toString());
-  }, [locale, searchParams]);
   const {
     sessions,
     loading: historyLoading,
@@ -158,7 +146,6 @@ export default function WatchlistHomeClient({
   }, [companies, deferredQuery]);
   const companySections = useMemo(() => {
     return [
-      { key: "holding", title: "보유 중" },
       { key: "interest", title: "관심" },
     ].map((section) => ({
       ...section,
@@ -248,44 +235,18 @@ export default function WatchlistHomeClient({
             </p>
             <div className="min-w-0">
               <h1 className="mt-2 text-balance text-[30px] font-black leading-[1.08] tracking-normal text-ink sm:text-[40px]">
-                기업 커버리지
+                {activeTab === "history" ? "채팅 기록" : "기업 커버리지"}
               </h1>
               <p className="mt-3 max-w-2xl text-[15px] leading-6 text-body sm:text-[16px]">
                 {activeTab === "history"
                   ? "이전 질문과 분석 결과를 찾아, 같은 맥락에서 바로 이어서 볼 수 있습니다."
                   : "회사별로 무엇이 변했는지, 내 판단은 무엇인지, 다음에 무엇을 할지 한곳에서 이어봅니다."}
               </p>
-              <nav className="mt-4 flex items-center gap-1" aria-label="기업 커버리지 보기">
-                <Link
-                  href={notebookHref}
-                  className={[
-                    "rounded-[8px] px-sm py-xs text-[13px] font-extrabold leading-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                    activeTab === "notebook"
-                      ? "bg-surface text-ink"
-                      : "text-muted hover:bg-surface-soft hover:text-ink",
-                  ].join(" ")}
-                  aria-current={activeTab === "notebook" ? "page" : undefined}
-                >
-                  커버리지
-                </Link>
-                <Link
-                  href={historyHref}
-                  className={[
-                    "rounded-[8px] px-sm py-xs text-[13px] font-extrabold leading-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                    activeTab === "history"
-                      ? "bg-surface text-ink"
-                      : "text-muted hover:bg-surface-soft hover:text-ink",
-                  ].join(" ")}
-                  aria-current={activeTab === "history" ? "page" : undefined}
-                >
-                  채팅 기록
-                </Link>
-              </nav>
             </div>
           </div>
           <div className="relative min-w-0">
             <p className="mb-2 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
-              Coverage search
+              {activeTab === "history" ? "Chat search" : "Coverage search"}
             </p>
             <span
               aria-hidden="true"
@@ -296,7 +257,7 @@ export default function WatchlistHomeClient({
             <input
               className="h-11 w-full rounded-[8px] border border-hairline bg-canvas pl-10 pr-sm text-[14px] font-semibold leading-5 text-ink shadow-sm placeholder:text-muted focus:border-outline focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim/25"
               placeholder={activeTab === "history" ? "티커, 질문, 대화 검색" : "티커, 회사명, 판단 노트 검색"}
-              aria-label="기업 커버리지 검색"
+              aria-label={activeTab === "history" ? "채팅 기록 검색" : "기업 커버리지 검색"}
               value={query}
               onChange={(event) => updateQuery(event.target.value)}
             />
@@ -770,7 +731,7 @@ function EmptyWatchlist() {
         아직 커버하는 회사가 없습니다.
       </p>
       <p className="mt-3 max-w-2xl text-[14px] font-semibold leading-6 text-body">
-        회사 한 곳을 선택해 탐색·관찰·보유 상태를 정하고, 새 공시가 올 때마다 판단을 이어가세요.
+        관심 기업을 저장하고, 새 공시가 올 때마다 판단을 이어가세요.
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <Link

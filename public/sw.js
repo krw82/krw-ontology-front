@@ -113,7 +113,10 @@ function isNetworkOnlyPath(pathname) {
 }
 
 function isSafeStaticAsset(request, pathname) {
-  if (pathname.startsWith("/_next/static/")) return true;
+  // Next.js owns the cache lifecycle for its build/HMR chunks. A service
+  // worker cache can outlive the module graph that produced those chunks and
+  // make a development tab fail before React can boot. Only cache the small,
+  // explicitly allowlisted PWA shell assets here.
   if (!SAFE_PUBLIC_ASSET_PATHS.has(pathname)) return false;
   return ["font", "image", "script", "style"].includes(request.destination);
 }

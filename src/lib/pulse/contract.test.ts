@@ -4,11 +4,13 @@ import { normalizePulseDateTime, pulseItemSchema } from "@/lib/pulse/contract";
 const validItem = {
   id: "opaque",
   kind: "filing",
+  feed_slot: "signal",
+  server_rank: 0,
   trigger: "event",
   source_type: "filing",
   source_id: "notification-id",
   ticker: "AAPL",
-  coverage_level: "holding",
+  coverage_level: "interest",
   judgment: null,
   linked_thesis: null,
   eyebrow: "8-K 새 공시",
@@ -45,6 +47,7 @@ describe("Pulse item contract", () => {
 
   it("rejects mismatched kinds and missing reason/action data", () => {
     expect(pulseItemSchema.safeParse({ ...validItem, source_type: "question" }).success).toBe(false);
+    expect(pulseItemSchema.safeParse({ ...validItem, coverage_level: "holding" }).success).toBe(false);
     const withoutReason: Partial<typeof validItem> = { ...validItem };
     delete withoutReason.reason_label;
     expect(pulseItemSchema.safeParse(withoutReason).success).toBe(false);

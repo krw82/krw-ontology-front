@@ -6,7 +6,9 @@ import {
   getFilingBrief,
   getFilingMetadata,
   getForm4InsiderTransactions,
+  listFilingDocuments,
   listFilingSections,
+  readFilingDocument,
   readFilingSection,
   searchCatalogFilings,
 } from "./on-demand-filing-reader";
@@ -31,6 +33,8 @@ export const KRW_FILINGS_MCP_TOOL_NAMES = [
   "search_catalog_filings",
   "list_filing_sections",
   "read_filing_section",
+  "list_filing_documents",
+  "read_filing_document",
   "get_form4_insider_transactions",
 ] as const;
 
@@ -102,6 +106,28 @@ export function createKrwFilingsMcpServer(
   }, async ({ filing_event_id, section_key, offset, max_chars }) => toolResult(() => readFilingSection({
     filingEventId: filing_event_id,
     sectionKey: section_key,
+    offset,
+    maxChars: max_chars,
+  })));
+
+  server.registerTool("list_filing_documents", {
+    title: "List verified SEC filing documents",
+    description: "Fetches the selected 8-K or 6-K filing's SEC submission index on demand and lists primary and Exhibit metadata. It never persists the document list or a document body.",
+    inputSchema: { filing_event_id: FILING_EVENT_ID_SCHEMA },
+  }, async ({ filing_event_id }) => toolResult(() => listFilingDocuments(filing_event_id)));
+
+  server.registerTool("read_filing_document", {
+    title: "Read a verified SEC filing attachment",
+    description: "Reads a bounded text slice from one HTML, XML, or text Exhibit returned by list_filing_documents. A raw URL is never accepted; the document_key must belong to the selected SEC filing.",
+    inputSchema: {
+      filing_event_id: FILING_EVENT_ID_SCHEMA,
+      document_key: z.string().min(12).max(120).describe("A document_key returned by list_filing_documents for this same filing."),
+      offset: z.number().int().min(0).optional().describe("Character offset for pagination; defaults to 0."),
+      max_chars: z.number().int().min(1_000).max(120_000).optional().describe("Maximum returned characters; defaults to 24,000."),
+    },
+  }, async ({ filing_event_id, document_key, offset, max_chars }) => toolResult(() => readFilingDocument({
+    filingEventId: filing_event_id,
+    documentKey: document_key,
     offset,
     maxChars: max_chars,
   })));

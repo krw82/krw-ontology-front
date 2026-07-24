@@ -10,6 +10,11 @@ export const ANALYTICS_EVENT_NAMES = [
   "home_cta_clicked",
   "signup_started",
   "login_completed",
+  "onboarding_started",
+  "onboarding_company_selected",
+  "onboarding_question_started",
+  "onboarding_evidence_opened",
+  "onboarding_skipped",
   "company_selected",
   "question_prefilled",
   "suggested_question_clicked",
@@ -80,6 +85,9 @@ export const ANALYTICS_EVENT_NAMES = [
   "pulse_filter_changed",
   "pulse_preferences_updated",
   "pulse_new_items_seen",
+  "pulse_refresh_requested",
+  "pulse_refresh_completed",
+  "pulse_refresh_failed",
   "pulse_end_reached",
   "pulse_feedback_submitted",
   "pulse_source_degraded",
@@ -112,6 +120,11 @@ export const SERVER_ONLY_ANALYTICS_EVENT_NAMES = [
   "monitoring_rule_created",
   "decision_session_closed",
   "second_opportunity_resolved",
+  "onboarding_started",
+  "onboarding_company_selected",
+  "onboarding_question_started",
+  "onboarding_evidence_opened",
+  "onboarding_skipped",
   "sec_source_opened",
 ] as const satisfies readonly AnalyticsEventName[];
 
@@ -230,12 +243,12 @@ const DECISION_LOOP_CATEGORY_KEYS = new Set([
 ]);
 
 const DECISION_LOOP_CATEGORY_VALUES: Readonly<Record<string, readonly string[]>> = {
-  coverage_level: ["interest", "holding", "none"],
+  coverage_level: ["interest", "none"],
   form_type: ["8-k", "8-k/a", "6-k", "6-k/a", "4", "4/a"],
   impact: ["positive", "neutral", "negative", "unclear"],
   next_action: ["complete", "update_thesis", "create_question", "review_later"],
   outcome: ["completed", "updated", "unchanged", "dismissed", "deferred", "resolved", "failed"],
-  previous_coverage_level: ["none", "interest", "holding"],
+  previous_coverage_level: ["none", "interest"],
   previous_impact: ["none", "positive", "neutral", "negative", "unclear"],
   previous_next_action: ["none", "complete", "update_thesis", "create_question", "review_later"],
   previous_status: ["none", "active", "completed", "resolved"],

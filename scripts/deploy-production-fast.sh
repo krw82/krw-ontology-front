@@ -197,6 +197,9 @@ if [ "$SKIP_MAC" = "0" ]; then
   require_file "$SCRIPT_DIR/install-stock-news-mcp-launchd.sh"
   require_file "$SCRIPT_DIR/install-filings-mcp-launchd.sh"
   require_file "$SCRIPT_DIR/install-mac-worker-launchd.sh"
+  require_file "$SCRIPT_DIR/materialize-ontology-plugin.mjs"
+  require_file "$SCRIPT_DIR/verify-mcp-server-production.sh"
+  require_file "$SCRIPT_DIR/verify-mac-worker-heartbeats.mjs"
 fi
 if [ "$APPLY_MIGRATIONS" = "1" ]; then
   require_file "$SCRIPT_DIR/supabase-schema-smoke.mjs"
@@ -210,11 +213,65 @@ if [ "$APPLY_MIGRATIONS" = "1" ]; then
   run_migration_dry_run
 fi
 
+materialize_runtime_ontology_plugin() {
+  runtime_env=$1
+  output_path=$2
+  (
+    set -a
+    # shellcheck disable=SC1090
+    . "$runtime_env"
+    set +a
+
+    [ "$KRW_ONTOLOGY_ENV" = "prod" ] || {
+      echo "Runtime plugin materialization requires KRW_ONTOLOGY_ENV=prod." >&2
+      exit 1
+    }
+    [ -n "$KRW_ONTOLOGY_PLUGIN_SOURCE_PATH" ] || {
+      echo "Missing KRW_ONTOLOGY_PLUGIN_SOURCE_PATH for runtime plugin materialization." >&2
+      exit 1
+    }
+    [ -n "$KRW_ONTOLOGY_MCP_URL" ] || {
+      echo "Missing KRW_ONTOLOGY_MCP_URL for runtime plugin materialization." >&2
+      exit 1
+    }
+
+    # Derive both hashes from the exact source/release that this runtime will
+    # launch. A previously pinned expected hash must not preserve a stale
+    # plugin contract across a source upgrade.
+    KRW_MCP_EXPECTED_TOOL_SCHEMA_SHA256= \
+    KRW_MCP_EXPECTED_BUILD_FINGERPRINT_SHA256= \
+      node "$SCRIPT_DIR/materialize-ontology-plugin.mjs" \
+        --env prod \
+        --source "$KRW_ONTOLOGY_PLUGIN_SOURCE_PATH" \
+        --out "$output_path" \
+        --mcp-url "$KRW_ONTOLOGY_MCP_URL"
+  )
+}
+
+prepare_dry_run_runtime_plugin() {
+  TMP_BASE=$TMPDIR
+  [ -n "$TMP_BASE" ] || TMP_BASE=/tmp
+  TMP_DIR=$(mktemp -d "$TMP_BASE/krw-fast-runtime-plugin.XXXXXX")
+  DRY_RUNTIME_ENV="$TMP_DIR/runtime.env"
+  DRY_PLUGIN_PATH="$TMP_DIR/plugins/krw-ontology"
+
+  umask 077
+  cp "$ENV_PATH" "$DRY_RUNTIME_ENV"
+  printf '\nKRW_ONTOLOGY_PLUGIN_PATH=%s\n' "$DRY_PLUGIN_PATH" >> "$DRY_RUNTIME_ENV"
+  chmod 600 "$DRY_RUNTIME_ENV"
+
+  echo "Materializing and verifying a temporary runtime plugin candidate..."
+  materialize_runtime_ontology_plugin "$DRY_RUNTIME_ENV" "$DRY_PLUGIN_PATH"
+}
+
 if [ "$DRY_RUN" = "1" ]; then
+  if [ "$SKIP_MAC" = "0" ]; then
+    prepare_dry_run_runtime_plugin
+  fi
   if [ "$WITH_DATA" = "1" ]; then
     "$SCRIPT_DIR/deploy-data-release-production.sh" --env-file "$ENV_PATH" --dry-run
   fi
-  echo "Dry run passed. No archive, container, migration, catalog, or launchd change was made."
+  echo "Dry run passed. No archive, container, migration, catalog, launchd, or active runtime change was made."
   exit 0
 fi
 
@@ -222,11 +279,13 @@ prepare_mac_runtime() {
   MAC_RUNTIME_BASE="$HOME/.local/share/krw-ontology/simple-runtimes"
   MAC_RUNTIME_DIR="$MAC_RUNTIME_BASE/$RELEASE_ID"
   MAC_RUNTIME_ENV="$MAC_RUNTIME_DIR/runtime.env"
+  MAC_RUNTIME_PLUGIN_PATH="$MAC_RUNTIME_DIR/plugins/krw-ontology"
   [ ! -e "$MAC_RUNTIME_DIR" ] || fail "Mac runtime directory already exists: $MAC_RUNTIME_DIR"
-  mkdir -p "$MAC_RUNTIME_DIR"
+  mkdir -p "$MAC_RUNTIME_DIR/plugins"
   umask 077
   cp "$ENV_PATH" "$MAC_RUNTIME_ENV"
-  printf '\nNEXT_PUBLIC_APP_VERSION=%s\nKRW_DEPLOYMENT_ID=%s\n' "$RELEASE_ID" "$RELEASE_ID" >> "$MAC_RUNTIME_ENV"
+  printf '\nNEXT_PUBLIC_APP_VERSION=%s\nKRW_DEPLOYMENT_ID=%s\nKRW_ONTOLOGY_PLUGIN_PATH=%s\n' \
+    "$RELEASE_ID" "$RELEASE_ID" "$MAC_RUNTIME_PLUGIN_PATH" >> "$MAC_RUNTIME_ENV"
   if [ "$SKIP_MAC" = "0" ]; then
     (cd "$FRONT_DIR" && npm run build:worker)
     WORKER_SHA=$(shasum -a 256 "$FRONT_DIR/.worker/agent-worker.mjs" | awk '{print $1}')
@@ -234,6 +293,8 @@ prepare_mac_runtime() {
     printf 'KRW_MAC_IMMUTABLE_RUNTIME=0\nKRW_MAC_RUNTIME_ROOT=%s\nKRW_WORKER_BUNDLE_SHA256=%s\nKRW_RUNTIME_IDENTITY_SHA256=%s\n' "$FRONT_DIR" "$WORKER_SHA" "$RUNTIME_SHA" >> "$MAC_RUNTIME_ENV"
   fi
   chmod 600 "$MAC_RUNTIME_ENV"
+  echo "Materializing versioned production runtime plugin..."
+  materialize_runtime_ontology_plugin "$MAC_RUNTIME_ENV" "$MAC_RUNTIME_PLUGIN_PATH"
 }
 
 prepare_data_environment() {
@@ -462,6 +523,21 @@ restart_mac_services() {
   "$runtime_root/scripts/install-mac-worker-launchd.sh" --env-file "$runtime_env" --load --skip-preflight
 }
 
+verify_new_mac_runtime() {
+  runtime_root=$1
+  runtime_env=$2
+  activation_started_at=$3
+
+  "$runtime_root/scripts/verify-mcp-server-production.sh" --env-file "$runtime_env"
+  node "$runtime_root/scripts/verify-mac-worker-heartbeats.mjs" \
+    --env-file "$runtime_env" \
+    --seen-after "$activation_started_at" \
+    --deployment-id "$RELEASE_ID" \
+    --worker-bundle-sha256 "$WORKER_SHA" \
+    --runtime-identity-sha256 "$RUNTIME_SHA" \
+    --timeout-ms 120000
+}
+
 capture_previous_mac_runtime() {
   PREVIOUS_MAC_ENV=
   PREVIOUS_MAC_ROOT=
@@ -491,8 +567,10 @@ restore_previous_mac_runtime() {
 
 activate_mac_runtime() {
   capture_previous_mac_runtime
+  ACTIVATION_STARTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   if "$SCRIPT_DIR/mac-worker-preflight.sh" --env-file "$MAC_RUNTIME_ENV" --skip-worker-build --skip-worker-duplicate-check --skip-live-mcp-fingerprint; then
-    if restart_mac_services "$FRONT_DIR" "$MAC_RUNTIME_ENV"; then
+    if restart_mac_services "$FRONT_DIR" "$MAC_RUNTIME_ENV" \
+      && verify_new_mac_runtime "$FRONT_DIR" "$MAC_RUNTIME_ENV" "$ACTIVATION_STARTED_AT"; then
       rm -f "$MAC_RUNTIME_BASE/current"
       ln -s "$MAC_RUNTIME_DIR" "$MAC_RUNTIME_BASE/current"
       echo "Activated Mac runtime: $MAC_RUNTIME_DIR"

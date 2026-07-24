@@ -8,7 +8,7 @@ usage() {
 Usage: scripts/verify-filings-mcp-production.sh [--env-file FILE]
 
 Verify the authenticated local on-demand SEC filings MCP /readyz endpoint and
-its exact public six-tool and authenticated personal four-tool contracts.
+its exact public eight-tool and authenticated personal four-tool contracts.
 EOF
 }
 
@@ -60,6 +60,8 @@ const expected = [
   "search_catalog_filings",
   "list_filing_sections",
   "read_filing_section",
+  "list_filing_documents",
+  "read_filing_document",
   "get_form4_insider_transactions",
 ];
 const expectedPersonal = [

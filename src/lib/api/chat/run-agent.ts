@@ -49,6 +49,10 @@ import {
   mergeSdkDiagnosticsForPersistence,
 } from "@/lib/agent/sdk-diagnostics";
 import { cancelledAssistantContent } from "@/lib/chat/message-status";
+import {
+  redactFilingCitationForPersistence,
+  redactFilingToolCallForPersistence,
+} from "@/lib/agent/filing-tool-persistence";
 
 const EXISTING_RUN_POLL_INTERVAL_MS = 800;
 const EXISTING_RUN_MAX_POLL_MS = 120_000;
@@ -857,17 +861,18 @@ function createRunEventPersister(
   };
 
   const persistToolCall = async (toolCall: AccumulatedToolCall) => {
+    const persistedToolCall = redactFilingToolCallForPersistence(toolCall);
     const payload = {
       run_id: runId,
-      tool_use_id: toolCall.id,
-      tool_name: toolCall.toolName,
-      arguments_json: parseJsonStringForDb(toolCall.argumentsJson) ?? {},
-      result_summary: toolCall.resultSummary,
-      result_json: jsonForDb(toolCall.resultJson),
-      result_text: toolCall.resultText,
-      started_at: toolCall.startedAt,
-      finished_at: toolCall.finishedAt,
-      error_message: toolCall.errorMessage,
+      tool_use_id: persistedToolCall.id,
+      tool_name: persistedToolCall.toolName,
+      arguments_json: parseJsonStringForDb(persistedToolCall.argumentsJson) ?? {},
+      result_summary: persistedToolCall.resultSummary,
+      result_json: jsonForDb(persistedToolCall.resultJson),
+      result_text: persistedToolCall.resultText,
+      started_at: persistedToolCall.startedAt,
+      finished_at: persistedToolCall.finishedAt,
+      error_message: persistedToolCall.errorMessage,
     };
 
     const { data: existing } = await admin
@@ -887,19 +892,20 @@ function createRunEventPersister(
   };
 
   const persistCitation = async (citation: StreamingCitation) => {
+    const persistedCitation = redactFilingCitationForPersistence(citation);
     await admin.from("citations").insert({
       message_id: assistantMessageId,
       run_id: runId,
-      object_id: citation.object_id,
-      ticker: citation.ticker,
-      document_type: citation.document_type,
-      period: citation.period,
-      section: citation.section,
-      quote_text: citation.quote_text,
-      claim_text: citation.claim_text,
-      evidence_grade: citation.evidence_grade,
-      source_quality: citation.source_quality,
-      trace_json: jsonForDb(citation.trace_json),
+      object_id: persistedCitation.object_id,
+      ticker: persistedCitation.ticker,
+      document_type: persistedCitation.document_type,
+      period: persistedCitation.period,
+      section: persistedCitation.section,
+      quote_text: persistedCitation.quote_text,
+      claim_text: persistedCitation.claim_text,
+      evidence_grade: persistedCitation.evidence_grade,
+      source_quality: persistedCitation.source_quality,
+      trace_json: jsonForDb(persistedCitation.trace_json),
     });
   };
 

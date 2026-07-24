@@ -1,5 +1,6 @@
 import type { Locale } from "@/i18n/config";
 import {
+  localeSwitchHref,
   localizedPath,
   queryLocalizedPath,
   stripLocalePrefix,
@@ -13,7 +14,7 @@ export type WorkspaceRouteId =
   | "perspectives"
   | "companies"
   | "notebook"
-  | "filings"
+  | "chatHistory"
   | "holdings";
 
 export type WorkspaceNavigationGroupId = "now" | "explore" | "research" | "monitor";
@@ -22,7 +23,6 @@ export type WorkspaceShellMode =
   | "immersive"
   | "self-managed"
   | "public";
-export type WorkspaceTabId = "feed" | "explore" | "coverage" | "filings";
 
 interface WorkspaceRouteDefinition {
   id: WorkspaceRouteId;
@@ -50,14 +50,6 @@ export interface WorkspaceNavigationGroup {
   id: WorkspaceNavigationGroupId;
   label: string;
   items: WorkspaceNavigationItem[];
-}
-
-export interface WorkspaceTabItem {
-  id: WorkspaceTabId;
-  icon: string;
-  label: string;
-  href: string;
-  active: boolean;
 }
 
 const GROUP_LABELS: Record<Locale, Record<WorkspaceNavigationGroupId, string>> = {
@@ -93,13 +85,13 @@ const WORKSPACE_ROUTES: WorkspaceRouteDefinition[] = [
     matches: (pathname) => pathname === "/pulse" || pathname.startsWith("/pulse/"),
   },
   {
-    id: "discover",
+    id: "companies",
     group: "explore",
-    icon: "travel_explore",
-    labels: { ko: "조건으로 기업 검색", en: "Company search by criteria" },
-    onboardingTarget: "stock-discovery-nav",
-    href: (locale) => queryLocalizedPath(locale, "/discover"),
-    matches: (pathname) => pathname === "/discover" || pathname.startsWith("/discover/"),
+    icon: "search",
+    labels: { ko: "회사", en: "Companies" },
+    onboardingTarget: "company-search-nav",
+    href: (locale) => localizedPath(locale, "/companies"),
+    matches: (pathname) => pathname === "/companies" || pathname.startsWith("/companies/"),
   },
   {
     id: "perspectives",
@@ -109,6 +101,15 @@ const WORKSPACE_ROUTES: WorkspaceRouteDefinition[] = [
     onboardingTarget: "guru-advisor-nav",
     href: (locale) => queryLocalizedPath(locale, "/guru"),
     matches: (pathname) => pathname === "/guru" || pathname.startsWith("/guru/"),
+  },
+  {
+    id: "discover",
+    group: "explore",
+    icon: "travel_explore",
+    labels: { ko: "조건으로 기업 검색", en: "Company search by criteria" },
+    onboardingTarget: "stock-discovery-nav",
+    href: (locale) => queryLocalizedPath(locale, "/discover"),
+    matches: (pathname) => pathname === "/discover" || pathname.startsWith("/discover/"),
   },
   {
     id: "wideResearch",
@@ -121,15 +122,6 @@ const WORKSPACE_ROUTES: WorkspaceRouteDefinition[] = [
     matches: () => false,
   },
   {
-    id: "companies",
-    group: "explore",
-    icon: "search",
-    labels: { ko: "회사", en: "Companies" },
-    onboardingTarget: "company-search-nav",
-    href: (locale) => localizedPath(locale, "/companies"),
-    matches: (pathname) => pathname === "/companies" || pathname.startsWith("/companies/"),
-  },
-  {
     id: "notebook",
     group: "research",
     icon: "article",
@@ -139,13 +131,14 @@ const WORKSPACE_ROUTES: WorkspaceRouteDefinition[] = [
     matches: (pathname) => pathname === "/watchlist" || pathname.startsWith("/watchlist/"),
   },
   {
-    id: "filings",
-    group: "monitor",
-    icon: "notifications",
-    labels: { ko: "공시 알림", en: "Filing alerts" },
-    onboardingTarget: "filing-alerts-nav",
-    href: (locale) => queryLocalizedPath(locale, "/filings"),
-    matches: (pathname) => pathname === "/filings" || pathname.startsWith("/filings/"),
+    id: "chatHistory",
+    group: "research",
+    icon: "history",
+    labels: { ko: "최근 채팅", en: "Recent chats" },
+    onboardingTarget: "chat-history-nav",
+    desktop: false,
+    href: (locale) => localeSwitchHref(locale, "/watchlist", "tab=history"),
+    matches: () => false,
   },
   {
     id: "holdings",
@@ -157,52 +150,6 @@ const WORKSPACE_ROUTES: WorkspaceRouteDefinition[] = [
     matches: (pathname) =>
       pathname === "/institutional-holdings" ||
       pathname.startsWith("/institutional-holdings/"),
-  },
-];
-
-const MOBILE_TAB_DEFINITIONS: Array<{
-  id: WorkspaceTabId;
-  icon: string;
-  labels: Record<Locale, string>;
-  href: (locale: Locale) => string;
-  matches: (pathname: string) => boolean;
-}> = [
-  {
-    id: "feed",
-    icon: "dynamic_feed",
-    labels: { ko: "피드", en: "Feed" },
-    href: (locale) => queryLocalizedPath(locale, "/pulse"),
-    matches: (pathname) =>
-      pathname === "/pulse" || pathname.startsWith("/pulse/"),
-  },
-  {
-    id: "explore",
-    icon: "search",
-    labels: { ko: "탐색", en: "Explore" },
-    href: (locale) => localizedPath(locale, "/companies"),
-    matches: (pathname) =>
-      pathname === "/companies" ||
-      pathname.startsWith("/companies/") ||
-      pathname === "/discover" ||
-      pathname.startsWith("/discover/") ||
-      pathname === "/guru" ||
-      pathname.startsWith("/guru/"),
-  },
-  {
-    id: "coverage",
-    icon: "radar",
-    labels: { ko: "커버리지", en: "Coverage" },
-    href: (locale) => queryLocalizedPath(locale, "/watchlist"),
-    matches: (pathname) =>
-      pathname === "/watchlist" || pathname.startsWith("/watchlist/"),
-  },
-  {
-    id: "filings",
-    icon: "notifications",
-    labels: { ko: "공시", en: "Filings" },
-    href: (locale) => queryLocalizedPath(locale, "/filings"),
-    matches: (pathname) =>
-      pathname === "/filings" || pathname.startsWith("/filings/"),
   },
 ];
 
@@ -238,21 +185,6 @@ export function getWorkspaceShellMode(pathname: string): WorkspaceShellMode {
   }
 
   return "public";
-}
-
-export function getWorkspaceTabItems(
-  locale: Locale,
-  pathname: string,
-): WorkspaceTabItem[] {
-  const normalizedPathname = stripLocalePrefix(pathname);
-
-  return MOBILE_TAB_DEFINITIONS.map((tab) => ({
-    id: tab.id,
-    icon: tab.icon,
-    label: tab.labels[locale],
-    href: tab.href(locale),
-    active: tab.matches(normalizedPathname),
-  }));
 }
 
 function resolveItem(

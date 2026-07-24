@@ -31,7 +31,7 @@ export function pulseGlobalCacheKey(input: {
     "krwo",
     "pulse",
     "global-filing-candidates",
-    "v3",
+    "v4",
     input.env,
     String(input.globalRevision),
     String(input.timeBucket),

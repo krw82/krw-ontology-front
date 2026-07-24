@@ -58,6 +58,6 @@ describe("Pulse analysis activity source", () => {
     expect(candidate.eyebrow).toContain("완료");
     expect(candidate.body).toContain("원래 채팅");
     expect(candidate.primary_action).toMatchObject({ label: "결과 이어보기" });
-    expect(candidate.secondary_actions.map((action) => action.label)).toContain("검토 완료");
+    expect(candidate.secondary_actions).toEqual([]);
   });
 });

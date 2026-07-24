@@ -345,7 +345,7 @@ function parseMarkUpdate(body: Record<string, unknown>) {
     >
   > = {};
   if (body.coverage_level !== undefined) {
-    if (body.coverage_level !== null && !(["interest", "holding"] as const).includes(
+    if (body.coverage_level !== null && !(["interest"] as const).includes(
       body.coverage_level as Exclude<UserCompanyMarkRow["coverage_level"], null>,
     )) {
       throw validationError("커버리지 상태가 올바르지 않습니다.");

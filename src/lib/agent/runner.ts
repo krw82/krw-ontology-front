@@ -26,15 +26,15 @@ import {
   STOCK_NEWS_MCP_TOOLS,
   YAHOO_FINANCE_MCP_TOOLS,
   YAHOO_FINANCE_SDK_ALLOWED_TOOLS,
-  CHART_MCP_TOOLS,
-  CHART_SDK_ALLOWED_TOOLS,
+  VISUALIZATION_MCP_TOOLS,
+  VISUALIZATION_SDK_ALLOWED_TOOLS,
   KRW_FILINGS_MCP_TOOLS,
   KRW_FILINGS_SDK_ALLOWED_TOOLS,
   KRW_PERSONAL_FILINGS_MCP_TOOLS,
   KRW_PERSONAL_FILINGS_SDK_ALLOWED_TOOLS,
   getStockNewsSdkAllowedTools,
   getKrwOntologyPluginPath,
-  isChartSdkTool,
+  isVisualizationSdkTool,
   isGuruAdvisorSdkTool,
   isKrwFilingsMcpEnabled,
   isKrwPersonalFilingsMcpEnabled,
@@ -90,10 +90,10 @@ import {
 } from "@/lib/run-kind";
 import type { GuruLensKey } from "@/lib/guru-lenses";
 import {
-  CHART_MCP_SERVER_NAME,
-  createChartMcpServer,
-} from "@/lib/charts/create-chart-tool";
-import { isChartGenerationEnabled } from "@/lib/features/charts";
+  VISUALIZATION_MCP_SERVER_NAME,
+  createVisualizationMcpServer,
+} from "@/lib/visualizations/create-visualization-tool";
+import { isVisualizationGenerationEnabled } from "@/lib/features/charts";
 import { publicAgentErrorMessage } from "@/lib/api/chat/error-messages";
 import { createYahooFinanceNewsMcpServer } from "@/lib/news-discovery/yahoo-finance-mcp-tool";
 import { YAHOO_FINANCE_MCP_SERVER_NAME } from "@/lib/news-discovery/yahoo-finance-mcp-constants";
@@ -109,9 +109,14 @@ import {
   type AccumulatedToolCall,
   type StreamWriter,
 } from "./stream-handler";
+import {
+  filingBodyReadSummary,
+  isOnDemandFilingBodyTool,
+  redactFilingCitationForPersistence,
+} from "./filing-tool-persistence";
 import type {
   DocumentType,
-  ChartMCPToolName,
+  VisualizationMCPToolName,
   GuruMCPToolName,
   KrwFilingsMCPToolName,
   KRWOntologyMCPToolName,
@@ -125,7 +130,7 @@ const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const STOCK_NEWS_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_MCP_TOOLS);
 const GURU_MCP_TOOL_SET = new Set<string>(GURU_MCP_TOOLS);
 const YAHOO_FINANCE_MCP_TOOL_SET = new Set<string>(YAHOO_FINANCE_MCP_TOOLS);
-const CHART_MCP_TOOL_SET = new Set<string>(CHART_MCP_TOOLS);
+const VISUALIZATION_MCP_TOOL_SET = new Set<string>(VISUALIZATION_MCP_TOOLS);
 const KRW_FILINGS_MCP_TOOL_SET = new Set<string>(KRW_FILINGS_MCP_TOOLS);
 const KRW_PERSONAL_FILINGS_MCP_TOOL_SET = new Set<string>(
   KRW_PERSONAL_FILINGS_MCP_TOOLS,
@@ -134,6 +139,9 @@ const KRW_ALL_FILINGS_MCP_TOOL_SET = new Set<string>([
   ...KRW_FILINGS_MCP_TOOLS,
   ...KRW_PERSONAL_FILINGS_MCP_TOOLS,
 ]);
+const KRW_SOURCE_FILINGS_SDK_ALLOWED_TOOLS = KRW_FILINGS_SDK_ALLOWED_TOOLS.filter(
+  (toolName) => !toolName.endsWith("__search_catalog_filings"),
+);
 type KrwPublicFilingsMCPToolName =
   (typeof KRW_FILINGS_MCP_TOOLS)[number];
 type KrwPersonalFilingsMCPToolName =
@@ -143,6 +151,7 @@ const TOOL_BUDGET_EXCEEDED = "tool_budget_exceeded";
 const TOOL_RESULT_MISSING = "tool_result_missing";
 const DEFAULT_STOCK_NEWS_MAX_CALLS = 12;
 const DEFAULT_YAHOO_FINANCE_MAX_CALLS = 4;
+const DEFAULT_FILINGS_MAX_CALLS = 5;
 const AGENT_TOOL_NAME = "Agent";
 const SUBAGENT_TOOL_NAMES = [AGENT_TOOL_NAME] as const;
 const COMPANY_EVIDENCE_SUBAGENT_NAME = "company_evidence_researcher";
@@ -374,10 +383,17 @@ export async function runAgent(
   const stockNewsRun = isStockNewsRunKind(runKind);
   const stockNewsEnabledForRun = stockNewsRun && isStockNewsEnabled();
   const yahooFinanceRun = isYahooFinanceRunKind(runKind);
-  const chartGenerationEnabled = !guruAdvisorRun && isChartGenerationEnabled();
+  const visualizationGenerationEnabled = isVisualizationGenerationEnabled();
   const hasSourceFilingContext = Boolean(options.sourceFilingEventId);
+  const filingCorrelationActive = Boolean(
+    !hasSourceFilingContext &&
+      shouldUseRelatedFilingsEvidence(options, runKind) &&
+      isKrwFilingsMcpEnabled(),
+  );
   const personalFilingsEnabled = Boolean(
-    options.userId && isKrwPersonalFilingsMcpEnabled(),
+    !hasSourceFilingContext &&
+      options.userId &&
+      isKrwPersonalFilingsMcpEnabled(),
   );
   const toolBudget = getResearchModeToolBudget(researchMode);
   const abortHandler = () => abortController.abort();
@@ -416,10 +432,11 @@ export async function runAgent(
       stockNewsUnavailableForNews: stockNewsRun && !stockNewsEnabledForRun,
       yahooFinanceNewsEnabled: yahooFinanceRun,
       yahooFinanceNewsRequired: yahooFinanceRun,
-      chartGenerationEnabled,
+      visualizationGenerationEnabled,
       guruAdvisorMode: guruAdvisorRun,
       guruAgentGeneratedBriefEnabled,
       filingSourceActive: hasSourceFilingContext,
+      filingCorrelationActive,
       responseLocale,
     },
   );
@@ -430,32 +447,46 @@ export async function runAgent(
       runKind,
       responseLocale,
       options.guruLensKey,
+      hasSourceFilingContext,
+      filingCorrelationActive,
     ),
-    buildResearchModePrompt(researchMode),
-    buildSelectedNewsEventContextPrompt(
-      runKind,
-      options.selectedNewsEventContext,
-    ),
-    buildPersonalFilingsPrompt(personalFilingsEnabled),
-  ].join("\n\n");
+    ...(hasSourceFilingContext
+      ? []
+      : [
+          ...(filingCorrelationActive
+            ? []
+            : [buildResearchModePrompt(researchMode)]),
+          buildSelectedNewsEventContextPrompt(
+            runKind,
+            options.selectedNewsEventContext,
+            filingCorrelationActive,
+          ),
+          buildPersonalFilingsPrompt(personalFilingsEnabled),
+        ]),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   const allowedTools = allowedSdkToolsForResearchMode(
     researchMode,
     analysisMode,
     runKind,
-    chartGenerationEnabled,
+    visualizationGenerationEnabled,
     hasSourceFilingContext,
+    filingCorrelationActive,
     personalFilingsEnabled,
   );
 
   const requestedModel = getClaudeAgentModel();
   let strictHttpMcpServers: Record<string, McpHttpServerConfig> | undefined;
   try {
-    strictHttpMcpServers = guruAdvisorRun
+    const configuredMcpServers = guruAdvisorRun
       ? undefined
       : readStrictHttpMcpServerConfigs(ontologyPluginPath, {
-          requireFilingsMcp: hasSourceFilingContext,
+          requireFilingsMcp:
+            hasSourceFilingContext || filingCorrelationActive,
           personalUserId: personalFilingsEnabled ? options.userId : null,
         });
+    strictHttpMcpServers = configuredMcpServers;
   } catch (error) {
     options.abortSignal?.removeEventListener("abort", abortHandler);
     const rawErrorMessage =
@@ -469,6 +500,9 @@ export async function runAgent(
       internalErrorMessage: rawErrorMessage,
     };
   }
+  const researchDisallowedTools = filingCorrelationActive
+    ? [...DISALLOWED_SDK_TOOLS, ...KRW_ONTOLOGY_SDK_ALLOWED_TOOLS]
+    : DISALLOWED_SDK_TOOLS;
   const baseSdkOptions: Options = {
     cwd,
     model: requestedModel,
@@ -493,7 +527,10 @@ export async function runAgent(
         }
       : {
           tools: [],
-          disallowedTools: DISALLOWED_SDK_TOOLS,
+          // The plugin still declares the ontology server, so it can load in
+          // the SDK, but this bounded path must not expose its tools to the
+          // model. The PreToolUse hook remains the backstop for bare names.
+          disallowedTools: researchDisallowedTools,
         }),
     permissionMode: "dontAsk",
     allowDangerouslySkipPermissions: false,
@@ -544,6 +581,7 @@ export async function runAgent(
       runKind,
       responseLocale,
       toolBudget,
+      filingCorrelationActive,
       guruAgentGeneratedBriefEnabled,
       requiredGuruCompanyTicker,
     });
@@ -619,6 +657,35 @@ function selectedGuruCompanyTicker(
   return tickers.length === 1 ? tickers[0] ?? null : null;
 }
 
+/**
+ * The public filings MCP is intentionally narrow: use it only for questions
+ * where a recent market event or a named current filing must be checked
+ * against source disclosure. Ordinary filing research remains on the indexed
+ * ontology path, while source-card chats stay locked to their one filing.
+ */
+function shouldUseRelatedFilingsEvidence(
+  options: AgentRunOptions,
+  runKind: RunKind,
+): boolean {
+  if (runKind === "market_move_research") return true;
+  if (
+    runKind === "company_research" &&
+    options.selectedNewsEventContext != null
+  ) {
+    return true;
+  }
+
+  const text = options.userMessage.toLowerCase();
+  const asksForCurrentTiming = /최근|최신|오늘|방금|current|recent|latest/.test(
+    text,
+  );
+  const asksForFilingSource = /8[-\s]?k|6[-\s]?k|공시\s*원문|원문\s*공시|첨부\s*문서|exhibit/.test(
+    text,
+  );
+
+  return asksForCurrentTiming && asksForFilingSource;
+}
+
 async function runSdkPass(params: {
   passName: "research";
   prompt: string;
@@ -634,6 +701,7 @@ async function runSdkPass(params: {
   runKind: RunKind;
   responseLocale: Locale;
   toolBudget: ResearchModeToolBudget;
+  filingCorrelationActive: boolean;
   guruAgentGeneratedBriefEnabled: boolean;
   requiredGuruCompanyTicker: string | null;
 }): Promise<AgentRunResult> {
@@ -652,6 +720,7 @@ async function runSdkPass(params: {
     runKind,
     responseLocale,
     toolBudget,
+    filingCorrelationActive,
     guruAgentGeneratedBriefEnabled,
     requiredGuruCompanyTicker,
   } = params;
@@ -674,10 +743,15 @@ async function runSdkPass(params: {
     DEFAULT_YAHOO_FINANCE_MAX_CALLS,
     { min: 1 },
   );
+  const maxFilingsCalls = readIntEnv(
+    "FILINGS_MCP_MAX_CALLS",
+    DEFAULT_FILINGS_MAX_CALLS,
+    { min: 1 },
+  );
   const allowedStockNewsSourceUrls = extractAllowedStockNewsSourceUrls(
     options.selectedNewsEventContext,
   );
-  const chartGenerationEnabled = isChartGenerationEnabled();
+  const visualizationGenerationEnabled = isVisualizationGenerationEnabled();
   const personalFilingsEnabled = Boolean(
     options.userId && isKrwPersonalFilingsMcpEnabled(),
   );
@@ -686,6 +760,7 @@ async function runSdkPass(params: {
     maxToolCalls,
     maxStockNewsCalls,
     maxYahooFinanceCalls,
+    maxFilingsCalls,
   });
 
   try {
@@ -697,12 +772,14 @@ async function runSdkPass(params: {
       maxToolCalls,
       maxStockNewsCalls,
       maxYahooFinanceCalls,
+      maxFilingsCalls,
       budgetReservations,
       allowedStockNewsSourceUrls,
-      chartGenerationEnabled,
+      visualizationGenerationEnabled,
       guruAgentGeneratedBriefEnabled,
       requiredGuruCompanyTicker,
       options.sourceFilingEventId ?? null,
+      filingCorrelationActive,
       personalFilingsEnabled,
     );
     const mcpServers = {
@@ -712,9 +789,9 @@ async function runSdkPass(params: {
             [YAHOO_FINANCE_MCP_SERVER_NAME]: createYahooFinanceNewsMcpServer(),
           }
         : {}),
-      ...(chartGenerationEnabled
+      ...(visualizationGenerationEnabled
         ? {
-            [CHART_MCP_SERVER_NAME]: createChartMcpServer(acc),
+            [VISUALIZATION_MCP_SERVER_NAME]: createVisualizationMcpServer(acc),
           }
         : {}),
     };
@@ -745,7 +822,7 @@ async function runSdkPass(params: {
 
       if (message.type === "system" && message.subtype === "init") {
         systemInit = message;
-        assertKrwOntologySystemInit(message, runKind);
+        assertKrwOntologySystemInit(message, runKind, filingCorrelationActive);
       }
 
       const observedModel = modelFromSdkMessage(message);
@@ -1043,6 +1120,7 @@ function summarizeSystemInit(message: SDKSystemMessage) {
 function assertKrwOntologySystemInit(
   message: SDKSystemMessage,
   runKind: RunKind,
+  filingCorrelationActive = false,
 ): void {
   if (runKind === "guru_advisor" || runKind === "news_discovery") return;
   const ontologyTools = message.tools
@@ -1057,6 +1135,14 @@ function assertKrwOntologySystemInit(
   const ontologyServer = message.mcp_servers.find(
     (server) => server.name === "krw-ontology",
   );
+  if (filingCorrelationActive) {
+    if (ontologyToolSet.size === 0 && ontologyServer?.status === "connected") {
+      return;
+    }
+    throw new Error(
+      "MCP tool parity mismatch in system/init: bounded news-filing correlation requires a connected krw-ontology server with its tools hidden from the model",
+    );
+  }
   if (!hasExactTools || ontologyServer?.status !== "connected") {
     throw new Error(
       `MCP tool parity mismatch in system/init: expected ${KRW_ONTOLOGY_MCP_TOOLS.length} exact ontology tools from a connected krw-ontology server`,
@@ -1269,7 +1355,7 @@ function buildGuruAdvisorSubagents(
       prompt: [
         "You are the KRW Ontology company evidence researcher for a Guru Advisor parent run.",
         "Your only job is to answer the parent Guru run's company-specific evidence questions from filings. Do not write the final user answer and do not imitate any guru voice.",
-        "Use only the read-only KRW Ontology MCP tools attached to this subagent. Do not use Guru Advisor tools, current-news tools, chart tools, WebSearch, WebFetch, or filesystem tools.",
+        "Use only the read-only KRW Ontology MCP tools attached to this subagent. Do not use Guru Advisor tools, current-news tools, visualization tools, WebSearch, WebFetch, or filesystem tools.",
         "Work English-first internally when forming retrieval queries. Final payload may be compact English unless the parent explicitly asks for Korean labels.",
         agentGeneratedBriefEnabled
           ? "The parent provides an exact sealed krw-guru-investigation-brief/v1 with one philosophy-shaped key question. Treat it as the highest-priority evidence contract. Answer only its question_id; do not replace it with a general company report, new thesis, or Guru interpretation."
@@ -1453,6 +1539,13 @@ function buildGuruAdvisorToolBoundaryHooks(
               );
             }
 
+            if (isVisualizationSdkTool(toolName)) {
+              return guruAdvisorHookDecision(
+                isVisualizationGenerationEnabled() ? "allow" : "deny",
+                "Visualizations may use only compiler-owned structured data from this run.",
+              );
+            }
+
             if (isGuruAdvisorSdkTool(toolName)) {
               const guruToolName = normalizeGuruAdvisorToolName(toolName);
               let briefInputDecision: PermissionResult | null = null;
@@ -1600,10 +1693,15 @@ function buildResearchToolBoundaryHooks(
             const record = input as UnknownRecord;
             const toolName =
               typeof record.tool_name === "string" ? record.tool_name : "";
+            // The SDK presents direct MCP names to `allowedTools`, but its
+            // PreToolUse event reports the bare name. Canonicalize only bare
+            // known names before applying the same guard; never rewrite an
+            // arbitrary prefixed name from another MCP server.
+            const permissionToolName = canonicalSdkToolNameForHook(toolName);
             const toolInput = isRecord(record.tool_input)
               ? record.tool_input
               : {};
-            const decision = await passCanUseTool(toolName, toolInput, {
+            const decision = await passCanUseTool(permissionToolName, toolInput, {
               signal: hookOptions.signal,
               toolUseID:
                 toolUseID ??
@@ -1648,6 +1746,31 @@ function buildResearchToolBoundaryHooks(
       },
     ],
   };
+}
+
+function canonicalSdkToolNameForHook(toolName: string): string {
+  if (!toolName || toolName.includes("__")) return toolName;
+
+  const ontologyToolName = normalizeKrwOntologyToolName(toolName);
+  if (ontologyToolName) return `mcp__krw-ontology__${ontologyToolName}`;
+
+  const filingsToolName = normalizeKrwFilingsToolName(toolName);
+  if (filingsToolName) return `mcp__krw-filings__${filingsToolName}`;
+
+  const stockNewsToolName = normalizeStockNewsToolName(toolName);
+  if (stockNewsToolName) return `mcp__stock-news__${stockNewsToolName}`;
+
+  const yahooFinanceToolName = normalizeYahooFinanceToolName(toolName);
+  if (yahooFinanceToolName) {
+    return `mcp__yahoo_finance__${yahooFinanceToolName}`;
+  }
+
+  const visualizationToolName = normalizeVisualizationToolName(toolName);
+  if (visualizationToolName) {
+    return `mcp__krw_presentation__${visualizationToolName}`;
+  }
+
+  return toolName;
 }
 
 function guruAdvisorHookDecision(
@@ -1734,12 +1857,12 @@ export async function canUseTool(
   toolName: string,
   input: Record<string, unknown> = {},
 ): Promise<PermissionResult> {
-  if (isChartSdkTool(toolName)) {
-    return isChartGenerationEnabled()
+  if (isVisualizationSdkTool(toolName)) {
+    return isVisualizationGenerationEnabled()
       ? { behavior: "allow" }
       : {
           behavior: "deny",
-          message: "Inline chart generation is disabled for this runtime.",
+          message: "Inline visualization generation is disabled for this runtime.",
         };
   }
 
@@ -1782,15 +1905,24 @@ function allowedSdkToolsForResearchMode(
   mode: ResearchMode,
   analysisMode: AnalysisMode,
   runKind: RunKind,
-  chartGenerationEnabled = isChartGenerationEnabled(),
+  visualizationGenerationEnabled = isVisualizationGenerationEnabled(),
   hasSourceFilingContext = false,
+  filingCorrelationActive = false,
   personalFilingsEnabled = false,
 ): string[] {
   if (runKind === "guru_advisor") {
     return [
       ...GURU_ADVISOR_DEFAULT_SDK_ALLOWED_TOOLS,
+      ...(visualizationGenerationEnabled ? VISUALIZATION_SDK_ALLOWED_TOOLS : []),
       ...SUBAGENT_TOOL_NAMES,
       "Read",
+    ];
+  }
+
+  if (hasSourceFilingContext) {
+    return [
+      ...KRW_SOURCE_FILINGS_SDK_ALLOWED_TOOLS,
+      ...(visualizationGenerationEnabled ? VISUALIZATION_SDK_ALLOWED_TOOLS : []),
     ];
   }
 
@@ -1821,13 +1953,15 @@ function allowedSdkToolsForResearchMode(
   );
 
   return [
-    ...(runKind === "news_discovery" ? [] : allowedOntologyTools),
+    ...(runKind === "news_discovery" || filingCorrelationActive
+      ? []
+      : allowedOntologyTools),
     ...(isStockNewsRunKind(runKind) ? allowedStockNewsTools : []),
     ...(isYahooFinanceRunKind(runKind) ? allowedYahooFinanceTools : []),
-    ...(chartGenerationEnabled && runKind !== "news_discovery"
-      ? CHART_SDK_ALLOWED_TOOLS
+    ...(visualizationGenerationEnabled
+      ? VISUALIZATION_SDK_ALLOWED_TOOLS
       : []),
-    ...(hasSourceFilingContext
+    ...(filingCorrelationActive
       ? KRW_FILINGS_SDK_ALLOWED_TOOLS
       : []),
     ...(personalFilingsEnabled
@@ -1836,7 +1970,7 @@ function allowedSdkToolsForResearchMode(
   ];
 }
 
-type ToolBudgetCategory = "stock_news" | "yahoo_finance";
+type ToolBudgetCategory = "stock_news" | "yahoo_finance" | "filings";
 
 type ToolBudgetReservations = {
   reserve: (
@@ -1850,16 +1984,19 @@ function createToolBudgetReservations(params: {
   maxToolCalls: number;
   maxStockNewsCalls: number;
   maxYahooFinanceCalls: number;
+  maxFilingsCalls: number;
 }): ToolBudgetReservations {
   const {
     acc,
     maxStockNewsCalls,
     maxToolCalls,
     maxYahooFinanceCalls,
+    maxFilingsCalls,
   } = params;
   const reservedTotalToolUseIds = new Set<string>();
   const reservedStockNewsToolUseIds = new Set<string>();
   const reservedYahooFinanceToolUseIds = new Set<string>();
+  const reservedFilingsToolUseIds = new Set<string>();
 
   return {
     reserve(toolUseId, category = null) {
@@ -1868,18 +2005,24 @@ function createToolBudgetReservations(params: {
           ? reservedStockNewsToolUseIds
           : category === "yahoo_finance"
             ? reservedYahooFinanceToolUseIds
+            : category === "filings"
+              ? reservedFilingsToolUseIds
             : null;
       const categoryRecordedCount =
         category === "stock_news"
           ? countStockNewsToolCalls(acc.toolCalls)
           : category === "yahoo_finance"
             ? countYahooFinanceToolCalls(acc.toolCalls)
+            : category === "filings"
+              ? countKrwFilingsToolCalls(acc.toolCalls)
             : 0;
       const categoryLimit =
         category === "stock_news"
           ? maxStockNewsCalls
           : category === "yahoo_finance"
             ? maxYahooFinanceCalls
+            : category === "filings"
+              ? maxFilingsCalls
             : Number.POSITIVE_INFINITY;
 
       // Current Agent SDK permission requests carry toolUseID. Keeping the
@@ -1938,18 +2081,24 @@ function createToolPermissionGuard(
   maxToolCalls: number,
   maxStockNewsCalls: number,
   maxYahooFinanceCalls: number,
+  maxFilingsCalls: number,
   budgetReservations: ToolBudgetReservations,
   allowedStockNewsSourceUrls: string[] = [],
-  chartGenerationEnabled = isChartGenerationEnabled(),
+  visualizationGenerationEnabled = isVisualizationGenerationEnabled(),
   guruAgentGeneratedBriefEnabled = false,
   requiredGuruCompanyTicker: string | null = null,
   sourceFilingEventId: string | null = null,
+  filingCorrelationActive = false,
   personalFilingsEnabled = false,
 ): CanUseTool {
   let guruSawCompanyBrief = false;
   let guruSawCompanyEvidenceAgent = false;
   let guruSawCompanyEvidenceReview = false;
   let guruEvidenceReviewAttempts = 0;
+  // A correlation run gets one catalog pass, then spends its small filing
+  // budget on inspecting a candidate instead of repeatedly rediscovering it.
+  const correlationCatalogSearchToolUseIds = new Set<string>();
+  let correlationCatalogSearchWithoutToolUseId = false;
   const reserveToolSlots = (
     permissionContext: Parameters<CanUseTool>[2] | undefined,
     category: ToolBudgetCategory | null = null,
@@ -1965,12 +2114,24 @@ function createToolPermissionGuard(
     input: Record<string, unknown> = {},
     permissionContext,
   ): Promise<PermissionResult> => {
-    if (isChartSdkTool(toolName)) {
-      return chartGenerationEnabled
+    if (
+      sourceFilingEventId &&
+      !isKrwFilingsSdkTool(toolName) &&
+      !isVisualizationSdkTool(toolName)
+    ) {
+      return {
+        behavior: "deny",
+        message:
+          "This source-filing chat may use only the configured tools for its original filing card.",
+      };
+    }
+
+    if (isVisualizationSdkTool(toolName)) {
+      return visualizationGenerationEnabled
         ? { behavior: "allow" }
         : {
             behavior: "deny",
-            message: "Inline chart generation is disabled for this runtime.",
+            message: "Inline visualization generation is disabled for this runtime.",
           };
     }
 
@@ -1988,33 +2149,76 @@ function createToolPermissionGuard(
     }
 
     if (isKrwFilingsSdkTool(toolName)) {
-      if (!sourceFilingEventId) {
+      if (!sourceFilingEventId && !filingCorrelationActive) {
         return {
           behavior: "deny",
-          message: "On-demand SEC filing tools are available only for the filing card that opened this chat.",
+          message:
+            "On-demand SEC filing tools are available only for a source-filing chat or the bounded news-filing correlation workflow.",
         };
       }
       const filingToolName = normalizeKrwFilingsToolName(toolName);
       if (!filingToolName) {
         return { behavior: "deny", message: "Unknown on-demand SEC filing tool." };
       }
-      if (filingToolName === "search_catalog_filings") {
+      if (sourceFilingEventId && filingToolName === "search_catalog_filings") {
         return {
           behavior: "deny",
           message: "This filing-scoped chat may read only its source filing, not search other filings.",
         };
       }
-      const preparedInput = constrainFilingToolInput(
-        filingToolName,
-        input,
-        sourceFilingEventId,
-      );
-      if (!reserveTotalToolSlot(permissionContext)) {
-        return { behavior: "deny", message: buildToolBudgetDenyMessage() };
+      const isCorrelationCatalogSearch =
+        filingCorrelationActive && filingToolName === "search_catalog_filings";
+      const catalogSearchToolUseId = permissionContext?.toolUseID;
+      const catalogSearchAlreadyReserved = catalogSearchToolUseId
+        ? correlationCatalogSearchToolUseIds.has(catalogSearchToolUseId)
+        : false;
+      if (
+        isCorrelationCatalogSearch &&
+        !catalogSearchAlreadyReserved &&
+        (correlationCatalogSearchToolUseIds.size > 0 ||
+          correlationCatalogSearchWithoutToolUseId)
+      ) {
+        return {
+          behavior: "deny",
+          message:
+            "Catalog search already ran for this bounded correlation. Use its candidates to read one relevant filing, or explain that no relevant filing was available.",
+        };
+      }
+      const preparedInput = sourceFilingEventId
+        ? constrainFilingToolInput(filingToolName, input, sourceFilingEventId)
+        : { input, changed: false };
+      if (
+        sourceFilingEventId
+          ? !reserveTotalToolSlot(permissionContext)
+          : !reserveToolSlots(permissionContext, "filings")
+      ) {
+        return {
+          behavior: "deny",
+          message:
+            !sourceFilingEventId &&
+            countKrwFilingsToolCalls(acc.toolCalls) >= maxFilingsCalls
+              ? buildFilingsBudgetDenyMessage()
+              : buildToolBudgetDenyMessage(),
+        };
+      }
+      if (isCorrelationCatalogSearch && !catalogSearchAlreadyReserved) {
+        if (catalogSearchToolUseId) {
+          correlationCatalogSearchToolUseIds.add(catalogSearchToolUseId);
+        } else {
+          correlationCatalogSearchWithoutToolUseId = true;
+        }
       }
       return preparedInput.changed
         ? { behavior: "allow", updatedInput: preparedInput.input }
         : { behavior: "allow" };
+    }
+
+    if (filingCorrelationActive && isKrwOntologySdkTool(toolName)) {
+      return {
+        behavior: "deny",
+        message:
+          "This bounded news-filing correlation workflow uses current market context and related SEC filing evidence only.",
+      };
     }
 
     if (runKind === "guru_advisor") {
@@ -2040,6 +2244,15 @@ function createToolPermissionGuard(
           guruSawCompanyEvidenceAgent = true;
         }
         return decision;
+      }
+
+      if (isVisualizationSdkTool(toolName)) {
+        return visualizationGenerationEnabled
+          ? { behavior: "allow" }
+          : {
+              behavior: "deny",
+              message: "Inline visualization generation is disabled for this runtime.",
+            };
       }
 
       if (!isGuruAdvisorSdkTool(toolName)) {
@@ -2146,7 +2359,8 @@ function createToolPermissionGuard(
     if (
       !isKrwOntologySdkTool(toolName) &&
       !isStockNewsSdkTool(toolName) &&
-      !isYahooFinanceSdkTool(toolName)
+      !isYahooFinanceSdkTool(toolName) &&
+      !isVisualizationSdkTool(toolName)
     ) {
       return {
         behavior: "deny",
@@ -3033,6 +3247,7 @@ function personalFilingsDelegationTtlSeconds(): number {
 function buildSelectedNewsEventContextPrompt(
   runKind: RunKind,
   selectedNewsEventContext: Record<string, unknown> | null | undefined,
+  filingCorrelationActive = false,
 ): string {
   if (runKind === "idea_generation" && selectedNewsEventContext) {
     return `Use this user-provided URL context as additional input for KRW Ontology idea generation. Treat extracted page text as an external market/business hypothesis, not confirmed company fact. Follow the idea-generation skill's URL workflow for covered-company discovery. Start from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology when present. Do not switch to news mode or write an article summary.
@@ -3042,14 +3257,28 @@ ${JSON.stringify(selectedNewsEventContext)}
 </idea_generation_url_context>`;
   }
   if (runKind === "market_move_research" && selectedNewsEventContext) {
-    return `Use this app-provided market move context only as supplemental bounded context for stock-move interpretation. Runtime current market-news lookup remains the primary current price/news read. Treat current market data and recent news candidates as market observations, not confirmed company disclosure. Default to a compact market/news explanation of the observed move. Use KRW Ontology retrieval from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology only when filing-grounded depth is required by the user's question or by a durable investment-view claim. Follow-up prompts should bridge the observed move/news into filing-grounded KRW Ontology research. Provider/tool names are internal and must not appear in the final answer unless the user explicitly asks about data/debug provenance.
+    const filingCorrelationInstruction = filingCorrelationActive
+      ? "Use this selected market narrative to identify the event window, then compare it with only closely timed and relevant same-ticker 8-K/6-K evidence. Keep the market observation and filing fact separate."
+      : "Default to a compact market/news explanation of the observed move. Use KRW Ontology retrieval only when filing-grounded depth is required by the user's question or by a durable investment-view claim.";
+    const retrievalInstruction = filingCorrelationActive
+      ? "This is a bounded news-filing correlation run: use only the current market/news context and the permitted same-ticker filing evidence; do not request KRW Ontology retrieval."
+      : "Use KRW Ontology retrieval from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology only when filing-grounded depth is required by the user's question or by a durable investment-view claim. Follow-up prompts should bridge the observed move/news into filing-grounded KRW Ontology research.";
+    return `Use this app-provided market move context only as supplemental bounded context for stock-move interpretation. Runtime current market-news lookup remains the primary current price/news read. Treat current market data and recent news candidates as market observations, not confirmed company disclosure. ${retrievalInstruction} Provider/tool names are internal and must not appear in the final answer unless the user explicitly asks about data/debug provenance.
+
+${filingCorrelationInstruction}
 
 <selected_news_event_context>
 ${JSON.stringify(selectedNewsEventContext)}
 </selected_news_event_context>`;
   }
   if (runKind !== "company_research" || !selectedNewsEventContext) return "";
-  return `Use this selected market narrative as the input brief for KRW Ontology filing research. Treat it as an investment hypothesis, not confirmed company fact. If it came from a user-provided URL, first ask what would matter if the narrative is directionally true, then anchor the interpretation against filing evidence. Start KRW ontology retrieval from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology when present; otherwise use ontology_bridge_brief_en.
+  const filingCorrelationInstruction = filingCorrelationActive
+    ? "Use it to identify the news/event window and compare only closely timed, same-ticker 8-K/6-K source evidence. Do not treat the narrative as confirmed until the relevant company disclosure supports it."
+    : "If it came from a user-provided URL, first ask what would matter if the narrative is directionally true, then anchor the interpretation against filing evidence.";
+  const retrievalInstruction = filingCorrelationActive
+    ? "Use only the permitted current market/news context and same-ticker filing evidence in this bounded correlation run; do not request KRW Ontology retrieval."
+    : "Start KRW ontology retrieval from source_pack.ontology_search_brief_en and source_pack.original_text_for_ontology when present; otherwise use ontology_bridge_brief_en.";
+  return `Use this selected market narrative as the input brief for ${filingCorrelationActive ? "bounded news-filing correlation" : "KRW Ontology filing research"}. Treat it as an investment hypothesis, not confirmed company fact. ${filingCorrelationInstruction} ${retrievalInstruction}
 
 <selected_news_event_context>
 ${JSON.stringify(selectedNewsEventContext)}
@@ -3134,13 +3363,16 @@ function prepareToolInputForRun(
   if (isKrwPersonalFilingsMcpToolName(mcpToolName)) {
     return { input, changed: false };
   }
-  if (isChartMcpToolName(mcpToolName) || !mcpToolName) {
+  if (isVisualizationMcpToolName(mcpToolName) || !mcpToolName) {
     return { input, changed: false };
   }
 
-  const inputWithContext = attachAgentContextInput(mcpToolName, input, acc);
+  const ontologyToolName = normalizeKrwOntologyToolName(mcpToolName);
+  if (!ontologyToolName) return { input, changed: false };
+
+  const inputWithContext = attachAgentContextInput(ontologyToolName, input, acc);
   const policy = normalizeKrwOntologyToolInput(
-    mcpToolName,
+    ontologyToolName,
     inputWithContext.input,
   );
   return {
@@ -3397,6 +3629,14 @@ function buildYahooFinanceBudgetDenyMessage(): string {
   ].join(" ");
 }
 
+function buildFilingsBudgetDenyMessage(): string {
+  return [
+    "No more on-demand SEC filing tools can be called in this run.",
+    "Use the filing evidence already collected and do not broaden the filing search.",
+    "Write the final answer with any remaining uncertainty stated plainly.",
+  ].join(" ");
+}
+
 function buildGuruBudgetDenyMessage(): string {
   return [
     "No more Guru Advisor MCP tools can be called in this run.",
@@ -3545,10 +3785,16 @@ async function consumeSdkMessage(params: {
         openToolCalls.has(toolResult.toolUseId);
 
       if (toolResult.toolUseId) {
+        const toolName = acc.toolCalls.find(
+          (candidate) => candidate.id === toolResult.toolUseId,
+        )?.toolName;
+        const resultSummary = toolName && isOnDemandFilingBodyTool(toolName)
+          ? filingBodyReadSummary(toolResultBodyCharCount(toolResult.json))
+          : summarizeToolResult(toolResult.text);
         const toolCall = endToolCall(
           acc,
           toolResult.toolUseId,
-          summarizeToolResult(toolResult.text),
+          resultSummary,
           null,
           toolResult.json,
           toolResult.text,
@@ -3561,7 +3807,7 @@ async function consumeSdkMessage(params: {
           openToolCalls.delete(toolResult.toolUseId);
           await sendEvent("tool_call_end", {
             tool_call_id: toolResult.toolUseId,
-            result_summary: summarizeToolResult(toolResult.text),
+            result_summary: resultSummary,
             error_message: null,
             duration_ms: toolCallDurationMs(acc, toolResult.toolUseId),
           });
@@ -3574,7 +3820,7 @@ async function consumeSdkMessage(params: {
       for (let i = prevCitationCount; i < acc.citations.length; i++) {
         const citation = acc.citations[i];
         await onCitation?.(citation);
-        await sendEvent("citation", citation);
+        await sendEvent("citation", redactFilingCitationForPersistence(citation));
       }
     }
   }
@@ -3600,13 +3846,19 @@ async function consumeSdkMessage(params: {
     for (const toolUseId of message.preceding_tool_use_ids) {
       if (!openToolCalls.has(toolUseId)) continue;
       openToolCalls.delete(toolUseId);
-      const toolCall = endToolCall(acc, toolUseId, message.summary, null);
+      const existingToolCall = acc.toolCalls.find(
+        (candidate) => candidate.id === toolUseId,
+      );
+      const resultSummary = existingToolCall && isOnDemandFilingBodyTool(existingToolCall.toolName)
+        ? filingBodyReadSummary(toolResultBodyCharCount(existingToolCall.resultJson))
+        : message.summary;
+      const toolCall = endToolCall(acc, toolUseId, resultSummary, null);
       if (toolCall) {
         await onToolCallEnd?.(toolCall);
       }
       await sendEvent("tool_call_end", {
         tool_call_id: toolUseId,
-        result_summary: message.summary.slice(0, 2000),
+        result_summary: resultSummary.slice(0, 2000),
         error_message: null,
         duration_ms: toolCallDurationMs(acc, toolUseId),
       });
@@ -3709,6 +3961,11 @@ function summarizeToolResult(text: string): string | null {
   return compact.slice(0, 2000);
 }
 
+function toolResultBodyCharCount(result: unknown): number {
+  const record = isRecord(result) ? result : null;
+  return typeof record?.text === "string" ? record.text.length : 0;
+}
+
 function normalizeMcpToolName(name: unknown): MCPToolName | null {
   return (
     normalizeKrwOntologyToolName(name) ??
@@ -3716,7 +3973,7 @@ function normalizeMcpToolName(name: unknown): MCPToolName | null {
     normalizeStockNewsToolName(name) ??
     normalizeGuruAdvisorToolName(name) ??
     normalizeYahooFinanceToolName(name) ??
-    normalizeChartToolName(name)
+    normalizeVisualizationToolName(name)
   );
 }
 
@@ -3763,11 +4020,13 @@ function normalizeYahooFinanceToolName(
   return bareName as YahooFinanceMCPToolName;
 }
 
-function normalizeChartToolName(name: unknown): ChartMCPToolName | null {
+function normalizeVisualizationToolName(
+  name: unknown,
+): VisualizationMCPToolName | null {
   if (typeof name !== "string") return null;
   const bareName = name.includes("__") ? name.split("__").at(-1) : name;
-  if (!bareName || !CHART_MCP_TOOL_SET.has(bareName)) return null;
-  return bareName as ChartMCPToolName;
+  if (!bareName || !VISUALIZATION_MCP_TOOL_SET.has(bareName)) return null;
+  return bareName as VisualizationMCPToolName;
 }
 
 function pendingToolResultsFailure(
@@ -3834,10 +4093,18 @@ function countYahooFinanceToolCalls(
   ).length;
 }
 
-function isChartMcpToolName(
+function countKrwFilingsToolCalls(
+  toolCalls: Array<Pick<AccumulatedToolCall, "toolName">>,
+): number {
+  return toolCalls.filter((toolCall) =>
+    isKrwFilingsMcpToolName(toolCall.toolName),
+  ).length;
+}
+
+function isVisualizationMcpToolName(
   toolName: MCPToolName | null,
-): toolName is ChartMCPToolName {
-  return Boolean(toolName && CHART_MCP_TOOL_SET.has(toolName));
+): toolName is VisualizationMCPToolName {
+  return Boolean(toolName && VISUALIZATION_MCP_TOOL_SET.has(toolName));
 }
 
 function isKrwFilingsMcpToolName(

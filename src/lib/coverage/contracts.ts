@@ -3,7 +3,6 @@ import { z } from "zod";
 
 export const companyCoverageLevelSchema = z.enum([
   "interest",
-  "holding",
 ] satisfies readonly UserCompanyCoverageLevel[]).nullable();
 
 export const setCompanyCoverageSchema = z.object({

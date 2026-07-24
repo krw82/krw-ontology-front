@@ -136,4 +136,10 @@ describe("sanitizeAssistantContent", () => {
       "Based on the filing, margins improved. *(Source: CY2025 10-K, Item 7 MD&A)*",
     );
   });
+
+  it("removes retired inline chart tokens from historical answers", () => {
+    expect(
+      sanitizeAssistantContent("요약입니다.\n\n[[krw-chart:chart_1_old]]\n\n후속 설명입니다."),
+    ).toBe("요약입니다.\n\n후속 설명입니다.");
+  });
 });

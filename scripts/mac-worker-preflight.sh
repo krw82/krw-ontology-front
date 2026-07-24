@@ -463,7 +463,7 @@ const timeout = Number(process.env.MCP_HEALTH_TIMEOUT_MS || 30000);
 const response = await fetch(readyUrl, { headers, signal: AbortSignal.timeout(timeout) });
 const payload = await response.json().catch(() => null);
 if (!response.ok || payload?.ok !== true) throw new Error("On-demand filings MCP readiness is not ok");
-const expectedTools = ["get_filing", "get_filing_brief", "search_catalog_filings", "list_filing_sections", "read_filing_section", "get_form4_insider_transactions"];
+const expectedTools = ["get_filing", "get_filing_brief", "search_catalog_filings", "list_filing_sections", "read_filing_section", "list_filing_documents", "read_filing_document", "get_form4_insider_transactions"];
 const client = new Client({ name: "mac-worker-filings-preflight", version: "1.0.0" });
 const transport = new StreamableHTTPClientTransport(new URL(expectedUrl), { requestInit: { headers } });
 try {

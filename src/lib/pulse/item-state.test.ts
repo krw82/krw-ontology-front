@@ -3,7 +3,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   applyPulseItemStates,
   getPulseItemStates,
-  hasRecentKindImpression,
 } from "@/lib/pulse/item-state";
 import type { PulseCandidate } from "@/lib/pulse/contract";
 import type { Database, UserPulseItemStateRow } from "@/types/database";
@@ -47,16 +46,10 @@ function state(overrides: Partial<UserPulseItemStateRow> = {}): UserPulseItemSta
     source_id: "old",
     kind: "resurface",
     first_seen_at: null,
-    last_seen_at: null,
-    view_count: 0,
     reviewed_at: null,
     saved_at: null,
     snoozed_until: null,
     dismissed_at: null,
-    last_impression_at: null,
-    last_impression_session_id: null,
-    impression_count: 0,
-    feedback: null,
     created_at: "2026-07-01T00:00:00.000Z",
     updated_at: "2026-07-01T00:00:00.000Z",
     ...overrides,
@@ -96,18 +89,24 @@ describe("Pulse item state", () => {
     const first = candidate("resurface", "first");
     const second = candidate("resurface", "second");
     const states = new Map([[first.item_key, state({ item_key: first.item_key, dismissed_at: now.toISOString() })]]);
-    expect(applyPulseItemStates([first, second], states, now, "Asia/Seoul").map((item) => item.item_key)).toEqual([second.item_key]);
+    expect(applyPulseItemStates([first, second], states, now).map((item) => item.item_key)).toEqual([second.item_key]);
   });
 
-  it("suppresses another learning card in the same local ISO week", () => {
+  it("does not let a server-side impression suppress a learning candidate", () => {
     const learning = candidate("learning", "weekly");
     const states = new Map([[learning.item_key, state({
       item_key: learning.item_key,
       kind: "learning",
       source_type: "learning",
-      last_seen_at: "2026-07-14T01:00:00.000Z",
     })]]);
-    expect(hasRecentKindImpression(states, "learning", now, "Asia/Seoul", 7 * 24 * 60 * 60 * 1_000)).toBe(true);
+    expect(applyPulseItemStates([learning], states, now)).toHaveLength(1);
+  });
+
+  it("treats a legacy placeholder state row as new on the device-first feed", () => {
+    const filing = candidate("filing", "legacy-placeholder");
+    const states = new Map([[filing.item_key, state({ item_key: filing.item_key })]]);
+
+    expect(applyPulseItemStates([filing], states, now)[0]?.state).toBe("new");
   });
 
   it("keeps a due scheduled review visible after an impression until the user resolves it", () => {
@@ -116,9 +115,7 @@ describe("Pulse item state", () => {
     const states = new Map([[review.item_key, state({
       item_key: review.item_key,
       source_id: review.source_id,
-      last_seen_at: "2026-07-15T11:00:00.000Z",
     })]]);
-    expect(applyPulseItemStates([review], states, now, "Asia/Seoul")).toHaveLength(1);
-    expect(hasRecentKindImpression(states, "resurface", now, "Asia/Seoul", 28 * 24 * 60 * 60 * 1_000)).toBe(false);
+    expect(applyPulseItemStates([review], states, now)).toHaveLength(1);
   });
 });

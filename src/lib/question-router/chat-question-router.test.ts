@@ -204,6 +204,26 @@ describe("chat question router", () => {
     expect(query).not.toHaveBeenCalled();
   });
 
+  it("keeps an explicit recent 8-K source request on company research for filing correlation", async () => {
+    const decision = await resolveChatQuestionRoute({
+      content: "AAPL 최근 8-K 원문을 뉴스와 함께 확인해줘.",
+      currentAnalysisMode: "company",
+      currentRunKind: "company_research",
+      defaultTickers: ["AAPL"],
+      scopeType: "company",
+      hasUserUrls: false,
+      responseLocale: "ko",
+    });
+
+    expect(decision).toMatchObject({
+      analysisMode: "company",
+      runKind: "company_research",
+      source: "deterministic",
+      confidence: "high",
+    });
+    expect(query).not.toHaveBeenCalled();
+  });
+
   it("corrects sector/cohort macro interpretation away from idea generation", async () => {
     vi.mocked(query).mockReturnValueOnce(
       makeSdkResult("idea_generation") as never,

@@ -9,6 +9,7 @@ import { getPulseFeedRevision } from "@/lib/pulse/revision";
 import type {
   PulseFeedDeltaResponse,
   PulseFeedResponse,
+  PulseFeedRefreshSummary,
   PulseItem,
 } from "@/types/api-contracts";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -84,10 +85,12 @@ export function buildDelta(
   feed: PulseFeedResponse,
   knownItemVersions: Record<string, string>,
 ): PulseFeedDeltaResponse {
-  const currentItems = [...feed.items, ...feed.active_analysis_items];
+  const currentItems = [...feed.candidate_items, ...feed.active_analysis_items];
   const currentIds = new Set(currentItems.map((item) => item.id));
+  const knownIds = new Set(Object.keys(knownItemVersions));
   const upserts = currentItems.filter((item) =>
     knownItemVersions[item.id] !== feed.item_versions[item.id]);
+  const removedItemIds = Object.keys(knownItemVersions).filter((id) => !currentIds.has(id));
   return {
     generated_at: feed.generated_at,
     revision: feed.revision,
@@ -97,15 +100,21 @@ export function buildDelta(
       timezone: feed.timezone,
       date_label: feed.date_label,
       filter: feed.filter,
-      summary: feed.summary,
+      visible_limit: feed.visible_limit,
       new_item_count: feed.new_item_count,
       source_statuses: feed.source_statuses,
     },
-    ordered_item_ids: feed.items.map((item) => item.id),
+    ordered_candidate_ids: feed.candidate_items.map((item) => item.id),
     active_analysis_item_ids: feed.active_analysis_items.map((item) => item.id),
     upserts,
-    removed_item_ids: Object.keys(knownItemVersions).filter((id) => !currentIds.has(id)),
+    removed_item_ids: removedItemIds,
     item_versions: feed.item_versions,
+    refresh_summary: buildRefreshSummary(
+      feed,
+      knownIds,
+      upserts,
+      removedItemIds,
+    ),
   };
 }
 
@@ -115,10 +124,34 @@ function unchangedDelta(revision: string, now: Date): PulseFeedDeltaResponse {
     revision,
     changed: false,
     snapshot: null,
-    ordered_item_ids: [],
+    ordered_candidate_ids: [],
     active_analysis_item_ids: [],
     upserts: [] as PulseItem[],
     removed_item_ids: [],
     item_versions: {},
+    refresh_summary: emptyRefreshSummary(),
+  };
+}
+
+function buildRefreshSummary(
+  feed: PulseFeedResponse,
+  knownIds: Set<string>,
+  upserts: PulseItem[],
+  removedItemIds: string[],
+): PulseFeedRefreshSummary {
+  return {
+    // A card that was already in the device snapshot but moved between the
+    // active-analysis and candidate lists is an update, not a false “new”.
+    added_candidate_count: feed.candidate_items.filter((item) => !knownIds.has(item.id)).length,
+    updated_item_count: upserts.filter((item) => knownIds.has(item.id)).length,
+    removed_item_count: removedItemIds.length,
+  };
+}
+
+function emptyRefreshSummary(): PulseFeedRefreshSummary {
+  return {
+    added_candidate_count: 0,
+    updated_item_count: 0,
+    removed_item_count: 0,
   };
 }

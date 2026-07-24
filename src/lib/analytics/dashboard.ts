@@ -19,12 +19,19 @@ export interface AnalyticsFunnelSummary {
   rates: {
     pageToCta: number | null;
     ctaToSignup: number | null;
+    loginToCompanySelection: number | null;
+    companySelectionToFiling: number | null;
+    filingToSource: number | null;
+    sourceToFollow: number | null;
     signupToQuestion: number | null;
     prefillToQuestion: number | null;
     questionToAnswer: number | null;
     answerToCitation: number | null;
     answerFailureRate: number | null;
     limitToUpgrade: number | null;
+    onboardingStartToCompanySelection: number | null;
+    onboardingStartToQuestion: number | null;
+    onboardingStartToEvidence: number | null;
   };
 }
 
@@ -83,12 +90,40 @@ export function buildAnalyticsFunnelSummary(
     rates: {
       pageToCta: rate(counts.cta_clicked, counts.page_viewed),
       ctaToSignup: rate(counts.signup_started, counts.cta_clicked),
+      loginToCompanySelection: rate(
+        counts.company_selected,
+        counts.login_completed,
+      ),
+      companySelectionToFiling: rate(
+        counts.filing_detail_viewed,
+        counts.company_selected,
+      ),
+      filingToSource: rate(
+        counts.sec_source_opened,
+        counts.filing_detail_viewed,
+      ),
+      sourceToFollow: rate(
+        counts.company_followed,
+        counts.sec_source_opened,
+      ),
       signupToQuestion: rate(counts.question_submitted, counts.signup_started),
       prefillToQuestion: rate(counts.question_submitted, counts.question_prefilled),
       questionToAnswer: rate(completed, counts.question_submitted),
       answerToCitation: rate(counts.citation_opened, completed),
       answerFailureRate: rate(failed, completed + failed),
       limitToUpgrade: rate(counts.upgrade_clicked, counts.usage_limit_reached),
+      onboardingStartToCompanySelection: rate(
+        counts.onboarding_company_selected,
+        counts.onboarding_started,
+      ),
+      onboardingStartToQuestion: rate(
+        counts.onboarding_question_started,
+        counts.onboarding_started,
+      ),
+      onboardingStartToEvidence: rate(
+        counts.onboarding_evidence_opened,
+        counts.onboarding_started,
+      ),
     },
   };
 }

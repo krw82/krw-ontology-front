@@ -2,35 +2,35 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import FilingJudgmentPanel, {
-  type FilingJudgmentValue,
-} from "@/components/pulse/FilingJudgmentPanel";
 import { trackClientEventSilently } from "@/lib/analytics/client";
-import {
-  persistPulseItemImpression,
-  persistPulseItemImpressions,
-  pulseImpressionStorageKey,
-} from "@/lib/pulse/impression-client";
+import { type PulseDeviceSignal } from "@/lib/pulse/device-ranking";
+import { PULSE_INSIDER_FEATURED_ITEM_COUNT } from "@/lib/pulse/insider-trade-stack";
 import type { PulseFeedResponse, PulseItem } from "@/types/api-contracts";
 
 interface InsiderTradeStackCardProps {
   items: Array<{ item: PulseItem; position: number }>;
+  feedSlot: "signal" | "discovery";
+  timezone: string;
   pending: boolean;
   feedSessionId: string;
   rankingVersion: PulseFeedResponse["ranking_version"];
-  draftOwnerId: string;
-  onJudgmentSaved: (item: PulseItem, judgment: FilingJudgmentValue) => void;
+  onDeviceSignal: (item: PulseItem, signal: PulseDeviceSignal) => void;
 }
 
-const COLLAPSED_ROW_COUNT = 3;
+const COLLAPSED_ROW_COUNT = PULSE_INSIDER_FEATURED_ITEM_COUNT;
+
+function pulseImpressionStorageKey(feedSessionId: string, itemId: string): string {
+  return `pulse-impression:${feedSessionId}:${itemId}`;
+}
 
 export default function InsiderTradeStackCard({
   items,
+  feedSlot,
+  timezone,
   pending,
   feedSessionId,
   rankingVersion,
-  draftOwnerId,
-  onJudgmentSaved,
+  onDeviceSignal,
 }: InsiderTradeStackCardProps) {
   const ref = useRef<HTMLElement>(null);
   const impressionSent = useRef(false);
@@ -49,7 +49,14 @@ export default function InsiderTradeStackCard({
   const summary = useMemo(() => buildSummary(items.map(({ item }) => item)), [items]);
   const visibleItems = expanded ? items : items.slice(0, COLLAPSED_ROW_COUNT);
   const hiddenCount = Math.max(0, items.length - visibleItems.length);
+  const collapsedHiddenCount = Math.max(0, items.length - COLLAPSED_ROW_COUNT);
   const first = items[0]?.item;
+  const latestAvailableAt = useMemo(() => latestAvailableAtFor(items), [items]);
+  const summaryTimeLabel = useMemo(
+    () => formatInsiderSummaryTime(latestAvailableAt, timezone),
+    [latestAvailableAt, timezone],
+  );
+  const title = isToday(latestAvailableAt, timezone) ? "오늘의 내부자 거래" : "새 내부자 거래";
   const collapsedItemIds = useMemo(
     () => items.slice(0, COLLAPSED_ROW_COUNT).map(({ item }) => item.id),
     [items],
@@ -64,7 +71,6 @@ export default function InsiderTradeStackCard({
       `insider-stack:${items.map(({ item }) => item.id).join(",")}`,
     );
     if (window.sessionStorage.getItem(sessionKey) === "1") return;
-    const requestController = new AbortController();
     let timer: number | null = null;
     const observer = new IntersectionObserver((entries) => {
       const visible = entries.some((entry) => entry.isIntersecting && entry.intersectionRatio >= 0.5);
@@ -83,41 +89,26 @@ export default function InsiderTradeStackCard({
           phase: first.phase,
           priority: first.priority,
           item_count: items.length,
+          feed_slot: feedSlot,
           top_ticker: first.ticker,
           has_urgent_item: items.some(({ item }) => item.priority === "urgent"),
           feed_session_id: feedSessionId,
           ranking_version: rankingVersion,
         });
-        // The three visible rows form the collapsed stack exposure. Persist
-        // them atomically; hidden rows are recorded only if they later enter
-        // the viewport after expansion.
-        void persistPulseItemImpressions({
-          itemIds: collapsedItemIds,
-          feedSessionId,
-          signal: requestController.signal,
-        }).then((persisted) => {
-          if (!persisted) {
-            impressionSent.current = false;
-            return;
-          }
-          for (const itemId of collapsedItemIds) {
-            window.sessionStorage.setItem(
-              pulseImpressionStorageKey(feedSessionId, itemId),
-              "1",
-            );
-          }
-          window.sessionStorage.setItem(sessionKey, "1");
-          observer.disconnect();
-        });
+        for (const { item } of items.slice(0, COLLAPSED_ROW_COUNT)) {
+          onDeviceSignal(item, "impression");
+          window.sessionStorage.setItem(pulseImpressionStorageKey(feedSessionId, item.id), "1");
+        }
+        window.sessionStorage.setItem(sessionKey, "1");
+        observer.disconnect();
       }, 1_000);
     }, { threshold: [0.5] });
     observer.observe(element);
     return () => {
       if (timer !== null) window.clearTimeout(timer);
-      requestController.abort();
       observer.disconnect();
     };
-  }, [collapsedItemIds, collapsedItemIdsKey, feedSessionId, first, items, rankingVersion]);
+  }, [collapsedItemIds, collapsedItemIdsKey, feedSessionId, feedSlot, first, items, onDeviceSignal, rankingVersion]);
 
   if (!first) return null;
 
@@ -129,7 +120,7 @@ export default function InsiderTradeStackCard({
           <span className="material-symbols-outlined text-[18px] text-muted" aria-hidden="true">task_alt</span>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-black uppercase tracking-[0.12em] text-muted">검토 완료 · 내부자 거래</p>
-            <p className="mt-0.5 truncate text-[13px] font-extrabold text-body">{items.length}건의 Form 4 묶음</p>
+            <p className="mt-0.5 truncate text-[13px] font-extrabold text-body">{items.length}건의 내부자 거래 요약</p>
           </div>
           <button type="button" onClick={() => setExpandedCompletedKey(completedKey)} className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-[9px] px-sm text-[12px] font-extrabold text-muted hover:bg-white hover:text-ink" aria-expanded={false}>
             다시 보기
@@ -151,6 +142,7 @@ export default function InsiderTradeStackCard({
           phase: first.phase,
           reason_code: first.reason_code,
           item_count: items.length,
+          feed_slot: feedSlot,
           feed_session_id: feedSessionId,
           ranking_version: rankingVersion,
         });
@@ -174,27 +166,28 @@ export default function InsiderTradeStackCard({
             <div className="flex min-w-0 items-center">
               <div className="min-w-0">
                 <p className="text-[11px] font-black uppercase tracking-[0.13em] text-muted">내부자 거래</p>
-                <p className="mt-0.5 text-[12px] font-extrabold text-primary">오늘 확인할 묶음</p>
+                <p className="mt-0.5 text-[12px] font-extrabold text-primary">중요 거래 요약</p>
               </div>
             </div>
-            <time className="shrink-0 text-[11px] font-semibold text-muted" dateTime={first.occurred_at}>
-              {formatRelativeTime(first.occurred_at)}
+            <time className="shrink-0 text-[11px] font-semibold text-muted" dateTime={latestAvailableAt}>
+              {summaryTimeLabel}
             </time>
           </div>
 
           <div className="mt-base flex flex-wrap items-end justify-between gap-sm">
             <div>
-              <h2 className="text-[22px] font-black leading-[1.25] tracking-[-0.035em] text-ink sm:text-[25px]">오늘의 내부자 거래</h2>
-              <p className="mt-xs text-[14px] font-semibold leading-6 text-body">{items.length}건 · {summary.purchaseCount > 0 ? `매수 ${summary.purchaseCount}` : "매수 없음"} · {summary.saleCount > 0 ? `매도 ${summary.saleCount}` : "매도 없음"}</p>
+              <h2 className="text-[22px] font-black leading-[1.25] tracking-[-0.035em] text-ink sm:text-[25px]">{title}</h2>
+              <p className="mt-xs text-[14px] font-semibold leading-6 text-body">총 {items.length}건 · {summary.purchaseCount > 0 ? `매수 ${summary.purchaseCount}` : "매수 없음"} · {summary.saleCount > 0 ? `매도 ${summary.saleCount}` : "매도 없음"}</p>
             </div>
             <div className="flex flex-wrap justify-end gap-xs">
-              {summary.urgentCount > 0 ? <span className="rounded-full bg-[#fff0ed] px-sm py-xs text-[11px] font-black text-[#c43c22]">긴급 {summary.urgentCount}</span> : null}
-              {summary.holdingCount > 0 ? <span className="rounded-full bg-primary-fixed/60 px-sm py-xs text-[11px] font-black text-primary">보유 {summary.holdingCount}</span> : null}
               {summary.researchCount > 0 ? <span className="rounded-full bg-[#f3f0ff] px-sm py-xs text-[11px] font-black text-[#5c43ca]">최근 리서치 {summary.researchCount}</span> : null}
             </div>
           </div>
 
-          <p className="mt-sm text-[13px] leading-6 text-muted">SEC Form 4에 보고된 공개시장 매수·매도만 금액으로 표시합니다. 금액이 없는 거래는 추정하지 않습니다.</p>
+          <p className="mt-sm text-[13px] leading-6 text-muted">
+            SEC Form 4에 공개시장 매수·매도로 보고된 거래만 모았습니다.
+            {collapsedHiddenCount > 0 ? ` 중요도 순으로 ${COLLAPSED_ROW_COUNT}건만 먼저 보여줍니다.` : null}
+          </p>
 
           <div className="mt-base space-y-xs" aria-label={expanded ? "모든 내부자 거래" : "중요 내부자 거래"}>
             {visibleItems.map(({ item, position }, index) => (
@@ -202,12 +195,10 @@ export default function InsiderTradeStackCard({
                 key={item.id}
                 item={item}
                 position={position}
-                expanded={expanded}
                 feedSessionId={feedSessionId}
                 rankingVersion={rankingVersion}
-                draftOwnerId={draftOwnerId}
-                onJudgmentSaved={onJudgmentSaved}
                 trackImpression={expanded && index >= COLLAPSED_ROW_COUNT}
+                onDeviceSignal={onDeviceSignal}
               />
             ))}
           </div>
@@ -216,18 +207,20 @@ export default function InsiderTradeStackCard({
             <p className="mt-sm text-[12px] font-semibold text-muted">+ {hiddenCount}건의 거래가 더 있습니다</p>
           ) : null}
 
-          <div className="mt-lg flex flex-wrap items-center gap-sm">
-            <button
-              type="button"
-              onClick={toggleExpanded}
-              aria-expanded={expanded}
-              disabled={pending}
-              className="inline-flex min-h-11 items-center gap-xs rounded-[10px] bg-ink px-base text-[13px] font-extrabold text-white transition-colors hover:bg-primary disabled:opacity-50"
-            >
-              {expanded ? "거래 접기" : `거래 ${items.length}건 모두 보기`}
-              <span className="material-symbols-outlined text-[16px]" aria-hidden="true">{expanded ? "expand_less" : "expand_more"}</span>
-            </button>
-          </div>
+          {items.length > COLLAPSED_ROW_COUNT ? (
+            <div className="mt-lg flex flex-wrap items-center gap-sm">
+              <button
+                type="button"
+                onClick={toggleExpanded}
+                aria-expanded={expanded}
+                disabled={pending}
+                className="inline-flex min-h-11 items-center gap-xs rounded-[10px] bg-ink px-base text-[13px] font-extrabold text-white transition-colors hover:bg-primary disabled:opacity-50"
+              >
+                {expanded ? "거래 접기" : `나머지 ${collapsedHiddenCount}건 보기`}
+                <span className="material-symbols-outlined text-[16px]" aria-hidden="true">{expanded ? "expand_less" : "expand_more"}</span>
+              </button>
+            </div>
+          ) : null}
         </div>
       </article>
     </div>
@@ -237,38 +230,28 @@ export default function InsiderTradeStackCard({
 function InsiderTradeRow({
   item,
   position,
-  expanded,
   feedSessionId,
   rankingVersion,
-  draftOwnerId,
-  onJudgmentSaved,
   trackImpression,
+  onDeviceSignal,
 }: {
   item: PulseItem;
   position: number;
-  expanded: boolean;
   feedSessionId: string;
   rankingVersion: PulseFeedResponse["ranking_version"];
-  draftOwnerId: string;
-  onJudgmentSaved: (item: PulseItem, judgment: FilingJudgmentValue) => void;
   trackImpression: boolean;
+  onDeviceSignal: (item: PulseItem, signal: PulseDeviceSignal) => void;
 }) {
   const rowRef = useRef<HTMLDivElement>(null);
   const detail = transactionDetail(item);
   const relationship = relationshipLabel(item);
   const primary = item.primary_action;
-  const questionAction = item.secondary_actions.find(
-    (action) =>
-      action.type === "link" &&
-      action.analytics_name === "pulse_answer_prefilled",
-  );
 
   useEffect(() => {
     const element = rowRef.current;
     if (!trackImpression || !element) return;
     const storageKey = pulseImpressionStorageKey(feedSessionId, item.id);
     if (window.sessionStorage.getItem(storageKey) === "1") return;
-    const controller = new AbortController();
     let timer: number | null = null;
     const observer = new IntersectionObserver((entries) => {
       const visible = entries.some((entry) =>
@@ -280,24 +263,17 @@ function InsiderTradeRow({
       if (!visible || timer !== null) return;
       timer = window.setTimeout(() => {
         timer = null;
-        void persistPulseItemImpression({
-          itemId: item.id,
-          feedSessionId,
-          signal: controller.signal,
-        }).then((persisted) => {
-          if (!persisted) return;
-          window.sessionStorage.setItem(storageKey, "1");
-          observer.disconnect();
-        });
+        onDeviceSignal(item, "impression");
+        window.sessionStorage.setItem(storageKey, "1");
+        observer.disconnect();
       }, 1_000);
     }, { threshold: [0.5] });
     observer.observe(element);
     return () => {
       if (timer !== null) window.clearTimeout(timer);
-      controller.abort();
       observer.disconnect();
     };
-  }, [feedSessionId, item.id, trackImpression]);
+  }, [feedSessionId, item, item.id, onDeviceSignal, trackImpression]);
 
   const content = (
     <>
@@ -326,36 +302,24 @@ function InsiderTradeRow({
           <Link
             href={primary.href}
             className="flex min-h-11 min-w-0 flex-1 items-start justify-between gap-sm text-left"
-            onClick={() => trackClientEventSilently("pulse_item_opened", {
-              item_kind: item.kind,
-              action: "insider_stack_row",
-              item_state: item.state,
-              phase: item.phase,
-              position,
-              feed_session_id: feedSessionId,
-              ranking_version: rankingVersion,
-              reason_code: item.reason_code,
-            })}
+            onClick={() => {
+              onDeviceSignal(item, "open");
+              trackClientEventSilently("pulse_item_opened", {
+                item_kind: item.kind,
+                action: "insider_stack_row",
+                item_state: item.state,
+                phase: item.phase,
+                position,
+                feed_session_id: feedSessionId,
+                ranking_version: rankingVersion,
+                reason_code: item.reason_code,
+              });
+            }}
           >
             {content}
           </Link>
         ) : null}
-        {expanded ? (
-          <span className="shrink-0 rounded-full bg-surface-soft px-xs py-1 text-[10px] font-black text-muted">
-            {item.judgment ? "판단 저장됨" : "판단 필요"}
-          </span>
-        ) : null}
       </div>
-      {expanded ? (
-        <FilingJudgmentPanel
-          item={item}
-          questionHref={
-            questionAction?.type === "link" ? questionAction.href : null
-          }
-          draftOwnerId={draftOwnerId}
-          onSaved={onJudgmentSaved}
-        />
-      ) : null}
     </div>
   );
 }
@@ -366,11 +330,9 @@ function buildSummary(items: PulseItem[]) {
     const sale = numberMetadata(item, "form4_reported_sale_value");
     if (purchase > 0) summary.purchaseCount += 1;
     if (sale > 0) summary.saleCount += 1;
-    if (item.priority === "urgent") summary.urgentCount += 1;
-    if (coverageLevel(item) === "holding") summary.holdingCount += 1;
     if (item.metadata.has_recent_research === true) summary.researchCount += 1;
     return summary;
-  }, { purchaseCount: 0, saleCount: 0, urgentCount: 0, holdingCount: 0, researchCount: 0 });
+  }, { purchaseCount: 0, saleCount: 0, researchCount: 0 });
 }
 
 function transactionDetail(item: PulseItem) {
@@ -390,7 +352,6 @@ function transactionDetail(item: PulseItem) {
 
 function relationshipLabel(item: PulseItem): string | null {
   const level = coverageLevel(item);
-  if (level === "holding") return "보유 중";
   if (level === "interest") return "관심";
   if (item.metadata.has_recent_research === true) return "최근 리서치";
   return null;
@@ -398,11 +359,9 @@ function relationshipLabel(item: PulseItem): string | null {
 
 function coverageLevel(
   item: PulseItem,
-): "interest" | "holding" | null {
+): "interest" | null {
   const value = (item as PulseItem & { coverage_level?: unknown }).coverage_level;
-  return value === "interest" || value === "holding"
-    ? value
-    : null;
+  return value === "interest" ? value : null;
 }
 
 function planLabel(item: PulseItem): string | null {
@@ -435,4 +394,27 @@ function formatRelativeTime(iso: string): string {
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}일 전`;
   return new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric" }).format(new Date(iso));
+}
+
+function latestAvailableAtFor(items: Array<{ item: PulseItem }>): string {
+  return items.reduce((latest, { item }) => (
+    Date.parse(item.available_at) > Date.parse(latest) ? item.available_at : latest
+  ), items[0]?.item.available_at ?? new Date().toISOString());
+}
+
+function formatInsiderSummaryTime(iso: string, timezone: string): string {
+  return isToday(iso, timezone) ? "오늘 새로 확인" : `최근 확인 · ${formatRelativeTime(iso)}`;
+}
+
+function isToday(iso: string, timezone: string): boolean {
+  return localDateKey(iso, timezone) === localDateKey(new Date().toISOString(), timezone);
+}
+
+function localDateKey(iso: string, timezone: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
 }

@@ -113,4 +113,27 @@ describe("Pulse filing source", () => {
     expect(candidate?.secondary_actions[0]).toMatchObject({ label: "이 요약으로 질문" });
     expect(candidate?.metadata).toMatchObject({ filing_brief_ready: true, filing_brief_fact_count: 1 });
   });
+
+  it("excludes Form 4 records without a reported open-market purchase or sale", async () => {
+    const rpc = vi.fn(async () => ({
+      data: [{
+        filing_event_id: "event-non-market-form4",
+        payload: {
+          ...filingPayload("event-non-market-form4"),
+          form_type: "4",
+          form4_has_reported_open_market_trade: false,
+        },
+        candidate_bucket: "priority",
+      }],
+      error: null,
+    }));
+    const supabase = { rpc } as unknown as SupabaseClient<Database>;
+
+    await expect(getFilingCandidates(
+      supabase,
+      new Date("2026-07-16T00:00:00.000Z"),
+      [],
+      { globalRevision: 99, timeBucket: 99 },
+    )).resolves.toEqual([]);
+  });
 });

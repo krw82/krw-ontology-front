@@ -542,7 +542,7 @@ const watchlistOverview: WatchlistOverviewResponse = {
     mark: {
       user_id: "dev-user",
       ticker: company.ticker,
-      coverage_level: index === 0 ? "holding" : "interest",
+      coverage_level: "interest",
       priority: index,
       interest_reason: "핵심 리서치 대상",
       tags: index === 0 ? ["서비스", "마진"] : ["AI", "데이터센터"],
@@ -583,8 +583,7 @@ const watchlistOverview: WatchlistOverviewResponse = {
   ],
   stats: {
     total: 2,
-    interest: 1,
-    holding: 1,
+    interest: 2,
     open_questions: 1,
     notes: 5,
     recent_activity: 2,
@@ -600,7 +599,7 @@ const coverageItems: CoverageItem[] = [
   { name: "ChatSidebar", state: "runtime", section: "채팅", note: "API 기반 기록 패널, 실제 앱에서 확인" },
   { name: "CompaniesBrowser", state: "rendered", section: "회사", note: "검색, 조건별 기업 검색 CTA, 리스트" },
   { name: "CompanyCard", state: "rendered", section: "회사", note: "ko/en, 모바일/데스크톱 반응형" },
-  { name: "CompanyWatchlistActions", state: "rendered", section: "회사", note: "로그아웃/관심/보유 상태" },
+  { name: "CompanyWatchlistActions", state: "rendered", section: "회사", note: "로그아웃/관심 상태" },
   { name: "Composer", state: "rendered", section: "입력", note: "기본, URL, 파일 메뉴, 전송 샌드박스" },
   { name: "EvidenceGraphPreview", state: "rendered", section: "근거", note: "citation/tool call 기반 그래프" },
   { name: "FloatingAskBar", state: "rendered", section: "입력", note: "고정 질문 바" },
@@ -1061,7 +1060,7 @@ export default function DevComponentsGallery() {
 
         <Section
           title="회사와 목록"
-          description="회사 검색/리스트, 개별 카드, 관심·보유 버튼 상태를 확인합니다."
+          description="회사 검색/리스트, 개별 카드, 관심 버튼 상태를 확인합니다."
         >
           <div className="grid gap-base">
             <PreviewCard title="CompaniesBrowser">
@@ -1088,9 +1087,7 @@ export default function DevComponentsGallery() {
                   destinationHref="/ko/companies/AAPL"
                   labels={{
                     watchlist: "관심",
-                    holding: "보유",
                     savedWatchlist: "관심 등록됨",
-                    savedHolding: "보유 등록됨",
                     saving: "저장 중",
                     error: "저장하지 못했습니다.",
                   }}
@@ -1105,26 +1102,22 @@ export default function DevComponentsGallery() {
                   initialCoverageLevel="interest"
                   labels={{
                     watchlist: "관심",
-                    holding: "보유",
                     savedWatchlist: "관심 등록됨",
-                    savedHolding: "보유 등록됨",
                     saving: "저장 중",
                     error: "저장하지 못했습니다.",
                   }}
                 />
               </PreviewCard>
-              <PreviewCard title="WatchlistActions saved holding">
+              <PreviewCard title="WatchlistActions saved interest">
                 <CompanyWatchlistActions
                   ticker="AAPL"
                   isAuthenticated
                   loginHref="/login"
                   destinationHref="/ko/companies/AAPL"
-                  initialCoverageLevel="holding"
+                  initialCoverageLevel="interest"
                   labels={{
                     watchlist: "관심",
-                    holding: "보유",
                     savedWatchlist: "관심 등록됨",
-                    savedHolding: "보유 등록됨",
                     saving: "저장 중",
                     error: "저장하지 못했습니다.",
                   }}

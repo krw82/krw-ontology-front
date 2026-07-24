@@ -163,7 +163,7 @@ export default function WorkspaceNavigation({
                           <span aria-hidden="true" className="material-symbols-outlined text-[20px] text-muted">
                             {item.icon}
                           </span>
-                          <span>{item.label}</span>
+                          <span className="min-w-0 flex-1">{item.label}</span>
                         </Link>
                       ))}
                     </div>

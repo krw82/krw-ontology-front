@@ -11,6 +11,9 @@ describe("Research Pulse state migration", () => {
   const v3ReadModelMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260720040000_pulse_feed_v3_read_model.sql"), "utf8");
   const editorialRepairMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260720041000_repair_pulse_editorial_schema.sql"), "utf8");
   const authCleanupRepairMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260720042000_fix_pulse_revision_auth_cleanup.sql"), "utf8");
+  const v4DeviceAffinityMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260720043000_pulse_v4_device_private_affinity.sql"), "utf8");
+  const unifiedCoverageMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260721000000_unify_company_coverage_interest.sql"), "utf8");
+  const form4SupersessionMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260722200000_pulse_form4_transaction_supersessions.sql"), "utf8");
 
   it("creates additive preference and item-state tables with ownership RLS", () => {
     expect(migration).toContain("create table if not exists public.user_pulse_preferences");
@@ -107,5 +110,30 @@ describe("Research Pulse state migration", () => {
   it("does not recreate a private revision while auth-user cleanup cascades", () => {
     expect(authCleanupRepairMigration).toContain("from auth.users where id = p_user_id");
     expect(authCleanupRepairMigration).toContain("exception when foreign_key_violation");
+  });
+
+  it("removes server-side exposure profiling and the daily close loop for V4", () => {
+    expect(v4DeviceAffinityMigration).toContain("drop function if exists public.record_pulse_item_impression");
+    expect(v4DeviceAffinityMigration).toContain("drop function if exists public.record_pulse_item_impressions");
+    expect(v4DeviceAffinityMigration).toContain("drop function if exists public.close_user_decision_session");
+    expect(v4DeviceAffinityMigration).toContain("drop table if exists public.user_decision_sessions");
+    expect(v4DeviceAffinityMigration).toContain("drop column if exists impression_count");
+  });
+
+  it("normalizes coverage into a single interest state without rewriting unrelated analytics history", () => {
+    expect(unifiedCoverageMigration).toContain("set coverage_level = 'interest'");
+    expect(unifiedCoverageMigration).toContain("coverage_level is null or coverage_level = 'interest'");
+    expect(unifiedCoverageMigration).toContain("v_coverage_level <> 'interest'");
+    expect(unifiedCoverageMigration).not.toContain("update public.analytics_events");
+  });
+
+  it("uses transaction-level Form 4 amendment supersession without deleting raw SEC facts", () => {
+    expect(form4SupersessionMigration).toContain("sec_form4_transaction_supersessions");
+    expect(form4SupersessionMigration).toContain("sync_sec_form4_transaction_supersessions");
+    expect(form4SupersessionMigration).toContain("pulse_effective_form4_summary");
+    expect(form4SupersessionMigration).toContain("transaction_fingerprint");
+    expect(form4SupersessionMigration).toContain("form4_reported_sale_value");
+    expect(form4SupersessionMigration).toContain("trg_z_refresh_sec_form4_transaction_supersessions");
+    expect(form4SupersessionMigration).toContain("to service_role");
   });
 });

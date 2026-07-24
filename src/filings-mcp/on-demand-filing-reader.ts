@@ -1,7 +1,12 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import { readIntEnv } from "@/lib/env";
 import { toPublicFilingBrief } from "@/lib/filing-briefs/public";
+import {
+  parseFilingIndexDocuments,
+  type FilingDocumentCandidate,
+} from "@/lib/filing-notifications/sec-filing-index";
 import { parseSecFilingSections, type FilingSection, type ParsedFilingSections } from "@/lib/filing-notifications/sec-filing-sections";
 import { fetchSecText, SecRequestError } from "@/lib/filing-notifications/sec-client";
 import { reserveSecRequestSlot } from "@/lib/filing-notifications/sec-request-limiter";
@@ -63,6 +68,24 @@ export type FilingSectionDescriptor = Pick<FilingSection, "key" | "kind" | "head
   text_length: number;
 };
 
+/**
+ * Metadata from the verified SEC submission index. This is deliberately not a
+ * persisted document record: it exists only in the on-demand MCP response and
+ * the process-local cache used to serve the active request.
+ */
+export type FilingDocumentDescriptor = {
+  document_key: string;
+  document_name: string;
+  document_type: string | null;
+  description: string | null;
+  document_url: string;
+  sequence: number | null;
+  size_bytes: number | null;
+  is_primary: boolean;
+  recommendation_score: number;
+  readable: boolean;
+};
+
 export type FilingDocumentCitation = {
   source: "SEC EDGAR";
   filing_event_id: string;
@@ -73,6 +96,9 @@ export type FilingDocumentCitation = {
   section_heading: string;
   extraction: "deterministic_html" | "stored_structured_form4";
   fetched_at: string;
+  document_key?: string;
+  document_name?: string;
+  document_type?: string | null;
 };
 
 type ActiveCatalogFiling = {
@@ -87,8 +113,18 @@ type CachedDocument = {
   fetchedAt: string;
 };
 
+type ListedFilingDocument = FilingDocumentDescriptor;
+
+type CachedDocumentList = {
+  expiresAt: number;
+  documents: ListedFilingDocument[];
+  fetchedAt: string;
+};
+
 const documentCache = new Map<string, CachedDocument>();
 const inFlightDocumentReads = new Map<string, Promise<CachedDocument>>();
+const documentListCache = new Map<string, CachedDocumentList>();
+const inFlightDocumentListReads = new Map<string, Promise<CachedDocumentList>>();
 
 export function filingsMcpEnv(): "dev" | "staging" | "prod" {
   const value = (process.env.FILINGS_MCP_ENV ?? process.env.FILING_WORKER_ENV ?? "prod").trim().toLowerCase();
@@ -198,7 +234,7 @@ export async function listFilingSections(filingEventId: string): Promise<{
 }> {
   const active = await loadActiveCatalogFiling(filingEventId);
   assertNarrativeFiling(active.filing);
-  const document = await loadParsedDocument(active.filing);
+  const document = await loadPrimaryParsedDocument(active.filing);
   return {
     filing: toMetadata(active.filing),
     sections: [
@@ -236,7 +272,7 @@ export async function readFilingSection(params: {
 }> {
   const active = await loadActiveCatalogFiling(params.filingEventId);
   assertNarrativeFiling(active.filing);
-  const document = await loadParsedDocument(active.filing);
+  const document = await loadPrimaryParsedDocument(active.filing);
   const section = resolveSection(document.parsed, params.sectionKey);
   if (!section) {
     throw new FilingReaderError("section_not_found", `No section named ${params.sectionKey} exists in this filing.`);
@@ -263,6 +299,99 @@ export async function readFilingSection(params: {
       section_heading: section.heading,
       extraction: "deterministic_html",
       fetched_at: document.fetchedAt,
+    },
+  };
+}
+
+/**
+ * Lists files from the source filing's SEC submission index without writing
+ * the document list or any body to Supabase. A caller must use a returned
+ * document_key; raw SEC URLs are never accepted as read inputs.
+ */
+export async function listFilingDocuments(filingEventId: string): Promise<{
+  filing: FilingMcpMetadata;
+  documents: FilingDocumentDescriptor[];
+  fetched_at: string;
+}> {
+  const active = await loadActiveCatalogFiling(filingEventId);
+  assertNarrativeFiling(active.filing);
+  const documentList = await loadFilingDocumentList(active.filing);
+  return {
+    filing: toMetadata(active.filing),
+    documents: documentList.documents,
+    fetched_at: documentList.fetchedAt,
+  };
+}
+
+/**
+ * Reads a bounded plain-text slice of one verified, text-like attachment in
+ * the source filing. It fetches from SEC on demand and retains the body only
+ * in the existing bounded process-memory cache.
+ */
+export async function readFilingDocument(params: {
+  filingEventId: string;
+  documentKey: string;
+  offset?: number;
+  maxChars?: number;
+}): Promise<{
+  filing: FilingMcpMetadata;
+  document: FilingDocumentDescriptor;
+  text: string;
+  offset: number;
+  next_offset: number | null;
+  document_truncated: boolean;
+  citation: FilingDocumentCitation;
+}> {
+  const active = await loadActiveCatalogFiling(params.filingEventId);
+  assertNarrativeFiling(active.filing);
+  const documentList = await loadFilingDocumentList(active.filing);
+  const descriptor = documentList.documents.find(
+    (candidate) => candidate.document_key === params.documentKey,
+  );
+  if (!descriptor) {
+    throw new FilingReaderError(
+      "document_not_found",
+      "The requested document is not present in this filing's verified SEC index.",
+    );
+  }
+  if (!descriptor.readable) {
+    throw new FilingReaderError(
+      "unsupported_document_format",
+      "This SEC attachment is not a supported text document for on-demand reading.",
+    );
+  }
+  if (!isVerifiedFilingDocumentUrl(descriptor.document_url, active.filing)) {
+    throw new FilingReaderError(
+      "document_unavailable",
+      "The requested document is outside the verified SEC filing directory.",
+    );
+  }
+
+  const source = await loadParsedDocumentForUrl(
+    active.filing,
+    descriptor.document_url,
+  );
+  const slice = readTextSlice(source.parsed.normalizedText, params.offset, params.maxChars);
+  return {
+    filing: toMetadata(active.filing),
+    document: descriptor,
+    text: slice.text,
+    offset: slice.offset,
+    next_offset: slice.nextOffset,
+    document_truncated: source.parsed.truncated,
+    citation: {
+      source: "SEC EDGAR",
+      filing_event_id: active.filing.id,
+      accession_number: active.filing.accession_number,
+      filing_detail_url: active.filing.filing_detail_url,
+      document_url: descriptor.document_url,
+      section_key: descriptor.document_key,
+      section_heading: documentHeading(descriptor),
+      extraction: "deterministic_html",
+      fetched_at: source.fetchedAt,
+      document_key: descriptor.document_key,
+      document_name: descriptor.document_name,
+      document_type: descriptor.document_type,
     },
   };
 }
@@ -362,8 +491,15 @@ function assertNarrativeFiling(filing: SecFilingEventRow): void {
   }
 }
 
-async function loadParsedDocument(filing: SecFilingEventRow): Promise<CachedDocument> {
+async function loadPrimaryParsedDocument(filing: SecFilingEventRow): Promise<CachedDocument> {
   const documentUrl = await selectPrimaryDocumentUrl(filing);
+  return loadParsedDocumentForUrl(filing, documentUrl);
+}
+
+async function loadParsedDocumentForUrl(
+  filing: SecFilingEventRow,
+  documentUrl: string,
+): Promise<CachedDocument> {
   const cacheKey = `${filing.id}:${documentUrl}`;
   const cached = documentCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached;
@@ -376,6 +512,59 @@ async function loadParsedDocument(filing: SecFilingEventRow): Promise<CachedDocu
   });
   inFlightDocumentReads.set(cacheKey, read);
   return read;
+}
+
+async function loadFilingDocumentList(
+  filing: SecFilingEventRow,
+): Promise<CachedDocumentList> {
+  const cacheKey = `${filing.id}:${filing.filing_detail_url}`;
+  const cached = documentListCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached;
+  if (cached) documentListCache.delete(cacheKey);
+
+  const pending = inFlightDocumentListReads.get(cacheKey);
+  if (pending) return pending;
+  const read = fetchAndListFilingDocuments(filing, cacheKey).finally(() => {
+    inFlightDocumentListReads.delete(cacheKey);
+  });
+  inFlightDocumentListReads.set(cacheKey, read);
+  return read;
+}
+
+async function fetchAndListFilingDocuments(
+  filing: SecFilingEventRow,
+  cacheKey: string,
+): Promise<CachedDocumentList> {
+  await reserveSecRequestSlot({ scope: "global", minIntervalMs: ON_DEMAND_SEC_MIN_INTERVAL_MS });
+  let indexHtml: string;
+  try {
+    indexHtml = await fetchSecText(filing.filing_detail_url, 15_000, {
+      maxBytes: ON_DEMAND_DOCUMENT_MAX_BYTES,
+    });
+  } catch (error) {
+    if (error instanceof SecRequestError && error.code === "response_too_large") {
+      throw new FilingReaderError("document_index_too_large", "SEC's filing document index is too large for a safe on-demand read.");
+    }
+    throw error;
+  }
+
+  const indexed = parseFilingIndexDocuments({
+    html: indexHtml,
+    filingDetailUrl: filing.filing_detail_url,
+    primaryDocumentName: filing.primary_document_name,
+  });
+  const documents = canonicalFilingDocuments(filing, indexed);
+  if (documents.length === 0) {
+    throw new FilingReaderError("document_index_unavailable", "No verified readable document metadata is available for this SEC filing.");
+  }
+  const cached: CachedDocumentList = {
+    expiresAt: Date.now() + ON_DEMAND_CACHE_TTL_MS,
+    documents,
+    fetchedAt: new Date().toISOString(),
+  };
+  documentListCache.set(cacheKey, cached);
+  evictExpiredCacheEntries();
+  return cached;
 }
 
 async function fetchAndParseDocument(
@@ -453,6 +642,99 @@ function resolveSection(parsed: ParsedFilingSections, sectionKey: string): Filin
   return parsed.sections.find((section) => section.key === sectionKey) ?? null;
 }
 
+function canonicalFilingDocuments(
+  filing: SecFilingEventRow,
+  candidates: FilingDocumentCandidate[],
+): ListedFilingDocument[] {
+  const byUrl = new Map<string, ListedFilingDocument>();
+  for (const candidate of candidates) {
+    if (!isVerifiedFilingDocumentUrl(candidate.documentUrl, filing)) continue;
+    const descriptor = toDocumentDescriptor(filing, candidate);
+    byUrl.set(descriptor.document_url, descriptor);
+  }
+
+  const primaryUrl = filing.primary_document_url;
+  if (primaryUrl && isVerifiedFilingDocumentUrl(primaryUrl, filing) && !byUrl.has(primaryUrl)) {
+    const documentName = filing.primary_document_name
+      ?? new URL(primaryUrl).pathname.split("/").pop()
+      ?? "primary-document";
+    byUrl.set(primaryUrl, toDocumentDescriptor(filing, {
+      sequence: null,
+      documentName,
+      documentType: filing.form_type,
+      description: "Primary filing document",
+      documentUrl: primaryUrl,
+      sizeBytes: null,
+      isPrimary: true,
+      recommendationScore: 60,
+    }));
+  }
+
+  return [...byUrl.values()].sort(
+    (left, right) => right.recommendation_score - left.recommendation_score
+      || Number(right.is_primary) - Number(left.is_primary)
+      || (left.sequence ?? Number.MAX_SAFE_INTEGER) - (right.sequence ?? Number.MAX_SAFE_INTEGER)
+      || left.document_name.localeCompare(right.document_name),
+  );
+}
+
+function toDocumentDescriptor(
+  filing: SecFilingEventRow,
+  candidate: FilingDocumentCandidate,
+): ListedFilingDocument {
+  const isPrimary = candidate.isPrimary || candidate.documentUrl === filing.primary_document_url;
+  return {
+    document_key: documentKey(filing.id, candidate.documentUrl),
+    document_name: candidate.documentName,
+    document_type: candidate.documentType,
+    description: candidate.description,
+    document_url: candidate.documentUrl,
+    sequence: candidate.sequence,
+    size_bytes: candidate.sizeBytes,
+    is_primary: isPrimary,
+    recommendation_score: candidate.recommendationScore,
+    readable: isReadableNarrativeDocument(candidate, isPrimary),
+  };
+}
+
+function documentKey(filingEventId: string, documentUrl: string): string {
+  const digest = createHash("sha256")
+    .update(`${filingEventId}\n${documentUrl}`)
+    .digest("base64url")
+    .slice(0, 22);
+  return `document:${digest}`;
+}
+
+function isReadableNarrativeDocument(
+  candidate: FilingDocumentCandidate,
+  isPrimary: boolean,
+): boolean {
+  if (!/\.(?:html?|xml|txt)$/i.test(candidate.documentName)) return false;
+  if (isPrimary) return true;
+  const type = candidate.documentType?.trim().toUpperCase() ?? "";
+  return /^(?:EX-(?:2|10|99)(?:\.\d+)?|EXHIBIT\s+(?:2|10|99)(?:\.\d+)?)$/.test(type);
+}
+
+function documentHeading(document: FilingDocumentDescriptor): string {
+  const type = document.document_type?.trim();
+  return type ? `${type} — ${document.document_name}` : document.document_name;
+}
+
+function readTextSlice(
+  fullText: string,
+  requestedOffset: number | undefined,
+  requestedMaxChars: number | undefined,
+): { text: string; offset: number; nextOffset: number | null } {
+  const offset = Math.max(0, Math.floor(requestedOffset ?? 0));
+  const maxChars = Math.max(1_000, Math.min(Math.floor(requestedMaxChars ?? 24_000), 120_000));
+  const text = fullText.slice(offset, offset + maxChars);
+  return {
+    text,
+    offset,
+    nextOffset: offset + text.length < fullText.length ? offset + text.length : null,
+  };
+}
+
 function toMetadata(filing: SecFilingEventRow): FilingMcpMetadata {
   return {
     filing_event_id: filing.id,
@@ -502,5 +784,13 @@ function evictExpiredCacheEntries(): void {
     const oldestKey = documentCache.keys().next().value;
     if (!oldestKey) break;
     documentCache.delete(oldestKey);
+  }
+  for (const [key, entry] of documentListCache) {
+    if (entry.expiresAt <= now) documentListCache.delete(key);
+  }
+  while (documentListCache.size > ON_DEMAND_CACHE_MAX_ENTRIES) {
+    const oldestKey = documentListCache.keys().next().value;
+    if (!oldestKey) break;
+    documentListCache.delete(oldestKey);
   }
 }

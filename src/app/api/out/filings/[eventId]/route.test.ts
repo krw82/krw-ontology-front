@@ -14,6 +14,9 @@ vi.mock("@/lib/analytics/server", () => ({
 vi.mock("@/lib/coverage/activation", () => ({
   tryRecordCoverageActivation: vi.fn().mockResolvedValue(false),
 }));
+vi.mock("@/lib/onboarding/state", () => ({
+  recordOnboardingStateAction: vi.fn().mockResolvedValue(null),
+}));
 vi.mock("@/lib/filing-notifications/filing-access", () => ({
   resolveFilingAccess: vi.fn(),
   resolveFilingContextTicker: vi.fn(),
@@ -25,6 +28,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { getAuthUser } from "@/lib/auth";
 import { tryRecordCoverageActivation } from "@/lib/coverage/activation";
+import { recordOnboardingStateAction } from "@/lib/onboarding/state";
 import {
   resolveFilingAccess,
   resolveFilingContextTicker,
@@ -93,6 +97,32 @@ describe("GET /api/out/filings/[eventId]", () => {
     expect(response.status).toBe(503);
     expect(recordAnalyticsEvent).not.toHaveBeenCalled();
     expect(tryRecordCoverageActivation).not.toHaveBeenCalled();
+  });
+
+  it("completes the new start flow only after its SEC source write succeeds", async () => {
+    const fake = adminForSourceOpen(null);
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+    vi.mocked(recordOnboardingStateAction).mockResolvedValue({
+      state: { status: "completed" },
+      changed: true,
+    } as never);
+
+    const response = await GET(
+      new NextRequest(
+        `http://localhost/api/out/filings/${eventId}?entry=onboarding_v2`,
+      ),
+      { params: Promise.resolve({ eventId }) },
+    );
+
+    expect(response.status).toBe(302);
+    expect(recordOnboardingStateAction).toHaveBeenCalledWith(
+      fake.admin,
+      "20000000-0000-4000-8000-000000000001",
+      "evidence_opened",
+    );
+    expect(recordAnalyticsEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ eventName: "onboarding_evidence_opened" }),
+    );
   });
 });
 

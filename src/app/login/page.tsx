@@ -187,7 +187,7 @@ function LoginContent() {
   const copy = loginCopy[loginLocale];
   const nextPath = normalizeInternalNextPath(
     rawNextPath,
-    queryLocalizedPath(loginLocale, "/pulse"),
+    queryLocalizedPath(loginLocale, "/auth/landing"),
   );
   const desktopCode = normalizeDesktopCode(searchParams.get("desktop_code"));
   const desktopNextPath = desktopCode

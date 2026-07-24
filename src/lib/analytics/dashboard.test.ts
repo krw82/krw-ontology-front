@@ -51,12 +51,19 @@ describe("analytics dashboard aggregation", () => {
     expect(summary.rates).toEqual({
       pageToCta: null,
       ctaToSignup: null,
+      loginToCompanySelection: 0,
+      companySelectionToFiling: null,
+      filingToSource: null,
+      sourceToFollow: null,
       signupToQuestion: 100,
       prefillToQuestion: null,
       questionToAnswer: 50,
       answerToCitation: 100,
       answerFailureRate: 50,
       limitToUpgrade: null,
+      onboardingStartToCompanySelection: null,
+      onboardingStartToQuestion: null,
+      onboardingStartToEvidence: null,
     });
   });
 
@@ -82,6 +89,38 @@ describe("analytics dashboard aggregation", () => {
       counts: {
         question_submitted: 1,
       },
+    });
+  });
+
+  it("measures the first-value evidence path", () => {
+    const summary = buildAnalyticsFunnelSummary([
+      event("login_completed", "user:1", "2026-05-23T01:00:00.000Z"),
+      event("company_selected", "user:1", "2026-05-23T01:01:00.000Z"),
+      event("filing_detail_viewed", "user:1", "2026-05-23T01:02:00.000Z"),
+      event("sec_source_opened", "user:1", "2026-05-23T01:03:00.000Z"),
+      event("company_followed", "user:1", "2026-05-23T01:04:00.000Z"),
+    ], range);
+
+    expect(summary.rates).toMatchObject({
+      loginToCompanySelection: 100,
+      companySelectionToFiling: 100,
+      filingToSource: 100,
+      sourceToFollow: 100,
+    });
+  });
+
+  it("measures the new-user path through an evidence confirmation", () => {
+    const summary = buildAnalyticsFunnelSummary([
+      event("onboarding_started", "user:1", "2026-05-23T01:00:00.000Z"),
+      event("onboarding_company_selected", "user:1", "2026-05-23T01:01:00.000Z"),
+      event("onboarding_question_started", "user:2", "2026-05-23T01:02:00.000Z"),
+      event("onboarding_evidence_opened", "user:1", "2026-05-23T01:03:00.000Z"),
+    ], range);
+
+    expect(summary.rates).toMatchObject({
+      onboardingStartToCompanySelection: 100,
+      onboardingStartToQuestion: 100,
+      onboardingStartToEvidence: 100,
     });
   });
 });

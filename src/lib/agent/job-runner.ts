@@ -82,9 +82,15 @@ import {
   type RunKind,
 } from "@/lib/run-kind";
 import { normalizeGuruLensKey, type GuruLensKey } from "@/lib/guru-lenses";
-import { persistCreatedCharts } from "@/lib/charts/db";
 import {
-  isChartGenerationEnabled,
+  extractCreatedVisualizationArtifacts,
+  persistCreatedVisualizations,
+  persistMessagePresentation,
+} from "@/lib/visualizations/db";
+import {
+  getVisualizationMode,
+  isVisualizationGenerationEnabled,
+  isVisualizationVisible,
   stripChartTokens,
 } from "@/lib/features/charts";
 import { buildSelectedNewsSourcePack } from "@/lib/news-discovery/source-pack";
@@ -92,6 +98,10 @@ import { appendDocumentContextToUserMessage } from "@/lib/document-ingestion/pro
 import { resolveChatQuestionRoute } from "@/lib/question-router/chat-question-router";
 import { writeLocalDebugLog } from "@/lib/observability/local-debug-log";
 import { redactSensitiveOutput } from "@/lib/security/sensitive-output";
+import {
+  redactFilingCitationForPersistence,
+  redactFilingToolCallForPersistence,
+} from "@/lib/agent/filing-tool-persistence";
 
 const HEARTBEAT_INTERVAL_MS = readIntEnv("LEASE_HEARTBEAT_INTERVAL_MS", 60_000, {
   min: 1_000,
@@ -867,17 +877,18 @@ function createRunRecordPersister(
   };
 
   const persistToolCall = async (toolCall: AccumulatedToolCall) => {
+    const persistedToolCall = redactFilingToolCallForPersistence(toolCall);
     const payload = {
       run_id: runId,
-      tool_use_id: toolCall.id,
-      tool_name: toolCall.toolName,
-      arguments_json: parseJsonStringForDb(toolCall.argumentsJson) ?? {},
-      result_summary: toolCall.resultSummary,
-      result_json: jsonForDb(toolCall.resultJson),
-      result_text: toolCall.resultText,
-      started_at: toolCall.startedAt,
-      finished_at: toolCall.finishedAt,
-      error_message: toolCall.errorMessage,
+      tool_use_id: persistedToolCall.id,
+      tool_name: persistedToolCall.toolName,
+      arguments_json: parseJsonStringForDb(persistedToolCall.argumentsJson) ?? {},
+      result_summary: persistedToolCall.resultSummary,
+      result_json: jsonForDb(persistedToolCall.resultJson),
+      result_text: persistedToolCall.resultText,
+      started_at: persistedToolCall.startedAt,
+      finished_at: persistedToolCall.finishedAt,
+      error_message: persistedToolCall.errorMessage,
     };
 
     const { data: existing } = await admin
@@ -897,19 +908,20 @@ function createRunRecordPersister(
   };
 
   const persistCitation = async (citation: StreamingCitation) => {
+    const persistedCitation = redactFilingCitationForPersistence(citation);
     await admin.from("citations").insert({
       message_id: assistantMessageId,
       run_id: runId,
-      object_id: citation.object_id,
-      ticker: citation.ticker,
-      document_type: citation.document_type,
-      period: citation.period,
-      section: citation.section,
-      quote_text: citation.quote_text,
-      claim_text: citation.claim_text,
-      evidence_grade: citation.evidence_grade,
-      source_quality: citation.source_quality,
-      trace_json: jsonForDb(citation.trace_json),
+      object_id: persistedCitation.object_id,
+      ticker: persistedCitation.ticker,
+      document_type: persistedCitation.document_type,
+      period: persistedCitation.period,
+      section: persistedCitation.section,
+      quote_text: persistedCitation.quote_text,
+      claim_text: persistedCitation.claim_text,
+      evidence_grade: persistedCitation.evidence_grade,
+      source_quality: persistedCitation.source_quality,
+      trace_json: jsonForDb(persistedCitation.trace_json),
     });
   };
 
@@ -995,24 +1007,24 @@ async function handleCompletedJob(params: {
 }) {
   const { admin, job, runStartedAt, result, release, sendEvent } = params;
   const { acc } = result;
-  const chartGenerationEnabled = isChartGenerationEnabled();
-  const rawVisibleAnswer = chartGenerationEnabled
-    ? acc.fullText.trim()
-    : stripChartTokens(acc.fullText);
+  const visualizationMode = getVisualizationMode();
+  const rawVisibleAnswer = stripChartTokens(acc.fullText);
   const redactedAnswer = redactSensitiveOutput(rawVisibleAnswer);
   const visibleAnswer = redactedAnswer.content;
   const estimatedCost = estimateCost(acc.inputTokens, acc.outputTokens);
   const finishedAt = new Date().toISOString();
   const latencyMs = Date.now() - new Date(runStartedAt).getTime();
   const chatArtifacts: ChatArtifact[] = [];
-  const chatCharts = chartGenerationEnabled
-    ? await persistCreatedCharts({
+  const generatedVisualizations = isVisualizationGenerationEnabled()
+    ? extractCreatedVisualizationArtifacts(acc)
+    : [];
+  const chatVisualizations = isVisualizationVisible()
+    ? await persistCreatedVisualizations({
         admin,
         acc,
         sessionId: job.session.id,
         messageId: job.assistantMessageId,
         runId: job.run.id,
-        content: visibleAnswer,
       })
     : [];
 
@@ -1023,6 +1035,17 @@ async function handleCompletedJob(params: {
       status: "completed",
     })
     .eq("id", job.assistantMessageId);
+
+  const presentation = isVisualizationVisible()
+    ? await persistMessagePresentation({
+        admin,
+        sessionId: job.session.id,
+        messageId: job.assistantMessageId,
+        runId: job.run.id,
+        content: visibleAnswer,
+        visualizations: chatVisualizations,
+      })
+    : null;
 
   await markAgentRunTerminal(admin, job.run.id, {
     status: "completed",
@@ -1070,8 +1093,10 @@ async function handleCompletedJob(params: {
       citation_count: acc.citations.length,
       artifact_count: chatArtifacts.length,
       artifact_created: chatArtifacts.length > 0,
-      chart_count: chatCharts.length,
-      chart_created: chatCharts.length > 0,
+      visualization_mode: visualizationMode,
+      visualization_generated_count: generatedVisualizations.length,
+      visualization_count: chatVisualizations.length,
+      visualization_created: chatVisualizations.length > 0,
       input_tokens: acc.inputTokens,
       output_tokens: acc.outputTokens,
       tool_call_count: acc.toolCalls.length,
@@ -1086,8 +1111,8 @@ async function handleCompletedJob(params: {
   for (const artifact of chatArtifacts) {
     await sendEvent("artifact", artifact);
   }
-  for (const chart of chatCharts) {
-    await sendEvent("chart", chart);
+  for (const visualization of chatVisualizations) {
+    await sendEvent("visualization", visualization);
   }
 
   await sendEvent("done", {
@@ -1097,7 +1122,8 @@ async function handleCompletedJob(params: {
     rich_answers: [],
     artifacts: [],
     chat_artifacts: chatArtifacts,
-    charts: chatCharts,
+    visualizations: chatVisualizations,
+    presentation,
     release: publicReleaseMetadata(release),
     usage: {
       input_tokens: acc.inputTokens,

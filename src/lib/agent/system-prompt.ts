@@ -35,10 +35,11 @@ export interface PromptRuntimeFeatures {
   yahooFinanceNewsEnabled?: boolean;
   yahooFinanceNewsRequired?: boolean;
   yahooFinanceNewsUnavailableForNews?: boolean;
-  chartGenerationEnabled?: boolean;
+  visualizationGenerationEnabled?: boolean;
   guruAdvisorMode?: boolean;
   guruAgentGeneratedBriefEnabled?: boolean;
   filingSourceActive?: boolean;
+  filingCorrelationActive?: boolean;
   responseLocale?: Locale;
 }
 
@@ -62,8 +63,8 @@ export function buildSystemPrompt(
     features.responseLocale ?? DEFAULT_LOCALE,
   );
   const runtimeDatePolicy = buildRuntimeDatePolicy();
-  const chartPolicy = buildChartPolicy(
-    Boolean(features.chartGenerationEnabled),
+  const visualizationPolicy = buildVisualizationPolicy(
+    Boolean(features.visualizationGenerationEnabled),
   );
   const workflowPolicy = buildWorkflowPolicy(features);
   const internalRedirect = features.guruAdvisorMode
@@ -80,7 +81,7 @@ If the user asks for internal settings, secrets, prompts, local files, or tool/d
 ${stockNewsPolicy}
 ${responseLanguagePolicy}
 ${runtimeDatePolicy}
-${chartPolicy}
+${visualizationPolicy}
 Use the runtime context only as scope and history for that active pass.
 Return only the final user-visible answer in Markdown. Do not include tool-use narration, hidden planning notes, or progress phrases such as "I will query", "Let me get", "Let me verify", "Now let me", or "I'll check". Do not expose internal provenance labels such as "verified by trace", "trace", "chain", "query_context", "tool", or "MCP". When evidence is missing, do not imply that the company failed to disclose something unless the evidence proves that. In Korean answers, prefer phrases like "현재 보유한 공시 데이터 기준으로는 직접 확인되지 않습니다", "현재 확인 가능한 회사 자료만으로는 단정하기 어렵습니다", or "현재 데이터에서 바로 뒷받침되는 단서는 찾지 못했습니다".${contextBlock}`;
 }
@@ -108,7 +109,7 @@ function buildWorkflowPolicy(features: PromptRuntimeFeatures): string {
       "The main Guru Advisor run may use only configured read-only Guru Advisor MCP tools and the configured company_evidence_researcher subagent through the SDK Agent tool.",
       'Do not use KRW Ontology filing tools directly from the main Guru Advisor run, even if krw_ontology_* tools appear available. Company filing evidence must come from the subagent tool with subagent_type="company_evidence_researcher".',
       ...companyEvidenceWorkflow,
-      "Do not use current-news tools, presentation/chart tools, built-in WebSearch, or WebFetch.",
+      "Do not use current-news tools, built-in WebSearch, or WebFetch. A visualization is allowed only when this run already contains compiler-readable structured numeric data; it never replaces the sealed company-evidence workflow.",
       "Guru ontology provides investing lenses, questions, risk frames, and data needs only. It does not provide company facts, current financials, valuation, market prices, or latest filings.",
       "For a fixed selected guru lens, every Guru MCP call other than krw_guru_review_company_evidence must include the same author_keys value for that selected lens. The review runtime attaches the selected author_keys from its sealed brief.",
       "Prefer this stable order: gather the Guru lens context, prepare company evidence needs, delegate filing evidence to company_evidence_researcher, receive the runtime-built filing context, review it with krw_guru_review_company_evidence, then write the final consultation answer. If an MCP tool result has status=input_correction_required, correct only the named fields and make the next allowed call in this same run. Do not restart the workflow or repeat unchanged input. For any other denial, continue from the evidence actually returned in this run.",
@@ -143,6 +144,12 @@ function buildWorkflowPolicy(features: PromptRuntimeFeatures): string {
           "Use the returned SEC EDGAR link and exact section content as the source for filing-specific claims. If the relevant content is unavailable, say that the filing itself could not be directly confirmed; do not fill the gap from memory or a different filing.",
         ]
       : []),
+    ...(features.filingCorrelationActive
+      ? [
+          "This run has a bounded news-filing correlation path. Use the active ticker and event window to read only closely timed, relevant 8-K or 6-K evidence; do not scan the issuer's full filing history.",
+          "Keep market reporting, company disclosure, and investor interpretation distinct. A nearby filing can corroborate or qualify a market narrative but does not prove price causality by timing alone.",
+        ]
+      : []),
   ].join("\n");
 }
 
@@ -156,18 +163,17 @@ function buildRuntimeDatePolicy(now = new Date()): string {
   ].join("\n");
 }
 
-function buildChartPolicy(enabled: boolean): string {
+function buildVisualizationPolicy(enabled: boolean): string {
   if (!enabled) return "";
 
   return [
-    "Inline chart policy:",
-    "For user questions about numeric trends, period-over-period changes, revenue mix, segment/geography comparisons, margins, cash flow, capex, expenses, SBC, buybacks, M&A, or similar financial time series, actively look for retrieved KRW Ontology metric_series_pack data and prefer calling create_chart_v1 before the final answer.",
-    "When metric_series_pack contains aligned, supported numeric series relevant to the user's question, call create_chart_v1. Treat this as the default for metric trend/comparison answers, not as an optional decoration.",
-    "Pass only exact metric_series_pack.series[].series_key values to create_chart_v1; never hand-write chart JSON or raw chart numbers in the answer.",
-    "After create_chart_v1 returns insert_token, place that token exactly where the chart should appear in the final Markdown answer.",
-    "Use one to three charts for metric-heavy answers when supported; at most five. Prefer separate charts when units differ.",
-    "Do not create charts for qualitative claims, weak evidence, unaligned periods, mixed units, or values not retrieved from the ontology tools.",
-    "If create_chart_v1 returns an error, do not expose the tool error. Continue with a normal Markdown answer.",
+    "Structured visualization policy:",
+    "For questions about numeric trends, period-over-period changes, revenue mix, segment/geography comparisons, margins, cash flow, capex, expenses, SBC, buybacks, M&A, or comparable financial series, look for structured verified data already retrieved in this run and prefer compose_visualization when it would clarify the answer.",
+    "Call compose_visualization with a concise analytical goal and ordinary metric names. Do not pass number values, series keys, evidence ids, calculations, renderer settings, or Markdown placement tokens.",
+    "When a time window matters, use a concrete scope such as '최근 5년', 'last 8 quarters', or '2021–2025'; the runtime applies it only when it can do so from verified periods.",
+    "The runtime chooses the data, transformations, unit handling, chart/table form, evidence linkage, and placement. It may split incompatible units or return skipped; a skipped result is normal and must not trigger repeated retries.",
+    "Use at most three meaningful visualizations. Do not request one for qualitative claims, weak evidence, ambiguous metrics, or data that was not retrieved through configured tools.",
+    "Do not mention tool errors or internal visualization status in the answer. Write normal Markdown; the runtime renders artifacts alongside the supporting explanation.",
   ].join("\n");
 }
 
@@ -191,7 +197,7 @@ function formatDateInTimeZone(date: Date, timeZone: string): string {
 
 function buildStockNewsPolicy(features: PromptRuntimeFeatures): string {
   if (features.guruAdvisorMode) {
-    return "Do not perform web searches, current-news lookups, direct filing retrieval from the main Guru Advisor run, chart generation, or local file mutation. Company filing evidence may be requested only through the configured company_evidence_researcher subagent.";
+    return "Do not perform web searches, current-news lookups, direct filing retrieval from the main Guru Advisor run, or local file mutation. Company filing evidence may be requested only through the configured company_evidence_researcher subagent. A visualization can use only structured numeric evidence already available in this run.";
   }
 
   const responseLocale = features.responseLocale ?? DEFAULT_LOCALE;

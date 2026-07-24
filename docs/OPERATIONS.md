@@ -91,7 +91,9 @@ npm run prod:deploy:web
 npm run prod:deploy:runtime
 ```
 
-This restarts only the Mac MCP/worker runtime.
+This restarts only the Mac MCP/worker runtime. It materializes a versioned
+Ontology plugin from the same source as the MCP, verifies the live fingerprint,
+and requires a fresh worker heartbeat before marking the runtime active.
 
 For routine code deploys with pending migrations but without catalog publication:
 

@@ -1,6 +1,7 @@
 import type { AgentRunSummary, Message, RunStatus, Session } from "@/types/api-contracts";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import { normalizeTicker, normalizeTickers } from "@/lib/ontology/ticker";
+import { ONBOARDING_START_ENTRY } from "@/lib/onboarding/start-flow";
 import type { RunKind } from "@/lib/run-kind";
 
 export interface LoadedChatState {
@@ -18,6 +19,7 @@ export function buildChatSessionHref(
     locale?: Locale;
     ticker?: string | null;
     runKind?: RunKind | null;
+    entry?: typeof ONBOARDING_START_ENTRY | null;
   } = {},
 ): string {
   const params = new URLSearchParams();
@@ -25,6 +27,9 @@ export function buildChatSessionHref(
   if (ticker) params.set("ticker", ticker);
   appendLocaleParam(params, options.locale);
   if (options.runKind) params.set("runKind", options.runKind);
+  if (options.entry === ONBOARDING_START_ENTRY) {
+    params.set("entry", ONBOARDING_START_ENTRY);
+  }
   const localeQuery = params.toString();
   return `/chat?sessionId=${encodeURIComponent(sessionId)}${
     localeQuery ? `&${localeQuery}` : ""

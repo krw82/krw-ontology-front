@@ -35,11 +35,11 @@ describe("Pulse production E2E fixture", () => {
     const second = createStaticPulseE2EFeed();
 
     expect(second).toEqual(first);
-    expect(first.items).toHaveLength(1);
-    expect(first.items[0]).toMatchObject({
+    expect(first.candidate_items).toHaveLength(1);
+    expect(first.candidate_items[0]).toMatchObject({
       kind: "filing",
       metadata: { development_showcase: true },
     });
-    expect(first.items.some((item) => item.kind === "checkup")).toBe(false);
+    expect(first.candidate_items.some((item) => item.kind === "checkup")).toBe(false);
   });
 });

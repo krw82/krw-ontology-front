@@ -138,11 +138,21 @@ function toCandidateFromGlobalRow(row: GlobalFilingCandidateRow): PulseCandidate
     || typeof candidate.occurred_at !== "string"
     || typeof candidate.first_seen_at !== "string"
   ) return [];
+  // Form 4 also covers grants, option exercises, tax withholding, gifts, and
+  // other ownership changes. Pulse treats this as a trading-signal surface,
+  // so only SEC-reported open-market P/S activity is eligible here.
+  if (isForm4Candidate(candidate) && !candidate.form4_has_reported_open_market_trade) {
+    return [];
+  }
   return [toCandidate(candidate)];
 }
 
 function isRecord(value: Json): value is Record<string, Json | undefined> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isForm4Candidate(event: Pick<FilingRow, "form_type">): boolean {
+  return event.form_type === "4" || event.form_type === "4/A";
 }
 
 function filingCatalogEnv(): "dev" | "staging" | "prod" {

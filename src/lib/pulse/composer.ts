@@ -10,6 +10,7 @@ import {
   encodePulseItemId,
   normalizePulseDateTime,
   PULSE_PAGE_SIZE,
+  PULSE_VISIBLE_ITEM_LIMIT,
   pulseItemSchema,
   type PulseCandidate,
   type PulseRankedCandidate,
@@ -17,8 +18,6 @@ import {
 import {
   applyPulseItemStates,
   getPulseItemStates,
-  hasRecentKindImpression,
-  markPulseItemsFirstSeen,
 } from "@/lib/pulse/item-state";
 import {
   applyPulseFilingDecisionTicker,
@@ -33,15 +32,14 @@ import {
 } from "@/lib/pulse/monitoring";
 import { getPulsePreferences } from "@/lib/pulse/preferences";
 import {
+  buildPulseCandidatePool,
   rankPulseCandidates,
-  selectFinitePulseQueue,
 } from "@/lib/pulse/ranking";
 import { getLearningCandidates, selectLearningCandidate } from "@/lib/pulse/sources/learning";
 import { getAnalysisCandidates } from "@/lib/pulse/sources/analysis";
 import { getFilingCandidates } from "@/lib/pulse/sources/filings";
 import { getQuestionCandidates } from "@/lib/pulse/sources/questions";
 import { getRawResurfaceCandidates, selectResurfaceCandidate } from "@/lib/pulse/sources/resurface";
-import { buildPulseSummary } from "@/lib/pulse/summary";
 import { buildPulseItemVersions } from "@/lib/pulse/delta";
 import { getPulseFeedRevision, type PulseFeedRevision } from "@/lib/pulse/revision";
 import { getPulseFilingDecisionContext } from "@/lib/judgments/read-model";
@@ -173,39 +171,26 @@ export async function composePulseFeed({
       linked_thesis: context.linked_thesis,
     };
   });
-  const stateful = applyPulseItemStates(contextualized, states, snapshotAt, preferences.timezone);
+  const stateful = applyPulseItemStates(contextualized, states, snapshotAt);
 
   // Rotation follows per-item hidden/snoozed/fatigue state, ensuring a hidden
   // first candidate never makes the whole resurface/learning source disappear.
   const scheduledReviews = stateful.filter((item) =>
     item.kind === "resurface" && item.metadata.monitoring_rule_type === "scheduled_review");
-  const resurface = hasRecentKindImpression(
-    states,
-    "resurface",
+  // Rotation and fatigue are device-local in the flat feed. The server only emits one
+  // eligible resurface/learning candidate; a device may suppress it based on
+  // its own recent exposure history without creating a database write.
+  const resurface = selectResurfaceCandidate(
+    stateful.filter((item) => item.kind === "resurface" && item.metadata.monitoring_rule_type !== "scheduled_review"),
+    userId,
     snapshotAt,
-    preferences.timezone,
-    28 * 24 * 60 * 60 * 1_000,
-  )
-    ? []
-    : selectResurfaceCandidate(
-      stateful.filter((item) => item.kind === "resurface" && item.metadata.monitoring_rule_type !== "scheduled_review"),
-      userId,
-      snapshotAt,
-      resurfaceCadence,
-    );
-  const learning = hasRecentKindImpression(
-    states,
-    "learning",
+    resurfaceCadence,
+  );
+  const learning = selectLearningCandidate(
+    stateful.filter((item) => item.kind === "learning"),
+    userId,
     snapshotAt,
-    preferences.timezone,
-    7 * 24 * 60 * 60 * 1_000,
-  )
-    ? []
-    : selectLearningCandidate(
-      stateful.filter((item) => item.kind === "learning"),
-      userId,
-      snapshotAt,
-    );
+  );
   const candidates = [
     ...stateful.filter((item) => item.kind !== "resurface" && item.kind !== "learning"),
     ...scheduledReviews,
@@ -217,43 +202,52 @@ export async function composePulseFeed({
     ? rankPulseCandidates(buildDevelopmentPulseShowcase(snapshotAt), snapshotAt)
     : [];
   const activeAnalysis = ranked.filter(isActiveAnalysis);
-  const rankedFeed = ranked.filter((item) => !isActiveAnalysis(item));
-  const developmentFeed = developmentShowcase.filter((item) => !isActiveAnalysis(item));
+  // Active analyses are also candidates in V5. The separate field remains a
+  // compact status channel for polling and summaries; the client de-duplicates
+  // it and renders one continuous stream.
+  const rankedFeed = ranked;
+  const developmentFeed = developmentShowcase;
   const developmentActiveAnalysis = developmentShowcase.filter(isActiveAnalysis);
 
   const boundedLimit = Math.max(1, Math.min(limit, PULSE_PAGE_SIZE));
-  const displayItems = selectFinitePulseQueue(
+  const candidateItems = buildPulseCandidatePool(
     [...developmentFeed, ...rankedFeed],
-    boundedLimit,
+    snapshotAt,
+  ).slice(0, boundedLimit);
+  const candidateRankByKey = new Map(
+    candidateItems.map((candidate) => [candidate.item_key, candidate.server_rank]),
   );
 
-  const visibleActiveAnalysis = [...developmentActiveAnalysis, ...activeAnalysis].slice(0, 2);
-  const summary = buildPulseSummary([...displayItems, ...visibleActiveAnalysis]);
-  await markPulseItemsFirstSeen(supabase, userId, [...displayItems, ...visibleActiveAnalysis], snapshotAt).catch((error) => {
-    console.warn("[pulse] failed to mark first delivered", {
-      error_code: typeof error === "object" && error && "code" in error ? String(error.code) : "unknown",
-    });
-  });
+  const visibleActiveAnalysis = [...developmentActiveAnalysis, ...activeAnalysis]
+    .slice(0, 2)
+    .map((candidate, activeIndex) => ({
+      ...candidate,
+      // The status channel duplicates an active card only for polling. Keep
+      // its exact candidate rank so a sparse delta cannot overwrite the flat
+      // baseline order with a legacy "active first" position.
+      server_rank: candidateRankByKey.get(candidate.item_key)
+        ?? candidateItems.length + activeIndex,
+    }));
 
   const sinceTime = since && !Number.isNaN(Date.parse(since)) ? Date.parse(since) : null;
 
   const publicActiveAnalysis = toPublicItems(visibleActiveAnalysis);
-  const publicItems = toPublicItems(displayItems);
+  const publicCandidateItems = toPublicItems(candidateItems);
 
   return {
     revision: revision.value,
     generated_at: snapshotAt.toISOString(),
     snapshot_at: snapshotAt.toISOString(),
-    ranking_version: "rule_v3",
+    ranking_version: "rule_v5_flat",
     timezone: preferences.timezone,
     date_label: formatDateLabel(snapshotAt, preferences.timezone),
     filter,
-    summary,
     active_analysis_items: publicActiveAnalysis,
-    items: publicItems,
+    candidate_items: publicCandidateItems,
+    visible_limit: PULSE_VISIBLE_ITEM_LIMIT,
     item_versions: buildPulseItemVersions({
       active_analysis_items: publicActiveAnalysis,
-      items: publicItems,
+      candidate_items: publicCandidateItems,
     }),
     new_item_count: sinceTime === null
       ? 0
@@ -275,18 +269,13 @@ export function createUnavailablePulseFeed(now = new Date()): PulseFeedResponse 
     revision: "unavailable",
     generated_at: now.toISOString(),
     snapshot_at: now.toISOString(),
-    ranking_version: "rule_v3",
+    ranking_version: "rule_v5_flat",
     timezone: "Asia/Seoul",
     date_label: formatDateLabel(now, "Asia/Seoul"),
     filter: "all",
-    summary: {
-      actionable_count: 0,
-      active_analysis_count: 0,
-      counts: { filing: 0, analysis: 0, question: 0, resurface: 0 },
-      primary_action: null,
-    },
     active_analysis_items: [],
-    items: [],
+    candidate_items: [],
+    visible_limit: PULSE_VISIBLE_ITEM_LIMIT,
     item_versions: {},
     new_item_count: 0,
     source_statuses: SOURCE_KINDS.map((source) => degradedStatus(source)),
@@ -304,6 +293,7 @@ function toPublicItem(candidate: PulseRankedCandidate): PulseItem | null {
   const {
     item_key,
     has_recent_research,
+    research_affinity,
     is_pinned,
     lane,
     rank_score,
@@ -313,6 +303,7 @@ function toPublicItem(candidate: PulseRankedCandidate): PulseItem | null {
     ...item
   } = candidate;
   void has_recent_research;
+  void research_affinity;
   void is_pinned;
   void lane;
   void rank_score;

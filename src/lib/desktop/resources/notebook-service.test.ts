@@ -135,7 +135,7 @@ describe("createDesktopNotebookNote", () => {
     vi.mocked(getCompanyMark).mockResolvedValue({
       user_id: "user-1",
       ticker: "AAPL",
-      coverage_level: "holding",
+      coverage_level: "interest",
       priority: 0,
       interest_reason: null,
       tags: [],

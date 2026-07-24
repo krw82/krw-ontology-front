@@ -7,7 +7,7 @@ import { easeOutExpo } from "@/lib/animation";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
-import { localizedPath } from "@/i18n/routing";
+import { localizedPath, queryLocalizedPath } from "@/i18n/routing";
 import { createClient } from "@/lib/supabase/client";
 
 const traceTransitionMs = 0.12;
@@ -138,6 +138,7 @@ export function HomeHeaderActions({
   locale?: Locale;
 }) {
   const companiesHref = localizedPath(locale, "/companies");
+  const pulseHref = queryLocalizedPath(locale, "/pulse");
   const startLabel = locale === "ko" ? "리서치 시작" : "Start research";
   const loginLabel = locale === "ko" ? "로그인" : "Log in";
   const researchLabel = locale === "ko" ? "내 리서치" : "My research";
@@ -173,7 +174,7 @@ export function HomeHeaderActions({
   const isAuthenticated = authState === "authenticated";
   const secondaryHref = isAuthenticated
     ? "/chat"
-    : `/login?next=${encodeURIComponent(companiesHref)}`;
+    : `/login?next=${encodeURIComponent(pulseHref)}`;
   const secondaryLabel = isAuthenticated ? researchLabel : loginLabel;
 
   return (

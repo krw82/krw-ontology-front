@@ -1,4 +1,4 @@
-import type { PulseAnalysisPhase } from "@/types/api-contracts";
+import type { PulseAnalysisPhase, PulseFeedSlot } from "@/types/api-contracts";
 import {
   PULSE_PRIORITY_RANK,
   type PulseCandidate,
@@ -9,16 +9,18 @@ import {
 const HOUR_MS = 60 * 60 * 1_000;
 const DAY_MS = 24 * HOUR_MS;
 const URGENT_FRESH_MS = 72 * HOUR_MS;
-const FILING_FRESH_MS = 7 * DAY_MS;
-const DIGEST_FRESH_MS = 3 * DAY_MS;
 const TERMINAL_ANALYSIS_FRESH_MS = 7 * DAY_MS;
+const FLAT_MIX_TOP_WINDOW = 6;
+const MAX_TOP_TICKER_COUNT = 2;
+const MAX_COMPLETED_ANALYSIS_COUNT = 2;
 
-export const PULSE_SESSION_MAX_ITEMS = 20;
-export const PULSE_SESSION_MAX_GLOBAL_FILINGS = 2;
+/** The server ships a compact, authorized candidate slate. */
+export const PULSE_CANDIDATE_POOL_MAX = 20;
 
 /**
- * Lane order is intentionally categorical rather than a weighted score. A
- * lower number always wins; preference boosts only break ties inside a lane.
+ * Produces a single utility order. `feed_slot` remains a reason/category for
+ * analytics and safety constraints, but no longer determines visible sections
+ * or a fixed slot quota.
  */
 export function rankPulseCandidates(
   candidates: PulseCandidate[],
@@ -38,7 +40,6 @@ export function toRankedCandidate(
   const reviewedAt = candidate.reviewed_at ?? candidate.judgment?.updated_at ?? null;
   const actionable = candidate.actionable ?? isActionableCandidate(candidate, phase, reviewedAt);
   const state = candidate.state ?? (reviewedAt ? "reviewed" : "new");
-  const lane = reviewedAt ? 90 : getPulseLane(candidate, phase, now);
 
   return {
     ...candidate,
@@ -46,11 +47,13 @@ export function toRankedCandidate(
     reviewed_at: reviewedAt,
     state,
     actionable,
-    lane,
-    rank_score: getRankScore(candidate, phase, actionable, reviewedAt, now),
+    lane: getPulseLane(candidate, phase, now),
+    rank_score: getRankScore(candidate, phase, actionable, reviewedAt, state, now),
     priority_rank: PULSE_PRIORITY_RANK[candidate.priority],
     coverage_rank: coverageRank(candidate.coverage_level),
     saved_rank: candidate.is_pinned || candidate.saved_at ? 0 : 1,
+    feed_slot: classifyPulseFeedSlot(candidate, phase),
+    server_rank: 0,
   };
 }
 
@@ -73,34 +76,21 @@ export function isActionableCandidate(
   return candidate.kind === "analysis" && phase !== "active";
 }
 
+/**
+ * A small tie-break/safety band, not a visible lane. The utility score remains
+ * the primary order so a highly relevant completed analysis can sit naturally
+ * between filings rather than after a whole feed section.
+ */
 export function getPulseLane(
   candidate: PulseCandidate,
   phase: PulseAnalysisPhase | null,
   now: Date,
 ): number {
   const ageMs = Math.max(0, now.getTime() - Date.parse(candidate.occurred_at));
-  if (candidate.kind === "filing") {
-    const covered = isActiveCoverage(candidate.coverage_level);
-    if (candidate.judgment) return 90;
-    if (covered && candidate.priority === "urgent" && ageMs <= URGENT_FRESH_MS) return 0;
-    if (covered && candidate.state === "seen") return 5;
-    if (candidate.linked_thesis || hasMonitoringRuleMatch(candidate)) return 10;
-    if (covered && ageMs <= FILING_FRESH_MS) return 12;
-    if (isDigestFiling(candidate) && ageMs <= DIGEST_FRESH_MS) return 18;
-    return 15;
-  }
-  if (candidate.kind === "analysis") {
-    if (phase === "active") return 30;
-    return ageMs <= TERMINAL_ANALYSIS_FRESH_MS ? 20 : 25;
-  }
-  if (candidate.kind === "question") return hasQuestionEvidence(candidate) ? 25 : 35;
-  if (candidate.kind === "resurface") {
-    return candidate.metadata.monitoring_rule_type === "scheduled_review"
-      ? 38
-      : 40;
-  }
-  if (candidate.kind === "learning") return 50;
-  return 90;
+  if (candidate.kind === "filing" && candidate.priority === "urgent" && ageMs <= URGENT_FRESH_MS) return 0;
+  if (candidate.kind === "analysis" && phase === "active") return 5;
+  if (candidate.kind === "learning") return 40;
+  return 10;
 }
 
 export function compareRankedCandidates(
@@ -114,9 +104,9 @@ export function comparePulseSortKeys(
   left: PulseSortKey,
   right: PulseSortKey,
 ): number {
-  if (left.lane !== right.lane) return left.lane - right.lane;
   if (left.rank_score !== right.rank_score) return right.rank_score - left.rank_score;
   if (left.priority_rank !== right.priority_rank) return left.priority_rank - right.priority_rank;
+  if (left.lane !== right.lane) return left.lane - right.lane;
   if (left.coverage_rank !== right.coverage_rank) return left.coverage_rank - right.coverage_rank;
   if (left.saved_rank !== right.saved_rank) return left.saved_rank - right.saved_rank;
   const occurredDiff = Date.parse(right.occurred_at) - Date.parse(left.occurred_at);
@@ -138,92 +128,128 @@ export function sortKeyOf(candidate: PulseRankedCandidate): PulseSortKey {
 }
 
 /**
- * Diversity is a display-only pass. Call this only with the already bounded
- * first raw page window so it cannot alter keyset pagination boundaries.
+ * Converts the scored server candidates into one ordered list. The rules make
+ * the first scroll varied without exposing category controls to the user.
  */
-export function reorderFirstPageWindow(
-  rawWindow: PulseRankedCandidate[],
+export function buildPulseCandidatePool(
+  ranked: PulseRankedCandidate[],
+  now = new Date(),
 ): PulseRankedCandidate[] {
-  const protectedWindow: PulseRankedCandidate[] = [];
+  // Sources (including the optional development showcase) may be composed in
+  // parallel. Re-establish the utility order here rather than relying on the
+  // caller's concatenation order.
+  const available = ranked
+    .filter((candidate) => !candidate.reviewed_at && !isStaleTerminalAnalysis(candidate, now))
+    .sort(compareRankedCandidates);
+  const selected = mixFlatCandidates(available, PULSE_CANDIDATE_POOL_MAX);
+
+  return selected.map((candidate, serverRank) => ({
+    ...candidate,
+    feed_slot: classifyPulseFeedSlot(candidate, candidate.phase),
+    server_rank: serverRank,
+  }));
+}
+
+export function classifyPulseFeedSlot(
+  candidate: Pick<PulseCandidate, "kind" | "coverage_level" | "has_recent_research" | "linked_thesis" | "metadata">,
+  phase: PulseAnalysisPhase | null = null,
+): PulseFeedSlot {
+  if (candidate.kind === "learning") return "learning";
+  if (candidate.kind === "resurface") {
+    return candidate.metadata.monitoring_rule_type === "scheduled_review"
+      ? "continue"
+      : "resurface";
+  }
+  if (candidate.kind === "analysis" || candidate.kind === "question" || candidate.kind === "checkup") {
+    return "continue";
+  }
+  if (candidate.kind === "filing") {
+    const personal = isActiveCoverage(candidate.coverage_level)
+      || Boolean(candidate.has_recent_research)
+      || Boolean(candidate.linked_thesis)
+      || hasMonitoringRuleMatch(candidate);
+    return personal ? "signal" : "discovery";
+  }
+  void phase;
+  return "continue";
+}
+
+function mixFlatCandidates(
+  candidates: PulseRankedCandidate[],
+  limit: number,
+): PulseRankedCandidate[] {
+  const selected: PulseRankedCandidate[] = [];
   const deferred: PulseRankedCandidate[] = [];
-  const tickerCounts = new Map<string, number>();
-  let learningCount = 0;
 
-  for (const candidate of rawWindow) {
-    if (protectedWindow.length >= 10) {
+  for (const candidate of candidates) {
+    if (selected.length >= limit) break;
+    if (canPlace(candidate, selected, true)) {
+      selected.push(candidate);
+    } else {
       deferred.push(candidate);
-      continue;
     }
-
-    const ticker = candidate.ticker;
-    const tickerCount = ticker ? tickerCounts.get(ticker) ?? 0 : 0;
-    const tickerAllowed =
-      protectedWindow.length >= 8
-      || !ticker
-      || tickerCount < 2
-      || candidate.priority === "urgent";
-    const learningAllowed = candidate.kind !== "learning" || learningCount < 1;
-
-    if (!tickerAllowed || !learningAllowed) {
-      deferred.push(candidate);
-      continue;
-    }
-
-    protectedWindow.push(candidate);
-    if (ticker && protectedWindow.length <= 8) tickerCounts.set(ticker, tickerCount + 1);
-    if (candidate.kind === "learning") learningCount += 1;
   }
 
-  return [...protectedWindow, ...deferred];
+  // When a user has only one kind of useful work, never leave blank space just
+  // to preserve a diversity ideal. Relax only soft top-of-feed constraints.
+  for (const candidate of deferred) {
+    if (selected.length >= limit) break;
+    if (canPlace(candidate, selected, false)) selected.push(candidate);
+  }
+
+  return selected;
 }
 
-/**
- * Builds one finite decision session. User-owned work always receives the
- * protected slots; catalog-wide filings are discovery, not an infinite inbox,
- * and therefore cannot occupy more than two of the twenty cards.
- */
-export function selectFinitePulseQueue(
-  candidates: PulseRankedCandidate[],
-  requestedLimit = PULSE_SESSION_MAX_ITEMS,
-): PulseRankedCandidate[] {
-  const limit = Math.max(
-    1,
-    Math.min(PULSE_SESSION_MAX_ITEMS, Math.floor(requestedLimit)),
-  );
-  const personal = reorderFirstPageWindow(
-    candidates.filter(isProtectedDecisionCandidate),
-  );
-  const globalFilings = candidates
-    .filter(isGlobalDiscoveryFiling)
-    .slice(0, PULSE_SESSION_MAX_GLOBAL_FILINGS);
-  const supplemental = reorderFirstPageWindow(
-    candidates.filter(
-      (candidate) =>
-        !isProtectedDecisionCandidate(candidate) &&
-        !isGlobalDiscoveryFiling(candidate),
-    ),
-  );
-
-  return [...personal, ...globalFilings, ...supplemental].slice(0, limit);
-}
-
-function isProtectedDecisionCandidate(
+function canPlace(
   candidate: PulseRankedCandidate,
+  selected: PulseRankedCandidate[],
+  strict: boolean,
 ): boolean {
-  if (candidate.reviewed_at) return false;
-  if (isActiveCoverage(candidate.coverage_level)) return true;
-  if (candidate.kind === "question" || candidate.kind === "resurface") return true;
-  if (candidate.kind === "analysis" || candidate.kind === "checkup") return true;
-  return candidate.kind === "filing" &&
-    (Boolean(candidate.linked_thesis) || hasMonitoringRuleMatch(candidate));
+  const completedAnalyses = selected.filter((item) =>
+    item.kind === "analysis" && item.phase === "completed").length;
+  if (
+    candidate.kind === "analysis"
+    && candidate.phase === "completed"
+    && completedAnalyses >= MAX_COMPLETED_ANALYSIS_COUNT
+  ) {
+    return false;
+  }
+
+  if (!strict || candidate.priority === "urgent" || selected.length >= FLAT_MIX_TOP_WINDOW) {
+    return true;
+  }
+
+  if (candidate.feed_slot === "learning") return false;
+
+  if (candidate.ticker) {
+    const sameTicker = selected.filter((item) => item.ticker === candidate.ticker).length;
+    if (sameTicker >= MAX_TOP_TICKER_COUNT) return false;
+  }
+
+  if (candidate.feed_slot === "discovery") {
+    const discoveryCount = selected.filter((item) => item.feed_slot === "discovery").length;
+    if (discoveryCount >= 1) return false;
+  }
+
+  if (isForm4(candidate)) {
+    const existingForm4 = selected.filter(isForm4);
+    if (existingForm4.length > 0 && !existingForm4.every((item) => sameCalendarDay(item, candidate))) {
+      return false;
+    }
+  }
+
+  const previous = selected.at(-1);
+  if (!previous || previous.kind !== candidate.kind) return true;
+  // Several same-day Form 4 filings intentionally become one compact stack in
+  // the client, so they are not treated as repetitive adjacent cards.
+  return isForm4(previous) && isForm4(candidate) && sameCalendarDay(previous, candidate);
 }
 
-function isGlobalDiscoveryFiling(candidate: PulseRankedCandidate): boolean {
-  return candidate.kind === "filing" &&
-    !candidate.reviewed_at &&
-    !isActiveCoverage(candidate.coverage_level) &&
-    !candidate.linked_thesis &&
-    !hasMonitoringRuleMatch(candidate);
+function isStaleTerminalAnalysis(candidate: PulseRankedCandidate, now: Date): boolean {
+  if (candidate.kind !== "analysis" || candidate.phase === "active") return false;
+  const age = Math.max(0, now.getTime() - Date.parse(candidate.occurred_at));
+  if (candidate.phase === "failed") return age > 3 * DAY_MS;
+  return age > TERMINAL_ANALYSIS_FRESH_MS;
 }
 
 function isAvailable(candidate: PulseCandidate, now: Date): boolean {
@@ -237,27 +263,54 @@ function isDigestFiling(candidate: PulseCandidate): boolean {
   return candidate.kind === "filing" && String(candidate.metadata.alert_priority ?? "") === "digest";
 }
 
+function isForm4(candidate: Pick<PulseCandidate, "kind" | "metadata">): boolean {
+  if (candidate.kind !== "filing") return false;
+  const formType = String(candidate.metadata.form_type ?? "");
+  return formType === "4" || formType === "4/A";
+}
+
+function sameCalendarDay(left: PulseRankedCandidate, right: PulseRankedCandidate): boolean {
+  return left.occurred_at.slice(0, 10) === right.occurred_at.slice(0, 10);
+}
+
 function getRankScore(
   candidate: PulseCandidate,
   phase: PulseAnalysisPhase | null,
   actionable: boolean,
   reviewedAt: string | null,
+  state: PulseRankedCandidate["state"],
   now: Date,
 ): number {
   if (reviewedAt) return 0;
 
   const materiality = candidate.priority === "urgent"
-    ? 35
-    : candidate.priority === "high" ? 25 : candidate.priority === "normal" ? 15 : 8;
-  const userRelevance = Math.min(
-    30,
-    coverageScore(candidate.coverage_level)
-      + (candidate.has_recent_research ? 8 : 0)
-      + (candidate.saved_at || candidate.is_pinned ? 5 : 0),
+    ? 25
+    : candidate.priority === "high" ? 18 : candidate.priority === "normal" ? 11 : 4;
+  const researchAffinity = researchAffinityRankScore(
+    candidate.research_affinity ?? (candidate.has_recent_research ? 6 : 0),
   );
-  const actionValue = actionable ? 10 : phase === "active" ? 6 : 0;
+  const userRelevance = Math.min(
+    25,
+    coverageScore(candidate.coverage_level)
+      + researchAffinity
+      + (candidate.linked_thesis ? 7 : 0)
+      + (hasMonitoringRuleMatch(candidate) ? 6 : 0)
+      + (candidate.saved_at || candidate.is_pinned ? 4 : 0),
+  );
+  const continuity = candidate.kind === "analysis"
+    ? phase === "completed" ? 18 : phase === "active" ? 12 : 2
+    : candidate.kind === "question" ? (hasQuestionEvidence(candidate) ? 10 : 5)
+      : candidate.kind === "resurface" ? 6 : actionable ? 3 : 0;
+  const evidence = candidate.kind === "filing"
+    ? candidate.metadata.filing_brief_ready === true ? 6 : isDigestFiling(candidate) ? 1 : 3
+    : candidate.kind === "question" && hasQuestionEvidence(candidate) ? 4 : 0;
+  const seenPenalty = state === "seen" ? 6 : 0;
 
-  return materiality + userRelevance + actionValue + freshnessScore(candidate.occurred_at, now);
+  return Math.max(
+    0,
+    materiality + userRelevance + continuity + evidence
+      + freshnessScore(candidate.occurred_at, now) - seenPenalty,
+  );
 }
 
 function isActiveCoverage(level: PulseCandidate["coverage_level"]): boolean {
@@ -265,18 +318,23 @@ function isActiveCoverage(level: PulseCandidate["coverage_level"]): boolean {
 }
 
 function coverageRank(level: PulseCandidate["coverage_level"]): number {
-  if (level === "holding") return 0;
-  if (level === "interest") return 1;
-  return 2;
+  return level === "interest" ? 0 : 1;
 }
 
 function coverageScore(level: PulseCandidate["coverage_level"]): number {
-  if (level === "holding") return 18;
-  if (level === "interest") return 12;
-  return 0;
+  return level === "interest" ? 15 : 0;
 }
 
-function hasMonitoringRuleMatch(candidate: PulseCandidate): boolean {
+/**
+ * Affinity is generated on a 0–20 session-based scale. Compress it only at
+ * ranking time so repeated conversations remain distinguishable while a
+ * manually selected interest company still has the strongest single signal.
+ */
+function researchAffinityRankScore(value: number): number {
+  return Math.min(14, Math.log1p(Math.max(0, value)) * 4.6);
+}
+
+function hasMonitoringRuleMatch(candidate: Pick<PulseCandidate, "metadata">): boolean {
   const value = candidate.metadata.monitoring_rule_match_count ?? candidate.metadata.rule_match_count;
   return typeof value === "number" ? value > 0 : value === true || value === "true";
 }
@@ -290,9 +348,9 @@ function freshnessScore(occurredAt: string, now: Date): number {
   const parsed = Date.parse(occurredAt);
   if (Number.isNaN(parsed)) return 0;
   const ageHours = Math.max(0, now.getTime() - parsed) / HOUR_MS;
-  if (ageHours <= 6) return 20;
-  if (ageHours <= 24) return 16;
-  if (ageHours <= 72) return 10;
+  if (ageHours <= 6) return 18;
+  if (ageHours <= 24) return 14;
+  if (ageHours <= 72) return 9;
   if (ageHours <= 7 * 24) return 4;
   return 0;
 }

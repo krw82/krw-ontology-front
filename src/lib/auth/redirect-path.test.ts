@@ -41,7 +41,7 @@ describe("normalizeInternalNextPath", () => {
   });
 
   it("rejects absolute and protocol-relative URLs", () => {
-    expect(normalizeInternalNextPath("https://evil.example")).toBe("/companies");
-    expect(normalizeInternalNextPath("//evil.example")).toBe("/companies");
+    expect(normalizeInternalNextPath("https://evil.example")).toBe("/pulse");
+    expect(normalizeInternalNextPath("//evil.example")).toBe("/pulse");
   });
 });

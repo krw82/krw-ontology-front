@@ -68,6 +68,15 @@ describe("chat history state", () => {
     ).toBe("/chat?sessionId=session-1&runKind=idea_generation");
   });
 
+  it("keeps the start onboarding entry through session creation", () => {
+    expect(
+      buildChatSessionHref("session-1", {
+        ticker: "AAPL",
+        entry: "onboarding_v2",
+      }),
+    ).toBe("/chat?sessionId=session-1&ticker=AAPL&entry=onboarding_v2");
+  });
+
   it("prefers persisted session tickers over URL fallback", () => {
     expect(
       getSessionTickers(

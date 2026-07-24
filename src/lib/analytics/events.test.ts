@@ -17,6 +17,7 @@ describe("analytics event schema helpers", () => {
     expect(isAnalyticsEventName("coverage_level_changed")).toBe(true);
     expect(isAnalyticsEventName("filing_judgment_completed")).toBe(true);
     expect(isAnalyticsEventName("second_opportunity_resolved")).toBe(true);
+    expect(isAnalyticsEventName("pulse_refresh_requested")).toBe(true);
     expect(isAnalyticsEventName("Question Submitted")).toBe(false);
     expect(isAnalyticsEventName("raw_question_saved")).toBe(false);
   });
@@ -24,6 +25,7 @@ describe("analytics event schema helpers", () => {
   it("keeps authoritative decision outcomes off the browser endpoint", () => {
     expect(isClientAnalyticsEventName("filing_judgment_started")).toBe(true);
     expect(isClientAnalyticsEventName("pulse_viewed")).toBe(true);
+    expect(isClientAnalyticsEventName("pulse_refresh_completed")).toBe(true);
     for (const eventName of [
       "coverage_level_changed",
       "coverage_activated",

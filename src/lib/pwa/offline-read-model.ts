@@ -21,9 +21,9 @@ export interface OfflinePulseSnapshot {
 }
 
 export function buildOfflinePulseSnapshot(
-  feed: Pick<PulseFeedResponse, "generated_at" | "items">,
+  feed: Pick<PulseFeedResponse, "generated_at" | "candidate_items">,
 ): OfflinePulseSnapshot | null {
-  const items = feed.items
+  const items = feed.candidate_items
     .filter((item) => item.kind === "filing")
     .slice(0, MAX_OFFLINE_FILING_ITEMS)
     .map((item) => ({
@@ -44,7 +44,7 @@ export function buildOfflinePulseSnapshot(
 }
 
 export async function saveOfflinePulseSnapshot(
-  feed: Pick<PulseFeedResponse, "generated_at" | "items">,
+  feed: Pick<PulseFeedResponse, "generated_at" | "candidate_items">,
 ): Promise<void> {
   if (typeof indexedDB === "undefined") return;
   const snapshot = buildOfflinePulseSnapshot(feed);

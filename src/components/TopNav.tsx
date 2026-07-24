@@ -17,7 +17,6 @@ import { dispatchOpenChatSidebar } from "@/lib/chat/sidebar-events";
 import WorkspaceNavigation from "@/components/navigation/WorkspaceNavigation";
 import { Pressable } from "@/components/ui/Pressable";
 import { clearAllComposerDrafts } from "@/lib/chat/composer-draft-store";
-import { clearAllFilingJudgmentDrafts } from "@/lib/pulse/judgment-draft-store";
 import { clearOfflineReadModel } from "@/lib/pwa/offline-read-model";
 import {
   clearDeviceCacheOwner,
@@ -247,7 +246,6 @@ export default function TopNav({
     if (!supabase) {
       await Promise.allSettled([
         clearAllComposerDrafts(),
-        Promise.resolve(clearAllFilingJudgmentDrafts()),
         clearOfflineReadModel(),
       ]);
       setAccountMenuOpen(false);
@@ -258,7 +256,6 @@ export default function TopNav({
     await Promise.allSettled([
       supabase.auth.signOut(),
       clearAllComposerDrafts(),
-      Promise.resolve(clearAllFilingJudgmentDrafts()),
       clearOfflineReadModel(),
     ]);
     setUserProfile(null);
@@ -374,24 +371,6 @@ export default function TopNav({
                       onClick={() => setAccountMenuOpen(false)}
                     >
                       <UsageStatus entitlement={entitlement} variant="menu" />
-                    </Link>
-                    <Link
-                      href="/filings"
-                      className="mt-xs flex w-full items-center justify-between rounded-[8px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-surface-soft hover:text-primary"
-                      role="menuitem"
-                      onClick={() => setAccountMenuOpen(false)}
-                    >
-                      <span>{currentLocale === "ko" ? "새 공시" : "New filings"}</span>
-                      <span aria-hidden="true" className="material-symbols-outlined text-[18px]">notifications</span>
-                    </Link>
-                    <Link
-                      href="/settings/notifications"
-                      className="mt-xs flex w-full items-center justify-between rounded-[8px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-surface-soft hover:text-primary"
-                      role="menuitem"
-                      onClick={() => setAccountMenuOpen(false)}
-                    >
-                      <span>{currentLocale === "ko" ? "공시 알림 설정" : "Filing alerts"}</span>
-                      <span aria-hidden="true" className="material-symbols-outlined text-[18px]">settings</span>
                     </Link>
                     <button
                       type="button"

@@ -1,3 +1,19 @@
+import type {
+  ChatMessagePresentation,
+  ChatMessageVisualization,
+} from "@/lib/visualizations/contracts";
+
+export type {
+  ChatMessagePresentation,
+  ChatMessageVisualization,
+  KrwVisualizationArtifact,
+  PresentationBlock,
+  VisualizationIntent,
+  VisualizationSeries,
+  VisualizationToolResult,
+  VisualizationView,
+} from "@/lib/visualizations/contracts";
+
 /**
  * API Contracts: KRW Ontology Web Chat
  *
@@ -59,7 +75,7 @@ export type StreamingEventType =
   | "activity_update"
   | "citation"
   | "artifact"
-  | "chart"
+  | "visualization"
   | "state_sync"
   | "done"
   | "error"
@@ -162,8 +178,8 @@ export type StockNewsMCPToolName =
 export type YahooFinanceMCPToolName =
   "get_yahoo_finance_news" | "get_stock_info";
 
-/** Local presentation MCP tool names */
-export type ChartMCPToolName = "create_chart_v1";
+/** Local presentation MCP tool name. */
+export type VisualizationMCPToolName = "compose_visualization";
 
 /** On-demand SEC filing MCP tools. Document bodies are never persisted. */
 export type KrwFilingsMCPToolName =
@@ -172,6 +188,8 @@ export type KrwFilingsMCPToolName =
   | "search_catalog_filings"
   | "list_filing_sections"
   | "read_filing_section"
+  | "list_filing_documents"
+  | "read_filing_document"
   | "get_form4_insider_transactions"
   | "get_coverage_state"
   | "list_filing_judgments"
@@ -199,7 +217,7 @@ export type MCPToolName =
   | KRWOntologyMCPToolName
   | StockNewsMCPToolName
   | YahooFinanceMCPToolName
-  | ChartMCPToolName
+  | VisualizationMCPToolName
   | KrwFilingsMCPToolName
   | GuruMCPToolName;
 
@@ -257,7 +275,7 @@ export type UserCompanyQuestionSource =
   | "saved_from_chat";
 export type UserCompanyThesisStatus =
   "active" | "needs_review" | "weakened" | "mixed" | "archived";
-export type UserCompanyCoverageLevel = "interest" | "holding";
+export type UserCompanyCoverageLevel = "interest";
 export type FilingJudgmentImpact =
   | "positive"
   | "neutral"
@@ -556,7 +574,6 @@ export interface WatchlistOverviewResponse {
   stats: {
     total: number;
     interest: number;
-    holding: number;
     open_questions: number;
     notes: number;
     recent_activity: number;
@@ -1190,54 +1207,6 @@ export interface ChatArtifactSelection {
   readonly created_at: string;
 }
 
-export type KrwChartType = "line" | "bar";
-
-export interface KrwChartPointV1 {
-  period: string;
-  value: number;
-  formatted_value?: string | null;
-  evidence_ref: string;
-}
-
-export interface KrwChartSeriesV1 {
-  series_key: string;
-  label: string;
-  metric_name?: string | null;
-  unit?: string | null;
-  points: KrwChartPointV1[];
-}
-
-export interface KrwChartV1 {
-  version: "krw-chart/v1";
-  chart_type: KrwChartType;
-  title: string;
-  subtitle?: string | null;
-  unit?: string | null;
-  series: KrwChartSeriesV1[];
-  source: {
-    tool: "create_chart_v1";
-    source_tool_call_ids: string[];
-  };
-  quality: {
-    series_count: number;
-    point_count: number;
-    warnings: string[];
-  };
-}
-
-export interface ChatMessageChart {
-  readonly id: string;
-  session_id: string;
-  message_id: string;
-  run_id: string;
-  chart_ref: string;
-  insert_token: string;
-  title: string;
-  chart_type: KrwChartType;
-  payload_json: KrwChartV1;
-  readonly created_at: string;
-}
-
 // ============================================================
 // Release Metadata Types
 // ============================================================
@@ -1392,9 +1361,9 @@ export interface StreamingArtifactEvent extends StreamingEventBase {
   data: ChatArtifact;
 }
 
-export interface StreamingChartEvent extends StreamingEventBase {
-  event: "chart";
-  data: ChatMessageChart;
+export interface StreamingVisualizationEvent extends StreamingEventBase {
+  event: "visualization";
+  data: ChatMessageVisualization;
 }
 
 /** Server-side session state reconciliation after reconnect races */
@@ -1419,7 +1388,8 @@ export interface StreamingDoneEvent extends StreamingEventBase {
     rich_answers?: ResearchArtifact[];
     artifacts?: ResearchArtifact[];
     chat_artifacts?: ChatArtifact[];
-    charts?: ChatMessageChart[];
+    visualizations?: ChatMessageVisualization[];
+    presentation?: ChatMessagePresentation | null;
     release: ReleaseMetadata;
     usage: {
       input_tokens: number;
@@ -1460,7 +1430,7 @@ export type StreamingEvent =
   | StreamingActivityUpdateEvent
   | StreamingCitationEvent
   | StreamingArtifactEvent
-  | StreamingChartEvent
+  | StreamingVisualizationEvent
   | StreamingStateSyncEvent
   | StreamingDoneEvent
   | StreamingErrorEvent
@@ -1555,7 +1525,8 @@ export interface GetChatSessionResponse {
   citations?: Citation[];
   tool_calls?: ToolCall[];
   chat_artifacts?: ChatArtifact[];
-  charts?: ChatMessageChart[];
+  visualizations?: ChatMessageVisualization[];
+  presentations?: ChatMessagePresentation[];
   artifact_selections?: ChatArtifactSelection[];
   rich_answers?: ResearchArtifact[];
   research_artifacts?: ResearchArtifact[];
@@ -1799,8 +1770,6 @@ export type PulseMutationAction =
   | "snooze"
   | "dismiss";
 
-export type PulseStateMutationAction = PulseMutationAction | "impression";
-
 export interface PulseLinkAction {
   type: "link";
   label: string;
@@ -1833,6 +1802,9 @@ export interface PulseItemBase<K extends PulseItemKind> {
   body: string;
   reason_code: string;
   reason_label: string;
+  feed_slot: PulseFeedSlot;
+  /** Deterministic server baseline before the bounded device-only adjustment. */
+  server_rank: number;
   priority: PulseItemPriority;
   occurred_at: string;
   available_at: string;
@@ -1864,6 +1836,17 @@ export type PulseItem =
   | PulseResurfaceItem
   | PulseLearningItem;
 
+/**
+ * An internal diversity/reason label. It never creates a visible feed section;
+ * the device may only make a bounded local adjustment to the server baseline.
+ */
+export type PulseFeedSlot =
+  | "signal"
+  | "continue"
+  | "discovery"
+  | "resurface"
+  | "learning";
+
 export interface PulseSourceStatus {
   source: PulseItemKind;
   status: "ready" | "empty" | "degraded" | "unavailable";
@@ -1884,17 +1867,19 @@ export interface PulseFeedSummary {
 }
 
 export interface PulseFeedResponse {
-  /** Opaque, account-scoped V3 snapshot revision used for status and delta. */
+  /** Opaque, account-scoped snapshot revision used for status and delta. */
   revision: string;
   generated_at: string;
   snapshot_at: string;
-  ranking_version: "rule_v3";
+  ranking_version: "rule_v4" | "rule_v5_flat";
   timezone: string;
   date_label: string;
   filter: PulseFilter;
-  summary: PulseFeedSummary;
   active_analysis_items: PulseItem[];
-  items: PulseItem[];
+  /** Server-authorized candidates. The device selects one continuous visible slate. */
+  candidate_items: PulseItem[];
+  /** Maximum cards the device may render from candidate_items. */
+  visible_limit: number;
   /** Render fingerprints for private delta synchronization. */
   item_versions: Record<string, string>;
   new_item_count: number;
@@ -1907,6 +1892,16 @@ export interface PulseFeedStatusResponse {
   changed: boolean;
 }
 
+/** Aggregate-only result metadata for a successful device feed sync. */
+export interface PulseFeedRefreshSummary {
+  /** Cards newly authorized for this device that were absent from its snapshot. */
+  added_candidate_count: number;
+  /** Existing cards whose render fingerprint changed. */
+  updated_item_count: number;
+  /** Previously cached cards no longer present in the authoritative feed. */
+  removed_item_count: number;
+}
+
 export interface PulseFeedDeltaResponse {
   generated_at: string;
   revision: string;
@@ -1914,14 +1909,15 @@ export interface PulseFeedDeltaResponse {
   /** Null when the caller already has the exact current revision. */
   snapshot: Omit<
     PulseFeedResponse,
-    "revision" | "generated_at" | "snapshot_at" | "items" | "active_analysis_items" | "item_versions"
+    "revision" | "generated_at" | "snapshot_at" | "candidate_items" | "active_analysis_items" | "item_versions"
   > | null;
-  ordered_item_ids: string[];
+  ordered_candidate_ids: string[];
   active_analysis_item_ids: string[];
   /** Only cards whose rendering fingerprint changed since the device snapshot. */
   upserts: PulseItem[];
   removed_item_ids: string[];
   item_versions: Record<string, string>;
+  refresh_summary: PulseFeedRefreshSummary;
 }
 
 export interface PulsePreferences {
@@ -1952,14 +1948,13 @@ export interface PulsePreferencesPatch {
 }
 
 export interface PulseItemMutationRequest {
-  action: PulseStateMutationAction;
+  action: PulseMutationAction;
   snoozed_until?: string;
-  feed_session_id?: string;
 }
 
 export interface PulseItemMutationResponse {
   item_id: string;
-  action: PulseStateMutationAction;
+  action: PulseMutationAction;
   reviewed_at: string | null;
   saved_at: string | null;
   snoozed_until: string | null;

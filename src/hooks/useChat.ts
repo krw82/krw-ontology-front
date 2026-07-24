@@ -19,7 +19,8 @@ import type {
   MCPToolName,
   ToolCall,
   ChatArtifact,
-  ChatMessageChart,
+  ChatMessagePresentation,
+  ChatMessageVisualization,
   ChatArtifactSelection,
   AtomicNewsEventCard,
   RunKind,
@@ -94,7 +95,8 @@ export interface ChatState {
   toolCalls: ToolCallState[];
   citations: ChatCitation[];
   artifactsByMessageId: Record<string, ChatArtifact[]>;
-  chartsByMessageId: Record<string, ChatMessageChart[]>;
+  visualizationsByMessageId: Record<string, ChatMessageVisualization[]>;
+  presentationsByMessageId: Record<string, ChatMessagePresentation>;
   artifactSelections: ChatArtifactSelection[];
   runDurationsByMessageId: Record<string, number>;
   lastAttemptedContent: string | null;
@@ -122,7 +124,8 @@ function createInitialChatState(): ChatState {
     toolCalls: [],
     citations: [],
     artifactsByMessageId: {},
-    chartsByMessageId: {},
+    visualizationsByMessageId: {},
+    presentationsByMessageId: {},
     artifactSelections: [],
     runDurationsByMessageId: {},
     lastAttemptedContent: null,
@@ -196,29 +199,42 @@ function addArtifactToState(
   };
 }
 
-function groupChartsByMessageId(
-  charts: ChatMessageChart[] | undefined,
-): Record<string, ChatMessageChart[]> {
-  const grouped: Record<string, ChatMessageChart[]> = {};
-  for (const chart of charts ?? []) {
-    grouped[chart.message_id] = [
-      ...(grouped[chart.message_id] ?? []),
-      chart,
+function groupVisualizationsByMessageId(
+  visualizations: ChatMessageVisualization[] | undefined,
+): Record<string, ChatMessageVisualization[]> {
+  const grouped: Record<string, ChatMessageVisualization[]> = {};
+  for (const visualization of visualizations ?? []) {
+    grouped[visualization.message_id] = [
+      ...(grouped[visualization.message_id] ?? []),
+      visualization,
     ];
   }
   return grouped;
 }
 
-function addChartToState(
-  chartsByMessageId: Record<string, ChatMessageChart[]>,
-  chart: ChatMessageChart,
+function addVisualizationToState(
+  visualizationsByMessageId: Record<string, ChatMessageVisualization[]>,
+  visualization: ChatMessageVisualization,
 ) {
-  const current = chartsByMessageId[chart.message_id] ?? [];
-  if (current.some((item) => item.id === chart.id)) return chartsByMessageId;
+  const current = visualizationsByMessageId[visualization.message_id] ?? [];
+  if (current.some((item) => item.id === visualization.id)) {
+    return visualizationsByMessageId;
+  }
   return {
-    ...chartsByMessageId,
-    [chart.message_id]: [...current, chart],
+    ...visualizationsByMessageId,
+    [visualization.message_id]: [...current, visualization],
   };
+}
+
+function groupPresentationsByMessageId(
+  presentations: ChatMessagePresentation[] | undefined,
+): Record<string, ChatMessagePresentation> {
+  return Object.fromEntries(
+    (presentations ?? []).map((presentation) => [
+      presentation.message_id,
+      presentation,
+    ]),
+  );
 }
 
 function findNewsEventSelection(
@@ -305,12 +321,10 @@ function activityForTool(toolName: MCPToolName): ResearchActivityUpdate {
     };
   }
 
-  if (
-    toolName === "create_chart_v1"
-  ) {
+  if (toolName === "compose_visualization") {
     return {
       stage: "composing",
-      label: "차트 정리 중",
+      label: "근거 기반 시각화 정리 중",
     };
   }
 
@@ -656,11 +670,14 @@ export function useChat({
         }));
         break;
       }
-      case "chart": {
-        const d = data as ChatMessageChart;
+      case "visualization": {
+        const d = data as ChatMessageVisualization;
         setState((prev) => ({
           ...prev,
-          chartsByMessageId: addChartToState(prev.chartsByMessageId, d),
+          visualizationsByMessageId: addVisualizationToState(
+            prev.visualizationsByMessageId,
+            d,
+          ),
         }));
         break;
       }
@@ -670,7 +687,8 @@ export function useChat({
           message_id: string;
           content?: string;
           chat_artifacts?: ChatArtifact[];
-          charts?: ChatMessageChart[];
+          visualizations?: ChatMessageVisualization[];
+          presentation?: ChatMessagePresentation | null;
           release: ReleaseMetadata;
           usage: {
             input_tokens: number;
@@ -734,10 +752,16 @@ export function useChat({
               addArtifactToState,
               prev.artifactsByMessageId,
             ),
-            chartsByMessageId: (d.charts ?? []).reduce(
-              addChartToState,
-              prev.chartsByMessageId,
+            visualizationsByMessageId: (d.visualizations ?? []).reduce(
+              addVisualizationToState,
+              prev.visualizationsByMessageId,
             ),
+            presentationsByMessageId: d.presentation
+              ? {
+                  ...prev.presentationsByMessageId,
+                  [d.presentation.message_id]: d.presentation,
+                }
+              : prev.presentationsByMessageId,
             lastAttemptedContent: null,
             status: "completed",
             isHydratingSession: false,
@@ -902,7 +926,12 @@ export function useChat({
         toolCalls: [],
         citations: [],
         artifactsByMessageId: groupArtifactsByMessageId(data.chat_artifacts),
-        chartsByMessageId: groupChartsByMessageId(data.charts),
+        visualizationsByMessageId: groupVisualizationsByMessageId(
+          data.visualizations,
+        ),
+        presentationsByMessageId: groupPresentationsByMessageId(
+          data.presentations,
+        ),
         artifactSelections: data.artifact_selections ?? [],
         runDurationsByMessageId: Object.fromEntries(
           (data.runs ?? [])

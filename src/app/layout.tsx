@@ -27,6 +27,7 @@ import {
   topNavProfileFromUser,
 } from "@/lib/auth/user-profile";
 import { getWorkspaceShellMode } from "@/lib/navigation/workspace-routes";
+import { DEVELOPMENT_SERVICE_WORKER_RESET_SCRIPT } from "@/lib/pwa/development-service-worker-reset";
 import "./globals.css";
 
 const googleSiteVerification = process.env.GOOGLE_SITE_VERIFICATION?.trim();
@@ -114,13 +115,7 @@ export const viewport: Viewport = {
   colorScheme: "only light",
 };
 
-function RootAppShellFallback({
-  mode,
-}: {
-  mode: ReturnType<typeof getWorkspaceShellMode>;
-}) {
-  const showsPersistentNavigation = mode === "standard";
-
+function RootAppShellFallback() {
   return (
     <div
       aria-hidden="true"
@@ -143,11 +138,6 @@ function RootAppShellFallback({
           <div className="h-28 rounded-[16px] border border-hairline bg-surface-soft" />
         </div>
       </div>
-      {showsPersistentNavigation ? (
-        <div
-          className="h-[calc(64px+env(safe-area-inset-bottom))] flex-shrink-0 border-t border-hairline bg-canvas lg:hidden"
-        />
-      ) : null}
     </div>
   );
 }
@@ -195,6 +185,14 @@ export default async function RootLayout({
       className="h-full antialiased"
     >
       <body className="min-h-full flex flex-col bg-canvas text-on-surface">
+        {process.env.NODE_ENV !== "production" ? (
+          <script
+            nonce={requestHeaders.get("x-nonce") ?? undefined}
+            dangerouslySetInnerHTML={{
+              __html: DEVELOPMENT_SERVICE_WORKER_RESET_SCRIPT,
+            }}
+          />
+        ) : null}
         <AnalyticsBootstrap />
         <ApiPerformanceReporter />
         <WebVitalsReporter />
@@ -207,7 +205,7 @@ export default async function RootLayout({
         >
           {locale === "ko" ? "메인 콘텐츠로 이동" : "Skip to main content"}
         </a>
-        <Suspense fallback={<RootAppShellFallback mode={workspaceShellMode} />}>
+        <Suspense fallback={<RootAppShellFallback />}>
           <ResolvedAppShell
             shouldSeedWorkspaceProfile={shouldSeedWorkspaceProfile}
           >

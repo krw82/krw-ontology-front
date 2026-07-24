@@ -6,9 +6,11 @@ import { useSearchParams } from "next/navigation";
 import { filingClassificationReason, filingEventTagLabel } from "@/lib/filing-notifications/classification";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import FilingOnboardingDecision from "@/components/filings/FilingOnboardingDecision";
+import FirstValueFilingActions from "@/components/onboarding/FirstValueFilingActions";
 import { DEFAULT_LOCALE, isLocale } from "@/i18n/config";
 import { localizedPath } from "@/i18n/routing";
 import { normalizeCoverageContinuePath } from "@/lib/onboarding/coverage-flow";
+import { isFirstEvidenceEntry } from "@/lib/onboarding/start-flow";
 
 type Filing = {
   id: string;
@@ -85,6 +87,7 @@ export default function FilingDetail({ eventId }: { eventId: string }) {
   const notificationId = searchParams.get("notification");
   const fromPulse = searchParams.get("source") === "pulse";
   const coverageOnboarding = searchParams.get("onboarding") === "coverage";
+  const firstValueEntry = isFirstEvidenceEntry(searchParams.get("entry"));
   const requestedContextTicker = searchParams.get("ticker");
   const requestedLocale = searchParams.get("locale");
   const onboardingLocale = isLocale(requestedLocale)
@@ -166,6 +169,13 @@ export default function FilingDetail({ eventId }: { eventId: string }) {
   }
   const onboardingCompanyHref = `${localizedPath(onboardingLocale, `/companies/${encodeURIComponent(filing.display_ticker)}`)}?${onboardingParams.toString()}`;
   const onboardingCompaniesHref = `${localizedPath(onboardingLocale, "/companies")}?${onboardingParams.toString()}`;
+  const firstValueSourceHref = outboundFilingHref(filing.id, {
+    target: brief ? "brief" : filing.primary_document_url ? "primary" : "index",
+    context_ticker: filing.display_ticker,
+    ...(firstValueEntry && searchParams.get("entry")
+      ? { entry: searchParams.get("entry") ?? "first_value" }
+      : {}),
+  });
 
   return <article>
     <Link href={coverageOnboarding ? onboardingCompanyHref : fromPulse ? "/pulse" : "/filings"} className="inline-flex min-h-11 items-center px-xs text-sm font-bold text-primary underline underline-offset-4">← {coverageOnboarding ? `${filing.display_ticker} 회사` : fromPulse ? "피드" : "공시함"}</Link>
@@ -181,6 +191,14 @@ export default function FilingDetail({ eventId }: { eventId: string }) {
     {coverageOnboarding ? <FilingOnboardingDecision filingEventId={filing.id} ticker={filing.display_ticker} formType={filing.form_type} sourceHref={outboundFilingHref(filing.id, { target: filing.primary_document_url ? "primary" : "index", context_ticker: filing.display_ticker })} companiesHref={onboardingCompaniesHref} continueHref={onboardingContinuePath} /> : null}
 
     {brief ? <FilingBriefPanel brief={brief} filingEventId={filing.id} contextTicker={filing.display_ticker} /> : null}
+
+    {firstValueEntry ? (
+      <FirstValueFilingActions
+        ticker={filing.display_ticker}
+        filingEventId={filing.id}
+        sourceHref={firstValueSourceHref}
+      />
+    ) : null}
 
     <section className="mt-lg rounded-[10px] border border-hairline bg-canvas p-lg">
       <h2 className="text-base font-extrabold text-ink">권장 첨부문서</h2>

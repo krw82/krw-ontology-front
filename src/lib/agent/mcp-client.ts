@@ -11,11 +11,11 @@ import {
   type OntologyEnv,
 } from "@/lib/env";
 import type {
-  ChartMCPToolName,
   GuruMCPToolName,
   KrwFilingsMCPToolName,
   KRWOntologyMCPToolName,
   StockNewsMCPToolName,
+  VisualizationMCPToolName,
 } from "@/types/api-contracts";
 import type { Json } from "@/types/database";
 import {
@@ -32,7 +32,7 @@ const STOCK_NEWS_MCP_SERVER_NAME = "stock-news";
 const STOCK_NEWS_DIRECT_TOOL_PREFIX = `mcp__${STOCK_NEWS_MCP_SERVER_NAME}__`;
 const GURU_ADVISOR_PLUGIN_TOOL_PREFIX =
   "mcp__plugin_krw-guru-advisor_krw-guru-advisor__";
-const CHART_MCP_TOOL_PREFIX = "mcp__krw_presentation__";
+const VISUALIZATION_MCP_TOOL_PREFIX = "mcp__krw_presentation__";
 const YAHOO_FINANCE_MCP_TOOL_PREFIX =
   `mcp__${YAHOO_FINANCE_MCP_SERVER_NAME}__`;
 export const KRW_FILINGS_MCP_SERVER_NAME = "krw-filings";
@@ -68,9 +68,9 @@ export const STOCK_NEWS_MCP_TOOLS = [
   "audit_news_sources",
 ] as const satisfies readonly StockNewsMCPToolName[];
 
-export const CHART_MCP_TOOLS = [
-  "create_chart_v1",
-] as const satisfies readonly ChartMCPToolName[];
+export const VISUALIZATION_MCP_TOOLS = [
+  "compose_visualization",
+] as const satisfies readonly VisualizationMCPToolName[];
 
 export const KRW_FILINGS_MCP_TOOLS = [
   "get_filing",
@@ -78,6 +78,8 @@ export const KRW_FILINGS_MCP_TOOLS = [
   "search_catalog_filings",
   "list_filing_sections",
   "read_filing_section",
+  "list_filing_documents",
+  "read_filing_document",
   "get_form4_insider_transactions",
 ] as const satisfies readonly KrwFilingsMCPToolName[];
 
@@ -126,8 +128,8 @@ export const GURU_ADVISOR_SDK_ALLOWED_TOOLS = GURU_MCP_TOOLS.map(
   (toolName) => `${GURU_ADVISOR_PLUGIN_TOOL_PREFIX}${toolName}`,
 );
 
-export const CHART_SDK_ALLOWED_TOOLS = CHART_MCP_TOOLS.map(
-  (toolName) => `${CHART_MCP_TOOL_PREFIX}${toolName}`,
+export const VISUALIZATION_SDK_ALLOWED_TOOLS = VISUALIZATION_MCP_TOOLS.map(
+  (toolName) => `${VISUALIZATION_MCP_TOOL_PREFIX}${toolName}`,
 );
 
 export const KRW_FILINGS_SDK_ALLOWED_TOOLS = KRW_FILINGS_MCP_TOOLS.map(
@@ -143,7 +145,7 @@ const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const STOCK_NEWS_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_MCP_TOOLS);
 const GURU_MCP_TOOL_SET = new Set<string>(GURU_MCP_TOOLS);
 const YAHOO_FINANCE_MCP_TOOL_SET = new Set<string>(YAHOO_FINANCE_MCP_TOOLS);
-const CHART_MCP_TOOL_SET = new Set<string>(CHART_MCP_TOOLS);
+const VISUALIZATION_MCP_TOOL_SET = new Set<string>(VISUALIZATION_MCP_TOOLS);
 const KRW_FILINGS_MCP_TOOL_SET = new Set<string>(KRW_FILINGS_MCP_TOOLS);
 const KRW_PERSONAL_FILINGS_MCP_TOOL_SET = new Set<string>(
   KRW_PERSONAL_FILINGS_MCP_TOOLS,
@@ -179,11 +181,11 @@ export function isYahooFinanceSdkTool(toolName: string): boolean {
   return Boolean(bareName && YAHOO_FINANCE_MCP_TOOL_SET.has(bareName));
 }
 
-export function isChartSdkTool(toolName: string): boolean {
-  if (!toolName.startsWith(CHART_MCP_TOOL_PREFIX)) return false;
-  const bareName = toolName.slice(CHART_MCP_TOOL_PREFIX.length);
+export function isVisualizationSdkTool(toolName: string): boolean {
+  if (!toolName.startsWith(VISUALIZATION_MCP_TOOL_PREFIX)) return false;
+  const bareName = toolName.slice(VISUALIZATION_MCP_TOOL_PREFIX.length);
 
-  return Boolean(bareName && CHART_MCP_TOOL_SET.has(bareName));
+  return Boolean(bareName && VISUALIZATION_MCP_TOOL_SET.has(bareName));
 }
 
 export function isKrwFilingsSdkTool(toolName: string): boolean {

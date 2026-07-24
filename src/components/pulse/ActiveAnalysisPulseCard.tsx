@@ -3,10 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { trackClientEventSilently } from "@/lib/analytics/client";
-import {
-  persistPulseItemImpression,
-  pulseImpressionStorageKey,
-} from "@/lib/pulse/impression-client";
+import { type PulseDeviceSignal } from "@/lib/pulse/device-ranking";
 import type { PulseFeedResponse, PulseItem } from "@/types/api-contracts";
 
 interface ActiveAnalysisPulseCardProps {
@@ -14,6 +11,7 @@ interface ActiveAnalysisPulseCardProps {
   position: number;
   feedSessionId: string;
   rankingVersion: PulseFeedResponse["ranking_version"];
+  onDeviceSignal: (item: PulseItem, signal: PulseDeviceSignal) => void;
 }
 
 export default function ActiveAnalysisPulseCard({
@@ -21,6 +19,7 @@ export default function ActiveAnalysisPulseCard({
   position,
   feedSessionId,
   rankingVersion,
+  onDeviceSignal,
 }: ActiveAnalysisPulseCardProps) {
   const ref = useRef<HTMLElement>(null);
   const impressionSent = useRef(false);
@@ -31,7 +30,6 @@ export default function ActiveAnalysisPulseCard({
     if (!element) return;
     const sessionKey = pulseImpressionStorageKey(feedSessionId, item.id);
     if (window.sessionStorage.getItem(sessionKey) === "1") return;
-    const requestController = new AbortController();
 
     let impressionTimer: number | null = null;
     const observer = new IntersectionObserver((entries) => {
@@ -61,28 +59,18 @@ export default function ActiveAnalysisPulseCard({
           ranking_version: rankingVersion,
           reason_code: item.reason_code,
         });
-        void persistPulseItemImpression({
-          itemId: item.id,
-          feedSessionId,
-          signal: requestController.signal,
-        }).then((persisted) => {
-          if (!persisted) {
-            impressionSent.current = false;
-            return;
-          }
-          window.sessionStorage.setItem(sessionKey, "1");
-          observer.disconnect();
-        });
+        onDeviceSignal(item, "impression");
+        window.sessionStorage.setItem(sessionKey, "1");
+        observer.disconnect();
       }, 1_000);
     }, { threshold: [0.5] });
 
     observer.observe(element);
     return () => {
       if (impressionTimer !== null) window.clearTimeout(impressionTimer);
-      requestController.abort();
       observer.disconnect();
     };
-  }, [feedSessionId, item.id, item.kind, item.phase, item.priority, item.reason_code, item.state, item.ticker, position, rankingVersion]);
+  }, [feedSessionId, item, item.id, item.kind, item.phase, item.priority, item.reason_code, item.state, item.ticker, onDeviceSignal, position, rankingVersion]);
 
   if (item.primary_action.type !== "link") return null;
 
@@ -144,7 +132,8 @@ export default function ActiveAnalysisPulseCard({
         <Link
           href={item.primary_action.href}
           className="mt-lg inline-flex min-h-11 items-center gap-xs rounded-[10px] bg-ink px-base text-[13px] font-extrabold text-white transition-colors hover:bg-primary"
-          onClick={() =>
+          onClick={() => {
+            onDeviceSignal(item, "open");
             trackClientEventSilently("pulse_item_opened", {
               item_kind: item.kind,
               action: "return_to_chat",
@@ -154,8 +143,8 @@ export default function ActiveAnalysisPulseCard({
               feed_session_id: feedSessionId,
               ranking_version: rankingVersion,
               reason_code: item.reason_code,
-            })
-          }
+            });
+          }}
         >
           분석 화면 열기
           <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
@@ -165,6 +154,10 @@ export default function ActiveAnalysisPulseCard({
       </div>
     </article>
   );
+}
+
+function pulseImpressionStorageKey(feedSessionId: string, itemId: string): string {
+  return `pulse-impression:${feedSessionId}:${itemId}`;
 }
 
 function analysisProgress(item: PulseItem): {

@@ -47,13 +47,34 @@ export default function CompanyCard({
   if (!ticker) return null;
 
   const accessibleSummary = getCompanyListAccessibleSummary(company, locale);
-  const destination = companyCoverageOnboardingHref(
+  const coverageDestination = companyCoverageOnboardingHref(
     locale,
     ticker,
     coverageOnboarding,
     onboardingContinuePath,
   );
-  if (!destination) return null;
+  if (!coverageDestination) return null;
+  const destination = coverageDestination;
+
+  function trackSelection() {
+    trackClientEventSilently("cta_clicked", {
+      cta_id: "company_card",
+      cta_label: ticker,
+      surface: "companies_index",
+      source_surface: "companies_index",
+      destination,
+      ticker,
+      company_name: company.name ?? null,
+      sector: company.sector ?? null,
+    });
+    trackClientEventSilently("company_selected", {
+      ticker,
+      company_name: company.name ?? null,
+      sector: company.sector ?? null,
+      surface: "companies_index",
+      entry: coverageOnboarding ? "coverage" : "company_browse",
+    });
+  }
 
   return (
     <motion.div
@@ -75,18 +96,7 @@ export default function CompanyCard({
     >
       <Link
         href={destination}
-        onClick={() => {
-          trackClientEventSilently("cta_clicked", {
-            cta_id: "company_card",
-            cta_label: ticker,
-            surface: "companies_index",
-            source_surface: "companies_index",
-            destination,
-            ticker,
-            company_name: company.name ?? null,
-            sector: company.sector ?? null,
-          });
-        }}
+        onClick={trackSelection}
         className="group block cursor-pointer"
         aria-label={`${accessibleSummary}. ${
           locale === "ko"

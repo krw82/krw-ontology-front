@@ -4,7 +4,7 @@ import { pulseGlobalCacheKey, pulseRedisUrl } from "@/lib/pulse/global-cache";
 describe("Pulse global candidate cache", () => {
   it("uses a revision- and time-window-scoped key with no user identity", () => {
     expect(pulseGlobalCacheKey({ env: "prod", globalRevision: 41, timeBucket: 123 })).toBe(
-      "krwo:pulse:global-filing-candidates:v3:prod:41:123",
+      "krwo:pulse:global-filing-candidates:v4:prod:41:123",
     );
   });
 

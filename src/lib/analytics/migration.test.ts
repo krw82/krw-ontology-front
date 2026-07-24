@@ -51,6 +51,21 @@ const productionSchemaRepairMigrationPath = join(
   process.cwd(),
   "supabase/migrations/20260720030000_repair_production_schema_drift.sql",
 );
+const startOnboardingMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260722000000_start_onboarding_v2.sql",
+);
+const pulseRefreshAnalyticsMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260722210000_add_pulse_refresh_analytics.sql",
+);
+const startOnboardingEventNameSet = new Set<string>([
+  "onboarding_started",
+  "onboarding_company_selected",
+  "onboarding_question_started",
+  "onboarding_evidence_opened",
+  "onboarding_skipped",
+]);
 const FILING_NOTIFICATION_EVENT_NAMES = [
   "company_followed",
   "push_permission_requested",
@@ -85,9 +100,16 @@ const pulseEventNames = [
   "pulse_source_degraded", "pulse_answer_prefilled",
   "pulse_summary_actioned",
 ] as const;
+const pulseRefreshEventNames = [
+  "pulse_refresh_requested",
+  "pulse_refresh_completed",
+  "pulse_refresh_failed",
+] as const;
+const pulseRefreshEventNameSet = new Set<string>(pulseRefreshEventNames);
 const postInitialAnalyticsEventNameSet = new Set<string>([
   ...filingNotificationEventNameSet,
   ...pulseEventNames,
+  ...pulseRefreshEventNames,
   "performance_metric_reported",
   "coverage_level_changed",
   "coverage_cleared",
@@ -99,6 +121,11 @@ const postInitialAnalyticsEventNameSet = new Set<string>([
   "monitoring_rule_created",
   "decision_session_closed",
   "second_opportunity_resolved",
+  "onboarding_started",
+  "onboarding_company_selected",
+  "onboarding_question_started",
+  "onboarding_evidence_opened",
+  "onboarding_skipped",
 ]);
 
 describe("analytics events migration", () => {
@@ -184,6 +211,23 @@ describe("analytics events migration", () => {
     }
   });
 
+  it("adds manual and pull refresh analytics events to already-created databases", () => {
+    const pulseRefreshMigration = readFileSync(pulseRefreshAnalyticsMigrationPath, "utf8");
+    expect(pulseRefreshMigration).toContain(
+      "drop constraint if exists analytics_events_event_name_check",
+    );
+    for (const eventName of pulseRefreshEventNames) {
+      expect(pulseRefreshMigration).toContain(`'${eventName}'`);
+    }
+  });
+
+  it("keeps the latest analytics allow-list complete when adding refresh events", () => {
+    const pulseRefreshMigration = readFileSync(pulseRefreshAnalyticsMigrationPath, "utf8");
+    for (const eventName of ANALYTICS_EVENT_NAMES) {
+      expect(pulseRefreshMigration).toContain(`'${eventName}'`);
+    }
+  });
+
   it("adds sampled client performance metrics to already-created databases", () => {
     const performanceMigration = readFileSync(
       performanceAnalyticsMigrationPath,
@@ -232,12 +276,29 @@ describe("analytics events migration", () => {
       productionSchemaRepairMigrationPath,
       "utf8",
     );
-    for (const eventName of ANALYTICS_EVENT_NAMES) {
+    for (const eventName of ANALYTICS_EVENT_NAMES.filter(
+      (eventName) => !startOnboardingEventNameSet.has(eventName)
+        && !pulseRefreshEventNameSet.has(eventName),
+    )) {
       expect(repairMigration).toContain(`'${eventName}'`);
     }
     expect(repairMigration).toContain("mark.coverage_level is not null");
     expect(repairMigration).toContain("browse_core_strength");
     expect(repairMigration).toContain("browse_critical_risk");
+  });
+
+  it("adds the server-owned v2 onboarding lifecycle without prompt text", () => {
+    const onboardingMigration = readFileSync(startOnboardingMigrationPath, "utf8");
+    for (const eventName of [
+      "onboarding_started",
+      "onboarding_company_selected",
+      "onboarding_question_started",
+      "onboarding_evidence_opened",
+      "onboarding_skipped",
+    ]) {
+      expect(onboardingMigration).toContain(`'${eventName}'`);
+    }
+    expect(onboardingMigration).toContain("never written to analytics");
   });
 
   it("keeps analytics server-owned and indexed for dashboard queries", () => {

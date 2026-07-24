@@ -151,7 +151,6 @@ export async function listWatchlistOverview(
     stats: {
       total: summaries.length,
       interest: summaries.filter((company) => company.mark.coverage_level === "interest").length,
-      holding: summaries.filter((company) => company.mark.coverage_level === "holding").length,
       open_questions: sumQuestionStates(questionStatesByTicker),
       notes: sumMap(notesByTicker),
       recent_activity: summaries.filter((company) => company.latest_activity_at).length,

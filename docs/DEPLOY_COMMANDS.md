@@ -101,6 +101,8 @@ npm run prod:deploy:runtime
 ```
 
 Mac MCP, filings MCP, optional Stock News MCP, agent supervisor만 재시작한다.
+새 runtime마다 Ontology plugin을 동일한 MCP source/release에서 materialize하고,
+live fingerprint와 새 worker heartbeat가 모두 통과해야 active runtime으로 전환한다.
 GCP web/API와 Supabase migration은 건드리지 않는다.
 
 ```bash

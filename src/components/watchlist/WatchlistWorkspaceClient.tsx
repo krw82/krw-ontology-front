@@ -353,24 +353,25 @@ export default function WatchlistWorkspaceClient({
               )}
             </div>
 
-            <label className="relative inline-flex min-h-11 items-center gap-2 rounded-[8px] border border-hairline bg-canvas px-sm text-[14px] font-extrabold text-ink focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 lg:justify-self-end">
-              <span className="material-symbols-outlined text-[18px] text-primary" aria-hidden="true">radar</span>
-              <span className="text-[12px] font-bold text-muted">커버리지</span>
-              <select
-                value={coverageLevelOf(company.mark) ?? ""}
-                disabled={isBusy}
-                onChange={(event) => updateCoverageLevel(
-                  event.target.value === "" ? null : event.target.value as CoverageLevel,
-                )}
-                className="min-h-11 appearance-none bg-transparent pr-6 font-extrabold outline-none disabled:cursor-wait"
-                aria-label="커버리지 수준"
-              >
-                <option value="">미선택</option>
-                <option value="interest">관심</option>
-                <option value="holding">보유 중</option>
-              </select>
-              <span className="pointer-events-none absolute right-2 material-symbols-outlined text-[17px] text-muted" aria-hidden="true">expand_more</span>
-            </label>
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={() => updateCoverageLevel(
+                coverageLevelOf(company.mark) === "interest" ? null : "interest",
+              )}
+              aria-pressed={coverageLevelOf(company.mark) === "interest"}
+              className={[
+                "inline-flex min-h-11 items-center gap-2 rounded-[8px] border px-sm text-[14px] font-extrabold transition-colors disabled:cursor-wait disabled:opacity-60 lg:justify-self-end",
+                coverageLevelOf(company.mark) === "interest"
+                  ? "border-primary bg-primary-fixed text-on-primary-fixed"
+                  : "border-hairline bg-canvas text-ink hover:border-primary hover:text-primary",
+              ].join(" ")}
+            >
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                {coverageLevelOf(company.mark) === "interest" ? "check" : "bookmark"}
+              </span>
+              {coverageLevelOf(company.mark) === "interest" ? "관심 저장됨" : "관심"}
+            </button>
           </div>
         </header>
 

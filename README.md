@@ -102,8 +102,10 @@ npm run prod:deploy:code
 ```
 
 `prod:deploy:web`은 GCP web/API와 stateless support worker만, `prod:deploy:runtime`은
-Mac MCP/agent runtime만 갱신합니다. 둘을 함께 반영할 때는 `prod:deploy:code`를
-사용합니다. GCP ontology MCP/agent sidecar는 운영하지 않습니다.
+Mac MCP/agent runtime만 갱신합니다. runtime 배포는 새 버전 경로에 Ontology plugin을
+동일 소스에서 materialize한 뒤 MCP fingerprint와 worker heartbeat를 검증하고, 둘 중
+하나라도 실패하면 active runtime 전환을 중단합니다. 둘을 함께 반영할 때는
+`prod:deploy:code`를 사용합니다. GCP ontology MCP/agent sidecar는 운영하지 않습니다.
 
 현재 prod/current의 web catalog만 재게시:
 

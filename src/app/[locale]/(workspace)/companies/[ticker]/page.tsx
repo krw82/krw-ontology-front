@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import CompanyLogo from "@/components/CompanyLogo";
+import CompanyInsiderTransactions from "@/components/CompanyInsiderTransactions";
+import CompanyRecentImportantFilings from "@/components/CompanyRecentImportantFilings";
 import CompanyWatchlistActions from "@/components/CompanyWatchlistActions";
 import InstitutionalTickerActivity from "@/components/InstitutionalTickerActivity";
 import JsonLdScript from "@/components/JsonLdScript";
@@ -27,7 +29,14 @@ import { getCspNonce } from "@/lib/security/csp-nonce";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getInstitutionalTickerActivity } from "@/lib/sec-13f/service";
 import { getLatestAccessibleImportantFiling } from "@/lib/onboarding/latest-important-filing";
-import { normalizeCoverageContinuePath } from "@/lib/onboarding/coverage-flow";
+import {
+  normalizeCoverageContinuePath,
+  type CoverageOnboardingFiling,
+} from "@/lib/onboarding/coverage-flow";
+import { isFirstValueEntry } from "@/lib/onboarding/first-value";
+import { ONBOARDING_START_ENTRY } from "@/lib/onboarding/start-flow";
+import { getRecentCompanyInsiderTransactions } from "@/lib/filing-notifications/company-insider-transactions";
+import { getRecentCompanyImportantFilings } from "@/lib/filing-notifications/company-important-filings";
 import type { UserCompanyMarkRow } from "@/types/database";
 
 export const runtime = "nodejs";
@@ -38,9 +47,15 @@ type CompanyPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-function chatHref(ticker: string, query?: string, locale?: Locale): string {
+function chatHref(
+  ticker: string,
+  query?: string,
+  locale?: Locale,
+  entry?: string,
+): string {
   const params = new URLSearchParams({ ticker });
   if (query) params.set("query", query);
+  if (entry) params.set("entry", entry);
   if (locale && locale !== DEFAULT_LOCALE) params.set("locale", locale);
   return `/chat/new?${params.toString()}`;
 }
@@ -111,15 +126,32 @@ export default async function CompanyLandingPage({
     (Array.isArray(query.onboarding)
       ? query.onboarding[0]
       : query.onboarding) === "coverage";
+  // Legacy first-value links remain valid, but previewing the new first-user
+  // flow now happens at `/[locale]/start?preview=always` instead of appearing
+  // on every local company page.
+  const firstValueEntry = isFirstValueEntry(
+    Array.isArray(query.entry) ? query.entry[0] : query.entry,
+  );
+  const firstValueEntryName = Array.isArray(query.entry)
+    ? query.entry[0] ?? null
+    : query.entry ?? null;
   const onboardingContinuePath = normalizeCoverageContinuePath(
     Array.isArray(query.continue) ? query.continue[0] : query.continue,
   );
-  const [institutionalActivity, latestImportantFiling] = await Promise.all([
-    getInstitutionalTickerActivity(company.ticker).catch(() => []),
-    user && coverageOnboarding
-      ? getLatestAccessibleImportantFiling(user.id, company.ticker)
-      : Promise.resolve(null),
-  ]);
+  const [
+    institutionalActivity,
+    latestImportantFiling,
+    insiderTransactions,
+    recentImportantFilings,
+  ] =
+    await Promise.all([
+      getInstitutionalTickerActivity(company.ticker).catch(() => []),
+      user && (coverageOnboarding || firstValueEntry)
+        ? getLatestAccessibleImportantFiling(user.id, company.ticker)
+        : Promise.resolve(null),
+      getRecentCompanyInsiderTransactions(company.ticker).catch(() => []),
+      getRecentCompanyImportantFilings(company.ticker).catch(() => []),
+    ]);
 
   let savedMark: Pick<
     UserCompanyMarkRow,
@@ -152,11 +184,15 @@ export default async function CompanyLandingPage({
           breadcrumbCompanies: "회사 목록",
           heroHeading: `${companyTitleName} 공시 기반 리서치`,
           startCta: `${displayCompany.ticker} 분석 시작`,
+          firstValueEyebrow: "첫 공시 변화",
+          firstValueTitle: "최근 중요한 변화부터 확인하세요",
+          firstValueDescription: "한 번의 클릭으로 요약과 SEC 원문까지 이어집니다.",
+          firstValueCta: "이 변화의 근거 보기",
+          firstValueUnavailable:
+            "지금 바로 열 수 있는 새 중요 공시가 없습니다. 이 회사의 실적과 리스크를 공시 근거로 확인해보세요.",
           guruCta: "구루 관점으로 보기",
           watchlistInterestCta: "관심",
-          watchlistHoldingCta: "보유",
           watchlistInterestSaved: "관심 저장됨",
-          watchlistHoldingSaved: "보유 저장됨",
           watchlistSaving: "저장 중",
           watchlistError: "종목 상태를 저장하지 못했습니다.",
           scopeEyebrow: "분석 범위",
@@ -171,11 +207,15 @@ export default async function CompanyLandingPage({
           breadcrumbCompanies: "Companies",
           heroHeading: `${displayCompany.name} filing-grounded research`,
           startCta: `Start ${displayCompany.ticker} analysis`,
+          firstValueEyebrow: "First filing change",
+          firstValueTitle: "Start with the latest important change",
+          firstValueDescription: "Open the filing summary and SEC source in one short path.",
+          firstValueCta: "See the evidence for this change",
+          firstValueUnavailable:
+            "There is no newly accessible important filing right now. Start a filing-grounded check of this company instead.",
           guruCta: "View through a Guru lens",
           watchlistInterestCta: "Watch",
-          watchlistHoldingCta: "Holding",
           watchlistInterestSaved: "Watch saved",
-          watchlistHoldingSaved: "Holding saved",
           watchlistSaving: "Saving",
           watchlistError: "Could not save this company.",
           scopeEyebrow: "Analysis scope",
@@ -312,9 +352,7 @@ export default async function CompanyLandingPage({
                   initialCoverageLevel={savedMark?.coverage_level ?? null}
                   labels={{
                     watchlist: pageCopy.watchlistInterestCta,
-                    holding: pageCopy.watchlistHoldingCta,
                     savedWatchlist: pageCopy.watchlistInterestSaved,
-                    savedHolding: pageCopy.watchlistHoldingSaved,
                     saving: pageCopy.watchlistSaving,
                     error: pageCopy.watchlistError,
                   }}
@@ -357,6 +395,33 @@ export default async function CompanyLandingPage({
               }}
             />
           </header>
+
+          {firstValueEntry && user ? (
+            <FirstValueCompanyPanel
+              locale={locale}
+              ticker={displayCompany.ticker}
+              companyName={companyTitleName}
+              filing={latestImportantFiling}
+              entry={
+                firstValueEntryName === ONBOARDING_START_ENTRY
+                  ? ONBOARDING_START_ENTRY
+                  : "first_value"
+              }
+              copy={pageCopy}
+            />
+          ) : null}
+
+          <CompanyRecentImportantFilings
+            locale={locale}
+            ticker={displayCompany.ticker}
+            items={recentImportantFilings}
+          />
+
+          <CompanyInsiderTransactions
+            locale={locale}
+            ticker={displayCompany.ticker}
+            items={insiderTransactions}
+          />
 
           <InstitutionalTickerActivity
             locale={locale}
@@ -401,6 +466,105 @@ export default async function CompanyLandingPage({
       </main>
     </div>
   );
+}
+
+function FirstValueCompanyPanel({
+  locale,
+  ticker,
+  companyName,
+  filing,
+  entry,
+  copy,
+}: {
+  locale: Locale;
+  ticker: string;
+  companyName: string;
+  filing: CoverageOnboardingFiling | null;
+  entry: "first_value" | typeof ONBOARDING_START_ENTRY;
+  copy: {
+    startCta: string;
+    firstValueEyebrow: string;
+    firstValueTitle: string;
+    firstValueDescription: string;
+    firstValueCta: string;
+    firstValueUnavailable: string;
+  };
+}) {
+  const filingHref = filing
+    ? `/filings/${encodeURIComponent(filing.id)}?${new URLSearchParams({
+      source: "company_onboarding",
+      entry,
+      ticker,
+      locale,
+    }).toString()}`
+    : null;
+  const fallbackHref = chatHref(
+    ticker,
+    undefined,
+    locale,
+    entry === ONBOARDING_START_ENTRY ? entry : undefined,
+  );
+
+  return (
+    <section className="border-b border-hairline py-6 sm:py-7" aria-label={copy.firstValueEyebrow}>
+      <div className="rounded-[10px] border border-primary/25 bg-primary-fixed/45 p-base sm:p-lg">
+        <p className="font-mono text-[10px] font-black uppercase tracking-[0.14em] text-primary">
+          {copy.firstValueEyebrow}
+        </p>
+        <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-[19px] font-black leading-6 text-ink">
+              {copy.firstValueTitle}
+            </h2>
+            {filing ? (
+              <p className="mt-2 text-[14px] font-bold leading-6 text-body">
+                {formatFirstValueFiling(filing, locale)}
+              </p>
+            ) : (
+              <p className="mt-2 text-[14px] leading-6 text-body">
+                {copy.firstValueUnavailable}
+              </p>
+            )}
+            <p className="mt-1 text-[12px] font-semibold leading-5 text-muted">
+              {filing ? copy.firstValueDescription : companyName}
+            </p>
+          </div>
+          <MarketingCtaLink
+            href={filingHref ?? fallbackHref}
+            ctaId={filingHref ? "first_value_filing" : "first_value_company_analysis"}
+            ctaLabel={filingHref ? copy.firstValueCta : copy.startCta}
+            surface="company_first_value"
+            analyticsProperties={{
+              ticker,
+              filing_event_id: filing?.id ?? null,
+              company_name: companyName,
+            }}
+            className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-[8px] bg-surface-dark px-5 py-3 text-[14px] font-extrabold text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-primary-fixed"
+          >
+            {filingHref ? copy.firstValueCta : copy.startCta}
+            <span className="material-symbols-outlined ml-1 text-[18px]" aria-hidden="true">
+              arrow_forward
+            </span>
+          </MarketingCtaLink>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function formatFirstValueFiling(
+  filing: CoverageOnboardingFiling,
+  locale: Locale,
+): string {
+  const date = new Date(`${filing.filing_date}T00:00:00Z`);
+  const formattedDate = Number.isNaN(date.getTime())
+    ? filing.filing_date
+    : new Intl.DateTimeFormat(locale === "ko" ? "ko-KR" : "en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }).format(date);
+  return `${formattedDate} ${filing.form_type} · ${filing.label}`;
 }
 
 function ScopeActionGroup({

@@ -1,5 +1,8 @@
 const SAFE_NEXT_ORIGIN = "https://krw-ontology.local";
-const DEFAULT_NEXT_PATH = "/companies";
+// A person who starts at login without an explicit destination should land on
+// the product's daily home, not on a setup/browse screen. Deep links still
+// supply their own `next` value and take precedence over this fallback.
+const DEFAULT_NEXT_PATH = "/pulse";
 const MAX_NEXT_UNWRAP_DEPTH = 5;
 
 export function normalizeInternalNextPath(

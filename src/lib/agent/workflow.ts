@@ -17,8 +17,14 @@ export const KRW_ONTOLOGY_NEWS_DISCOVERY_SKILL =
 export const KRW_ONTOLOGY_MARKET_MOVE_RESEARCH_SKILL =
   "/krw-ontology:krw-ontology-market-move-research";
 
+export const KRW_ONTOLOGY_NEWS_FILING_CORRELATION_SKILL =
+  "/krw-ontology:krw-ontology-news-filing-correlation";
+
 export const KRW_ONTOLOGY_SCENARIO_SENSITIVITY_SKILL =
   "/krw-ontology:krw-ontology-scenario-sensitivity";
+
+export const KRW_ONTOLOGY_FILING_FOLLOW_UP_SKILL =
+  "/krw-ontology:krw-ontology-filing-follow-up";
 
 export const KRW_GURU_BUFFETT_ADVISOR_SKILL =
   "/krw-guru-advisor:krw-guru-buffett-advisor";
@@ -44,7 +50,13 @@ type GuruLensSelection = {
 export function getKrwOntologySkillForRunKind(
   runKind: RunKind,
   responseLocale: Locale = DEFAULT_LOCALE,
+  hasSourceFilingContext = false,
+  filingCorrelationActive = false,
 ): string {
+  if (hasSourceFilingContext) return KRW_ONTOLOGY_FILING_FOLLOW_UP_SKILL;
+  if (filingCorrelationActive) {
+    return KRW_ONTOLOGY_NEWS_FILING_CORRELATION_SKILL;
+  }
   if (runKind === "idea_generation") {
     return KRW_ONTOLOGY_IDEA_GENERATION_SKILL;
   }
@@ -68,6 +80,8 @@ export function buildResearchPassPrompt(
     : "company_research",
   responseLocale: Locale = DEFAULT_LOCALE,
   guruLensKey?: GuruLensKey | null,
+  hasSourceFilingContext = false,
+  filingCorrelationActive = false,
 ): string {
   if (runKind === "guru_advisor") {
     return buildGuruAdvisorResearchPassPrompt(
@@ -77,9 +91,18 @@ export function buildResearchPassPrompt(
     );
   }
 
-  const skillCommand = getKrwOntologySkillForRunKind(runKind, responseLocale);
+  const skillCommand = getKrwOntologySkillForRunKind(
+    runKind,
+    responseLocale,
+    hasSourceFilingContext,
+    filingCorrelationActive,
+  );
   const runtimeMode =
-    runKind === "idea_generation"
+    hasSourceFilingContext
+      ? sourceFilingRuntimePrompt(responseLocale)
+      : filingCorrelationActive
+        ? newsFilingCorrelationRuntimePrompt(responseLocale)
+      : runKind === "idea_generation"
       ? ideaGenerationRuntimePrompt()
       : runKind === "news_discovery"
       ? newsDiscoveryRuntimePrompt(responseLocale)
@@ -92,6 +115,38 @@ export function buildResearchPassPrompt(
   return `${skillCommand} ${userMessage}
 
 ${runtimeMode}`;
+}
+
+function newsFilingCorrelationRuntimePrompt(responseLocale: Locale): string {
+  if (responseLocale === "en") {
+    return `Web app news-filing correlation run:
+- Establish the current market move or selected market narrative first, then compare it with a small number of closely timed, relevant 8-K or 6-K disclosures for the same ticker.
+- Treat price/news as market observations. Search catalog metadata once before reading a filing; use a filing brief only for orientation; list sections before reading a material section or a verified exhibit.
+- Do not search an issuer's full filing history, use a nearby filing as proof of price causality, or turn this into a full company report.
+- Clearly distinguish market reporting, what the company directly disclosed, and the remaining uncertainty. If there is no relevant filing, say that the available filing record does not independently confirm that market narrative.
+- Do not expose provider, tool, MCP, plugin, event-ID, document-key, or internal workflow names. Write final English Markdown investor prose only.`;
+  }
+
+  return `웹앱 뉴스·공시 상관관계 research 실행:
+- 현재 주가 움직임 또는 선택된 시장 서사를 먼저 파악한 뒤, 같은 ticker의 시점과 주제가 가까운 8-K 또는 6-K 몇 건만 대조합니다.
+- 가격/뉴스는 시장 관찰값으로 취급합니다. 공시 목록 메타데이터는 한 번만 찾고, 자동 요약은 방향을 잡는 데만 쓰며, 중요한 원문 주장을 하기 전에는 항목 목록을 확인한 뒤 필요한 항목이나 검증된 첨부문서만 읽습니다.
+- 한 회사의 공시 이력을 넓게 훑지 말고, 가까운 공시가 주가 원인을 증명한다고 단정하지 말며, 전체 회사 리포트로 확장하지 않습니다.
+- 시장 보도, 회사가 공시로 직접 확인한 사실, 아직 남는 불확실성을 분명히 나눕니다. 관련 공시가 없으면 현재 확인 가능한 공시 기록만으로 그 시장 서사를 독립적으로 확인하지 못했다고 설명합니다.
+- provider·tool·MCP·plugin·event ID·문서 키·내부 절차 이름을 노출하지 않습니다. 최종 답변은 사용자에게 바로 보여줄 한국어 Markdown 투자 해석만 작성합니다.`;
+}
+
+function sourceFilingRuntimePrompt(responseLocale: Locale): string {
+  if (responseLocale === "en") {
+    return `Web app source-filing follow-up run:
+- This chat was opened from one verified SEC filing card. Read and interpret that filing only.
+- Do not broaden into company research, current news, another filing, valuation, or a trading recommendation.
+- Write a direct English Markdown answer. Do not expose internal workflow or tool details.`;
+  }
+
+  return `웹앱 원문 공시 후속 질문 실행:
+- 이 대화는 검증된 SEC 공시 카드 한 건에서 시작되었습니다. 해당 공시만 읽고 해석합니다.
+- 일반 회사 리서치, 최신 뉴스, 다른 공시, 밸류에이션, 매매 추천으로 범위를 넓히지 않습니다.
+- 한국어 Markdown 본문으로 바로 답합니다. 내부 절차나 도구 이름은 노출하지 않습니다.`;
 }
 
 function buildGuruAdvisorResearchPassPrompt(
@@ -227,7 +282,7 @@ ${authorInstruction}
 - Do not tell the user that the current session, tool budget, subagent, MCP, or retrieval process could not confirm data. Translate gaps into investor language: "the exact split is the next check" or "this would need the segment detail to confirm", not process language.
 - Do not write interim workflow status to the user. Never include phrases like "ResearchPack received", "company research context received", "delegating to the subagent", "parameter encoding issue", "tool failed", "now writing the final answer", "수신 완료", or "서브에이전트에 위임하겠습니다" before or inside the answer. If a tool call is denied or returns an unusable internal payload, do not retry the overall workflow; continue from available evidence and express only the relevant business uncertainty in normal investor language.
 - Start the final answer directly in ${responseLocale === "en" ? "English" : "Korean"} consultation prose. Do not prepend English workflow narration, packet status, separators, or tool diagnostics.
-- Do not call current-news tools, chart tools, WebSearch, or WebFetch.
+- Do not call current-news tools, visualization tools, WebSearch, or WebFetch.
 - Do not use Guru source-support tools as an alternative route in the default web runtime; keep the path focused on lens context, company evidence delegation, evidence review, and final consultation.
 - Do not expose tool names, raw reviewed_ids, internal ResearchPack field names, or private excerpts.
 - Do not present the guru lens as personal financial advice, a buy/sell/hold recommendation, target price, or valuation conclusion.

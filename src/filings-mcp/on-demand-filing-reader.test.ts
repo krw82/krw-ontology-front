@@ -24,6 +24,8 @@ import {
   getFilingBrief,
   getForm4InsiderTransactions,
   isVerifiedFilingDocumentUrl,
+  listFilingDocuments,
+  readFilingDocument,
   readFilingSection,
 } from "./on-demand-filing-reader";
 
@@ -161,6 +163,63 @@ describe("isVerifiedFilingDocumentUrl", () => {
     expect(result.citation.extraction).toBe("deterministic_html");
     expect(result.text).toContain("Revenue increased");
     expect(mocks.fetchSecText).toHaveBeenCalledOnce();
+  });
+
+  it("lists and reads only a verified text Exhibit from the selected filing index", async () => {
+    const filing = {
+      ...NARRATIVE_FILING,
+      id: "33333333-3333-4333-8333-333333333333",
+    };
+    mockAdmin(filing);
+    const exhibitUrl = "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/aapl-ex991.htm";
+    mocks.fetchSecText.mockImplementation(async (url: string) => {
+      if (url === filing.filing_detail_url) {
+        return `<table>
+          <tr><td>1</td><td>8-K</td><td><a href="aapl-20260101.htm">aapl-20260101.htm</a></td><td>8-K</td><td>1234</td></tr>
+          <tr><td>2</td><td>Earnings results press release</td><td><a href="aapl-ex991.htm">aapl-ex991.htm</a></td><td>EX-99.1</td><td>4321</td></tr>
+          <tr><td>3</td><td>PDF exhibit</td><td><a href="aapl-ex991.pdf">aapl-ex991.pdf</a></td><td>EX-99.2</td><td>2000</td></tr>
+          <tr><td>4</td><td>Wrong accession</td><td><a href="/Archives/edgar/data/320193/000032019325000001/other.htm">other.htm</a></td><td>EX-99.3</td><td>2000</td></tr>
+        </table>`;
+      }
+      if (url === exhibitUrl) {
+        return "<html><body><h1>Apple Results</h1><p>EXHIBIT_SENTINEL Revenue increased.</p></body></html>";
+      }
+      throw new Error(`Unexpected SEC URL: ${url}`);
+    });
+
+    const listed = await listFilingDocuments(filing.id);
+    const exhibit = listed.documents.find((document) => document.document_type === "EX-99.1");
+    const pdf = listed.documents.find((document) => document.document_type === "EX-99.2");
+
+    expect(exhibit).toMatchObject({
+      document_name: "aapl-ex991.htm",
+      document_url: exhibitUrl,
+      readable: true,
+    });
+    expect(exhibit?.document_key).toMatch(/^document:/);
+    expect(pdf).toMatchObject({ readable: false });
+    expect(listed.documents).not.toContainEqual(expect.objectContaining({ document_name: "other.htm" }));
+
+    const result = await readFilingDocument({
+      filingEventId: filing.id,
+      documentKey: exhibit?.document_key ?? "document:missing",
+      maxChars: 1_000,
+    });
+
+    expect(result.text).toContain("EXHIBIT_SENTINEL Revenue increased");
+    expect(result.citation).toMatchObject({
+      document_url: exhibitUrl,
+      document_name: "aapl-ex991.htm",
+      document_type: "EX-99.1",
+      extraction: "deterministic_html",
+    });
+    expect(mocks.fetchSecText).toHaveBeenCalledTimes(2);
+
+    await expect(readFilingDocument({
+      filingEventId: filing.id,
+      documentKey: "document:not-in-the-index",
+    })).rejects.toMatchObject({ code: "document_not_found" });
+    expect(mocks.fetchSecText).toHaveBeenCalledTimes(2);
   });
 
   it("marks stored Form 4 facts as structured Form 4 extraction", async () => {

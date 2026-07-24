@@ -29,21 +29,16 @@ vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => ({}) }));
 import { GET } from "@/app/api/pulse/route";
 
 const feed = {
-  revision: "p3.1.1.1",
+  revision: "p4.1.1.1",
   generated_at: "2026-07-15T00:00:00.000Z",
   snapshot_at: "2026-07-15T00:00:00.000Z",
-  ranking_version: "rule_v3",
+  ranking_version: "rule_v5_flat",
   timezone: "Asia/Seoul",
   date_label: "7월 15일 수요일",
   filter: "all",
-  summary: {
-    actionable_count: 0,
-    active_analysis_count: 0,
-    counts: { filing: 0, analysis: 0, question: 0, resurface: 0 },
-    primary_action: null,
-  },
   active_analysis_items: [],
-  items: [],
+  candidate_items: [],
+  visible_limit: 12,
   item_versions: {},
   new_item_count: 0,
   source_statuses: [],

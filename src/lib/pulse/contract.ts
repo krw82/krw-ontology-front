@@ -6,6 +6,7 @@ import type {
   PulseItemKind,
   PulseItemPriority,
   PulseItemState,
+  PulseFeedSlot,
   UserCompanyCoverageLevel,
 } from "@/types/api-contracts";
 import { z } from "zod";
@@ -21,6 +22,7 @@ export const PULSE_ITEM_KINDS = [
 
 export const PULSE_PAGE_SIZE = 20;
 export const PULSE_MAX_PAGE_SIZE = 20;
+export const PULSE_VISIBLE_ITEM_LIMIT = 12;
 
 const pulseLinkActionSchema = z.object({
   type: z.literal("link"),
@@ -43,10 +45,12 @@ const pulseActionSchema = z.discriminatedUnion("type", [
 
 const pulseItemBaseSchema = z.object({
   id: z.string().min(1),
+  feed_slot: z.enum(["signal", "continue", "discovery", "resurface", "learning"]),
+  server_rank: z.number().int().nonnegative(),
   trigger: z.enum(["event", "schedule", "state", "editorial"]),
   source_id: z.string().min(1),
   ticker: z.string().nullable(),
-  coverage_level: z.enum(["interest", "holding"] satisfies readonly UserCompanyCoverageLevel[]).nullable(),
+  coverage_level: z.enum(["interest"] satisfies readonly UserCompanyCoverageLevel[]).nullable(),
   judgment: z.object({
     id: z.string().uuid(),
     filing_event_id: z.string().uuid(),
@@ -99,7 +103,7 @@ export const pulseItemSchema = z.discriminatedUnion("kind", [
 
 export interface PulseCandidate extends Omit<
   PulseItemBase<PulseItemKind>,
-  "id" | "reviewed_at" | "state" | "actionable" | "phase"
+  "id" | "reviewed_at" | "state" | "actionable" | "phase" | "feed_slot" | "server_rank"
 > {
   item_key: string;
   reviewed_at?: string | null;
@@ -107,6 +111,12 @@ export interface PulseCandidate extends Omit<
   actionable?: boolean;
   phase?: PulseAnalysisPhase | null;
   has_recent_research?: boolean;
+  /**
+   * A bounded, server-computed measure of completed company research. This is
+   * intentionally not exposed in the public feed contract; it is only an
+   * input to ranking and reason selection.
+   */
+  research_affinity?: number;
   is_pinned?: boolean;
 }
 
@@ -125,6 +135,8 @@ export interface PulseRankedCandidate extends PulseCandidate, PulseSortKey {
   state: PulseItemState;
   actionable: boolean;
   phase: PulseAnalysisPhase | null;
+  feed_slot: PulseFeedSlot;
+  server_rank: number;
 }
 
 export const PULSE_PRIORITY_RANK: Record<PulseItemPriority, number> = {

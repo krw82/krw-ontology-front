@@ -144,11 +144,7 @@ export function buildAnalysisCandidates(
       },
       secondary_actions: active
         ? [{ type: "mutation" as const, label: "숨기기", action: "dismiss" as const }]
-        : [
-            { type: "mutation" as const, label: "검토 완료", action: "review" as const },
-            { type: "mutation" as const, label: "저장", action: "save" as const },
-            { type: "mutation" as const, label: "숨기기", action: "dismiss" as const },
-          ],
+        : [],
       metadata: {
         run_status: run.status,
         session_id: session.id,

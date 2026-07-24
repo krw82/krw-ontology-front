@@ -19,7 +19,8 @@ import type { ToolCallState } from "@/hooks/useChat";
 import type {
   ChatCitation,
   ChatArtifact,
-  ChatMessageChart,
+  ChatMessagePresentation,
+  ChatMessageVisualization,
   ChatArtifactSelection,
   MessageStatus,
   ResearchActivityUpdate,
@@ -43,7 +44,8 @@ interface ChatMessageProps {
   activity?: ResearchActivityUpdate | null;
   citations?: ChatCitation[];
   artifacts?: ChatArtifact[];
-  charts?: ChatMessageChart[];
+  visualizations?: ChatMessageVisualization[];
+  messagePresentation?: ChatMessagePresentation | null;
   artifactSelections?: ChatArtifactSelection[];
   onSelectNewsEvent?: (params: {
     artifactId: string;
@@ -413,13 +415,15 @@ function StreamingContentBlocks({
 
 function CompletedAssistantContent({
   content,
-  charts,
+  visualizations,
+  messagePresentation,
   presentation = "default",
   onFollowUpQuestionSelect,
   followUpQuestionDisabled,
 }: {
   content: string;
-  charts?: ChatMessageChart[];
+  visualizations?: ChatMessageVisualization[];
+  messagePresentation?: ChatMessagePresentation | null;
   presentation?: "default" | "guru";
   onFollowUpQuestionSelect?: (question: string) => void;
   followUpQuestionDisabled?: boolean;
@@ -433,7 +437,8 @@ function CompletedAssistantContent({
     return (
       <ResearchMarkdown
         content={content}
-        charts={charts}
+        visualizations={visualizations}
+        blocks={messagePresentation?.blocks}
         presentation={presentation}
       />
     );
@@ -443,7 +448,7 @@ function CompletedAssistantContent({
     <>
       <ResearchMarkdown
         content={followUpQuestions.body}
-        charts={charts}
+        visualizations={visualizations}
         presentation={presentation}
       />
       <FollowUpQuestionActions
@@ -469,7 +474,8 @@ export default function ChatMessage({
   activity,
   citations,
   artifacts,
-  charts,
+  visualizations,
+  messagePresentation,
   metadata,
   artifactSelections,
   onSelectNewsEvent,
@@ -568,7 +574,8 @@ export default function ChatMessage({
           {assistantContent ? (
             <CompletedAssistantContent
               content={assistantContent}
-              charts={charts}
+              visualizations={visualizations}
+              messagePresentation={messagePresentation}
               presentation={presentation}
               onFollowUpQuestionSelect={onFollowUpQuestionSelect}
               followUpQuestionDisabled={followUpQuestionDisabled}

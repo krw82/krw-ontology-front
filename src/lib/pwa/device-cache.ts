@@ -3,12 +3,21 @@ import type {
   PulseFeedResponse,
   WatchlistOverviewResponse,
 } from "@/types/api-contracts";
+import {
+  createPulseDeviceProfile,
+  isPulseDeviceProfile,
+  type PulseDeviceProfile,
+} from "@/lib/pulse/device-ranking";
 
 export const DEVICE_CACHE_DB = "krwo-device-cache";
 const DEVICE_CACHE_STORE = "records";
 const DEVICE_CACHE_VERSION = 1;
-const DEVICE_CACHE_SCHEMA_VERSION = 1;
-const PULSE_SNAPSHOT_VERSION = 2;
+// Coverage was collapsed from `interest | holding` to one active state. A
+// schema bump prevents an old account-scoped snapshot from briefly rendering
+// the removed label before the server refreshes it.
+const DEVICE_CACHE_SCHEMA_VERSION = 2;
+const PULSE_SNAPSHOT_VERSION = 3;
+const PULSE_PROFILE_RECORD_VERSION = "3";
 const MAX_CACHED_COMPANY_BROWSE_CARDS = 3_000;
 const MAX_CACHED_PULSE_ITEMS = 50;
 const MAX_CACHED_SESSIONS = 50;
@@ -101,18 +110,11 @@ export async function readDeviceCompanyBrowseCatalog<TCompany>(
 export function buildDevicePulseSnapshot(
   feed: PulseFeedResponse,
 ): DevicePulseSnapshot | null {
-  const items = feed.items
+  const candidateItems = feed.candidate_items
     .filter((item) => item.kind !== "analysis")
     .slice(0, MAX_CACHED_PULSE_ITEMS);
-  if (items.length === 0) return null;
-
-  const counts = {
-    filing: items.filter((item) => item.kind === "filing").length,
-    analysis: 0,
-    question: items.filter((item) => item.kind === "question").length,
-    resurface: items.filter((item) => item.kind === "resurface").length,
-  };
-  const retainedItemIds = new Set(items.map((item) => item.id));
+  if (candidateItems.length === 0) return null;
+  const retainedItemIds = new Set(candidateItems.map((item) => item.id));
   const itemVersions = Object.fromEntries(
     Object.entries(feed.item_versions).filter(([id]) => retainedItemIds.has(id)),
   );
@@ -126,15 +128,9 @@ export function buildDevicePulseSnapshot(
       // before it can be treated as current.
       revision: "device-partial",
       active_analysis_items: [],
-      items,
+      candidate_items: candidateItems,
       item_versions: itemVersions,
       new_item_count: 0,
-      summary: {
-        ...feed.summary,
-        active_analysis_count: 0,
-        actionable_count: items.filter((item) => item.actionable).length,
-        counts,
-      },
     },
   };
 }
@@ -165,6 +161,37 @@ export async function readDevicePulseSnapshot(
   });
   if (!record || record.value.version !== PULSE_SNAPSHOT_VERSION) return null;
   return record.value;
+}
+
+/**
+ * Soft Pulse affinity is account-scoped but intentionally never leaves the
+ * browser. Losing it only returns the device to the deterministic base order.
+ */
+export async function saveDevicePulseProfile(
+  ownerId: string,
+  profile: PulseDeviceProfile,
+): Promise<void> {
+  await writeRecord({
+    key: userKey(ownerId, "pulse-profile"),
+    owner_id: ownerId,
+    resource: "pulse-profile",
+    version: PULSE_PROFILE_RECORD_VERSION,
+    value: profile,
+  });
+}
+
+export async function readDevicePulseProfile(
+  ownerId: string,
+): Promise<PulseDeviceProfile> {
+  const record = await readRecord<PulseDeviceProfile>({
+    key: userKey(ownerId, "pulse-profile"),
+    ownerId,
+    resource: "pulse-profile",
+    version: PULSE_PROFILE_RECORD_VERSION,
+  });
+  return record && isPulseDeviceProfile(record.value)
+    ? record.value
+    : createPulseDeviceProfile();
 }
 
 export async function saveDeviceSessionList(

@@ -43,6 +43,10 @@ import {
   getSessionTickers,
   buildChatSessionHref,
 } from "@/lib/chat/history-state";
+import {
+  isOnboardingStartEntry,
+  ONBOARDING_START_ENTRY,
+} from "@/lib/onboarding/start-flow";
 import { DEFAULT_LOCALE, isLocale } from "@/i18n/config";
 import { findQuestionTopic } from "@/lib/marketing/site";
 import { deriveChatPresentationContext } from "@/lib/chat/presentation-context";
@@ -141,6 +145,7 @@ function ChatContent({
   const runKindParam = searchParams.get("runKind");
   const guruParam = searchParams.get("guru");
   const entryParam = searchParams.get("entry");
+  const isStartOnboardingChat = isOnboardingStartEntry(entryParam);
   const filingEventId = searchParams.get("filing_event_id");
   const isDiscoverRoute = pathname === "/discover";
   const isGuruRoute = pathname === "/guru";
@@ -219,6 +224,7 @@ function ChatContent({
           locale: responseLocale,
           ticker: activeTicker,
           runKind: requestedRunKind,
+          entry: isStartOnboardingChat ? ONBOARDING_START_ENTRY : null,
         }),
         { scroll: false },
       );
@@ -232,6 +238,7 @@ function ChatContent({
       responseLocale,
       router,
       selectedGuruLens.key,
+      isStartOnboardingChat,
     ],
   );
 
@@ -601,6 +608,9 @@ function ChatContent({
         if (responseLocale !== DEFAULT_LOCALE) {
           nextParams.set("locale", responseLocale);
         }
+        if (isStartOnboardingChat) {
+          nextParams.set("entry", ONBOARDING_START_ENTRY);
+        }
         const nextHref = isGuruAdvisor
           ? `/guru?${nextParams.toString()}`
           : `/chat?${nextParams.toString()}`;
@@ -646,6 +656,7 @@ function ChatContent({
       setComposerExpanded,
       setSessionError,
       shouldStickToBottomRef,
+      isStartOnboardingChat,
     ],
   );
 
@@ -913,9 +924,14 @@ function ChatContent({
                             ? chat.artifactsByMessageId[msg.id]
                             : undefined
                         }
-                        charts={
+                        visualizations={
                           msg.role === "assistant"
-                            ? chat.chartsByMessageId[msg.id]
+                            ? chat.visualizationsByMessageId[msg.id]
+                            : undefined
+                        }
+                        messagePresentation={
+                          msg.role === "assistant"
+                            ? chat.presentationsByMessageId[msg.id]
                             : undefined
                         }
                         artifactSelections={chat.artifactSelections}
@@ -1065,6 +1081,13 @@ function ChatContent({
                       {contextTickers.length === 0 ? (
                         <p className="mx-auto mt-3 max-w-[34rem] text-balance text-[15px] font-semibold leading-6 text-body sm:text-[16px]">
                           {emptyStateCopy.descriptionWithoutContext}
+                        </p>
+                      ) : null}
+                      {isStartOnboardingChat && contextTickers.length > 0 ? (
+                        <p className="mx-auto mt-3 max-w-[34rem] text-balance text-[14px] font-semibold leading-6 text-body sm:text-[15px]">
+                          {responseLocale === "ko"
+                            ? "시작 질문을 고르거나 직접 적어보세요. 중요한 답변은 공시 원문 근거까지 확인할 수 있어요."
+                            : "Choose a starter question or write your own. Important answers keep the filing source within reach."}
                         </p>
                       ) : null}
                     </motion.div>

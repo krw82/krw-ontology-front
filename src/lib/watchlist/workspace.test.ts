@@ -22,7 +22,7 @@ import {
 const MARK_AAPL = {
   user_id: "user-1",
   ticker: "AAPL",
-  coverage_level: "holding",
+  coverage_level: "interest",
   priority: 0,
   interest_reason: "서비스 매출과 자사주를 확인 중",
   tags: ["service", "buyback"],
@@ -431,8 +431,7 @@ describe("watchlist workspace helpers", () => {
     ]);
     expect(overview.stats).toEqual({
       total: 2,
-      interest: 1,
-      holding: 1,
+      interest: 2,
       open_questions: 2,
       notes: 1,
       recent_activity: 2,
@@ -465,7 +464,7 @@ describe("watchlist workspace helpers", () => {
       research_status: "has_open_questions",
       research_status_reason: "open_questions",
       mark: {
-        coverage_level: "holding",
+        coverage_level: "interest",
         interest_reason: "서비스 매출과 자사주를 확인 중",
       },
     });

@@ -236,6 +236,25 @@ export interface ChatMessageChartRow extends Record<string, unknown> {
   created_at: string;
 }
 
+export interface ChatMessageVisualizationRow extends Record<string, unknown> {
+  id: string;
+  session_id: string;
+  message_id: string;
+  run_id: string;
+  artifact_ref: string;
+  payload_json: Json;
+  created_at: string;
+}
+
+export interface ChatMessagePresentationRow extends Record<string, unknown> {
+  message_id: string;
+  session_id: string;
+  run_id: string;
+  blocks_json: Json;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AgentWorkerHeartbeatRow extends Record<string, unknown> {
   worker_id: string;
   status: "idle" | "running" | "stopped" | "unhealthy";
@@ -454,7 +473,7 @@ export interface OntologyCompanyRow extends Record<string, unknown> {
 export interface UserCompanyMarkRow extends Record<string, unknown> {
   user_id: string;
   ticker: string;
-  coverage_level: "interest" | "holding" | null;
+  coverage_level: "interest" | null;
   coverage_cleared_at: string | null;
   priority: number;
   interest_reason: string | null;
@@ -561,23 +580,6 @@ export interface UserRetentionMilestoneRow extends Record<string, unknown> {
   milestone: "coverage_activated";
   achieved_at: string;
   metadata: Json;
-}
-
-export interface UserDecisionSessionRow extends Record<string, unknown> {
-  id: string;
-  user_id: string;
-  local_date: string;
-  timezone: string;
-  feed_session_id: string;
-  snapshot_at: string;
-  judgment_count: number;
-  observation_count: number;
-  thesis_update_count: number;
-  open_question_count: number;
-  next_check_count: number;
-  outcome: "completed" | "deferred";
-  closed_at: string;
-  updated_at: string;
 }
 
 export type SecFilingFormType = "8-K" | "8-K/A" | "6-K" | "6-K/A" | "4" | "4/A";
@@ -972,6 +974,20 @@ export interface UserPulsePreferencesRow extends Record<string, unknown> {
   updated_at: string;
 }
 
+export interface UserOnboardingStateRow extends Record<string, unknown> {
+  user_id: string;
+  onboarding_version: 2;
+  status: "not_started" | "in_progress" | "completed" | "skipped";
+  started_at: string | null;
+  first_company_selected_at: string | null;
+  first_question_started_at: string | null;
+  first_evidence_opened_at: string | null;
+  completed_at: string | null;
+  skipped_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface UserPulseItemStateRow extends Record<string, unknown> {
   user_id: string;
   item_key: string;
@@ -979,16 +995,10 @@ export interface UserPulseItemStateRow extends Record<string, unknown> {
   source_id: string;
   kind: "filing" | "analysis" | "checkup" | "question" | "resurface" | "learning";
   first_seen_at: string | null;
-  last_seen_at: string | null;
-  view_count: number;
   reviewed_at: string | null;
   saved_at: string | null;
   snoozed_until: string | null;
   dismissed_at: string | null;
-  last_impression_at: string | null;
-  last_impression_session_id: string | null;
-  impression_count: number;
-  feedback: -1 | 1 | null;
   created_at: string;
   updated_at: string;
 }
@@ -1753,6 +1763,11 @@ export interface AnalyticsEventRow extends Record<string, unknown> {
     | "home_cta_clicked"
     | "signup_started"
     | "login_completed"
+    | "onboarding_started"
+    | "onboarding_company_selected"
+    | "onboarding_question_started"
+    | "onboarding_evidence_opened"
+    | "onboarding_skipped"
     | "company_selected"
     | "question_prefilled"
     | "suggested_question_clicked"
@@ -1823,6 +1838,9 @@ export interface AnalyticsEventRow extends Record<string, unknown> {
     | "pulse_filter_changed"
     | "pulse_preferences_updated"
     | "pulse_new_items_seen"
+    | "pulse_refresh_requested"
+    | "pulse_refresh_completed"
+    | "pulse_refresh_failed"
     | "pulse_end_reached"
     | "pulse_feedback_submitted"
     | "pulse_source_degraded"
@@ -2727,41 +2745,6 @@ export interface Database {
           referencedColumns: string[];
         }>;
       };
-      user_decision_sessions: {
-        Row: UserDecisionSessionRow;
-        Insert: Pick<
-          UserDecisionSessionRow,
-          | "user_id"
-          | "local_date"
-          | "timezone"
-          | "feed_session_id"
-          | "snapshot_at"
-          | "outcome"
-        > &
-          Partial<
-            Pick<
-              UserDecisionSessionRow,
-              | "id"
-              | "judgment_count"
-              | "observation_count"
-              | "thesis_update_count"
-              | "open_question_count"
-              | "next_check_count"
-              | "closed_at"
-              | "updated_at"
-            >
-          >;
-        Update: Partial<
-          Omit<UserDecisionSessionRow, "id" | "user_id" | "local_date">
-        >;
-        Relationships: Array<{
-          foreignKeyName: string;
-          columns: string[];
-          isOneToOne: boolean;
-          referencedRelation: string;
-          referencedColumns: string[];
-        }>;
-      };
       sec_company_identifiers: {
         Row: SecCompanyIdentifierRow;
         Insert: Pick<SecCompanyIdentifierRow, "ticker"> &
@@ -3130,6 +3113,22 @@ export interface Database {
             updated_at?: string;
           };
         Update: Partial<Omit<UserPulsePreferencesRow, "user_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      user_onboarding_states: {
+        Row: UserOnboardingStateRow;
+        Insert: Pick<UserOnboardingStateRow, "user_id"> &
+          Partial<Omit<UserOnboardingStateRow, "user_id" | "created_at" | "updated_at">> & {
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<UserOnboardingStateRow, "user_id" | "created_at">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];
@@ -4026,6 +4025,36 @@ export interface Database {
           referencedColumns: string[];
         }>;
       };
+      chat_message_visualizations: {
+        Row: ChatMessageVisualizationRow;
+        Insert: Omit<ChatMessageVisualizationRow, "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<ChatMessageVisualizationRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      chat_message_presentations: {
+        Row: ChatMessagePresentationRow;
+        Insert: Omit<ChatMessagePresentationRow, "created_at" | "updated_at"> & {
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<ChatMessagePresentationRow, "message_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
       chat_message_artifact_selections: {
         Row: ChatMessageArtifactSelectionRow;
         Insert: Omit<ChatMessageArtifactSelectionRow, "id" | "created_at"> & {
@@ -4362,23 +4391,6 @@ export interface Database {
         Args: { p_user_id: string };
         Returns: boolean;
       };
-      close_user_decision_session: {
-        Args: {
-          p_user_id: string;
-          p_feed_session_id: string;
-          p_timezone: string;
-        };
-        Returns: Json;
-      };
-      record_pulse_item_impressions: {
-        Args: {
-          p_user_id: string;
-          p_items: Json;
-          p_feed_session_id: string;
-          p_seen_at?: string;
-        };
-        Returns: number;
-      };
       resolve_scheduled_monitoring_pulse_item: {
         Args: {
           p_user_id: string;
@@ -4498,18 +4510,6 @@ export interface Database {
           daily_reserved_usd: number;
           daily_limit_usd: number;
         }>;
-      };
-      record_pulse_item_impression: {
-        Args: {
-          p_user_id: string;
-          p_item_key: string;
-          p_source_type: "filing" | "analysis" | "checkup" | "question" | "resurface" | "learning";
-          p_source_id: string;
-          p_kind: "filing" | "analysis" | "checkup" | "question" | "resurface" | "learning";
-          p_feed_session_id: string;
-          p_seen_at?: string;
-        };
-        Returns: undefined;
       };
       attach_execution_budget_run: {
         Args: {

@@ -8,12 +8,16 @@ import type {
   AgentRunRow,
   ChatMessageArtifactRow,
   ChatMessageArtifactSelectionRow,
-  ChatMessageChartRow,
+  ChatMessagePresentationRow,
+  ChatMessageVisualizationRow,
   ChatSessionRow,
   MessageRow,
 } from "@/types/database";
 import { toPublicChatArtifact } from "@/lib/chat-artifacts/news-event-selection";
-import { toPublicChatChart } from "@/lib/charts/db";
+import {
+  toPublicChatPresentation,
+  toPublicChatVisualization,
+} from "@/lib/visualizations/db";
 import { ServerTiming } from "@/lib/performance/server-timing";
 
 const DEFAULT_CHAT_DETAIL_MESSAGE_LIMIT = 50;
@@ -150,31 +154,46 @@ export async function GET(
         .order("created_at", { ascending: true })
         .returns<ChatMessageArtifactRow[]>()
     : Promise.resolve({ data: [], error: null });
-  const chartsRequest = messageIds.length > 0
+  const visualizationsRequest = messageIds.length > 0
     ? supabase
-        .from("chat_message_charts")
+        .from("chat_message_visualizations")
         .select(
-          "id, session_id, message_id, run_id, chart_ref, insert_token, title, chart_type, payload_json, created_at",
+          "id, session_id, message_id, run_id, artifact_ref, payload_json, created_at",
         )
         .eq("session_id", sessionId)
         .in("message_id", messageIds)
         .order("created_at", { ascending: true })
-        .returns<ChatMessageChartRow[]>()
+        .returns<ChatMessageVisualizationRow[]>()
+    : Promise.resolve({ data: [], error: null });
+  const presentationsRequest = messageIds.length > 0
+    ? supabase
+        .from("chat_message_presentations")
+        .select("message_id, session_id, run_id, blocks_json, created_at, updated_at")
+        .eq("session_id", sessionId)
+        .in("message_id", messageIds)
+        .order("created_at", { ascending: true })
+        .returns<ChatMessagePresentationRow[]>()
     : Promise.resolve({ data: [], error: null });
   const [
     { data: chatArtifacts, error: chatArtifactsError },
-    { data: chatCharts, error: chatChartsError },
-  ] = await timing.measure("artifacts_charts", () => Promise.all([
+    { data: chatVisualizations, error: chatVisualizationsError },
+    { data: chatPresentations, error: chatPresentationsError },
+  ] = await timing.measure("artifacts_visualizations", () => Promise.all([
     artifactsRequest,
-    chartsRequest,
+    visualizationsRequest,
+    presentationsRequest,
   ]));
 
   if (chatArtifactsError) {
     return internalError("채팅 artifact를 불러오지 못했습니다.");
   }
 
-  if (chatChartsError) {
-    return internalError("채팅 차트를 불러오지 못했습니다.");
+  if (chatVisualizationsError) {
+    return internalError("채팅 시각화를 불러오지 못했습니다.");
+  }
+
+  if (chatPresentationsError) {
+    return internalError("채팅 표시 구성을 불러오지 못했습니다.");
   }
 
   const artifactIds = (chatArtifacts ?? []).map((artifact) => artifact.id);
@@ -199,7 +218,8 @@ export async function GET(
     messages: (messages ?? []).map(toPublicMessage),
     runs: (runs ?? []).map(toPublicRunSummary),
     chat_artifacts: (chatArtifacts ?? []).map(toPublicChatArtifact),
-    charts: (chatCharts ?? []).map(toPublicChatChart),
+    visualizations: (chatVisualizations ?? []).map(toPublicChatVisualization),
+    presentations: (chatPresentations ?? []).map(toPublicChatPresentation),
     artifact_selections: artifactSelections ?? [],
     message_pagination: {
       limit: messageLimit,

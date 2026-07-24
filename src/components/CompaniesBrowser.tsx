@@ -7,13 +7,11 @@ import {
   useRef,
   useState,
 } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import CompanyCard, {
   type CompanyCardData,
 } from "@/components/CompanyCard";
-import FirstResearchChoice from "@/components/FirstResearchChoice";
 import { easeOutExpo } from "@/lib/animation";
 import { filterAndSortCompanies } from "@/lib/companies/filter";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
@@ -21,20 +19,12 @@ import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import {
   readDeviceCompanyBrowseCatalog,
-  readDeviceCoverageOnboarding,
   saveDeviceCompanyBrowseCatalog,
-  saveDeviceCoverageOnboarding,
 } from "@/lib/pwa/device-cache";
-import {
-  DEVICE_CACHE_OWNER_CHANGED_EVENT,
-  getDeviceCacheOwner,
-} from "@/lib/pwa/device-cache-owner";
 
 interface CompaniesBrowserProps {
   initialCompanies: CompanyCardData[];
   locale?: Locale;
-  isAuthenticated?: boolean;
-  cacheOwnerId?: string | null;
   catalogReleaseId?: string | null;
   catalogGeneratedAt?: string | null;
   loadCatalog?: boolean;
@@ -46,73 +36,9 @@ type CompanyBrowseCatalogResponse = {
   companies: CompanyCardData[];
 };
 
-/* ─── Flow Animation ─────────────────────────────────────────────
-   3 thin lines slide in from left, fade into the arrow, then the
-   arrow nudges forward. Total cycle ≈ 1.2s active + 3.3s pause.
-   Symbolises "many companies → one chat context".              */
-
-const FLOW_CYCLE = 4.5; // total seconds per loop
-const LINE_MOVE = 1.0; // how long lines travel
-const ARROW_NUDGE_DELAY = 0.9; // when the arrow kicks
 const SEARCH_COACHMARK_STORAGE_KEY = "krw:companies-search-coachmark-seen:v1";
 const IS_DEV_ENV = process.env.NODE_ENV === "development";
 const EMPTY_COMPANIES: CompanyCardData[] = [];
-const COMPANY_RENDER_PAGE_SIZE = 120;
-
-function FlowAnimation({ disabled }: { disabled: boolean }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="relative flex h-7 w-14 shrink-0 items-center justify-end justify-self-end overflow-hidden sm:w-16"
-    >
-      {/* 3 converging lines */}
-      {[0, 1, 2].map((i) => (
-        <motion.span
-          key={i}
-          className="absolute left-0 h-[2px] w-[8px] rounded-full bg-canvas/50"
-          style={{ top: `${7 + i * 7}px` }}
-          animate={
-            disabled
-              ? undefined
-              : {
-                  x: [0, 42, 42],
-                  opacity: [0, 0.7, 0],
-                }
-          }
-          transition={{
-            duration: LINE_MOVE,
-            delay: i * 0.15,
-            repeat: Infinity,
-            repeatDelay: FLOW_CYCLE - LINE_MOVE,
-            ease: easeOutExpo,
-            times: [0, 0.7, 1],
-          }}
-        />
-      ))}
-
-      {/* Main arrow */}
-      <motion.span
-        className="material-symbols-outlined relative z-10 text-[28px] text-canvas/90"
-        animate={
-          disabled
-            ? undefined
-            : {
-                x: [0, 10, 0],
-              }
-        }
-        transition={{
-          duration: 0.5,
-          delay: ARROW_NUDGE_DELAY,
-          repeat: Infinity,
-          repeatDelay: FLOW_CYCLE - 0.5,
-          ease: easeOutExpo,
-        }}
-      >
-        arrow_forward
-      </motion.span>
-    </span>
-  );
-}
 
 function CompanyCatalogSkeleton() {
   return (
@@ -149,8 +75,6 @@ function CompanyCatalogSkeleton() {
 export default function CompaniesBrowser({
   initialCompanies,
   locale = DEFAULT_LOCALE,
-  isAuthenticated = false,
-  cacheOwnerId = null,
   catalogReleaseId = null,
   catalogGeneratedAt = null,
   loadCatalog = false,
@@ -158,17 +82,6 @@ export default function CompaniesBrowser({
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [showSearchCoachmark, setShowSearchCoachmark] = useState(false);
-  const [showFirstResearchChoice, setShowFirstResearchChoice] = useState(false);
-  const [coverageOnboardingActive, setCoverageOnboardingActive] = useState(
-    () => searchParams.get("onboarding") === "coverage",
-  );
-  const [deviceCacheOwnerId, setDeviceCacheOwnerId] = useState<string | null>(
-    null,
-  );
-  const [coverageOnboardingByOwner, setCoverageOnboardingByOwner] = useState<{
-    ownerId: string;
-    activated: boolean;
-  } | null>(null);
   const [freshCatalog, setFreshCatalog] =
     useState<CompanyBrowseCatalogResponse | null>(() =>
       initialCompanies.length > 0
@@ -184,7 +97,6 @@ export default function CompaniesBrowser({
   const [catalogLoading, setCatalogLoading] = useState(
     loadCatalog && initialCompanies.length === 0,
   );
-  const [companyRenderPage, setCompanyRenderPage] = useState(1);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const reducedMotion = useReducedMotion();
   const coarsePointer = useCoarsePointer();
@@ -193,18 +105,8 @@ export default function CompaniesBrowser({
   const animateCompanyRows =
     !reducedMotion && !coarsePointer && normalizedSearch.length === 0;
   const forceCoachmarks = searchParams.get("coach") === "1";
-  const forceFirstResearchChoice = searchParams.get("onboarding") === "1";
-  const coverageOnboardingRequested =
-    searchParams.get("onboarding") === "coverage";
+  const coverageOnboardingActive = searchParams.get("onboarding") === "coverage";
   const onboardingContinuePath = searchParams.get("continue");
-  const resolvedCacheOwnerId = cacheOwnerId ?? deviceCacheOwnerId;
-  const hasAuthenticatedSession =
-    isAuthenticated || Boolean(resolvedCacheOwnerId);
-  const coverageOnboardingActivated = !hasAuthenticatedSession
-    ? true
-    : coverageOnboardingByOwner?.ownerId === resolvedCacheOwnerId
-      ? coverageOnboardingByOwner.activated
-      : null;
   const companies = useMemo(
     () => freshCatalog?.companies ?? deviceCatalog?.companies ?? EMPTY_COMPANIES,
     [deviceCatalog, freshCatalog],
@@ -212,48 +114,38 @@ export default function CompaniesBrowser({
   const copy = locale === "ko"
       ? {
         eyebrow: "회사 찾기",
-        heading: "분석할 회사를 고르세요.",
+        heading: "궁금한 회사가 있나요?",
         intro:
-          "회사를 알고 있다면 바로 검색하세요. 질문은 회사 공시, 실적 변화, 리스크 맥락으로 이어집니다.",
-        searchLabel: "회사 검색",
+          "회사 하나를 고르면 최근 공시에서 달라진 점과 확인할 원문을 바로 안내합니다.",
+        searchLabel: "회사 또는 티커 검색",
         searchPlaceholder: "예: IBM, 브로드컴, 애플",
         searchAria: "회사 검색",
-        searchCoachmark: "분석할 회사명이나 티커를 입력하세요",
+        searchCoachmark: "회사명이나 티커를 입력하세요",
         dismissCoachmarkAria: "회사 검색 안내 닫기",
-        discoveryEyebrow: "다른 분석 관점이 필요하다면",
-        discoveryTitle: "관점별 분석",
-        discoveryDescription:
-          "버핏·하워드 막스처럼 공개된 질문 원칙으로 회사나 아이디어를 점검합니다.",
-        discoveryCta: "분석 관점 선택",
         emptyCatalog:
           "현재 환경의 웹 카탈로그에서 인덱싱된 회사를 찾지 못했습니다.",
-        availableCompanies: "분석 가능한 회사",
+        availableCompanies: "전체 분석 가능 회사",
+        searchResults: "검색 결과",
         countSuffix: "개 표시",
-        loadMore: "회사 더 보기",
         emptySearch: "검색 조건에 맞는 회사가 없습니다.",
         footer:
           "© 2026 KRW.O. 공시 근거 기반 기업 리서치.",
       }
     : {
         eyebrow: "Find a company",
-        heading: "Choose a company to analyze.",
+        heading: "Is there a company you want to understand?",
         intro:
-          "If you know the company, search directly. Questions continue into filing, earnings, and risk context.",
-        searchLabel: "Company search",
+          "Choose a company to see what changed in its latest filings and where to verify the source.",
+        searchLabel: "Company or ticker",
         searchPlaceholder: "e.g. IBM, Broadcom, Apple",
         searchAria: "Company search",
-        searchCoachmark: "Type a company name or ticker to analyze",
+        searchCoachmark: "Type a company name or ticker",
         dismissCoachmarkAria: "Dismiss company search tip",
-        discoveryEyebrow: "If you want another analysis perspective",
-        discoveryTitle: "Perspective analysis",
-        discoveryDescription:
-          "Pressure-test a company or idea through public question frames such as Buffett or Howard Marks.",
-        discoveryCta: "Choose a perspective",
         emptyCatalog:
           "No indexed companies were found in the current web catalog.",
-        availableCompanies: "Available companies",
+        availableCompanies: "All available companies",
+        searchResults: "Search results",
         countSuffix: "shown",
-        loadMore: "Load more companies",
         emptySearch: "No companies match this search.",
         footer:
           "© 2026 KRW.O. Filing-grounded company research.",
@@ -262,27 +154,8 @@ export default function CompaniesBrowser({
   const filteredCompanies = useMemo(() => {
     return filterAndSortCompanies(companies, deferredSearch);
   }, [companies, deferredSearch]);
-  const visibleCompanies = useMemo(
-    () =>
-      filteredCompanies.slice(
-        0,
-        companyRenderPage * COMPANY_RENDER_PAGE_SIZE,
-      ),
-    [companyRenderPage, filteredCompanies],
-  );
-  const hasMoreCompanies = visibleCompanies.length < filteredCompanies.length;
-
-  useEffect(() => {
-    if (!cacheOwnerId) {
-      const syncOwner = () => setDeviceCacheOwnerId(getDeviceCacheOwner());
-      syncOwner();
-      window.addEventListener(DEVICE_CACHE_OWNER_CHANGED_EVENT, syncOwner);
-      return () => {
-        window.removeEventListener(DEVICE_CACHE_OWNER_CHANGED_EVENT, syncOwner);
-      };
-    }
-    return undefined;
-  }, [cacheOwnerId]);
+  const isSearchActive = normalizedSearch.length > 0;
+  const visibleCompanies = filteredCompanies;
 
   useEffect(() => {
     if (freshCatalog?.release_id && freshCatalog.companies.length > 0) {
@@ -345,61 +218,6 @@ export default function CompaniesBrowser({
   }, [loadCatalog, locale]);
 
   useEffect(() => {
-    if (!hasAuthenticatedSession || !resolvedCacheOwnerId) {
-      return;
-    }
-
-    const controller = new AbortController();
-    let active = true;
-    void readDeviceCoverageOnboarding(resolvedCacheOwnerId)
-      .then((snapshot) => {
-        if (active && snapshot) {
-          setCoverageOnboardingByOwner({
-            ownerId: resolvedCacheOwnerId,
-            activated: snapshot.coverage_activated,
-          });
-        }
-      })
-      .catch(() => undefined);
-    void fetch("/api/onboarding/coverage/status", {
-      signal: controller.signal,
-      cache: "no-store",
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Unable to load coverage status");
-        const data = await response.json() as {
-          coverage_activated?: boolean;
-        };
-        const coverageActivated = data.coverage_activated === true;
-        if (active) {
-          setCoverageOnboardingByOwner({
-            ownerId: resolvedCacheOwnerId,
-            activated: coverageActivated,
-          });
-        }
-        void saveDeviceCoverageOnboarding(resolvedCacheOwnerId, coverageActivated)
-          .catch(() => undefined);
-      })
-      .catch((error: unknown) => {
-        if ((error as { name?: string }).name !== "AbortError") {
-          // Never block the company index when a personalized onboarding read
-          // is unavailable. It can retry on the next navigation.
-          if (active) {
-            setCoverageOnboardingByOwner({
-              ownerId: resolvedCacheOwnerId,
-              activated: true,
-            });
-          }
-        }
-      });
-
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, [hasAuthenticatedSession, resolvedCacheOwnerId]);
-
-  useEffect(() => {
     if (forceCoachmarks) {
       const showTimer = window.setTimeout(
         () => setShowSearchCoachmark(true),
@@ -430,50 +248,8 @@ export default function CompaniesBrowser({
     };
   }, [forceCoachmarks]);
 
-  useEffect(() => {
-    if (forceFirstResearchChoice) {
-      const showTimer = window.setTimeout(
-        () => setShowFirstResearchChoice(true),
-        0,
-      );
-      return () => window.clearTimeout(showTimer);
-    }
-
-    if (!hasAuthenticatedSession) return;
-    if (coverageOnboardingActivated === null) return;
-    if (coverageOnboardingActivated || coverageOnboardingRequested) return;
-
-    const showTimer = window.setTimeout(
-      () => setShowFirstResearchChoice(true),
-      0,
-    );
-    return () => window.clearTimeout(showTimer);
-  }, [
-    coverageOnboardingActivated,
-    coverageOnboardingRequested,
-    forceFirstResearchChoice,
-    hasAuthenticatedSession,
-  ]);
-
   function dismissSearchCoachmark() {
     setShowSearchCoachmark(false);
-  }
-
-  function dismissFirstResearchChoice() {
-    setShowFirstResearchChoice(false);
-  }
-
-  function startCompanySearch() {
-    setCoverageOnboardingActive(true);
-    setShowFirstResearchChoice(false);
-    const params = new URLSearchParams(window.location.search);
-    params.set("onboarding", "coverage");
-    window.history.replaceState(
-      window.history.state,
-      "",
-      `${window.location.pathname}?${params.toString()}`,
-    );
-    window.requestAnimationFrame(() => searchInputRef.current?.focus());
   }
 
   function updateSearch(nextSearch: string) {
@@ -501,13 +277,6 @@ export default function CompaniesBrowser({
         id="main-content"
         className="w-full px-base pb-xl pt-lg sm:px-md md:px-xl md:pb-[96px] md:pt-xl"
       >
-        {showFirstResearchChoice ? (
-          <FirstResearchChoice
-            locale={locale}
-            onStartCompany={startCompanySearch}
-            onDismiss={dismissFirstResearchChoice}
-          />
-        ) : (
         <header className="border-b border-hairline pb-5">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.82fr)] lg:items-end">
             <div className="min-w-0 max-w-2xl">
@@ -584,34 +353,9 @@ export default function CompaniesBrowser({
                   />
                 </div>
               </div>
-              <div className="mt-4 rounded-[8px] border border-hairline bg-surface p-sm">
-                <p className="font-mono text-[10px] font-black uppercase tracking-[0.14em] text-primary">
-                  {copy.discoveryEyebrow}
-                </p>
-                <div className="mt-2 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-[15px] font-black leading-5 text-ink">
-                      {copy.discoveryTitle}
-                    </p>
-                    <p className="mt-1 text-[12px] font-semibold leading-5 text-muted">
-                      {copy.discoveryDescription}
-                    </p>
-                  </div>
-                  <Link
-                    href="/guru"
-                    data-onboarding-target="guru-advisor-cta"
-                    className="group inline-flex h-11 min-w-0 shrink-0 items-center justify-between gap-2 rounded-[8px] bg-ink px-3 text-[13px] font-bold leading-5 text-canvas shadow-sm transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-                    aria-label={copy.discoveryCta}
-                  >
-                    <span className="truncate">{copy.discoveryCta}</span>
-                    <FlowAnimation disabled={reducedMotion || coarsePointer} />
-                  </Link>
-                </div>
-              </div>
             </div>
           </div>
         </header>
-        )}
 
         {catalogLoading ? (
           <CompanyCatalogSkeleton />
@@ -623,7 +367,9 @@ export default function CompaniesBrowser({
           <div className="mt-5">
             <div className="mb-3 flex items-center justify-between gap-4">
               <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] leading-5 text-muted">
-                {copy.availableCompanies}
+                {isSearchActive
+                  ? copy.searchResults
+                  : copy.availableCompanies}
               </p>
               <p className="text-[12px] font-bold leading-4 text-muted" aria-live="polite">
                 <AnimatePresence mode="wait" initial={false}>
@@ -637,9 +383,7 @@ export default function CompaniesBrowser({
                       ease: easeOutExpo,
                     }}
                   >
-                    {hasMoreCompanies
-                      ? `${visibleCompanies.length.toLocaleString()} / ${filteredCompanies.length.toLocaleString()} ${copy.countSuffix}`
-                      : `${filteredCompanies.length.toLocaleString()} ${copy.countSuffix}`}
+                    {`${filteredCompanies.length.toLocaleString()} ${copy.countSuffix}`}
                   </motion.span>
                 </AnimatePresence>
               </p>
@@ -665,24 +409,13 @@ export default function CompaniesBrowser({
                     company={company}
                     locale={locale}
                     motionDelay={index < 8 ? Math.min(index * 24, 120) : 0}
-                    animateRow={animateCompanyRows}
+                    animateRow={animateCompanyRows && index < 8}
                     coverageOnboarding={coverageOnboardingActive}
                     onboardingContinuePath={onboardingContinuePath}
                   />
                 ))}
               </AnimatePresence>
             </motion.div>
-            {hasMoreCompanies ? (
-              <div className="mt-3 flex justify-center">
-                <button
-                  type="button"
-                  className="min-h-11 rounded-[8px] border border-hairline bg-canvas px-base text-[13px] font-extrabold text-ink shadow-sm transition-colors hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  onClick={() => setCompanyRenderPage((page) => page + 1)}
-                >
-                  {copy.loadMore}
-                </button>
-              </div>
-            ) : null}
           </div>
         )}
 

@@ -6,21 +6,24 @@ import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { normalizeTicker } from "@/lib/ontology/ticker";
-import type { ChatMessageChart } from "@/types/api-contracts";
+import type {
+  ChatMessageVisualization,
+  PresentationBlock,
+} from "@/types/api-contracts";
 
 interface ResearchMarkdownProps {
   content: string;
   className?: string;
   normalizePlainText?: boolean;
-  charts?: ChatMessageChart[];
+  visualizations?: ChatMessageVisualization[];
+  blocks?: PresentationBlock[];
   presentation?: "default" | "guru";
 }
 
 const SAFE_LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
 const SAFE_IMAGE_PROTOCOLS = new Set(["http:", "https:"]);
 const UNSAFE_URL_CHARACTERS = /[\u0000-\u001F\u007F]/;
-const CHART_TOKEN_PATTERN = /\[\[krw-chart:([A-Za-z0-9_-]+)\]\]/g;
-const CHART_TOKEN_LINE_PATTERN = /^\s*\[\[krw-chart:[A-Za-z0-9_-]+\]\]\s*$/;
+const LEGACY_CHART_TOKEN_PATTERN = /\[\[krw-chart:[A-Za-z0-9_-]+\]\]/g;
 const FENCE_START_PATTERN = /^\s*(```|~~~)/;
 const MARKDOWN_BLOCK_PATTERN =
   /^\s*(#{1,6}\s|[-*+]\s+|\d+[.)]\s+|>\s|---+$|\|)/;
@@ -31,20 +34,23 @@ const HEADING_START_PATTERN =
 const SENTENCE_END_PATTERN =
   /([.!。！？]|다\.?|니다\.?|습니다\.?|입니다\.?|합니다\.?|됩니다\.?|했습니다\.?|있습니다\.?|없습니다\.?|보입니다\.?)$/;
 const QUESTION_END_PATTERN = /([?？]|나요\??|인가요\??|까요\??|습니까\??)$/;
-const EMPTY_CHARTS: ChatMessageChart[] = [];
+const EMPTY_VISUALIZATIONS: ChatMessageVisualization[] = [];
 const RESEARCH_MARKDOWN_PLUGINS = [remarkGfm];
 
-const LazyKrwChartCard = dynamic(() => import("@/components/KrwChartCard"), {
+const LazyKrwVisualizationCard = dynamic(
+  () => import("@/components/KrwVisualizationCard"),
+  {
   loading: () => (
     <div
       className="my-lg flex min-h-[360px] w-full max-w-[820px] items-center justify-center rounded-[8px] border border-hairline bg-surface/55 sm:min-h-[400px]"
       role="status"
       aria-live="polite"
     >
-      <span className="text-[13px] font-semibold text-muted">차트 불러오는 중…</span>
+      <span className="text-[13px] font-semibold text-muted">시각화 불러오는 중…</span>
     </div>
   ),
-});
+  },
+);
 
 function getSafeMarkdownUrl(
   value: unknown,
@@ -157,7 +163,10 @@ function collapseBlankLines(lines: string[]): string[] {
 }
 
 export function normalizeResearchMarkdown(content: string): string {
-  const normalized = content.replace(/\r\n/g, "\n").trim();
+  const normalized = content
+    .replace(/\r\n/g, "\n")
+    .replace(LEGACY_CHART_TOKEN_PATTERN, "")
+    .trim();
   if (!normalized) return "";
 
   const lines = normalized.split("\n");
@@ -185,15 +194,6 @@ export function normalizeResearchMarkdown(content: string): string {
 
     if (!line) {
       output.push("");
-      continue;
-    }
-
-    if (CHART_TOKEN_LINE_PATTERN.test(line)) {
-      pushBlankLine(output);
-      output.push(rawLine);
-      output.push("");
-      pendingBareList = false;
-      activeBareList = false;
       continue;
     }
 
@@ -393,7 +393,8 @@ function ResearchMarkdown({
   content,
   className,
   normalizePlainText = true,
-  charts = EMPTY_CHARTS,
+  visualizations = EMPTY_VISUALIZATIONS,
+  blocks,
   presentation = "default",
 }: ResearchMarkdownProps) {
   const isGuru = presentation === "guru";
@@ -411,38 +412,51 @@ function ResearchMarkdown({
   );
   const markdownContent = useMemo(
     () =>
-      normalizePlainText ? normalizeResearchMarkdown(content) : content,
+      normalizePlainText
+        ? normalizeResearchMarkdown(content)
+        : content.replace(LEGACY_CHART_TOKEN_PATTERN, ""),
     [content, normalizePlainText],
   );
-  const parts = useMemo(
-    () => splitChartTokens(markdownContent),
-    [markdownContent],
-  );
-  const chartsByRef = useMemo(() => {
-    const chartMap = new Map<string, ChatMessageChart>();
-    for (const chart of charts) {
-      chartMap.set(chart.chart_ref, chart);
-      chartMap.set(chart.insert_token, chart);
-      chartMap.set(chart.id, chart);
+  const visualizationsByRef = useMemo(() => {
+    const visualizationMap = new Map<string, ChatMessageVisualization>();
+    for (const visualization of visualizations) {
+      visualizationMap.set(visualization.artifact_ref, visualization);
+      visualizationMap.set(visualization.id, visualization);
     }
-    return chartMap;
-  }, [charts]);
+    return visualizationMap;
+  }, [visualizations]);
+  const renderBlocks = useMemo(() => {
+    if (blocks && blocks.length > 0) return blocks;
+    return [
+      ...(markdownContent.trim()
+        ? [{ id: "markdown_fallback", type: "markdown" as const, content: markdownContent }]
+        : []),
+      ...visualizations.map((visualization) => ({
+        id: `visualization_${visualization.artifact_ref}`,
+        type: "visualization" as const,
+        artifact_ref: visualization.artifact_ref,
+      })),
+    ];
+  }, [blocks, markdownContent, visualizations]);
 
   return (
     <div className={classes}>
-      {parts.map((part, index) => {
-        if (part.type === "chart") {
-          const chart = chartsByRef.get(part.ref);
-          return chart ? (
-            <LazyKrwChartCard key={`${part.ref}-${index}`} chart={chart} />
+      {renderBlocks.map((block) => {
+        if (block.type === "visualization") {
+          const visualization = visualizationsByRef.get(block.artifact_ref);
+          return visualization ? (
+            <LazyKrwVisualizationCard
+              key={block.id}
+              visualization={visualization}
+            />
           ) : null;
         }
 
-        if (!part.content.trim()) return null;
+        if (!block.content.trim()) return null;
         return (
           <MarkdownBlock
-            key={`markdown-${index}`}
-            content={part.content}
+            key={block.id}
+            content={block.content}
             isGuru={isGuru}
           />
         );
@@ -452,36 +466,3 @@ function ResearchMarkdown({
 }
 
 export default memo(ResearchMarkdown);
-
-function splitChartTokens(
-  content: string,
-): Array<{ type: "markdown"; content: string } | { type: "chart"; ref: string }> {
-  const parts: Array<
-    { type: "markdown"; content: string } | { type: "chart"; ref: string }
-  > = [];
-  let lastIndex = 0;
-
-  for (const match of content.matchAll(CHART_TOKEN_PATTERN)) {
-    const matchIndex = match.index ?? 0;
-    if (matchIndex > lastIndex) {
-      parts.push({
-        type: "markdown",
-        content: content.slice(lastIndex, matchIndex),
-      });
-    }
-    parts.push({
-      type: "chart",
-      ref: match[1] ?? "",
-    });
-    lastIndex = matchIndex + match[0].length;
-  }
-
-  if (lastIndex < content.length) {
-    parts.push({
-      type: "markdown",
-      content: content.slice(lastIndex),
-    });
-  }
-
-  return parts.length > 0 ? parts : [{ type: "markdown", content }];
-}

@@ -29,6 +29,11 @@ vi.mock("@/lib/news-discovery/source-pack", () => ({
 vi.mock("@/lib/question-router/chat-question-router", () => ({
   resolveChatQuestionRoute: vi.fn(),
 }));
+vi.mock("@/lib/visualizations/db", () => ({
+  extractCreatedVisualizationArtifacts: vi.fn(),
+  persistCreatedVisualizations: vi.fn(),
+  persistMessagePresentation: vi.fn(),
+}));
 import { recordAnalyticsEvent } from "@/lib/analytics/server";
 import { checkMcpReady, type McpHealthResult } from "@/lib/agent/mcp-client";
 import { runAgent } from "@/lib/agent/runner";
@@ -36,6 +41,16 @@ import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { buildSelectedNewsSourcePack } from "@/lib/news-discovery/source-pack";
 import { resolveChatQuestionRoute } from "@/lib/question-router/chat-question-router";
+import type {
+  ChatMessagePresentation,
+  ChatMessageVisualization,
+  KrwVisualizationArtifact,
+} from "@/types/api-contracts";
+import {
+  extractCreatedVisualizationArtifacts,
+  persistCreatedVisualizations,
+  persistMessagePresentation,
+} from "@/lib/visualizations/db";
 import { runAgentJob } from "./job-runner";
 
 function createRunnerAdmin(params: {
@@ -293,6 +308,10 @@ describe("agent job runner", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.KRW_CHARTS_ENABLED;
+    delete process.env.KRW_VISUALIZATIONS_MODE;
+    vi.mocked(extractCreatedVisualizationArtifacts).mockReturnValue([]);
+    vi.mocked(persistCreatedVisualizations).mockResolvedValue([]);
+    vi.mocked(persistMessagePresentation).mockResolvedValue(null);
     vi.mocked(checkMcpReady).mockResolvedValue({
       connected: false,
       staticOk: true,
@@ -329,7 +348,7 @@ describe("agent job runner", () => {
     });
   });
 
-  it("strips chart tokens and skips chart persistence while chart generation is disabled", async () => {
+  it("strips legacy chart tokens and skips visualization persistence while disabled", async () => {
     const fake = createRunnerAdmin();
     vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
     vi.mocked(checkMcpReady).mockResolvedValue(readyMcpHealth());
@@ -360,7 +379,7 @@ describe("agent job runner", () => {
 
     expect(fake.inserted).not.toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ table: "chat_message_charts" }),
+        expect.objectContaining({ table: "chat_message_visualizations" }),
       ]),
     );
     expect(fake.updates).toEqual(
@@ -381,7 +400,102 @@ describe("agent job runner", () => {
       "done",
       expect.objectContaining({
         content: "요약입니다.\n\n후속 설명입니다.",
-        charts: [],
+        visualizations: [],
+        presentation: null,
+      }),
+    );
+  });
+
+  it("persists and publishes compiler-owned visualizations only in on mode", async () => {
+    process.env.KRW_VISUALIZATIONS_MODE = "on";
+    const artifact: KrwVisualizationArtifact = {
+      artifact_format: "krw-visualization",
+      schema_version: 1,
+      artifact_ref: "viz_1_revenue",
+      intent: { goal: "매출 추이" },
+      title: "매출 추이",
+      views: [{
+        view_id: "view_1",
+        chart_type: "line",
+        title: "매출 추이",
+        series: [{
+          series_key: "revenue",
+          label: "Revenue",
+          points: [{ period: "CY2025", value: 100, evidence_ref: "metric_observation:1" }],
+        }],
+      }],
+      provenance: {
+        source_tool_call_ids: ["ontology-1"],
+        evidence_refs: ["metric_observation:1"],
+        source_kinds: ["ontology"],
+      },
+      quality: { series_count: 1, point_count: 1, warnings: [] },
+    };
+    const visualization: ChatMessageVisualization = {
+      id: "visualization-row-1",
+      session_id: "session-1",
+      message_id: "assistant-message-1",
+      run_id: "run-1",
+      artifact_ref: artifact.artifact_ref,
+      payload_json: artifact,
+      created_at: "2026-05-25T00:00:02.000Z",
+    };
+    const presentation: ChatMessagePresentation = {
+      message_id: "assistant-message-1",
+      session_id: "session-1",
+      run_id: "run-1",
+      blocks: [
+        { id: "markdown_1", type: "markdown", content: "매출은 증가했습니다." },
+        { id: "visualization_viz_1_revenue", type: "visualization", artifact_ref: artifact.artifact_ref },
+      ],
+      created_at: "2026-05-25T00:00:02.000Z",
+      updated_at: "2026-05-25T00:00:02.000Z",
+    };
+    const fake = createRunnerAdmin();
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+    vi.mocked(checkMcpReady).mockResolvedValue(readyMcpHealth());
+    vi.mocked(extractCreatedVisualizationArtifacts).mockReturnValue([artifact]);
+    vi.mocked(persistCreatedVisualizations).mockResolvedValue([visualization]);
+    vi.mocked(persistMessagePresentation).mockResolvedValue(presentation);
+    vi.mocked(runAgent).mockResolvedValue({
+      status: "completed",
+      acc: {
+        fullText: "매출은 증가했습니다.",
+        structuredOutput: null,
+        researchSynthesisOutput: null,
+        researchSynthesisText: null,
+        displayPlanOutput: null,
+        toolCalls: [],
+        citations: [],
+        inputTokens: 10,
+        outputTokens: 20,
+        cacheHitInputTokens: 0,
+        cacheMissInputTokens: 0,
+      },
+    });
+
+    await runAgentJob("run-1", "worker-1");
+
+    expect(persistCreatedVisualizations).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: "session-1",
+        messageId: "assistant-message-1",
+        runId: "run-1",
+      }),
+    );
+    expect(persistMessagePresentation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: "매출은 증가했습니다.",
+        visualizations: [visualization],
+      }),
+    );
+    expect(appendAgentRunEvent).toHaveBeenCalledWith(
+      fake.admin,
+      "run-1",
+      "done",
+      expect.objectContaining({
+        visualizations: [visualization],
+        presentation,
       }),
     );
   });

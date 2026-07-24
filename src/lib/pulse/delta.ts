@@ -12,10 +12,10 @@ export function pulseItemVersion(item: PulseItem): string {
 }
 
 export function buildPulseItemVersions(
-  feed: Pick<PulseFeedResponse, "items" | "active_analysis_items">,
+  feed: Pick<PulseFeedResponse, "candidate_items" | "active_analysis_items">,
 ): PulseItemVersions {
   return Object.fromEntries(
-    [...feed.items, ...feed.active_analysis_items].map((item) => [item.id, pulseItemVersion(item)]),
+    [...feed.candidate_items, ...feed.active_analysis_items].map((item) => [item.id, pulseItemVersion(item)]),
   );
 }
 

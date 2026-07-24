@@ -2,23 +2,34 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { SetStateAction } from "react";
-import ActiveAnalysisPulseCard from "@/components/pulse/ActiveAnalysisPulseCard";
+import type { SetStateAction, TouchEvent } from "react";
 import InsiderTradeStackCard from "@/components/pulse/InsiderTradeStackCard";
 import PulseCard from "@/components/pulse/PulseCard";
-import PulseDayCloseCard from "@/components/pulse/PulseDayCloseCard";
-import type { FilingJudgmentValue } from "@/components/pulse/FilingJudgmentPanel";
-import PulseSummaryBar from "@/components/pulse/PulseSummaryBar";
 import { trackClientEventSilently } from "@/lib/analytics/client";
+import {
+  applyPulseDeviceSignal,
+  createPulseDeviceProfile,
+  selectDevicePulseSlate,
+  type PulseDeviceProfile,
+  type PulseDeviceSignal,
+} from "@/lib/pulse/device-ranking";
+import {
+  buildPulseFeedViewMetrics,
+  pulseViewProperties,
+} from "@/lib/pulse/feed-metrics";
 import { buildPulseFeedDisplayEntries } from "@/lib/pulse/insider-trade-stack";
+import type { FirstValueIntent } from "@/lib/onboarding/first-value";
 import { saveOfflinePulseSnapshot } from "@/lib/pwa/offline-read-model";
 import {
   readDevicePulseSnapshot,
+  readDevicePulseProfile,
   saveDevicePulseSnapshot,
+  saveDevicePulseProfile,
 } from "@/lib/pwa/device-cache";
 import type {
   PulseFeedDeltaResponse,
   PulseFeedResponse,
+  PulseFeedRefreshSummary,
   PulseFeedStatusResponse,
   PulseItem,
   PulseMutationAction,
@@ -28,39 +39,77 @@ interface PulseFeedProps {
   initialFeed: PulseFeedResponse;
   draftOwnerId: string;
   loadInitialFeed?: boolean;
+  firstValueEntry?: boolean;
+  onboardingIntent?: FirstValueIntent | null;
 }
 
 const PAGE_SIZE = 20;
+const PULL_REFRESH_TRIGGER = 64;
+const PULL_DISTANCE_MAX = 96;
+const EMPTY_REFRESH_SUMMARY: PulseFeedRefreshSummary = {
+  added_candidate_count: 0,
+  updated_item_count: 0,
+  removed_item_count: 0,
+};
+
+type PulseRefreshOrigin = "manual" | "pull" | "pending_update" | "recovery" | "reconnect";
+
+interface PulseRefreshResult {
+  changed: boolean;
+  generatedAt: string;
+  mode: "delta" | "full";
+  summary: PulseFeedRefreshSummary;
+}
 
 function isUnavailablePulseFeed(feed: PulseFeedResponse): boolean {
   return (
     feed.revision === "unavailable" &&
-    feed.items.length === 0 &&
+    feed.candidate_items.length === 0 &&
     feed.active_analysis_items.length === 0 &&
     feed.source_statuses.some((source) => source.status === "degraded")
   );
+}
+
+function needsFullPulseRefresh(feed: PulseFeedResponse): boolean {
+  return isUnavailablePulseFeed(feed)
+    || feed.source_statuses.some((source) => source.status === "degraded");
 }
 
 export default function PulseFeed({
   initialFeed,
   draftOwnerId,
   loadInitialFeed = false,
+  firstValueEntry = false,
+  onboardingIntent = null,
 }: PulseFeedProps) {
   const [feed, setFeedState] = useState(initialFeed);
   const feedRef = useRef(initialFeed);
+  const [deviceProfile, setDeviceProfile] = useState<PulseDeviceProfile>(() =>
+    createPulseDeviceProfile(),
+  );
+  const deviceProfileRef = useRef(deviceProfile);
   const [loading, setLoading] = useState(false);
+  const [initialFeedLoading, setInitialFeedLoading] = useState(
+    () => loadInitialFeed && isUnavailablePulseFeed(initialFeed),
+  );
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
-  const [newItemCount, setNewItemCount] = useState(0);
+  const [hasPendingUpdate, setHasPendingUpdate] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<"helpful" | "not_helpful" | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [pullRefreshing, setPullRefreshing] = useState(false);
   const [feedSessionId] = useState(createFeedSessionId);
-  const [activeAnalysisCount, setActiveAnalysisCount] = useState(initialFeed.summary.active_analysis_count);
   const mountedRef = useRef(true);
   const firstPageControllerRef = useRef<AbortController | null>(null);
   const statusControllerRef = useRef<AbortController | null>(null);
   const firstPageRequestIdRef = useRef(0);
   const statusRequestIdRef = useRef(0);
   const pendingMutationIdsRef = useRef<Set<string>>(new Set());
+  const pulseViewTrackedRef = useRef(false);
+  const degradedSourcesTrackedRef = useRef<Set<string>>(new Set());
+  const pullStartYRef = useRef<number | null>(null);
+  const pullDistanceRef = useRef(0);
 
   const setFeed = useCallback((nextState: SetStateAction<PulseFeedResponse>) => {
     const nextFeed =
@@ -71,45 +120,69 @@ export default function PulseFeed({
     setFeedState(nextFeed);
   }, []);
 
+  const setLocalProfile = useCallback((next: PulseDeviceProfile) => {
+    deviceProfileRef.current = next;
+    setDeviceProfile(next);
+  }, []);
+
+  const recordDeviceSignal = useCallback((item: PulseItem, signal: PulseDeviceSignal) => {
+    const next = applyPulseDeviceSignal(deviceProfileRef.current, item, signal);
+    setLocalProfile(next);
+    void saveDevicePulseProfile(draftOwnerId, next).catch(() => undefined);
+  }, [draftOwnerId, setLocalProfile]);
+
   const cancelStatusRequest = useCallback(() => {
     statusRequestIdRef.current += 1;
     statusControllerRef.current?.abort();
     statusControllerRef.current = null;
   }, []);
 
-  const hasActiveAnalysis = activeAnalysisCount > 0;
-  const activeAnalysisItems = feed.active_analysis_items;
-  const visibleActiveAnalysisItems = activeAnalysisItems.slice(0, 2);
-  const feedItems = feed.items;
-  const displayEntries = useMemo(
-    () => buildPulseFeedDisplayEntries(feedItems, feed.timezone),
-    [feedItems, feed.timezone],
+  const slate = useMemo(
+    () => selectDevicePulseSlate(feed, deviceProfile),
+    [deviceProfile, feed],
   );
-  const hiddenActiveAnalysisCount = Math.max(
-    0,
-    activeAnalysisCount - visibleActiveAnalysisItems.length,
+  const hasActiveAnalysis = feed.active_analysis_items.length > 0;
+  const feedItems = slate.items;
+  const displayEntries = useMemo(
+    () => buildPulseFeedDisplayEntries(feedItems, feed.timezone, feed.visible_limit),
+    [feed.visible_limit, feedItems, feed.timezone],
+  );
+  const displayMetrics = useMemo(
+    () => buildPulseFeedViewMetrics(displayEntries, feedItems),
+    [displayEntries, feedItems],
   );
   const degraded = useMemo(
     () => feed.source_statuses.filter((source) => source.status === "degraded"),
     [feed.source_statuses],
   );
   const feedBusy = loading || pendingIds.size > 0;
+  const feedUnavailable = isUnavailablePulseFeed(feed);
+  const showDegradedNotice = !initialFeedLoading && !feedUnavailable && degraded.length > 0;
+  const showInitialLoadFailure = !initialFeedLoading && feedUnavailable && errorMessage !== null;
+  const showSyncIndicator = loading && !initialFeedLoading && !feedUnavailable;
 
   useEffect(() => {
-    trackClientEventSilently("pulse_viewed", {
-      feed_session_id: feedSessionId,
-      item_count: feed.items.length + feed.active_analysis_items.length,
-      actionable_count: feed.summary.actionable_count,
-      active_analysis_count: feed.summary.active_analysis_count,
-      ranking_version: feed.ranking_version,
-      degraded_sources: feed.source_statuses.filter((source) => source.status === "degraded").map((source) => source.source),
-    });
-    for (const source of feed.source_statuses.filter((item) => item.status === "degraded")) {
-      trackClientEventSilently("pulse_source_degraded", { source: source.source });
+    // The server intentionally renders an unavailable shell and the first
+    // usable slate arrives asynchronously. Do not record that empty shell as
+    // a viewed feed; it made production `item_count` appear as zero.
+    if (initialFeedLoading || feedUnavailable || pulseViewTrackedRef.current) return;
+    const degradedSources = feed.source_statuses
+      .filter((source) => source.status === "degraded")
+      .map((source) => source.source);
+    trackClientEventSilently("pulse_viewed", pulseViewProperties(feed, displayMetrics, {
+      feedSessionId,
+      entry: firstValueEntry ? "first_value" : null,
+      onboardingIntent,
+      degradedSources,
+    }));
+    pulseViewTrackedRef.current = true;
+
+    for (const source of degradedSources) {
+      if (degradedSourcesTrackedRef.current.has(source)) continue;
+      degradedSourcesTrackedRef.current.add(source);
+      trackClientEventSilently("pulse_source_degraded", { source });
     }
-    // This event intentionally describes the initial page view only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [displayMetrics, feed, feedSessionId, feedUnavailable, firstValueEntry, initialFeedLoading, onboardingIntent]);
 
   useEffect(() => {
     void saveOfflinePulseSnapshot(feed).catch(() => undefined);
@@ -143,18 +216,25 @@ export default function PulseFeed({
     setLoading(true);
     setErrorMessage(null);
     try {
+      const current = feedRef.current;
       const response = await fetch(
         `/api/pulse?${new URLSearchParams({ filter: "all", limit: String(PAGE_SIZE) })}`,
         {
           cache: "no-store",
           signal: controller.signal,
-          headers: isUnavailablePulseFeed(feedRef.current)
-            || feedRef.current.source_statuses.some((source) => source.status === "degraded")
+          headers: needsFullPulseRefresh(current)
             ? undefined
-            : { "If-None-Match": `"${feedRef.current.revision}"` },
+            : { "If-None-Match": `"${current.revision}"` },
         },
       );
-      if (response.status === 304) return feedRef.current;
+      if (response.status === 304) {
+        return {
+          changed: false,
+          generatedAt: current.generated_at,
+          mode: "full" as const,
+          summary: EMPTY_REFRESH_SUMMARY,
+        };
+      }
       if (!response.ok) throw new Error("feed_failed");
       const next = await response.json() as PulseFeedResponse;
       if (
@@ -165,9 +245,13 @@ export default function PulseFeed({
         return null;
       }
       setFeed(next);
-      setActiveAnalysisCount(next.summary.active_analysis_count);
-      setNewItemCount(0);
-      return next;
+      setHasPendingUpdate(false);
+      return {
+        changed: true,
+        generatedAt: next.generated_at,
+        mode: "full" as const,
+        summary: buildFullPulseRefreshSummary(current, next),
+      };
     } catch (error) {
       if (
         isAbortError(error) ||
@@ -222,9 +306,15 @@ export default function PulseFeed({
         || requestId !== firstPageRequestIdRef.current
       ) return null;
       setFeed((existing) => applyPulseFeedDelta(existing, delta));
-      if (delta.snapshot) setActiveAnalysisCount(delta.snapshot.summary.active_analysis_count);
-      setNewItemCount(0);
-      return delta;
+      setHasPendingUpdate(false);
+      return {
+        changed: delta.changed,
+        generatedAt: delta.generated_at,
+        mode: "delta" as const,
+        // A stale cached client can briefly meet a server from the prior
+        // release during a rolling deploy. The sync itself is still valid.
+        summary: delta.refresh_summary ?? EMPTY_REFRESH_SUMMARY,
+      };
     } catch (error) {
       if (isAbortError(error) || !mountedRef.current || requestId !== firstPageRequestIdRef.current) {
         return null;
@@ -242,6 +332,117 @@ export default function PulseFeed({
       }
     }
   }, [cancelStatusRequest, setFeed]);
+
+  const refreshFeed = useCallback(async (
+    origin: PulseRefreshOrigin,
+    options: { scrollToTop?: boolean } = {},
+  ): Promise<PulseRefreshResult | null> => {
+    if (feedBusy || pullRefreshing || initialFeedLoading) return null;
+
+    const userInitiated = isUserInitiatedPulseRefresh(origin);
+    const startedAt = performance.now();
+    if (origin === "pull") setPullRefreshing(true);
+    if (userInitiated) {
+      trackClientEventSilently("pulse_refresh_requested", {
+        origin,
+        has_pending_update: hasPendingUpdate,
+        online: navigator.onLine,
+      });
+    }
+
+    try {
+      const result = needsFullPulseRefresh(feedRef.current)
+        ? await fetchFirstPage()
+        : await fetchDelta();
+      const durationMs = Math.max(0, Math.round(performance.now() - startedAt));
+      if (!result) {
+        if (userInitiated) {
+          trackClientEventSilently("pulse_refresh_failed", {
+            origin,
+            error_category: navigator.onLine ? "request_failed" : "offline",
+            duration_ms: durationMs,
+          });
+        }
+        return null;
+      }
+
+      if (userInitiated) {
+        trackClientEventSilently("pulse_refresh_completed", {
+          origin,
+          outcome: result.changed ? "changed" : "unchanged",
+          mode: result.mode,
+          added_candidate_count: result.summary.added_candidate_count,
+          updated_item_count: result.summary.updated_item_count,
+          removed_item_count: result.summary.removed_item_count,
+          duration_ms: durationMs,
+        });
+      }
+      if (origin === "manual" || origin === "pull") {
+        setRefreshMessage(
+          result.changed ? "새 업데이트를 반영했습니다." : "이미 최신 피드입니다.",
+        );
+      }
+      if (options.scrollToTop && result.changed) {
+        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
+      }
+      return result;
+    } finally {
+      if (origin === "pull" && mountedRef.current) setPullRefreshing(false);
+    }
+  }, [feedBusy, fetchDelta, fetchFirstPage, hasPendingUpdate, initialFeedLoading, pullRefreshing]);
+
+  const refreshFromPull = useCallback(async () => {
+    await refreshFeed("pull");
+  }, [refreshFeed]);
+
+  const handleTouchStart = useCallback((event: TouchEvent<HTMLElement>) => {
+    if (feedBusy || pullRefreshing || initialFeedLoading || window.scrollY > 0) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest("button,a,input,textarea,select")) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+    pullStartYRef.current = touch.clientY;
+    pullDistanceRef.current = 0;
+  }, [feedBusy, initialFeedLoading, pullRefreshing]);
+
+  const handleTouchMove = useCallback((event: TouchEvent<HTMLElement>) => {
+    const startY = pullStartYRef.current;
+    if (startY === null) return;
+    if (window.scrollY > 0) {
+      pullStartYRef.current = null;
+      pullDistanceRef.current = 0;
+      setPullDistance(0);
+      return;
+    }
+    const touch = event.touches[0];
+    if (!touch) return;
+    const delta = touch.clientY - startY;
+    if (delta <= 0) {
+      pullDistanceRef.current = 0;
+      setPullDistance(0);
+      return;
+    }
+    const distance = Math.min(PULL_DISTANCE_MAX, delta * 0.45);
+    pullDistanceRef.current = distance;
+    setPullDistance(distance);
+  }, []);
+
+  const resetPullGesture = useCallback(() => {
+    pullStartYRef.current = null;
+    pullDistanceRef.current = 0;
+    setPullDistance(0);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    const shouldRefresh = pullDistanceRef.current >= PULL_REFRESH_TRIGGER;
+    resetPullGesture();
+    if (shouldRefresh) void refreshFromPull();
+  }, [refreshFromPull, resetPullGesture]);
+
+  const handleTouchCancel = useCallback(() => {
+    resetPullGesture();
+  }, [resetPullGesture]);
 
   const pollStatus = useCallback(async (applyImmediately = false) => {
     if (
@@ -277,9 +478,9 @@ export default function PulseFeed({
         if (applyImmediately) {
           await fetchDelta();
         } else {
-          // The exact card count is known only after the user asks for its
-          // delta. Keep polling to one cheap revision read.
-          setNewItemCount(1);
+          // Status is intentionally only a cheap revision read. Do not claim
+          // a fabricated card count before the user asks for its delta.
+          setHasPendingUpdate(true);
         }
       }
     } catch (error) {
@@ -297,23 +498,30 @@ export default function PulseFeed({
     if (!loadInitialFeed) return;
     let active = true;
     void (async () => {
-      const snapshot = await readDevicePulseSnapshot(draftOwnerId).catch(() => null);
+      const [snapshot, profile] = await Promise.all([
+        readDevicePulseSnapshot(draftOwnerId).catch(() => null),
+        readDevicePulseProfile(draftOwnerId).catch(() => createPulseDeviceProfile()),
+      ]);
       if (!active) return;
+      setLocalProfile(profile);
       if (snapshot && isUnavailablePulseFeed(feedRef.current)) {
         setFeed(snapshot.feed);
-        setActiveAnalysisCount(snapshot.feed.summary.active_analysis_count);
+        // Cached cards are useful immediately. Keep them visible while the
+        // following revision check fetches only any changed cards.
+        setInitialFeedLoading(false);
       }
       if (!active) return;
-      if (isUnavailablePulseFeed(feedRef.current)) {
+      if (needsFullPulseRefresh(feedRef.current)) {
         await fetchFirstPage();
       } else {
         await pollStatus(true);
       }
+      if (active) setInitialFeedLoading(false);
     })();
     return () => {
       active = false;
     };
-  }, [draftOwnerId, fetchFirstPage, loadInitialFeed, pollStatus, setFeed]);
+  }, [draftOwnerId, fetchFirstPage, loadInitialFeed, pollStatus, setFeed, setLocalProfile]);
 
   useEffect(() => {
     let interval: number | null = null;
@@ -370,14 +578,14 @@ export default function PulseFeed({
   }, [cancelStatusRequest, hasActiveAnalysis, pollStatus]);
 
   async function refreshNewItems() {
+    const refreshed = await refreshFeed("pending_update", { scrollToTop: true });
+    if (!refreshed?.changed) return;
     trackClientEventSilently("pulse_new_items_seen", {
       feed_session_id: feedSessionId,
-      item_count: newItemCount,
+      item_count: refreshed.summary.added_candidate_count,
+      updated_item_count: refreshed.summary.updated_item_count,
+      removed_item_count: refreshed.summary.removed_item_count,
     });
-    const refreshed = await fetchDelta();
-    if (!refreshed) return;
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
   }
 
   async function mutate(item: PulseItem, action: PulseMutationAction) {
@@ -405,6 +613,7 @@ export default function PulseFeed({
       });
       if (!response.ok) throw new Error("pulse_mutation_failed");
       saved = true;
+      recordDeviceSignal(item, action);
     } catch {
       setFeed((current) =>
         rollbackPulseItemMutation(current, snapshot, action, timestamp),
@@ -431,23 +640,6 @@ export default function PulseFeed({
     }
   }
 
-  function handleJudgmentSaved(
-    item: PulseItem,
-    judgment: FilingJudgmentValue,
-  ) {
-    setFeed((current) =>
-      applyPulseJudgment(
-        current,
-        item.id,
-        judgment,
-        judgment.updated_at ?? new Date().toISOString(),
-      ),
-    );
-    // Filing judgments update a separate user read model, which advances the
-    // same private feed revision as item-state mutations.
-    void fetchDelta();
-  }
-
   return (
     <>
       <header className="relative overflow-hidden border-b border-hairline bg-white">
@@ -457,18 +649,49 @@ export default function PulseFeed({
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">Research feed</p>
               <h1 className="mt-xs text-[32px] font-black leading-none tracking-[-0.05em] text-ink sm:text-[40px]">피드</h1>
-              <p className="mt-sm text-[13px] font-semibold text-muted">
-                {feed.date_label} · {feed.summary.actionable_count > 0 ? `미검토 ${feed.summary.actionable_count}개` : "미검토 항목 없음"}
-              </p>
+              {initialFeedLoading ? (
+                <p className="mt-sm flex items-center gap-xs text-[13px] font-semibold text-muted" role="status">
+                  <span className="material-symbols-outlined animate-spin text-[16px]" aria-hidden="true">progress_activity</span>
+                  피드를 불러오는 중
+                </p>
+              ) : (
+                <p className="mt-sm text-[13px] font-semibold text-muted">
+                  {feed.date_label} · {displayMetrics.actionable_count > 0 ? `확인할 카드 ${displayMetrics.actionable_count}개` : "미검토 항목 없음"}
+                  {refreshMessage ? (
+                    <span aria-live="polite" role="status"> · {refreshMessage}</span>
+                  ) : null}
+                </p>
+              )}
             </div>
-            <Link href="/pulse/settings" className="inline-flex size-11 items-center justify-center rounded-[12px] border border-hairline bg-white text-muted shadow-sm hover:text-ink" aria-label="피드 설정">
-              <span className="material-symbols-outlined text-[20px]" aria-hidden="true">tune</span>
-            </Link>
+            <div className="flex items-center gap-xs">
+              <button
+                aria-busy={feedBusy || pullRefreshing}
+                aria-label="피드 새로고침"
+                className="inline-flex min-h-11 items-center justify-center gap-1 rounded-[12px] border border-hairline bg-white px-sm text-[13px] font-extrabold text-muted shadow-sm transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={feedBusy || pullRefreshing || initialFeedLoading}
+                onClick={() => void refreshFeed("manual")}
+                title="피드 새로고침"
+                type="button"
+              >
+                <span className={`material-symbols-outlined text-[20px] ${loading || pullRefreshing ? "animate-spin" : ""}`} aria-hidden="true">refresh</span>
+                <span className="hidden sm:inline">새로고침</span>
+              </button>
+              <Link href="/pulse/settings" className="inline-flex size-11 items-center justify-center rounded-[12px] border border-hairline bg-white text-muted shadow-sm hover:text-ink" aria-label="피드 설정">
+                <span className="material-symbols-outlined text-[20px]" aria-hidden="true">tune</span>
+              </Link>
+            </div>
           </div>
         </div>
       </header>
 
-      <main id="main-content" className="mx-auto w-full max-w-[760px] px-base py-lg sm:px-xl sm:py-xl">
+      <main
+        id="main-content"
+        className="mx-auto w-full max-w-[760px] px-base py-lg sm:px-xl sm:py-xl"
+        onTouchCancel={handleTouchCancel}
+        onTouchEnd={handleTouchEnd}
+        onTouchMove={handleTouchMove}
+        onTouchStart={handleTouchStart}
+      >
         <p aria-live="polite" className="sr-only" role="status">
           {loading
             ? "피드를 불러오는 중입니다."
@@ -476,8 +699,30 @@ export default function PulseFeed({
               ? `${pendingIds.size}개 항목의 변경을 저장하는 중입니다.`
               : ""}
         </p>
+        {firstValueEntry ? (
+          <FirstValuePulseContext intent={onboardingIntent} />
+        ) : null}
+        <div
+          aria-hidden={pullDistance === 0 && !pullRefreshing}
+          aria-live="polite"
+          className="pointer-events-none flex items-center justify-center gap-xs overflow-hidden text-[12px] font-semibold text-muted transition-[height,opacity] duration-150"
+          role="status"
+          style={{
+            height: pullRefreshing ? 40 : pullDistance,
+            opacity: pullRefreshing || pullDistance > 0 ? 1 : 0,
+          }}
+        >
+          <span className={`material-symbols-outlined text-[16px] ${pullRefreshing ? "animate-spin" : ""}`} aria-hidden="true">
+            {pullRefreshing ? "progress_activity" : pullDistance >= PULL_REFRESH_TRIGGER ? "refresh" : "south"}
+          </span>
+          {pullRefreshing
+            ? "최신 내용 확인 중"
+            : pullDistance >= PULL_REFRESH_TRIGGER
+              ? "놓으면 새로고침"
+              : "당겨서 새로고침"}
+        </div>
         <div aria-live="polite" className="sticky top-3 z-20 flex justify-center">
-          {newItemCount > 0 ? (
+          {hasPendingUpdate ? (
             <button
               aria-busy={feedBusy}
               className="min-h-11 rounded-full bg-primary px-base text-[13px] font-extrabold text-white shadow-[0_8px_24px_rgba(0,62,199,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
@@ -485,87 +730,52 @@ export default function PulseFeed({
               onClick={() => void refreshNewItems()}
               type="button"
             >
-              {loading ? "새 항목 불러오는 중…" : pendingIds.size > 0 ? "변경 저장 중…" : `새로 들어온 ${newItemCount}개`}
+              {loading ? "새 업데이트 불러오는 중…" : pendingIds.size > 0 ? "변경 저장 중…" : "새 업데이트 보기"}
             </button>
           ) : null}
         </div>
 
-        {degraded.length > 0 ? (
-          <div className="mb-base flex items-center justify-between gap-base rounded-[12px] border border-[#f3d8a5] bg-[#fff8e9] px-base py-sm text-[12px] leading-5 text-[#76510e]" role="status">
-            <span>일부 리서치 항목을 아직 불러오지 못했습니다. 현재 목록은 보존되며 다시 시도할 수 있습니다.</span>
-            <button aria-busy={feedBusy} className="inline-flex min-h-11 shrink-0 items-center px-xs font-extrabold underline disabled:cursor-not-allowed disabled:opacity-60" disabled={feedBusy} type="button" onClick={() => void fetchFirstPage()}>{loading ? "불러오는 중…" : "다시 시도"}</button>
-          </div>
-        ) : null}
-        {errorMessage ? (
-          <div className="mb-base flex items-center justify-between gap-base rounded-[12px] border border-[#f0b9b0] bg-[#fff1ef] px-base py-sm text-[12px] leading-5 text-[#8c2f20]" role="alert">
-            <span>{errorMessage}</span>
-            <button aria-busy={feedBusy} className="inline-flex min-h-11 shrink-0 items-center px-xs font-extrabold underline disabled:cursor-not-allowed disabled:opacity-60" disabled={feedBusy} type="button" onClick={() => void fetchFirstPage()}>{loading ? "불러오는 중…" : "다시 시도"}</button>
-          </div>
-        ) : null}
-
-        <PulseSummaryBar summary={feed.summary} />
-
-        {hasActiveAnalysis ? (
-          <section className="mb-xl" aria-label="진행 중인 분석">
-            <div className="mb-sm flex items-center justify-between gap-base">
-              <h2 className="text-[14px] font-black text-ink">진행 중인 분석</h2>
-              {visibleActiveAnalysisItems.length > 0 && hiddenActiveAnalysisCount > 0 ? (
-                <p className="text-[12px] font-semibold text-muted">
-                  추가 {hiddenActiveAnalysisCount}개 진행 중
-                </p>
-              ) : null}
-            </div>
-            {visibleActiveAnalysisItems.length > 0 ? (
-              <div className="space-y-base">
-                {visibleActiveAnalysisItems.map((item, index) => (
-                  <ActiveAnalysisPulseCard
-                    key={item.id}
-                    item={item}
-                    position={index + 1}
-                    feedSessionId={feedSessionId}
-                    rankingVersion={feed.ranking_version}
-                  />
-                ))}
+        {initialFeedLoading ? (
+          <PulseFeedLoadingSkeleton />
+        ) : (
+          <>
+            {showDegradedNotice || showInitialLoadFailure ? (
+              <div className="mb-base flex items-center justify-between gap-base rounded-[12px] border border-[#f3d8a5] bg-[#fff8e9] px-base py-sm text-[12px] leading-5 text-[#76510e]" role="alert">
+                <span>{showInitialLoadFailure ? errorMessage : "일부 리서치 항목을 아직 불러오지 못했습니다. 현재 목록은 보존되며 다시 시도할 수 있습니다."}</span>
+                <button aria-busy={feedBusy} className="inline-flex min-h-11 shrink-0 items-center px-xs font-extrabold underline disabled:cursor-not-allowed disabled:opacity-60" disabled={feedBusy} type="button" onClick={() => void refreshFeed("recovery")}>{loading ? "불러오는 중…" : "다시 시도"}</button>
               </div>
-            ) : (
-              <button
-                aria-busy={feedBusy}
-                type="button"
-                disabled={feedBusy}
-                onClick={() => void fetchFirstPage()}
-                className="flex min-h-11 w-full items-center justify-between gap-base rounded-[14px] border border-[#d9d7ff] bg-[#fbfbff] px-base py-base text-left text-[13px] font-extrabold text-[#4338ca] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <span>{loading ? "진행 중인 분석 불러오는 중…" : pendingIds.size > 0 ? "변경 저장 중…" : `진행 중인 분석 ${activeAnalysisCount}개를 불러오기`}</span>
-                <span className="material-symbols-outlined text-[18px]" aria-hidden="true">refresh</span>
-              </button>
-            )}
-          </section>
-        ) : null}
+            ) : null}
+            {errorMessage && !showInitialLoadFailure ? (
+              <div className="mb-base flex items-center justify-between gap-base rounded-[12px] border border-[#f0b9b0] bg-[#fff1ef] px-base py-sm text-[12px] leading-5 text-[#8c2f20]" role="alert">
+                <span>{errorMessage}</span>
+                <button aria-busy={feedBusy} className="inline-flex min-h-11 shrink-0 items-center px-xs font-extrabold underline disabled:cursor-not-allowed disabled:opacity-60" disabled={feedBusy} type="button" onClick={() => void refreshFeed("recovery")}>{loading ? "불러오는 중…" : "다시 시도"}</button>
+              </div>
+            ) : null}
 
-        {displayEntries.length > 0 ? (
+            {showSyncIndicator && !pullRefreshing ? (
+              <div className="mb-base flex items-center justify-center gap-xs text-[12px] font-semibold text-muted" role="status">
+                <span className="material-symbols-outlined animate-spin text-[15px]" aria-hidden="true">progress_activity</span>
+                최신 내용 확인 중
+              </div>
+            ) : null}
+
+            {displayEntries.length > 0 ? (
           <div className="relative space-y-base before:absolute before:bottom-8 before:left-[-13px] before:top-8 before:hidden before:w-px before:bg-hairline sm:before:block">
-            {displayEntries.map((entry, index) => {
-              const showReviewedDivider = entry.state === "reviewed" && (index === 0 || displayEntries[index - 1]?.state !== "reviewed");
+            {displayEntries.map((entry) => {
               return (
                 <div
                   key={entry.id}
                   data-workspace-scroll-anchor={entry.id}
                 >
-                  {showReviewedDivider ? (
-                    <div className="mb-base flex items-center gap-sm" role="separator" aria-label="이전에 검토한 항목">
-                      <span className="h-px flex-1 bg-hairline" />
-                      <span className="text-[11px] font-extrabold text-muted">이전에 검토한 항목</span>
-                      <span className="h-px flex-1 bg-hairline" />
-                    </div>
-                  ) : null}
                   {entry.type === "insider_trade_stack" ? (
                     <InsiderTradeStackCard
                       items={entry.items}
+                      feedSlot={entry.feed_slot}
+                      timezone={feed.timezone}
                       pending={entry.items.some(({ item }) => pendingIds.has(item.id))}
                       feedSessionId={feedSessionId}
                       rankingVersion={feed.ranking_version}
-                      draftOwnerId={draftOwnerId}
-                      onJudgmentSaved={handleJudgmentSaved}
+                      onDeviceSignal={recordDeviceSignal}
                     />
                   ) : (
                     <PulseCard
@@ -574,55 +784,133 @@ export default function PulseFeed({
                       pending={pendingIds.has(entry.item.id)}
                       feedSessionId={feedSessionId}
                       rankingVersion={feed.ranking_version}
-                      draftOwnerId={draftOwnerId}
                       onMutation={mutate}
-                      onJudgmentSaved={handleJudgmentSaved}
+                      onDeviceSignal={recordDeviceSignal}
                     />
                   )}
                 </div>
               );
             })}
           </div>
-        ) : visibleActiveAnalysisItems.length === 0 ? (
-          <div className="rounded-[18px] border border-dashed border-hairline bg-white px-xl py-3xl text-center">
-            <span className="material-symbols-outlined text-[34px] text-muted" aria-hidden="true">done_all</span>
-            <h2 className="mt-sm text-lg font-black text-ink">{degraded.length > 0 ? "신호를 준비하는 중입니다" : "지금 확인할 신호가 없습니다"}</h2>
-            <p className="mt-xs text-sm leading-6 text-muted">{degraded.length > 0 ? "잠시 후 다시 시도하면 최신 공시와 분석 상태를 불러옵니다." : "임의의 추천을 더 붙이지 않습니다. 아래 오늘 정리에서 세션을 마무리할 수 있습니다."}</p>
-          </div>
-        ) : null}
-
-        <div className="py-2xl text-center" aria-live="polite">
-          <PulseDayCloseCard
-            feed={feed}
-            feedSessionId={feedSessionId}
-            busy={feedBusy}
-          />
-          <div className="mx-auto mt-xl flex max-w-[360px] items-center justify-center gap-sm border-t border-hairline pt-base">
-            {feedback ? (
-              <p className="text-[12px] font-semibold text-muted">의견을 반영해 피드를 다듬겠습니다.</p>
             ) : (
-              <>
-                <p className="mr-xs text-[12px] font-semibold text-muted">오늘 피드가 도움됐나요?</p>
-                {(["helpful", "not_helpful"] as const).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => {
-                      setFeedback(value);
-                      trackClientEventSilently("pulse_feedback_submitted", { feedback: value, surface: "pulse" });
-                    }}
-                    className="grid size-11 place-items-center rounded-full border border-hairline bg-white text-muted hover:text-ink"
-                    aria-label={value === "helpful" ? "도움됐어요" : "도움되지 않았어요"}
-                  >
-                    <span className="material-symbols-outlined text-[18px]" aria-hidden="true">{value === "helpful" ? "thumb_up" : "thumb_down"}</span>
-                  </button>
-                ))}
-              </>
+              <div className="rounded-[18px] border border-dashed border-hairline bg-white px-xl py-3xl text-center">
+                <span className="material-symbols-outlined text-[34px] text-muted" aria-hidden="true">done_all</span>
+                <h2 className="mt-sm text-lg font-black text-ink">지금 확인할 신호가 없습니다</h2>
+                <p className="mt-xs text-sm leading-6 text-muted">임의의 추천을 더 붙이지 않습니다.</p>
+              </div>
             )}
-          </div>
-        </div>
+
+            <div className="py-2xl text-center" aria-live="polite">
+              <div className="mx-auto flex max-w-[360px] items-center justify-center gap-sm border-t border-hairline pt-base">
+                {feedback ? (
+                  <p className="text-[12px] font-semibold text-muted">의견을 반영해 피드를 다듬겠습니다.</p>
+                ) : (
+                  <>
+                    <p className="mr-xs text-[12px] font-semibold text-muted">오늘 피드가 도움됐나요?</p>
+                    {(["helpful", "not_helpful"] as const).map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => {
+                          setFeedback(value);
+                          trackClientEventSilently("pulse_feedback_submitted", { feedback: value, surface: "pulse" });
+                        }}
+                        className="grid size-11 place-items-center rounded-full border border-hairline bg-white text-muted hover:text-ink"
+                        aria-label={value === "helpful" ? "도움됐어요" : "도움되지 않았어요"}
+                      >
+                        <span className="material-symbols-outlined text-[18px]" aria-hidden="true">{value === "helpful" ? "thumb_up" : "thumb_down"}</span>
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </main>
     </>
+  );
+}
+
+function FirstValuePulseContext({
+  intent,
+}: {
+  intent: FirstValueIntent | null;
+}) {
+  const copy = intent === "earnings"
+    ? {
+      title: "실적 변화를 먼저 확인해보세요",
+      body: "오늘 카드에서 매출·마진·현금흐름 변화가 있는 공시를 고르고, 원문으로 돌아가 확인하세요.",
+    }
+    : intent === "risk"
+      ? {
+        title: "새 리스크 신호를 먼저 확인해보세요",
+        body: "오늘 카드에서 확인할 위험이 있는 공시를 고르고, 원문 문맥을 직접 살펴보세요.",
+      }
+      : intent === "growth"
+        ? {
+          title: "성장 신호를 먼저 확인해보세요",
+          body: "사업 변화와 확장을 보여주는 공시를 고른 뒤, 원문 근거를 직접 확인하세요.",
+        }
+        : intent === "valuation"
+          ? {
+            title: "가치 판단에 필요한 변화를 확인해보세요",
+            body: "숫자만 보기 전에 사업과 리스크가 바뀐 공시를 고르고, 원문으로 돌아가 확인하세요.",
+          }
+          : {
+            title: "오늘의 공시 변화부터 살펴보세요",
+            body: "관심 가는 카드 하나를 열고, 그 변화가 나온 SEC 원문까지 확인해보세요.",
+          };
+
+  return (
+    <section
+      className="mb-base rounded-[12px] border border-primary/25 bg-primary-fixed/45 px-base py-sm"
+      aria-label="첫 리서치 안내"
+    >
+      <p className="font-mono text-[10px] font-black uppercase tracking-[0.14em] text-primary">
+        첫 리서치
+      </p>
+      <h2 className="mt-1 text-[15px] font-black leading-5 text-ink">
+        {copy.title}
+      </h2>
+      <p className="mt-1 text-[12px] font-semibold leading-5 text-muted">
+        {copy.body}
+      </p>
+    </section>
+  );
+}
+
+function PulseFeedLoadingSkeleton() {
+  return (
+    <section aria-busy="true" aria-label="피드를 불러오는 중" className="space-y-base">
+      <div className="flex items-center justify-center gap-xs py-sm text-[13px] font-semibold text-muted" role="status">
+        <span className="material-symbols-outlined animate-spin text-[17px]" aria-hidden="true">progress_activity</span>
+        피드를 불러오는 중
+      </div>
+      <div className="rounded-[16px] border border-hairline bg-white px-base py-base shadow-[0_8px_24px_rgba(16,24,40,0.04)] sm:px-lg" aria-hidden="true">
+        <div className="h-3 w-28 animate-pulse rounded-full bg-surface-strong motion-reduce:animate-none" />
+        <div className="mt-3 h-5 w-48 max-w-[70%] animate-pulse rounded-[7px] bg-surface-strong motion-reduce:animate-none" />
+        <div className="mt-2 h-3 w-full max-w-[540px] animate-pulse rounded-full bg-surface-strong motion-reduce:animate-none" />
+      </div>
+      {[0, 1, 2].map((index) => (
+        <div key={index} className="rounded-[18px] border border-hairline bg-white p-lg pl-[22px] shadow-[0_12px_36px_rgba(16,24,40,0.055)] sm:p-xl sm:pl-[26px]" aria-hidden="true">
+          <div className="flex items-start justify-between gap-base">
+            <div className="flex items-center gap-sm">
+              <div className="size-9 animate-pulse rounded-[11px] bg-surface-strong motion-reduce:animate-none" />
+              <div className="space-y-2">
+                <div className="h-3 w-24 animate-pulse rounded-full bg-surface-strong motion-reduce:animate-none" />
+                <div className="h-3 w-16 animate-pulse rounded-full bg-surface-strong motion-reduce:animate-none" />
+              </div>
+            </div>
+            <div className="h-3 w-10 animate-pulse rounded-full bg-surface-strong motion-reduce:animate-none" />
+          </div>
+          <div className="mt-base h-6 w-[84%] animate-pulse rounded-[8px] bg-surface-strong motion-reduce:animate-none" />
+          <div className="mt-sm h-4 w-full animate-pulse rounded-full bg-surface-strong motion-reduce:animate-none" />
+          <div className="mt-2 h-4 w-[68%] animate-pulse rounded-full bg-surface-strong motion-reduce:animate-none" />
+          <div className="mt-lg h-11 w-32 animate-pulse rounded-[10px] bg-surface-strong motion-reduce:animate-none" />
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -649,12 +937,12 @@ export function capturePulseItemSnapshot(
   feed: PulseFeedResponse,
   itemId: string,
 ): PulseItemMutationSnapshot | null {
-  const itemIndex = feed.items.findIndex((item) => item.id === itemId);
+  const itemIndex = feed.candidate_items.findIndex((item) => item.id === itemId);
   const activeAnalysisIndex = feed.active_analysis_items.findIndex(
     (item) => item.id === itemId,
   );
   const item = itemIndex >= 0
-    ? feed.items[itemIndex]
+    ? feed.candidate_items[itemIndex]
     : feed.active_analysis_items[activeAnalysisIndex];
   if (!item) return null;
   return {
@@ -668,19 +956,19 @@ export function capturePulseItemSnapshot(
   };
 }
 
-/** Applies a sparse V3 delta while preserving cards whose fingerprints match. */
+/** Applies a sparse candidate delta while preserving unchanged cards. */
 export function applyPulseFeedDelta(
   feed: PulseFeedResponse,
   delta: PulseFeedDeltaResponse,
 ): PulseFeedResponse {
   if (!delta.changed || !delta.snapshot) return feed;
   const byId = new Map<string, PulseItem>([
-    ...feed.items,
+    ...feed.candidate_items,
     ...feed.active_analysis_items,
   ].map((item) => [item.id, item]));
   for (const item of delta.upserts) byId.set(item.id, item);
 
-  const orderedItems = delta.ordered_item_ids
+  const orderedCandidateItems = delta.ordered_candidate_ids
     .map((id) => byId.get(id))
     .filter((item): item is PulseItem => Boolean(item));
   const activeItems = delta.active_analysis_item_ids
@@ -693,9 +981,30 @@ export function applyPulseFeedDelta(
     revision: delta.revision,
     generated_at: delta.generated_at,
     snapshot_at: delta.generated_at,
-    items: orderedItems,
+    candidate_items: orderedCandidateItems,
     active_analysis_items: activeItems,
     item_versions: delta.item_versions,
+  };
+}
+
+/** Builds the same aggregate-only result for a full recovery fetch. */
+export function buildFullPulseRefreshSummary(
+  previous: PulseFeedResponse,
+  next: PulseFeedResponse,
+): PulseFeedRefreshSummary {
+  const previousIds = new Set([
+    ...previous.candidate_items,
+    ...previous.active_analysis_items,
+  ].map((item) => item.id));
+  const nextItems = [...next.candidate_items, ...next.active_analysis_items];
+  const nextIds = new Set(nextItems.map((item) => item.id));
+
+  return {
+    added_candidate_count: next.candidate_items.filter((item) => !previousIds.has(item.id)).length,
+    updated_item_count: nextItems.filter((item) =>
+      previous.item_versions[item.id] !== undefined
+      && previous.item_versions[item.id] !== next.item_versions[item.id]).length,
+    removed_item_count: Object.keys(previous.item_versions).filter((id) => !nextIds.has(id)).length,
   };
 }
 
@@ -706,25 +1015,23 @@ export function applyPulseItemMutation(
   timestamp: string,
 ): PulseFeedResponse {
   const exists =
-    feed.items.some((candidate) => candidate.id === item.id) ||
+    feed.candidate_items.some((candidate) => candidate.id === item.id) ||
     feed.active_analysis_items.some((candidate) => candidate.id === item.id);
   if (!exists) return feed;
 
-  const summaryDelta = pulseMutationSummaryDelta(item, action);
   if (action === "dismiss" || action === "snooze") {
     return {
       ...feed,
-      items: feed.items.filter((candidate) => candidate.id !== item.id),
+      candidate_items: feed.candidate_items.filter((candidate) => candidate.id !== item.id),
       active_analysis_items: feed.active_analysis_items.filter(
         (candidate) => candidate.id !== item.id,
       ),
-      summary: adjustPulseSummary(feed.summary, item, summaryDelta),
     };
   }
 
   return {
     ...feed,
-    items: feed.items.map((candidate) =>
+    candidate_items: feed.candidate_items.map((candidate) =>
       candidate.id === item.id
         ? applyPulseItemState(candidate, action, timestamp)
         : candidate,
@@ -734,40 +1041,6 @@ export function applyPulseItemMutation(
         ? applyPulseItemState(candidate, action, timestamp)
         : candidate,
     ),
-    summary: adjustPulseSummary(feed.summary, item, summaryDelta),
-  };
-}
-
-export function applyPulseJudgment(
-  feed: PulseFeedResponse,
-  itemId: string,
-  judgment: FilingJudgmentValue,
-  timestamp: string,
-): PulseFeedResponse {
-  const completedItem =
-    feed.items.find((item) => item.id === itemId) ??
-    feed.active_analysis_items.find((item) => item.id === itemId);
-  if (!completedItem) return feed;
-
-  const complete = (item: PulseItem): PulseItem => {
-    if (item.id !== itemId) return item;
-    return {
-      ...item,
-      judgment,
-      reviewed_at: timestamp,
-      state: "reviewed",
-      actionable: false,
-    };
-  };
-  const items = feed.items.map(complete);
-  const activeAnalysisItems = feed.active_analysis_items.map(complete);
-
-  const delta = completedItem.actionable ? -1 : 0;
-  return {
-    ...feed,
-    items,
-    active_analysis_items: activeAnalysisItems,
-    summary: adjustPulseSummary(feed.summary, completedItem, delta),
   };
 }
 
@@ -777,20 +1050,16 @@ export function rollbackPulseItemMutation(
   action: PulseMutationAction,
   timestamp: string,
 ): PulseFeedResponse {
-  const summaryDelta = pulseMutationSummaryDelta(snapshot.item, action);
   if (action === "dismiss" || action === "snooze") {
-    const itemAlreadyPresent =
-      feed.items.some((item) => item.id === snapshot.item.id) ||
-      feed.active_analysis_items.some((item) => item.id === snapshot.item.id);
     let restored = false;
-    let items = feed.items;
+    let candidateItems = feed.candidate_items;
     let activeAnalysisItems = feed.active_analysis_items;
 
     if (
       snapshot.itemIndex >= 0 &&
-      !items.some((item) => item.id === snapshot.item.id)
+      !candidateItems.some((item) => item.id === snapshot.item.id)
     ) {
-      items = insertAt(items, snapshot.itemIndex, snapshot.item);
+      candidateItems = insertAt(candidateItems, snapshot.itemIndex, snapshot.item);
       restored = true;
     }
     if (
@@ -809,11 +1078,8 @@ export function rollbackPulseItemMutation(
     if (!restored) return feed;
     return {
       ...feed,
-      items,
+      candidate_items: candidateItems,
       active_analysis_items: activeAnalysisItems,
-      summary: itemAlreadyPresent
-        ? feed.summary
-        : adjustPulseSummary(feed.summary, snapshot.item, -summaryDelta),
     };
   }
 
@@ -829,14 +1095,13 @@ export function rollbackPulseItemMutation(
     if (result !== candidate) restored = true;
     return result;
   };
-  const items = feed.items.map(restoreItem);
+  const candidateItems = feed.candidate_items.map(restoreItem);
   const activeAnalysisItems = feed.active_analysis_items.map(restoreItem);
   if (!restored) return feed;
   return {
     ...feed,
-    items,
+    candidate_items: candidateItems,
     active_analysis_items: activeAnalysisItems,
-    summary: adjustPulseSummary(feed.summary, snapshot.item, -summaryDelta),
   };
 }
 
@@ -911,39 +1176,14 @@ function rollbackPulseItemState(
   return current;
 }
 
-function pulseMutationSummaryDelta(
-  item: PulseItem,
-  action: PulseMutationAction,
-): number {
-  if (action === "review" || action === "dismiss" || action === "snooze") {
-    return item.actionable ? -1 : 0;
-  }
-  if (action === "unreview") return isItemActionable(item) ? 1 : 0;
-  return 0;
-}
-
-function adjustPulseSummary(
-  summary: PulseFeedResponse["summary"],
-  item: PulseItem,
-  delta: number,
-): PulseFeedResponse["summary"] {
-  if (delta === 0) return summary;
-  const counts = { ...summary.counts };
-  if (item.kind === "filing") counts.filing = Math.max(0, counts.filing + delta);
-  if (item.kind === "analysis" && item.phase !== "active") counts.analysis = Math.max(0, counts.analysis + delta);
-  if (item.kind === "question") counts.question = Math.max(0, counts.question + delta);
-  if (item.kind === "resurface") counts.resurface = Math.max(0, counts.resurface + delta);
-  return {
-    ...summary,
-    counts,
-    actionable_count: Math.max(0, summary.actionable_count + delta),
-  };
-}
-
 function insertAt(items: PulseItem[], index: number, item: PulseItem) {
   const next = [...items];
   next.splice(Math.min(Math.max(index, 0), next.length), 0, item);
   return next;
+}
+
+function isUserInitiatedPulseRefresh(origin: PulseRefreshOrigin): boolean {
+  return origin === "manual" || origin === "pull" || origin === "pending_update";
 }
 
 function isAbortError(error: unknown): boolean {

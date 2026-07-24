@@ -339,6 +339,14 @@ const checks = [
     select: "id,session_id,message_id,run_id,type,payload_json",
   },
   {
+    table: "chat_message_visualizations",
+    select: "id,session_id,message_id,run_id,artifact_ref,payload_json,created_at",
+  },
+  {
+    table: "chat_message_presentations",
+    select: "message_id,session_id,run_id,blocks_json,created_at,updated_at",
+  },
+  {
     table: "chat_message_artifact_selections",
     select:
       "id,artifact_id,session_id,event_id,user_id,user_message_id,research_run_id,status,updated_at",
@@ -514,8 +522,9 @@ const checks = [
   },
   {
     table: "user_pulse_item_states",
-    select:
-      "user_id,item_key,source_type,kind,reviewed_at,last_impression_session_id,impression_count",
+    // Pulse V4 keeps exposure and ranking state in browser-local IndexedDB.
+    // Postgres retains only explicit user decisions for an item.
+    select: "user_id,item_key,source_type,source_id,kind,reviewed_at",
   },
   {
     table: "filing_notification_deliveries",
@@ -1043,26 +1052,6 @@ if (activationRpcError || activationResult !== false) {
 }
 console.log("OK schema: try_record_coverage_activation RPC");
 
-const { error: closeDecisionSessionRpcError } = await supabase.rpc(
-  "close_user_decision_session",
-  {
-    p_user_id: "00000000-0000-0000-0000-000000000000",
-    p_feed_session_id: "00000000-0000-4000-8000-000000000000",
-    p_timezone: "UTC",
-  },
-);
-if (
-  closeDecisionSessionRpcError &&
-  closeDecisionSessionRpcError.code !== "22023" &&
-  closeDecisionSessionRpcError.code !== "23503"
-) {
-  console.error(
-    `Schema smoke failed for close_user_decision_session RPC: ${closeDecisionSessionRpcError.message}`,
-  );
-  process.exit(1);
-}
-console.log("OK schema: close_user_decision_session RPC");
-
 const { data: pulseRevisionData, error: pulseRevisionRpcError } = await supabase.rpc(
   "get_pulse_feed_revisions_v1",
   {
@@ -1147,26 +1136,6 @@ if (reserveAnalysisRpcError && reserveAnalysisRpcError.code !== "23503") {
 }
 console.log("OK schema: reserve_analysis_credits RPC");
 
-const { error: pulseImpressionRpcError } = await supabase.rpc(
-  "record_pulse_item_impression",
-  {
-    p_user_id: zeroUuid,
-    p_item_key: "filing:schema-smoke",
-    p_source_type: "filing",
-    p_source_id: "schema-smoke",
-    p_kind: "filing",
-    p_feed_session_id: "00000000-0000-4000-8000-000000000000",
-    p_seen_at: new Date().toISOString(),
-  },
-);
-if (pulseImpressionRpcError && pulseImpressionRpcError.code !== "23503") {
-  console.error(
-    `Schema smoke failed for record_pulse_item_impression RPC: ${pulseImpressionRpcError.message}`,
-  );
-  process.exit(1);
-}
-console.log("OK schema: record_pulse_item_impression RPC");
-
 async function expectAnonRpcBlocked(name, args) {
   try {
     await assertRpcBlocked(anonSupabase, "anon", name, args);
@@ -1229,15 +1198,6 @@ await expectAnonRpcBlocked("claim_agent_run", {
   p_lease_seconds: 300,
   p_global_limit: 1,
 });
-await expectAnonRpcBlocked("record_pulse_item_impression", {
-  p_user_id: zeroUuid,
-  p_item_key: "filing:schema-smoke",
-  p_source_type: "filing",
-  p_source_id: "schema-smoke",
-  p_kind: "filing",
-  p_feed_session_id: "00000000-0000-4000-8000-000000000000",
-  p_seen_at: new Date().toISOString(),
-});
 await expectAnonRpcBlocked("claim_agent_run", {
   p_worker_id: "schema-smoke",
   p_worker_env: "invalid",
@@ -1281,11 +1241,6 @@ await expectAnonRpcBlocked("get_pulse_global_filing_candidates_v1", {
 });
 await expectAnonRpcBlocked("try_record_coverage_activation", {
   p_user_id: zeroUuid,
-});
-await expectAnonRpcBlocked("close_user_decision_session", {
-  p_user_id: zeroUuid,
-  p_feed_session_id: "00000000-0000-4000-8000-000000000000",
-  p_timezone: "UTC",
 });
 await expectAnonRpcBlocked("get_pulse_feed_revisions_v1", {
   p_env: "prod",

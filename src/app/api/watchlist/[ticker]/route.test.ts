@@ -85,7 +85,7 @@ describe("watchlist company mutation", () => {
     vi.mocked(getCompanyCoverage).mockResolvedValue({
       user_id: "user-1",
       ticker: "AAPL",
-      coverage_level: "holding",
+      coverage_level: "interest",
       priority: 0,
       interest_reason: null,
       tags: [],
@@ -106,7 +106,7 @@ describe("watchlist company mutation", () => {
         updated_at: "2026-07-20T00:00:00.000Z",
       },
       eventId: "20000000-0000-4000-8000-000000000001",
-      previousLevel: "holding",
+      previousLevel: "interest",
       changed: true,
       idempotentReplay: false,
     });

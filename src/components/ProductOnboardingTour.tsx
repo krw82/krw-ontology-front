@@ -26,6 +26,7 @@ const cardTransition = {
 } as const;
 
 type TourStepId =
+  | "research-pulse-nav"
   | "research-notebook-nav"
   | "stock-discovery-nav"
   | "guru-advisor-nav"
@@ -66,45 +67,17 @@ interface ProductOnboardingTourProps {
 
 const companyTourSteps: TourStep[] = [
   {
-    id: "research-notebook-nav",
+    id: "research-pulse-nav",
     selector:
-      '[data-onboarding-target="research-notebook-nav"], [data-onboarding-target="workspace-menu-trigger"]',
-    icon: "article",
+      '[data-onboarding-target="research-pulse-nav"], [data-onboarding-target="workspace-menu-trigger"]',
+    icon: "dynamic_feed",
     title: {
-      ko: "리서치 노트북은 이어보기 공간입니다",
-      en: "Research notebook is where you continue",
+      ko: "피드에서 오늘의 변화를 보세요",
+      en: "Start with today's changes in the feed",
     },
     body: {
-      ko: "관심·보유 종목과 이전 질문을 모아두고, 나중에 같은 맥락에서 다시 이어볼 때 사용합니다.",
-      en: "Use the notebook to keep watched companies, holdings, and past questions so you can continue from the same context later.",
-    },
-  },
-  {
-    id: "stock-discovery-nav",
-    selector:
-      '[data-onboarding-target="stock-discovery-nav"], [data-onboarding-target="workspace-menu-trigger"]',
-    icon: "travel_explore",
-    title: {
-      ko: "조건으로 기업을 검색하세요",
-      en: "Search companies by criteria",
-    },
-    body: {
-      ko: "아이디어, 산업, 리스크, 재무 조건을 넣으면 여러 회사를 비교해 리서치 범위를 좁힙니다. 조건이 구체적일수록 더 빠르고 정확합니다.",
-      en: "Add an idea, industry, risk, or financial condition to compare companies and narrow the research scope. More specific conditions make it faster.",
-    },
-  },
-  {
-    id: "guru-advisor-nav",
-    selector:
-      '[data-onboarding-target="guru-advisor-nav"], [data-onboarding-target="guru-advisor-cta"], [data-onboarding-target="workspace-menu-trigger"]',
-    icon: "psychology",
-    title: {
-      ko: "공개 원칙으로 아이디어 점검",
-      en: "Check ideas with public principles",
-    },
-    body: {
-      ko: "버핏, 하워드 막스처럼 공개된 질문 원칙으로 회사나 아이디어의 좋은 점과 의심할 점을 다시 정리합니다.",
-      en: "Reframe a company or idea through public question principles such as Buffett or Howard Marks, then separate strengths from doubts.",
+      ko: "관심 기업과 최근 질문을 바탕으로, 먼저 확인할 공시 변화와 리서치 흐름을 보여줍니다.",
+      en: "The feed surfaces filing changes and research threads to check first, based on watched companies and recent questions.",
     },
   },
   {
@@ -113,8 +86,8 @@ const companyTourSteps: TourStep[] = [
       '[data-onboarding-target="company-search-nav"], [data-onboarding-target="company-search"], [data-onboarding-target="workspace-menu-trigger"]',
     icon: "search",
     title: {
-      ko: "회사를 알면 회사 찾기",
-      en: "Use company search when you know the company",
+      ko: "궁금한 회사에서 시작하세요",
+      en: "Start with the company you want to know",
     },
     body: {
       ko: "티커나 회사명을 입력하면 그 회사의 공시·실적·리스크 리서치로 바로 이어집니다.",
@@ -122,17 +95,31 @@ const companyTourSteps: TourStep[] = [
     },
   },
   {
-    id: "wide-research-nav",
+    id: "guru-advisor-nav",
     selector:
-      '[data-onboarding-target="wide-research-nav"], [data-onboarding-target="workspace-menu-trigger"]',
-    icon: "hub",
+      '[data-onboarding-target="guru-advisor-nav"], [data-onboarding-target="guru-advisor-cta"], [data-onboarding-target="workspace-menu-trigger"]',
+    icon: "psychology",
     title: {
-      ko: "이슈를 넓게 보려면 와이드 리서치",
-      en: "Use wide research for broad issues",
+      ko: "관점별 분석으로 가설을 점검하세요",
+      en: "Pressure-test a thesis from different perspectives",
     },
     body: {
-      ko: "티커 없이 산업이나 이슈를 넣어 여러 회사를 함께 탐색합니다. 범위가 넓어 일반 회사 질문보다 시간이 더 걸릴 수 있습니다.",
-      en: "Explore an industry or issue across multiple companies without starting from a ticker. Broad searches can take longer than single-company research.",
+      ko: "공개된 투자 원칙을 기준으로 회사나 아이디어의 좋은 점과 의심할 점을 다시 정리합니다.",
+      en: "Use public investment principles to reframe the strengths and doubts in a company or idea.",
+    },
+  },
+  {
+    id: "stock-discovery-nav",
+    selector:
+      '[data-onboarding-target="stock-discovery-nav"], [data-onboarding-target="workspace-menu-trigger"]',
+    icon: "travel_explore",
+    title: {
+      ko: "조건으로 기업을 좁혀보세요",
+      en: "Narrow companies by criteria",
+    },
+    body: {
+      ko: "아이디어, 산업, 리스크, 재무 조건을 넣으면 여러 회사를 비교해 리서치 범위를 좁힙니다.",
+      en: "Add an idea, industry, risk, or financial condition to compare companies and narrow the research scope.",
     },
   },
   {
@@ -141,8 +128,8 @@ const companyTourSteps: TourStep[] = [
       '[data-onboarding-target="institutional-holdings-nav"], [data-onboarding-target="workspace-menu-trigger"]',
     icon: "monitoring",
     title: {
-      ko: "기관 보유 변화는 13F",
-      en: "Use 13F for institutional holdings",
+      ko: "13F 보유로 다음 확인 대상을 찾으세요",
+      en: "Use 13F holdings to find what to check next",
     },
     body: {
       ko: "기관의 보유 변화를 보고, 다음에 더 확인할 회사와 질문을 정할 때 사용합니다.",
@@ -164,20 +151,6 @@ const chatTourSteps: TourStep[] = [
     body: {
       ko: "회사 페이지에서 들어오면 그 회사 기준으로 봅니다. 뉴스나 가격 질문도 결국 매출, 마진, 현금흐름, 리스크로 이어서 확인할 수 있습니다.",
       en: "From a company page, chat starts with that company. News or price questions can then continue into revenue, margin, cash-flow, and risk checks.",
-    },
-  },
-  {
-    id: "chat-wide-research",
-    selector:
-      '[data-onboarding-target="chat-empty-heading"], [data-onboarding-target="chat-suggested-prompts"], [data-onboarding-target="chat-composer"]',
-    icon: "hub",
-    title: {
-      ko: "와이드 리서치는 여러 회사를 동시에 봅니다",
-      en: "Wide research checks multiple companies at once",
-    },
-    body: {
-      ko: "일반 회사 채팅보다 더 걸릴 수 있지만, 아이디어·산업·리스크 조건으로 후보와 비교축을 함께 잡을 수 있습니다.",
-      en: "It can take longer than single-company chat, but it finds candidates and comparison angles from an idea, industry, or risk condition.",
     },
   },
   {
@@ -218,7 +191,7 @@ const chatTourSteps: TourStep[] = [
       en: "Save important research to the notebook",
     },
     body: {
-      ko: "관심·보유로 저장하면 리서치 노트북에서 종목별 질문과 메모를 이어서 관리할 수 있습니다.",
+      ko: "관심 기업으로 저장하면 리서치 노트북에서 종목별 질문과 메모를 이어서 관리할 수 있습니다.",
       en: "Mark companies as watched or held, then continue notes and questions in the research notebook.",
     },
   },
@@ -387,29 +360,16 @@ export default function ProductOnboardingTour({
     if (!ready || !isAuthenticated) return;
     let timeoutId: number | null = null;
 
-    // Development pages are opened repeatedly while implementing and testing
-    // product flows. Keep the tour available through `?tour=1`, but do not let
-    // it cover every dev navigation by default.
-    if (IS_DEV_ENV && !force) return;
-
-    if (force) {
+    // Local development is an intentional onboarding-preview mode. In
+    // production the legacy guided tour is opt-in only; the first-value flow
+    // handles the normal product entry instead.
+    if (force || IS_DEV_ENV) {
       timeoutId = window.setTimeout(() => setVisible(true), 0);
       return () => {
         if (timeoutId !== null) window.clearTimeout(timeoutId);
       };
     }
-    if (!userStorageKey) return;
-
-    try {
-      if (window.localStorage.getItem(userStorageKey) === "1") return;
-    } catch {
-      // If storage is unavailable, still show once for this page view.
-    }
-
-    timeoutId = window.setTimeout(() => setVisible(true), 0);
-    return () => {
-      if (timeoutId !== null) window.clearTimeout(timeoutId);
-    };
+    return;
   }, [force, isAuthenticated, ready, userStorageKey]);
 
   const completeTour = useCallback(() => {
@@ -538,14 +498,7 @@ export default function ProductOnboardingTour({
                 ease: easeOutExpo,
               }}
             >
-              <div className="flex items-start gap-sm">
-                <span
-                  aria-hidden="true"
-                  className="material-symbols-outlined mt-[2px] grid h-9 w-9 shrink-0 place-items-center rounded-[8px] bg-surface-dark text-[20px] text-on-dark"
-                >
-                  {currentStep.icon}
-                </span>
-                <div className="min-w-0">
+              <div className="min-w-0">
                   <div className="flex items-center gap-xs">
                     <p className="font-mono text-[10px] font-black uppercase tracking-[0.14em] text-primary">
                       {copy.eyebrow}
@@ -560,7 +513,6 @@ export default function ProductOnboardingTour({
                   <p className="mt-2 text-[13px] font-medium leading-5 text-body">
                     {currentStep.body[locale]}
                   </p>
-                </div>
               </div>
 
               <div className="mt-base flex items-center justify-between gap-xs">
@@ -740,11 +692,10 @@ function needsMobileWorkspaceMenu(stepId: TourStepId): boolean {
   }
 
   return (
-    stepId === "research-notebook-nav" ||
+    stepId === "research-pulse-nav" ||
     stepId === "stock-discovery-nav" ||
     stepId === "guru-advisor-nav" ||
     stepId === "company-search-nav" ||
-    stepId === "wide-research-nav" ||
     stepId === "institutional-holdings-nav"
   );
 }

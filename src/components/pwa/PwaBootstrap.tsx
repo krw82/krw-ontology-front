@@ -231,6 +231,60 @@ export default function PwaBootstrap() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
+    // A service worker must not control the Next.js development server. The
+    // dev server reuses the `development` app version while Turbopack emits
+    // changing HMR chunks; caching those chunks can mix module graphs from
+    // different refreshes and produce a client-only "module factory is not
+    // available" error. Remove registrations left by an earlier local run so
+    // the fix also repairs an already-controlled development tab.
+    if (process.env.NODE_ENV !== "production") {
+      let disposed = false;
+      void navigator.serviceWorker
+        .getRegistrations()
+        .then(async (registrations) => {
+          if (disposed) return;
+
+          await Promise.all(
+            registrations
+              .filter((registration) => {
+                try {
+                  const workers = [
+                    registration.active,
+                    registration.waiting,
+                    registration.installing,
+                  ];
+                  return workers.some((worker) => {
+                    if (!worker) return false;
+                    const scriptUrl = new URL(worker.scriptURL);
+                    return (
+                      scriptUrl.origin === window.location.origin &&
+                      scriptUrl.pathname === "/sw.js"
+                    );
+                  });
+                } catch {
+                  return false;
+                }
+              })
+              .map((registration) => registration.unregister()),
+          );
+
+          if (!("caches" in window)) return;
+          const cacheNames = await window.caches.keys();
+          await Promise.all(
+            cacheNames
+              .filter((cacheName) => cacheName.startsWith("krwo-pwa:"))
+              .map((cacheName) => window.caches.delete(cacheName)),
+          );
+        })
+        .catch(() => {
+          // A browser may expose serviceWorker without allowing cleanup.
+        });
+
+      return () => {
+        disposed = true;
+      };
+    }
+
     const standalone = isStandalonePwa({
       displayModeStandalone:
         typeof window.matchMedia === "function" &&

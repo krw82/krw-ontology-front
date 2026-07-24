@@ -6,6 +6,7 @@ import {
 } from "@/i18n/config";
 
 export const PUBLIC_LOCALIZED_PATH_PREFIXES = [
+  "/start",
   "/companies",
   "/13f",
   "/questions",

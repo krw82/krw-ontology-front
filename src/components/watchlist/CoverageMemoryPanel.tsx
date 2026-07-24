@@ -414,7 +414,7 @@ function TimelineRow({ item }: { item: CompanyCoverageTimelineItem }) {
 
 function coverageLevelLabel(level: string | null) {
   if (level === null) return "해제";
-  return ({ interest: "관심", holding: "보유" } as Record<string, string>)[level] ?? level;
+  return level === "interest" ? "관심" : level;
 }
 
 function impactLabel(impact: string) {

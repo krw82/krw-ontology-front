@@ -28,7 +28,7 @@ export default function ChatWatchlistHeaderActions({
     ticker: string;
     hasBeenUsed: boolean;
   } | null>(null);
-  const [pending, setPending] = useState(false);
+  const [pendingLevel, setPendingLevel] = useState<CoverageLevel | null>(null);
 
   useEffect(() => {
     if (!normalizedTicker) return;
@@ -103,10 +103,13 @@ export default function ChatWatchlistHeaderActions({
 
   if (!normalizedTicker) return null;
 
-  async function saveCoverageLevel(coverageLevel: CoverageLevel | null) {
-    if (!normalizedTicker || pending) return;
+  async function saveCoverageLevel(nextLevel: CoverageLevel) {
+    if (!normalizedTicker || pendingLevel) return;
 
-    setPending(true);
+    const currentLevel = coverageLevelOf(mark);
+    const coverageLevel = currentLevel === nextLevel ? null : nextLevel;
+
+    setPendingLevel(nextLevel);
     try {
       const response = await fetch(
         `/api/watchlist/${encodeURIComponent(normalizedTicker)}`,
@@ -120,7 +123,7 @@ export default function ChatWatchlistHeaderActions({
       const payload = (await response.json()) as { mark?: UserCompanyMark };
       if (payload.mark) setMark(payload.mark);
     } finally {
-      setPending(false);
+      setPendingLevel(null);
     }
   }
 
@@ -139,11 +142,13 @@ export default function ChatWatchlistHeaderActions({
       className="relative flex items-center gap-1"
       data-onboarding-target="chat-notebook-actions"
     >
-      <div className="inline-flex items-center rounded-[8px] border border-hairline bg-canvas p-1" role="group" aria-label="이 회사의 커버리지 수준">
-        <button type="button" disabled={pending} onClick={() => void saveCoverageLevel("interest")} className={`min-h-9 rounded-[6px] px-2 text-[12px] font-extrabold ${currentCoverageLevel === "interest" ? "bg-primary-fixed text-on-primary-fixed" : "text-muted hover:text-primary"}`}>관심</button>
-        <button type="button" disabled={pending} onClick={() => void saveCoverageLevel("holding")} className={`min-h-9 rounded-[6px] px-2 text-[12px] font-extrabold ${currentCoverageLevel === "holding" ? "bg-primary-fixed text-on-primary-fixed" : "text-muted hover:text-primary"}`}>보유</button>
-        {currentCoverageLevel !== null ? <button type="button" disabled={pending} onClick={() => void saveCoverageLevel(null)} className="min-h-9 px-2 text-[11px] font-extrabold text-muted hover:text-error">해제</button> : null}
-      </div>
+      <ChatHeaderMarkButton
+        active={currentCoverageLevel === "interest"}
+        disabled={pendingLevel !== null}
+        icon={currentCoverageLevel === "interest" ? "check" : "bookmark"}
+        label={pendingLevel === "interest" ? "저장 중" : "관심"}
+        onClick={() => void saveCoverageLevel("interest")}
+      />
       {shouldShowNotebookHint ? (
         <div
           className="absolute right-0 top-[calc(100%+8px)] z-30 inline-flex max-w-[calc(100vw-32px)] items-center rounded-[8px] border border-primary/25 bg-canvas px-3 py-2 text-left shadow-[0_12px_28px_rgba(15,23,42,0.16)]"
@@ -161,6 +166,40 @@ export default function ChatWatchlistHeaderActions({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function ChatHeaderMarkButton({
+  active,
+  disabled,
+  icon,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  disabled: boolean;
+  icon: string;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={[
+        "inline-flex h-9 items-center justify-center gap-1 rounded-[8px] border px-2 text-[12px] font-extrabold leading-4 transition-colors disabled:cursor-not-allowed disabled:opacity-55 sm:h-10 sm:px-3 sm:text-[13px]",
+        active
+          ? "border-primary bg-primary-fixed text-on-primary-fixed"
+          : "border-hairline bg-canvas text-ink hover:border-primary hover:text-primary",
+      ].join(" ")}
+      disabled={disabled}
+      onClick={onClick}
+      aria-pressed={active}
+    >
+      <span aria-hidden="true" className="material-symbols-outlined text-[17px]">
+        {icon}
+      </span>
+      <span>{label}</span>
+    </button>
   );
 }
 

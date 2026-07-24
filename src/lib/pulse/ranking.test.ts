@@ -1,20 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { PulseCandidate } from "@/lib/pulse/contract";
 import {
-  comparePulseSortKeys,
-  PULSE_SESSION_MAX_GLOBAL_FILINGS,
-  PULSE_SESSION_MAX_ITEMS,
+  buildPulseCandidatePool,
+  PULSE_CANDIDATE_POOL_MAX,
   rankPulseCandidates,
-  reorderFirstPageWindow,
-  selectFinitePulseQueue,
+  toRankedCandidate,
 } from "@/lib/pulse/ranking";
 
-const now = new Date("2026-07-15T12:00:00.000Z");
+const now = new Date("2026-07-20T12:00:00.000Z");
 
-function candidate(
-  itemKey: string,
-  overrides: Partial<PulseCandidate> = {},
-): PulseCandidate {
+function candidate(itemKey: string, overrides: Partial<PulseCandidate> = {}): PulseCandidate {
   const kind = overrides.kind ?? "filing";
   return {
     item_key: itemKey,
@@ -26,14 +21,14 @@ function candidate(
     coverage_level: null,
     judgment: null,
     linked_thesis: null,
-    eyebrow: "공시",
+    eyebrow: "새 신호",
     title: itemKey,
     body: "body",
-    reason_code: "followed_company",
-    reason_label: "관심 기업",
+    reason_code: "test",
+    reason_label: "test",
     priority: "normal",
-    occurred_at: "2026-07-15T00:00:00.000Z",
-    available_at: "2026-07-15T00:00:00.000Z",
+    occurred_at: "2026-07-20T00:00:00.000Z",
+    available_at: "2026-07-20T00:00:00.000Z",
     expires_at: null,
     saved_at: null,
     snoozed_until: null,
@@ -45,170 +40,75 @@ function candidate(
   };
 }
 
-describe("pulse lane ranking", () => {
-  it("keeps fresh filings ahead of terminal analysis and questions", () => {
+describe("Pulse V5 flat server candidate pool", () => {
+  it("keeps a single utility order while diversifying the first six cards", () => {
     const ranked = rankPulseCandidates([
-      candidate("question:1", { kind: "question", source_type: "question" }),
-      candidate("analysis:1:completed", {
+      ...Array.from({ length: 3 }, (_, index) => candidate(`filing:aapl:${index}`, {
+        coverage_level: "interest",
+        research_affinity: 12,
+        ticker: "AAPL",
+      })),
+      ...Array.from({ length: 3 }, (_, index) => candidate(`analysis:${index}`, {
         kind: "analysis",
         source_type: "analysis",
         phase: "completed",
-      }),
-      candidate("filing:1", { priority: "normal" }),
-      candidate("filing:urgent", { priority: "urgent" }),
+        ticker: `A${index}`,
+      })),
+      ...Array.from({ length: 2 }, (_, index) => candidate(`filing:discovery:${index}`, {
+        ticker: `D${index}`,
+      })),
+      candidate("question:one", { kind: "question", source_type: "question", ticker: "QQQ" }),
+      candidate("resurface:one", { kind: "resurface", source_type: "resurface", ticker: "RRR" }),
+      candidate("learning:one", { kind: "learning", source_type: "learning", ticker: null }),
     ], now);
-    expect(ranked.map((item) => item.item_key)).toEqual([
-      "filing:urgent",
-      "filing:1",
-      "analysis:1:completed",
-      "question:1",
-    ]);
+    const pool = buildPulseCandidatePool(ranked, now);
+    const topSix = pool.slice(0, 6);
+
+    expect(pool.length).toBeLessThanOrEqual(PULSE_CANDIDATE_POOL_MAX);
+    expect(topSix.filter((item) => item.ticker === "AAPL")).toHaveLength(2);
+    expect(topSix.filter((item) => item.feed_slot === "discovery")).toHaveLength(1);
+    expect(topSix.some((item) => item.feed_slot === "learning")).toBe(false);
+    expect(pool.filter((item) => item.kind === "analysis" && item.phase === "completed")).toHaveLength(2);
+    expect(pool.map((item) => item.server_rank)).toEqual(pool.map((_, index) => index));
   });
 
-  it("places active analysis after action items and reviewed cards last", () => {
+  it("uses completed research affinity before a generic high-priority filing", () => {
     const ranked = rankPulseCandidates([
-      candidate("analysis:active", { kind: "analysis", source_type: "analysis", phase: "active" }),
-      candidate("question:1", { kind: "question", source_type: "question", metadata: { evidence_count: 1 } }),
-      candidate("filing:reviewed", { reviewed_at: "2026-07-15T01:00:00.000Z" }),
-    ], now);
-    expect(ranked.map((item) => item.item_key)).toEqual([
-      "question:1",
-      "analysis:active",
-      "filing:reviewed",
-    ]);
-    expect(ranked[0].actionable).toBe(true);
-    expect(ranked[1].actionable).toBe(false);
-    expect(ranked[2].state).toBe("reviewed");
-  });
-
-  it("uses a deterministic tuple when a lane ties", () => {
-    const ranked = rankPulseCandidates([
-      candidate("filing:b", { occurred_at: "2026-07-15T00:00:00.000Z" }),
-      candidate("filing:a", { occurred_at: "2026-07-15T00:00:00.000Z" }),
-    ], now);
-    expect(ranked.map((item) => item.item_key)).toEqual(["filing:a", "filing:b"]);
-    expect(comparePulseSortKeys(ranked[0], ranked[1])).toBeLessThan(0);
-  });
-
-  it("uses personal relevance only within the same hard lane", () => {
-    const ranked = rankPulseCandidates([
-      candidate("filing:holding", {
-        ticker: "AAPL",
-        coverage_level: "holding",
+      candidate("filing:generic", { ticker: "GEN", priority: "high" }),
+      candidate("filing:researched", {
+        ticker: "RSCH",
         priority: "normal",
-        has_recent_research: true,
+        research_affinity: 12,
       }),
-      candidate("filing:watchlisted", {
-        ticker: "NVDA",
-        coverage_level: "interest",
-        has_recent_research: true,
-      }),
-      candidate("filing:ordinary", { ticker: "MSFT", coverage_level: "interest", priority: "high" }),
-      candidate("filing:plain", { ticker: "GOOG", coverage_level: "interest" }),
     ], now);
 
-    expect(ranked.map((item) => item.item_key)).toEqual([
-      "filing:holding",
-      "filing:ordinary",
-      "filing:watchlisted",
-      "filing:plain",
-    ]);
-    expect(ranked[0].rank_score).toBeGreaterThan(ranked[1].rank_score);
+    expect(ranked[0]?.item_key).toBe("filing:researched");
   });
 
-  it("keeps ticker and learning diversity inside the supplied first-page window", () => {
-    const rawWindow = rankPulseCandidates(Array.from({ length: 14 }, (_, index) => candidate(
-      `${index < 4 ? "learning" : "filing"}:${index}`,
-      index < 4
-        ? { kind: "learning", source_type: "learning", ticker: null }
-        : { ticker: index < 9 ? "AAPL" : `T${index}` },
-    )), now);
-    const displayed = reorderFirstPageWindow(rawWindow);
-    expect(displayed).toHaveLength(rawWindow.length);
-    expect(displayed.slice(0, 8).filter((item) => item.ticker === "AAPL")).toHaveLength(2);
-    expect(displayed.slice(0, 10).filter((item) => item.kind === "learning")).toHaveLength(1);
+  it("keeps session-based affinity differentiated without outranking explicit interest", () => {
+    const strong = toRankedCandidate(candidate("filing:strong", { research_affinity: 20 }), now);
+    const active = toRankedCandidate(candidate("filing:active", { research_affinity: 14 }), now);
+    const explicitInterest = toRankedCandidate(candidate("filing:interest", {
+      research_affinity: 0,
+      coverage_level: "interest",
+    }), now);
+
+    expect(strong.rank_score).toBeGreaterThan(active.rank_score);
+    expect(explicitInterest.rank_score).toBeGreaterThan(strong.rank_score);
   });
 
-  it("protects personal decision work and caps global filings in one finite session", () => {
+  it("removes reviewed and stale terminal research from candidates", () => {
     const ranked = rankPulseCandidates([
-      ...Array.from({ length: 30 }, (_, index) =>
-        candidate(`filing:global:${index}`, {
-          ticker: `G${index}`,
-          priority: index < 5 ? "urgent" : "normal",
-        }),
-      ),
-      candidate("filing:holding", {
-        ticker: "AAPL",
-        coverage_level: "holding",
+      candidate("filing:reviewed", { reviewed_at: "2026-07-20T01:00:00.000Z" }),
+      candidate("analysis:old", {
+        kind: "analysis",
+        source_type: "analysis",
+        phase: "completed",
+        occurred_at: "2026-07-01T00:00:00.000Z",
       }),
-      candidate("question:open", {
-        kind: "question",
-        source_type: "question",
-        ticker: "MSFT",
-      }),
-      candidate("resurface:scheduled", {
-        kind: "resurface",
-        source_type: "resurface",
-        ticker: "NVDA",
-        metadata: { monitoring_rule_type: "scheduled_review" },
-      }),
-      candidate("resurface:memo", {
-        kind: "resurface",
-        source_type: "resurface",
-        ticker: "AVGO",
-      }),
-      candidate("learning:one", {
-        kind: "learning",
-        source_type: "learning",
-        ticker: null,
-      }),
+      candidate("filing:fresh", { coverage_level: "interest" }),
     ], now);
 
-    const queue = selectFinitePulseQueue(ranked);
-    const globalFilings = queue.filter((item) =>
-      item.item_key.startsWith("filing:global:"),
-    );
-
-    expect(queue).toHaveLength(7);
-    expect(queue.slice(0, 4).map((item) => item.item_key)).toEqual([
-      "filing:holding",
-      "question:open",
-      "resurface:scheduled",
-      "resurface:memo",
-    ]);
-    expect(globalFilings).toHaveLength(PULSE_SESSION_MAX_GLOBAL_FILINGS);
-    expect(queue.at(-1)?.item_key).toBe("learning:one");
-  });
-
-  it("never exposes more than twenty cards even when personal work exceeds the queue", () => {
-    const ranked = rankPulseCandidates(
-      Array.from({ length: 35 }, (_, index) =>
-        candidate(`question:${index}`, {
-          kind: "question",
-          source_type: "question",
-          ticker: `T${index}`,
-        }),
-      ),
-      now,
-    );
-
-    const first = selectFinitePulseQueue(ranked, 999);
-    const second = selectFinitePulseQueue(ranked, 999);
-
-    expect(first).toHaveLength(PULSE_SESSION_MAX_ITEMS);
-    expect(first.map((item) => item.item_key)).toEqual(
-      second.map((item) => item.item_key),
-    );
-  });
-
-  it("ranks one thousand deterministic fixtures within a small local budget", () => {
-    const fixtures = Array.from({ length: 1_000 }, (_, index) => candidate(`filing:${index}`, {
-      ticker: `T${index % 100}`,
-      occurred_at: new Date(Date.UTC(2026, 6, 15, 0, 0, 0) - index * 1_000).toISOString(),
-    }));
-    const startedAt = performance.now();
-    const result = rankPulseCandidates(fixtures, now);
-    expect(result).toHaveLength(1_000);
-    expect(performance.now() - startedAt).toBeLessThan(250);
+    expect(buildPulseCandidatePool(ranked, now).map((item) => item.item_key)).toEqual(["filing:fresh"]);
   });
 });

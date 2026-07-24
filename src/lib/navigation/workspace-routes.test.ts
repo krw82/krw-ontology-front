@@ -3,7 +3,6 @@ import {
   getWorkspaceNavigationGroups,
   getWorkspaceNavigationItems,
   getWorkspaceShellMode,
-  getWorkspaceTabItems,
 } from "./workspace-routes";
 
 describe("workspace route model", () => {
@@ -25,45 +24,6 @@ describe("workspace route model", () => {
     expect(getWorkspaceShellMode(pathname)).toBe(expected);
   });
 
-  it("builds exactly four Korean primary tabs with one active item", () => {
-    const tabs = getWorkspaceTabItems("ko", "/ko/companies/AAPL");
-
-    expect(tabs.map(({ id, label, href }) => ({ id, label, href }))).toEqual([
-      { id: "feed", label: "피드", href: "/pulse" },
-      { id: "explore", label: "탐색", href: "/ko/companies" },
-      { id: "coverage", label: "커버리지", href: "/watchlist" },
-      { id: "filings", label: "공시", href: "/filings" },
-    ]);
-    expect(tabs.filter((tab) => tab.active).map((tab) => tab.id)).toEqual([
-      "explore",
-    ]);
-  });
-
-  it("uses locale paths for public company tabs and locale queries for app tabs", () => {
-    const tabs = getWorkspaceTabItems("en", "/pulse");
-
-    expect(tabs.map(({ id, href }) => ({ id, href }))).toEqual([
-      { id: "feed", href: "/pulse?locale=en" },
-      { id: "explore", href: "/en/companies" },
-      { id: "coverage", href: "/watchlist?locale=en" },
-      { id: "filings", href: "/filings?locale=en" },
-    ]);
-    expect(tabs.filter((tab) => tab.active).map((tab) => tab.id)).toEqual([
-      "feed",
-    ]);
-  });
-
-  it("maps secondary explore routes to the explore tab without changing their shell mode", () => {
-    expect(
-      getWorkspaceTabItems("ko", "/discover").find((tab) => tab.active)?.id,
-    ).toBe("explore");
-    expect(
-      getWorkspaceTabItems("ko", "/guru").find((tab) => tab.active)?.id,
-    ).toBe("explore");
-    expect(getWorkspaceShellMode("/discover")).toBe("immersive");
-    expect(getWorkspaceShellMode("/guru")).toBe("self-managed");
-  });
-
   it("keeps the drawer route model locale-aware", () => {
     const items = getWorkspaceNavigationItems("en", "/en/companies/AAPL");
     const companies = items.find((item) => item.id === "companies");
@@ -79,6 +39,21 @@ describe("workspace route model", () => {
     });
   });
 
+  it("keeps the workspace in research order across navigation surfaces", () => {
+    expect(
+      getWorkspaceNavigationItems("ko", "/companies").map((item) => item.id),
+    ).toEqual([
+      "feed",
+      "companies",
+      "perspectives",
+      "discover",
+      "wideResearch",
+      "notebook",
+      "chatHistory",
+      "holdings",
+    ]);
+  });
+
   it("keeps wide research in the mobile drawer without adding it to desktop navigation", () => {
     const groups = getWorkspaceNavigationGroups("ko", "/pulse");
     const explore = groups.find((group) => group.id === "explore");
@@ -92,17 +67,37 @@ describe("workspace route model", () => {
     );
   });
 
-  it("keeps notebook and monitoring destinations in separate drawer groups", () => {
+  it("keeps notebook and institutional holdings in separate drawer groups", () => {
     const groups = getWorkspaceNavigationGroups("en", "/watchlist/AAPL");
 
     expect(groups.find((group) => group.id === "research")).toMatchObject({
       label: "My research",
-      items: [expect.objectContaining({ id: "notebook", active: true })],
+      items: [
+        expect.objectContaining({ id: "notebook", active: true }),
+        expect.objectContaining({ id: "chatHistory", desktop: false }),
+      ],
     });
     expect(
       groups
         .find((group) => group.id === "monitor")
         ?.items.map((item) => item.id),
-    ).toEqual(["filings", "holdings"]);
+    ).toEqual(["holdings"]);
+  });
+
+  it("keeps chat history in the mobile research menu without adding a desktop tab", () => {
+    const research = getWorkspaceNavigationGroups("ko", "/watchlist")
+      .find((group) => group.id === "research");
+
+    expect(research?.items.find((item) => item.id === "chatHistory")).toMatchObject({
+      label: "최근 채팅",
+      href: "/watchlist?tab=history",
+      desktop: false,
+    });
+  });
+
+  it("keeps filing alerts reachable without listing them in workspace navigation", () => {
+    expect(getWorkspaceNavigationItems("ko", "/filings")).not.toContainEqual(
+      expect.objectContaining({ id: "filings" }),
+    );
   });
 });

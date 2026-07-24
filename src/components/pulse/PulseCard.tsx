@@ -3,14 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { trackClientEventSilently } from "@/lib/analytics/client";
-import {
-  persistPulseItemImpression,
-  pulseImpressionStorageKey,
-} from "@/lib/pulse/impression-client";
+import { type PulseDeviceSignal } from "@/lib/pulse/device-ranking";
 import CompanyLogo from "@/components/CompanyLogo";
-import FilingJudgmentPanel, {
-  type FilingJudgmentValue,
-} from "@/components/pulse/FilingJudgmentPanel";
 import type { PulseFeedResponse, PulseItem, PulseMutationAction } from "@/types/api-contracts";
 
 interface PulseCardProps {
@@ -19,9 +13,8 @@ interface PulseCardProps {
   pending: boolean;
   feedSessionId: string;
   rankingVersion: PulseFeedResponse["ranking_version"];
-  draftOwnerId: string;
   onMutation: (item: PulseItem, action: PulseMutationAction) => void;
-  onJudgmentSaved: (item: PulseItem, judgment: FilingJudgmentValue) => void;
+  onDeviceSignal: (item: PulseItem, signal: PulseDeviceSignal) => void;
 }
 
 const KIND_STYLES = {
@@ -33,15 +26,18 @@ const KIND_STYLES = {
   learning: { icon: "school", rail: "bg-[#178768]", wash: "bg-[#eaf8f3]" },
 } as const;
 
+function pulseImpressionStorageKey(feedSessionId: string, itemId: string): string {
+  return `pulse-impression:${feedSessionId}:${itemId}`;
+}
+
 export default function PulseCard({
   item,
   position,
   pending,
   feedSessionId,
   rankingVersion,
-  draftOwnerId,
   onMutation,
-  onJudgmentSaved,
+  onDeviceSignal,
 }: PulseCardProps) {
   const ref = useRef<HTMLElement>(null);
   const impressionSent = useRef(false);
@@ -49,11 +45,6 @@ export default function PulseCard({
   const isDevelopmentShowcase = item.metadata.development_showcase === true;
   const showsCompanyLogo = Boolean(item.ticker);
   const hasSourceGroundedBrief = item.kind === "filing" && item.metadata.filing_brief_ready === true;
-  const [expandedReviewedItemId, setExpandedReviewedItemId] = useState<
-    string | null
-  >(null);
-  const reviewedAndCollapsed =
-    item.state === "reviewed" && expandedReviewedItemId !== item.id;
 
   useEffect(() => {
     if (isDevelopmentShowcase) return;
@@ -61,7 +52,6 @@ export default function PulseCard({
     if (!element) return;
     const sessionKey = pulseImpressionStorageKey(feedSessionId, item.id);
     if (window.sessionStorage.getItem(sessionKey) === "1") return;
-    const requestController = new AbortController();
     let impressionTimer: number | null = null;
     const observer = new IntersectionObserver((entries) => {
       const sufficientlyVisible = entries.some((entry) => entry.isIntersecting && entry.intersectionRatio >= 0.5);
@@ -86,93 +76,67 @@ export default function PulseCard({
           reason_code: item.reason_code,
           has_source_grounded_brief: hasSourceGroundedBrief,
         });
-        void persistPulseItemImpression({
-          itemId: item.id,
-          feedSessionId,
-          signal: requestController.signal,
-        }).then((persisted) => {
-          if (!persisted) {
-            impressionSent.current = false;
-            return;
-          }
-          window.sessionStorage.setItem(sessionKey, "1");
-          observer.disconnect();
-        });
+        onDeviceSignal(item, "impression");
+        window.sessionStorage.setItem(sessionKey, "1");
+        observer.disconnect();
       }, 1_000);
     }, { threshold: [0.5] });
     observer.observe(element);
     return () => {
       if (impressionTimer !== null) window.clearTimeout(impressionTimer);
-      requestController.abort();
       observer.disconnect();
     };
-  }, [feedSessionId, hasSourceGroundedBrief, isDevelopmentShowcase, item.id, item.kind, item.phase, item.priority, item.reason_code, item.state, item.ticker, position, rankingVersion]);
+  }, [feedSessionId, hasSourceGroundedBrief, isDevelopmentShowcase, item, item.id, item.kind, item.phase, item.priority, item.reason_code, item.state, item.ticker, onDeviceSignal, position, rankingVersion]);
 
   const primary = item.primary_action;
   const analysisStatus = item.kind === "analysis" ? String(item.metadata.run_status ?? "") : null;
   const analysisActive = item.kind === "analysis" && item.phase === "active";
-  const questionHref = item.secondary_actions.find(
-    (action) => action.type === "link" && action.analytics_name === "pulse_answer_prefilled",
-  );
-
-  if (reviewedAndCollapsed) {
-    return (
-      <article
-        ref={ref}
-        className="relative overflow-hidden rounded-[14px] border border-hairline bg-surface-soft px-base py-sm"
-        data-pulse-kind={item.kind}
-        data-pulse-state="reviewed-collapsed"
-      >
-        <div className={`absolute inset-y-0 left-0 w-1 opacity-55 ${style.rail}`} aria-hidden="true" />
-        <div className="flex min-w-0 items-center gap-sm pl-xs">
-          <span className="material-symbols-outlined text-[18px] text-muted" aria-hidden="true">
-            task_alt
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-muted">
-              검토 완료{item.ticker ? ` · ${item.ticker}` : ""}
-            </p>
-            <p className="mt-0.5 truncate text-[13px] font-extrabold text-body">
-              {item.title}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setExpandedReviewedItemId(item.id)}
-            className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-[9px] px-sm text-[12px] font-extrabold text-muted hover:bg-white hover:text-ink"
-            aria-expanded={false}
-          >
-            다시 보기
-            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">expand_more</span>
-          </button>
-        </div>
-      </article>
-    );
-  }
+  const recordPrimaryOpen = () => {
+    onDeviceSignal(item, item.kind === "filing" ? "source_open" : "open");
+    trackClientEventSilently("pulse_item_opened", {
+      item_kind: item.kind,
+      action: "primary",
+      item_state: item.state,
+      phase: item.phase,
+      feed_session_id: feedSessionId,
+      ranking_version: rankingVersion,
+      reason_code: item.reason_code,
+      has_source_grounded_brief: hasSourceGroundedBrief,
+    });
+  };
 
   return (
     <article
       ref={ref}
-      className="group relative overflow-hidden rounded-[18px] border border-hairline bg-white shadow-[0_12px_36px_rgba(16,24,40,0.055)] transition-transform duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none"
+      className={`group relative overflow-hidden rounded-[18px] border border-hairline bg-white shadow-[0_12px_36px_rgba(16,24,40,0.055)] transition-transform duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none ${primary.type === "link" ? "cursor-pointer" : ""}`}
       data-pulse-kind={item.kind}
       data-pulse-state={item.state}
     >
-      <div className={`absolute inset-y-0 left-0 w-1 ${style.rail}`} aria-hidden="true" />
-      <div className="p-lg pl-[22px] sm:p-xl sm:pl-[26px]">
-          <div className="flex items-start justify-between gap-base">
-            <div className="flex min-w-0 items-center gap-sm">
-              {showsCompanyLogo && item.ticker ? (
-                <span className={`grid size-9 shrink-0 place-items-center rounded-[11px] ${style.wash}`} aria-hidden="true">
-                  <CompanyLogo
-                    ticker={item.ticker}
-                    companyName={item.ticker}
-                    className="size-7 text-[10px] text-ink"
-                    imageSize={48}
-                  />
-                </span>
-              ) : null}
+      {primary.type === "link" ? (
+        <Link
+          href={primary.href}
+          className="absolute inset-0 z-0 rounded-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
+          aria-label={`${item.title} · ${primary.label}`}
+          onClick={recordPrimaryOpen}
+        />
+      ) : null}
+      <div className={`pointer-events-none absolute inset-y-0 left-0 z-20 w-1 ${style.rail}`} aria-hidden="true" />
+      <div className="relative z-10 pointer-events-none p-lg pl-[22px] sm:p-xl sm:pl-[26px]">
+        <div className="flex items-start justify-between gap-base">
+          <div className="flex min-w-0 items-center gap-sm">
+            {showsCompanyLogo && item.ticker ? (
+              <span className={`grid size-9 shrink-0 place-items-center rounded-[11px] ${style.wash}`} aria-hidden="true">
+                <CompanyLogo
+                  ticker={item.ticker}
+                  companyName={item.ticker}
+                  className="size-7 text-[10px] text-ink"
+                  imageSize={48}
+                />
+              </span>
+            ) : null}
             <div className="min-w-0">
               <p className="truncate text-[11px] font-black uppercase tracking-[0.13em] text-muted">{item.eyebrow}</p>
+              <p className="mt-0.5 line-clamp-1 text-[12px] font-extrabold text-primary">{item.reason_label}</p>
               {item.priority === "urgent" ? <p className="mt-0.5 text-[11px] font-black text-[#c43c22]">긴급 · 먼저 확인</p> : null}
               {item.state === "reviewed" ? <p className="mt-0.5 text-[11px] font-black text-muted">이전에 검토함</p> : null}
               {item.ticker ? <p className="mt-0.5 text-[12px] font-extrabold text-primary">{item.ticker}</p> : null}
@@ -221,34 +185,15 @@ export default function PulseCard({
           <p className="mt-sm text-[14px] leading-6 text-body">{item.body}</p>
         ) : null}
 
-        {item.kind === "filing" ? (
-          <>
-            <FilingSourceStrip item={item} />
-            {!isDevelopmentShowcase ? (
-              <p className="mt-sm flex items-start gap-xs rounded-[10px] bg-surface-soft px-sm py-xs text-[12px] font-semibold leading-5 text-muted">
-                <span className="material-symbols-outlined mt-0.5 text-[15px]" aria-hidden="true">filter_alt</span>
-                <span><strong className="font-extrabold text-body">표시 이유</strong> · {item.reason_label}</span>
-              </p>
-            ) : null}
-            <FilingJudgmentPanel
-              item={item}
-              questionHref={questionHref?.type === "link" ? questionHref.href : null}
-              draftOwnerId={draftOwnerId}
-              onSaved={onJudgmentSaved}
-            />
-          </>
-        ) : (
+        {item.kind === "filing" ? <FilingSourceStrip item={item} /> : null}
+
         <div className="mt-lg flex flex-wrap items-center gap-sm">
           {primary.type === "link" ? (
-            <Link
-              href={primary.href}
-              className="inline-flex min-h-11 items-center gap-xs rounded-[10px] bg-ink px-base text-[13px] font-extrabold text-white transition-colors hover:bg-primary"
-              onClick={() => trackClientEventSilently("pulse_item_opened", { item_kind: item.kind, action: "primary", item_state: item.state, phase: item.phase, feed_session_id: feedSessionId, ranking_version: rankingVersion, reason_code: item.reason_code, has_source_grounded_brief: hasSourceGroundedBrief })}
-            >
+            <span className="inline-flex min-h-11 items-center gap-xs rounded-[10px] bg-ink px-base text-[13px] font-extrabold text-white">
               {primary.label}<span className="material-symbols-outlined text-[16px]" aria-hidden="true">arrow_forward</span>
-            </Link>
+            </span>
           ) : (
-            <button type="button" disabled={pending} onClick={() => onMutation(item, primary.action)} className="inline-flex min-h-11 items-center rounded-[10px] bg-ink px-base text-[13px] font-extrabold text-white disabled:opacity-50">
+            <button type="button" disabled={pending} onClick={() => onMutation(item, primary.action)} className="pointer-events-auto inline-flex min-h-11 items-center rounded-[10px] bg-ink px-base text-[13px] font-extrabold text-white disabled:opacity-50">
               {primary.label}
             </button>
           )}
@@ -256,8 +201,11 @@ export default function PulseCard({
             <Link
               key={`${action.type}-${action.label}`}
               href={action.href}
-              className="inline-flex min-h-11 items-center rounded-[10px] px-sm text-[13px] font-bold text-primary hover:bg-primary-fixed/60"
-              onClick={() => trackClientEventSilently(action.analytics_name === "pulse_answer_prefilled" ? "pulse_answer_prefilled" : "pulse_item_opened", { item_kind: item.kind, action: action.label, item_state: item.state, phase: item.phase, feed_session_id: feedSessionId, ranking_version: rankingVersion, reason_code: item.reason_code, has_source_grounded_brief: hasSourceGroundedBrief })}
+              className="pointer-events-auto inline-flex min-h-11 items-center rounded-[10px] px-sm text-[13px] font-bold text-primary hover:bg-primary-fixed/60"
+              onClick={() => {
+                onDeviceSignal(item, "open");
+                trackClientEventSilently(action.analytics_name === "pulse_answer_prefilled" ? "pulse_answer_prefilled" : "pulse_item_opened", { item_kind: item.kind, action: action.label, item_state: item.state, phase: item.phase, feed_session_id: feedSessionId, ranking_version: rankingVersion, reason_code: item.reason_code, has_source_grounded_brief: hasSourceGroundedBrief });
+              }}
             >
               {action.label}
             </Link>
@@ -268,37 +216,18 @@ export default function PulseCard({
               ? "저장됨"
               : effectiveAction === "review" && item.reviewed_at ? "다시 미검토" : action.label;
             return (
-            <button
-              key={`${action.type}-${action.action}`}
-              type="button"
-              disabled={pending}
-              onClick={() => onMutation(item, reviewAction)}
-              className="inline-flex min-h-11 items-center rounded-[10px] px-sm text-[13px] font-bold text-muted transition-colors hover:bg-surface-soft hover:text-ink disabled:opacity-45"
-            >
-              {label}
-            </button>
+              <button
+                key={`${action.type}-${action.action}`}
+                type="button"
+                disabled={pending}
+                onClick={() => onMutation(item, reviewAction)}
+                className="pointer-events-auto inline-flex min-h-11 items-center rounded-[10px] px-sm text-[13px] font-bold text-muted transition-colors hover:bg-surface-soft hover:text-ink disabled:opacity-45"
+              >
+                {label}
+              </button>
             );
           })())}
         </div>
-        )}
-
-        {item.kind !== "filing" && item.trigger !== "editorial" ? (
-          <p className="mt-base flex min-h-11 items-center border-t border-hairline pt-sm text-[12px] font-semibold leading-5 text-muted">
-            <span><strong className="font-bold text-body">{triggerLabel(item.trigger)}</strong> · {item.reason_label}</span>
-          </p>
-        ) : null}
-
-        {item.state === "reviewed" ? (
-          <button
-            type="button"
-            onClick={() => setExpandedReviewedItemId(null)}
-            className="mt-sm inline-flex min-h-11 items-center gap-1 text-[12px] font-extrabold text-muted hover:text-ink"
-            aria-expanded={true}
-          >
-            완료 항목 접기
-            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">expand_less</span>
-          </button>
-        ) : null}
       </div>
     </article>
   );
@@ -325,7 +254,7 @@ function PulseEditorialMedia({ item }: { item: PulseItem }) {
       {isCarousel ? (
         <div className="mt-sm flex items-center justify-between gap-sm">
           <div className="flex gap-xs" aria-label="캐러셀 페이지">
-            {assets.map((asset, index) => <button key={asset.url} type="button" onClick={() => setActiveIndex(index)} aria-label={`${index + 1}번째 이미지 보기`} aria-current={index === activeIndex ? "true" : undefined} className={`size-8 rounded-full text-[11px] font-black ${index === activeIndex ? "bg-ink text-white" : "bg-surface-soft text-muted hover:bg-primary-fixed"}`}>{index + 1}</button>)}
+            {assets.map((asset, index) => <button key={asset.url} type="button" onClick={() => setActiveIndex(index)} aria-label={`${index + 1}번째 이미지 보기`} aria-current={index === activeIndex ? "true" : undefined} className={`pointer-events-auto size-8 rounded-full text-[11px] font-black ${index === activeIndex ? "bg-ink text-white" : "bg-surface-soft text-muted hover:bg-primary-fixed"}`}>{index + 1}</button>)}
           </div>
           <span className="text-[12px] font-semibold text-muted">{activeIndex + 1} / {assets.length}</span>
         </div>
@@ -361,30 +290,15 @@ function FilingChangeBrief({ item }: { item: PulseItem }) {
 function FilingSourceStrip({ item }: { item: PulseItem }) {
   const formType = stringMetadata(item, "form_type") ?? "SEC";
   const factCount = numberMetadata(item, "filing_brief_fact_count");
-  const sourceAction = item.primary_action.type === "link" ? item.primary_action : null;
   return (
     <div className="mt-base flex flex-wrap items-center justify-between gap-xs rounded-[10px] border border-primary/15 bg-[#f7faff] px-sm py-xs">
       <p className="flex min-h-8 items-center gap-xs text-[12px] font-extrabold text-body">
-        <span className="material-symbols-outlined text-[16px] text-primary" aria-hidden="true">verified</span>
         SEC {formType}
         <span className="font-semibold text-muted">
           {factCount > 0 ? `· 원문 근거 ${factCount}개` : "· 제출 원문"}
         </span>
       </p>
-      {sourceAction ? (
-        <Link
-          href={sourceAction.href}
-          className="inline-flex min-h-11 items-center gap-1 rounded-[9px] px-sm text-[12px] font-extrabold text-primary hover:bg-white"
-          onClick={() => trackClientEventSilently("pulse_item_opened", {
-            item_kind: item.kind,
-            action: "source",
-            reason_code: item.reason_code,
-          })}
-        >
-          출처 보기
-          <span className="material-symbols-outlined text-[15px]" aria-hidden="true">arrow_forward</span>
-        </Link>
-      ) : null}
+      <span className="text-[12px] font-extrabold text-primary">카드 전체를 눌러 확인</span>
     </div>
   );
 }
@@ -405,13 +319,6 @@ function stringMetadata(item: PulseItem, key: string): string | null {
 function numberMetadata(item: PulseItem, key: string): number {
   const value = item.metadata[key];
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function triggerLabel(trigger: PulseItem["trigger"]): string {
-  if (trigger === "event") return "새 사건 감지";
-  if (trigger === "schedule") return "예약된 체크";
-  if (trigger === "editorial") return "주간 편집 콘텐츠";
-  return "내 활동 상태 변화";
 }
 
 function formatRelativeTime(iso: string): string {

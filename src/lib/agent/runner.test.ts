@@ -80,7 +80,7 @@ vi.mock("./mcp-client", () => {
     "build_news_timeline",
     "audit_news_sources",
   ];
-  const chartTools = ["create_chart_v1"];
+  const visualizationTools = ["compose_visualization"];
   const yahooFinanceTools = ["get_yahoo_finance_news", "get_stock_info"];
   const filingsTools = [
     "get_filing",
@@ -88,6 +88,8 @@ vi.mock("./mcp-client", () => {
     "search_catalog_filings",
     "list_filing_sections",
     "read_filing_section",
+    "list_filing_documents",
+    "read_filing_document",
     "get_form4_insider_transactions",
   ];
   const personalFilingsTools = [
@@ -115,7 +117,7 @@ vi.mock("./mcp-client", () => {
     KRW_ONTOLOGY_MCP_TOOLS: tools,
     STOCK_NEWS_MCP_TOOLS: stockNewsTools,
     YAHOO_FINANCE_MCP_TOOLS: yahooFinanceTools,
-    CHART_MCP_TOOLS: chartTools,
+    VISUALIZATION_MCP_TOOLS: visualizationTools,
     KRW_FILINGS_MCP_TOOLS: filingsTools,
     KRW_PERSONAL_FILINGS_MCP_TOOLS: personalFilingsTools,
     GURU_MCP_TOOLS: guruTools,
@@ -131,7 +133,7 @@ vi.mock("./mcp-client", () => {
     YAHOO_FINANCE_SDK_ALLOWED_TOOLS: yahooFinanceTools.map(
       (toolName) => `mcp__yahoo_finance__${toolName}`,
     ),
-    CHART_SDK_ALLOWED_TOOLS: chartTools.map(
+    VISUALIZATION_SDK_ALLOWED_TOOLS: visualizationTools.map(
       (toolName) => `mcp__krw_presentation__${toolName}`,
     ),
     KRW_FILINGS_SDK_ALLOWED_TOOLS: filingsTools.map(
@@ -162,7 +164,7 @@ vi.mock("./mcp-client", () => {
       toolName.startsWith("mcp__plugin_krw-guru-advisor_krw-guru-advisor__"),
     isYahooFinanceSdkTool: (toolName: string) =>
       toolName.startsWith("mcp__yahoo_finance__"),
-    isChartSdkTool: (toolName: string) =>
+    isVisualizationSdkTool: (toolName: string) =>
       toolName.startsWith("mcp__krw_presentation__"),
     isKrwFilingsMcpEnabled: () =>
       process.env.FILINGS_MCP_ENABLED === "1" &&
@@ -260,6 +262,9 @@ function sdkToolName(toolName: MCPToolName): string {
   if (isStockNewsToolName(toolName)) return stockNewsSdkToolName(toolName);
   if (isYahooFinanceToolName(toolName))
     return yahooFinanceSdkToolName(toolName);
+  if (isPublicFilingsToolName(toolName)) {
+    return `mcp__krw-filings__${toolName}`;
+  }
   return `mcp__krw-ontology__${toolName}`;
 }
 
@@ -347,6 +352,19 @@ function isYahooFinanceToolName(
   toolName: MCPToolName,
 ): toolName is YahooFinanceMCPToolName {
   return ["get_yahoo_finance_news", "get_stock_info"].includes(toolName);
+}
+
+function isPublicFilingsToolName(toolName: MCPToolName): boolean {
+  return [
+    "get_filing",
+    "get_filing_brief",
+    "search_catalog_filings",
+    "list_filing_sections",
+    "read_filing_section",
+    "list_filing_documents",
+    "read_filing_document",
+    "get_form4_insider_transactions",
+  ].includes(toolName);
 }
 
 function toolUseMessage(toolName: MCPToolName, index: number) {
@@ -497,6 +515,7 @@ async function probeToolPermission(params: {
   researchMode?: ResearchMode;
   analysisMode?: AnalysisMode;
   runKind?: RunKind;
+  userMessage?: string;
   selectedNewsEventContext?: Record<string, unknown> | null;
 }): Promise<{
   permission: Awaited<ReturnType<typeof canUseTool>>;
@@ -538,7 +557,7 @@ async function probeToolPermission(params: {
   const result = await runAgent(
     {
       sessionId: "11111111-1111-4111-8111-111111111111",
-      userMessage: "Apple 매출 구조를 정리해줘",
+      userMessage: params.userMessage ?? "Apple 매출 구조를 정리해줘",
       scopeType: "company",
       defaultTickers: ["AAPL"],
       defaultDocumentTypes: [],
@@ -594,6 +613,8 @@ describe("agent runner research budget recovery", () => {
     delete process.env.FILINGS_MCP_ENABLED;
     delete process.env.FILINGS_MCP_AUTH_TOKEN;
     delete process.env.FILINGS_MCP_PERSONAL_SIGNING_SECRET;
+    delete process.env.FILINGS_MCP_MAX_CALLS;
+    delete process.env.KRW_VISUALIZATIONS_MODE;
   });
 
   it("keeps the deep mode total tool budget unchanged", () => {
@@ -696,6 +717,189 @@ describe("agent runner research budget recovery", () => {
     await expect(
       options.canUseTool("mcp__krw-filings__get_filing", {}),
     ).resolves.toMatchObject({ behavior: "deny" });
+  });
+
+  it("uses the source-filing skill with only source-bound public filing tools", async () => {
+    process.env.FILINGS_MCP_ENABLED = "1";
+    process.env.FILINGS_MCP_AUTH_TOKEN = "test-filings-service-secret";
+    process.env.FILINGS_MCP_PERSONAL_SIGNING_SECRET =
+      "test-personal-signing-secret";
+    writeFileSync(
+      "/tmp/krw-ontology-plugin/.mcp.json",
+      JSON.stringify({
+        mcpServers: {
+          "krw-ontology": {
+            type: "http",
+            url: "http://127.0.0.1:8765/mcp",
+            alwaysLoad: true,
+          },
+          "krw-filings": {
+            type: "http",
+            url: "http://127.0.0.1:8785/mcp",
+            alwaysLoad: true,
+          },
+        },
+      }),
+    );
+    const sourceFilingEventId = "123e4567-e89b-42d3-a456-426614174000";
+    let sourceDecision: Awaited<ReturnType<typeof canUseTool>> | null = null;
+    let documentDecision: Awaited<ReturnType<typeof canUseTool>> | null = null;
+    let searchDecision: Awaited<ReturnType<typeof canUseTool>> | null = null;
+    let ontologyDecision: Awaited<ReturnType<typeof canUseTool>> | null = null;
+    let personalDecision: Awaited<ReturnType<typeof canUseTool>> | null = null;
+    sdkMocks.query.mockImplementationOnce(
+      (call: { options: { canUseTool?: typeof canUseTool } }) =>
+        makeSdkQueryFromGenerator(async function* () {
+          const guard = call.options.canUseTool;
+          if (!guard) throw new Error("missing source-filing permission guard");
+          sourceDecision = await guard(
+            "mcp__krw-filings__list_filing_sections",
+            { filing_event_id: "00000000-0000-4000-8000-000000000001" },
+          );
+          documentDecision = await guard(
+            "mcp__krw-filings__read_filing_document",
+            {
+              filing_event_id: "00000000-0000-4000-8000-000000000001",
+              document_key: "document:exhibit",
+            },
+          );
+          searchDecision = await guard(
+            "mcp__krw-filings__search_catalog_filings",
+            { ticker: "MSFT" },
+          );
+          ontologyDecision = await guard(
+            sdkToolName("krw_ontology_query"),
+            { query: "AAPL latest filing" },
+          );
+          personalDecision = await guard(
+            "mcp__krw-filings__get_coverage_state",
+            { ticker: "AAPL" },
+          );
+          yield {
+            type: "result",
+            subtype: "success",
+            result: "공시 원문 기반 답변입니다.",
+            usage: { input_tokens: 10, output_tokens: 12 },
+          };
+        }),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111129",
+        userId: "123e4567-e89b-42d3-a456-426614174000",
+        userMessage: "이 공시가 투자 가설에 어떤 의미가 있어?",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        sourceFilingEventId,
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(sourceDecision).toEqual({
+      behavior: "allow",
+      updatedInput: { filing_event_id: sourceFilingEventId },
+    });
+    expect(documentDecision).toEqual({
+      behavior: "allow",
+      updatedInput: {
+        filing_event_id: sourceFilingEventId,
+        document_key: "document:exhibit",
+      },
+    });
+    expect(searchDecision).toMatchObject({ behavior: "deny" });
+    expect(ontologyDecision).toMatchObject({ behavior: "deny" });
+    expect(personalDecision).toMatchObject({ behavior: "deny" });
+
+    const queryCall = sdkMocks.query.mock.calls[0]?.[0];
+    const options = queryCall.options;
+    expect(queryCall.prompt).toContain(
+      "/krw-ontology:krw-ontology-filing-follow-up 이 공시가 투자 가설에 어떤 의미가 있어?",
+    );
+    expect(queryCall.prompt).not.toContain("Research mode: deep.");
+    expect(options.allowedTools).toEqual([
+      "mcp__krw-filings__get_filing",
+      "mcp__krw-filings__get_filing_brief",
+      "mcp__krw-filings__list_filing_sections",
+      "mcp__krw-filings__read_filing_section",
+      "mcp__krw-filings__list_filing_documents",
+      "mcp__krw-filings__read_filing_document",
+      "mcp__krw-filings__get_form4_insider_transactions",
+    ]);
+    expect(options.mcpServers["krw-filings"].headers).toEqual({
+      Authorization: "Bearer test-filings-service-secret",
+    });
+  });
+
+  it("does not put an on-demand filing body from an SDK tool summary into run events", async () => {
+    process.env.FILINGS_MCP_ENABLED = "1";
+    process.env.FILINGS_MCP_AUTH_TOKEN = "test-filings-service-secret";
+    writeFileSync(
+      "/tmp/krw-ontology-plugin/.mcp.json",
+      JSON.stringify({
+        mcpServers: {
+          "krw-ontology": {
+            type: "http",
+            url: "http://127.0.0.1:8765/mcp",
+            alwaysLoad: true,
+          },
+          "krw-filings": {
+            type: "http",
+            url: "http://127.0.0.1:8785/mcp",
+            alwaysLoad: true,
+          },
+        },
+      }),
+    );
+    const rawBody = "EXHIBIT_SENTINEL raw attachment text";
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        sdkToolUseMessage(
+          "mcp__krw-filings__read_filing_document",
+          1,
+          { document_key: "document:exhibit" },
+        ),
+        {
+          type: "tool_use_summary",
+          preceding_tool_use_ids: ["tool-1"],
+          summary: rawBody,
+        },
+        {
+          type: "result",
+          subtype: "success",
+          result: "첨부문서 기반 답변입니다.",
+          usage: { input_tokens: 10, output_tokens: 12 },
+        },
+      ]),
+    );
+    const writes: string[] = [];
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111129",
+        userMessage: "첨부 보도자료를 읽어줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        sourceFilingEventId: "123e4567-e89b-42d3-a456-426614174000",
+      },
+      {
+        write: vi.fn(async (chunk: Uint8Array) => {
+          writes.push(Buffer.from(chunk).toString("utf8"));
+        }),
+      },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(result.acc.toolCalls[0]?.resultSummary).toBe(
+      "SEC filing source body read (0 characters; body omitted from persistence).",
+    );
+    expect(writes.join("")).not.toContain("EXHIBIT_SENTINEL");
+    expect(writes.join("")).toContain("body omitted from persistence");
   });
 
   it("atomically reserves the last personal tool slot across parallel permission requests", async () => {
@@ -1280,7 +1484,7 @@ describe("agent runner research budget recovery", () => {
       stockNewsSdkToolName("search_company_news_events"),
     );
     expect(call.options.allowedTools).not.toContain(
-      "mcp__krw_presentation__create_chart_v1",
+      "mcp__krw_presentation__compose_visualization",
     );
     expect(call.options.strictMcpConfig).toBe(true);
     expect(call.options.mcpServers).toEqual({
@@ -1294,7 +1498,7 @@ describe("agent runner research budget recovery", () => {
       "Do not perform web searches",
     );
     expect(call.options.systemPrompt.append).not.toContain(
-      "Inline chart policy",
+      "Structured visualization policy",
     );
   });
 
@@ -2852,16 +3056,16 @@ describe("agent runner research budget recovery", () => {
     expect(sdkMocks.query).toHaveBeenCalledTimes(1);
   });
 
-  it("enables chart tools only when the chart feature flag is on", async () => {
+  it("enables compiler-owned visualization tools only when the feature flag is on", async () => {
     await expect(
-      canUseTool("mcp__krw_presentation__create_chart_v1"),
+      canUseTool("mcp__krw_presentation__compose_visualization"),
     ).resolves.toMatchObject({
       behavior: "deny",
     });
 
     process.env.KRW_CHARTS_ENABLED = "1";
     await expect(
-      canUseTool("mcp__krw_presentation__create_chart_v1"),
+      canUseTool("mcp__krw_presentation__compose_visualization"),
     ).resolves.toEqual({
       behavior: "allow",
     });
@@ -2897,10 +3101,48 @@ describe("agent runner research budget recovery", () => {
     expect(result.status).toBe("completed");
     const call = sdkMocks.query.mock.calls[0]?.[0];
     expect(call.options.allowedTools).toContain(
-      "mcp__krw_presentation__create_chart_v1",
+      "mcp__krw_presentation__compose_visualization",
     );
     expect(call.options.mcpServers).toHaveProperty("krw_presentation");
-    expect(call.options.systemPrompt.append).toContain("Inline chart policy");
+    expect(call.options.systemPrompt.append).toContain("Structured visualization policy");
+  });
+
+  it("makes the same visualization tool available to a Guru run without weakening its evidence boundary", async () => {
+    process.env.KRW_VISUALIZATIONS_MODE = "on";
+    sdkMocks.query.mockReturnValueOnce(
+      makeSdkQuery([
+        {
+          type: "result",
+          subtype: "success",
+          result: "구루 관점의 최종 답변입니다.",
+          usage: { input_tokens: 10, output_tokens: 12 },
+        },
+      ]),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "AAPL을 버핏 관점으로 봐줘",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+        researchMode: "deep",
+        runKind: "guru_advisor",
+        guruLensKey: "buffett",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    const call = sdkMocks.query.mock.calls[0]?.[0];
+    expect(call.options.allowedTools).toContain(
+      "mcp__krw_presentation__compose_visualization",
+    );
+    expect(call.options.mcpServers).toHaveProperty("krw_presentation");
+    expect(call.options.systemPrompt.append).toContain(
+      "sealed company-evidence workflow",
+    );
   });
 
   it("denies Stock News MCP by default and allows it only when explicitly enabled", async () => {
@@ -3180,8 +3422,27 @@ describe("agent runner research budget recovery", () => {
     );
   });
 
-  it("uses selected news context with ordinary ontology company research", async () => {
+  it("uses selected news context with bounded on-demand filing correlation", async () => {
     process.env.STOCK_NEWS_ENABLED = "1";
+    process.env.FILINGS_MCP_ENABLED = "1";
+    process.env.FILINGS_MCP_AUTH_TOKEN = "test-filings-service-secret";
+    writeFileSync(
+      "/tmp/krw-ontology-plugin/.mcp.json",
+      JSON.stringify({
+        mcpServers: {
+          "krw-ontology": {
+            type: "http",
+            url: "http://127.0.0.1:8765/mcp",
+            alwaysLoad: true,
+          },
+          "krw-filings": {
+            type: "http",
+            url: "http://127.0.0.1:8785/mcp",
+            alwaysLoad: true,
+          },
+        },
+      }),
+    );
 
     sdkMocks.query.mockReturnValueOnce(
       makeSdkQuery([
@@ -3220,18 +3481,62 @@ describe("agent runner research budget recovery", () => {
 
     expect(result.status).toBe("completed");
     const call = sdkMocks.query.mock.calls[0]?.[0];
+    expect(call.options.allowedTools).not.toContain(
+      sdkToolName("krw_ontology_query_context"),
+    );
+    expect(call.options.disallowedTools).toEqual(
+      expect.arrayContaining([
+        sdkToolName("krw_ontology_query_context"),
+        sdkToolName("krw_ontology_query"),
+      ]),
+    );
     expect(call.options.allowedTools).toEqual(
-      expect.arrayContaining([sdkToolName("krw_ontology_query_context")]),
+      expect.arrayContaining([
+        "mcp__krw-filings__search_catalog_filings",
+        "mcp__krw-filings__list_filing_sections",
+        "mcp__krw-filings__read_filing_section",
+      ]),
     );
     expect(call.options.allowedTools).not.toContain(
       stockNewsSdkToolName("search_company_news_events"),
     );
-    expect(call.prompt).toContain("/krw-ontology:krw-ontology-research");
+    expect(call.prompt).toContain(
+      "/krw-ontology:krw-ontology-news-filing-correlation",
+    );
+    expect(call.prompt).toContain("같은 ticker의 시점과 주제가 가까운 8-K 또는 6-K");
+    expect(call.prompt).toContain("do not request KRW Ontology retrieval");
+    expect(call.prompt).not.toContain("Start KRW ontology retrieval");
     expect(call.prompt).toContain("<selected_news_event_context>");
+    expect(call.options.mcpServers).toEqual(
+      expect.objectContaining({
+        "krw-filings": expect.objectContaining({
+          url: "http://127.0.0.1:8785/mcp",
+        }),
+      }),
+    );
   });
 
-  it("uses market move skill with runtime Yahoo Finance tools and no Stock News tools", async () => {
+  it("uses news-filing correlation with runtime Yahoo Finance tools and no Stock News tools", async () => {
     process.env.STOCK_NEWS_ENABLED = "1";
+    process.env.FILINGS_MCP_ENABLED = "1";
+    process.env.FILINGS_MCP_AUTH_TOKEN = "test-filings-service-secret";
+    writeFileSync(
+      "/tmp/krw-ontology-plugin/.mcp.json",
+      JSON.stringify({
+        mcpServers: {
+          "krw-ontology": {
+            type: "http",
+            url: "http://127.0.0.1:8765/mcp",
+            alwaysLoad: true,
+          },
+          "krw-filings": {
+            type: "http",
+            url: "http://127.0.0.1:8785/mcp",
+            alwaysLoad: true,
+          },
+        },
+      }),
+    );
 
     sdkMocks.query.mockReturnValueOnce(
       makeSdkQuery([
@@ -3264,13 +3569,16 @@ describe("agent runner research budget recovery", () => {
 
     expect(result.status).toBe("completed");
     const call = sdkMocks.query.mock.calls[0]?.[0];
-    expect(call.options.allowedTools).toEqual(
-      expect.arrayContaining([sdkToolName("krw_ontology_query_context")]),
+    expect(call.options.allowedTools).not.toContain(
+      sdkToolName("krw_ontology_query_context"),
     );
     expect(call.options.allowedTools).toEqual(
       expect.arrayContaining([
         yahooFinanceSdkToolName("get_stock_info"),
         yahooFinanceSdkToolName("get_yahoo_finance_news"),
+        "mcp__krw-filings__search_catalog_filings",
+        "mcp__krw-filings__get_filing_brief",
+        "mcp__krw-filings__read_filing_section",
       ]),
     );
     expect(call.options.allowedTools).not.toContain(
@@ -3281,22 +3589,22 @@ describe("agent runner research budget recovery", () => {
     );
     expect(call.options.systemPrompt.append).not.toContain("Stock News MCP");
     expect(call.prompt).toContain(
-      "/krw-ontology:krw-ontology-market-move-research",
-    );
-    expect(call.prompt).toContain("웹앱 주가 변동 research 실행");
-    expect(call.prompt).toContain(
-      "현재 시장/뉴스 MCP 도구를 런타임에서 직접 호출",
+      "/krw-ontology:krw-ontology-news-filing-correlation",
     );
     expect(call.prompt).toContain(
-      "최종 답변에는 Yahoo Finance 같은 provider 이름을 절대 쓰지 말고",
+      "웹앱 뉴스·공시 상관관계 research 실행",
     );
-    expect(call.prompt).toContain("헤드라인 요약이 아니라");
-    expect(call.prompt).toContain("무엇을 추가로 확인해야 하는지");
+    expect(call.prompt).toContain(
+      "시장 보도, 회사가 공시로 직접 확인한 사실",
+    );
     expect(call.prompt).not.toContain("<selected_news_event_context>");
     expect(call.options.mcpServers).toEqual(
       expect.objectContaining({
         yahoo_finance: expect.objectContaining({
           name: "yahoo_finance",
+        }),
+        "krw-filings": expect.objectContaining({
+          url: "http://127.0.0.1:8785/mcp",
         }),
       }),
     );
@@ -3339,6 +3647,297 @@ describe("agent runner research budget recovery", () => {
     });
 
     expect(permission.behavior).toBe("allow");
+  });
+
+  it("allows bounded on-demand filing reads during market-move correlation", async () => {
+    process.env.FILINGS_MCP_ENABLED = "1";
+    process.env.FILINGS_MCP_AUTH_TOKEN = "test-filings-service-secret";
+    writeFileSync(
+      "/tmp/krw-ontology-plugin/.mcp.json",
+      JSON.stringify({
+        mcpServers: {
+          "krw-ontology": {
+            type: "http",
+            url: "http://127.0.0.1:8765/mcp",
+            alwaysLoad: true,
+          },
+          "krw-filings": {
+            type: "http",
+            url: "http://127.0.0.1:8785/mcp",
+            alwaysLoad: true,
+          },
+        },
+      }),
+    );
+
+    const { permission } = await probeToolPermission({
+      existingTools: [],
+      attemptedTool: "search_catalog_filings",
+      analysisMode: "news",
+      runKind: "market_move_research",
+      input: { ticker: "AAPL", limit: 5 },
+    });
+
+    expect(permission).toEqual({ behavior: "allow" });
+  });
+
+  it("enforces the correlation-only tool boundary in the authoritative PreToolUse hook", async () => {
+    process.env.FILINGS_MCP_ENABLED = "1";
+    process.env.FILINGS_MCP_AUTH_TOKEN = "test-filings-service-secret";
+    writeFileSync(
+      "/tmp/krw-ontology-plugin/.mcp.json",
+      JSON.stringify({
+        mcpServers: {
+          "krw-ontology": {
+            type: "http",
+            url: "http://127.0.0.1:8765/mcp",
+            alwaysLoad: true,
+          },
+          "krw-filings": {
+            type: "http",
+            url: "http://127.0.0.1:8785/mcp",
+            alwaysLoad: true,
+          },
+        },
+      }),
+    );
+    let decision: unknown;
+    sdkMocks.query.mockImplementationOnce(
+      (call: {
+        options: {
+          hooks?: {
+            PreToolUse?: Array<{
+              hooks: Array<
+                (
+                  input: Record<string, unknown>,
+                  toolUseID: string,
+                  options: { signal: AbortSignal },
+                ) => Promise<unknown>
+              >;
+            }>;
+          };
+        };
+      }) =>
+        makeSdkQueryFromGenerator(async function* () {
+          const hook = call.options.hooks?.PreToolUse?.[0]?.hooks?.[0];
+          if (!hook) throw new Error("missing correlation PreToolUse hook");
+          decision = await hook(
+            {
+              hook_event_name: "PreToolUse",
+              session_id: "11111111-1111-4111-8111-111111111111",
+              transcript_path: "/tmp/transcript.jsonl",
+              cwd: "/tmp",
+              tool_use_id: "correlation-ontology-tool",
+              // The actual SDK PreToolUse event uses a bare MCP name, even
+              // though allowedTools uses mcp__server__tool names.
+              tool_name: "krw_ontology_query",
+              tool_input: { ticker: "MTB", topic: "earnings" },
+            },
+            "correlation-ontology-tool",
+            { signal: new AbortController().signal },
+          );
+          yield {
+            type: "result",
+            subtype: "success",
+            result: "상관관계 경계를 확인했습니다.",
+            usage: { input_tokens: 10, output_tokens: 12 },
+          };
+        }),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "MTB 주가가 왜 움직였는지 뉴스와 8-K를 함께 봐줘",
+        scopeType: "company",
+        defaultTickers: ["MTB"],
+        defaultDocumentTypes: [],
+        researchMode: "standard",
+        runKind: "market_move_research",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(hookDecision(decision)).toBe("deny");
+  });
+
+  it("allows only one catalog search during a news-filing correlation run", async () => {
+    process.env.FILINGS_MCP_ENABLED = "1";
+    process.env.FILINGS_MCP_AUTH_TOKEN = "test-filings-service-secret";
+    writeFileSync(
+      "/tmp/krw-ontology-plugin/.mcp.json",
+      JSON.stringify({
+        mcpServers: {
+          "krw-ontology": {
+            type: "http",
+            url: "http://127.0.0.1:8765/mcp",
+            alwaysLoad: true,
+          },
+          "krw-filings": {
+            type: "http",
+            url: "http://127.0.0.1:8785/mcp",
+            alwaysLoad: true,
+          },
+        },
+      }),
+    );
+    const decisions: unknown[] = [];
+    sdkMocks.query.mockImplementationOnce(
+      (call: {
+        options: {
+          hooks?: {
+            PreToolUse?: Array<{
+              hooks: Array<
+                (
+                  input: Record<string, unknown>,
+                  toolUseID: string,
+                  options: { signal: AbortSignal },
+                ) => Promise<unknown>
+              >;
+            }>;
+          };
+        };
+      }) =>
+        makeSdkQueryFromGenerator(async function* () {
+          const hook = call.options.hooks?.PreToolUse?.[0]?.hooks?.[0];
+          if (!hook) throw new Error("missing correlation PreToolUse hook");
+          for (const toolUseId of ["correlation-search-1", "correlation-search-2"]) {
+            decisions.push(
+              await hook(
+                {
+                  hook_event_name: "PreToolUse",
+                  session_id: "11111111-1111-4111-8111-111111111111",
+                  transcript_path: "/tmp/transcript.jsonl",
+                  cwd: "/tmp",
+                  tool_use_id: toolUseId,
+                  tool_name: "search_catalog_filings",
+                  tool_input: { ticker: "MTB", limit: 5 },
+                },
+                toolUseId,
+                { signal: new AbortController().signal },
+              ),
+            );
+          }
+          yield {
+            type: "result",
+            subtype: "success",
+            result: "공시 카탈로그 검색 횟수를 확인했습니다.",
+            usage: { input_tokens: 10, output_tokens: 12 },
+          };
+        }),
+    );
+
+    const result = await runAgent(
+      {
+        sessionId: "11111111-1111-4111-8111-111111111111",
+        userMessage: "MTB 주가가 왜 움직였는지 뉴스와 8-K를 함께 봐줘",
+        scopeType: "company",
+        defaultTickers: ["MTB"],
+        defaultDocumentTypes: [],
+        researchMode: "standard",
+        runKind: "market_move_research",
+      },
+      { write: vi.fn().mockResolvedValue(undefined) },
+    );
+
+    expect(result.status).toBe("completed");
+    expect(hookDecision(decisions[0])).toBe("allow");
+    expect(hookDecision(decisions[1])).toBe("deny");
+  });
+
+  it("keeps on-demand filing reads unavailable to ordinary company research", async () => {
+    process.env.FILINGS_MCP_ENABLED = "1";
+    process.env.FILINGS_MCP_AUTH_TOKEN = "test-filings-service-secret";
+
+    const { permission } = await probeToolPermission({
+      existingTools: [],
+      attemptedTool: "search_catalog_filings",
+      analysisMode: "company",
+      runKind: "company_research",
+      input: { ticker: "AAPL", limit: 5 },
+    });
+
+    expect(permission.behavior).toBe("deny");
+    if (permission.behavior === "deny") {
+      expect(permission.message).toContain("bounded news-filing correlation");
+    }
+  });
+
+  it("enables on-demand filing correlation for an explicit recent 8-K request", async () => {
+    process.env.FILINGS_MCP_ENABLED = "1";
+    process.env.FILINGS_MCP_AUTH_TOKEN = "test-filings-service-secret";
+    writeFileSync(
+      "/tmp/krw-ontology-plugin/.mcp.json",
+      JSON.stringify({
+        mcpServers: {
+          "krw-ontology": {
+            type: "http",
+            url: "http://127.0.0.1:8765/mcp",
+            alwaysLoad: true,
+          },
+          "krw-filings": {
+            type: "http",
+            url: "http://127.0.0.1:8785/mcp",
+            alwaysLoad: true,
+          },
+        },
+      }),
+    );
+
+    const { permission, result } = await probeToolPermission({
+      existingTools: [],
+      attemptedTool: "search_catalog_filings",
+      analysisMode: "company",
+      runKind: "company_research",
+      userMessage: "AAPL 최근 8-K 원문을 뉴스와 함께 확인해줘",
+      input: { ticker: "AAPL", limit: 5 },
+    });
+
+    expect(permission).toEqual({ behavior: "allow" });
+    const call = sdkMocks.query.mock.calls[0]?.[0];
+    expect(call.prompt).toContain(
+      "/krw-ontology:krw-ontology-news-filing-correlation",
+    );
+    expect(result.status).toBe("completed");
+  });
+
+  it("limits on-demand filing calls separately during market-move correlation", async () => {
+    process.env.FILINGS_MCP_ENABLED = "1";
+    process.env.FILINGS_MCP_AUTH_TOKEN = "test-filings-service-secret";
+    process.env.FILINGS_MCP_MAX_CALLS = "2";
+    writeFileSync(
+      "/tmp/krw-ontology-plugin/.mcp.json",
+      JSON.stringify({
+        mcpServers: {
+          "krw-ontology": {
+            type: "http",
+            url: "http://127.0.0.1:8765/mcp",
+            alwaysLoad: true,
+          },
+          "krw-filings": {
+            type: "http",
+            url: "http://127.0.0.1:8785/mcp",
+            alwaysLoad: true,
+          },
+        },
+      }),
+    );
+
+    const { permission } = await probeToolPermission({
+      existingTools: ["search_catalog_filings", "get_filing"],
+      attemptedTool: "get_filing_brief",
+      analysisMode: "news",
+      runKind: "market_move_research",
+      input: {
+        filing_event_id: "123e4567-e89b-42d3-a456-426614174000",
+      },
+    });
+
+    expect(permission.behavior).toBe("deny");
+    if (permission.behavior === "deny") {
+      expect(permission.message).toContain("No more on-demand SEC filing tools");
+    }
   });
 
   it("denies Yahoo Finance tools outside news and market-move workflows", async () => {

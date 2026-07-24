@@ -176,7 +176,10 @@ function createSupabase(overrides: {
                   error: null,
                 });
               }
-              if (table === "chat_message_charts") {
+              if (
+                table === "chat_message_visualizations" ||
+                table === "chat_message_presentations"
+              ) {
                 return Promise.resolve({
                   data: [],
                   error: null,
@@ -257,11 +260,13 @@ describe("GET /api/chat/[sessionId]", () => {
       "messages",
       "agent_runs",
       "chat_message_artifacts",
-      "chat_message_charts",
+      "chat_message_visualizations",
+      "chat_message_presentations",
     ]);
     expect(body).toMatchObject({
       chat_artifacts: [],
-      charts: [],
+      visualizations: [],
+      presentations: [],
       artifact_selections: [],
       message_pagination: {
         limit: 50,

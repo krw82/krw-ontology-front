@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "리서치 노트북 | KRW.O",
-  description: "보유 종목과 관심 종목의 리서치 이유, 질문, 노트를 관리합니다.",
+  description: "관심 기업의 리서치 이유, 질문, 노트를 관리합니다.",
 };
 
 const EMPTY_OVERVIEW: WatchlistOverviewResponse = {
@@ -20,7 +20,6 @@ const EMPTY_OVERVIEW: WatchlistOverviewResponse = {
   stats: {
     total: 0,
     interest: 0,
-    holding: 0,
     open_questions: 0,
     notes: 0,
     recent_activity: 0,

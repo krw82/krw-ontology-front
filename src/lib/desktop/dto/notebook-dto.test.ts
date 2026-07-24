@@ -67,7 +67,6 @@ describe("Desktop notebook DTO", () => {
       stats: {
         total: 1,
         interest: 1,
-        holding: 0,
         open_questions: 1,
         notes: 1,
         recent_activity: 1,

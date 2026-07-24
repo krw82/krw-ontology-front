@@ -12,16 +12,15 @@ import { PULSE_LEARNING_ENTRIES } from "@/content/pulse/learning";
 import type {
   PulseItemKind,
   PulseItemMutationResponse,
-  PulseStateMutationAction,
+  PulseMutationAction,
 } from "@/types/api-contracts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
-  action: z.enum(["review", "unreview", "save", "unsave", "snooze", "dismiss", "impression"]),
+  action: z.enum(["review", "unreview", "save", "unsave", "snooze", "dismiss"]),
   snoozed_until: z.iso.datetime().optional(),
-  feed_session_id: z.string().uuid().optional(),
 }).strict();
 
 export async function PATCH(
@@ -67,9 +66,6 @@ export async function PATCH(
       { status: 400 },
     );
   }
-  if (action === "impression" && !parsed.data.feed_session_id) {
-    return Response.json({ error: { code: "validation_error", message: "노출 세션 정보가 필요합니다." } }, { status: 400 });
-  }
   const now = new Date();
   const snoozedUntil = action === "snooze"
     ? parsed.data.snoozed_until ?? new Date(now.getTime() + 24 * 60 * 60 * 1_000).toISOString()
@@ -97,15 +93,12 @@ export async function PATCH(
       action,
       now: now.toISOString(),
       snoozedUntil,
-      feedSessionId: parsed.data.feed_session_id ?? null,
     });
-    if (action !== "impression") {
-      void recordAnalyticsEventFromRequest(request, {
-        eventName: "pulse_item_actioned",
-        userId: user.id,
-        properties: { item_kind: sourceType, action },
-      });
-    }
+    void recordAnalyticsEventFromRequest(request, {
+      eventName: "pulse_item_actioned",
+      userId: user.id,
+      properties: { item_kind: sourceType, action },
+    });
     if (
       sourceType === "resurface" &&
       sourceId.startsWith("monitoring:") &&
@@ -142,10 +135,9 @@ interface MutationContext {
   itemKey: string;
   sourceType: PulseItemKind;
   sourceId: string;
-  action: PulseStateMutationAction;
+  action: PulseMutationAction;
   now: string;
   snoozedUntil: string | null;
-  feedSessionId?: string | null;
 }
 
 async function mutateSourceIfRequired(context: MutationContext): Promise<boolean> {
@@ -257,27 +249,6 @@ async function upsertState(context: MutationContext) {
       dismissed_at: string | null;
     };
   }
-  if (context.action === "impression") {
-    const { error } = await supabase.rpc("record_pulse_item_impression", {
-      p_user_id: context.userId,
-      p_item_key: context.itemKey,
-      p_source_type: context.sourceType,
-      p_source_id: context.sourceId,
-      p_kind: context.sourceType,
-      p_feed_session_id: context.feedSessionId!,
-      p_seen_at: context.now,
-    });
-    if (error) throw error;
-    const { data, error: stateError } = await supabase
-      .from("user_pulse_item_states")
-      .select("reviewed_at,saved_at,snoozed_until,dismissed_at")
-      .eq("user_id", context.userId)
-      .eq("item_key", context.itemKey)
-      .single();
-    if (stateError) throw stateError;
-    return data;
-  }
-
   const { data: existing, error: existingError } = await supabase
     .from("user_pulse_item_states")
     .select("first_seen_at")

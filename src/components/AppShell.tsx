@@ -5,10 +5,11 @@ import { usePathname, useSearchParams } from "next/navigation";
 import ChatSidebar from "@/components/ChatSidebar";
 import TopNav, { type TopNavUserProfile } from "@/components/TopNav";
 import ProductOnboardingTour from "@/components/ProductOnboardingTour";
-import MobileBottomNavigation from "@/components/navigation/MobileBottomNavigation";
 import WorkspaceScrollRestoration from "@/components/navigation/WorkspaceScrollRestoration";
 import { stripLocalePrefix } from "@/i18n/routing";
 import { getWorkspaceShellMode } from "@/lib/navigation/workspace-routes";
+
+const IS_DEV_ENV = process.env.NODE_ENV === "development";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -34,36 +35,17 @@ function WorkspaceHeaderFallback() {
   );
 }
 
-function MobileBottomNavigationFallback() {
-  return (
-    <div
-      aria-hidden="true"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-canvas/95 lg:hidden"
-      style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}
-    >
-      <div className="mx-auto grid min-h-14 w-full max-w-[560px] grid-cols-4 px-xs">
-        {Array.from({ length: 4 }, (_, index) => (
-          <div
-            key={index}
-            className="mx-auto my-2 h-10 w-12 rounded-[10px] bg-surface-soft"
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function BrowseOnboardingLayer({ pathname }: { pathname: string }) {
   const searchParams = useSearchParams();
   const forceLegacyTour = searchParams.get("tour") === "1";
   const onboardingContinuePath = searchParams.get("continue");
 
-  if (!forceLegacyTour) return null;
+  if (!forceLegacyTour && !IS_DEV_ENV) return null;
 
   return (
     <ProductOnboardingTour
       pathname={pathname}
-      force
+      force={forceLegacyTour}
       continuePath={onboardingContinuePath}
     />
   );
@@ -148,16 +130,13 @@ export default function AppShell({
           />
         </Suspense>
         <div
-          className="min-w-0 flex-1 pb-[calc(64px+env(safe-area-inset-bottom))] lg:pb-0"
+          className="min-w-0 flex-1"
           data-workspace-scroll-content
         >
           {children}
         </div>
         <Suspense fallback={null}>
           <WorkspaceScrollRestoration />
-        </Suspense>
-        <Suspense fallback={<MobileBottomNavigationFallback />}>
-          <MobileBottomNavigation />
         </Suspense>
         {isCompanyWorkspace && unlocalizedPathname === "/companies" ? (
           <Suspense fallback={null}>

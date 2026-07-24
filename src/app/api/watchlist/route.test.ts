@@ -77,7 +77,7 @@ describe("POST /api/watchlist", () => {
       mark: {
         user_id: "user-1",
         ticker: "AAPL",
-        coverage_level: "holding",
+        coverage_level: "interest",
         priority: 0,
         interest_reason: "제품 전환 확인",
         tags: ["long-term", "ai"],
@@ -94,7 +94,7 @@ describe("POST /api/watchlist", () => {
     const response = await POST(
       postRequest({
         ticker: " aapl ",
-        coverage_level: "holding",
+        coverage_level: "interest",
         client_mutation_id: "coverage-AAPL-1",
         interest_reason: "제품 전환 확인",
         tags: ["long-term", "ai", "ai"],
@@ -110,12 +110,27 @@ describe("POST /api/watchlist", () => {
       userId: "user-1",
       userEmail: "user@example.test",
       ticker: "AAPL",
-      coverageLevel: "holding",
+      coverageLevel: "interest",
       idempotencyKey: "coverage-AAPL-1",
       source: "watchlist_create",
       interestReason: "제품 전환 확인",
       tags: ["long-term", "ai"],
     });
+  });
+
+  it("rejects the removed holding coverage level before writing user data", async () => {
+    vi.mocked(getIndexedCompany).mockResolvedValue({
+      ticker: "AAPL",
+      name: "Apple Inc.",
+    } as Awaited<ReturnType<typeof getIndexedCompany>>);
+
+    const response = await POST(postRequest({
+      ticker: "AAPL",
+      coverage_level: "holding",
+    }));
+
+    expect(response.status).toBe(400);
+    expect(setCompanyCoverageLevelWithEvent).not.toHaveBeenCalled();
   });
 
   it("rejects unknown tickers before writing user data", async () => {
