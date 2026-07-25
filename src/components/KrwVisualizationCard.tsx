@@ -2,11 +2,18 @@
 
 import { useMemo, useState } from "react";
 import { ResponsiveBar } from "@nivo/bar";
+import { ResponsiveHeatMap } from "@nivo/heatmap";
 import { ResponsiveLine } from "@nivo/line";
+import { ResponsivePie } from "@nivo/pie";
+import { ResponsiveScatterPlot } from "@nivo/scatterplot";
 import type {
   ChatMessageVisualization,
+  VisualizationBridgeDataset,
+  VisualizationCompositionDataset,
+  VisualizationMatrixDataset,
   VisualizationSeries,
   VisualizationView,
+  VisualizationXYDataset,
 } from "@/types/api-contracts";
 
 const VISUALIZATION_COLORS = [
@@ -52,6 +59,39 @@ const visualizationTheme = {
 } as const;
 
 type BarDatum = { period: string; [key: string]: string | number };
+
+interface PieDatum {
+  id: string;
+  label: string;
+  value: number;
+  formatted_value?: string | null;
+}
+
+interface ScatterDatum {
+  x: number;
+  y: number;
+  label: string;
+  x_formatted_value?: string | null;
+  y_formatted_value?: string | null;
+}
+
+interface HeatMapDatum {
+  x: string;
+  y: number | null;
+  formatted_value?: string | null;
+  row_label: string;
+}
+
+type WaterfallDatum = BarDatum & {
+  base: number;
+  increase: number;
+  decrease: number;
+  total: number;
+  step_id: string;
+  step_label: string;
+  step_value: number;
+  formatted_value?: string;
+};
 
 interface LinePointDatum {
   x: string;
@@ -160,13 +200,21 @@ function VisualizationViewCard({
         ) : null}
       </div>
 
+      {view.dataset.kind === "xy" ? (
+        <p className="mb-xs px-sm text-[10px] font-bold leading-4 text-muted sm:px-md sm:text-[11px]">
+          X: {view.dataset.x_label}{view.dataset.x_unit ? ` (${view.dataset.x_unit})` : ""}
+          {" · "}
+          Y: {view.dataset.y_label}{view.dataset.y_unit ? ` (${view.dataset.y_unit})` : ""}
+        </p>
+      ) : null}
+
       {showData || isDataOnly ? (
         <VisualizationDataTable view={view} />
       ) : (
         <>
-          <VisualizationLegend series={view.series} />
+          <VisualizationLegend view={view} />
           <div className="h-[250px] w-full sm:h-[304px]">
-            {isLineLike(view) ? <LineVisualization view={view} /> : <BarVisualization view={view} />}
+            <VisualizationRenderer view={view} />
           </div>
         </>
       )}
@@ -202,13 +250,30 @@ function VisualizationViewCard({
 }
 
 function isRenderableChart(view: VisualizationView) {
-  return ["line", "area", "bar", "stacked_bar", "stacked_100"].includes(
+  return [
+    "line",
+    "area",
+    "bar",
+    "stacked_bar",
+    "stacked_100",
+    "pie",
+    "donut",
+    "scatter",
+    "heatmap",
+    "waterfall",
+  ].includes(
     view.chart_type,
   );
 }
 
-function isLineLike(view: VisualizationView) {
-  return view.chart_type === "line" || view.chart_type === "area";
+function VisualizationRenderer({ view }: { view: VisualizationView }) {
+  if (view.dataset.kind === "composition") return <PieVisualization view={view} dataset={view.dataset} />;
+  if (view.dataset.kind === "xy") return <ScatterVisualization dataset={view.dataset} />;
+  if (view.dataset.kind === "matrix") return <HeatMapVisualization dataset={view.dataset} />;
+  if (view.dataset.kind === "bridge") return <WaterfallVisualization view={view} dataset={view.dataset} />;
+  return view.chart_type === "line" || view.chart_type === "area"
+    ? <LineVisualization view={view} />
+    : <BarVisualization view={view} />;
 }
 
 function LineVisualization({ view }: { view: VisualizationView }) {
@@ -320,22 +385,299 @@ function BarVisualization({ view }: { view: VisualizationView }) {
   );
 }
 
-function VisualizationLegend({ series }: { series: VisualizationSeries[] }) {
-  if (series.length <= 1) return null;
+function PieVisualization({
+  view,
+  dataset,
+}: {
+  view: VisualizationView;
+  dataset: VisualizationCompositionDataset;
+}) {
+  const data = useMemo<PieDatum[]>(
+    () => dataset.slices.map((slice) => ({
+      id: slice.id,
+      label: slice.label,
+      value: slice.value,
+      formatted_value: slice.formatted_value,
+    })),
+    [dataset.slices],
+  );
+
+  return (
+    <ResponsivePie<PieDatum>
+      data={data}
+      margin={{ top: 12, right: 12, bottom: 12, left: 12 }}
+      innerRadius={view.chart_type === "donut" ? 0.62 : 0}
+      padAngle={1.2}
+      cornerRadius={3}
+      sortByValue={false}
+      colors={VISUALIZATION_COLORS}
+      theme={visualizationTheme}
+      enableArcLabels={false}
+      enableArcLinkLabels={false}
+      activeOuterRadiusOffset={5}
+      tooltip={({ datum }) => (
+        <VisualizationTooltip
+          color={datum.color}
+          label={String(datum.label)}
+          period={dataset.period}
+          value={datum.value}
+          formattedValue={datum.data.formatted_value}
+          unit={view.unit}
+        />
+      )}
+    />
+  );
+}
+
+function ScatterVisualization({ dataset }: { dataset: VisualizationXYDataset }) {
+  const data = useMemo(
+    () => [{
+      id: "verified-observations",
+      data: dataset.points.map((point) => ({
+        x: point.x,
+        y: point.y,
+        label: point.label,
+        x_formatted_value: point.x_formatted_value,
+        y_formatted_value: point.y_formatted_value,
+      })),
+    }],
+    [dataset.points],
+  );
+
+  return (
+    <ResponsiveScatterPlot<ScatterDatum>
+      data={data}
+      margin={{ top: 12, right: 16, bottom: 44, left: 56 }}
+      xScale={{ type: "linear", min: "auto", max: "auto" }}
+      yScale={{ type: "linear", min: "auto", max: "auto" }}
+      nodeSize={10}
+      colors={[VISUALIZATION_COLORS[0] ?? "#0052ff"]}
+      theme={visualizationTheme}
+      axisTop={null}
+      axisRight={null}
+      axisBottom={{ tickSize: 0, tickPadding: 8, format: formatAxisValue }}
+      axisLeft={{ tickSize: 0, tickPadding: 8, format: formatAxisValue }}
+      enableGridX={false}
+      enableGridY
+      useMesh
+      tooltip={({ node }) => (
+        <VisualizationXYTooltip
+          label={node.data.label}
+          xLabel={dataset.x_label}
+          yLabel={dataset.y_label}
+          xValue={node.data.x}
+          yValue={node.data.y}
+          xFormattedValue={node.data.x_formatted_value}
+          yFormattedValue={node.data.y_formatted_value}
+          xUnit={dataset.x_unit}
+          yUnit={dataset.y_unit}
+        />
+      )}
+    />
+  );
+}
+
+function HeatMapVisualization({ dataset }: { dataset: VisualizationMatrixDataset }) {
+  const values = dataset.rows.flatMap((row) => row.cells.map((cell) => cell.value));
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const crowded = dataset.columns.length > 5;
+  const data = useMemo(
+    () => dataset.rows.map((row) => {
+      const cellsByColumn = new Map(row.cells.map((cell) => [cell.column, cell]));
+      return {
+        id: compactAxisLabel(row.label),
+        data: dataset.columns.map((column) => {
+          const cell = cellsByColumn.get(column);
+          return {
+            x: column,
+            y: cell?.value ?? null,
+            formatted_value: cell?.formatted_value,
+            row_label: row.label,
+          };
+        }),
+      };
+    }),
+    [dataset.columns, dataset.rows],
+  );
+
+  return (
+    <ResponsiveHeatMap<HeatMapDatum, Record<string, unknown>>
+      data={data}
+      margin={{ top: 12, right: 12, bottom: crowded ? 56 : 42, left: 82 }}
+      forceSquare={false}
+      xInnerPadding={2}
+      yInnerPadding={2}
+      borderRadius={3}
+      colors={(cell) => heatMapColor(cell.value ?? 0, minimum, maximum)}
+      emptyColor="var(--color-surface)"
+      theme={visualizationTheme}
+      axisTop={null}
+      axisRight={null}
+      axisBottom={{ tickSize: 0, tickPadding: 8, tickRotation: crowded ? -32 : 0 }}
+      axisLeft={{ tickSize: 0, tickPadding: 8 }}
+      enableLabels={false}
+      tooltip={({ cell }) => (
+        <VisualizationTooltip
+          color={cell.color}
+          label={cell.data.row_label}
+          period={String(cell.data.x)}
+          value={cell.value ?? 0}
+          formattedValue={cell.data.formatted_value}
+        />
+      )}
+    />
+  );
+}
+
+function WaterfallVisualization({
+  view,
+  dataset,
+}: {
+  view: VisualizationView;
+  dataset: VisualizationBridgeDataset;
+}) {
+  const rows = useMemo<WaterfallDatum[]>(() => {
+    const projected = dataset.steps.reduce<{ running: number; rows: WaterfallDatum[] }>((state, step) => {
+      if (step.kind === "start" || step.kind === "end") {
+        const total = step.value ?? 0;
+        return {
+          running: step.kind === "start" ? total : state.running,
+          rows: [
+            ...state.rows,
+            {
+              period: step.label,
+              base: 0,
+              increase: 0,
+              decrease: 0,
+              total,
+              step_id: step.id,
+              step_label: step.label,
+              step_value: total,
+              ...(step.formatted_value ? { formatted_value: step.formatted_value } : {}),
+            },
+          ],
+        };
+      }
+
+      const delta = step.delta ?? 0;
+      const base = delta >= 0 ? state.running : state.running + delta;
+      return {
+        running: state.running + delta,
+        rows: [
+          ...state.rows,
+          {
+            period: step.label,
+            base,
+            increase: delta >= 0 ? delta : 0,
+            decrease: delta < 0 ? Math.abs(delta) : 0,
+            total: 0,
+            step_id: step.id,
+            step_label: step.label,
+            step_value: delta,
+          },
+        ],
+      };
+    }, { running: 0, rows: [] });
+    return projected.rows;
+  }, [dataset.steps]);
+
+  return (
+    <ResponsiveBar<WaterfallDatum>
+      data={rows}
+      keys={["base", "increase", "decrease", "total"]}
+      indexBy="period"
+      margin={{ top: 12, right: 12, bottom: dataset.steps.length > 5 ? 56 : 42, left: 52 }}
+      padding={0.24}
+      groupMode="stacked"
+      colors={({ id }) => waterfallColor(String(id))}
+      theme={visualizationTheme}
+      axisTop={null}
+      axisRight={null}
+      axisBottom={{
+        tickSize: 0,
+        tickPadding: 8,
+        tickRotation: dataset.steps.length > 5 ? -32 : 0,
+      }}
+      axisLeft={{ tickSize: 0, tickPadding: 8, format: formatAxisValue }}
+      enableGridX={false}
+      enableLabel={false}
+      tooltip={(bar) => {
+        const datum = bar.data as WaterfallDatum;
+        return (
+          <VisualizationTooltip
+            color={bar.color}
+            label={datum.step_label}
+            period={datum.step_label}
+            value={datum.step_value}
+            formattedValue={datum.formatted_value}
+            unit={view.unit}
+          />
+        );
+      }}
+    />
+  );
+}
+
+interface VisualizationLegendItem {
+  id: string;
+  label: string;
+  color: string;
+}
+
+function VisualizationLegend({ view }: { view: VisualizationView }) {
+  if (view.dataset.kind === "matrix") {
+    return (
+      <div className="mb-xs flex items-center justify-end gap-1.5 px-sm text-[10px] font-bold text-muted sm:px-md sm:text-[11px]">
+        <span>낮음</span>
+        <span
+          aria-label="값의 크기에 따른 색상 농도"
+          className="h-2.5 w-16 rounded-full border border-hairline-soft"
+          style={{ background: "linear-gradient(90deg, #dbeafe 0%, #0052ff 100%)" }}
+        />
+        <span>높음</span>
+      </div>
+    );
+  }
+  const items = legendItemsForView(view);
+  if (items.length <= 1) return null;
   return (
     <ul className="mb-xs flex max-h-[52px] flex-wrap gap-x-3 gap-y-1 overflow-y-auto px-sm text-[10px] font-bold leading-4 text-muted sm:px-md sm:text-[11px]">
-      {series.map((item, index) => (
-        <li key={item.series_key} className="flex min-w-0 max-w-full items-center gap-1.5">
+      {items.map((item) => (
+        <li key={item.id} className="flex min-w-0 max-w-full items-center gap-1.5">
           <span
             aria-hidden="true"
             className="size-2 shrink-0 rounded-full"
-            style={{ backgroundColor: colorForSeriesIndex(index) }}
+            style={{ backgroundColor: item.color }}
           />
           <span className="truncate">{item.label}</span>
         </li>
       ))}
     </ul>
   );
+}
+
+function legendItemsForView(view: VisualizationView): VisualizationLegendItem[] {
+  if (view.dataset.kind === "composition") {
+    return view.dataset.slices.map((slice, index) => ({
+      id: slice.id,
+      label: slice.label,
+      color: colorForSeriesIndex(index),
+    }));
+  }
+  if (view.dataset.kind === "bridge") {
+    return [
+      { id: "increase", label: "증가", color: "#0f9f6e" },
+      { id: "decrease", label: "감소", color: "#c2410c" },
+      { id: "total", label: "시작·결과", color: "#0052ff" },
+    ];
+  }
+  if (view.dataset.kind !== "series") return [];
+  return view.series.map((item, index) => ({
+    id: item.series_key,
+    label: item.label,
+    color: colorForSeriesIndex(index),
+  }));
 }
 
 function VisualizationDataTable({ view }: { view: VisualizationView }) {
@@ -423,6 +765,44 @@ function VisualizationTooltip({
   );
 }
 
+function VisualizationXYTooltip({
+  label,
+  xLabel,
+  yLabel,
+  xValue,
+  yValue,
+  xFormattedValue,
+  yFormattedValue,
+  xUnit,
+  yUnit,
+}: {
+  label: string;
+  xLabel: string;
+  yLabel: string;
+  xValue: number;
+  yValue: number;
+  xFormattedValue?: string | null;
+  yFormattedValue?: string | null;
+  xUnit?: string | null;
+  yUnit?: string | null;
+}) {
+  return (
+    <div className="min-w-[196px] px-sm py-xs">
+      <p className="truncate text-[12px] font-black leading-5 text-ink">{label}</p>
+      <dl className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-[12px] leading-5">
+        <dt className="truncate font-bold text-muted">{xLabel}</dt>
+        <dd className="font-extrabold text-ink">
+          {xFormattedValue || formatDisplayValue(xValue)}{xUnit ? ` ${xUnit}` : ""}
+        </dd>
+        <dt className="truncate font-bold text-muted">{yLabel}</dt>
+        <dd className="font-extrabold text-ink">
+          {yFormattedValue || formatDisplayValue(yValue)}{yUnit ? ` ${yUnit}` : ""}
+        </dd>
+      </dl>
+    </div>
+  );
+}
+
 function formatAxisValue(value: number | string) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return String(value);
@@ -440,6 +820,27 @@ function colorForKey(key: string, keys: string[]) {
 
 function colorForSeriesIndex(index: number) {
   return VISUALIZATION_COLORS[index % VISUALIZATION_COLORS.length] ?? VISUALIZATION_COLORS[0];
+}
+
+function waterfallColor(key: string) {
+  if (key === "base") return "transparent";
+  if (key === "increase") return "#0f9f6e";
+  if (key === "decrease") return "#c2410c";
+  return "#0052ff";
+}
+
+function heatMapColor(value: number, minimum: number, maximum: number) {
+  if (!Number.isFinite(value)) return "var(--color-surface)";
+  const ratio = maximum === minimum ? 0.68 : Math.max(0, Math.min(1, (value - minimum) / (maximum - minimum)));
+  const start = [219, 234, 254];
+  const end = [0, 82, 255];
+  const channel = (index: number) => Math.round(start[index]! + ((end[index]! - start[index]!) * ratio));
+  return `rgb(${channel(0)} ${channel(1)} ${channel(2)})`;
+}
+
+function compactAxisLabel(value: string, maxLength = 13) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 1)}…` : normalized;
 }
 
 function xAxisIsCrowded(view: VisualizationView) {

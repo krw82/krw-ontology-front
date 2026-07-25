@@ -36,9 +36,9 @@ export function createVisualizationMcpServer(acc: AccumulatedRun) {
         COMPOSE_VISUALIZATION_TOOL_NAME,
         [
           "Create a verified inline visualization from data already retrieved during this KRW run.",
-          "Give only semantic intent in ordinary Korean or English: the analytical goal, metric names, whether to use the company total or a breakdown, optional group/scope filters, and optional Korean display text. All number values, source ids, units, calculations, chart selection, and placement are runtime-owned.",
+          "Give only semantic intent in ordinary Korean or English: the analytical goal, metric names, whether to use the company total or a breakdown, optional group/scope filters, optional Korean display text, and an optional form only when its data conditions clearly apply. Use composition_snapshot+donut/pie for one-period mix, relationship+scatter for paired measures, matrix+heatmap for a compact category-by-period grid, and bridge+waterfall for one non-negative series of changes. All number values, source ids, units, calculations, final chart selection, and placement are runtime-owned.",
           "Never provide raw chart values, an ECharts/Nivo/Vega spec, evidence ids, or a Markdown insert token.",
-          "The display title and series label hints are editorial only and must be short. The runtime validates them against selected verified series. A skipped or duplicate result is normal; continue the answer without retrying the same visualization.",
+          "The display title and series label hints are editorial only and must be short. Prefer each series_label_hints item as {source:'Americas', label:'미주'}. For a low-capability caller, bare Korean labels are also accepted only when include_scopes has the same number of items and the labels are in exactly the same order; the runtime then pairs them with those verified source scopes. The runtime validates hints against selected verified series. A skipped or duplicate result is normal; continue the answer without retrying the same visualization.",
         ].join(" "),
         {
           // All fields are optional and normalized in the handler. This avoids
@@ -73,7 +73,7 @@ export function createVisualizationMcpServer(acc: AccumulatedRun) {
           // Build at call time, after preceding MCP results have reached acc.
           const registry = VisualizationDatasetRegistry.fromAccumulatedRun(acc);
           const result = compileVisualization({
-            intent: normalizeToolIntent(args),
+            intent: normalizeVisualizationToolIntent(args),
             registry,
             artifactIndex: visualizationCount + 1,
           });
@@ -98,7 +98,7 @@ export function createVisualizationMcpServer(acc: AccumulatedRun) {
   });
 }
 
-function normalizeToolIntent(args: Record<string, unknown>): VisualizationIntent {
+export function normalizeVisualizationToolIntent(args: Record<string, unknown>): VisualizationIntent {
   const measures = typeof args.measures === "string"
     ? [args.measures]
     : Array.isArray(args.measures)
@@ -107,14 +107,8 @@ function normalizeToolIntent(args: Record<string, unknown>): VisualizationIntent
   const strings = (value: unknown): string[] | undefined => Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : undefined;
-  const labels = Array.isArray(args.series_label_hints)
-    ? args.series_label_hints.flatMap((value) => {
-      if (!isRecord(value) || typeof value.source !== "string" || typeof value.label !== "string") {
-        return [];
-      }
-      return [{ source: value.source, label: value.label }];
-    })
-    : undefined;
+  const includeScopes = strings(args.include_scopes);
+  const labels = normalizeSeriesLabelHints(args.series_label_hints, includeScopes);
   return {
     goal: typeof args.goal === "string" ? args.goal : "",
     measures,
@@ -122,7 +116,7 @@ function normalizeToolIntent(args: Record<string, unknown>): VisualizationIntent
     relationship: allowedRelationship(args.relationship),
     scope_mode: allowedScopeMode(args.scope_mode),
     group_by: stringOrNull(args.group_by),
-    include_scopes: strings(args.include_scopes),
+    include_scopes: includeScopes,
     exclude_scopes: strings(args.exclude_scopes),
     transform_hints: strings(args.transform_hints)?.flatMap((value) => {
       const transform = allowedTransform(value);
@@ -140,12 +134,54 @@ function normalizeToolIntent(args: Record<string, unknown>): VisualizationIntent
   };
 }
 
+function normalizeSeriesLabelHints(
+  value: unknown,
+  includeScopes: string[] | undefined,
+): VisualizationIntent["series_label_hints"] {
+  if (!Array.isArray(value)) return undefined;
+  const objectHints = value.flatMap((item) => {
+    if (!isRecord(item) || typeof item.source !== "string" || typeof item.label !== "string") {
+      return [];
+    }
+    return [{ source: item.source, label: item.label }];
+  });
+  if (objectHints.length > 0) return objectHints;
+
+  // Some small models emit just ["미주", "유럽"] despite the object-shaped
+  // contract. When and only when an equally sized verified source list is
+  // present, pair by position. This remains presentation-only and the compiler
+  // still verifies every source against the run-local registry.
+  const bareLabels = value.filter((item): item is string => typeof item === "string");
+  if (
+    bareLabels.length !== value.length ||
+    !includeScopes ||
+    includeScopes.length !== bareLabels.length
+  ) {
+    return undefined;
+  }
+  return bareLabels.map((label, index) => ({
+    source: includeScopes[index]!,
+    label,
+  }));
+}
+
 function stringOrNull(value: unknown): string | null | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
 function allowedRelationship(value: unknown): VisualizationIntent["relationship"] {
-  return isOneOf(value, ["auto", "trend", "comparison", "composition", "relationship", "decomposition", "exact_values"])
+  return isOneOf(value, [
+    "auto",
+    "trend",
+    "comparison",
+    "composition",
+    "composition_snapshot",
+    "relationship",
+    "decomposition",
+    "bridge",
+    "matrix",
+    "exact_values",
+  ])
     ? value
     : undefined;
 }
@@ -165,7 +201,20 @@ function allowedOverlay(value: string): NonNullable<VisualizationIntent["event_o
 }
 
 function allowedViewType(value: unknown): VisualizationIntent["preferred_form"] {
-  return isOneOf(value, ["auto", "line", "area", "bar", "stacked_bar", "stacked_100", "scatter", "waterfall", "table"])
+  return isOneOf(value, [
+    "auto",
+    "line",
+    "area",
+    "bar",
+    "stacked_bar",
+    "stacked_100",
+    "pie",
+    "donut",
+    "scatter",
+    "heatmap",
+    "waterfall",
+    "table",
+  ])
     ? value
     : undefined;
 }

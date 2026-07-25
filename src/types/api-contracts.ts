@@ -7,11 +7,16 @@ export type {
   ChatMessagePresentation,
   ChatMessageVisualization,
   KrwVisualizationArtifact,
+  VisualizationBridgeDataset,
+  VisualizationCompositionDataset,
+  VisualizationDataset,
   PresentationBlock,
   VisualizationIntent,
+  VisualizationMatrixDataset,
   VisualizationSeries,
   VisualizationToolResult,
   VisualizationView,
+  VisualizationXYDataset,
 } from "@/lib/visualizations/contracts";
 
 /**

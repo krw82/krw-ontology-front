@@ -619,4 +619,407 @@ describe("visualization compiler", () => {
     expect(first.artifact?.semantic_fingerprint).toBe(second.artifact?.semantic_fingerprint);
     expect(first.artifact?.artifact_ref).toBe(second.artifact?.artifact_ref);
   });
+
+  it("compiles a one-period breakdown into a deterministic donut dataset", () => {
+    const registry = VisualizationDatasetRegistry.fromAccumulatedRun(accumulator([
+      metricSeries({
+        key: "AAPL|revenue|americas|USD|annual",
+        label: "Americas segment revenue",
+        metric: "revenue",
+        unit: "USD",
+        scope: { kind: "geography", key: "americas", label: "Americas" },
+        points: [["CY2025", 55]],
+      }),
+      metricSeries({
+        key: "AAPL|revenue|europe|USD|annual",
+        label: "Europe segment revenue",
+        metric: "revenue",
+        unit: "USD",
+        scope: { kind: "geography", key: "europe", label: "Europe" },
+        points: [["CY2025", 45]],
+      }),
+    ]));
+
+    const result = compileVisualization({
+      intent: {
+        goal: "애플 지역별 매출 구성",
+        measures: ["revenue"],
+        relationship: "composition_snapshot",
+        title_hint: "애플 지역별 매출 구성",
+        series_label_hints: [
+          { source: "Americas", label: "미주" },
+          { source: "Europe", label: "유럽" },
+        ],
+      },
+      registry,
+      artifactIndex: 1,
+    });
+
+    expect(result.artifact?.views[0]?.chart_type).toBe("donut");
+    const dataset = result.artifact?.views[0]?.dataset;
+    expect(dataset).toMatchObject({ kind: "composition", period: "CY2025" });
+    if (!dataset || dataset.kind !== "composition") throw new Error("Expected composition dataset");
+    expect(dataset.slices.map((slice) => ({
+      label: slice.label,
+      value: slice.value,
+      evidence_refs: slice.evidence_refs,
+    }))).toEqual([
+      { label: "미주", value: 55, evidence_refs: ["metric_observation:xbrl:AAPL:CY2025:revenue"] },
+      { label: "유럽", value: 45, evidence_refs: ["metric_observation:xbrl:AAPL:CY2025:revenue"] },
+    ]);
+  });
+
+  it("preserves a source scope label when the model supplies no Korean legend hint", () => {
+    const registry = VisualizationDatasetRegistry.fromAccumulatedRun(accumulator([
+      metricSeries({
+        key: "AAPL|revenue|americas|USD|annual",
+        label: "Americas segment revenue",
+        metric: "revenue",
+        unit: "USD",
+        scope: { kind: "geography", key: "americas", label: "Americas" },
+        points: [["CY2025", 55]],
+      }),
+      metricSeries({
+        key: "AAPL|revenue|europe|USD|annual",
+        label: "Europe segment revenue",
+        metric: "revenue",
+        unit: "USD",
+        scope: { kind: "geography", key: "europe", label: "Europe" },
+        points: [["CY2025", 45]],
+      }),
+    ]));
+
+    const result = compileVisualization({
+      intent: {
+        goal: "애플 지역별 매출 구성",
+        measures: ["revenue"],
+        relationship: "composition_snapshot",
+      },
+      registry,
+      artifactIndex: 1,
+    });
+
+    const dataset = result.artifact?.views[0]?.dataset;
+    if (!dataset || dataset.kind !== "composition") throw new Error("Expected composition dataset");
+    expect(dataset.slices.map((slice) => slice.label)).toEqual(["Americas", "Europe"]);
+  });
+
+  it("honors explicit regional scopes when an ontology sidecar calls them segments", () => {
+    const regions = [
+      ["americas", "Americas Segment", 72.5],
+      ["europe", "Europe Segment", 47.7],
+      ["greater_china", "Greater China Segment", 26.9],
+      ["japan", "Japan Segment", 14],
+      ["rest_of_asia_pacific", "Rest of Asia Pacific Segment", 14.6],
+    ] as const;
+    const registry = VisualizationDatasetRegistry.fromAccumulatedRun(accumulator([
+      ...regions.map(([key, label, value]) => metricSeries({
+        key: `AAPL|operating_income|${key}|USD|annual`,
+        label,
+        metric: "operating_income",
+        unit: "USD",
+        scope: { kind: "segment", key: `operating_segments:${key}`, label },
+        points: [["CY2025", value]],
+      })),
+      metricSeries({
+        key: "AAPL|operating_income|corporate|USD|annual",
+        label: "Corporate",
+        metric: "operating_income",
+        unit: "USD",
+        scope: { kind: "segment", key: "operating_segments:corporate", label: "Corporate" },
+        points: [["CY2025", -42.6]],
+      }),
+    ]));
+
+    const result = compileVisualization({
+      intent: {
+        goal: "애플 CY2025 지역별 영업이익 구성",
+        measures: ["operating income"],
+        relationship: "composition_snapshot",
+        scope_mode: "breakdown",
+        group_by: "지역별",
+        include_scopes: ["Americas", "Europe", "Greater China", "Japan", "Rest of Asia Pacific"],
+        series_label_hints: [
+          { source: "Americas", label: "미주" },
+          { source: "Europe", label: "유럽" },
+          { source: "Greater China", label: "중화권" },
+          { source: "Japan", label: "일본" },
+          { source: "Rest of Asia Pacific", label: "기타 아시아·태평양" },
+        ],
+      },
+      registry,
+      artifactIndex: 1,
+    });
+
+    expect(result.status).toBe("created");
+    expect(result.artifact?.views[0]?.chart_type).toBe("donut");
+    const dataset = result.artifact?.views[0]?.dataset;
+    if (!dataset || dataset.kind !== "composition") throw new Error("Expected composition dataset");
+    expect(dataset.slices.map((slice) => slice.label)).toEqual([
+      "미주",
+      "유럽",
+      "중화권",
+      "일본",
+      "기타 아시아·태평양",
+    ]);
+    expect(dataset.slices.map((slice) => slice.value)).toEqual([72.5, 47.7, 26.9, 14, 14.6]);
+  });
+
+  it("resolves previously unseen scope names from this run instead of a regional dictionary", () => {
+    const registry = VisualizationDatasetRegistry.fromAccumulatedRun(accumulator([
+      metricSeries({
+        key: "ZETA|operating_income|northern_arc|USD|annual",
+        label: "Northern Arc operating income",
+        metric: "operating_income",
+        unit: "USD",
+        scope: { kind: "segment", key: "reported_units:northern_arc", label: "Northern Arc" },
+        points: [["CY2025", 41]],
+      }),
+      metricSeries({
+        key: "ZETA|operating_income|coastal_cluster|USD|annual",
+        label: "Coastal Cluster operating income",
+        metric: "operating_income",
+        unit: "USD",
+        scope: { kind: "segment", key: "reported_units:coastal_cluster", label: "Coastal Cluster" },
+        points: [["CY2025", 33]],
+      }),
+      metricSeries({
+        key: "ZETA|operating_income|inland_markets|USD|annual",
+        label: "Inland Markets operating income",
+        metric: "operating_income",
+        unit: "USD",
+        scope: { kind: "segment", key: "reported_units:inland_markets", label: "Inland Markets" },
+        points: [["CY2025", 26]],
+      }),
+    ]));
+
+    const result = compileVisualization({
+      intent: {
+        goal: "Zeta CY2025 지역별 영업이익 구성",
+        measures: ["operating income"],
+        relationship: "composition_snapshot",
+        scope_mode: "breakdown",
+        group_by: "지역별",
+        include_scopes: ["Northern Arc", "Coastal Cluster", "Inland Markets"],
+        series_label_hints: [
+          { source: "Northern Arc", label: "북부 권역" },
+          { source: "Coastal Cluster", label: "해안 권역" },
+          { source: "Inland Markets", label: "내륙 권역" },
+        ],
+      },
+      registry,
+      artifactIndex: 1,
+    });
+
+    expect(result.status).toBe("created");
+    const dataset = result.artifact?.views[0]?.dataset;
+    if (!dataset || dataset.kind !== "composition") throw new Error("Expected composition dataset");
+    expect(dataset.slices.map((slice) => ({ label: slice.label, value: slice.value }))).toEqual([
+      { label: "북부 권역", value: 41 },
+      { label: "해안 권역", value: 33 },
+      { label: "내륙 권역", value: 26 },
+    ]);
+  });
+
+  it("does not guess when a requested scope text matches multiple verified scopes", () => {
+    const registry = VisualizationDatasetRegistry.fromAccumulatedRun(accumulator([
+      metricSeries({
+        key: "ZETA|revenue|asia_consumer|USD|annual",
+        label: "Asia Consumer revenue",
+        metric: "revenue",
+        unit: "USD",
+        scope: { kind: "segment", key: "business_units:asia_consumer", label: "Asia Consumer" },
+        points: [["CY2025", 60]],
+      }),
+      metricSeries({
+        key: "ZETA|revenue|asia_enterprise|USD|annual",
+        label: "Asia Enterprise revenue",
+        metric: "revenue",
+        unit: "USD",
+        scope: { kind: "segment", key: "business_units:asia_enterprise", label: "Asia Enterprise" },
+        points: [["CY2025", 40]],
+      }),
+    ]));
+
+    const result = compileVisualization({
+      intent: {
+        goal: "Zeta 아시아 매출 구성",
+        measures: ["revenue"],
+        relationship: "composition_snapshot",
+        scope_mode: "breakdown",
+        include_scopes: ["Asia"],
+      },
+      registry,
+      artifactIndex: 1,
+    });
+
+    expect(result).toMatchObject({ status: "skipped", reason_code: "ambiguous_scope" });
+  });
+
+  it("requires every explicitly requested scope to exist in the current run", () => {
+    const registry = VisualizationDatasetRegistry.fromAccumulatedRun(accumulator([
+      metricSeries({
+        key: "ZETA|revenue|northern_arc|USD|annual",
+        label: "Northern Arc revenue",
+        metric: "revenue",
+        unit: "USD",
+        scope: { kind: "segment", key: "reported_units:northern_arc", label: "Northern Arc" },
+        points: [["CY2025", 60]],
+      }),
+    ]));
+
+    const result = compileVisualization({
+      intent: {
+        goal: "Zeta 권역별 매출 구성",
+        measures: ["revenue"],
+        relationship: "composition_snapshot",
+        scope_mode: "breakdown",
+        include_scopes: ["Northern Arc", "Missing Scope"],
+      },
+      registry,
+      artifactIndex: 1,
+    });
+
+    expect(result).toMatchObject({ status: "skipped", reason_code: "no_matching_scope" });
+  });
+
+  it("compiles paired verified metrics into a scatter dataset before splitting units", () => {
+    const registry = VisualizationDatasetRegistry.fromAccumulatedRun(accumulator([
+      metricSeries({
+        key: "AAPL|revenue|USD|annual",
+        label: "Revenue",
+        metric: "revenue",
+        unit: "USD",
+        points: [["CY2023", 100], ["CY2024", 120], ["CY2025", 150]],
+      }),
+      metricSeries({
+        key: "AAPL|operating_margin|percent|annual",
+        label: "Operating margin",
+        metric: "operating_margin",
+        unit: "%",
+        points: [["CY2023", 20], ["CY2024", 22], ["CY2025", 25]],
+      }),
+    ]));
+
+    const result = compileVisualization({
+      intent: {
+        goal: "애플 매출과 영업이익률의 관계",
+        measures: ["revenue", "operating margin"],
+        relationship: "relationship",
+      },
+      registry,
+      artifactIndex: 1,
+    });
+
+    expect(result.artifact?.views).toHaveLength(1);
+    expect(result.artifact?.views[0]).toMatchObject({
+      chart_type: "scatter",
+      dataset: {
+        kind: "xy",
+        x_label: "revenue",
+        y_label: "operating_margin",
+        points: [
+          { label: "CY2023", x: 100, y: 20 },
+          { label: "CY2024", x: 120, y: 22 },
+          { label: "CY2025", x: 150, y: 25 },
+        ],
+      },
+    });
+  });
+
+  it("compiles a compact breakdown-by-period matrix into a heatmap dataset", () => {
+    const registry = VisualizationDatasetRegistry.fromAccumulatedRun(accumulator([
+      metricSeries({
+        key: "AAPL|operating_income|americas|USD|annual",
+        label: "Americas Segment Operating income",
+        metric: "operating_income",
+        unit: "USD",
+        scope: { kind: "geography", key: "americas", label: "Americas" },
+        points: [["CY2023", 60], ["CY2024", 65], ["CY2025", 70]],
+      }),
+      metricSeries({
+        key: "AAPL|operating_income|europe|USD|annual",
+        label: "Europe Segment Operating income",
+        metric: "operating_income",
+        unit: "USD",
+        scope: { kind: "geography", key: "europe", label: "Europe" },
+        points: [["CY2023", 25], ["CY2024", 27], ["CY2025", 30]],
+      }),
+    ]));
+
+    const result = compileVisualization({
+      intent: {
+        goal: "애플 지역별 영업이익 분포",
+        measures: ["operating income"],
+        relationship: "matrix",
+        series_label_hints: [
+          { source: "Americas", label: "미주" },
+          { source: "Europe", label: "유럽" },
+        ],
+      },
+      registry,
+      artifactIndex: 1,
+    });
+
+    expect(result.artifact?.views[0]?.chart_type).toBe("heatmap");
+    const dataset = result.artifact?.views[0]?.dataset;
+    expect(dataset).toMatchObject({ kind: "matrix", columns: ["CY2023", "CY2024", "CY2025"] });
+    if (!dataset || dataset.kind !== "matrix") throw new Error("Expected matrix dataset");
+    expect(dataset.rows.map((row) => ({
+      label: row.label,
+      cells: row.cells.map((cell) => ({ column: cell.column, value: cell.value })),
+    }))).toEqual([
+      {
+        label: "미주",
+        cells: [
+          { column: "CY2023", value: 60 },
+          { column: "CY2024", value: 65 },
+          { column: "CY2025", value: 70 },
+        ],
+      },
+      {
+        label: "유럽",
+        cells: [
+          { column: "CY2023", value: 25 },
+          { column: "CY2024", value: 27 },
+          { column: "CY2025", value: 30 },
+        ],
+      },
+    ]);
+  });
+
+  it("compiles a non-negative verified total series into a waterfall bridge", () => {
+    const registry = VisualizationDatasetRegistry.fromAccumulatedRun(accumulator([
+      metricSeries({
+        key: "AAPL|revenue|USD|annual",
+        label: "Revenue",
+        metric: "revenue",
+        unit: "USD",
+        points: [["CY2023", 100], ["CY2024", 130], ["CY2025", 120]],
+      }),
+    ]));
+
+    const result = compileVisualization({
+      intent: {
+        goal: "애플 매출 증감",
+        measures: ["revenue"],
+        relationship: "bridge",
+      },
+      registry,
+      artifactIndex: 1,
+    });
+
+    expect(result.artifact?.views[0]).toMatchObject({
+      chart_type: "waterfall",
+      dataset: {
+        kind: "bridge",
+        steps: [
+          { kind: "start", value: 100 },
+          { kind: "increase", delta: 30 },
+          { kind: "decrease", delta: -10 },
+          { kind: "end", value: 120 },
+        ],
+      },
+    });
+  });
 });

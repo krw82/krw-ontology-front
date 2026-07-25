@@ -39,7 +39,7 @@ describe("visualization persistence extraction", () => {
   it("persists compiler artifacts without requiring a Markdown insert token", () => {
     const artifact = {
       artifact_format: "krw-visualization",
-      schema_version: 2,
+      schema_version: 3,
       artifact_ref: "viz_1_revenue",
       semantic_fingerprint: "fingerprint-revenue",
       intent: { goal: "매출 추이" },
@@ -54,6 +54,7 @@ describe("visualization persistence extraction", () => {
           scope: { kind: "company_total", key: "company_total", label: "Company total" },
           points: [{ period: "CY2025", value: 100, evidence_ref: "metric_observation:1" }],
         }],
+        dataset: { kind: "series" },
       }],
       provenance: {
         source_tool_call_ids: ["ontology-tool-1"],
@@ -77,7 +78,7 @@ describe("visualization persistence extraction", () => {
   it("keeps one artifact when separate tool calls resolve to the same semantic data", () => {
     const firstArtifact = {
       artifact_format: "krw-visualization" as const,
-      schema_version: 2 as const,
+      schema_version: 3 as const,
       artifact_ref: "viz_a1b2c3d4e5f60708",
       semantic_fingerprint: "same-selected-data",
       intent: { goal: "매출 추이" },
@@ -92,6 +93,7 @@ describe("visualization persistence extraction", () => {
           scope: { kind: "company_total", key: "company_total" },
           points: [{ period: "CY2025", value: 100, evidence_ref: "metric_observation:1" }],
         }],
+        dataset: { kind: "series" },
       }],
       provenance: {
         source_tool_call_ids: ["ontology-tool-1"],
@@ -146,7 +148,7 @@ describe("visualization persistence extraction", () => {
   it("persists compiler artifacts and deterministic presentation blocks separately", async () => {
     const artifact = {
       artifact_format: "krw-visualization" as const,
-      schema_version: 2 as const,
+      schema_version: 3 as const,
       artifact_ref: "viz_1_revenue",
       semantic_fingerprint: "fingerprint-revenue",
       intent: { goal: "매출 추이" },
@@ -161,6 +163,7 @@ describe("visualization persistence extraction", () => {
           scope: { kind: "company_total", key: "company_total", label: "Company total" },
           points: [{ period: "CY2025", value: 100, evidence_ref: "metric_observation:1" }],
         }],
+        dataset: { kind: "series" },
       }],
       provenance: {
         source_tool_call_ids: ["ontology-tool-1"],

@@ -403,7 +403,7 @@ describe("agent job runner", () => {
     process.env.KRW_VISUALIZATIONS_MODE = "on";
     const artifact: KrwVisualizationArtifact = {
       artifact_format: "krw-visualization",
-      schema_version: 2,
+      schema_version: 3,
       artifact_ref: "viz_1_revenue",
       semantic_fingerprint: "fingerprint-revenue",
       intent: { goal: "매출 추이" },
@@ -418,6 +418,7 @@ describe("agent job runner", () => {
           scope: { kind: "company_total", key: "company_total", label: "Company total" },
           points: [{ period: "CY2025", value: 100, evidence_ref: "metric_observation:1" }],
         }],
+        dataset: { kind: "series" },
       }],
       provenance: {
         source_tool_call_ids: ["ontology-1"],

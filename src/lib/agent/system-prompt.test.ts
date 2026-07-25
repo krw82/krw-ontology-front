@@ -233,6 +233,10 @@ describe("buildSystemPrompt", () => {
     expect(enabledPrompt).toContain("Structured visualization policy");
     expect(enabledPrompt).toContain("compose_visualization");
     expect(enabledPrompt).toContain("Markdown placement tokens");
+    expect(enabledPrompt).toContain("composition_snapshot");
+    expect(enabledPrompt).toContain("series_label_hints");
+    expect(enabledPrompt).toContain("include_scopes");
+    expect(enabledPrompt).toContain("exact items and order");
   });
 
   it("adds an English-only final answer policy when requested", () => {

@@ -4161,6 +4161,21 @@ const SAFE_TOOL_ARGUMENT_KEYS = [
   "max_events",
   "urls",
   "event_id",
+  // Compiler-owned visualization calls are semantic-only. Logging these small
+  // fields makes a skipped chart diagnosable without logging values or source
+  // identifiers from the artifact.
+  "measures",
+  "time_scope",
+  "relationship",
+  "scope_mode",
+  "group_by",
+  "include_scopes",
+  "exclude_scopes",
+  "preferred_form",
+  "title_hint",
+  "metric_label_hint",
+  "group_label_hint",
+  "series_label_hints",
 ] as const;
 
 function summarizeToolArguments(

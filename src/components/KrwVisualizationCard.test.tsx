@@ -4,11 +4,25 @@ import { describe, expect, it, vi } from "vitest";
 import type { ChatMessageVisualization } from "@/types/api-contracts";
 
 vi.mock("@nivo/bar", () => ({
-  ResponsiveBar: () => <div data-chart="bar" />,
+  ResponsiveBar: ({ keys }: { keys?: string[] }) => (
+    <div data-chart={keys?.includes("total") ? "waterfall" : "bar"} />
+  ),
 }));
 
 vi.mock("@nivo/line", () => ({
   ResponsiveLine: () => <div data-chart="line" />,
+}));
+
+vi.mock("@nivo/pie", () => ({
+  ResponsivePie: () => <div data-chart="pie" />,
+}));
+
+vi.mock("@nivo/scatterplot", () => ({
+  ResponsiveScatterPlot: () => <div data-chart="scatter" />,
+}));
+
+vi.mock("@nivo/heatmap", () => ({
+  ResponsiveHeatMap: () => <div data-chart="heatmap" />,
 }));
 
 import KrwVisualizationCard from "./KrwVisualizationCard";
@@ -23,7 +37,7 @@ function visualization(): ChatMessageVisualization {
     created_at: "2026-07-25T00:00:00.000Z",
     payload_json: {
       artifact_format: "krw-visualization",
-      schema_version: 2,
+      schema_version: 3,
       artifact_ref: "viz_a1b2c3d4e5f60708",
       semantic_fingerprint: "a1b2c3d4e5f60708",
       intent: {
@@ -61,6 +75,7 @@ function visualization(): ChatMessageVisualization {
               ],
             },
           ],
+          dataset: { kind: "series" },
         },
         {
           view_id: "margin",
@@ -79,6 +94,7 @@ function visualization(): ChatMessageVisualization {
               ],
             },
           ],
+          dataset: { kind: "series" },
         },
       ],
       provenance: {
@@ -113,5 +129,111 @@ describe("KrwVisualizationCard", () => {
     expect(html).toContain('data-chart="bar"');
     expect(html).not.toContain("Americas Segment Operating income");
     expect(html).not.toContain("AAPL|operating_income|geography:americas|USD|annual");
+  });
+
+  it("routes compiler-owned advanced datasets to their matching Nivo renderer", () => {
+    const source = visualization();
+    const series = source.payload_json.views[0]?.series ?? [];
+    const cases = [
+      {
+        chart: "pie",
+        view: {
+          view_id: "composition",
+          chart_type: "donut" as const,
+          title: "지역별 구성",
+          unit: "USD",
+          series,
+          dataset: {
+            kind: "composition" as const,
+            period: "CY2025",
+            slices: [
+              { id: "americas", label: "미주", value: 70, evidence_refs: ["metric_observation:2"] },
+              { id: "europe", label: "유럽", value: 30, evidence_refs: ["metric_observation:4"] },
+            ],
+          },
+        },
+      },
+      {
+        chart: "scatter",
+        view: {
+          view_id: "relationship",
+          chart_type: "scatter" as const,
+          title: "매출과 이익률 관계",
+          series,
+          dataset: {
+            kind: "xy" as const,
+            x_label: "매출",
+            y_label: "영업이익률",
+            x_unit: "USD",
+            y_unit: "%",
+            points: [
+              { id: "2023", label: "CY2023", x: 100, y: 20, evidence_refs: ["metric_observation:1"] },
+              { id: "2024", label: "CY2024", x: 120, y: 22, evidence_refs: ["metric_observation:2"] },
+              { id: "2025", label: "CY2025", x: 140, y: 24, evidence_refs: ["metric_observation:3"] },
+            ],
+          },
+        },
+      },
+      {
+        chart: "heatmap",
+        view: {
+          view_id: "matrix",
+          chart_type: "heatmap" as const,
+          title: "지역별 분포",
+          series,
+          dataset: {
+            kind: "matrix" as const,
+            columns: ["CY2024", "CY2025"],
+            rows: [
+              {
+                id: "americas",
+                label: "미주",
+                cells: [
+                  { column: "CY2024", value: 60, evidence_refs: ["metric_observation:1"] },
+                  { column: "CY2025", value: 70, evidence_refs: ["metric_observation:2"] },
+                ],
+              },
+              {
+                id: "europe",
+                label: "유럽",
+                cells: [
+                  { column: "CY2024", value: 25, evidence_refs: ["metric_observation:3"] },
+                  { column: "CY2025", value: 30, evidence_refs: ["metric_observation:4"] },
+                ],
+              },
+            ],
+          },
+        },
+      },
+      {
+        chart: "waterfall",
+        view: {
+          view_id: "bridge",
+          chart_type: "waterfall" as const,
+          title: "매출 증감",
+          unit: "USD",
+          series,
+          dataset: {
+            kind: "bridge" as const,
+            steps: [
+              { id: "start", label: "CY2023", kind: "start" as const, value: 100, evidence_refs: ["metric_observation:1"] },
+              { id: "up", label: "CY2024 증감", kind: "increase" as const, delta: 20, evidence_refs: ["metric_observation:1", "metric_observation:2"] },
+              { id: "end", label: "CY2024 결과", kind: "end" as const, value: 120, evidence_refs: ["metric_observation:2"] },
+            ],
+          },
+        },
+      },
+    ];
+
+    for (const item of cases) {
+      const visualizationForCase: ChatMessageVisualization = {
+        ...source,
+        payload_json: { ...source.payload_json, views: [item.view] },
+      };
+      const html = renderToStaticMarkup(
+        createElement(KrwVisualizationCard, { visualization: visualizationForCase }),
+      );
+      expect(html).toContain(`data-chart="${item.chart}"`);
+    }
   });
 });
