@@ -30,6 +30,7 @@ Options:
   --with-data              Publish the active web catalog separately from code.
   --skip-web               Do not build or switch GCP containers.
   --skip-mac               Do not restart local Mac MCP/worker services.
+  --require-live-toss      Require a matching live Toss key pair in the GCP runtime env.
   --skip-worker-restart    Compatibility alias for --skip-mac.
   --release-id ID          Safe deployment identifier.
   --env-file FILE          Mac production environment file.
@@ -47,6 +48,7 @@ APPLY_MIGRATIONS=0
 WITH_DATA=0
 SKIP_WEB=0
 SKIP_MAC=0
+REQUIRE_LIVE_TOSS=0
 RELEASE_ID=
 ENV_FILE=.env.mac-worker.production
 TMP_DIR=
@@ -81,6 +83,7 @@ while [ "$#" -gt 0 ]; do
     --with-data) WITH_DATA=1 ;;
     --skip-web) SKIP_WEB=1 ;;
     --skip-mac|--skip-worker-restart) SKIP_MAC=1 ;;
+    --require-live-toss) REQUIRE_LIVE_TOSS=1 ;;
     --skip-data|--skip-db-check|--no-restart-queue)
       echo "Compatibility option $1 has no effect on the fast path." >&2
       ;;
@@ -349,7 +352,7 @@ upload_archive() {
 }
 
 run_remote_prepare() {
-  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="RELEASE_ID='$RELEASE_ID' REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' REMOTE_FRONT_ARCHIVE='$REMOTE_FRONT_ARCHIVE' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="RELEASE_ID='$RELEASE_ID' REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' REMOTE_FRONT_ARCHIVE='$REMOTE_FRONT_ARCHIVE' COMPOSE_PROJECT='$COMPOSE_PROJECT' REQUIRE_LIVE_TOSS='$REQUIRE_LIVE_TOSS' /bin/sh -s"
 set -e
 test -f "$REMOTE_FRONT_DIR/.env"
 test ! -e "$REMOTE_STAGE"
@@ -359,6 +362,41 @@ test -f "$REMOTE_STAGE/docker-compose.yml"
 test -f "$REMOTE_STAGE/Dockerfile.web"
 cp "$REMOTE_FRONT_DIR/.env" "$REMOTE_STAGE/runtime.env"
 chmod 600 "$REMOTE_STAGE/runtime.env"
+value_of() {
+  key="$1"
+  awk -F= -v key="$key" '
+    $0 !~ /^[[:space:]]*#/ && $1 == key {
+      sub(/^[^=]*=/, "")
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+      gsub(/^"|"$/, "")
+      gsub(/^'\''|'\''$/, "")
+      print
+    }
+  ' "$REMOTE_STAGE/runtime.env" | tail -n 1
+}
+require_live_toss_key() {
+  key="$1"
+  prefix="$2"
+  value=$(value_of "$key")
+  case "$value" in
+    "$prefix"*) ;;
+    *)
+      echo "Production billing deploy requires a live Toss key for $key." >&2
+      exit 1
+      ;;
+  esac
+  case "$value" in
+    *"..."*)
+      echo "Production billing deploy found a placeholder Toss key for $key." >&2
+      exit 1
+      ;;
+  esac
+}
+if [ "$REQUIRE_LIVE_TOSS" = "1" ]; then
+  require_live_toss_key TOSS_PAYMENTS_CLIENT_KEY live_ck_
+  require_live_toss_key TOSS_PAYMENTS_SECRET_KEY live_sk_
+  echo "Verified matching live Toss key prefixes in the GCP runtime env."
+fi
 printf '\nFRONT_DIR=%s\nNEXT_PUBLIC_APP_VERSION=%s\n' "$REMOTE_STAGE" "$RELEASE_ID" >> "$REMOTE_STAGE/runtime.env"
 OLD_IMAGE=$(docker image inspect --format '{{.Id}}' krw-ontology-front-web:local 2>/dev/null || true)
 test -n "$OLD_IMAGE"

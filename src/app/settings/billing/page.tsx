@@ -4,7 +4,7 @@ import { getAuthUser } from "@/lib/auth";
 import { getEntitlementStatus } from "@/lib/billing/entitlement";
 import { MENU_FEATURE_DEFINITIONS } from "@/lib/billing/feature-access";
 import { listPublicBillingPlansFromStore } from "@/lib/billing/plan-store";
-import { isTossPaymentsConfigured } from "@/lib/billing/toss";
+import { isTossPaymentsCheckoutConfigured } from "@/lib/billing/toss";
 import { getCurrentTossSubscriptionSummary } from "@/lib/billing/toss-subscriptions";
 
 export const runtime = "nodejs";
@@ -122,7 +122,7 @@ export default async function BillingSettingsPage({
     plans.find((plan) => plan.key === subscription?.planKey) ??
     plans.find((plan) => plan.key === entitlement.plan.key) ??
     plans.find((plan) => plan.key === "free");
-  const billingProviderReady = isTossPaymentsConfigured();
+  const billingProviderReady = isTossPaymentsCheckoutConfigured();
   const notice = billingNotice(resolvedSearchParams);
   return (
     <div className="bg-canvas">

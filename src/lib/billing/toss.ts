@@ -11,6 +11,8 @@ export interface TossPaymentsConfig {
   apiBaseUrl: string;
 }
 
+export type TossPaymentsKeyMode = "test" | "live";
+
 export interface TossBillingKeyResponse {
   mId?: string;
   customerKey: string;
@@ -76,9 +78,24 @@ export class TossPaymentsError extends Error {
 }
 
 export function getTossPaymentsConfig(): TossPaymentsConfig {
+  const clientKey = requireEnv("TOSS_PAYMENTS_CLIENT_KEY");
+  const secretKey = requireEnv("TOSS_PAYMENTS_SECRET_KEY");
+  const env = {
+    ...process.env,
+    TOSS_PAYMENTS_CLIENT_KEY: clientKey,
+    TOSS_PAYMENTS_SECRET_KEY: secretKey,
+  };
+  if (!isTossPaymentsConfigured(env)) {
+    throw new Error(
+      "Toss Payments client and secret keys must be a matching test or live pair.",
+    );
+  }
+  if (requiresLiveTossKeys(env) && !isTossPaymentsLiveConfigured(env)) {
+    throw new Error("Toss Payments live keys are required in production.");
+  }
   return {
-    clientKey: requireEnv("TOSS_PAYMENTS_CLIENT_KEY"),
-    secretKey: requireEnv("TOSS_PAYMENTS_SECRET_KEY"),
+    clientKey,
+    secretKey,
     apiBaseUrl:
       process.env.TOSS_PAYMENTS_API_BASE_URL?.replace(/\/+$/, "") ||
       DEFAULT_TOSS_API_BASE_URL,
@@ -91,22 +108,56 @@ function isUsableTossKey(value: string | undefined, prefixes: string[]) {
   return prefixes.some((prefix) => trimmed.startsWith(prefix));
 }
 
+function modeForTossKey(
+  value: string | undefined,
+  kind: "client" | "secret",
+): TossPaymentsKeyMode | null {
+  const prefixes =
+    kind === "client"
+      ? {
+          test: "test_ck_",
+          live: "live_ck_",
+        }
+      : {
+          test: "test_sk_",
+          live: "live_sk_",
+        };
+  if (isUsableTossKey(value, [prefixes.test])) return "test";
+  if (isUsableTossKey(value, [prefixes.live])) return "live";
+  return null;
+}
+
+export function getTossPaymentsKeyMode(
+  env: Record<string, string | undefined> = process.env,
+): TossPaymentsKeyMode | null {
+  const clientMode = modeForTossKey(env.TOSS_PAYMENTS_CLIENT_KEY, "client");
+  const secretMode = modeForTossKey(env.TOSS_PAYMENTS_SECRET_KEY, "secret");
+  return clientMode && clientMode === secretMode ? clientMode : null;
+}
+
+function requiresLiveTossKeys(env: Record<string, string | undefined>) {
+  const ontologyEnv = env.KRW_ONTOLOGY_ENV?.trim().toLowerCase();
+  if (ontologyEnv) return ontologyEnv === "prod";
+  return env.NODE_ENV === "production";
+}
+
 export function isTossPaymentsConfigured(
   env: Record<string, string | undefined> = process.env,
 ) {
-  return (
-    isUsableTossKey(env.TOSS_PAYMENTS_CLIENT_KEY, ["test_ck_", "live_ck_"]) &&
-    isUsableTossKey(env.TOSS_PAYMENTS_SECRET_KEY, ["test_sk_", "live_sk_"])
-  );
+  return getTossPaymentsKeyMode(env) !== null;
+}
+
+export function isTossPaymentsCheckoutConfigured(
+  env: Record<string, string | undefined> = process.env,
+) {
+  const mode = getTossPaymentsKeyMode(env);
+  return mode !== null && (!requiresLiveTossKeys(env) || mode === "live");
 }
 
 export function isTossPaymentsLiveConfigured(
   env: Record<string, string | undefined> = process.env,
 ) {
-  return (
-    isUsableTossKey(env.TOSS_PAYMENTS_CLIENT_KEY, ["live_ck_"]) &&
-    isUsableTossKey(env.TOSS_PAYMENTS_SECRET_KEY, ["live_sk_"])
-  );
+  return getTossPaymentsKeyMode(env) === "live";
 }
 
 export function buildTossBasicAuthorization(secretKey: string): string {

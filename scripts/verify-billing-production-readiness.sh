@@ -95,8 +95,11 @@ fi
 pricing_html=$(curl -fsS "$BASE_URL/ko/pricing")
 assert_contains_any "$pricing_html" "Standard monthly price" "7,900" "7900"
 assert_contains_any "$pricing_html" "Pro monthly price" "29,000" "29000"
-assert_contains_any "$pricing_html" "Standard weekly credits" "2,000" "2000"
-assert_contains_any "$pricing_html" "Pro weekly credits" "6,000" "6000"
+# Credit limits are enforced from the active plan version and are intentionally
+# not a hard-coded public-price-page promise. Keep this probe coupled to the
+# visible paid-plan value proposition instead of stale numeric marketing copy.
+assert_contains_any "$pricing_html" "Standard feature" "와이드 리서치" "Wide research"
+assert_contains_any "$pricing_html" "Pro feature" "가장 넉넉한 분석량" "Highest research capacity"
 
 echo "OK public billing endpoints."
 
@@ -127,7 +130,7 @@ value_of() {
   ' "\$ENV_FILE" | tail -n 1
 }
 
-require_live_or_allowed_test_key() {
+mode_for_toss_key() {
   key="\$1"
   live_prefix="\$2"
   test_prefix="\$3"
@@ -144,11 +147,11 @@ require_live_or_allowed_test_key() {
   esac
   case "\$value" in
     "\$live_prefix"*)
-      echo "OK \$key=live key present"
+      printf '%s' live
       ;;
     "\$test_prefix"*)
       if [ "\$ALLOW_TEST_TOSS_KEYS" = "1" ]; then
-        echo "Warning: \$key is a Toss test key because --allow-test-toss-keys was supplied." >&2
+        printf '%s' test
       else
         echo "\$key must be a Toss live key for production readiness." >&2
         exit 1
@@ -170,10 +173,41 @@ if [ "\$mode" != "enforced" ]; then
 fi
 echo "OK ANALYSIS_CREDIT_ENFORCEMENT_MODE=enforced"
 
-require_live_or_allowed_test_key TOSS_PAYMENTS_CLIENT_KEY live_ck_ test_ck_
-require_live_or_allowed_test_key TOSS_PAYMENTS_SECRET_KEY live_sk_ test_sk_
+CLIENT_MODE=\$(mode_for_toss_key TOSS_PAYMENTS_CLIENT_KEY live_ck_ test_ck_)
+SECRET_MODE=\$(mode_for_toss_key TOSS_PAYMENTS_SECRET_KEY live_sk_ test_sk_)
+if [ "\$CLIENT_MODE" != "\$SECRET_MODE" ]; then
+  echo "Toss client and secret keys must use the same mode." >&2
+  exit 1
+fi
+if [ "\$CLIENT_MODE" = "test" ] && [ "\$ALLOW_TEST_TOSS_KEYS" != "1" ]; then
+  echo "Toss Payments keys must both be live keys for production readiness." >&2
+  exit 1
+fi
+echo "OK matching Toss Payments key mode: \$CLIENT_MODE"
 
 docker compose --project-name "\$COMPOSE_PROJECT_NAME" --env-file "\$ENV_FILE" ps web billing-worker
+
+require_running_key_mode() {
+  service="\$1"
+  docker compose --project-name "\$COMPOSE_PROJECT_NAME" --env-file "\$ENV_FILE" \
+    exec -T "\$service" node -e '
+      const expected = process.argv[1];
+      const ck = process.env.TOSS_PAYMENTS_CLIENT_KEY || "";
+      const sk = process.env.TOSS_PAYMENTS_SECRET_KEY || "";
+      const mode = ck.startsWith("live_ck_") && sk.startsWith("live_sk_")
+        ? "live"
+        : ck.startsWith("test_ck_") && sk.startsWith("test_sk_")
+          ? "test"
+          : null;
+      if (mode !== expected || ck.includes("...") || sk.includes("...")) {
+        throw new Error("Toss Payments key mode mismatch in running container");
+      }
+    ' "\$CLIENT_MODE"
+}
+
+require_running_key_mode web
+require_running_key_mode billing-worker
+echo "OK running web and billing-worker key mode."
 EOF
 
 echo "Checking production GCP billing environment..."

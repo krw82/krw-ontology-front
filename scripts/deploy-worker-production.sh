@@ -6,7 +6,7 @@ usage() {
 Usage: scripts/deploy-worker-production.sh [--env-file FILE] [--release-id ID] [--deployment-id ID] [--worker-bundle-sha256 SHA256] [--runtime-identity-sha256 SHA256] [--use-prebuilt] [--dry-run]
 
 Rebuild and restart only the Mac production agent supervisor. The long-running
-MCP HTTP server must already be healthy. Use prod:deploy:runtime when
+MCP HTTP server must already be healthy. Use prod:deploy:mac-runtime when
 plugin/MCP code changes too.
 
 This does not deploy or restart the GCP web container.

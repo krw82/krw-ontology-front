@@ -91,9 +91,13 @@ npm run prod:deploy:web
 npm run prod:deploy:runtime
 ```
 
-This restarts only the Mac MCP/worker runtime. It materializes a versioned
-Ontology plugin from the same source as the MCP, verifies the live fingerprint,
-and requires a fresh worker heartbeat before marking the runtime active.
+This is the billing-safe runtime release: it applies pending migrations, switches
+the GCP web/API and billing worker containers, and restarts the Mac runtime. It
+also refuses to deploy when the GCP runtime environment does not contain a
+matching live Toss key pair.
+
+For a Mac MCP/worker-only restart that intentionally leaves the GCP payment
+runtime untouched, use `npm run prod:deploy:mac-runtime`.
 
 For routine code deploys with pending migrations but without catalog publication:
 

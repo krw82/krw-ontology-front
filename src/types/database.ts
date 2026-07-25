@@ -1523,14 +1523,17 @@ export interface BillingTossCheckoutSessionRow extends Record<string, unknown> {
   status:
     | "created"
     | "auth_succeeded"
+    | "processing"
     | "paid"
     | "failed"
     | "cancelled"
-    | "expired";
+    | "expired"
+    | "superseded";
   success_url: string;
   fail_url: string;
   auth_key_received_at: string | null;
   billing_key_idempotency_key: string;
+  processing_started_at: string | null;
   failure_code: string | null;
   failure_message: string | null;
   provider_response: Json;
@@ -1568,6 +1571,9 @@ export interface BillingTossSubscriptionRow extends Record<string, unknown> {
   renewal_lease_expires_at: string | null;
   pending_plan_key: BillingTossPlanKey | null;
   pending_plan_version_id: string | null;
+  terminal_entitlement_applied_at: string | null;
+  billing_key_delete_pending: boolean;
+  billing_key_deleted_at: string | null;
   last_payment_id: string | null;
   created_at: string;
   updated_at: string;
@@ -1590,6 +1596,10 @@ export interface BillingTossPaymentRow extends Record<string, unknown> {
   billing_period_end: string | null;
   attempt_number: number;
   status: "pending" | "paid" | "failed" | "cancelled";
+  fulfillment_status: "pending" | "failed" | "applied";
+  fulfillment_error: string | null;
+  fulfillment_attempted_at: string | null;
+  fulfillment_applied_at: string | null;
   provider_payment_key: string | null;
   provider_status: string | null;
   failure_code: string | null;
@@ -3772,6 +3782,7 @@ export interface Database {
           | "currency"
           | "status"
           | "auth_key_received_at"
+          | "processing_started_at"
           | "failure_code"
           | "failure_message"
           | "provider_response"
@@ -3784,6 +3795,7 @@ export interface Database {
           status?: BillingTossCheckoutSessionRow["status"];
           auth_key_received_at?: string | null;
           billing_key_idempotency_key?: string;
+          processing_started_at?: string | null;
           failure_code?: string | null;
           failure_message?: string | null;
           provider_response?: Json;
@@ -3813,6 +3825,9 @@ export interface Database {
           | "renewal_lease_expires_at"
           | "pending_plan_key"
           | "pending_plan_version_id"
+          | "terminal_entitlement_applied_at"
+          | "billing_key_delete_pending"
+          | "billing_key_deleted_at"
           | "last_payment_id"
           | "created_at"
           | "updated_at"
@@ -3830,6 +3845,9 @@ export interface Database {
           renewal_lease_expires_at?: string | null;
           pending_plan_key?: BillingTossPlanKey | null;
           pending_plan_version_id?: string | null;
+          terminal_entitlement_applied_at?: string | null;
+          billing_key_delete_pending?: boolean;
+          billing_key_deleted_at?: string | null;
           last_payment_id?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -3847,6 +3865,10 @@ export interface Database {
           | "billing_period_end"
           | "attempt_number"
           | "status"
+          | "fulfillment_status"
+          | "fulfillment_error"
+          | "fulfillment_attempted_at"
+          | "fulfillment_applied_at"
           | "provider_payment_key"
           | "provider_status"
           | "failure_code"
@@ -3864,6 +3886,10 @@ export interface Database {
           billing_period_end?: string | null;
           attempt_number?: number;
           status?: BillingTossPaymentRow["status"];
+          fulfillment_status?: BillingTossPaymentRow["fulfillment_status"];
+          fulfillment_error?: string | null;
+          fulfillment_attempted_at?: string | null;
+          fulfillment_applied_at?: string | null;
           provider_payment_key?: string | null;
           provider_status?: string | null;
           failure_code?: string | null;
@@ -4691,6 +4717,31 @@ export interface Database {
         };
         Returns: Array<{
           subscription_id: string;
+        }>;
+      };
+      finalize_toss_billing_payment: {
+        Args: {
+          p_operation: "initial" | "renewal" | "upgrade";
+          p_user_id: string;
+          p_subscription_id: string;
+          p_payment_id: string;
+          p_checkout_session_id: string | null;
+          p_plan_version_id: string;
+          p_period_start: string;
+          p_period_end: string;
+          p_credit_anchor_at: string;
+          p_customer_key: string;
+          p_billing_key: string | null;
+          p_billing_key_issued_at: string | null;
+          p_card_snapshot: Json;
+          p_paid_at: string;
+          p_renewal_lease_owner: string | null;
+          p_defer_plan_change_until: string | null;
+          p_now: string;
+        };
+        Returns: Array<{
+          subscription_id: string;
+          already_applied: boolean;
         }>;
       };
       mark_agent_run_terminal: {

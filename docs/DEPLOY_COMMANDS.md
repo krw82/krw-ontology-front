@@ -100,9 +100,15 @@ Supabase migration은 건드리지 않는다.
 npm run prod:deploy:runtime
 ```
 
+결제 변경을 포함한 runtime 배포 경로다. pending Supabase migration을 적용하고
+GCP web/API·billing worker와 Mac runtime을 함께 전환한다. GCP runtime env에
+서로 짝이 맞는 `live_ck_` / `live_sk_`가 없으면 배포를 중단한다.
+
+```bash
+npm run prod:deploy:mac-runtime
+```
+
 Mac MCP, filings MCP, optional Stock News MCP, agent supervisor만 재시작한다.
-새 runtime마다 Ontology plugin을 동일한 MCP source/release에서 materialize하고,
-live fingerprint와 새 worker heartbeat가 모두 통과해야 active runtime으로 전환한다.
 GCP web/API와 Supabase migration은 건드리지 않는다.
 
 ```bash
@@ -323,8 +329,9 @@ npm run billing:prod:readiness
 
 ## MCP And Worker Operations
 
-일상 운영에서는 `prod:deploy:runtime`과 `prod:status`만 외우면 된다. 낮은
-수준의 확인이 필요할 때는 아래 명령어를 쓴다.
+결제를 포함한 일상 배포에서는 `prod:deploy:runtime`과 `prod:status`를 쓴다.
+Mac-local 서비스만 조정할 때는 `prod:deploy:mac-runtime`을 쓴다. 낮은 수준의
+확인이 필요할 때는 아래 명령어를 쓴다.
 
 ```bash
 npm run mcp:prod:status
@@ -366,9 +373,9 @@ Supabase CLI는 `scripts/supabase-cli.sh`를 통해 실행한다. 이 wrapper는
 경로 순서로 CLI를 찾는다. `npx supabase`는 darwin-arm64 native package
 해결이 불안정할 수 있어 배포 경로에서 직접 사용하지 않는다.
 
-`prod:deploy:code`와 `prod:deploy:full`은 migration dry-run 후 pending
-migration을 적용하고 schema smoke를 수행한다. `prod:deploy:web`과
-`prod:deploy:runtime`은 migration을 적용하지 않는다.
+`prod:deploy:code`, `prod:deploy:runtime`, `prod:deploy:full`은 migration
+dry-run 후 pending migration을 적용하고 schema smoke를 수행한다.
+`prod:deploy:web`과 `prod:deploy:mac-runtime`은 migration을 적용하지 않는다.
 
 ## Verification
 
@@ -391,8 +398,8 @@ npm run check
 deploy:web              -> prod:deploy:web
 deploy:runtime          -> prod:deploy:runtime
 deploy:runtime:prod     -> prod:deploy:runtime
-deploy:mcp              -> prod:deploy:runtime
-deploy:plugin           -> prod:deploy:runtime
+deploy:mcp              -> prod:deploy:mac-runtime
+deploy:plugin           -> prod:deploy:mac-runtime
 deploy:prod             -> prod:deploy:code
 deploy:prod:code        -> prod:deploy:code
 deploy:prod:full        -> prod:deploy:full
@@ -424,8 +431,11 @@ dev catalog만 local Supabase에 publish한다
 GCP web/API만 전환한다
   npm run prod:deploy:web
 
-Mac runtime만 전환한다
+결제 runtime(GCP web/billing worker + Mac runtime)을 전환한다
   npm run prod:deploy:runtime
+
+Mac runtime만 전환한다
+  npm run prod:deploy:mac-runtime
 
 평소 코드 배포를 한다
   npm run prod:deploy:code

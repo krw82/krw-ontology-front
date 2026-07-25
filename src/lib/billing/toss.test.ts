@@ -3,8 +3,10 @@ import {
   buildTossBasicAuthorization,
   chargeTossBillingKey,
   generateTossOrderId,
+  getTossPaymentsKeyMode,
   getTossPaymentByOrderId,
   issueTossBillingKey,
+  isTossPaymentsCheckoutConfigured,
   isTossPaymentsConfigured,
   isTossPaymentsLiveConfigured,
 } from "./toss";
@@ -46,6 +48,49 @@ describe("Toss Payments billing client", () => {
         TOSS_PAYMENTS_SECRET_KEY: "test_sk_123",
       }),
     ).toBe(false);
+    expect(
+      isTossPaymentsConfigured({
+        TOSS_PAYMENTS_CLIENT_KEY: "live_ck_123",
+        TOSS_PAYMENTS_SECRET_KEY: "test_sk_123",
+      }),
+    ).toBe(false);
+  });
+
+  it("requires a matching live pair for production checkout while allowing test pairs outside prod", () => {
+    expect(
+      getTossPaymentsKeyMode({
+        TOSS_PAYMENTS_CLIENT_KEY: "live_ck_123",
+        TOSS_PAYMENTS_SECRET_KEY: "live_sk_123",
+      }),
+    ).toBe("live");
+    expect(
+      getTossPaymentsKeyMode({
+        TOSS_PAYMENTS_CLIENT_KEY: "test_ck_123",
+        TOSS_PAYMENTS_SECRET_KEY: "live_sk_123",
+      }),
+    ).toBeNull();
+    expect(
+      isTossPaymentsCheckoutConfigured({
+        NODE_ENV: "production",
+        TOSS_PAYMENTS_CLIENT_KEY: "test_ck_123",
+        TOSS_PAYMENTS_SECRET_KEY: "test_sk_123",
+      }),
+    ).toBe(false);
+    expect(
+      isTossPaymentsCheckoutConfigured({
+        KRW_ONTOLOGY_ENV: "staging",
+        NODE_ENV: "production",
+        TOSS_PAYMENTS_CLIENT_KEY: "test_ck_123",
+        TOSS_PAYMENTS_SECRET_KEY: "test_sk_123",
+      }),
+    ).toBe(true);
+    expect(
+      isTossPaymentsCheckoutConfigured({
+        KRW_ONTOLOGY_ENV: "prod",
+        TOSS_PAYMENTS_CLIENT_KEY: "live_ck_123",
+        TOSS_PAYMENTS_SECRET_KEY: "live_sk_123",
+      }),
+    ).toBe(true);
   });
 
   it("detects whether Toss live keys are ready for production renewals", () => {

@@ -9,14 +9,14 @@ import {
   getRenewalGraceUntilIso,
   getRenewalRetryAtIso,
 } from "@/lib/billing/billing-cycle";
-import { getBillingPlanFromStore } from "@/lib/billing/plan-store";
+import { getBillingPlan } from "@/lib/billing/plans";
 import {
   chargeTossBillingKey,
   deleteTossBillingKey,
   generateTossOrderId,
   getTossPaymentsConfig,
   getTossPaymentByOrderId,
-  isTossPaymentsConfigured,
+  isTossPaymentsCheckoutConfigured,
   issueTossBillingKey,
   TossPaymentsError,
   type TossBillingKeyResponse,
@@ -77,6 +77,7 @@ export interface RenewDueTossSubscriptionsResult {
   renewed: number;
   failed: number;
   expired: number;
+  recovered: number;
 }
 
 export interface TossSubscriptionSummary {
@@ -137,6 +138,15 @@ function isTossPaymentNotFound(error: unknown): boolean {
     (error.status === 404 ||
       error.code === "NOT_FOUND_PAYMENT" ||
       error.code === "NOT_FOUND")
+  );
+}
+
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "23505"
   );
 }
 
@@ -276,6 +286,49 @@ async function loadCheckoutSession(
   return data;
 }
 
+async function expireStaleCheckoutSessions(userId: string, nowIso: string) {
+  const admin = getSupabaseAdmin();
+  const { error } = await admin
+    .from("billing_toss_checkout_sessions")
+    .update({
+      status: "expired",
+      failure_code: "checkout_expired",
+      failure_message: "결제 세션이 만료되었습니다.",
+    })
+    .eq("user_id", userId)
+    .in("status", ["created", "auth_succeeded", "processing"])
+    .lt("expires_at", nowIso);
+  if (error) {
+    throw new TossBillingFlowError(
+      "checkout_session_expiry_failed",
+      "이전 결제 세션을 정리하지 못했습니다.",
+      500,
+    );
+  }
+}
+
+async function loadOpenCheckoutSession(
+  userId: string,
+): Promise<BillingTossCheckoutSessionRow | null> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("billing_toss_checkout_sessions")
+    .select("*")
+    .eq("user_id", userId)
+    .in("status", ["created", "auth_succeeded", "processing"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<BillingTossCheckoutSessionRow>();
+  if (error) {
+    throw new TossBillingFlowError(
+      "checkout_session_lookup_failed",
+      "진행 중인 결제 세션을 확인하지 못했습니다.",
+      500,
+    );
+  }
+  return data ?? null;
+}
+
 async function markCheckoutFailed({
   session,
   code,
@@ -293,7 +346,48 @@ async function markCheckoutFailed({
       failure_code: code,
       failure_message: message,
     })
-    .eq("id", session.id);
+    .eq("id", session.id)
+    .in("status", ["created", "auth_succeeded", "processing"]);
+}
+
+async function markCheckoutProcessing(
+  session: BillingTossCheckoutSessionRow,
+): Promise<BillingTossCheckoutSessionRow> {
+  if (session.status === "paid") return session;
+  if (session.status === "processing") return session;
+  if (session.status !== "created" && session.status !== "auth_succeeded") {
+    throw new TossBillingFlowError(
+      "checkout_session_not_actionable",
+      "이 결제 세션은 더 이상 진행할 수 없습니다.",
+      409,
+    );
+  }
+
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("billing_toss_checkout_sessions")
+    .update({
+      status: "processing",
+      processing_started_at: new Date().toISOString(),
+      failure_code: null,
+      failure_message: null,
+    })
+    .eq("id", session.id)
+    .in("status", ["created", "auth_succeeded"])
+    .select("*")
+    .maybeSingle<BillingTossCheckoutSessionRow>();
+
+  if (!error && data) return data;
+
+  const refreshed = await loadCheckoutSession(session.user_id, session.id);
+  if (refreshed.status === "paid" || refreshed.status === "processing") {
+    return refreshed;
+  }
+  throw new TossBillingFlowError(
+    "checkout_session_not_actionable",
+    "이 결제 세션은 더 이상 진행할 수 없습니다.",
+    409,
+  );
 }
 
 async function loadInitialPayment(
@@ -332,6 +426,21 @@ async function loadInitialPayment(
     })
     .select("*")
     .single<BillingTossPaymentRow>();
+
+  if (!error && data) return data;
+
+  // Two success redirects for the same billing auth may race. The unique
+  // checkout-session index is the source of truth; load its winner instead of
+  // creating a second Toss order.
+  if (isUniqueConstraintViolation(error)) {
+    const { data: raced, error: racedError } = await admin
+      .from("billing_toss_payments")
+      .select("*")
+      .eq("checkout_session_id", session.id)
+      .eq("payment_kind", "initial")
+      .maybeSingle<BillingTossPaymentRow>();
+    if (!racedError && raced) return raced;
+  }
 
   if (error || !data) {
     throw new TossBillingFlowError(
@@ -392,7 +501,7 @@ async function issueOrLoadBillingKey({
   await admin
     .from("billing_toss_checkout_sessions")
     .update({
-      status: "auth_succeeded",
+      status: session.status === "processing" ? "processing" : "auth_succeeded",
       auth_key_received_at: new Date().toISOString(),
       provider_response: jsonObject({
         billingAuthorization: authorization,
@@ -520,6 +629,27 @@ async function loadOpenSubscription(
   return data ?? null;
 }
 
+async function loadSubscriptionById(
+  userId: string,
+  subscriptionId: string,
+): Promise<BillingTossSubscriptionRow> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("billing_toss_subscriptions")
+    .select("*")
+    .eq("id", subscriptionId)
+    .eq("user_id", userId)
+    .maybeSingle<BillingTossSubscriptionRow>();
+  if (error || !data) {
+    throw new TossBillingFlowError(
+      "subscription_lookup_failed",
+      "구독 정보를 확인하지 못했습니다.",
+      500,
+    );
+  }
+  return data;
+}
+
 export async function getCurrentTossSubscriptionSummary(
   userId: string,
 ): Promise<TossSubscriptionSummary | null> {
@@ -533,115 +663,6 @@ export async function getCurrentTossSubscriptionSummary(
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
     pendingPlanKey: subscription.pending_plan_key,
   };
-}
-
-async function createSubscriptionAfterPayment({
-  session,
-  authorization,
-  payment,
-  paidAt,
-  periodEnd,
-  creditAnchorAt,
-}: {
-  session: BillingTossCheckoutSessionRow;
-  authorization: TossBillingKeyResponse;
-  payment: BillingTossPaymentRow;
-  paidAt: string;
-  periodEnd: string;
-  creditAnchorAt: string;
-}): Promise<BillingTossSubscriptionRow> {
-  const admin = getSupabaseAdmin();
-  const { data: existingSubscription, error: existingError } = await admin
-    .from("billing_toss_subscriptions")
-    .select("*")
-    .eq("last_payment_id", payment.id)
-    .maybeSingle<BillingTossSubscriptionRow>();
-
-  if (existingError) {
-    throw new TossBillingFlowError(
-      "subscription_lookup_failed",
-      "구독 정보를 확인하지 못했습니다.",
-      500,
-    );
-  }
-  if (existingSubscription) {
-    const planVersion = session.plan_version_id
-      ? await loadPlanVersionById(session.plan_version_id)
-      : null;
-    await activatePaidEntitlement({
-      userId: session.user_id,
-      planKey: session.plan_key,
-      planVersionId: session.plan_version_id,
-      providerPriceId: planVersion?.provider_price_id ?? null,
-      customerKey: authorization.customerKey,
-      subscriptionId: existingSubscription.id,
-      periodStart: existingSubscription.current_period_start,
-      periodEnd: existingSubscription.current_period_end,
-      creditAnchorAt,
-    });
-    return existingSubscription;
-  }
-
-  await admin
-    .from("billing_toss_subscriptions")
-    .update({
-      status: "cancelled",
-      cancel_at_period_end: false,
-      cancelled_at: new Date().toISOString(),
-    })
-    .eq("user_id", session.user_id)
-    .in("status", ["active", "past_due", "grace", "pending_cancel"]);
-
-  const { data: subscription, error } = await admin
-    .from("billing_toss_subscriptions")
-    .insert({
-      user_id: session.user_id,
-      plan_key: session.plan_key,
-      plan_version_id: session.plan_version_id,
-      status: "active",
-      customer_key: authorization.customerKey,
-      billing_key: authorization.billingKey,
-      billing_method: "CARD",
-      billing_key_issued_at: stringValue(authorization.authenticatedAt),
-      card_snapshot: jsonObject(authorization.card ?? {}),
-      current_period_start: paidAt,
-      current_period_end: periodEnd,
-      next_billing_at: periodEnd,
-      renewal_due_at: periodEnd,
-      last_payment_id: payment.id,
-    })
-    .select("*")
-    .single<BillingTossSubscriptionRow>();
-
-  if (error || !subscription) {
-    throw new TossBillingFlowError(
-      "subscription_create_failed",
-      "구독 정보를 저장하지 못했습니다.",
-      500,
-    );
-  }
-
-  await admin
-    .from("billing_toss_payments")
-    .update({ subscription_id: subscription.id })
-    .eq("id", payment.id);
-
-  const planVersion = session.plan_version_id
-    ? await loadPlanVersionById(session.plan_version_id)
-    : null;
-  await activatePaidEntitlement({
-    userId: session.user_id,
-    planKey: session.plan_key,
-    planVersionId: session.plan_version_id,
-    providerPriceId: planVersion?.provider_price_id ?? null,
-    customerKey: authorization.customerKey,
-    subscriptionId: subscription.id,
-    periodStart: paidAt,
-    periodEnd,
-    creditAnchorAt,
-  });
-
-  return subscription;
 }
 
 async function loadPlanVersionById(
@@ -660,42 +681,168 @@ async function loadPlanVersionById(
   return data ?? null;
 }
 
+type PaidPaymentOperation = "initial" | "renewal" | "upgrade";
+
+async function markPaymentFulfillmentFailed(
+  payment: BillingTossPaymentRow,
+  error: unknown,
+) {
+  const admin = getSupabaseAdmin();
+  await admin
+    .from("billing_toss_payments")
+    .update({
+      fulfillment_status: "failed",
+      fulfillment_error: tossErrorMessage(error).slice(0, 500),
+      fulfillment_attempted_at: new Date().toISOString(),
+    })
+    .eq("id", payment.id)
+    .eq("status", "paid");
+}
+
+async function finalizePaidBillingPayment({
+  operation,
+  userId,
+  subscriptionId,
+  payment,
+  plan,
+  periodStart,
+  periodEnd,
+  creditAnchorAt,
+  customerKey,
+  checkoutSessionId,
+  billingKey,
+  billingKeyIssuedAt,
+  cardSnapshot,
+  renewalLeaseOwner,
+  deferPlanChangeUntil,
+  now,
+}: {
+  operation: PaidPaymentOperation;
+  userId: string;
+  subscriptionId: string;
+  payment: BillingTossPaymentRow;
+  plan: BillingPlanVersionRow;
+  periodStart: string;
+  periodEnd: string;
+  creditAnchorAt: string;
+  customerKey: string;
+  checkoutSessionId: string | null;
+  billingKey: string | null;
+  billingKeyIssuedAt: string | null;
+  cardSnapshot: Json;
+  renewalLeaseOwner: string | null;
+  deferPlanChangeUntil: string | null;
+  now: Date;
+}): Promise<{ subscriptionId: string; alreadyApplied: boolean }> {
+  const admin = getSupabaseAdmin();
+  const nowIso = now.toISOString();
+  const { data, error } = await admin.rpc("finalize_toss_billing_payment", {
+    p_operation: operation,
+    p_user_id: userId,
+    p_subscription_id: subscriptionId,
+    p_payment_id: payment.id,
+    p_checkout_session_id: checkoutSessionId,
+    p_plan_version_id: plan.id,
+    p_period_start: periodStart,
+    p_period_end: periodEnd,
+    p_credit_anchor_at: creditAnchorAt,
+    p_customer_key: customerKey,
+    p_billing_key: billingKey,
+    p_billing_key_issued_at: billingKeyIssuedAt,
+    p_card_snapshot: cardSnapshot,
+    p_paid_at: payment.paid_at ?? nowIso,
+    p_renewal_lease_owner: renewalLeaseOwner,
+    p_defer_plan_change_until: deferPlanChangeUntil,
+    p_now: nowIso,
+  });
+
+  if (error || !data?.[0]?.subscription_id) {
+    if (error) await markPaymentFulfillmentFailed(payment, error);
+    const message = error?.message ?? "결제 반영 결과가 비어 있습니다.";
+    if (message.includes("billing_open_subscription_exists")) {
+      throw new TossBillingFlowError(
+        "subscription_already_exists",
+        "이미 활성화된 유료 구독이 있어 새 결제를 반영하지 않았습니다. 문의 코드와 함께 고객지원에 알려주세요.",
+        409,
+      );
+    }
+    if (message.includes("internal_entitlement_billing_forbidden")) {
+      throw new TossBillingFlowError(
+        "internal_entitlement_billing_forbidden",
+        "내부 운영 계정은 유료 구독을 변경할 수 없습니다.",
+        409,
+      );
+    }
+    throw new TossBillingFlowError(
+      "payment_fulfillment_pending",
+      "결제는 승인됐지만 구독 반영을 재시도 중입니다. 잠시 후 다시 확인해 주세요.",
+      503,
+    );
+  }
+
+  return {
+    subscriptionId: data[0].subscription_id,
+    alreadyApplied: Boolean(data[0].already_applied),
+  };
+}
+
+function getRenewalPlanChangeDeferral({
+  subscription,
+  targetPlan,
+  periodStart,
+  creditAnchorAt,
+  now,
+}: {
+  subscription: BillingTossSubscriptionRow;
+  targetPlan: BillingPlanVersionRow;
+  periodStart: string;
+  creditAnchorAt: string;
+  now: Date;
+}): string | null {
+  const isDowngrade =
+    subscription.plan_key === "pro" && targetPlan.plan_key === "standard";
+  if (!isDowngrade) return null;
+  const effectiveAt = getFirstWeeklyBoundaryAtOrAfterIso({
+    anchor: creditAnchorAt,
+    at: periodStart,
+  });
+  return new Date(effectiveAt).getTime() > now.getTime() ? effectiveAt : null;
+}
+
 async function activateFreeEntitlement({
   userId,
-  customerKey,
   subscriptionId,
   nowIso,
 }: {
   userId: string;
-  customerKey: string;
   subscriptionId: string;
   nowIso: string;
 }) {
   const admin = getSupabaseAdmin();
-  if ((await loadBillingEntitlementPlanKey(userId)) === "internal") {
-    const internalAccessEnd = "9999-12-31T23:59:59.000Z";
-    const { error: preserveError } = await admin
-      .from("user_entitlements")
-      .update({
-        status: "active",
-        current_period_end: internalAccessEnd,
-        billing_period_end: internalAccessEnd,
-        grace_until: null,
-        cancel_at_period_end: false,
-        plan_change_pending: null,
-        entitlement_updated_at: nowIso,
-      })
-      .eq("user_id", userId)
-      .eq("plan_key", "internal");
-    if (preserveError) {
-      throw new TossBillingFlowError(
-        "internal_entitlement_preservation_failed",
-        "내부 운영 권한을 보존하지 못했습니다.",
-        500,
-      );
-    }
-    return;
+  const { data: entitlement, error: entitlementError } = await admin
+    .from("user_entitlements")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle<UserEntitlementRow>();
+  if (entitlementError) {
+    throw new TossBillingFlowError(
+      "terminal_entitlement_lookup_failed",
+      "해지된 구독의 권한 상태를 확인하지 못했습니다.",
+      500,
+    );
   }
+
+  // A cancelled subscription may be reconciled after the user has started a
+  // new one. Only the entitlement still owned by this terminal subscription
+  // may be moved to free; otherwise the terminal record is simply stale.
+  if (
+    !entitlement ||
+    entitlement.provider_subscription_id !== subscriptionId ||
+    entitlement.plan_key === "internal"
+  ) {
+    return false;
+  }
+
   const { data: freePlan, error: planError } = await admin
     .from("billing_plan_versions")
     .select(
@@ -715,9 +862,9 @@ async function activateFreeEntitlement({
   }
 
   const accessEnd = addCalendarMonthsIso(nowIso, 1200);
-  const { error } = await admin.from("user_entitlements").upsert(
-    {
-      user_id: userId,
+  const { data, error } = await admin
+    .from("user_entitlements")
+    .update({
       plan_key: "free",
       status: "active",
       current_period_start: nowIso,
@@ -726,16 +873,18 @@ async function activateFreeEntitlement({
       billing_period_end: accessEnd,
       credit_anchor_at: null,
       plan_version_id: freePlan.id,
-      provider_customer_id: customerKey,
-      provider_subscription_id: subscriptionId,
+      provider_customer_id: null,
+      provider_subscription_id: null,
       provider_price_id: freePlan.provider_price_id,
       cancel_at_period_end: false,
       plan_change_pending: null,
       grace_until: null,
       entitlement_updated_at: nowIso,
-    },
-    { onConflict: "user_id" },
-  );
+    })
+    .eq("user_id", userId)
+    .eq("provider_subscription_id", subscriptionId)
+    .select("user_id")
+    .maybeSingle<Pick<UserEntitlementRow, "user_id">>();
   if (error) {
     throw new TossBillingFlowError(
       "free_entitlement_update_failed",
@@ -743,6 +892,7 @@ async function activateFreeEntitlement({
       500,
     );
   }
+  return Boolean(data);
 }
 
 async function updatePaymentPaid(
@@ -760,6 +910,10 @@ async function updatePaymentPaid(
       provider_response: jsonObject(response),
       failure_code: null,
       failure_message: null,
+      fulfillment_status: "pending",
+      fulfillment_error: null,
+      fulfillment_attempted_at: null,
+      fulfillment_applied_at: null,
       requested_at: stringValue(response.requestedAt),
       approved_at: stringValue(response.approvedAt),
       paid_at: paidAt,
@@ -767,6 +921,8 @@ async function updatePaymentPaid(
     .eq("id", payment.id)
     .select("*")
     .single<BillingTossPaymentRow>();
+
+  if (!error && data) return data;
 
   if (error || !data) {
     throw new TossBillingFlowError(
@@ -831,10 +987,8 @@ async function chargeInitialPayment({
   }
 
   try {
-    if (payment.failure_code === "payment_result_uncertain") {
-      const reconciled = await reconcilePaymentByOrderId(payment);
-      if (reconciled) return reconciled;
-    }
+    const reconciled = await reconcilePaymentByOrderId(payment);
+    if (reconciled) return reconciled;
 
     const response = await chargeTossBillingKey({
       billingKey: authorization.billingKey,
@@ -891,15 +1045,7 @@ export async function startTossBillingCheckout({
     );
   }
 
-  const plan = await getBillingPlanFromStore(planKey);
-  if (plan.monthlyPriceKrw <= 0) {
-    throw new TossBillingFlowError(
-      "plan_not_billable",
-      "결제 가능한 유료 플랜이 아닙니다.",
-    );
-  }
-
-  if (!isTossPaymentsConfigured()) {
+  if (!isTossPaymentsCheckoutConfigured()) {
     throw new TossBillingFlowError(
       "billing_provider_not_configured",
       "결제 준비 중입니다.",
@@ -918,8 +1064,15 @@ export async function startTossBillingCheckout({
     );
   }
 
-  const config = getTossPaymentsConfig();
   const planVersion = await loadCurrentPlanVersion(planKey);
+  if (planVersion.monthly_price_krw <= 0) {
+    throw new TossBillingFlowError(
+      "plan_not_billable",
+      "결제 가능한 유료 플랜이 아닙니다.",
+    );
+  }
+  const plan = getBillingPlan(planKey);
+  const config = getTossPaymentsConfig();
   const customer = await getOrCreateTossCustomerKey(userId);
   const origin = getConfiguredBillingRedirectOrigin(requestOrigin);
   if (!origin) {
@@ -934,6 +1087,35 @@ export async function startTossBillingCheckout({
   const failUrl = `${origin}/api/billing/toss/fail?sessionId=${sessionId}`;
   const orderName = `KRW Ontology ${plan.label} 월 구독`;
   const expiresAt = new Date(Date.now() + CHECKOUT_TTL_MS).toISOString();
+  await expireStaleCheckoutSessions(userId, new Date().toISOString());
+
+  const openCheckout = await loadOpenCheckoutSession(userId);
+  if (openCheckout) {
+    if (openCheckout.status === "created") {
+      const { error: supersedeError } = await getSupabaseAdmin()
+        .from("billing_toss_checkout_sessions")
+        .update({
+          status: "superseded",
+          failure_code: "checkout_superseded",
+          failure_message: "새 결제 세션으로 대체되었습니다.",
+        })
+        .eq("id", openCheckout.id)
+        .eq("status", "created");
+      if (supersedeError) {
+        throw new TossBillingFlowError(
+          "checkout_session_supersede_failed",
+          "이전 결제 세션을 정리하지 못했습니다.",
+          500,
+        );
+      }
+    } else {
+      throw new TossBillingFlowError(
+        "checkout_in_progress",
+        "이미 진행 중인 결제가 있습니다. 이전 결제 결과를 확인한 뒤 다시 시도해 주세요.",
+        409,
+      );
+    }
+  }
 
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
@@ -943,7 +1125,7 @@ export async function startTossBillingCheckout({
       user_id: userId,
       plan_key: planKey,
       plan_version_id: planVersion.id,
-      amount_krw: plan.monthlyPriceKrw,
+      amount_krw: planVersion.monthly_price_krw,
       order_name: orderName,
       customer_key: customer.customer_key,
       success_url: successUrl,
@@ -953,6 +1135,13 @@ export async function startTossBillingCheckout({
     .select("*")
     .single<BillingTossCheckoutSessionRow>();
 
+  if (isUniqueConstraintViolation(error)) {
+    throw new TossBillingFlowError(
+      "checkout_in_progress",
+      "이미 진행 중인 결제가 있습니다. 이전 결제 결과를 확인한 뒤 다시 시도해 주세요.",
+      409,
+    );
+  }
   if (error || !data) {
     throw new TossBillingFlowError(
       "checkout_session_create_failed",
@@ -971,7 +1160,7 @@ export async function startTossBillingCheckout({
     plan: {
       key: planKey,
       label: plan.label,
-      amountKrw: plan.monthlyPriceKrw,
+      amountKrw: planVersion.monthly_price_krw,
       orderName,
     },
   };
@@ -992,13 +1181,24 @@ export async function completeTossBillingCheckout({
   userEmail?: string | null;
   userName?: string | null;
 }): Promise<CompleteTossCheckoutResult> {
-  const session = await loadCheckoutSession(userId, sessionId);
+  let session = await loadCheckoutSession(userId, sessionId);
 
   if (session.status === "paid") {
     return {
       status: "already_paid",
       planKey: session.plan_key,
     };
+  }
+  if (
+    session.status !== "created" &&
+    session.status !== "auth_succeeded" &&
+    session.status !== "processing"
+  ) {
+    throw new TossBillingFlowError(
+      "checkout_session_not_actionable",
+      "이 결제 세션은 더 이상 진행할 수 없습니다.",
+      409,
+    );
   }
   await assertBillingEntitlementIsMutable(userId);
   if (new Date(session.expires_at).getTime() < Date.now()) {
@@ -1026,6 +1226,26 @@ export async function completeTossBillingCheckout({
     );
   }
 
+  const existingSubscription = await loadOpenSubscription(userId);
+  if (existingSubscription) {
+    await getSupabaseAdmin()
+      .from("billing_toss_checkout_sessions")
+      .update({
+        status: "superseded",
+        failure_code: "subscription_already_exists",
+        failure_message: "기존 유료 구독이 확인되어 새 결제를 진행하지 않았습니다.",
+      })
+      .eq("id", session.id)
+      .in("status", ["created", "auth_succeeded", "processing"]);
+    throw new TossBillingFlowError(
+      "subscription_already_exists",
+      "기존 유료 구독은 플랜 변경 기능으로 조정해 주세요.",
+      409,
+    );
+  }
+
+  session = await markCheckoutProcessing(session);
+
   const existingEntitlement = await loadExistingEntitlement(userId);
   const keepWeeklyAnchor =
     existingEntitlement?.status === "active" &&
@@ -1049,32 +1269,40 @@ export async function completeTossBillingCheckout({
     payment.status === "paid" ? payment : await updatePaymentPaid(payment, paymentResponse);
   const paidAt = paidPayment.paid_at ?? getApprovedAt(paymentResponse);
   const periodEnd = addCalendarMonthsIso(paidAt, 1);
-  const subscription = await createSubscriptionAfterPayment({
-    session,
-    authorization,
+  const plan = session.plan_version_id
+    ? await loadPlanVersionById(session.plan_version_id)
+    : null;
+  if (!plan || plan.plan_key !== session.plan_key) {
+    throw new TossBillingFlowError(
+      "plan_version_missing",
+      "결제한 플랜 버전을 확인하지 못했습니다.",
+      500,
+    );
+  }
+  const settlement = await finalizePaidBillingPayment({
+    operation: "initial",
+    userId,
+    subscriptionId: randomUUID(),
     payment: paidPayment,
-    paidAt,
+    plan,
+    periodStart: paidAt,
     periodEnd,
     creditAnchorAt: keepWeeklyAnchor || paidAt,
+    customerKey: authorization.customerKey,
+    checkoutSessionId: session.id,
+    billingKey: authorization.billingKey,
+    billingKeyIssuedAt: stringValue(authorization.authenticatedAt),
+    cardSnapshot: jsonObject(authorization.card ?? {}),
+    renewalLeaseOwner: null,
+    deferPlanChangeUntil: null,
+    now: new Date(),
   });
 
-  const admin = getSupabaseAdmin();
-  await admin
-    .from("billing_toss_checkout_sessions")
-    .update({
-      status: "paid",
-      provider_response: jsonObject({
-        billingAuthorization: authorization,
-        initialPayment: paymentResponse,
-      }),
-    })
-    .eq("id", session.id);
-
   return {
-    status: "paid",
+    status: settlement.alreadyApplied ? "already_paid" : "paid",
     planKey: session.plan_key,
     paymentId: paidPayment.id,
-    subscriptionId: subscription.id,
+    subscriptionId: settlement.subscriptionId,
   };
 }
 
@@ -1151,9 +1379,32 @@ async function loadOrCreatePeriodPayment({
       billing_period_start: periodStart,
       billing_period_end: periodEnd,
       attempt_number: (existing?.attempt_number ?? 0) + 1,
-    })
+  })
     .select("*")
     .single<BillingTossPaymentRow>();
+
+  // The renewal lease normally serializes this path, while a plan-change
+  // request can still race with a retry. The partial period index gives both
+  // callers one durable order id to reconcile against Toss.
+  if (isUniqueConstraintViolation(error)) {
+    const { data: racedRows, error: racedError } = await admin
+      .from("billing_toss_payments")
+      .select("*")
+      .eq("subscription_id", subscription.id)
+      .eq("payment_kind", paymentKind)
+      .eq("billing_period_start", periodStart)
+      .order("attempt_number", { ascending: false })
+      .limit(1)
+      .returns<BillingTossPaymentRow[]>();
+    const raced = racedRows?.[0] ?? null;
+    if (
+      !racedError &&
+      raced &&
+      (raced.status === "pending" || raced.status === "paid")
+    ) {
+      return raced;
+    }
+  }
 
   if (error || !data) {
     throw new TossBillingFlowError(
@@ -1175,19 +1426,17 @@ async function chargeStoredPayment({
   if (payment.status === "paid") return payment;
 
   try {
-    if (payment.failure_code === "payment_result_uncertain") {
-      const reconciled = await reconcilePaymentByOrderId(payment);
-      if (reconciled) {
-        try {
-          return await updatePaymentPaid(payment, reconciled);
-        } catch (error) {
-          await updatePaymentUncertain(payment, error);
-          throw new TossBillingFlowError(
-            "payment_result_uncertain",
-            "승인된 결제 결과를 저장하지 못했습니다. 기존 주문을 재조회합니다.",
-            503,
-          );
-        }
+    const reconciled = await reconcilePaymentByOrderId(payment);
+    if (reconciled) {
+      try {
+        return await updatePaymentPaid(payment, reconciled);
+      } catch (error) {
+        await updatePaymentUncertain(payment, error);
+        throw new TossBillingFlowError(
+          "payment_result_uncertain",
+          "승인된 결제 결과를 저장하지 못했습니다. 기존 주문을 재조회합니다.",
+          503,
+        );
       }
     }
 
@@ -1237,77 +1486,6 @@ async function chargeStoredPayment({
   }
 }
 
-async function applyRenewedEntitlement({
-  subscription,
-  targetPlan,
-  periodStart,
-  periodEnd,
-  now,
-}: {
-  subscription: BillingTossSubscriptionRow;
-  targetPlan: BillingPlanVersionRow;
-  periodStart: string;
-  periodEnd: string;
-  now: Date;
-}) {
-  const existingEntitlement = await loadExistingEntitlement(subscription.user_id);
-  const creditAnchorAt =
-    existingEntitlement?.credit_anchor_at ?? subscription.current_period_start;
-  const isDowngrade =
-    subscription.plan_key === "pro" && targetPlan.plan_key === "standard";
-  const effectiveAt = isDowngrade
-    ? getFirstWeeklyBoundaryAtOrAfterIso({
-        anchor: creditAnchorAt,
-        at: periodStart,
-      })
-    : periodStart;
-
-  if (!isDowngrade || new Date(effectiveAt).getTime() <= now.getTime()) {
-    await activatePaidEntitlement({
-      userId: subscription.user_id,
-      planKey: targetPlan.plan_key as BillingTossPlanKey,
-      planVersionId: targetPlan.id,
-      providerPriceId: targetPlan.provider_price_id,
-      customerKey: subscription.customer_key,
-      subscriptionId: subscription.id,
-      periodStart,
-      periodEnd,
-      creditAnchorAt,
-    });
-    return;
-  }
-
-  const admin = getSupabaseAdmin();
-  const { error } = await admin
-    .from("user_entitlements")
-    .update({
-      status: "active",
-      current_period_start: periodStart,
-      current_period_end: periodEnd,
-      billing_period_start: periodStart,
-      billing_period_end: periodEnd,
-      provider_customer_id: subscription.customer_key,
-      provider_subscription_id: subscription.id,
-      provider_price_id: targetPlan.provider_price_id,
-      cancel_at_period_end: false,
-      grace_until: null,
-      plan_change_pending: jsonObject({
-        plan_key: targetPlan.plan_key,
-        plan_version_id: targetPlan.id,
-        effective_at: effectiveAt,
-      }),
-      entitlement_updated_at: now.toISOString(),
-    })
-    .eq("user_id", subscription.user_id);
-  if (error) {
-    throw new TossBillingFlowError(
-      "entitlement_plan_change_failed",
-      "다운그레이드 권한 일정을 반영하지 못했습니다.",
-      500,
-    );
-  }
-}
-
 async function handleRenewalFailure({
   subscription,
   now,
@@ -1331,6 +1509,8 @@ async function handleRenewalFailure({
         renewal_attempt_count: nextAttemptCount,
         renewal_lease_owner: null,
         renewal_lease_expires_at: null,
+        terminal_entitlement_applied_at: null,
+        billing_key_delete_pending: true,
       })
       .eq("id", subscription.id);
     if (subscriptionError) {
@@ -1340,12 +1520,6 @@ async function handleRenewalFailure({
         500,
       );
     }
-    await activateFreeEntitlement({
-      userId: subscription.user_id,
-      customerKey: subscription.customer_key,
-      subscriptionId: subscription.id,
-      nowIso,
-    });
     return;
   }
 
@@ -1428,48 +1602,41 @@ async function renewSubscription(
     orderName: `KRW Ontology ${targetPlan.plan_key} 월 구독 갱신`,
   });
 
+  let paidPayment: BillingTossPaymentRow;
   try {
-    const paidPayment = await chargeStoredPayment({ subscription, payment });
-    const admin = getSupabaseAdmin();
-    const { error } = await admin
-      .from("billing_toss_subscriptions")
-      .update({
-        plan_key: targetPlan.plan_key as BillingTossPlanKey,
-        plan_version_id: targetPlan.id,
-        status: "active",
-        current_period_start: periodStart,
-        current_period_end: periodEnd,
-        renewal_due_at: periodEnd,
-        next_billing_at: periodEnd,
-        grace_until: null,
-        renewal_attempt_count: 0,
-        renewal_lease_owner: null,
-        renewal_lease_expires_at: null,
-        pending_plan_key: null,
-        pending_plan_version_id: null,
-        last_payment_id: paidPayment.id,
-      })
-      .eq("id", subscription.id)
-      .eq("renewal_lease_owner", leaseOwner);
-    if (error) {
-      throw new TossBillingFlowError(
-        "subscription_renewal_update_failed",
-        "갱신된 구독 정보를 저장하지 못했습니다.",
-        500,
-      );
-    }
-
-    await applyRenewedEntitlement({
-      subscription,
-      targetPlan,
-      periodStart,
-      periodEnd,
-      now,
-    });
+    paidPayment = await chargeStoredPayment({ subscription, payment });
   } catch (error) {
     await handleRenewalFailure({ subscription, now });
     throw error;
   }
+
+  const entitlement = await loadExistingEntitlement(subscription.user_id);
+  const creditAnchorAt =
+    entitlement?.credit_anchor_at ?? subscription.current_period_start;
+  await finalizePaidBillingPayment({
+    operation: "renewal",
+    userId: subscription.user_id,
+    subscriptionId: subscription.id,
+    payment: paidPayment,
+    plan: targetPlan,
+    periodStart,
+    periodEnd,
+    creditAnchorAt,
+    customerKey: subscription.customer_key,
+    checkoutSessionId: null,
+    billingKey: null,
+    billingKeyIssuedAt: null,
+    cardSnapshot: {},
+    renewalLeaseOwner: leaseOwner,
+    deferPlanChangeUntil: getRenewalPlanChangeDeferral({
+      subscription,
+      targetPlan,
+      periodStart,
+      creditAnchorAt,
+      now,
+    }),
+    now,
+  });
 }
 
 async function expirePendingCancelledSubscriptions(nowIso: string): Promise<number> {
@@ -1493,25 +1660,236 @@ async function expirePendingCancelledSubscriptions(nowIso: string): Promise<numb
         pending_plan_version_id: null,
         renewal_lease_owner: null,
         renewal_lease_expires_at: null,
+        terminal_entitlement_applied_at: null,
+        billing_key_delete_pending: true,
       })
       .eq("id", subscription.id);
-    await activateFreeEntitlement({
-      userId: subscription.user_id,
-      customerKey: subscription.customer_key,
-      subscriptionId: subscription.id,
-      nowIso,
-    });
+  }
+
+  return data.length;
+}
+
+async function reconcileTerminalTossSubscriptions(nowIso: string): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("billing_toss_subscriptions")
+    .select("*")
+    .in("status", ["cancelled", "expired"])
+    .or("terminal_entitlement_applied_at.is.null,billing_key_delete_pending.eq.true")
+    .order("updated_at", { ascending: true })
+    .limit(MAX_RENEWAL_BATCH)
+    .returns<BillingTossSubscriptionRow[]>();
+
+  if (error || !data?.length) return;
+
+  for (const subscription of data) {
+    if (!subscription.terminal_entitlement_applied_at) {
+      try {
+        await activateFreeEntitlement({
+          userId: subscription.user_id,
+          subscriptionId: subscription.id,
+          nowIso,
+        });
+        await admin
+          .from("billing_toss_subscriptions")
+          .update({ terminal_entitlement_applied_at: nowIso })
+          .eq("id", subscription.id)
+          .is("terminal_entitlement_applied_at", null);
+      } catch (error) {
+        console.warn("[billing] failed to reconcile terminal entitlement", {
+          subscriptionId: subscription.id,
+          code: tossErrorCode(error),
+        });
+        continue;
+      }
+    }
+
+    if (
+      !subscription.billing_key_delete_pending ||
+      !isTossPaymentsCheckoutConfigured()
+    ) {
+      continue;
+    }
     try {
+      const { data: sharedBillingKey, error: sharedBillingKeyError } = await admin
+        .from("billing_toss_subscriptions")
+        .select("id")
+        .eq("user_id", subscription.user_id)
+        .neq("id", subscription.id)
+        .eq("billing_key", subscription.billing_key)
+        .in("status", ["active", "past_due", "grace", "pending_cancel"])
+        .limit(1)
+        .maybeSingle<Pick<BillingTossSubscriptionRow, "id">>();
+      if (sharedBillingKeyError) {
+        throw new TossBillingFlowError(
+          "billing_key_reuse_lookup_failed",
+          "결제 수단 재사용 여부를 확인하지 못했습니다.",
+          500,
+        );
+      }
+      if (sharedBillingKey) {
+        // A new subscription can reuse an existing key. It owns the key now,
+        // so the old terminal record must not revoke it.
+        await admin
+          .from("billing_toss_subscriptions")
+          .update({ billing_key_delete_pending: false })
+          .eq("id", subscription.id)
+          .eq("billing_key_delete_pending", true);
+        continue;
+      }
       await deleteTossBillingKey(subscription.billing_key);
+      await admin
+        .from("billing_toss_subscriptions")
+        .update({
+          billing_key_delete_pending: false,
+          billing_key_deleted_at: nowIso,
+        })
+        .eq("id", subscription.id)
+        .eq("billing_key_delete_pending", true);
     } catch (error) {
-      console.warn("[billing] failed to delete cancelled Toss billing key", {
+      console.warn("[billing] failed to delete terminal Toss billing key", {
         subscriptionId: subscription.id,
         code: tossErrorCode(error),
       });
     }
   }
+}
 
-  return data.length;
+async function reconcilePaidTossPaymentFulfillments(
+  now: Date,
+): Promise<number> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("billing_toss_payments")
+    .select("*")
+    .eq("status", "paid")
+    .in("fulfillment_status", ["pending", "failed"])
+    .order("created_at", { ascending: true })
+    .limit(MAX_RENEWAL_BATCH)
+    .returns<BillingTossPaymentRow[]>();
+
+  if (error || !data?.length) return 0;
+
+  let recovered = 0;
+  for (const payment of data) {
+    try {
+      const plan = payment.plan_version_id
+        ? await loadPlanVersionById(payment.plan_version_id)
+        : null;
+      if (!plan || plan.plan_key !== payment.plan_key) {
+        throw new TossBillingFlowError(
+          "plan_version_missing",
+          "결제한 플랜 버전을 확인하지 못했습니다.",
+          500,
+        );
+      }
+
+      if (payment.payment_kind === "initial") {
+        if (!payment.checkout_session_id) {
+          throw new TossBillingFlowError(
+            "checkout_session_missing",
+            "최초 결제 세션을 찾을 수 없습니다.",
+            500,
+          );
+        }
+        const session = await loadCheckoutSession(
+          payment.user_id,
+          payment.checkout_session_id,
+        );
+        const authorization = extractStoredBillingAuth(session);
+        if (!authorization) {
+          throw new TossBillingFlowError(
+            "billing_authorization_missing",
+            "자동결제 인증 정보를 찾을 수 없습니다.",
+            500,
+          );
+        }
+        const paidAt = payment.paid_at ?? now.toISOString();
+        const entitlement = await loadExistingEntitlement(payment.user_id);
+        const keepWeeklyAnchor =
+          entitlement?.status === "active" &&
+          isPaidPlanKey(entitlement.plan_key) &&
+          entitlement.credit_anchor_at;
+        await finalizePaidBillingPayment({
+          operation: "initial",
+          userId: payment.user_id,
+          subscriptionId: randomUUID(),
+          payment,
+          plan,
+          periodStart: paidAt,
+          periodEnd: addCalendarMonthsIso(paidAt, 1),
+          creditAnchorAt: keepWeeklyAnchor || paidAt,
+          customerKey: authorization.customerKey,
+          checkoutSessionId: session.id,
+          billingKey: authorization.billingKey,
+          billingKeyIssuedAt: stringValue(authorization.authenticatedAt),
+          cardSnapshot: jsonObject(authorization.card ?? {}),
+          renewalLeaseOwner: null,
+          deferPlanChangeUntil: null,
+          now,
+        });
+      } else {
+        if (
+          !payment.subscription_id ||
+          !payment.billing_period_start ||
+          !payment.billing_period_end
+        ) {
+          throw new TossBillingFlowError(
+            "payment_period_missing",
+            "결제 반영에 필요한 구독 기간을 찾을 수 없습니다.",
+            500,
+          );
+        }
+        const subscription = await loadSubscriptionById(
+          payment.user_id,
+          payment.subscription_id,
+        );
+        const entitlement = await loadExistingEntitlement(payment.user_id);
+        const creditAnchorAt =
+          entitlement?.credit_anchor_at ?? subscription.current_period_start;
+        await finalizePaidBillingPayment({
+          operation: payment.payment_kind,
+          userId: payment.user_id,
+          subscriptionId: subscription.id,
+          payment,
+          plan,
+          periodStart: payment.billing_period_start,
+          periodEnd: payment.billing_period_end,
+          creditAnchorAt,
+          customerKey: subscription.customer_key,
+          checkoutSessionId: null,
+          billingKey: null,
+          billingKeyIssuedAt: null,
+          cardSnapshot: {},
+          renewalLeaseOwner:
+            payment.payment_kind === "renewal"
+              ? subscription.renewal_lease_owner
+              : null,
+          deferPlanChangeUntil:
+            payment.payment_kind === "renewal"
+              ? getRenewalPlanChangeDeferral({
+                  subscription,
+                  targetPlan: plan,
+                  periodStart: payment.billing_period_start,
+                  creditAnchorAt,
+                  now,
+                })
+              : null,
+          now,
+        });
+      }
+      recovered += 1;
+    } catch (error) {
+      await markPaymentFulfillmentFailed(payment, error);
+      console.warn("[billing] failed to reconcile paid payment fulfillment", {
+        paymentId: payment.id,
+        paymentKind: payment.payment_kind,
+        code: tossErrorCode(error),
+      });
+    }
+  }
+
+  return recovered;
 }
 
 export async function renewDueTossSubscriptions({
@@ -1525,8 +1903,10 @@ export async function renewDueTossSubscriptions({
 } = {}): Promise<RenewDueTossSubscriptionsResult> {
   const nowIso = now.toISOString();
   const expired = await expirePendingCancelledSubscriptions(nowIso);
-  if (!isTossPaymentsConfigured()) {
-    return { checked: 0, renewed: 0, failed: 0, expired };
+  await reconcileTerminalTossSubscriptions(nowIso);
+  const recovered = await reconcilePaidTossPaymentFulfillments(now);
+  if (!isTossPaymentsCheckoutConfigured()) {
+    return { checked: 0, renewed: 0, failed: 0, expired, recovered };
   }
 
   const admin = getSupabaseAdmin();
@@ -1551,7 +1931,7 @@ export async function renewDueTossSubscriptions({
 
   const subscriptionIds = (claims ?? []).map((row) => row.subscription_id);
   if (subscriptionIds.length === 0) {
-    return { checked: 0, renewed: 0, failed: 0, expired };
+    return { checked: 0, renewed: 0, failed: 0, expired, recovered };
   }
 
   const { data, error } = await admin
@@ -1579,11 +1959,14 @@ export async function renewDueTossSubscriptions({
     }
   }
 
+  await reconcileTerminalTossSubscriptions(nowIso);
+
   return {
     checked: data?.length ?? 0,
     renewed,
     failed,
     expired,
+    recovered,
   };
 }
 
@@ -1602,7 +1985,7 @@ export async function changeCurrentTossPlan({
       "Standard 또는 Pro 플랜만 선택할 수 있습니다.",
     );
   }
-  if (!isTossPaymentsConfigured()) {
+  if (!isTossPaymentsCheckoutConfigured()) {
     throw new TossBillingFlowError(
       "billing_provider_not_configured",
       "결제 준비 중입니다.",
@@ -1631,6 +2014,23 @@ export async function changeCurrentTossPlan({
   const admin = getSupabaseAdmin();
   if (targetPlanKey === subscription.plan_key) {
     if (!subscription.pending_plan_key) {
+      const currentPlan =
+        (subscription.plan_version_id
+          ? await loadPlanVersionById(subscription.plan_version_id)
+          : null) ?? (await loadCurrentPlanVersion(subscription.plan_key));
+      const entitlement = await loadExistingEntitlement(userId);
+      await activatePaidEntitlement({
+        userId,
+        planKey: subscription.plan_key,
+        planVersionId: currentPlan.id,
+        providerPriceId: currentPlan.provider_price_id,
+        customerKey: subscription.customer_key,
+        subscriptionId: subscription.id,
+        periodStart: subscription.current_period_start,
+        periodEnd: subscription.current_period_end,
+        creditAnchorAt:
+          entitlement?.credit_anchor_at ?? subscription.current_period_start,
+      });
       return {
         status: "already_current",
         planKey: subscription.plan_key,
@@ -1721,39 +2121,62 @@ export async function changeCurrentTossPlan({
       orderName: `KRW Ontology ${targetPlan.plan_key} 플랜 업그레이드`,
     });
     paidPayment = await chargeStoredPayment({ subscription, payment });
+
+    const entitlement = await loadExistingEntitlement(userId);
+    await finalizePaidBillingPayment({
+      operation: "upgrade",
+      userId,
+      subscriptionId: subscription.id,
+      payment: paidPayment,
+      plan: targetPlan,
+      periodStart: subscription.current_period_start,
+      periodEnd: subscription.current_period_end,
+      creditAnchorAt:
+        entitlement?.credit_anchor_at ?? subscription.current_period_start,
+      customerKey: subscription.customer_key,
+      checkoutSessionId: null,
+      billingKey: null,
+      billingKeyIssuedAt: null,
+      cardSnapshot: {},
+      renewalLeaseOwner: null,
+      deferPlanChangeUntil: null,
+      now,
+    });
+  } else {
+    const entitlement = await loadExistingEntitlement(userId);
+    await activatePaidEntitlement({
+      userId,
+      planKey: targetPlanKey,
+      planVersionId: targetPlan.id,
+      providerPriceId: targetPlan.provider_price_id,
+      customerKey: subscription.customer_key,
+      subscriptionId: subscription.id,
+      periodStart: subscription.current_period_start,
+      periodEnd: subscription.current_period_end,
+      creditAnchorAt:
+        entitlement?.credit_anchor_at ?? subscription.current_period_start,
+    });
   }
 
-  const { error: subscriptionError } = await admin
-    .from("billing_toss_subscriptions")
-    .update({
-      plan_key: targetPlanKey,
-      plan_version_id: targetPlan.id,
-      pending_plan_key: null,
-      pending_plan_version_id: null,
-      last_payment_id: paidPayment?.id ?? subscription.last_payment_id,
-    })
-    .eq("id", subscription.id);
-  if (subscriptionError) {
-    throw new TossBillingFlowError(
-      "upgrade_subscription_update_failed",
-      "업그레이드된 구독 정보를 저장하지 못했습니다.",
-      500,
-    );
+  if (amountKrw === 0) {
+    const { error: subscriptionError } = await admin
+      .from("billing_toss_subscriptions")
+      .update({
+        plan_key: targetPlanKey,
+        plan_version_id: targetPlan.id,
+        pending_plan_key: null,
+        pending_plan_version_id: null,
+        last_payment_id: paidPayment?.id ?? subscription.last_payment_id,
+      })
+      .eq("id", subscription.id);
+    if (subscriptionError) {
+      throw new TossBillingFlowError(
+        "upgrade_subscription_update_failed",
+        "업그레이드된 구독 정보를 저장하지 못했습니다.",
+        500,
+      );
+    }
   }
-
-  const entitlement = await loadExistingEntitlement(userId);
-  await activatePaidEntitlement({
-    userId,
-    planKey: targetPlanKey,
-    planVersionId: targetPlan.id,
-    providerPriceId: targetPlan.provider_price_id,
-    customerKey: subscription.customer_key,
-    subscriptionId: subscription.id,
-    periodStart: subscription.current_period_start,
-    periodEnd: subscription.current_period_end,
-    creditAnchorAt:
-      entitlement?.credit_anchor_at ?? subscription.current_period_start,
-  });
 
   return {
     status: "upgraded",

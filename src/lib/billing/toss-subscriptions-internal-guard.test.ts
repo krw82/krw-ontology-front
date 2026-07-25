@@ -8,9 +8,8 @@ const source = readFileSync(
 );
 
 describe("internal entitlement billing guard", () => {
-  it("blocks every paid activation path and preserves internal access on free transitions", () => {
+  it("blocks every paid activation path and keeps terminal cleanup scoped to its own subscription", () => {
     expect(source).toContain("internal_entitlement_billing_forbidden");
-    expect(source).toContain("internal_entitlement_preservation_failed");
     expect(source).toMatch(
       /async function activatePaidEntitlement[\s\S]*?await assertBillingEntitlementIsMutable\(userId\)/,
     );
@@ -23,8 +22,13 @@ describe("internal entitlement billing guard", () => {
     expect(source).toMatch(
       /async function renewSubscription[\s\S]*?await assertBillingEntitlementIsMutable\(subscription\.user_id\)[\s\S]*?chargeStoredPayment/,
     );
-    expect(source).toMatch(
-      /async function activateFreeEntitlement[\s\S]*?loadBillingEntitlementPlanKey\(userId\)[\s\S]*?\.eq\("plan_key", "internal"\)/,
+    const terminalCleanup = source.slice(
+      source.indexOf("async function activateFreeEntitlement"),
+      source.indexOf("async function updatePaymentPaid"),
     );
+    expect(terminalCleanup).toContain("provider_subscription_id !== subscriptionId");
+    expect(terminalCleanup).toContain('.eq("provider_subscription_id", subscriptionId)');
+    expect(terminalCleanup).toContain("provider_subscription_id: null");
+    expect(terminalCleanup).not.toContain(".upsert(");
   });
 });

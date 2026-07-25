@@ -310,16 +310,21 @@ describe("production deploy scripts", () => {
     expect(packageJson).toContain('"prod:status": "scripts/status-production-fast.sh"');
     expect(packageJson).toContain('"prod:preflight": "scripts/run-production-release-gates.sh"');
     expect(packageJson).toContain('"prod:deploy:web": "scripts/deploy-production-fast.sh --skip-mac"');
-    expect(packageJson).toContain('"prod:deploy:runtime": "scripts/deploy-production-fast.sh --skip-web"');
+    expect(packageJson).toContain(
+      '"prod:deploy:runtime": "scripts/deploy-production-fast.sh --apply-migrations --require-live-toss"',
+    );
+    expect(packageJson).toContain(
+      '"prod:deploy:mac-runtime": "/bin/sh scripts/deploy-production-fast.sh --skip-web"',
+    );
     expect(packageJson).toContain('"prod:deploy:code": "scripts/deploy-production-fast.sh --apply-migrations"');
     expect(packageJson).toContain('"prod:deploy:full": "scripts/deploy-production-fast.sh --apply-migrations --with-data"');
     expect(packageJson).toContain('"prod:deploy:dry": "scripts/deploy-production-fast.sh --dry-run --apply-migrations"');
     expect(packageJson).toContain('"prod:deploy:safe": "scripts/deploy-production-fast.sh --apply-migrations --with-data"');
     expect(packageJson).toContain('"prod:release:publish": "scripts/deploy-production-fast.sh --with-data --skip-web --skip-mac"');
     expect(packageJson).toContain('"deploy:data": "scripts/deploy-production-fast.sh --with-data --skip-web --skip-mac"');
-    expect(packageJson).toContain('"deploy:worker": "scripts/deploy-production-fast.sh --skip-web"');
-    expect(packageJson).toContain('"deploy:plugin": "scripts/deploy-production-fast.sh --skip-web"');
-    expect(packageJson).toContain('"deploy:mcp": "scripts/deploy-production-fast.sh --skip-web"');
+    expect(packageJson).toContain('"deploy:worker": "/bin/sh scripts/deploy-production-fast.sh --skip-web"');
+    expect(packageJson).toContain('"deploy:plugin": "/bin/sh scripts/deploy-production-fast.sh --skip-web"');
+    expect(packageJson).toContain('"deploy:mcp": "/bin/sh scripts/deploy-production-fast.sh --skip-web"');
     expect(packageJson).not.toContain("legacy:gcp-mcp");
     expect(packageJson).not.toContain("deploy-data-production.sh");
     expect(packageJson).not.toContain("deploy:plugin:gcp");
@@ -536,6 +541,13 @@ describe("production deploy scripts", () => {
     expect(readiness).toContain("ANALYSIS_CREDIT_ENFORCEMENT_MODE");
     expect(readiness).toContain("TOSS_PAYMENTS_CLIENT_KEY");
     expect(readiness).toContain("billing-worker");
+    expect(readiness).toContain('"Standard feature" "와이드 리서치" "Wide research"');
+    expect(readiness).toContain('"Pro feature" "가장 넉넉한 분석량" "Highest research capacity"');
+    expect(readiness).not.toContain('"Standard weekly credits"');
+    expect(readiness).not.toContain('"Pro weekly credits"');
+    expect(read("scripts/deploy-production-fast.sh")).toContain(
+      "--require-live-toss",
+    );
 
     expect(billingContract).toContain("Production Readiness Gate");
     expect(billingContract).toContain("npm run billing:prod:readiness");

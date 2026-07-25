@@ -6,6 +6,8 @@ import type { EntitlementPlanKey } from "@/types/entitlement";
 
 type PaidPlanKey = "standard" | "pro";
 
+let checkoutRequestInFlight = false;
+
 interface TossPaymentInstance {
   requestBillingAuth(options: {
     method: "CARD";
@@ -58,6 +60,16 @@ function errorMessage(payload: unknown, fallback: string): string {
   return typeof message === "string" && message.trim() ? message : fallback;
 }
 
+async function responsePayload(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 export default function BillingPlanAction({
   planKey,
   currentPlanKey,
@@ -73,6 +85,7 @@ export default function BillingPlanAction({
   );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sdkLoadFailed, setSdkLoadFailed] = useState(false);
 
   const isCurrent = planKey === currentPlanKey;
   const currentIsPaid = subscriptionPlanKey !== null;
@@ -108,11 +121,20 @@ export default function BillingPlanAction({
     !cancelAtPeriodEnd;
 
   async function startCheckout() {
+    if (checkoutRequestInFlight) {
+      setError("이미 다른 결제 요청을 처리 중입니다. 잠시만 기다려 주세요.");
+      return;
+    }
     if (!window.TossPayments) {
-      setError("결제창 SDK를 아직 불러오지 못했습니다.");
+      setError(
+        sdkLoadFailed
+          ? "결제창을 불러오지 못했습니다. 네트워크를 확인한 뒤 다시 불러와 주세요."
+          : "결제창 SDK를 아직 불러오지 못했습니다.",
+      );
       return;
     }
 
+    checkoutRequestInFlight = true;
     setPending(true);
     setError(null);
     try {
@@ -121,7 +143,7 @@ export default function BillingPlanAction({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ planKey }),
       });
-      const payload = (await response.json()) as CheckoutResponse | unknown;
+      const payload = (await responsePayload(response)) as CheckoutResponse | unknown;
       if (!response.ok) {
         throw new Error(errorMessage(payload, "결제를 시작하지 못했습니다."));
       }
@@ -133,6 +155,8 @@ export default function BillingPlanAction({
         failUrl: checkout.failUrl,
         windowTarget: "self",
       });
+      checkoutRequestInFlight = false;
+      setPending(false);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -140,6 +164,7 @@ export default function BillingPlanAction({
           : "결제를 시작하지 못했습니다.",
       );
       setPending(false);
+      checkoutRequestInFlight = false;
     }
   }
 
@@ -150,7 +175,7 @@ export default function BillingPlanAction({
       const response = await fetch("/api/billing/toss/cancel", {
         method: "POST",
       });
-      const payload = await response.json();
+      const payload = await responsePayload(response);
       if (!response.ok) {
         throw new Error(errorMessage(payload, "해지 예약에 실패했습니다."));
       }
@@ -172,7 +197,7 @@ export default function BillingPlanAction({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ planKey }),
       });
-      const payload = await response.json();
+      const payload = await responsePayload(response);
       if (!response.ok) {
         throw new Error(errorMessage(payload, "플랜을 변경하지 못했습니다."));
       }
@@ -215,9 +240,17 @@ export default function BillingPlanAction({
     <div className="mt-sm">
       {canSubscribe && (
         <Script
+          id="toss-payments-sdk"
           src="https://js.tosspayments.com/v2/standard"
           strategy="afterInteractive"
-          onLoad={() => setScriptReady(true)}
+          onLoad={() => {
+            setScriptReady(true);
+            setSdkLoadFailed(false);
+          }}
+          onError={() => {
+            setSdkLoadFailed(true);
+            setError("결제창을 불러오지 못했습니다. 다시 불러와 주세요.");
+          }}
         />
       )}
       <button
@@ -264,8 +297,19 @@ export default function BillingPlanAction({
               ? "결제 준비 중"
               : scriptReady
                 ? "구독하기"
-                : "결제창 준비 중"}
+                : sdkLoadFailed
+                  ? "결제창 다시 불러오기"
+                  : "결제창 준비 중"}
       </button>
+      {sdkLoadFailed && canSubscribe && (
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-xs text-[12px] font-bold leading-5 text-primary underline underline-offset-2"
+        >
+          결제창 다시 불러오기
+        </button>
+      )}
       {checkoutUnavailable && (
         <p className="mt-xs text-[12px] font-bold leading-5 text-muted">
           결제 연동 설정 후 구독할 수 있습니다.

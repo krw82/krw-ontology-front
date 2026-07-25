@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { renewDueTossSubscriptions } from "@/lib/billing/toss-subscriptions";
 import {
-  isTossPaymentsConfigured,
+  isTossPaymentsCheckoutConfigured,
   isTossPaymentsLiveConfigured,
 } from "@/lib/billing/toss";
 import { readIntEnv } from "@/lib/env";
@@ -22,7 +22,7 @@ const ALLOW_TOSS_TEST_KEYS =
 function assertTossPaymentsReady() {
   if (!REQUIRE_TOSS_PAYMENTS) return;
   if (isTossPaymentsLiveConfigured()) return;
-  if (ALLOW_TOSS_TEST_KEYS && isTossPaymentsConfigured()) return;
+  if (ALLOW_TOSS_TEST_KEYS && isTossPaymentsCheckoutConfigured()) return;
 
   throw new Error(
     "Toss Payments live keys are required for billing-worker. Set TOSS_PAYMENTS_CLIENT_KEY=live_ck_... and TOSS_PAYMENTS_SECRET_KEY=live_sk_..., or set BILLING_WORKER_REQUIRE_TOSS_PAYMENTS=0 only for an intentional non-launch deploy.",

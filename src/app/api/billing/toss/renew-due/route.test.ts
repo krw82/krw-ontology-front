@@ -16,6 +16,7 @@ describe("POST /api/billing/toss/renew-due", () => {
       renewed: 1,
       failed: 0,
       expired: 0,
+      recovered: 0,
     });
   });
 
