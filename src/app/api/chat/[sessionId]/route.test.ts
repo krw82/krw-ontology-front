@@ -40,6 +40,8 @@ function params(sessionId = SESSION_ID) {
 function createSupabase(overrides: {
   session?: Record<string, unknown> | null;
   messages?: Array<Record<string, unknown>>;
+  visualizations?: Array<Record<string, unknown>>;
+  presentations?: Array<Record<string, unknown>>;
   sessionError?: { message: string } | null;
   messagesError?: { message: string } | null;
   runsError?: { message: string } | null;
@@ -70,6 +72,8 @@ function createSupabase(overrides: {
       updated_at: "2026-05-31T00:00:00.000Z",
     },
   ];
+  const visualizations = overrides.visualizations ?? [];
+  const presentations = overrides.presentations ?? [];
   const runs = [
     {
       id: "run-1",
@@ -176,12 +180,15 @@ function createSupabase(overrides: {
                   error: null,
                 });
               }
-              if (
-                table === "chat_message_visualizations" ||
-                table === "chat_message_presentations"
-              ) {
+              if (table === "chat_message_visualizations") {
                 return Promise.resolve({
-                  data: [],
+                  data: visualizations,
+                  error: null,
+                });
+              }
+              if (table === "chat_message_presentations") {
+                return Promise.resolve({
+                  data: presentations,
                   error: null,
                 });
               }
@@ -202,6 +209,7 @@ async function json(response: Response) {
     error?: { code: string; message: string };
     messages?: Array<Record<string, unknown>>;
     runs?: Array<Record<string, unknown>>;
+    visualizations?: Array<Record<string, unknown>>;
     message_pagination?: {
       limit: number;
       has_more: boolean;
@@ -315,6 +323,30 @@ describe("GET /api/chat/[sessionId]", () => {
       { role: "user", content: "Let me retrieve라고 사용자가 직접 입력" },
       { role: "assistant", content: "최종 답변입니다." },
     ]);
+  });
+
+  it("ignores an unrecognized visualization payload instead of failing the chat", async () => {
+    const supabase = createSupabase({
+      visualizations: [{
+        id: "legacy-visualization-1",
+        session_id: SESSION_ID,
+        message_id: "assistant-message-1",
+        run_id: "run-1",
+        artifact_ref: "chart_legacy",
+        payload_json: {
+          artifact_format: "krw-visualization",
+          schema_version: 1,
+        },
+        created_at: "2026-05-31T00:01:00.000Z",
+      }],
+    });
+    vi.mocked(createClient).mockResolvedValue(supabase.client);
+
+    const response = await GET(request(), params());
+    const body = await json(response);
+
+    expect(response.status).toBe(200);
+    expect(body.visualizations).toEqual([]);
   });
 
   it("returns 500 instead of not_found when session loading fails", async () => {

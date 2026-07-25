@@ -39,8 +39,9 @@ describe("visualization persistence extraction", () => {
   it("persists compiler artifacts without requiring a Markdown insert token", () => {
     const artifact = {
       artifact_format: "krw-visualization",
-      schema_version: 1,
+      schema_version: 2,
       artifact_ref: "viz_1_revenue",
+      semantic_fingerprint: "fingerprint-revenue",
       intent: { goal: "매출 추이" },
       title: "매출 추이",
       views: [{
@@ -50,6 +51,7 @@ describe("visualization persistence extraction", () => {
         series: [{
           series_key: "revenue",
           label: "Revenue",
+          scope: { kind: "company_total", key: "company_total", label: "Company total" },
           points: [{ period: "CY2025", value: 100, evidence_ref: "metric_observation:1" }],
         }],
       }],
@@ -72,6 +74,59 @@ describe("visualization persistence extraction", () => {
     expect(artifacts).toEqual([artifact]);
   });
 
+  it("keeps one artifact when separate tool calls resolve to the same semantic data", () => {
+    const firstArtifact = {
+      artifact_format: "krw-visualization" as const,
+      schema_version: 2 as const,
+      artifact_ref: "viz_a1b2c3d4e5f60708",
+      semantic_fingerprint: "same-selected-data",
+      intent: { goal: "매출 추이" },
+      title: "애플 매출 추이",
+      views: [{
+        view_id: "view_1",
+        chart_type: "line" as const,
+        title: "애플 매출 추이",
+        series: [{
+          series_key: "AAPL|revenue|company_total",
+          label: "회사 전체",
+          scope: { kind: "company_total", key: "company_total" },
+          points: [{ period: "CY2025", value: 100, evidence_ref: "metric_observation:1" }],
+        }],
+      }],
+      provenance: {
+        source_tool_call_ids: ["ontology-tool-1"],
+        evidence_refs: ["metric_observation:1"],
+        source_kinds: ["ontology" as const],
+      },
+      quality: { series_count: 1, point_count: 1, warnings: [] },
+    };
+    const secondArtifact = {
+      ...firstArtifact,
+      artifact_ref: "viz_0011223344556677",
+      title: "매출 변화",
+    };
+    const run = accumulated({
+      kind: "compose_visualization_result",
+      status: "created",
+      artifact_ref: firstArtifact.artifact_ref,
+      artifact: firstArtifact,
+      warnings: [],
+    });
+    run.toolCalls.push({
+      ...run.toolCalls[0]!,
+      id: "visualization-tool-2",
+      resultJson: {
+        kind: "compose_visualization_result",
+        status: "created",
+        artifact_ref: secondArtifact.artifact_ref,
+        artifact: secondArtifact,
+        warnings: [],
+      },
+    });
+
+    expect(extractCreatedVisualizationArtifacts(run)).toEqual([firstArtifact]);
+  });
+
   it("does not persist skipped or malformed tool output", () => {
     expect(extractCreatedVisualizationArtifacts(accumulated({
       kind: "compose_visualization_result",
@@ -91,8 +146,9 @@ describe("visualization persistence extraction", () => {
   it("persists compiler artifacts and deterministic presentation blocks separately", async () => {
     const artifact = {
       artifact_format: "krw-visualization" as const,
-      schema_version: 1 as const,
+      schema_version: 2 as const,
       artifact_ref: "viz_1_revenue",
+      semantic_fingerprint: "fingerprint-revenue",
       intent: { goal: "매출 추이" },
       title: "매출 추이",
       views: [{
@@ -102,6 +158,7 @@ describe("visualization persistence extraction", () => {
         series: [{
           series_key: "revenue",
           label: "Revenue",
+          scope: { kind: "company_total", key: "company_total", label: "Company total" },
           points: [{ period: "CY2025", value: 100, evidence_ref: "metric_observation:1" }],
         }],
       }],

@@ -3,8 +3,6 @@ import type {
   PresentationBlock,
 } from "./contracts";
 
-const LEGACY_CHART_TOKEN = /\[\[krw-chart:[A-Za-z0-9_-]+\]\]/g;
-
 /**
  * Converts a final Markdown answer and created artifacts into stable render
  * blocks. Models never need to emit an artifact placeholder.
@@ -13,7 +11,7 @@ export function buildPresentationBlocks(params: {
   content: string;
   visualizations: KrwVisualizationArtifact[];
 }): PresentationBlock[] {
-  const markdownBlocks = splitMarkdownBlocks(stripLegacyChartTokens(params.content));
+  const markdownBlocks = splitMarkdownBlocks(params.content);
   const insertions = new Map<number, KrwVisualizationArtifact[]>();
 
   for (const visualization of params.visualizations) {
@@ -43,13 +41,6 @@ export function buildPresentationBlocks(params: {
     }
   }
   return blocks;
-}
-
-export function stripLegacyChartTokens(content: string): string {
-  return content
-    .replace(LEGACY_CHART_TOKEN, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
 }
 
 function splitMarkdownBlocks(content: string): string[] {

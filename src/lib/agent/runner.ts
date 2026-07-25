@@ -93,7 +93,7 @@ import {
   VISUALIZATION_MCP_SERVER_NAME,
   createVisualizationMcpServer,
 } from "@/lib/visualizations/create-visualization-tool";
-import { isVisualizationGenerationEnabled } from "@/lib/features/charts";
+import { isVisualizationEnabled } from "@/lib/features/charts";
 import { publicAgentErrorMessage } from "@/lib/api/chat/error-messages";
 import { createYahooFinanceNewsMcpServer } from "@/lib/news-discovery/yahoo-finance-mcp-tool";
 import { YAHOO_FINANCE_MCP_SERVER_NAME } from "@/lib/news-discovery/yahoo-finance-mcp-constants";
@@ -383,7 +383,7 @@ export async function runAgent(
   const stockNewsRun = isStockNewsRunKind(runKind);
   const stockNewsEnabledForRun = stockNewsRun && isStockNewsEnabled();
   const yahooFinanceRun = isYahooFinanceRunKind(runKind);
-  const visualizationGenerationEnabled = isVisualizationGenerationEnabled();
+  const visualizationGenerationEnabled = isVisualizationEnabled();
   const hasSourceFilingContext = Boolean(options.sourceFilingEventId);
   const filingCorrelationActive = Boolean(
     !hasSourceFilingContext &&
@@ -751,7 +751,7 @@ async function runSdkPass(params: {
   const allowedStockNewsSourceUrls = extractAllowedStockNewsSourceUrls(
     options.selectedNewsEventContext,
   );
-  const visualizationGenerationEnabled = isVisualizationGenerationEnabled();
+  const visualizationGenerationEnabled = isVisualizationEnabled();
   const personalFilingsEnabled = Boolean(
     options.userId && isKrwPersonalFilingsMcpEnabled(),
   );
@@ -1541,7 +1541,7 @@ function buildGuruAdvisorToolBoundaryHooks(
 
             if (isVisualizationSdkTool(toolName)) {
               return guruAdvisorHookDecision(
-                isVisualizationGenerationEnabled() ? "allow" : "deny",
+                isVisualizationEnabled() ? "allow" : "deny",
                 "Visualizations may use only compiler-owned structured data from this run.",
               );
             }
@@ -1858,7 +1858,7 @@ export async function canUseTool(
   input: Record<string, unknown> = {},
 ): Promise<PermissionResult> {
   if (isVisualizationSdkTool(toolName)) {
-    return isVisualizationGenerationEnabled()
+    return isVisualizationEnabled()
       ? { behavior: "allow" }
       : {
           behavior: "deny",
@@ -1905,7 +1905,7 @@ function allowedSdkToolsForResearchMode(
   mode: ResearchMode,
   analysisMode: AnalysisMode,
   runKind: RunKind,
-  visualizationGenerationEnabled = isVisualizationGenerationEnabled(),
+  visualizationGenerationEnabled = isVisualizationEnabled(),
   hasSourceFilingContext = false,
   filingCorrelationActive = false,
   personalFilingsEnabled = false,
@@ -2084,7 +2084,7 @@ function createToolPermissionGuard(
   maxFilingsCalls: number,
   budgetReservations: ToolBudgetReservations,
   allowedStockNewsSourceUrls: string[] = [],
-  visualizationGenerationEnabled = isVisualizationGenerationEnabled(),
+  visualizationGenerationEnabled = isVisualizationEnabled(),
   guruAgentGeneratedBriefEnabled = false,
   requiredGuruCompanyTicker: string | null = null,
   sourceFilingEventId: string | null = null,

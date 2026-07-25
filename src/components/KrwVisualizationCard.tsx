@@ -67,8 +67,11 @@ export default function KrwVisualizationCard({
   visualization: ChatMessageVisualization;
 }) {
   const [showData, setShowData] = useState(false);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const artifact = visualization.payload_json;
   const warning = artifact.quality.warnings[0];
+  const activeView = artifact.views.find((view) => view.view_id === activeViewId)
+    ?? artifact.views[0];
 
   return (
     <figure className="my-lg w-full max-w-[820px] overflow-hidden rounded-[8px] border border-hairline bg-canvas shadow-[0_1px_0_rgba(15,23,42,0.04)]">
@@ -91,14 +94,37 @@ export default function KrwVisualizationCard({
         </p>
       </div>
 
-      <div className="space-y-lg px-xs py-sm sm:px-sm sm:py-md">
-        {artifact.views.map((view) => (
-          <VisualizationViewCard
-            key={view.view_id}
-            view={view}
-            showData={showData}
-          />
-        ))}
+      <div className="px-xs py-sm sm:px-sm sm:py-md">
+        {artifact.views.length > 1 ? (
+          <div
+            className="mb-sm flex gap-1 overflow-x-auto px-sm pb-1 sm:px-md"
+            role="tablist"
+            aria-label="표시 단위 선택"
+          >
+            {artifact.views.map((view) => {
+              const selected = view.view_id === activeView?.view_id;
+              return (
+                <button
+                  key={view.view_id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-black leading-none transition-colors sm:text-[12px] ${
+                    selected
+                      ? "bg-primary text-white"
+                      : "bg-surface text-muted hover:bg-primary-fixed/55 hover:text-ink"
+                  }`}
+                  onClick={() => setActiveViewId(view.view_id)}
+                >
+                  {view.title}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+        {activeView ? (
+          <VisualizationViewCard view={activeView} showData={showData} />
+        ) : null}
       </div>
 
       {warning ? (
@@ -122,16 +148,11 @@ function VisualizationViewCard({
   return (
     <section className="min-w-0">
       <div className="mb-sm flex flex-wrap items-start justify-between gap-x-md gap-y-1 px-sm sm:px-md">
-        <div>
-          <h3 className="text-[13px] font-black leading-5 text-ink sm:text-[14px]">
-            {view.title}
-          </h3>
-          {view.subtitle ? (
-            <p className="text-[11px] font-semibold leading-4 text-muted sm:text-[12px]">
-              {view.subtitle}
-            </p>
-          ) : null}
-        </div>
+        {view.subtitle ? (
+          <p className="text-[11px] font-semibold leading-4 text-muted sm:text-[12px]">
+            {view.subtitle}
+          </p>
+        ) : <span />}
         {view.unit ? (
           <span className="rounded-[5px] bg-surface px-2 py-1 text-[10px] font-bold leading-none text-muted">
             {view.unit}
@@ -142,9 +163,12 @@ function VisualizationViewCard({
       {showData || isDataOnly ? (
         <VisualizationDataTable view={view} />
       ) : (
-        <div className="h-[286px] w-full sm:h-[332px]">
-          {isLineLike(view) ? <LineVisualization view={view} /> : <BarVisualization view={view} />}
-        </div>
+        <>
+          <VisualizationLegend series={view.series} />
+          <div className="h-[250px] w-full sm:h-[304px]">
+            {isLineLike(view) ? <LineVisualization view={view} /> : <BarVisualization view={view} />}
+          </div>
+        </>
       )}
 
       {view.events && view.events.length > 0 ? (
@@ -188,9 +212,13 @@ function isLineLike(view: VisualizationView) {
 }
 
 function LineVisualization({ view }: { view: VisualizationView }) {
+  const labelByKey = useMemo(
+    () => new Map(view.series.map((series) => [series.series_key, series.label])),
+    [view.series],
+  );
   const data = useMemo(
     () => view.series.map((series) => ({
-      id: series.label,
+      id: series.series_key,
       data: series.points.map((point) => ({
         x: point.period,
         y: point.value,
@@ -206,7 +234,7 @@ function LineVisualization({ view }: { view: VisualizationView }) {
   return (
     <ResponsiveLine
       data={data}
-      margin={{ top: data.length > 1 ? 28 : 18, right: 20, bottom: 52, left: 68 }}
+      margin={{ top: 12, right: 12, bottom: xAxisIsCrowded(view) ? 56 : 42, left: 52 }}
       xScale={{ type: "point" }}
       yScale={{ type: "linear", min: "auto", max: "auto", stacked: false }}
       curve="monotoneX"
@@ -214,14 +242,11 @@ function LineVisualization({ view }: { view: VisualizationView }) {
       theme={visualizationTheme}
       axisTop={null}
       axisRight={null}
-      axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -32 }}
+      axisBottom={{ tickSize: 0, tickPadding: 8, tickRotation: xAxisIsCrowded(view) ? -32 : 0 }}
       axisLeft={{
         tickSize: 0,
         tickPadding: 8,
         format: formatAxisValue,
-        legend: view.unit ?? undefined,
-        legendOffset: -53,
-        legendPosition: "middle",
       }}
       enableGridX={false}
       enableArea={area}
@@ -232,13 +257,12 @@ function LineVisualization({ view }: { view: VisualizationView }) {
       pointColor="var(--color-canvas)"
       enableSlices={false}
       useMesh
-      legends={buildLineLegend(data.length)}
       tooltip={({ point }) => {
         const datum = point.data as unknown as LinePointDatum;
         return (
           <VisualizationTooltip
             color={point.seriesColor}
-            label={String(point.seriesId)}
+            label={labelByKey.get(String(point.seriesId)) ?? String(point.seriesId)}
             period={datum.period}
             value={datum.y}
             formattedValue={datum.formatted_value}
@@ -264,25 +288,21 @@ function BarVisualization({ view }: { view: VisualizationView }) {
       data={rows}
       keys={keys}
       indexBy="period"
-      margin={{ top: keys.length > 1 ? 28 : 18, right: 20, bottom: 52, left: 68 }}
+      margin={{ top: 12, right: 12, bottom: xAxisIsCrowded(view) ? 56 : 42, left: 52 }}
       padding={0.24}
       groupMode={stacked ? "stacked" : "grouped"}
       colors={({ id }) => colorForKey(String(id), keys)}
       theme={visualizationTheme}
       axisTop={null}
       axisRight={null}
-      axisBottom={{ tickSize: 0, tickPadding: 10, tickRotation: -32 }}
+      axisBottom={{ tickSize: 0, tickPadding: 8, tickRotation: xAxisIsCrowded(view) ? -32 : 0 }}
       axisLeft={{
         tickSize: 0,
         tickPadding: 8,
         format: formatAxisValue,
-        legend: view.unit ?? undefined,
-        legendOffset: -53,
-        legendPosition: "middle",
       }}
       enableGridX={false}
       enableLabel={false}
-      legends={buildBarLegend(keys.length)}
       tooltip={(bar) => {
         const key = String(bar.id);
         return (
@@ -297,6 +317,24 @@ function BarVisualization({ view }: { view: VisualizationView }) {
         );
       }}
     />
+  );
+}
+
+function VisualizationLegend({ series }: { series: VisualizationSeries[] }) {
+  if (series.length <= 1) return null;
+  return (
+    <ul className="mb-xs flex max-h-[52px] flex-wrap gap-x-3 gap-y-1 overflow-y-auto px-sm text-[10px] font-bold leading-4 text-muted sm:px-md sm:text-[11px]">
+      {series.map((item, index) => (
+        <li key={item.series_key} className="flex min-w-0 max-w-full items-center gap-1.5">
+          <span
+            aria-hidden="true"
+            className="size-2 shrink-0 rounded-full"
+            style={{ backgroundColor: colorForSeriesIndex(index) }}
+          />
+          <span className="truncate">{item.label}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -385,35 +423,6 @@ function VisualizationTooltip({
   );
 }
 
-function buildLineLegend(seriesCount: number) {
-  if (seriesCount <= 1) return [];
-  return [{
-    anchor: "top-left" as const,
-    direction: "row" as const,
-    translateY: -18,
-    itemWidth: 118,
-    itemHeight: 14,
-    symbolSize: 9,
-    symbolShape: "circle" as const,
-    itemTextColor: "var(--color-muted)",
-  }];
-}
-
-function buildBarLegend(seriesCount: number) {
-  if (seriesCount <= 1) return [];
-  return [{
-    anchor: "top-left" as const,
-    direction: "row" as const,
-    dataFrom: "keys" as const,
-    translateY: -18,
-    itemWidth: 118,
-    itemHeight: 14,
-    symbolSize: 9,
-    symbolShape: "square" as const,
-    itemTextColor: "var(--color-muted)",
-  }];
-}
-
 function formatAxisValue(value: number | string) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return String(value);
@@ -426,7 +435,15 @@ function formatDisplayValue(value: number) {
 
 function colorForKey(key: string, keys: string[]) {
   const index = Math.max(0, keys.indexOf(key));
+  return colorForSeriesIndex(index);
+}
+
+function colorForSeriesIndex(index: number) {
   return VISUALIZATION_COLORS[index % VISUALIZATION_COLORS.length] ?? VISUALIZATION_COLORS[0];
+}
+
+function xAxisIsCrowded(view: VisualizationView) {
+  return Math.max(...view.series.map((series) => series.points.length), 0) > 5;
 }
 
 function stringValue(value: unknown): string | null {

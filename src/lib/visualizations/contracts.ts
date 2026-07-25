@@ -5,7 +5,9 @@
  */
 
 export const KRW_VISUALIZATION_ARTIFACT_FORMAT = "krw-visualization" as const;
-export const KRW_VISUALIZATION_SCHEMA_VERSION = 1 as const;
+// This is a single breaking cutover. Readers intentionally accept only this
+// artifact shape; old chart-token and v1 artifact paths are not retained.
+export const KRW_VISUALIZATION_SCHEMA_VERSION = 2 as const;
 
 const VISUALIZATION_VIEW_TYPES = new Set<VisualizationViewType>([
   "line",
@@ -47,6 +49,24 @@ export type VisualizationViewType =
 
 export type VisualizationSourceKind = "ontology" | "filing" | "news" | "derived";
 
+export type VisualizationScopeMode = "auto" | "total" | "breakdown" | "explicit";
+
+export interface VisualizationScope {
+  /** e.g. company_total, geography, segment, product, or a future ontology dimension. */
+  kind: string;
+  /** Stable source-owned identifier. Never derive this by parsing a series key. */
+  key: string;
+  /** Source-owned display text used only as a safe fallback. */
+  label?: string | null;
+}
+
+export interface VisualizationSeriesLabelHint {
+  /** A selected source scope key or source label; never a renderer key. */
+  source: string;
+  /** Presentation-only text. It cannot alter values or source selection. */
+  label: string;
+}
+
 /**
  * This is the intentionally small, forgiving payload the model may submit.
  * Numeric values, evidence ids, units, and renderer specs are runtime-owned.
@@ -56,10 +76,17 @@ export interface VisualizationIntent {
   measures?: string[];
   time_scope?: string | null;
   relationship?: VisualizationRelationship;
+  scope_mode?: VisualizationScopeMode;
+  group_by?: string | null;
+  include_scopes?: string[];
+  exclude_scopes?: string[];
   transform_hints?: VisualizationTransform[];
   event_overlay?: Array<"8-K" | "6-K" | "filing" | "news">;
   preferred_form?: "auto" | VisualizationViewType;
   title_hint?: string | null;
+  metric_label_hint?: string | null;
+  group_label_hint?: string | null;
+  series_label_hints?: VisualizationSeriesLabelHint[];
 }
 
 export interface VisualizationPoint {
@@ -73,11 +100,18 @@ export interface VisualizationPoint {
 
 export interface VisualizationSeries {
   series_key: string;
+  /** Final renderer-safe display label. */
   label: string;
+  /** Original ontology label retained for provenance and semantic dedupe. */
+  source_label?: string | null;
+  ticker?: string | null;
   metric_name?: string | null;
   canonical_metric?: string | null;
   unit?: string | null;
   currency?: string | null;
+  period_type?: string | null;
+  duration?: string | null;
+  scope: VisualizationScope;
   points: VisualizationPoint[];
 }
 
@@ -115,6 +149,8 @@ export interface KrwVisualizationArtifact {
   artifact_format: typeof KRW_VISUALIZATION_ARTIFACT_FORMAT;
   schema_version: typeof KRW_VISUALIZATION_SCHEMA_VERSION;
   artifact_ref: string;
+  /** Stable selected-data identity, independent of title wording or call order. */
+  semantic_fingerprint: string;
   intent: VisualizationIntent;
   title: string;
   views: VisualizationView[];
@@ -173,6 +209,7 @@ export function isKrwVisualizationArtifact(
     value.artifact_format === KRW_VISUALIZATION_ARTIFACT_FORMAT &&
     value.schema_version === KRW_VISUALIZATION_SCHEMA_VERSION &&
     typeof value.artifact_ref === "string" &&
+    typeof value.semantic_fingerprint === "string" &&
     isRecord(value.intent) &&
     typeof value.intent.goal === "string" &&
     typeof value.title === "string" &&
@@ -201,8 +238,18 @@ function isVisualizationSeries(value: unknown): boolean {
   return (
     typeof value.series_key === "string" &&
     typeof value.label === "string" &&
+    isVisualizationScope(value.scope) &&
     Array.isArray(value.points) &&
     value.points.every(isVisualizationPoint)
+  );
+}
+
+function isVisualizationScope(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.kind === "string" &&
+    typeof value.key === "string" &&
+    (value.label === undefined || value.label === null || typeof value.label === "string")
   );
 }
 

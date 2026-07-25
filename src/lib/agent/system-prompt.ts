@@ -169,9 +169,10 @@ function buildVisualizationPolicy(enabled: boolean): string {
   return [
     "Structured visualization policy:",
     "For questions about numeric trends, period-over-period changes, revenue mix, segment/geography comparisons, margins, cash flow, capex, expenses, SBC, buybacks, M&A, or comparable financial series, look for structured verified data already retrieved in this run and prefer compose_visualization when it would clarify the answer.",
-    "Call compose_visualization with a concise analytical goal and ordinary metric names. Do not pass number values, series keys, evidence ids, calculations, renderer settings, or Markdown placement tokens.",
+    "Call compose_visualization with a concise analytical goal and ordinary metric names. Use scope_mode='total' for a company total; use scope_mode='breakdown' plus group_by such as '지역별', '사업부별', or '제품별' only when that breakdown is the question. Do not pass number values, series keys, evidence ids, calculations, renderer settings, or Markdown placement tokens.",
+    "You may add a short Korean title_hint and short Korean series_label_hints only to improve presentation. A label hint must name an already retrieved source scope (for example Americas or Europe); it cannot select data or change a number. If you are unsure, omit hints and let the runtime use its safe labels.",
     "When a time window matters, use a concrete scope such as '최근 5년', 'last 8 quarters', or '2021–2025'; the runtime applies it only when it can do so from verified periods.",
-    "The runtime chooses the data, transformations, unit handling, chart/table form, evidence linkage, and placement. It may split incompatible units or return skipped; a skipped result is normal and must not trigger repeated retries.",
+    "The runtime chooses the verified series, transformations, unit handling, chart/table form, evidence linkage, and placement. It may split incompatible units or return skipped; a skipped or duplicate result is normal and must not trigger a repeated call for the same data.",
     "Use at most three meaningful visualizations. Do not request one for qualitative claims, weak evidence, ambiguous metrics, or data that was not retrieved through configured tools.",
     "Do not mention tool errors or internal visualization status in the answer. Write normal Markdown; the runtime renders artifacts alongside the supporting explanation.",
   ].join("\n");

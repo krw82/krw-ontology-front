@@ -307,7 +307,6 @@ function readyMcpHealth(): McpHealthResult {
 describe("agent job runner", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.KRW_CHARTS_ENABLED;
     delete process.env.KRW_VISUALIZATIONS_MODE;
     vi.mocked(extractCreatedVisualizationArtifacts).mockReturnValue([]);
     vi.mocked(persistCreatedVisualizations).mockResolvedValue([]);
@@ -348,20 +347,14 @@ describe("agent job runner", () => {
     });
   });
 
-  it("strips legacy chart tokens and skips visualization persistence while disabled", async () => {
+  it("skips visualization persistence while the compiler-owned path is disabled", async () => {
     const fake = createRunnerAdmin();
     vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
     vi.mocked(checkMcpReady).mockResolvedValue(readyMcpHealth());
     vi.mocked(runAgent).mockResolvedValue({
       status: "completed",
       acc: {
-        fullText: [
-          "요약입니다.",
-          "",
-          "[[krw-chart:chart_1_deadbeef]]",
-          "",
-          "후속 설명입니다.",
-        ].join("\n"),
+        fullText: "요약입니다.\n\n후속 설명입니다.",
         structuredOutput: null,
         researchSynthesisOutput: null,
         researchSynthesisText: null,
@@ -410,8 +403,9 @@ describe("agent job runner", () => {
     process.env.KRW_VISUALIZATIONS_MODE = "on";
     const artifact: KrwVisualizationArtifact = {
       artifact_format: "krw-visualization",
-      schema_version: 1,
+      schema_version: 2,
       artifact_ref: "viz_1_revenue",
+      semantic_fingerprint: "fingerprint-revenue",
       intent: { goal: "매출 추이" },
       title: "매출 추이",
       views: [{
@@ -421,6 +415,7 @@ describe("agent job runner", () => {
         series: [{
           series_key: "revenue",
           label: "Revenue",
+          scope: { kind: "company_total", key: "company_total", label: "Company total" },
           points: [{ period: "CY2025", value: 100, evidence_ref: "metric_observation:1" }],
         }],
       }],

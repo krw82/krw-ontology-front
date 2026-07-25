@@ -88,10 +88,7 @@ import {
   persistMessagePresentation,
 } from "@/lib/visualizations/db";
 import {
-  getVisualizationMode,
-  isVisualizationGenerationEnabled,
-  isVisualizationVisible,
-  stripChartTokens,
+  isVisualizationEnabled,
 } from "@/lib/features/charts";
 import { buildSelectedNewsSourcePack } from "@/lib/news-discovery/source-pack";
 import { appendDocumentContextToUserMessage } from "@/lib/document-ingestion/prompt-context";
@@ -1007,18 +1004,17 @@ async function handleCompletedJob(params: {
 }) {
   const { admin, job, runStartedAt, result, release, sendEvent } = params;
   const { acc } = result;
-  const visualizationMode = getVisualizationMode();
-  const rawVisibleAnswer = stripChartTokens(acc.fullText);
-  const redactedAnswer = redactSensitiveOutput(rawVisibleAnswer);
+  const visualizationsEnabled = isVisualizationEnabled();
+  const redactedAnswer = redactSensitiveOutput(acc.fullText);
   const visibleAnswer = redactedAnswer.content;
   const estimatedCost = estimateCost(acc.inputTokens, acc.outputTokens);
   const finishedAt = new Date().toISOString();
   const latencyMs = Date.now() - new Date(runStartedAt).getTime();
   const chatArtifacts: ChatArtifact[] = [];
-  const generatedVisualizations = isVisualizationGenerationEnabled()
+  const generatedVisualizations = visualizationsEnabled
     ? extractCreatedVisualizationArtifacts(acc)
     : [];
-  const chatVisualizations = isVisualizationVisible()
+  const chatVisualizations = visualizationsEnabled
     ? await persistCreatedVisualizations({
         admin,
         acc,
@@ -1036,7 +1032,7 @@ async function handleCompletedJob(params: {
     })
     .eq("id", job.assistantMessageId);
 
-  const presentation = isVisualizationVisible()
+  const presentation = visualizationsEnabled
     ? await persistMessagePresentation({
         admin,
         sessionId: job.session.id,
@@ -1093,7 +1089,7 @@ async function handleCompletedJob(params: {
       citation_count: acc.citations.length,
       artifact_count: chatArtifacts.length,
       artifact_created: chatArtifacts.length > 0,
-      visualization_mode: visualizationMode,
+      visualization_mode: visualizationsEnabled ? "on" : "off",
       visualization_generated_count: generatedVisualizations.length,
       visualization_count: chatVisualizations.length,
       visualization_created: chatVisualizations.length > 0,

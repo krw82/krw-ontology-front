@@ -10,7 +10,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts", "services/**/*.test.ts"],
+    include: ["src/**/*.test.{ts,tsx}", "services/**/*.test.ts"],
     // The production gate runs from an isolated npm-ci checkout on a
     // many-core Mac Studio. Letting Vitest fork one worker per available core
     // can exhaust the process/memory envelope while shell-heavy cutover tests

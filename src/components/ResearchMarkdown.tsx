@@ -23,7 +23,6 @@ interface ResearchMarkdownProps {
 const SAFE_LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
 const SAFE_IMAGE_PROTOCOLS = new Set(["http:", "https:"]);
 const UNSAFE_URL_CHARACTERS = /[\u0000-\u001F\u007F]/;
-const LEGACY_CHART_TOKEN_PATTERN = /\[\[krw-chart:[A-Za-z0-9_-]+\]\]/g;
 const FENCE_START_PATTERN = /^\s*(```|~~~)/;
 const MARKDOWN_BLOCK_PATTERN =
   /^\s*(#{1,6}\s|[-*+]\s+|\d+[.)]\s+|>\s|---+$|\|)/;
@@ -165,7 +164,6 @@ function collapseBlankLines(lines: string[]): string[] {
 export function normalizeResearchMarkdown(content: string): string {
   const normalized = content
     .replace(/\r\n/g, "\n")
-    .replace(LEGACY_CHART_TOKEN_PATTERN, "")
     .trim();
   if (!normalized) return "";
 
@@ -414,7 +412,7 @@ function ResearchMarkdown({
     () =>
       normalizePlainText
         ? normalizeResearchMarkdown(content)
-        : content.replace(LEGACY_CHART_TOKEN_PATTERN, ""),
+        : content,
     [content, normalizePlainText],
   );
   const visualizationsByRef = useMemo(() => {

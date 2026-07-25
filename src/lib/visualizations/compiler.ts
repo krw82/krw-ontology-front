@@ -6,6 +6,7 @@ import type {
   VisualizationEvent,
   VisualizationIntent,
   VisualizationSeries,
+  VisualizationScopeMode,
   VisualizationToolResult,
   VisualizationTransform,
   VisualizationView,
@@ -28,7 +29,7 @@ export function compileVisualization(params: {
   artifactIndex: number;
 }): VisualizationToolResult {
   const intent = normalizeIntent(params.intent);
-  if (!intent.goal) {
+  if (!intent.goal && !intent.measures?.length) {
     return skipped("invalid_intent", "시각화 목적을 확인하지 못했습니다.");
   }
 
@@ -58,11 +59,12 @@ export function compileVisualization(params: {
     return skipped("insufficient_data", "표시할 수 있는 기간별 숫자가 충분하지 않습니다.");
   }
 
-  const artifactRef = createArtifactRef({
-    artifactIndex: params.artifactIndex,
+  const semanticFingerprint = createSemanticFingerprint({
     intent,
     views: build.views,
+    transforms: transformed.appliedTransforms,
   });
+  const artifactRef = `viz_${semanticFingerprint.slice(0, 16)}`;
   const evidenceRefs = Array.from(
     new Set(
       build.views.flatMap((view) => [
@@ -92,6 +94,7 @@ export function compileVisualization(params: {
     artifact_format: KRW_VISUALIZATION_ARTIFACT_FORMAT,
     schema_version: KRW_VISUALIZATION_SCHEMA_VERSION,
     artifact_ref: artifactRef,
+    semantic_fingerprint: semanticFingerprint,
     intent,
     title: build.title,
     views: build.views,
@@ -136,11 +139,43 @@ function normalizeIntent(intent: VisualizationIntent): VisualizationIntent {
     measures: measures.length > 0 ? measures : undefined,
     time_scope: intent.time_scope?.trim().slice(0, 120) || null,
     relationship: intent.relationship ?? "auto",
+    scope_mode: normalizeScopeMode(intent.scope_mode),
+    group_by: intent.group_by?.trim().slice(0, 120) || null,
+    include_scopes: normalizeScopeFilters(intent.include_scopes),
+    exclude_scopes: normalizeScopeFilters(intent.exclude_scopes),
     transform_hints: intent.transform_hints,
     event_overlay: intent.event_overlay,
     preferred_form: intent.preferred_form ?? "auto",
     title_hint: intent.title_hint?.trim().slice(0, 120) || null,
+    metric_label_hint: intent.metric_label_hint?.trim().slice(0, 60) || null,
+    group_label_hint: intent.group_label_hint?.trim().slice(0, 60) || null,
+    series_label_hints: normalizeSeriesLabelHints(intent.series_label_hints),
   };
+}
+
+function normalizeScopeMode(value: VisualizationIntent["scope_mode"]): VisualizationScopeMode {
+  return value === "total" || value === "breakdown" || value === "explicit" ? value : "auto";
+}
+
+function normalizeScopeFilters(value: string[] | undefined): string[] | undefined {
+  const normalized = Array.from(
+    new Set((value ?? []).map((item) => item.trim()).filter(Boolean)),
+  ).slice(0, MAX_SERIES_PER_ARTIFACT);
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function normalizeSeriesLabelHints(
+  value: VisualizationIntent["series_label_hints"],
+): VisualizationIntent["series_label_hints"] {
+  const seen = new Set<string>();
+  const normalized = (value ?? []).flatMap((hint) => {
+    const source = hint.source?.trim().slice(0, 160);
+    const label = cleanDisplayText(hint.label, 48);
+    if (!source || !label || seen.has(normalizeSearch(source))) return [];
+    seen.add(normalizeSearch(source));
+    return [{ source, label }];
+  });
+  return normalized.length > 0 ? normalized.slice(0, MAX_SERIES_PER_ARTIFACT) : undefined;
 }
 
 function resolveSeries(
@@ -177,15 +212,19 @@ function resolveSeries(
       warnings.push(`${measure}에 대응하는 검증된 시계열을 찾지 못했습니다.`);
       continue;
     }
-    const distinctMetrics = new Set(matches.map((series) => series.canonical_metric ?? series.metric_name ?? series.label));
-    if (distinctMetrics.size > 1 && matches.length > 4) {
+    const metricGroups = groupByMetric(matches);
+    const exactMetricGroups = metricGroups.filter((group) =>
+      group.some((series) => isExactMetricMatch(series, measure)),
+    );
+    const matchingGroups = exactMetricGroups.length > 0 ? exactMetricGroups : metricGroups;
+    if (matchingGroups.length > 1) {
       return {
         kind: "skipped",
         reasonCode: "ambiguous_metric",
         explanation: `${measure}에 여러 지표가 대응되어 임의로 선택하지 않았습니다.`,
       };
     }
-    for (const match of matches) {
+    for (const match of matchingGroups[0] ?? []) {
       if (!selected.some((series) => series.series_key === match.series_key)) selected.push(match);
     }
   }
@@ -197,12 +236,174 @@ function resolveSeries(
       explanation: "요청한 지표와 일치하는 검증된 시계열을 찾지 못했습니다.",
     };
   }
-  if (selected.length > MAX_SERIES_PER_ARTIFACT) {
-    selected.splice(MAX_SERIES_PER_ARTIFACT);
-    warnings.push(`표시 가능한 시리즈 수를 ${MAX_SERIES_PER_ARTIFACT}개로 제한했습니다.`);
+  const deduped = dedupeSemanticSeries(selected);
+  const scoped = selectScopes(intent, deduped);
+  if (scoped.kind === "skipped") {
+    return scoped;
+  }
+  if (scoped.series.length > MAX_SERIES_PER_ARTIFACT) {
+    return {
+      kind: "skipped",
+      reasonCode: "too_many_series",
+      explanation: `표시할 시리즈가 ${MAX_SERIES_PER_ARTIFACT}개를 넘어 차트를 임의로 줄이지 않았습니다. 범위를 좁혀 다시 요청해 주세요.`,
+    };
   }
 
-  return { kind: "resolved", series: selected, sourceSeries: selected, warnings };
+  if (deduped.length !== selected.length) {
+    warnings.push("동일한 검증 시계열은 단위 표기를 정규화해 한 번만 사용했습니다.");
+  }
+  return {
+    kind: "resolved",
+    series: scoped.series,
+    sourceSeries: scoped.series,
+    warnings,
+  };
+}
+
+function groupByMetric(series: RegisteredVisualizationSeries[]): RegisteredVisualizationSeries[][] {
+  const groups = new Map<string, RegisteredVisualizationSeries[]>();
+  for (const item of series) {
+    const key = normalizeSearch(item.canonical_metric ?? item.metric_name ?? item.source_label ?? item.label);
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  }
+  return Array.from(groups.values());
+}
+
+function isExactMetricMatch(series: RegisteredVisualizationSeries, query: string): boolean {
+  const normalizedQuery = normalizeSearch(query);
+  return [series.canonical_metric, series.metric_name, series.source_label, series.label]
+    .filter((value): value is string => Boolean(value))
+    .some((value) => normalizeSearch(value) === normalizedQuery);
+}
+
+function dedupeSemanticSeries(series: RegisteredVisualizationSeries[]): RegisteredVisualizationSeries[] {
+  const best = new Map<string, RegisteredVisualizationSeries>();
+  for (const item of series) {
+    const key = [
+      item.ticker ?? "",
+      item.canonical_metric ?? item.metric_name ?? item.source_label ?? item.label,
+      item.scope.kind,
+      item.scope.key,
+      normalizedUnitKey(item.unit),
+      item.period_type ?? "",
+      item.duration ?? "",
+    ].map(normalizeSearch).join("|");
+    const current = best.get(key);
+    if (!current || compareSeriesCompleteness(item, current) > 0) best.set(key, item);
+  }
+  return Array.from(best.values());
+}
+
+function compareSeriesCompleteness(
+  left: RegisteredVisualizationSeries,
+  right: RegisteredVisualizationSeries,
+): number {
+  if (left.points.length !== right.points.length) return left.points.length - right.points.length;
+  const leftEvidence = left.points.filter((point) => Boolean(point.evidence_ref)).length;
+  const rightEvidence = right.points.filter((point) => Boolean(point.evidence_ref)).length;
+  return leftEvidence - rightEvidence;
+}
+
+function selectScopes(
+  intent: VisualizationIntent,
+  series: RegisteredVisualizationSeries[],
+):
+  | { kind: "resolved"; series: RegisteredVisualizationSeries[] }
+  | { kind: "skipped"; reasonCode: string; explanation: string } {
+  const mode = effectiveScopeMode(intent);
+  const included = intent.include_scopes?.map(normalizeSearch) ?? [];
+  const excluded = new Set(intent.exclude_scopes?.map(normalizeSearch) ?? []);
+  const filtered = series.filter((item) => {
+    const aliases = scopeAliases(item);
+    if (aliases.some((alias) => excluded.has(alias))) return false;
+    if (mode === "total") return item.scope.kind === "company_total";
+    if (mode === "breakdown") {
+      return item.scope.kind !== "company_total" && matchesGroup(item, intent.group_by);
+    }
+    if (mode === "explicit") {
+      return included.length > 0 && aliases.some((alias) => included.includes(alias));
+    }
+    return true;
+  });
+
+  if (mode === "auto") {
+    const auto = selectAutomaticScope(filtered);
+    if (auto.length === 0) {
+      return {
+        kind: "skipped",
+        reasonCode: "ambiguous_scope",
+        explanation: "회사 전체와 세부 항목 중 무엇을 그릴지 명확하지 않아 임의로 선택하지 않았습니다.",
+      };
+    }
+    return { kind: "resolved", series: auto };
+  }
+  if (filtered.length === 0) {
+    return {
+      kind: "skipped",
+      reasonCode: mode === "breakdown" ? "no_matching_breakdown" : "no_matching_scope",
+      explanation: "요청한 범위에 맞는 검증 시계열을 찾지 못했습니다.",
+    };
+  }
+  return { kind: "resolved", series: filtered };
+}
+
+function effectiveScopeMode(intent: VisualizationIntent): VisualizationScopeMode {
+  if (intent.scope_mode !== "auto") return intent.scope_mode ?? "auto";
+  if (intent.group_by) return "breakdown";
+  if (intent.relationship === "composition" || intent.relationship === "decomposition") {
+    return "breakdown";
+  }
+  return "auto";
+}
+
+function scopeAliases(series: RegisteredVisualizationSeries): string[] {
+  return [series.scope.kind, series.scope.key, series.scope.label, series.source_label, series.label]
+    .filter((value): value is string => Boolean(value))
+    .map(normalizeSearch);
+}
+
+function matchesGroup(series: RegisteredVisualizationSeries, groupBy: string | null | undefined): boolean {
+  if (!groupBy) return true;
+  const query = normalizeSearch(groupBy);
+  return scopeAliases(series)
+    .concat(scopeKindAliases(series.scope.kind))
+    .some((alias) => alias === query || alias.includes(query) || query.includes(alias));
+}
+
+function scopeKindAliases(kind: string): string[] {
+  const normalizedKind = normalizeSearch(kind);
+  const aliases: Record<string, string[]> = {
+    geography: ["geography", "geographic", "region", "지역", "지역별", "지리"],
+    region: ["geography", "geographic", "region", "지역", "지역별", "지리"],
+    segment: ["segment", "business", "businessunit", "사업부", "사업부별", "부문", "세그먼트"],
+    product: ["product", "productline", "제품", "제품별", "제품군"],
+    channel: ["channel", "판매채널", "채널", "채널별"],
+  };
+  return aliases[normalizedKind]?.map(normalizeSearch) ?? [normalizedKind];
+}
+
+function selectAutomaticScope(series: RegisteredVisualizationSeries[]): RegisteredVisualizationSeries[] {
+  const groups = new Map<string, RegisteredVisualizationSeries[]>();
+  for (const item of series) {
+    const key = [item.ticker ?? "", item.canonical_metric ?? item.metric_name ?? item.source_label ?? item.label]
+      .map(normalizeSearch)
+      .join("|");
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  }
+  const selected: RegisteredVisualizationSeries[] = [];
+  for (const candidates of groups.values()) {
+    const totals = candidates.filter((item) => item.scope.kind === "company_total");
+    if (totals.length > 0) {
+      selected.push(totals.sort(compareSeriesCompleteness).at(-1)!);
+      continue;
+    }
+    if (candidates.length === 1) {
+      selected.push(candidates[0]!);
+      continue;
+    }
+    return [];
+  }
+  return selected;
 }
 
 function inferMeasuresFromGoal(
@@ -216,8 +417,21 @@ function inferMeasuresFromGoal(
       return normalizedAlias.length >= 3 && normalizedGoal.includes(normalizedAlias);
     }),
   );
-  const unique = Array.from(new Map(matches.map((series) => [series.series_key, series])).values());
-  if (unique.length === 1) return [unique[0]!.series_key];
+  const metricGroups = groupByMetric(matches);
+  // A low-capability model may omit measures even when the question names one
+  // clear metric. Total and dimensional variants are one semantic metric, so
+  // infer it without treating each scope as a separate measure.
+  if (metricGroups.length === 1) {
+    const representative = metricGroups[0]?.[0];
+    if (representative) {
+      return [
+        representative.canonical_metric ??
+          representative.metric_name ??
+          representative.source_label ??
+          representative.label,
+      ];
+    }
+  }
   return [];
 }
 
@@ -517,9 +731,9 @@ function buildViews(params: {
   events: VisualizationEvent[];
 }): { title: string; views: VisualizationView[]; warnings: string[] } {
   const warnings: string[] = [];
-  const displaySeries = disambiguateSeriesLabels(params.series);
+  const displaySeries = applyDisplayLabels(params.series, params.intent);
   const unitGroups = groupByUnit(displaySeries);
-  const title = params.intent.title_hint || defaultTitle(params.intent, displaySeries);
+  const title = displayTitle(params.intent, displaySeries);
   const entries = Array.from(unitGroups.entries());
   if (entries.length > 1 && !hasIndexTransform(params.series)) {
     warnings.push("서로 다른 단위는 같은 축에 그리지 않고 분리했습니다.");
@@ -528,7 +742,7 @@ function buildViews(params: {
   const views = entries.flatMap(([unit, series], index) => {
     const view = buildView({
       viewId: `view_${index + 1}`,
-      title: split ? `${title} · ${unit || "단위 미상"}` : title,
+      title: split ? viewTitleForUnit(unit, series, params.intent) : title,
       series,
       intent: params.intent,
       events: params.events.slice(-MAX_EVENTS_PER_VIEW),
@@ -590,11 +804,65 @@ function isValidPreferredForm(
     series.every((item) => item.unit === "%");
 }
 
-function defaultTitle(intent: VisualizationIntent, series: VisualizationSeries[]): string {
-  if (intent.relationship === "comparison") return `${series.map((item) => item.label).join(" · ")} 비교`;
-  if (intent.relationship === "composition") return `${series.map((item) => item.label).join(" · ")} 구성`;
-  if (intent.relationship === "exact_values") return `${series.map((item) => item.label).join(" · ")} 데이터`;
-  return `${series.map((item) => item.label).join(" · ")} 추이`;
+function displayTitle(intent: VisualizationIntent, series: VisualizationSeries[]): string {
+  const hinted = cleanDisplayText(intent.title_hint, 50);
+  if (hinted && isDisplayTitleAcceptable(hinted, intent)) return hinted;
+
+  const ticker = uniqueValues(series.map((item) => item.ticker).filter(Boolean)).at(0);
+  const metric = cleanDisplayText(intent.metric_label_hint, 32) ?? metricDisplayLabel(intent, series);
+  const group = cleanDisplayText(intent.group_label_hint, 24) ?? groupDisplayLabel(intent, series);
+  const subject = [ticker, group, metric].filter(Boolean).join(" ").trim() || "검증된 데이터";
+  return `${subject} ${relationshipSuffix(intent.relationship)}`.slice(0, 50);
+}
+
+function isDisplayTitleAcceptable(title: string, intent: VisualizationIntent): boolean {
+  if (/\||(?:^|\s)(?:segment|scope|series)(?:\s|:|$)/i.test(title)) return false;
+  // Korean questions should not surface a model's accidental English raw title
+  // when a deterministic Korean construction is available.
+  const asksInKorean = /[가-힣]/.test(intent.goal);
+  return !asksInKorean || /[가-힣]/.test(title);
+}
+
+function metricDisplayLabel(intent: VisualizationIntent, series: VisualizationSeries[]): string {
+  const requested = intent.measures?.[0];
+  if (requested && /[가-힣]/.test(requested)) return requested;
+  const canonical = series[0]?.canonical_metric ?? series[0]?.metric_name ?? requested ?? "지표";
+  const normalized = normalizeSearch(canonical);
+  const known: Record<string, string> = {
+    revenue: "매출",
+    sales: "매출",
+    operatingincome: "영업이익",
+    operatingmargin: "영업이익률",
+    grossprofit: "매출총이익",
+    grossmargin: "매출총이익률",
+    netincome: "순이익",
+    freecashflow: "잉여현금흐름",
+    capitalexpenditure: "설비투자",
+    earningspershare: "주당순이익",
+  };
+  return known[normalized] ?? cleanDisplayText(requested, 32) ?? cleanDisplayText(series[0]?.source_label, 32) ?? "지표";
+}
+
+function groupDisplayLabel(intent: VisualizationIntent, series: VisualizationSeries[]): string | null {
+  if (intent.scope_mode !== "breakdown" && !intent.group_by) return null;
+  if (intent.group_by && /[가-힣]/.test(intent.group_by)) return intent.group_by;
+  const kinds = uniqueValues(series.map((item) => item.scope.kind));
+  if (kinds.length !== 1) return null;
+  const known: Record<string, string> = {
+    geography: "지역별",
+    region: "지역별",
+    segment: "사업부별",
+    product: "제품별",
+  };
+  return known[kinds[0] ?? ""] ?? null;
+}
+
+function relationshipSuffix(relationship: VisualizationIntent["relationship"]): string {
+  if (relationship === "comparison") return "비교";
+  if (relationship === "composition") return "구성";
+  if (relationship === "decomposition") return "분해";
+  if (relationship === "exact_values") return "데이터";
+  return "추이";
 }
 
 function buildSubtitle(
@@ -613,51 +881,109 @@ function buildSubtitle(
 function groupByUnit(series: VisualizationSeries[]): Map<string, VisualizationSeries[]> {
   const groups = new Map<string, VisualizationSeries[]>();
   for (const item of series) {
-    const key = item.unit?.trim() || "";
-    groups.set(key, [...(groups.get(key) ?? []), item]);
+    const key = normalizedUnitKey(item.unit);
+    const normalized = { ...item, unit: displayUnit(item.unit) };
+    groups.set(key, [...(groups.get(key) ?? []), normalized]);
   }
   return groups;
 }
 
-function disambiguateSeriesLabels(series: VisualizationSeries[]): VisualizationSeries[] {
-  const counts = new Map<string, number>();
-  for (const item of series) {
-    counts.set(item.label, (counts.get(item.label) ?? 0) + 1);
-  }
-  return series.map((item) => {
-    if ((counts.get(item.label) ?? 0) <= 1) return item;
-    const parts = item.series_key.split("|").filter(Boolean);
-    const ticker = parts[0] ?? item.series_key;
-    const dimension = parts[2]?.split(":")[0]?.replaceAll("_", " ");
+function applyDisplayLabels(
+  series: VisualizationSeries[],
+  intent: VisualizationIntent,
+): VisualizationSeries[] {
+  const hints = intent.series_label_hints ?? [];
+  const tentative = series.map((item) => {
+    const hint = hints.find((candidate) => scopeMatchesHint(item, candidate.source));
     return {
       ...item,
-      label: dimension ? `${item.label} · ${ticker} · ${dimension}` : `${item.label} · ${ticker}`,
+      source_label: item.source_label ?? item.label,
+      label: hint?.label ?? defaultSeriesLabel(item, series),
     };
   });
+  const counts = new Map<string, number>();
+  for (const item of tentative) counts.set(item.label, (counts.get(item.label) ?? 0) + 1);
+  return tentative.map((item) => {
+    if ((counts.get(item.label) ?? 0) <= 1) return item;
+    const ticker = item.ticker?.trim();
+    return { ...item, label: ticker ? `${item.label} · ${ticker}` : item.label };
+  });
+}
+
+function scopeMatchesHint(series: VisualizationSeries, source: string): boolean {
+  const query = normalizeSearch(source);
+  return [series.scope.key, series.scope.label, series.source_label, series.label]
+    .filter((value): value is string => Boolean(value))
+    .some((value) => normalizeSearch(value) === query);
+}
+
+function defaultSeriesLabel(series: VisualizationSeries, allSeries: VisualizationSeries[]): string {
+  if (series.scope.kind === "company_total") {
+    const tickers = uniqueValues(allSeries.map((item) => item.ticker).filter(Boolean));
+    return tickers.length > 1 ? series.ticker ?? "회사 전체" : "회사 전체";
+  }
+  return cleanDisplayText(series.scope.label, 48)
+    ?? cleanDisplayText(series.source_label, 48)
+    ?? cleanDisplayText(series.label, 48)
+    ?? "시리즈";
+}
+
+function viewTitleForUnit(
+  unit: string,
+  series: VisualizationSeries[],
+  intent: VisualizationIntent,
+): string {
+  if (unit === "%") return "비율";
+  if (series.every((item) => item.canonical_metric?.includes("margin"))) return "비율";
+  if (unit) return "금액";
+  return relationshipSuffix(intent.relationship);
+}
+
+function normalizedUnitKey(unit: string | null | undefined): string {
+  const normalized = unit?.trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US") ?? "";
+  if (["%", "percent", "percentage"].includes(normalized)) return "%";
+  if (["usd", "us dollar", "us dollars", "$"].includes(normalized)) return "usd";
+  return normalized;
+}
+
+function displayUnit(unit: string | null | undefined): string | null {
+  const key = normalizedUnitKey(unit);
+  if (key === "usd") return "USD";
+  if (key === "%") return "%";
+  return unit?.trim() || null;
+}
+
+function cleanDisplayText(value: string | null | undefined, maxLength: number): string | null {
+  const text = value?.replace(/\s+/g, " ").trim();
+  if (!text || text.includes("|") || /(?:^|\s)(?:scope|series)(?:\s|:|$)/i.test(text)) return null;
+  return text.slice(0, maxLength);
+}
+
+function uniqueValues(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(values.filter((value): value is string => Boolean(value?.trim()))));
 }
 
 function hasIndexTransform(series: VisualizationSeries[]): boolean {
   return series.every((item) => item.unit === "index (first period = 100)");
 }
 
-function createArtifactRef(params: {
-  artifactIndex: number;
+function createSemanticFingerprint(params: {
   intent: VisualizationIntent;
   views: VisualizationView[];
+  transforms: VisualizationTransform[];
 }): string {
-  const hash = createHash("sha256")
+  return createHash("sha256")
     .update(JSON.stringify({
-      goal: params.intent.goal,
-      relationship: params.intent.relationship,
-      transforms: params.intent.transform_hints,
+      transforms: params.transforms,
       series: params.views.flatMap((view) => view.series.map((series) => ({
-        key: series.series_key,
+        ticker: series.ticker,
+        metric: series.canonical_metric ?? series.metric_name,
+        scope: [series.scope.kind, series.scope.key],
+        unit: normalizedUnitKey(series.unit),
         points: series.points.map((point) => [point.period, point.value, point.evidence_ref]),
-      }))),
+      }))).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))),
     }))
     .digest("hex")
-    .slice(0, 12);
-  return `viz_${params.artifactIndex}_${hash}`;
 }
 
 function cloneSeries(series: VisualizationSeries): VisualizationSeries {

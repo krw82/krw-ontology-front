@@ -212,13 +212,23 @@ export async function GET(
   if (artifactSelectionsError) {
     return internalError("채팅 artifact 선택 기록을 불러오지 못했습니다.");
   }
+  // The v2 reader deliberately does not convert or render older/invalid
+  // payloads. Ignore them so one retired row cannot make an entire chat
+  // session unreadable.
+  const visualizations = (chatVisualizations ?? []).flatMap((row) => {
+    try {
+      return [toPublicChatVisualization(row)];
+    } catch {
+      return [];
+    }
+  });
 
   return Response.json({
     session,
     messages: (messages ?? []).map(toPublicMessage),
     runs: (runs ?? []).map(toPublicRunSummary),
     chat_artifacts: (chatArtifacts ?? []).map(toPublicChatArtifact),
-    visualizations: (chatVisualizations ?? []).map(toPublicChatVisualization),
+    visualizations,
     presentations: (chatPresentations ?? []).map(toPublicChatPresentation),
     artifact_selections: artifactSelections ?? [],
     message_pagination: {

@@ -6,6 +6,7 @@ import type { AccumulatedRun, AccumulatedToolCall } from "@/lib/agent/stream-han
 import type {
   VisualizationEvent,
   VisualizationSeries,
+  VisualizationScope,
 } from "./contracts";
 
 const MAX_OVERFLOW_TOOL_RESULT_BYTES = 2_000_000;
@@ -159,6 +160,7 @@ function normalizeMetricSeries(
     canonicalMetric ??
     seriesKey.split("|").at(-1) ??
     seriesKey;
+  const scope = normalizeScope(item, seriesKey);
   const aliases = Array.from(
     new Set(
       [
@@ -166,6 +168,9 @@ function normalizeMetricSeries(
         label,
         metricName,
         canonicalMetric,
+        scope.kind,
+        scope.key,
+        scope.label ?? undefined,
         ...metricAliases(canonicalMetric, metricName),
         ...seriesKey.split("|"),
       ].filter((value): value is string => Boolean(value?.trim())),
@@ -176,12 +181,28 @@ function normalizeMetricSeries(
     source_tool_call_id: sourceToolCallId,
     series_key: seriesKey,
     label,
+    source_label: label,
+    ticker: stringValue(item.ticker),
     metric_name: metricName,
     canonical_metric: canonicalMetric,
     unit: stringValue(item.unit),
     currency: stringValue(item.currency),
+    period_type: stringValue(item.period_type),
+    duration: stringValue(item.duration),
+    scope,
     points,
     aliases,
+  };
+}
+
+function normalizeScope(item: UnknownRecord, seriesKey: string): VisualizationScope {
+  const raw = isRecord(item.scope) ? item.scope : null;
+  const kind = stringValue(raw?.kind) ?? "unspecified";
+  const key = stringValue(raw?.key) ?? seriesKey;
+  return {
+    kind,
+    key,
+    label: stringValue(raw?.label),
   };
 }
 

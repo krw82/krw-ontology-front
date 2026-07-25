@@ -42,12 +42,19 @@ function metricSeries(params: {
   metric: string;
   unit: string;
   points: Array<[string, number]>;
+  scope?: { kind: string; key: string; label?: string };
 }) {
   return {
     series_key: params.key,
     label: params.label,
+    ticker: params.key.split("|")[0],
     canonical_metric: params.metric,
     unit: params.unit,
+    scope: params.scope ?? {
+      kind: "company_total",
+      key: "company_total",
+      label: "Company total",
+    },
     points: params.points.map(([period, value]) => ({
       period,
       value,
@@ -79,7 +86,7 @@ describe("visualization compiler", () => {
     });
 
     expect(result.status).toBe("created");
-    expect(result.artifact?.artifact_ref).toMatch(/^viz_1_/);
+    expect(result.artifact?.artifact_ref).toMatch(/^viz_[a-f0-9]{16}$/);
     expect(result.artifact?.views).toHaveLength(1);
     expect(result.artifact?.views[0]?.chart_type).toBe("line");
     expect(result.artifact?.provenance.evidence_refs).toHaveLength(5);
@@ -208,8 +215,8 @@ describe("visualization compiler", () => {
     });
 
     expect(result.artifact?.views[0]?.series.map((series) => series.label)).toEqual([
-      "Revenue · AAPL · company total",
-      "Revenue · MSFT · company total",
+      "AAPL",
+      "MSFT",
     ]);
   });
 
@@ -454,5 +461,162 @@ describe("visualization compiler", () => {
     expect(result.artifact?.views[0]?.events).toEqual([
       expect.objectContaining({ source_kind: "news", evidence_ref: "news:news-event-1" }),
     ]);
+  });
+
+  it("selects the company total by default instead of mixing it with segment data", () => {
+    const registry = VisualizationDatasetRegistry.fromAccumulatedRun(accumulator([
+      metricSeries({
+        key: "AAPL|operating_income|company_total|USD|annual",
+        label: "Operating income",
+        metric: "operating_income",
+        unit: "USD",
+        points: [["CY2023", 100], ["CY2024", 120], ["CY2025", 140]],
+      }),
+      metricSeries({
+        key: "AAPL|operating_income|americas|USD|annual",
+        label: "Americas Segment Operating income",
+        metric: "operating_income",
+        unit: "USD",
+        scope: { kind: "geography", key: "americas", label: "Americas" },
+        points: [["CY2023", 50], ["CY2024", 60], ["CY2025", 70]],
+      }),
+      metricSeries({
+        key: "AAPL|operating_income|europe|USD|annual",
+        label: "Europe Segment Operating income",
+        metric: "operating_income",
+        unit: "USD",
+        scope: { kind: "geography", key: "europe", label: "Europe" },
+        points: [["CY2023", 20], ["CY2024", 25], ["CY2025", 30]],
+      }),
+    ]));
+
+    const result = compileVisualization({
+      intent: { goal: "AAPL 최근 3년 영업이익 추이", measures: ["operating income"] },
+      registry,
+      artifactIndex: 1,
+    });
+
+    expect(result.artifact?.views).toHaveLength(1);
+    expect(result.artifact?.views[0]?.series).toHaveLength(1);
+    expect(result.artifact?.views[0]?.series[0]?.scope.kind).toBe("company_total");
+    expect(result.artifact?.title).toBe("AAPL 영업이익 추이");
+  });
+
+  it("infers one named metric when total and dimensional variants share the same metric", () => {
+    const registry = VisualizationDatasetRegistry.fromAccumulatedRun(accumulator([
+      metricSeries({
+        key: "AAPL|operating_income|company_total|USD|annual",
+        label: "Operating income",
+        metric: "operating_income",
+        unit: "USD",
+        points: [["CY2024", 120], ["CY2025", 140]],
+      }),
+      metricSeries({
+        key: "AAPL|operating_income|americas|USD|annual",
+        label: "Americas Segment Operating income",
+        metric: "operating_income",
+        unit: "USD",
+        scope: { kind: "geography", key: "americas", label: "Americas" },
+        points: [["CY2024", 60], ["CY2025", 70]],
+      }),
+    ]));
+
+    const result = compileVisualization({
+      intent: { goal: "AAPL 영업이익 추이를 보여줘" },
+      registry,
+      artifactIndex: 1,
+    });
+
+    expect(result.status).toBe("created");
+    expect(result.artifact?.views[0]?.series).toHaveLength(1);
+    expect(result.artifact?.views[0]?.series[0]?.scope.kind).toBe("company_total");
+  });
+
+  it("uses a requested breakdown and accepts presentation-only Korean legend hints", () => {
+    const registry = VisualizationDatasetRegistry.fromAccumulatedRun(accumulator([
+      metricSeries({
+        key: "AAPL|operating_income|company_total|USD|annual",
+        label: "Operating income",
+        metric: "operating_income",
+        unit: "USD",
+        points: [["CY2024", 120], ["CY2025", 140]],
+      }),
+      metricSeries({
+        key: "AAPL|operating_income|americas|USD|annual",
+        label: "Americas Segment Operating income",
+        metric: "operating_income",
+        unit: "USD",
+        scope: { kind: "geography", key: "americas", label: "Americas" },
+        points: [["CY2024", 60], ["CY2025", 70]],
+      }),
+      metricSeries({
+        key: "AAPL|operating_income|europe|USD|annual",
+        label: "Europe Segment Operating income",
+        metric: "operating_income",
+        unit: "USD",
+        scope: { kind: "geography", key: "europe", label: "Europe" },
+        points: [["CY2024", 25], ["CY2025", 30]],
+      }),
+    ]));
+
+    const result = compileVisualization({
+      intent: {
+        goal: "AAPL 지역별 영업이익 추이",
+        measures: ["operating income"],
+        scope_mode: "breakdown",
+        group_by: "지역별",
+        title_hint: "애플 지역별 영업이익 추이",
+        series_label_hints: [
+          { source: "americas", label: "미주" },
+          { source: "europe", label: "유럽" },
+        ],
+      },
+      registry,
+      artifactIndex: 1,
+    });
+
+    expect(result.artifact?.title).toBe("애플 지역별 영업이익 추이");
+    expect(result.artifact?.views[0]?.series.map((series) => series.label)).toEqual(["미주", "유럽"]);
+    expect(result.artifact?.views[0]?.series.every((series) => series.scope.kind === "geography")).toBe(true);
+  });
+
+  it("merges cosmetic unit casing and keeps a stable data fingerprint across title changes", () => {
+    const registry = VisualizationDatasetRegistry.fromAccumulatedRun(accumulator([
+      metricSeries({
+        key: "AAPL|revenue|company_total|usd|annual",
+        label: "Revenue",
+        metric: "revenue",
+        unit: "usd",
+        points: [["CY2023", 100], ["CY2024", 120], ["CY2025", 140]],
+      }),
+      metricSeries({
+        key: "AAPL|revenue|company_total|USD|annual|duplicate",
+        label: "Revenue",
+        metric: "revenue",
+        unit: "USD",
+        points: [["CY2024", 120], ["CY2025", 140]],
+      }),
+    ]));
+    const first = compileVisualization({
+      intent: { goal: "AAPL 매출 추이", measures: ["revenue"], title_hint: "애플 매출 추이" },
+      registry,
+      artifactIndex: 1,
+    });
+    const second = compileVisualization({
+      intent: {
+        goal: "다른 문장",
+        measures: ["revenue"],
+        relationship: "comparison",
+        title_hint: "매출 변화",
+      },
+      registry,
+      artifactIndex: 2,
+    });
+
+    expect(first.artifact?.views).toHaveLength(1);
+    expect(first.artifact?.views[0]?.unit).toBe("USD");
+    expect(first.artifact?.views[0]?.series).toHaveLength(1);
+    expect(first.artifact?.semantic_fingerprint).toBe(second.artifact?.semantic_fingerprint);
+    expect(first.artifact?.artifact_ref).toBe(second.artifact?.artifact_ref);
   });
 });

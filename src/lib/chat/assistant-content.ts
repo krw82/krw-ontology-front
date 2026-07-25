@@ -40,7 +40,6 @@ const LEADING_TOOL_XML_PATTERNS = [
 ];
 const LEADING_TRUNCATED_TOOL_XML_PATTERN =
   /^\s*<(?:function_calls|tool_use|invoke)\b/i;
-const LEGACY_VISUALIZATION_TOKEN_PATTERN = /\[\[krw-chart:[A-Za-z0-9_-]+\]\]/g;
 
 function isLikelyFollowupBoundary(value: string): boolean {
   if (!value.trim()) return true;
@@ -209,7 +208,6 @@ export function sanitizeAssistantContent(content: string): string {
   }
 
   return stripStandaloneHorizontalRules(stripInternalEvidencePhrases(output))
-    .replace(LEGACY_VISUALIZATION_TOKEN_PATTERN, "")
     .replace(/\n{3,}/g, "\n\n")
     .trimStart();
 }

@@ -603,7 +603,6 @@ describe("agent runner research budget recovery", () => {
     delete process.env.STOCK_NEWS_ENABLED;
     delete process.env.STOCK_NEWS_MAX_CALLS;
     delete process.env.YAHOO_FINANCE_MAX_CALLS;
-    delete process.env.KRW_CHARTS_ENABLED;
     delete process.env.ZAI_API_KEY;
     delete process.env.CLAUDE_SDK_CONTEXT_USAGE_SAMPLE_RATE;
     delete process.env.CLAUDE_SDK_DIAGNOSTIC_TIMEOUT_MS;
@@ -3063,7 +3062,7 @@ describe("agent runner research budget recovery", () => {
       behavior: "deny",
     });
 
-    process.env.KRW_CHARTS_ENABLED = "1";
+    process.env.KRW_VISUALIZATIONS_MODE = "on";
     await expect(
       canUseTool("mcp__krw_presentation__compose_visualization"),
     ).resolves.toEqual({
@@ -4595,7 +4594,7 @@ describe("agent runner research budget recovery", () => {
 
   it("does not start a rewrite run for a partial answer result", async () => {
     process.env.RESEARCH_ANSWER_ENVELOPE_ENABLED = "1";
-    process.env.KRW_CHARTS_ENABLED = "1";
+    process.env.KRW_VISUALIZATIONS_MODE = "on";
     const researchState = {
       contract_version: "research-state/v2",
       answerability: { status: "partial", strong_claim_allowed: false },

@@ -11,7 +11,7 @@ import type {
 } from "./contracts";
 import { isKrwVisualizationArtifact } from "./contracts";
 import { COMPOSE_VISUALIZATION_TOOL_NAME } from "./create-visualization-tool";
-import { buildPresentationBlocks, stripLegacyChartTokens } from "./presentation";
+import { buildPresentationBlocks } from "./presentation";
 import type {
   ChatMessagePresentationRow,
   ChatMessageVisualizationRow,
@@ -118,7 +118,7 @@ export async function persistMessagePresentation(params: {
     .map((visualization) => visualization.payload_json)
     .filter(isKrwVisualizationArtifact);
   const blocks = buildPresentationBlocks({
-    content: stripLegacyChartTokens(params.content),
+    content: params.content,
     visualizations,
   });
 
@@ -151,14 +151,19 @@ export function extractCreatedVisualizationArtifacts(
 ): KrwVisualizationArtifact[] {
   const artifacts: KrwVisualizationArtifact[] = [];
   const seenRefs = new Set<string>();
+  const seenFingerprints = new Set<string>();
 
   for (const toolCall of acc.toolCalls) {
     if (toolCall.toolName !== COMPOSE_VISUALIZATION_TOOL_NAME) continue;
     for (const payload of [toolCall.resultJson, parseJson(toolCall.resultText)]) {
       const result = parseVisualizationToolResult(payload);
       if (!result?.artifact || result.status === "skipped") continue;
-      if (seenRefs.has(result.artifact.artifact_ref)) continue;
+      if (
+        seenRefs.has(result.artifact.artifact_ref) ||
+        seenFingerprints.has(result.artifact.semantic_fingerprint)
+      ) continue;
       seenRefs.add(result.artifact.artifact_ref);
+      seenFingerprints.add(result.artifact.semantic_fingerprint);
       artifacts.push(result.artifact);
     }
   }
