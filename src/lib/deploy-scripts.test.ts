@@ -177,6 +177,8 @@ describe("production deploy scripts", () => {
     expect(deployFast).toContain("krw-ontology-front-web:candidate-");
     expect(deployFast).toContain("Fast activation failed; restoring the previous VM image.");
     expect(deployFast).toContain("docker compose");
+    expect(deployFast).toContain("run_schema_smoke()");
+    expect(deployFast).toContain("run_schema_smoke");
     expect(deployFast).toContain("db push --dry-run");
     expect(deployFast).toContain("run_remote_deep_verify");
     expect(deployFast).toContain("Removing retired GCP ontology sidecars.");

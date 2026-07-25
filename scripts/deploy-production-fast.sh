@@ -164,6 +164,20 @@ run_migration_dry_run() {
   return 1
 }
 
+# The migration CLI uses the linked project metadata, but the schema smoke
+# talks to the Supabase HTTP API. Keep its credentials scoped to this child
+# process so a normal production runtime deploy can validate the migrated
+# schema before any new web or worker process is activated.
+run_schema_smoke() {
+  (
+    set -a
+    # shellcheck disable=SC1090
+    . "$ENV_PATH"
+    set +a
+    node "$SCRIPT_DIR/supabase-schema-smoke.mjs"
+  )
+}
+
 require_command node
 require_file "$TARGET_FILE"
 require_file "$ENV_PATH"
@@ -637,7 +651,7 @@ if [ "$APPLY_MIGRATIONS" = "1" ]; then
   else
     "$SCRIPT_DIR/supabase-cli.sh" db push
   fi
-  node "$SCRIPT_DIR/supabase-schema-smoke.mjs"
+  run_schema_smoke
 fi
 
 if [ "$WITH_DATA" = "1" ]; then

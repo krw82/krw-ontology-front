@@ -298,17 +298,17 @@ const checks = [
   {
     table: "billing_toss_checkout_sessions",
     select:
-      "id,user_id,plan_key,plan_version_id,amount_krw,customer_key,status,billing_key_idempotency_key,expires_at",
+      "id,user_id,plan_key,plan_version_id,amount_krw,customer_key,status,billing_key_idempotency_key,expires_at,processing_started_at",
   },
   {
     table: "billing_toss_subscriptions",
     select:
-      "id,user_id,plan_key,plan_version_id,status,customer_key,billing_method,current_period_start,current_period_end,renewal_due_at,next_billing_at,grace_until,renewal_attempt_count,pending_plan_key",
+      "id,user_id,plan_key,plan_version_id,status,customer_key,billing_method,current_period_start,current_period_end,renewal_due_at,next_billing_at,grace_until,renewal_attempt_count,pending_plan_key,terminal_entitlement_applied_at,billing_key_delete_pending,billing_key_deleted_at",
   },
   {
     table: "billing_toss_payments",
     select:
-      "id,user_id,subscription_id,checkout_session_id,plan_key,payment_kind,order_id,amount_krw,billing_period_start,billing_period_end,attempt_number,status,provider_payment_key",
+      "id,user_id,subscription_id,checkout_session_id,plan_key,payment_kind,order_id,amount_krw,billing_period_start,billing_period_end,attempt_number,status,provider_payment_key,fulfillment_status,fulfillment_error,fulfillment_attempted_at,fulfillment_applied_at",
   },
   {
     table: "usage_credit_balances",
@@ -1302,6 +1302,10 @@ await expectAnonRpcBlocked("claim_due_toss_subscriptions", {
   p_now: new Date().toISOString(),
   p_limit: 1,
   p_lease_seconds: 60,
+});
+await expectAnonRpcBlocked("finalize_toss_billing_payment", {
+  p_payment_id: zeroUuid,
+  p_paid_at: new Date().toISOString(),
 });
 
 console.log("Supabase schema smoke test passed.");
