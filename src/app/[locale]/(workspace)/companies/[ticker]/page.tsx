@@ -8,7 +8,6 @@ import CompanyWatchlistActions from "@/components/CompanyWatchlistActions";
 import InstitutionalTickerActivity from "@/components/InstitutionalTickerActivity";
 import JsonLdScript from "@/components/JsonLdScript";
 import MarketingCtaLink from "@/components/MarketingCtaLink";
-import SuggestedPromptActions from "@/components/SuggestedPromptActions";
 import CompanyGuruLensPicker from "@/components/guru/CompanyGuruLensPicker";
 import {
   getCompanyDisplayCopyForTicker,
@@ -378,22 +377,6 @@ export default async function CompanyLandingPage({
                 />
               </div>
             </div>
-            <SuggestedPromptActions
-              prompts={prompts}
-              groupId={`company-prompts-${displayCompany.ticker}`}
-              className="mt-5"
-              hrefs={promptHrefs}
-              analytics={{
-                sourceSurface: "company_detail",
-                ticker: displayCompany.ticker,
-                tickers: [displayCompany.ticker],
-                promptCategory: "company_research",
-                promptIds: prompts.map(
-                  (_, index) =>
-                    `${displayCompany.ticker.toLowerCase()}_suggested_${index + 1}`,
-                ),
-              }}
-            />
           </header>
 
           {firstValueEntry && user ? (
