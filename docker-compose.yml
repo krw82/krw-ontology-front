@@ -92,6 +92,8 @@ services:
       - WEB_COMMIT=${WEB_COMMIT:-}
       - KRW_ONTOLOGY_COMMIT=${KRW_ONTOLOGY_COMMIT:-}
       - ADMIN_EMAILS=${ADMIN_EMAILS:-}
+      - MARKET_ISSUE_ENV=${MARKET_ISSUE_ENV:-prod}
+      - MARKET_ISSUE_ADMIN_EMAILS=${MARKET_ISSUE_ADMIN_EMAILS:-}
       - ANALYSIS_CREDIT_ENFORCEMENT_MODE=${ANALYSIS_CREDIT_ENFORCEMENT_MODE:-enforced}
       - TOSS_PAYMENTS_CLIENT_KEY=${TOSS_PAYMENTS_CLIENT_KEY:-}
       - TOSS_PAYMENTS_SECRET_KEY=${TOSS_PAYMENTS_SECRET_KEY:-}
@@ -427,6 +429,48 @@ services:
           "-e",
           "require('fs').accessSync('.worker/filing-brief-worker.mjs'); if (process.env.FILING_BRIEF_ENABLED === '1') { for (const key of ['FILING_BRIEF_GATEWAY_TOKEN', 'SEC_USER_AGENT']) { if (!process.env[key]) { console.error('missing ' + key); process.exit(1); } } }",
         ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Market issues are deliberately review-first. With the default settings this
+  # process idles safely until an operator enables ingestion and configures an
+  # official X API bearer token.
+  market-issue-worker:
+    image: krw-ontology-front-web:local
+    command: ["node", ".worker/market-issue-worker.mjs"]
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - MARKET_ISSUE_ENV=${MARKET_ISSUE_ENV:-prod}
+      - MARKET_ISSUE_WORKER_ID=${MARKET_ISSUE_WORKER_ID:-gcp-market-issue-worker}
+      - MARKET_ISSUE_INGESTION_INTERVAL_MS=${MARKET_ISSUE_INGESTION_INTERVAL_MS:-300000}
+      - MARKET_ISSUE_X_API_BASE_URL=${MARKET_ISSUE_X_API_BASE_URL:-https://api.x.com}
+      - MARKET_ISSUE_X_BEARER_TOKEN=${MARKET_ISSUE_X_BEARER_TOKEN:-}
+      - MARKET_ISSUE_X_MAX_POSTS_PER_SOURCE=${MARKET_ISSUE_X_MAX_POSTS_PER_SOURCE:-20}
+      - MARKET_ISSUE_X_SOURCES=${MARKET_ISSUE_X_SOURCES:-[]}
+      - MARKET_ISSUE_SUMMARIZER_URL=${MARKET_ISSUE_SUMMARIZER_URL:-}
+      - MARKET_ISSUE_SUMMARIZER_TOKEN=${MARKET_ISSUE_SUMMARIZER_TOKEN:-}
+      - MARKET_ISSUE_REDIS_URL=${MARKET_ISSUE_REDIS_URL:-}
+      - REDIS_QUEUE_URL=${REDIS_QUEUE_URL:-}
+    networks:
+      - app-network
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('fs').accessSync('.worker/market-issue-worker.mjs')"]
       interval: 30s
       timeout: 5s
       retries: 3

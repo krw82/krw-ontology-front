@@ -24,10 +24,10 @@ const SCOPE_COPY: Record<MarketIssueScope, { label: string; description: string 
 };
 
 function getInitialScope(): MarketIssueScope {
-  if (typeof window === "undefined") return "mine";
-  return new URLSearchParams(window.location.search).get("scope") === "market"
-    ? "market"
-    : "mine";
+  if (typeof window === "undefined") return "market";
+  return new URLSearchParams(window.location.search).get("scope") === "mine"
+    ? "mine"
+    : "market";
 }
 
 function mergeIssues(current: readonly MarketIssueCard[], next: readonly MarketIssueCard[]): MarketIssueCard[] {

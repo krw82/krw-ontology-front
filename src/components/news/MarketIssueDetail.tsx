@@ -19,6 +19,8 @@ export default function MarketIssueDetail({ issueId }: { issueId: string }) {
   const [detail, setDetail] = useState<DetailState>({ kind: "loading" });
   const [draftError, setDraftError] = useState<string | null>(null);
   const [openingDraft, setOpeningDraft] = useState(false);
+  const [stateError, setStateError] = useState<string | null>(null);
+  const [updatingState, setUpdatingState] = useState<"save" | "hide" | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
 
   const loadDetail = useCallback(async () => {
@@ -67,6 +69,40 @@ export default function MarketIssueDetail({ issueId }: { issueId: string }) {
     }
   };
 
+  const updateIssueState = async (kind: "save" | "hide") => {
+    if (detail.kind !== "ready" || updatingState) return;
+    setUpdatingState(kind);
+    setStateError(null);
+    const isSaved = kind === "save" ? !detail.issue.userState?.saved : undefined;
+    const isHidden = kind === "hide" ? true : undefined;
+    try {
+      const response = await fetch(`/api/news/issues/${encodeURIComponent(detail.issue.id)}/state`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...(isSaved !== undefined ? { isSaved } : {}), ...(isHidden !== undefined ? { isHidden } : {}) }),
+      });
+      if (!response.ok) throw new Error("market_issue_state_failed");
+      if (kind === "hide") {
+        window.location.assign("/news");
+        return;
+      }
+      setDetail({
+        kind: "ready",
+        issue: {
+          ...detail.issue,
+          userState: {
+            saved: isSaved === true,
+            hidden: detail.issue.userState?.hidden === true,
+          },
+        },
+      });
+    } catch {
+      setStateError("이슈 상태를 저장하지 못했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setUpdatingState(null);
+    }
+  };
+
   return (
     <main id="main-content" className="mx-auto w-full max-w-4xl px-base pb-3xl pt-xl sm:px-xl sm:pt-2xl">
       <Link href="/news" className="inline-flex min-h-10 items-center gap-1.5 text-[13px] font-bold text-muted transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
@@ -82,6 +118,9 @@ export default function MarketIssueDetail({ issueId }: { issueId: string }) {
           openingDraft={openingDraft}
           draftError={draftError}
           onOpenResearchDraft={() => void openResearchDraft()}
+          updatingState={updatingState}
+          stateError={stateError}
+          onUpdateState={(kind) => void updateIssueState(kind)}
         />
       ) : null}
     </main>
@@ -93,11 +132,17 @@ function IssueDetailContent({
   openingDraft,
   draftError,
   onOpenResearchDraft,
+  updatingState,
+  stateError,
+  onUpdateState,
 }: {
   issue: MarketIssueCard;
   openingDraft: boolean;
   draftError: string | null;
   onOpenResearchDraft: () => void;
+  updatingState: "save" | "hide" | null;
+  stateError: string | null;
+  onUpdateState: (kind: "save" | "hide") => void;
 }) {
   const sourceCount = Math.max(issue.sourceCount, issue.sources.length);
   const impactPath = issue.impactPath.slice(0, 5);
@@ -123,6 +168,26 @@ function IssueDetailContent({
         <p className="mt-base max-w-2xl text-[14px] leading-6 text-muted">
           시장의 변화와 기업의 연결고리를 검토하기 위한 리서치 화면입니다. 아래 원문과 공시를 함께 확인해주세요.
         </p>
+        <div className="mt-base flex flex-wrap items-center gap-sm">
+          <button
+            type="button"
+            onClick={() => onUpdateState("save")}
+            disabled={updatingState !== null}
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-hairline bg-white px-base text-[12px] font-bold text-body transition hover:border-primary hover:text-primary disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">{issue.userState?.saved ? "bookmark_added" : "bookmark"}</span>
+            {issue.userState?.saved ? "저장됨" : "이슈 저장"}
+          </button>
+          <button
+            type="button"
+            onClick={() => onUpdateState("hide")}
+            disabled={updatingState !== null}
+            className="min-h-10 rounded-full px-base text-[12px] font-bold text-muted transition hover:text-ink disabled:opacity-50"
+          >
+            관심없음
+          </button>
+          {stateError ? <p className="text-[12px] text-[#9b4e25]" role="alert">{stateError}</p> : null}
+        </div>
       </header>
 
       <section className="mt-xl rounded-[22px] border border-[#d8e4fa] bg-[#f6f9ff] p-base sm:p-lg" aria-labelledby="korean-context-title">
