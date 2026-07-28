@@ -281,6 +281,7 @@ export function HomeQuestionForm({
 }: {
   locale?: Locale;
 }) {
+  const reducedMotion = useReducedMotion();
   const [demoStep, setDemoStep] = useState<HomeDemoStep>("idle");
   const demoTimeline = demoTimelineByLocale[locale];
   const activeDemo =
@@ -288,21 +289,36 @@ export function HomeQuestionForm({
   const isResolving = demoStep !== "idle";
 
   useEffect(() => {
+    if (reducedMotion) {
+      const completed =
+        demoTimeline[demoTimeline.length - 1] ?? demoTimeline[0];
+      const timeoutId = window.setTimeout(() => {
+        setDemoStep(completed.step);
+        emitDemoStep(completed.step);
+      }, 0);
+      return () => window.clearTimeout(timeoutId);
+    }
+
     let index = 0;
-    let timeoutId: number;
+    let timeoutId: number | undefined;
 
     const tick = () => {
-      const item = demoTimeline[index] ?? demoTimeline[0];
+      const item = demoTimeline[index];
+      if (!item) return;
       setDemoStep(item.step);
       emitDemoStep(item.step);
-      index = (index + 1) % demoTimeline.length;
-      timeoutId = window.setTimeout(tick, item.duration);
+      index += 1;
+      if (index < demoTimeline.length) {
+        timeoutId = window.setTimeout(tick, item.duration);
+      }
     };
 
     tick();
 
-    return () => window.clearTimeout(timeoutId);
-  }, [demoTimeline]);
+    return () => {
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
+  }, [demoTimeline, reducedMotion]);
 
   return (
     <div
@@ -368,7 +384,7 @@ export function HomeQuestionForm({
           {isResolving ? (
             <motion.span
               key="sphere"
-              className="relative inline-flex h-6 w-6 animate-spin rounded-full bg-[conic-gradient(from_0deg,rgba(0,82,255,0)_0deg,rgba(0,82,255,0.2)_90deg,var(--color-primary-container)_175deg,var(--color-primary)_270deg,rgba(0,82,255,0)_360deg)] p-[2px] [animation-duration:900ms]"
+              className="motion-progress-turn relative inline-flex h-6 w-6 rounded-full bg-[conic-gradient(from_0deg,rgba(0,82,255,0)_0deg,rgba(0,82,255,0.2)_90deg,var(--color-primary-container)_175deg,var(--color-primary)_270deg,rgba(0,82,255,0)_360deg)] p-[2px]"
               initial={{ opacity: 0, scale: 0.82 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.82 }}

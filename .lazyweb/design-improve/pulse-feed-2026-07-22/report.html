@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Design Improvement: KRW.O Pulse Feed</title>
+  <style>
+    :root { color-scheme: light; --ink:#111318; --muted:#626976; --line:#dfe3eb; --blue:#0b57d0; --blue-bg:#eef6ff; --warm:#fff7e8; --red:#b42318; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:#f6f7f9; color:var(--ink); font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { width:min(920px,calc(100% - 32px)); margin:40px auto 72px; background:#fff; border:1px solid var(--line); border-radius:20px; padding:clamp(24px,5vw,56px); box-shadow:0 16px 50px rgba(17,19,24,.08); }
+    h1 { margin:0 0 8px; font-size:clamp(32px,5vw,52px); line-height:1.05; letter-spacing:-.04em; }
+    h2 { margin:52px 0 18px; font-size:28px; letter-spacing:-.025em; }
+    h3 { margin:38px 0 10px; font-size:22px; letter-spacing:-.02em; }
+    p { margin:10px 0; }
+    a { color:var(--blue); }
+    .eyebrow { color:var(--blue); font-size:12px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
+    .muted, figcaption { color:var(--muted); }
+    .callout { margin:24px 0; padding:20px 22px; background:var(--blue-bg); border:1px solid #bdd8ff; border-radius:14px; }
+    .warning { background:var(--warm); border-color:#f0d59f; }
+    .score { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:22px 0; }
+    .score div { padding:14px; border:1px solid var(--line); border-radius:12px; }
+    .score b { display:block; font-size:26px; line-height:1.2; }
+    figure { margin:22px 0; }
+    img { width:100%; height:auto; border-radius:14px; border:1px solid var(--line); box-shadow:0 8px 30px rgba(17,19,24,.08); }
+    figcaption { margin-top:8px; font-size:13px; }
+    table { width:100%; border-collapse:collapse; margin:18px 0; font-size:14px; }
+    th,td { padding:11px 12px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { background:#f3f5f8; }
+    code { padding:2px 5px; border-radius:5px; background:#f0f2f5; }
+    pre { overflow:auto; padding:18px; background:#111318; color:#e7ebf3; border-radius:12px; font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    ul { padding-left:22px; }
+    .priority { display:inline-block; margin-left:6px; padding:2px 8px; border-radius:999px; background:#111318; color:#fff; font-size:11px; vertical-align:middle; }
+    .ref-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .ref-grid figure { margin:0; }
+    @media (max-width:720px) { .score,.ref-grid { grid-template-columns:1fr 1fr; } main { padding:24px 18px; } }
+  </style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">KRW.O · Pulse V5 audit · 2026-07-22</p>
+  <h1>Design Improvement: 현재 피드</h1>
+  <p class="muted">현재 로컬 로그인 계정과 실제 렌더링 화면, 후보 생성 코드, 로컬 Supabase 데이터를 함께 대조한 재평가입니다.</p>
+
+  <section class="callout">
+    <strong>TL;DR</strong>
+    <p>플랫 피드와 서버/기기 신호 분리는 맞게 구현됐습니다. 하지만 현재 화면의 상위 5개가 개인화 결과가 아닌 개발용 고정 카드라 실제 추천 1개를 가리고 있습니다. 지금 가장 큰 개선은 랭킹 공식 수정이 아니라 <strong>개발 쇼케이스를 실제 피드에서 완전히 분리하고, 후보가 부족한 콜드스타트 계정에는 관심 회사 기반의 다음 질문을 생성하는 것</strong>입니다.</p>
+  </section>
+
+  <div class="score">
+    <div><span class="muted">콘텐츠 관련성</span><b>2/10</b></div>
+    <div><span class="muted">스캔성</span><b>4/10</b></div>
+    <div><span class="muted">행동 명확성</span><b>6/10</b></div>
+    <div><span class="muted">신뢰성</span><b>3/10</b></div>
+  </div>
+
+  <h2>Current State</h2>
+  <figure>
+    <img src="references/current.png" alt="현재 KRW.O 로컬 피드 전체 화면">
+    <figcaption>현재 화면. 개발 미리보기 5개가 먼저 나오고, 실제 후보인 AAPL 편집 캐러셀이 마지막에 배치됩니다.</figcaption>
+  </figure>
+
+  <table>
+    <thead><tr><th>관찰 항목</th><th>현재 상태</th><th>판단</th></tr></thead>
+    <tbody>
+      <tr><td>로그인 계정</td><td><code>pulse-demo-20260720@local.test</code></td><td>이전 운영 계정 평가와는 별개의 로컬 테스트 계정</td></tr>
+      <tr><td>명시적 관심</td><td>ABBV = interest, AAPL = 표시만 있음</td><td>새 사건이 없다면 ABBV 맥락의 다음 질문이 우선되어야 함</td></tr>
+      <tr><td>최근 리서치</td><td>90일 내 완료 실행 0, 회사 채팅 0</td><td>리서치 횟수 기반 개인화는 이 계정에서 발동할 데이터가 없음</td></tr>
+      <tr><td>실제 소스 후보</td><td>현재 공시 후보 0, 열린 질문 0, 재노출 노트 0, AAPL 편집 콘텐츠 1</td><td>현재 알고리즘상 AAPL 학습 카드만 남는 것은 기계적으로는 정상</td></tr>
+      <tr><td>렌더링 후보</td><td>개발 fixture 5 + 실제 AAPL 1</td><td>사용자 관점에서는 추천 근거와 미검토 수가 왜곡됨</td></tr>
+      <tr><td>이미지</td><td>편집 캐러셀 첫 이미지 <code>naturalWidth=0</code></td><td>CSP의 <code>img-src</code>가 로컬 Supabase Storage 포트를 허용하지 않아 깨짐</td></tr>
+      <tr><td>분석 이벤트</td><td>화면은 6개인데 최신 <code>pulse_viewed</code>는 item_count=0</td><td>초기 빈 셸만 기록되어 운영 지표로 추천 품질을 판단할 수 없음</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Improvement Ideas</h2>
+
+  <h3>1. 개발 쇼케이스를 실제 피드에서 분리 <span class="priority">최우선</span></h3>
+  <p><code>NODE_ENV=development</code>라는 이유만으로 모든 요청에 fixture를 섞지 말고, <code>/dev/pulse-showcase</code> 또는 명시적 <code>?showcase=1</code>에서만 렌더링하세요. fixture는 미검토 수, 기기 피로도, 노출 분석, 실제 랭킹 후보에 절대 들어가면 안 됩니다.</p>
+  <p><strong>Inspired by:</strong> X Home Mixer는 후보 생성, 필터, 랭킹, 믹싱을 분리하고 테스트/비피드 모듈을 최종 선택 단계에서 명시적으로 섞습니다. 현재 구현은 테스트 후보가 사용자 후보와 같은 랭커에 들어가 경계를 무너뜨립니다. <a href="https://github.com/twitter/the-algorithm/blob/main/home-mixer/README.md">[Web · X Home Mixer]</a></p>
+  <pre>실제 /pulse                 /dev/pulse-showcase
+┌──────────────────┐       ┌──────────────────┐
+│ 사용자 후보만     │       │ Filing fixture   │
+│ 관심·리서치·사건  │       │ Analysis fixture │
+│ 기기 피로도 적용  │       │ Carousel fixture │
+└──────────────────┘       └──────────────────┘</pre>
+
+  <h3>2. 후보 부족 시 관심 회사 기반 “다음 질문”을 첫 카드로</h3>
+  <p>현재 계정처럼 관심 회사는 있지만 새 공시·완료 리서치·노트가 없는 경우, 무관한 글로벌 학습 카드보다 관심 회사 질문을 합성해야 합니다. 이 계정의 기대 순서는 <strong>ABBV 다음 질문 → ABBV/AAPL 새 사건 → 관련 학습 → 일반 발견</strong>입니다. 이유 문구도 “ABBV를 관심 회사로 설정해서”처럼 직접적이어야 합니다.</p>
+  <p><strong>Inspired by:</strong> Feedly는 사용자가 이미 신뢰하는 소스와 관심 토픽을 먼저 구성하고, 관련성·중복 제거·뮤트로 노이즈를 줄입니다. <a href="https://docs.feedly.com/article/523-getting-started-with-feedly">[Web · Feedly]</a></p>
+  <figure>
+    <img src="references/feedly-ai-feeds.png" alt="Feedly의 신뢰 소스 중심 시작 안내">
+    <figcaption>Feedly는 인기보다 사용자가 선택한 신뢰 소스와 관심 범위를 먼저 세팅합니다. KRW.O에서는 관심 회사가 그 역할을 해야 합니다.</figcaption>
+  </figure>
+  <pre>ABBV · 관심 회사
+┌────────────────────────────────────┐
+│ 이번 주 ABBV에서 무엇을 확인할까요? │
+│ ① 휴미라 이후 성장축  ② 마진 변화   │
+│ [질문 선택]                 [직접 입력]│
+└────────────────────────────────────┘</pre>
+
+  <h3>3. 카드 높이를 줄이고 “결정 정보”를 먼저</h3>
+  <p>현재 6개 카드가 약 한 화면의 3배 이상을 차지합니다. 기본 카드는 회사/유형, 제목, 한 줄 이유, 한 개의 주 행동만 보여주고 세부 근거는 펼침 또는 상세 화면으로 보내세요. 캐러셀 같은 고밀도 콘텐츠는 첫 2개의 행동 가능한 카드 이후 한 번만 배치하는 편이 좋습니다.</p>
+  <p><strong>Inspired by:</strong> Linear Pulse는 하나의 스트림 안에서 제목·핵심 변화·연관 맥락을 촘촘히 배치해 여러 업데이트를 한 번에 스캔하게 합니다. <a href="https://linear.app/docs/pulse">[Web · Linear Pulse]</a></p>
+  <figure>
+    <img src="references/linear-pulse.png" alt="Linear Pulse의 고밀도 업데이트 피드 예시">
+    <figcaption>Linear Pulse의 핵심은 섹션을 많이 만드는 것이 아니라, 한 화면에서 비교 가능한 정보 밀도입니다.</figcaption>
+  </figure>
+  <pre>ABBV  ·  새 공시  ·  2시간 전
+수익성 전망에서 바뀐 두 가지
+관심 회사이며 최근 확인하지 않은 공시입니다.
+[근거 보기 →]                         ⋯</pre>
+
+  <h3>4. “미검토”와 분석 이벤트를 실제 로드 이후 기준으로 계산</h3>
+  <p>개발 fixture, 진행 중 분석, 학습 카드는 미검토 업무 수에 포함하지 마세요. 또한 <code>pulse_viewed</code>는 초기 빈 셸에서 한 번 기록하는 대신 첫 정상 slate가 확정됐을 때 기록해야 합니다. 그렇지 않으면 노출 0으로 저장되어 A/B 테스트와 랭킹 평가가 왜곡됩니다.</p>
+  <p><strong>Inspired by:</strong> Linear Inbox는 읽기·스누즈·삭제 같은 명시적 상태를 알림 카운트와 동기화합니다. “보였다”와 “처리할 일”을 분리하는 패턴입니다. <a href="https://linear.app/docs/notifications">[Web · Linear Notifications]</a></p>
+  <pre>7월 22일 수요일
+처리할 신호 1개 · 진행 중 0개
+                          (학습 콘텐츠는 카운트 제외)</pre>
+
+  <h3>5. 편집 이미지의 로컬 CSP 허용 범위 수정</h3>
+  <p>현재 이미지 URL은 <code>http://localhost:54321/storage/...</code>이고 파일 자체는 HTTP 200이지만, 페이지 CSP의 <code>img-src</code>에는 <code>localhost:54321</code>이 없어 브라우저가 차단합니다. 개발 환경에서만 정확한 Supabase Storage origin을 허용하고, 운영에서는 등록된 Supabase CDN origin만 허용해야 합니다.</p>
+  <pre>img-src 'self' data: blob:
+        https://cdn.brandfetch.io
+        http://localhost:54321     ← dev only
+        https://*.supabase.co      ← prod</pre>
+
+  <h2>What's Working</h2>
+  <ul>
+    <li>보이는 섹션 없이 하나의 플랫 스트림으로 합친 방향은 맞습니다.</li>
+    <li>서버의 관심·완료 리서치 점수와 기기의 노출·열기·피로도 상태를 분리한 경계가 설명 가능합니다.</li>
+    <li>카드 전체 클릭과 구체적인 주 행동이 있어 다음 리서치로 이동하기 쉽습니다.</li>
+    <li>동일 티커 과다 노출, 완료 분석 수, 발견 후보 수를 제한하는 믹싱 안전장치가 이미 있습니다.</li>
+  </ul>
+
+  <section class="callout warning">
+    <strong>권장 구현 순서</strong>
+    <p>1) fixture 분리 → 2) 이미지 CSP 수정 → 3) 실제 로드 후 카운트/분석 기록 → 4) 관심 회사 cold-start 질문 후보 → 5) 카드 밀도 조정. 이 순서여야 먼저 신뢰할 수 있는 피드 데이터를 얻고, 그 다음 랭킹을 튜닝할 수 있습니다.</p>
+  </section>
+
+  <h2>All References</h2>
+  <div class="ref-grid">
+    <figure><img src="references/linear-pulse.png" alt="Linear Pulse"><figcaption>Linear Pulse · 업데이트 밀도와 요약 구조 [Web]</figcaption></figure>
+    <figure><img src="references/feedly-ai-feeds.png" alt="Feedly"><figcaption>Feedly · 신뢰 소스와 관심 범위 중심 시작 [Web]</figcaption></figure>
+  </div>
+  <p class="muted">Lazyweb MCP 검색 도구는 현재 세션에 노출되지 않아, 설치된 Lazyweb 개선 절차와 공식 제품 문서의 라이브 캡처를 사용했습니다.</p>
+</main>
+</body>
+</html>

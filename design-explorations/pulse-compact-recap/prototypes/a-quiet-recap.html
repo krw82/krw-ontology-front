@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="ko">
+<!--
+  가정 / 방향 메모
+  - 이 화면은 기존 Pulse의 정보 역할(공시, 대화, 분석 상태)을 유지하되 큰 카드와 CTA를 제거한 방향 A입니다.
+  - Quartr식 리캡처럼 "지난 방문 이후 무엇이 바뀌었나"를 먼저 보여주고, 한 줄의 변화와 한 줄의 근거만 남깁니다.
+  - 모든 회사·시간·사건은 시각 검토용 샘플입니다. 실제 공시나 거래로 해석하면 안 됩니다.
+  - form은 리캡 목록에서 왔습니다. 한 행 = 하나의 바로 열 수 있는 연구 기록입니다.
+-->
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pulse prototype A — Quiet recap</title>
+  <style>
+    :root {
+      --brand-primary: #003ec7;
+      --brand-primary-container: #0052ff;
+      --brand-ink: #0a0b0d;
+      --brand-body: #5b616e;
+      --brand-muted: #7c828a;
+      --brand-hairline: #dee1e6;
+      --brand-hairline-soft: #eef0f3;
+      --brand-canvas: #ffffff;
+      --brand-paper: #f8f7f3;
+      --font-body: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-mono: "SFMono-Regular", Menlo, Consolas, ui-monospace, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      background: #eef0f3;
+      font-synthesis: none;
+      line-break: strict;
+    }
+
+    body {
+      margin: 0;
+      color: var(--brand-ink);
+      background: #eef0f3;
+      font-family: var(--font-body);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    button { font: inherit; }
+
+    .canvas {
+      min-height: 100vh;
+      max-width: 430px;
+      margin: 0 auto;
+      background: var(--brand-canvas);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 72px;
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--brand-hairline);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--brand-ink);
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-decoration: none;
+    }
+
+    .brand img {
+      width: 31px;
+      height: 31px;
+      display: block;
+      border-radius: 7px;
+    }
+
+    .profile {
+      display: grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      border: 0;
+      border-radius: 7px;
+      background: var(--brand-ink);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .masthead {
+      padding: 29px 22px 22px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--brand-primary);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .16em;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 34px;
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -.045em;
+      text-wrap: balance;
+    }
+
+    .subhead {
+      margin: 10px 0 0;
+      color: var(--brand-muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .filters {
+      display: flex;
+      gap: 18px;
+      margin-top: 22px;
+      border-bottom: 1px solid var(--brand-hairline);
+    }
+
+    .filter {
+      position: relative;
+      min-height: 38px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--brand-muted);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .filter[aria-pressed="true"] { color: var(--brand-ink); }
+
+    .filter[aria-pressed="true"]::after {
+      position: absolute;
+      right: 0;
+      bottom: -1px;
+      left: 0;
+      height: 2px;
+      background: var(--brand-primary);
+      content: "";
+    }
+
+    .recap {
+      padding: 16px 22px 17px;
+      border-top: 1px solid var(--brand-hairline-soft);
+      border-bottom: 1px solid var(--brand-hairline);
+      background: var(--brand-paper);
+    }
+
+    .recap-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--brand-muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .04em;
+    }
+
+    .recap strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 16px;
+      font-weight: 750;
+      line-height: 1.42;
+      letter-spacing: -.02em;
+    }
+
+    .recap-note {
+      margin: 5px 0 0;
+      color: var(--brand-body);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .feed { padding: 0 22px; }
+
+    .feed-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 19px 0 10px;
+    }
+
+    .feed-head h2 {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: -.01em;
+    }
+
+    .feed-head span {
+      color: var(--brand-muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: .02em;
+    }
+
+    .feed-row {
+      display: grid;
+      width: 100%;
+      grid-template-columns: 47px minmax(0, 1fr) 16px;
+      gap: 10px;
+      padding: 16px 0;
+      border: 0;
+      border-top: 1px solid var(--brand-hairline);
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .feed-row:last-of-type { border-bottom: 1px solid var(--brand-hairline); }
+
+    .time {
+      padding-top: 2px;
+      color: var(--brand-muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.4;
+    }
+
+    .row-content { min-width: 0; }
+
+    .row-top {
+      display: flex;
+      align-items: baseline;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    .ticker {
+      flex: 0 0 auto;
+      color: var(--brand-primary);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .02em;
+    }
+
+    .kind {
+      min-width: 0;
+      overflow: hidden;
+      color: var(--brand-muted);
+      font-size: 11px;
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .change {
+      display: block;
+      margin-top: 4px;
+      color: var(--brand-ink);
+      font-size: 16px;
+      font-weight: 740;
+      line-height: 1.42;
+      letter-spacing: -.025em;
+      text-wrap: pretty;
+    }
+
+    .evidence {
+      display: block;
+      margin-top: 5px;
+      overflow: hidden;
+      color: var(--brand-body);
+      font-size: 12px;
+      line-height: 1.45;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .chevron {
+      align-self: center;
+      color: var(--brand-muted);
+      font-size: 19px;
+      font-weight: 400;
+      line-height: 1;
+    }
+
+    .feed-row:hover .change,
+    .feed-row:focus-visible .change,
+    .feed-row.is-selected .change { color: var(--brand-primary); }
+
+    .feed-row:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 3px; }
+
+    .selection {
+      margin: 20px 22px 0;
+      padding: 13px 0 23px;
+      border-top: 1px solid var(--brand-hairline);
+      color: var(--brand-body);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .selection strong { color: var(--brand-ink); }
+
+    .sample-note {
+      margin: 0 22px;
+      padding: 14px 0 30px;
+      border-top: 1px solid var(--brand-hairline-soft);
+      color: var(--brand-muted);
+      font-size: 10px;
+      line-height: 1.5;
+    }
+
+    [hidden] { display: none !important; }
+
+    @media (min-width: 431px) {
+      .canvas { box-shadow: 0 0 0 1px rgba(10, 11, 13, .05), 0 20px 50px rgba(10, 11, 13, .08); }
+    }
+  </style>
+</head>
+<body>
+  <main class="canvas" aria-label="Pulse compact recap prototype">
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="KRW.O 피드 처음으로">
+        <img src="../../../public/krw-logo.svg" alt="">
+        <span>KRW.O</span>
+      </a>
+      <button class="profile" type="button" aria-label="프로필">P</button>
+    </header>
+
+    <section class="masthead" id="top" aria-labelledby="page-title">
+      <p class="eyebrow">RESEARCH FEED</p>
+      <h1 id="page-title">피드</h1>
+      <p class="subhead">7월 26일 토요일 · 지난 방문 이후 확인할 업데이트</p>
+      <div class="filters" role="group" aria-label="피드 범위">
+        <button class="filter" type="button" data-filter="all" aria-pressed="true">전체 <span>5</span></button>
+        <button class="filter" type="button" data-filter="following" aria-pressed="false">관심 기업 <span>4</span></button>
+      </div>
+    </section>
+
+    <section class="recap" aria-label="리캡 설명">
+      <div class="recap-label"><span>LAST VISIT → NOW</span><span>샘플 화면</span></div>
+      <strong id="recap-title">관심 기업 4곳에서, 먼저 볼 변화 5개</strong>
+      <p class="recap-note" id="recap-note">원문 근거와 이어 볼 리서치 맥락만 남겼습니다.</p>
+    </section>
+
+    <section class="feed" aria-labelledby="feed-title">
+      <div class="feed-head"><h2 id="feed-title">업데이트</h2><span id="feed-count">5 ITEMS</span></div>
+
+      <button class="feed-row" type="button" data-following="true" data-item="AAPL 공시 상세" data-description="SEC 원문과 이번 공시에서 바뀐 항목을 바로 확인합니다.">
+        <span class="time">14:32</span>
+        <span class="row-content"><span class="row-top"><span class="ticker">AAPL</span><span class="kind">8-K · 새 공시</span></span><span class="change">실적 발표 자료가 제출됐습니다</span><span class="evidence">SEC 원문 · 이번 공시에서 바뀐 항목 확인</span></span>
+        <span class="chevron" aria-hidden="true">→</span>
+      </button>
+
+      <button class="feed-row" type="button" data-following="true" data-item="ABNB 리서치 대화" data-description="지난 대화와 연결되는 공시 근거를 확인한 뒤 채팅으로 이어갑니다.">
+        <span class="time">11:06</span>
+        <span class="row-content"><span class="row-top"><span class="ticker">ABNB</span><span class="kind">최근 대화 · 이어 보기</span></span><span class="change">지난 질문과 연결할 공시가 있습니다</span><span class="evidence">리서치 2회 · 근거를 보고 대화 이어가기</span></span>
+        <span class="chevron" aria-hidden="true">→</span>
+      </button>
+
+      <button class="feed-row" type="button" data-following="true" data-item="XOM 내부자 거래" data-description="동일 시점의 거래는 묶어서 보여주고 필요할 때만 원문으로 들어갑니다.">
+        <span class="time">어제</span>
+        <span class="row-content"><span class="row-top"><span class="ticker">XOM</span><span class="kind">Form 4 · 내부자 거래</span></span><span class="change">내부자 거래 3건이 한 묶음으로 들어왔습니다</span><span class="evidence">거래 3건 · 원문 3개 · 상세에서 각각 확인</span></span>
+        <span class="chevron" aria-hidden="true">→</span>
+      </button>
+
+      <button class="feed-row" type="button" data-following="true" data-item="NVDA 분석 결과" data-description="완료된 분석은 요약보다 바로 근거와 대화 맥락으로 연결합니다.">
+        <span class="time">09:18</span>
+        <span class="row-content"><span class="row-top"><span class="ticker">NVDA</span><span class="kind">분석 완료 · 근거 4개</span></span><span class="change">실적 변화의 근거 정리가 준비됐습니다</span><span class="evidence">지난 분석 · 대화 결과와 원문 근거 확인</span></span>
+        <span class="chevron" aria-hidden="true">→</span>
+      </button>
+
+      <button class="feed-row" type="button" data-following="false" data-item="SLB 새 공시" data-description="관심 기업 밖의 항목은 한 줄로 낮은 우선순위를 유지합니다.">
+        <span class="time">어제</span>
+        <span class="row-content"><span class="row-top"><span class="ticker">SLB</span><span class="kind">8-K · 새 공시</span></span><span class="change">확인할 공시가 새로 들어왔습니다</span><span class="evidence">관심 기업 외 · 원문으로 바로 확인</span></span>
+        <span class="chevron" aria-hidden="true">→</span>
+      </button>
+    </section>
+
+    <aside class="selection" aria-live="polite"><strong id="selection-title">행을 누르면:</strong> <span id="selection-description">공시 상세, 리서치 대화, 또는 원문으로 바로 이어집니다.</span></aside>
+    <p class="sample-note">프로토타입 · 샘플 데이터입니다. 실제 공시·거래·분석 상태를 나타내지 않습니다.</p>
+  </main>
+
+  <script>
+    const recapRows = Array.from(document.querySelectorAll('.feed-row'));
+    const recapFilters = Array.from(document.querySelectorAll('.filter'));
+    const recapTitle = document.querySelector('#recap-title');
+    const recapNote = document.querySelector('#recap-note');
+    const recapCount = document.querySelector('#feed-count');
+    const selectionTitle = document.querySelector('#selection-title');
+    const selectionDescription = document.querySelector('#selection-description');
+
+    recapFilters.forEach((filter) => {
+      filter.addEventListener('click', () => {
+        const followingOnly = filter.dataset.filter === 'following';
+        recapFilters.forEach((item) => item.setAttribute('aria-pressed', String(item === filter)));
+        let visible = 0;
+        recapRows.forEach((row) => {
+          const shouldShow = !followingOnly || row.dataset.following === 'true';
+          row.hidden = !shouldShow;
+          if (shouldShow) visible += 1;
+        });
+        recapTitle.textContent = followingOnly ? '관심 기업 4곳에서, 먼저 볼 변화 4개' : '관심 기업 4곳에서, 먼저 볼 변화 5개';
+        recapNote.textContent = followingOnly ? '사용자가 고른 회사의 원문과 연구 맥락만 정렬했습니다.' : '원문 근거와 이어 볼 리서치 맥락만 남겼습니다.';
+        recapCount.textContent = `${visible} ITEMS`;
+      });
+    });
+
+    recapRows.forEach((row) => {
+      row.addEventListener('click', () => {
+        recapRows.forEach((item) => item.classList.toggle('is-selected', item === row));
+        selectionTitle.textContent = `${row.dataset.item}로 이동:`;
+        selectionDescription.textContent = row.dataset.description;
+      });
+    });
+
+    window.__prototypeReady = true;
+  </script>
+</body>
+</html>

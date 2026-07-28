@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KRW.O — 13F 방향 2 · Quarterly Story</title>
+    <style>
+      :root {
+        --white: #fff;
+        --ink: #101114;
+        --navy: #07172e;
+        --blue: #003ec7;
+        --blue-pale: #e9efff;
+        --slate: #667083;
+        --line: #d8dce3;
+        --green: #05764a;
+        --red: #af2530;
+        --serif: "Iowan Old Style", "AppleMyungjo", "Songti SC", "Noto Serif KR", serif;
+        --sans: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+        --mono: "SFMono-Regular", "Menlo", "Consolas", monospace;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--white); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+      a { color: inherit; text-decoration: none; }
+      .header { height: 68px; border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 0 32px; }
+      .header-inner { max-width: 1160px; width: 100%; margin: auto; display: flex; justify-content: space-between; align-items: center; }
+      .logo { display: inline-flex; align-items: center; height: 44px; }
+      .logo img { width: 71px; }
+      .section-mark { color: var(--blue); font: 700 11px/1 var(--mono); letter-spacing: .13em; }
+      .main { max-width: 1160px; margin: auto; padding: 50px 0 84px; display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 72px; }
+      .rail { padding-top: 8px; color: var(--slate); }
+      .rail .rail-title { margin: 0 0 20px; color: var(--ink); font: 600 13px/1.45 var(--mono); letter-spacing: .05em; }
+      .rail dl { margin: 0; border-top: 1px solid var(--line); }
+      .rail div { padding: 15px 0; border-bottom: 1px solid var(--line); }
+      .rail dt { margin-bottom: 5px; font: 700 10px/1.3 var(--mono); letter-spacing: .1em; }
+      .rail dd { margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink); }
+      .rail .disclaimer { margin-top: 28px; font-size: 12px; line-height: 1.65; }
+      .story { min-width: 0; }
+      .kicker { margin: 0; font: 700 12px/1.5 var(--mono); color: var(--blue); letter-spacing: .1em; }
+      h1 { max-width: 800px; margin: 16px 0 22px; font: 500 clamp(44px, 6vw, 78px)/1.02 var(--serif); letter-spacing: -.06em; }
+      .intro { max-width: 640px; margin: 0; font-size: 17px; line-height: 1.75; color: #3b4657; }
+      .intro b { color: var(--ink); }
+      .story-nav { display: flex; gap: 18px; margin: 35px 0 0; padding: 0; list-style: none; color: var(--slate); font: 700 12px/1 var(--mono); }
+      .story-nav a { display: inline-flex; min-height: 44px; align-items: center; border-bottom: 2px solid transparent; }
+      .story-nav a:first-child { border-color: var(--blue); color: var(--ink); }
+      .scene { padding: 44px 0; border-top: 1px solid var(--line); }
+      .scene:first-of-type { margin-top: 10px; }
+      .scene-index { color: var(--blue); font: 700 12px/1 var(--mono); letter-spacing: .1em; }
+      .scene h2 { max-width: 700px; margin: 12px 0 12px; font: 500 clamp(30px, 4vw, 48px)/1.15 var(--serif); letter-spacing: -.05em; }
+      .scene-copy { max-width: 610px; margin: 0; color: #495466; font-size: 16px; line-height: 1.7; }
+      .change-list { margin-top: 30px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--ink); }
+      .change { padding: 17px 17px 19px 0; min-height: 142px; border-bottom: 1px solid var(--line); }
+      .change + .change { padding-left: 17px; border-left: 1px solid var(--line); }
+      .change .ticker { display: block; font: 700 27px/1 var(--mono); letter-spacing: -.06em; }
+      .change .name { display: block; min-height: 34px; margin-top: 5px; color: var(--slate); font-size: 12px; line-height: 1.35; }
+      .change .delta { display: block; margin-top: 15px; font: 700 14px/1 var(--mono); }
+      .scene.grow .delta { color: var(--green); }
+      .scene.reduce .delta { color: var(--red); }
+      .scene.reduce { background: linear-gradient(90deg, #fff 0, #fff 64%, #fffafa 100%); }
+      .position-table { margin-top: 28px; border-top: 2px solid var(--ink); }
+      .position { display: grid; grid-template-columns: 44px minmax(0, 1fr) 100px 105px; gap: 12px; align-items: center; min-height: 66px; border-bottom: 1px solid var(--line); }
+      .position .num { color: var(--slate); font: 11px/1 var(--mono); }
+      .position .company { font-size: 15px; font-weight: 750; }
+      .position .company small { display: block; margin-top: 3px; color: var(--slate); font: 10px/1.3 var(--mono); }
+      .position .ratio, .position .value { text-align: right; font: 700 13px/1 var(--mono); }
+      .source-note { margin: 15px 0 0; color: var(--slate); font-size: 12px; line-height: 1.6; }
+      .bottom-link { display: inline-flex; align-items: center; min-height: 44px; margin-top: 26px; padding: 0 16px; border: 1px solid var(--ink); font-size: 14px; font-weight: 800; }
+      .bottom-link::after { content: "↗"; margin-left: 11px; color: var(--blue); }
+      @media (max-width: 840px) {
+        .header { height: 62px; padding: 0 20px; }
+        .header .section-mark { font-size: 10px; }
+        .main { display: block; width: min(100% - 40px, 600px); padding: 35px 0 58px; }
+        .rail { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin: 0 0 35px; padding: 0 0 17px; border-bottom: 1px solid var(--line); }
+        .rail .rail-title { grid-column: 1 / -1; margin-bottom: 12px; }
+        .rail dl { display: contents; }
+        .rail div { padding: 10px 0; }
+        .rail .disclaimer { display: none; }
+        h1 { margin-top: 14px; font-size: 47px; }
+        .intro { font-size: 16px; }
+        .story-nav { justify-content: space-between; gap: 4px; margin-top: 25px; overflow: hidden; }
+        .story-nav a { min-height: 42px; font-size: 10px; }
+        .scene { padding: 34px 0; }
+        .scene h2 { font-size: 33px; }
+        .scene-copy { font-size: 16px; }
+        .change-list { display: block; margin-top: 23px; }
+        .change, .change + .change { display: grid; grid-template-columns: 75px 1fr auto; align-items: center; gap: 10px; min-height: 70px; padding: 14px 0; border-left: 0; }
+        .change .ticker { font-size: 21px; }
+        .change .name { min-height: 0; margin: 0; font-size: 12px; }
+        .change .delta { margin: 0; font-size: 13px; }
+        .position { grid-template-columns: 27px minmax(0, 1fr) auto; min-height: 69px; }
+        .position .ratio, .position .value { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Direction 2: a mobile-first, narrative reading order instead of a dashboard grid. -->
+    <header class="header">
+      <div class="header-inner">
+        <a class="logo" href="#" aria-label="KRW.O 홈"><img src="../assets/krw-logo.svg" alt="KRW.O" /></a>
+        <span class="section-mark">13F / QUARTERLY READ</span>
+      </div>
+    </header>
+    <main class="main">
+      <aside class="rail" aria-label="공시 정보">
+        <p class="rail-title">NATIONAL PENSION SERVICE</p>
+        <dl>
+          <div><dt>FORM</dt><dd>SEC 13F</dd></div>
+          <div><dt>AS OF</dt><dd>2026.03.31</dd></div>
+          <div><dt>TOP POSITIONS</dt><dd>$66.4B</dd></div>
+          <div><dt>COMPARE</dt><dd>직전 분기</dd></div>
+        </dl>
+        <p class="disclaimer">13F는 분기 말 미국 상장 증권 중심의 보유 공시입니다. 현재 보유 또는 매매 의도를 뜻하지 않습니다.</p>
+      </aside>
+
+      <article class="story">
+        <p class="kicker">국민연금공단의 2026년 1분기</p>
+        <h1>이번 분기,<br />무엇이 달라졌을까?</h1>
+        <p class="intro">표를 전부 읽기 전에 <b>달라진 곳부터</b> 봅니다. 아래 변화는 직전 13F 대비 보유 비중을 비교한 결과이며, 투자 판단의 시작점으로만 활용하세요.</p>
+        <nav aria-label="내용 바로가기"><ul class="story-nav"><li><a href="#more">더 크게 본 곳</a></li><li><a href="#less">덜어낸 곳</a></li><li><a href="#core">여전히 큰 보유</a></li></ul></nav>
+
+        <section class="scene grow" id="more">
+          <span class="scene-index">01 / MORE OF</span>
+          <h2>에너지와 헬스케어 쪽<br />비중을 조금 더 키웠어요.</h2>
+          <p class="scene-copy">가장 큰 증가는 Exxon Mobil입니다. Chevron, Johnson &amp; Johnson도 같은 방향에 있습니다. 세 종목을 하나의 매수 신호로 읽기보다, 분기별 비중 변화라는 사실을 먼저 확인합니다.</p>
+          <div class="change-list" aria-label="비중 증가 종목">
+            <div class="change"><span class="ticker">XOM</span><span class="name">Exxon Mobil</span><span class="delta">+0.39%p</span></div>
+            <div class="change"><span class="ticker">CVX</span><span class="name">Chevron</span><span class="delta">+0.21%p</span></div>
+            <div class="change"><span class="ticker">JNJ</span><span class="name">Johnson &amp; Johnson</span><span class="delta">+0.19%p</span></div>
+          </div>
+        </section>
+
+        <section class="scene reduce" id="less">
+          <span class="scene-index">02 / LESS OF</span>
+          <h2>가장 크게 줄인 쪽은<br />Microsoft입니다.</h2>
+          <p class="scene-copy">감소는 처분이나 부정적 전망과 같은 뜻이 아닙니다. 비중 변화의 크기와 보유 규모를 함께 보는 것이 안전합니다.</p>
+          <div class="change-list" aria-label="비중 감소 종목">
+            <div class="change"><span class="ticker">MSFT</span><span class="name">Microsoft</span><span class="delta">−1.00%p</span></div>
+            <div class="change"><span class="ticker">TSLA</span><span class="name">Tesla</span><span class="delta">−0.23%p</span></div>
+            <div class="change"><span class="ticker">META</span><span class="name">Meta Platforms</span><span class="delta">−0.21%p</span></div>
+          </div>
+        </section>
+
+        <section class="scene" id="core">
+          <span class="scene-index">03 / THE CORE</span>
+          <h2>변화와 별개로,<br />여전히 큰 종목들입니다.</h2>
+          <p class="scene-copy">시가 기준의 상위 보유를 나란히 보며, 변화가 전체 포트폴리오 안에서 어느 정도인지를 가늠할 수 있습니다.</p>
+          <div class="position-table" aria-label="상위 보유">
+            <a class="position" href="#"><span class="num">01</span><span class="company">NVIDIA<small>NVDA · NVIDIA CORPORATION</small></span><span class="ratio">6.79%</span><span class="value">$8.9B</span></a>
+            <a class="position" href="#"><span class="num">02</span><span class="company">Apple<small>AAPL · APPLE INC.</small></span><span class="ratio">5.98%</span><span class="value">$7.9B</span></a>
+            <a class="position" href="#"><span class="num">03</span><span class="company">Microsoft<small>MSFT · MICROSOFT CORPORATION</small></span><span class="ratio">4.19%</span><span class="value">$5.5B</span></a>
+            <a class="position" href="#"><span class="num">04</span><span class="company">Amazon<small>AMZN · AMAZON.COM INC.</small></span><span class="ratio">3.23%</span><span class="value">$4.3B</span></a>
+          </div>
+          <p class="source-note">기준일 2026.03.31 · 상위 보유 시가 $66.4B · 상세 수치와 원문 공시를 함께 확인하세요.</p>
+          <a class="bottom-link" href="#">전체 보유 종목 열기</a>
+        </section>
+      </article>
+    </main>
+  </body>
+</html>

@@ -3,7 +3,7 @@ import { pageMetadata } from "@/lib/marketing/site";
 
 export const metadata: Metadata = pageMetadata({
   title: "로그인",
-  description: "Google 또는 이메일로 KRW.O 리서치를 시작합니다.",
+  description: "Google로 KRW.O 리서치를 시작합니다.",
   path: "/login",
   noIndex: true,
 });

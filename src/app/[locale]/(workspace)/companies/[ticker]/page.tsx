@@ -5,6 +5,7 @@ import CompanyLogo from "@/components/CompanyLogo";
 import CompanyInsiderTransactions from "@/components/CompanyInsiderTransactions";
 import CompanyRecentImportantFilings from "@/components/CompanyRecentImportantFilings";
 import CompanyWatchlistActions from "@/components/CompanyWatchlistActions";
+import CompanyEditorialSeriesSection, { type CompanyEditorialSeries } from "@/components/editorial/CompanyEditorialSeriesSection";
 import InstitutionalTickerActivity from "@/components/InstitutionalTickerActivity";
 import JsonLdScript from "@/components/JsonLdScript";
 import MarketingCtaLink from "@/components/MarketingCtaLink";
@@ -17,6 +18,7 @@ import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
 import { localizedPageMetadata } from "@/i18n/metadata";
 import { localizedPath } from "@/i18n/routing";
 import { getAuthUser } from "@/lib/auth";
+import { editorialAssetUrl, getPublishedCompanyEditorialSeries } from "@/lib/editorial/repository";
 import { getIndexedCompany } from "@/lib/ontology/catalog";
 import { normalizeTicker } from "@/lib/ontology/ticker";
 import {
@@ -142,6 +144,7 @@ export default async function CompanyLandingPage({
     latestImportantFiling,
     insiderTransactions,
     recentImportantFilings,
+    editorialSeries,
   ] =
     await Promise.all([
       getInstitutionalTickerActivity(company.ticker).catch(() => []),
@@ -150,7 +153,27 @@ export default async function CompanyLandingPage({
         : Promise.resolve(null),
       getRecentCompanyInsiderTransactions(company.ticker).catch(() => []),
       getRecentCompanyImportantFilings(company.ticker).catch(() => []),
+      getPublishedCompanyEditorialSeries(company.ticker).catch(() => []),
     ]);
+
+  const companyStories: CompanyEditorialSeries[] = editorialSeries.map((series) => ({
+    id: series.id,
+    slug: series.slug,
+    title: series.title,
+    summary: series.summary,
+    episodes: series.entries.map((entry) => ({
+      id: entry.id,
+      number: entry.episode_number,
+      title: entry.title,
+      body: entry.body,
+      slides: entry.pulse_editorial_assets.map((asset) => ({
+        src: editorialAssetUrl(asset.id),
+        alt: asset.alt_text,
+        width: asset.width,
+        height: asset.height,
+      })),
+    })),
+  }));
 
   let savedMark: Pick<
     UserCompanyMarkRow,
@@ -379,39 +402,7 @@ export default async function CompanyLandingPage({
             </div>
           </header>
 
-          {firstValueEntry && user ? (
-            <FirstValueCompanyPanel
-              locale={locale}
-              ticker={displayCompany.ticker}
-              companyName={companyTitleName}
-              filing={latestImportantFiling}
-              entry={
-                firstValueEntryName === ONBOARDING_START_ENTRY
-                  ? ONBOARDING_START_ENTRY
-                  : "first_value"
-              }
-              copy={pageCopy}
-            />
-          ) : null}
-
-          <CompanyRecentImportantFilings
-            locale={locale}
-            ticker={displayCompany.ticker}
-            items={recentImportantFilings}
-          />
-
-          <CompanyInsiderTransactions
-            locale={locale}
-            ticker={displayCompany.ticker}
-            items={insiderTransactions}
-          />
-
-          <InstitutionalTickerActivity
-            locale={locale}
-            items={institutionalActivity}
-          />
-
-          <section className="border-b border-hairline py-7">
+          {companyStories.length > 0 ? <CompanyEditorialSeriesSection series={companyStories} /> : <section className="border-b border-hairline py-7">
             <div className="grid gap-5 md:grid-cols-[176px_minmax(0,1fr)] md:items-start">
               <div className="min-w-0">
                 <p className="font-mono text-[11px] font-black uppercase tracking-[0.16em] text-primary">
@@ -444,7 +435,39 @@ export default async function CompanyLandingPage({
                 />
               </div>
             </div>
-          </section>
+          </section>}
+
+          <InstitutionalTickerActivity
+            locale={locale}
+            items={institutionalActivity}
+          />
+
+          <CompanyRecentImportantFilings
+            locale={locale}
+            ticker={displayCompany.ticker}
+            items={recentImportantFilings}
+          />
+
+          {firstValueEntry && user ? (
+            <FirstValueCompanyPanel
+              locale={locale}
+              ticker={displayCompany.ticker}
+              companyName={companyTitleName}
+              filing={latestImportantFiling}
+              entry={
+                firstValueEntryName === ONBOARDING_START_ENTRY
+                  ? ONBOARDING_START_ENTRY
+                  : "first_value"
+              }
+              copy={pageCopy}
+            />
+          ) : null}
+
+          <CompanyInsiderTransactions
+            locale={locale}
+            ticker={displayCompany.ticker}
+            items={insiderTransactions}
+          />
         </div>
       </main>
     </div>

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ko">
+<!--
+  가정 / 방향 메모
+  - 방향 C는 사용자가 먼저 관심을 둔 회사를 기준으로 사건과 연구 이력을 묶습니다.
+  - 하나의 회사 안에서 여러 이벤트가 있어도 큰 카드 여러 장이 아니라, 한 개의 가벼운 thread로 읽힙니다.
+  - 모든 회사·시간·사건은 시각 검토용 샘플입니다. 실제 공시나 거래로 해석하면 안 됩니다.
+  - form은 "followed company"라는 제품 맥락에서 왔습니다. 회사 하나가 맥락이고, 이벤트는 그 아래의 짧은 증거 기록입니다.
+-->
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pulse prototype C — Company thread</title>
+  <style>
+    :root {
+      --brand-primary: #003ec7;
+      --brand-ink: #0a0b0d;
+      --brand-body: #5b616e;
+      --brand-muted: #7c828a;
+      --brand-hairline: #dee1e6;
+      --brand-hairline-soft: #eef0f3;
+      --brand-canvas: #ffffff;
+      --brand-paper: #f8f7f3;
+      --font-body: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-mono: "SFMono-Regular", Menlo, Consolas, ui-monospace, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: #eef0f3; font-synthesis: none; line-break: strict; }
+    body { margin: 0; background: #eef0f3; color: var(--brand-ink); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+    button { font: inherit; }
+
+    .canvas { min-height: 100vh; max-width: 430px; margin: 0 auto; background: var(--brand-canvas); }
+    .topbar { display: flex; align-items: center; justify-content: space-between; min-height: 72px; padding: 16px 22px; border-bottom: 1px solid var(--brand-hairline); }
+    .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--brand-ink); text-decoration: none; font-size: 15px; font-weight: 800; letter-spacing: .06em; }
+    .brand img { width: 31px; height: 31px; display: block; border-radius: 7px; }
+    .profile { display: grid; width: 36px; height: 36px; place-items: center; border: 0; border-radius: 7px; background: var(--brand-ink); color: #fff; font-size: 13px; font-weight: 800; }
+
+    .masthead { padding: 29px 22px 18px; }
+    .eyebrow { margin: 0 0 8px; color: var(--brand-primary); font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .16em; }
+    h1 { margin: 0; font-size: 33px; font-weight: 800; line-height: 1.15; letter-spacing: -.045em; }
+    .subhead { margin: 10px 0 0; color: var(--brand-muted); font-size: 14px; line-height: 1.55; }
+
+    .summary { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 14px 22px 15px; border-top: 1px solid var(--brand-hairline); border-bottom: 1px solid var(--brand-hairline); background: var(--brand-paper); }
+    .summary-kicker { margin: 0; color: var(--brand-muted); font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .11em; }
+    .summary strong { display: block; margin-top: 5px; font-size: 15px; line-height: 1.42; letter-spacing: -.02em; }
+    .summary-count { align-self: center; color: var(--brand-primary); font-family: var(--font-mono); font-size: 10px; font-weight: 800; letter-spacing: .02em; text-align: right; }
+
+    .filters { display: flex; gap: 7px; padding: 17px 22px 8px; }
+    .filter { min-height: 29px; padding: 0 10px; border: 1px solid var(--brand-hairline); border-radius: 999px; background: var(--brand-canvas); color: var(--brand-muted); cursor: pointer; font-size: 11px; font-weight: 700; }
+    .filter[aria-pressed="true"] { border-color: var(--brand-primary); color: var(--brand-primary); }
+
+    .threads { padding: 0 22px; }
+    .thread { padding: 18px 0 0; border-top: 1px solid var(--brand-hairline); }
+    .thread:first-child { border-top: 0; }
+    .company-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding-bottom: 10px; }
+    .company-name { display: flex; min-width: 0; align-items: baseline; gap: 8px; }
+    .ticker { flex: 0 0 auto; color: var(--brand-primary); font-family: var(--font-mono); font-size: 12px; font-weight: 800; letter-spacing: .02em; }
+    .company { overflow: hidden; color: var(--brand-ink); font-size: 14px; font-weight: 760; text-overflow: ellipsis; white-space: nowrap; }
+    .company-meta { flex: 0 0 auto; color: var(--brand-muted); font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .03em; }
+
+    .event-list { border-top: 1px solid var(--brand-hairline-soft); }
+    .event-row { display: grid; width: 100%; grid-template-columns: 72px minmax(0, 1fr) 16px; gap: 9px; padding: 13px 0; border: 0; border-bottom: 1px solid var(--brand-hairline-soft); background: transparent; text-align: left; cursor: pointer; }
+    .event-row:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 3px; }
+    .event-meta { padding-top: 2px; color: var(--brand-muted); font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .015em; line-height: 1.35; }
+    .event-text { min-width: 0; }
+    .event-title { display: block; color: var(--brand-ink); font-size: 14px; font-weight: 740; line-height: 1.42; letter-spacing: -.018em; text-wrap: pretty; }
+    .event-source { display: block; margin-top: 4px; color: var(--brand-body); font-size: 11px; line-height: 1.4; }
+    .arrow { align-self: center; color: var(--brand-muted); font-size: 18px; line-height: 1; }
+    .event-row:hover .event-title, .event-row.is-selected .event-title { color: var(--brand-primary); }
+    .event-row:hover .arrow, .event-row.is-selected .arrow { color: var(--brand-primary); }
+
+    .thread-foot { padding: 10px 0 17px; color: var(--brand-muted); font-size: 11px; line-height: 1.45; }
+    .thread-foot strong { color: var(--brand-body); font-weight: 700; }
+    .selection { margin: 0 22px; padding: 16px 0 24px; border-top: 2px solid var(--brand-ink); color: var(--brand-body); font-size: 12px; line-height: 1.55; }
+    .selection-label { display: block; margin-bottom: 5px; color: var(--brand-primary); font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .1em; }
+    .selection strong { color: var(--brand-ink); }
+    .sample-note { margin: 0 22px; padding: 14px 0 30px; border-top: 1px solid var(--brand-hairline-soft); color: var(--brand-muted); font-size: 10px; line-height: 1.5; }
+    [hidden] { display: none !important; }
+    @media (min-width: 431px) { .canvas { box-shadow: 0 0 0 1px rgba(10, 11, 13, .05), 0 20px 50px rgba(10, 11, 13, .08); } }
+  </style>
+</head>
+<body>
+  <main class="canvas" aria-label="Pulse company thread prototype">
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="KRW.O 피드 처음으로"><img src="../../../public/krw-logo.svg" alt=""><span>KRW.O</span></a>
+      <button class="profile" type="button" aria-label="프로필">P</button>
+    </header>
+
+    <section class="masthead" id="top" aria-labelledby="page-title">
+      <p class="eyebrow">RESEARCH FEED</p>
+      <h1 id="page-title">관심 기업</h1>
+      <p class="subhead">지난 방문 이후 회사별로 이어진 변화와 연구 맥락</p>
+    </section>
+
+    <section class="summary" aria-label="요약"><div><p class="summary-kicker">FOLLOWING RECAP</p><strong id="summary-copy">관심 기업 3곳에서 새로 이어진 기록 5개</strong></div><span class="summary-count" id="summary-count">3 THREADS</span></section>
+
+    <div class="filters" role="group" aria-label="회사 범위">
+      <button class="filter" type="button" data-filter="all" aria-pressed="true">전체 회사</button>
+      <button class="filter" type="button" data-filter="research" aria-pressed="false">대화 있는 회사</button>
+    </div>
+
+    <section class="threads" aria-label="회사별 업데이트">
+      <article class="thread" data-research="true">
+        <header class="company-head"><div class="company-name"><span class="ticker">AAPL</span><span class="company">Apple Inc.</span></div><span class="company-meta">2 EVENTS</span></header>
+        <div class="event-list">
+          <button class="event-row" type="button" data-item="AAPL 공시 상세" data-description="공시 원문과 바뀐 항목을 확인하는 상세 화면으로 연결합니다."><span class="event-meta">14:32<br>8-K</span><span class="event-text"><span class="event-title">실적 발표 자료가 제출됐습니다</span><span class="event-source">SEC 원문 · 변경점부터 확인</span></span><span class="arrow" aria-hidden="true">→</span></button>
+          <button class="event-row" type="button" data-item="AAPL 이전 분석" data-description="완료된 분석을 길게 반복하지 않고, 남아 있는 근거와 다음 질문만 보여줍니다."><span class="event-meta">09:18<br>연구</span><span class="event-text"><span class="event-title">지난 분석의 근거를 다시 볼 수 있습니다</span><span class="event-source">대화 결과 · 근거 4개</span></span><span class="arrow" aria-hidden="true">→</span></button>
+        </div>
+        <p class="thread-foot"><strong>연구 맥락:</strong> 지난 대화 1회 · 공시에서 확인할 질문 1개</p>
+      </article>
+
+      <article class="thread" data-research="true">
+        <header class="company-head"><div class="company-name"><span class="ticker">ABNB</span><span class="company">Airbnb, Inc.</span></div><span class="company-meta">1 EVENT</span></header>
+        <div class="event-list">
+          <button class="event-row" type="button" data-item="ABNB 리서치 대화" data-description="사용자가 남긴 질문과 원문 근거를 한 번에 가진 채 채팅을 이어갑니다."><span class="event-meta">11:06<br>대화</span><span class="event-text"><span class="event-title">지난 질문과 연결할 공시가 있습니다</span><span class="event-source">리서치 2회 · 대화로 이어가기</span></span><span class="arrow" aria-hidden="true">→</span></button>
+        </div>
+        <p class="thread-foot"><strong>연구 맥락:</strong> 최근 질문 2개 · 새 원문 근거 1개</p>
+      </article>
+
+      <article class="thread" data-research="false">
+        <header class="company-head"><div class="company-name"><span class="ticker">XOM</span><span class="company">Exxon Mobil Corp.</span></div><span class="company-meta">1 EVENT</span></header>
+        <div class="event-list">
+          <button class="event-row" type="button" data-item="XOM 내부자 거래" data-description="여러 Form 4는 피드에서 한 줄로 시작하고, 상세에서만 개별 거래를 봅니다."><span class="event-meta">어제<br>FORM 4</span><span class="event-text"><span class="event-title">내부자 거래 3건이 들어왔습니다</span><span class="event-source">묶음 보기 · 개별 원문 3개</span></span><span class="arrow" aria-hidden="true">→</span></button>
+        </div>
+        <p class="thread-foot"><strong>연구 맥락:</strong> 아직 연결된 대화 없음</p>
+      </article>
+    </section>
+
+    <aside class="selection" aria-live="polite"><span class="selection-label">NEXT VIEW</span><strong id="selection-title">기록을 선택하면</strong><br><span id="selection-description">해당 회사의 공시 상세, 대화, 또는 원문으로 바로 연결합니다.</span></aside>
+    <p class="sample-note">프로토타입 · 샘플 데이터입니다. 실제 공시·거래·분석 상태를 나타내지 않습니다.</p>
+  </main>
+
+  <script>
+    const threadFilters = Array.from(document.querySelectorAll('.filter'));
+    const threadItems = Array.from(document.querySelectorAll('.thread'));
+    const eventRows = Array.from(document.querySelectorAll('.event-row'));
+    const summaryCopy = document.querySelector('#summary-copy');
+    const summaryCount = document.querySelector('#summary-count');
+    const selectionTitle = document.querySelector('#selection-title');
+    const selectionDescription = document.querySelector('#selection-description');
+
+    threadFilters.forEach((filter) => {
+      filter.addEventListener('click', () => {
+        const researchOnly = filter.dataset.filter === 'research';
+        threadFilters.forEach((item) => item.setAttribute('aria-pressed', String(item === filter)));
+        let visibleThreads = 0;
+        let visibleEvents = 0;
+        threadItems.forEach((thread) => {
+          const show = !researchOnly || thread.dataset.research === 'true';
+          thread.hidden = !show;
+          if (show) {
+            visibleThreads += 1;
+            visibleEvents += thread.querySelectorAll('.event-row').length;
+          }
+        });
+        summaryCopy.textContent = researchOnly ? `대화가 이어진 기업 ${visibleThreads}곳의 기록 ${visibleEvents}개` : '관심 기업 3곳에서 새로 이어진 기록 5개';
+        summaryCount.textContent = `${visibleThreads} THREADS`;
+      });
+    });
+
+    eventRows.forEach((row) => {
+      row.addEventListener('click', () => {
+        eventRows.forEach((item) => item.classList.toggle('is-selected', item === row));
+        selectionTitle.textContent = `${row.dataset.item}로 이동`;
+        selectionDescription.textContent = row.dataset.description;
+      });
+    });
+
+    window.__prototypeReady = true;
+  </script>
+</body>
+</html>

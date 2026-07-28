@@ -1882,6 +1882,9 @@ export interface AnalyticsEventRow extends Record<string, unknown> {
 
 export interface PulseEditorialEntryRow extends Record<string, unknown> {
   id: string;
+  series_id: string | null;
+  episode_number: number | null;
+  company_visible: boolean;
   slug: string;
   status: "draft" | "published" | "archived";
   format: "single_image" | "carousel" | "text";
@@ -1892,6 +1895,18 @@ export interface PulseEditorialEntryRow extends Record<string, unknown> {
   action_href: string | null;
   publish_at: string | null;
   expires_at: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PulseEditorialSeriesRow extends Record<string, unknown> {
+  id: string;
+  ticker: string;
+  slug: string;
+  status: "draft" | "published" | "archived";
+  title: string;
+  summary: string;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -1908,6 +1923,20 @@ export interface PulseEditorialAssetRow extends Record<string, unknown> {
   width: number | null;
   height: number | null;
   created_at: string;
+}
+
+export interface PulseEditorialDistributionRow extends Record<string, unknown> {
+  id: string;
+  entry_id: string;
+  channel: "pulse";
+  status: "draft" | "active" | "paused" | "archived";
+  placement: "early" | "standard";
+  priority: number;
+  starts_at: string | null;
+  ends_at: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Supabase Database type for createClient generic
@@ -4131,6 +4160,9 @@ export interface Database {
         Row: PulseEditorialEntryRow;
         Insert: Omit<PulseEditorialEntryRow, "id" | "created_at" | "updated_at"> & {
           id?: string;
+          series_id?: string | null;
+          episode_number?: number | null;
+          company_visible?: boolean;
           status?: PulseEditorialEntryRow["status"];
           format?: PulseEditorialEntryRow["format"];
           body?: string;
@@ -4151,6 +4183,24 @@ export interface Database {
           referencedColumns: string[];
         }>;
       };
+      pulse_editorial_series: {
+        Row: PulseEditorialSeriesRow;
+        Insert: Omit<PulseEditorialSeriesRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          status?: PulseEditorialSeriesRow["status"];
+          summary?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<PulseEditorialSeriesRow, "id" | "created_at" | "created_by">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
       pulse_editorial_assets: {
         Row: PulseEditorialAssetRow;
         Insert: Omit<PulseEditorialAssetRow, "id" | "created_at" | "width" | "height"> & {
@@ -4160,6 +4210,28 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<Omit<PulseEditorialAssetRow, "id" | "entry_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      pulse_editorial_distributions: {
+        Row: PulseEditorialDistributionRow;
+        Insert: Omit<PulseEditorialDistributionRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          channel?: PulseEditorialDistributionRow["channel"];
+          status?: PulseEditorialDistributionRow["status"];
+          placement?: PulseEditorialDistributionRow["placement"];
+          priority?: number;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<PulseEditorialDistributionRow, "id" | "created_at" | "created_by">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];

@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SetStateAction } from "react";
 import { useSearchParams } from "next/navigation";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { easeOutExpo } from "@/lib/animation";
 import { filingEventTagLabel } from "@/lib/filing-notifications/classification";
 import { dispatchFilingUnreadChanged } from "@/lib/filing-notifications/client-events";
 import { trackClientEventSilently } from "@/lib/analytics/client";
@@ -65,6 +68,7 @@ type ArchiveUndo = {
 };
 
 export default function FilingInbox() {
+  const reducedMotion = useReducedMotion();
   const searchParams = useSearchParams();
   const selectedNotificationId = searchParams.get("notification");
   const [notifications, setNotificationsState] = useState<FilingNotification[]>([]);
@@ -340,7 +344,7 @@ export default function FilingInbox() {
           </button>
         </div>
       ) : null}
-      {!visible.length ? <p className="rounded-[8px] border border-dashed border-hairline p-md text-sm text-muted">{emptyCopy(view)}</p> : <div className="space-y-sm">{visible.map((notification) => <NotificationCard key={notification.id} notification={notification} selected={notification.id === selectedNotificationId} pendingActions={pendingActions} onMutate={mutateNotification} onArchive={archiveNotification} />)}</div>}
+      {!visible.length ? <p className="rounded-[8px] border border-dashed border-hairline p-md text-sm text-muted">{emptyCopy(view)}</p> : <div className="space-y-sm"><AnimatePresence initial={false}>{visible.map((notification) => <motion.div key={notification.id} layout="position" initial={false} animate={{ opacity: 1, y: 0 }} exit={reducedMotion ? undefined : { opacity: 0, y: -6, height: 0 }} transition={{ duration: reducedMotion ? 0 : 0.18, ease: easeOutExpo }} style={{ overflow: "hidden" }}><NotificationCard notification={notification} selected={notification.id === selectedNotificationId} pendingActions={pendingActions} onMutate={mutateNotification} onArchive={archiveNotification} /></motion.div>)}</AnimatePresence></div>}
     </section>
     {recentFilings.length ? <section><div className="mb-sm flex items-center justify-between gap-sm"><h2 className="text-base font-extrabold text-ink">최근 공시</h2><span className="text-xs text-muted">구독 전 제출된 공시</span></div><div className="space-y-sm">{recentFilings.map((filing) => <HistoryCard key={filing.id} filing={filing} />)}</div></section> : null}
   </div>;

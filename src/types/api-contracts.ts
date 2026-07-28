@@ -1876,7 +1876,7 @@ export interface PulseFeedResponse {
   revision: string;
   generated_at: string;
   snapshot_at: string;
-  ranking_version: "rule_v4" | "rule_v5_flat";
+  ranking_version: "rule_v4" | "rule_v5_flat" | "rule_v6_device" | "rule_v7_refresh" | "rule_v8_hybrid";
   timezone: string;
   date_label: string;
   filter: PulseFilter;

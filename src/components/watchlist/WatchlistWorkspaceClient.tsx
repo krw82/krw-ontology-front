@@ -44,6 +44,7 @@ export default function WatchlistWorkspaceClient({
   const [error, setError] = useState<string | null>(null);
   const [isRefreshingNotebook, setIsRefreshingNotebook] = useState(false);
   const [refreshJobId, setRefreshJobId] = useState<string | null>(null);
+  const [notebookRefreshSettled, setNotebookRefreshSettled] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const ticker = company.ticker;
@@ -196,6 +197,7 @@ export default function WatchlistWorkspaceClient({
         if (refreshedNotebook) {
           setNotebook(refreshedNotebook);
           setDraft(refreshedNotebook.content_md);
+          setNotebookRefreshSettled(true);
           void clearComposerDraft(notebookDraftKey);
           setIsEditing(false);
           setCompany(touchNotebookActivity);
@@ -215,6 +217,15 @@ export default function WatchlistWorkspaceClient({
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, [notebookDraftKey, refreshJobId, ticker]);
+
+  useEffect(() => {
+    if (!notebookRefreshSettled) return;
+    const timeoutId = window.setTimeout(
+      () => setNotebookRefreshSettled(false),
+      900,
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [notebookRefreshSettled]);
 
   const updateCoverageLevel = (coverageLevel: CoverageLevel | null) => {
     setError(null);
@@ -282,6 +293,7 @@ export default function WatchlistWorkspaceClient({
   const handleRefreshNotebook = () => {
     if (isRefreshingNotebook) return;
     setError(null);
+    setNotebookRefreshSettled(false);
     setIsRefreshingNotebook(true);
     void (async () => {
       try {
@@ -508,6 +520,7 @@ export default function WatchlistWorkspaceClient({
                 <div
                   className={[
                     "transition-[filter,opacity] duration-300 ease-[var(--ease-out-expo)]",
+                    notebookRefreshSettled ? "notebook-refresh-settled" : "",
                     isRefreshingNotebook
                       ? "pointer-events-none select-none opacity-45 blur-[1px]"
                       : "",

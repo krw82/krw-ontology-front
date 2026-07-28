@@ -72,6 +72,40 @@ describe("proxy", () => {
     expect(updateSession).not.toHaveBeenCalled();
   });
 
+  it("keeps editorial operations local while allowing public editorial assets", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("TRUSTED_CLIENT_IP_HEADER", "x-krw-client-ip");
+
+    const adminResponse = await proxy(request("/admin/editorial"));
+    const mutationResponse = await proxy(
+      request("/api/editorial/e1b2c3d4-e5f6-4789-abcd-123456789012"),
+    );
+    const publicAssetResponse = await proxy(
+      request("/api/editorial/assets/e1b2c3d4-e5f6-4789-abcd-123456789012", {
+        "x-krw-client-ip": "203.0.113.20",
+      }),
+    );
+
+    expect(adminResponse.status).toBe(404);
+    expect(mutationResponse.status).toBe(404);
+    expect(adminResponse.headers.get("Cache-Control")).toBe("no-store");
+    expect(publicAssetResponse.status).toBe(200);
+    expect(updateSession).toHaveBeenCalledOnce();
+  });
+
+  it("rejects an external host even while the local app runs in development", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+
+    const response = await proxy(
+      absoluteRequest("http://krwontology.example/admin/editorial", {
+        host: "krwontology.example",
+      }),
+    );
+
+    expect(response.status).toBe(404);
+    expect(updateSession).not.toHaveBeenCalled();
+  });
+
   it("accepts the Caddy-owned client IP header in production", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("TRUSTED_CLIENT_IP_HEADER", "x-krw-client-ip");

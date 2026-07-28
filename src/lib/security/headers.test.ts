@@ -102,6 +102,12 @@ describe("security headers", () => {
     expect(developmentCsp).toContain("http://localhost:*");
     expect(developmentCsp).toContain("http://127.0.0.1:*");
     expect(developmentCsp).toContain("ws://localhost:*");
+    expect(cspDirective(developmentCsp, "img-src")).toContain(
+      "http://localhost:54321",
+    );
+    expect(cspDirective(developmentCsp, "img-src")).toContain(
+      "http://127.0.0.1:54321",
+    );
     expect(cspDirective(developmentCsp, "connect-src")).toContain(
       "https://*.tosspayments.com",
     );

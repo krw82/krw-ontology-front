@@ -1,18 +1,26 @@
 "use client";
 
 import Link from "next/link";
+import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SetStateAction, TouchEvent } from "react";
+import CompanyLogo from "@/components/CompanyLogo";
 import InsiderTradeStackCard from "@/components/pulse/InsiderTradeStackCard";
 import PulseCard from "@/components/pulse/PulseCard";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { trackClientEventSilently } from "@/lib/analytics/client";
+import { easeOutExpo } from "@/lib/animation";
+import { pulseCompanyHref, pulseCompanyName } from "@/lib/pulse/company-display";
 import {
+  advancePulseDeviceRefresh,
   applyPulseDeviceSignal,
+  bindPulseDeviceProfileToDevice,
   createPulseDeviceProfile,
   selectDevicePulseSlate,
   type PulseDeviceProfile,
   type PulseDeviceSignal,
 } from "@/lib/pulse/device-ranking";
+import { getOrCreatePulseDeviceId } from "@/lib/pulse/device-identity";
 import {
   buildPulseFeedViewMetrics,
   pulseViewProperties,
@@ -43,7 +51,7 @@ interface PulseFeedProps {
   onboardingIntent?: FirstValueIntent | null;
 }
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 48;
 const PULL_REFRESH_TRIGGER = 64;
 const PULL_DISTANCE_MAX = 96;
 const EMPTY_REFRESH_SUMMARY: PulseFeedRefreshSummary = {
@@ -82,6 +90,7 @@ export default function PulseFeed({
   firstValueEntry = false,
   onboardingIntent = null,
 }: PulseFeedProps) {
+  const reducedMotion = useReducedMotion();
   const [feed, setFeedState] = useState(initialFeed);
   const feedRef = useRef(initialFeed);
   const [deviceProfile, setDeviceProfile] = useState<PulseDeviceProfile>(() =>
@@ -94,7 +103,6 @@ export default function PulseFeed({
   );
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [hasPendingUpdate, setHasPendingUpdate] = useState(false);
-  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<"helpful" | "not_helpful" | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pullDistance, setPullDistance] = useState(0);
@@ -131,6 +139,15 @@ export default function PulseFeed({
     void saveDevicePulseProfile(draftOwnerId, next).catch(() => undefined);
   }, [draftOwnerId, setLocalProfile]);
 
+  const advanceDeviceRefresh = useCallback((visibleItemIds: readonly string[]) => {
+    const current = deviceProfileRef.current;
+    const next = advancePulseDeviceRefresh(current, visibleItemIds);
+    if (next.refresh_generation === current.refresh_generation) return null;
+    setLocalProfile(next);
+    void saveDevicePulseProfile(draftOwnerId, next).catch(() => undefined);
+    return next;
+  }, [draftOwnerId, setLocalProfile]);
+
   const cancelStatusRequest = useCallback(() => {
     statusRequestIdRef.current += 1;
     statusControllerRef.current?.abort();
@@ -141,8 +158,21 @@ export default function PulseFeed({
     () => selectDevicePulseSlate(feed, deviceProfile),
     [deviceProfile, feed],
   );
-  const hasActiveAnalysis = feed.active_analysis_items.length > 0;
-  const feedItems = slate.items;
+  const activeResearchItems = useMemo(
+    () => feed.active_analysis_items.filter(
+      (item) => item.kind === "analysis" && item.phase === "active",
+    ),
+    [feed.active_analysis_items],
+  );
+  const activeResearchIds = useMemo(
+    () => new Set(activeResearchItems.map((item) => item.id)),
+    [activeResearchItems],
+  );
+  const hasActiveAnalysis = activeResearchItems.length > 0;
+  const feedItems = useMemo(
+    () => slate.items.filter((item) => !activeResearchIds.has(item.id)),
+    [activeResearchIds, slate.items],
+  );
   const displayEntries = useMemo(
     () => buildPulseFeedDisplayEntries(feedItems, feed.timezone, feed.visible_limit),
     [feed.visible_limit, feedItems, feed.timezone],
@@ -174,6 +204,7 @@ export default function PulseFeed({
       entry: firstValueEntry ? "first_value" : null,
       onboardingIntent,
       degradedSources,
+      storyContext: slate.story_context,
     }));
     pulseViewTrackedRef.current = true;
 
@@ -182,7 +213,7 @@ export default function PulseFeed({
       degradedSourcesTrackedRef.current.add(source);
       trackClientEventSilently("pulse_source_degraded", { source });
     }
-  }, [displayMetrics, feed, feedSessionId, feedUnavailable, firstValueEntry, initialFeedLoading, onboardingIntent]);
+  }, [displayMetrics, feed, feedSessionId, feedUnavailable, firstValueEntry, initialFeedLoading, onboardingIntent, slate.story_context]);
 
   useEffect(() => {
     void saveOfflinePulseSnapshot(feed).catch(() => undefined);
@@ -340,6 +371,10 @@ export default function PulseFeed({
     if (feedBusy || pullRefreshing || initialFeedLoading) return null;
 
     const userInitiated = isUserInitiatedPulseRefresh(origin);
+    // Capture the rendered ordinary cards before the request. A successful
+    // manual refresh records this local window and then chooses up to three
+    // replacements from the server-authorized reservoir.
+    const previousSlate = slate;
     const startedAt = performance.now();
     if (origin === "pull") setPullRefreshing(true);
     if (userInitiated) {
@@ -347,6 +382,8 @@ export default function PulseFeed({
         origin,
         has_pending_update: hasPendingUpdate,
         online: navigator.onLine,
+        ranking_version: feedRef.current.ranking_version,
+        story_context: previousSlate.story_context,
       });
     }
 
@@ -360,6 +397,7 @@ export default function PulseFeed({
           trackClientEventSilently("pulse_refresh_failed", {
             origin,
             error_category: navigator.onLine ? "request_failed" : "offline",
+            ranking_version: feedRef.current.ranking_version,
             duration_ms: durationMs,
           });
         }
@@ -367,6 +405,11 @@ export default function PulseFeed({
       }
 
       if (userInitiated) {
+        const previousGeneration = deviceProfileRef.current.refresh_generation;
+        const nextProfile = advanceDeviceRefresh(previousSlate.refreshable_item_ids);
+        const nextSlate = nextProfile
+          ? selectDevicePulseSlate(feedRef.current, nextProfile)
+          : null;
         trackClientEventSilently("pulse_refresh_completed", {
           origin,
           outcome: result.changed ? "changed" : "unchanged",
@@ -374,13 +417,21 @@ export default function PulseFeed({
           added_candidate_count: result.summary.added_candidate_count,
           updated_item_count: result.summary.updated_item_count,
           removed_item_count: result.summary.removed_item_count,
+          ranking_version: feedRef.current.ranking_version,
+          refresh_generation_before: previousGeneration,
+          refresh_generation_after: nextProfile?.refresh_generation ?? previousGeneration,
+          ordinary_visible_count: nextSlate?.refresh.ordinary_visible_count ?? 0,
+          retained_ordinary_count: nextSlate?.refresh.retained_ordinary_count ?? 0,
+          replacement_ordinary_count: nextSlate?.refresh.replacement_ordinary_count ?? 0,
+          cooldown_relaxed_count: nextSlate?.refresh.cooldown_relaxed_count ?? 0,
+          refresh_mode: nextSlate?.refresh.mode ?? "none",
+          anchor_rebased: nextSlate?.refresh.anchor_rebased ?? false,
+          story_context: nextSlate?.story_context ?? "none",
           duration_ms: durationMs,
         });
-      }
-      if (origin === "manual" || origin === "pull") {
-        setRefreshMessage(
-          result.changed ? "새 업데이트를 반영했습니다." : "이미 최신 피드입니다.",
-        );
+        // Passive polling and ordinary card impressions never reflow the
+        // slate underneath the user. A viewed story may still release its
+        // anchor on this explicit generation boundary.
       }
       if (options.scrollToTop && result.changed) {
         const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -390,7 +441,7 @@ export default function PulseFeed({
     } finally {
       if (origin === "pull" && mountedRef.current) setPullRefreshing(false);
     }
-  }, [feedBusy, fetchDelta, fetchFirstPage, hasPendingUpdate, initialFeedLoading, pullRefreshing]);
+  }, [advanceDeviceRefresh, feedBusy, fetchDelta, fetchFirstPage, hasPendingUpdate, initialFeedLoading, pullRefreshing, slate]);
 
   const refreshFromPull = useCallback(async () => {
     await refreshFeed("pull");
@@ -498,12 +549,15 @@ export default function PulseFeed({
     if (!loadInitialFeed) return;
     let active = true;
     void (async () => {
+      const deviceId = getOrCreatePulseDeviceId();
       const [snapshot, profile] = await Promise.all([
         readDevicePulseSnapshot(draftOwnerId).catch(() => null),
         readDevicePulseProfile(draftOwnerId).catch(() => createPulseDeviceProfile()),
       ]);
       if (!active) return;
-      setLocalProfile(profile);
+      const boundProfile = bindPulseDeviceProfileToDevice(profile, deviceId);
+      setLocalProfile(boundProfile);
+      void saveDevicePulseProfile(draftOwnerId, boundProfile).catch(() => undefined);
       if (snapshot && isUnavailablePulseFeed(feedRef.current)) {
         setFeed(snapshot.feed);
         // Cached cards are useful immediately. Keep them visible while the
@@ -644,24 +698,11 @@ export default function PulseFeed({
     <>
       <header className="relative overflow-hidden border-b border-hairline bg-white">
         <div className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-primary-fixed/55 blur-3xl" aria-hidden="true" />
-        <div className="relative mx-auto w-full max-w-[760px] px-base py-lg sm:px-xl sm:py-xl">
+        <div className="relative mx-auto w-full max-w-[760px] px-base py-base sm:px-xl sm:py-lg">
           <div className="flex items-center justify-between gap-lg">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">Research feed</p>
               <h1 className="mt-xs text-[32px] font-black leading-none tracking-[-0.05em] text-ink sm:text-[40px]">피드</h1>
-              {initialFeedLoading ? (
-                <p className="mt-sm flex items-center gap-xs text-[13px] font-semibold text-muted" role="status">
-                  <span className="material-symbols-outlined animate-spin text-[16px]" aria-hidden="true">progress_activity</span>
-                  피드를 불러오는 중
-                </p>
-              ) : (
-                <p className="mt-sm text-[13px] font-semibold text-muted">
-                  {feed.date_label} · {displayMetrics.actionable_count > 0 ? `확인할 카드 ${displayMetrics.actionable_count}개` : "미검토 항목 없음"}
-                  {refreshMessage ? (
-                    <span aria-live="polite" role="status"> · {refreshMessage}</span>
-                  ) : null}
-                </p>
-              )}
             </div>
             <div className="flex items-center gap-xs">
               <button
@@ -673,7 +714,7 @@ export default function PulseFeed({
                 title="피드 새로고침"
                 type="button"
               >
-                <span className={`material-symbols-outlined text-[20px] ${loading || pullRefreshing ? "animate-spin" : ""}`} aria-hidden="true">refresh</span>
+                <span className={`material-symbols-outlined text-[20px] ${loading || pullRefreshing ? "pulse-refresh-turn" : ""}`} aria-hidden="true">refresh</span>
                 <span className="hidden sm:inline">새로고침</span>
               </button>
               <Link href="/pulse/settings" className="inline-flex size-11 items-center justify-center rounded-[12px] border border-hairline bg-white text-muted shadow-sm hover:text-ink" aria-label="피드 설정">
@@ -699,6 +740,14 @@ export default function PulseFeed({
               ? `${pendingIds.size}개 항목의 변경을 저장하는 중입니다.`
               : ""}
         </p>
+        {activeResearchItems.length > 0 ? (
+          <ActiveResearchRail
+            items={activeResearchItems}
+            feedSessionId={feedSessionId}
+            rankingVersion={feed.ranking_version}
+            onDeviceSignal={recordDeviceSignal}
+          />
+        ) : null}
         {firstValueEntry ? (
           <FirstValuePulseContext intent={onboardingIntent} />
         ) : null}
@@ -712,7 +761,7 @@ export default function PulseFeed({
             opacity: pullRefreshing || pullDistance > 0 ? 1 : 0,
           }}
         >
-          <span className={`material-symbols-outlined text-[16px] ${pullRefreshing ? "animate-spin" : ""}`} aria-hidden="true">
+          <span className={`material-symbols-outlined text-[16px] ${pullRefreshing ? "pulse-refresh-turn" : ""}`} aria-hidden="true">
             {pullRefreshing ? "progress_activity" : pullDistance >= PULL_REFRESH_TRIGGER ? "refresh" : "south"}
           </span>
           {pullRefreshing
@@ -725,7 +774,7 @@ export default function PulseFeed({
           {hasPendingUpdate ? (
             <button
               aria-busy={feedBusy}
-              className="min-h-11 rounded-full bg-primary px-base text-[13px] font-extrabold text-white shadow-[0_8px_24px_rgba(0,62,199,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="motion-pulse-update min-h-11 rounded-full bg-primary px-base text-[13px] font-extrabold text-white shadow-[0_8px_24px_rgba(0,62,199,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={feedBusy}
               onClick={() => void refreshNewItems()}
               type="button"
@@ -754,43 +803,51 @@ export default function PulseFeed({
 
             {showSyncIndicator && !pullRefreshing ? (
               <div className="mb-base flex items-center justify-center gap-xs text-[12px] font-semibold text-muted" role="status">
-                <span className="material-symbols-outlined animate-spin text-[15px]" aria-hidden="true">progress_activity</span>
+                <span className="material-symbols-outlined pulse-refresh-turn text-[15px]" aria-hidden="true">progress_activity</span>
                 최신 내용 확인 중
               </div>
             ) : null}
 
             {displayEntries.length > 0 ? (
-          <div className="relative space-y-base before:absolute before:bottom-8 before:left-[-13px] before:top-8 before:hidden before:w-px before:bg-hairline sm:before:block">
-            {displayEntries.map((entry) => {
-              return (
-                <div
-                  key={entry.id}
-                  data-workspace-scroll-anchor={entry.id}
-                >
-                  {entry.type === "insider_trade_stack" ? (
-                    <InsiderTradeStackCard
-                      items={entry.items}
-                      feedSlot={entry.feed_slot}
-                      timezone={feed.timezone}
-                      pending={entry.items.some(({ item }) => pendingIds.has(item.id))}
-                      feedSessionId={feedSessionId}
-                      rankingVersion={feed.ranking_version}
-                      onDeviceSignal={recordDeviceSignal}
-                    />
-                  ) : (
-                    <PulseCard
-                      item={entry.item}
-                      position={entry.position}
-                      pending={pendingIds.has(entry.item.id)}
-                      feedSessionId={feedSessionId}
-                      rankingVersion={feed.ranking_version}
-                      onMutation={mutate}
-                      onDeviceSignal={recordDeviceSignal}
-                    />
-                  )}
-                </div>
-              );
-            })}
+          <div className="border-t border-hairline">
+            <AnimatePresence initial={false}>
+              {displayEntries.map((entry) => {
+                return (
+                  <motion.div
+                    key={entry.id}
+                    layout="position"
+                    initial={reducedMotion ? false : { opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={reducedMotion ? undefined : { opacity: 0, y: -6, height: 0 }}
+                    transition={{ duration: reducedMotion ? 0 : 0.2, ease: easeOutExpo }}
+                    style={{ overflow: "hidden" }}
+                    data-workspace-scroll-anchor={entry.id}
+                  >
+                    {entry.type === "insider_trade_stack" ? (
+                      <InsiderTradeStackCard
+                        items={entry.items}
+                        feedSlot={entry.feed_slot}
+                        timezone={feed.timezone}
+                        pending={entry.items.some(({ item }) => pendingIds.has(item.id))}
+                        feedSessionId={feedSessionId}
+                        rankingVersion={feed.ranking_version}
+                        onDeviceSignal={recordDeviceSignal}
+                      />
+                    ) : (
+                      <PulseCard
+                        item={entry.item}
+                        position={entry.position}
+                        pending={pendingIds.has(entry.item.id)}
+                        feedSessionId={feedSessionId}
+                        rankingVersion={feed.ranking_version}
+                        onMutation={mutate}
+                        onDeviceSignal={recordDeviceSignal}
+                      />
+                    )}
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
           </div>
             ) : (
               <div className="rounded-[18px] border border-dashed border-hairline bg-white px-xl py-3xl text-center">
@@ -829,6 +886,127 @@ export default function PulseFeed({
         )}
       </main>
     </>
+  );
+}
+
+function ActiveResearchRail({
+  items,
+  feedSessionId,
+  rankingVersion,
+  onDeviceSignal,
+}: {
+  items: PulseItem[];
+  feedSessionId: string;
+  rankingVersion: PulseFeedResponse["ranking_version"];
+  onDeviceSignal: (item: PulseItem, signal: PulseDeviceSignal) => void;
+}) {
+  return (
+    <section className="mb-base border-y border-hairline" aria-labelledby="active-research-title">
+      <div className="flex min-h-9 items-center justify-between border-b border-hairline">
+        <h2 id="active-research-title" className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
+          진행 중인 리서치
+        </h2>
+        <span className="text-[11px] font-semibold text-muted">{items.length}개</span>
+      </div>
+      {items.map((item) => (
+        <ActiveResearchRow
+          key={item.id}
+          item={item}
+          feedSessionId={feedSessionId}
+          rankingVersion={rankingVersion}
+          onDeviceSignal={onDeviceSignal}
+        />
+      ))}
+    </section>
+  );
+}
+
+function ActiveResearchRow({
+  item,
+  feedSessionId,
+  rankingVersion,
+  onDeviceSignal,
+}: {
+  item: PulseItem;
+  feedSessionId: string;
+  rankingVersion: PulseFeedResponse["ranking_version"];
+  onDeviceSignal: (item: PulseItem, signal: PulseDeviceSignal) => void;
+}) {
+  const companyName = pulseCompanyName(item);
+  const companyHref = pulseCompanyHref(item.ticker);
+  const primary = item.primary_action;
+  const isRunning = item.metadata.run_status === "running";
+  const openResearch = () => {
+    onDeviceSignal(item, "open");
+    trackClientEventSilently("pulse_item_opened", {
+      item_kind: item.kind,
+      action: "active_research",
+      item_state: item.state,
+      phase: item.phase,
+      feed_session_id: feedSessionId,
+      ranking_version: rankingVersion,
+      reason_code: item.reason_code,
+      has_source_grounded_brief: false,
+    });
+  };
+
+  const identity = item.ticker ? (
+    <CompanyLogo
+      ticker={item.ticker}
+      companyName={companyName}
+      className="size-9 text-[10px] text-ink"
+      imageSize={48}
+    />
+  ) : (
+    <span className="grid size-9 shrink-0 place-items-center rounded-[8px] border border-hairline bg-surface text-[11px] font-black text-primary" aria-hidden="true">K</span>
+  );
+
+  return (
+    <div className="flex min-h-[72px] items-center gap-sm py-sm">
+      {companyHref ? (
+        <Link
+          href={companyHref}
+          className="shrink-0 rounded-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label={`${companyName} 회사 소개`}
+        >
+          {identity}
+        </Link>
+      ) : identity}
+      {primary.type === "link" ? (
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-x-1.5 text-[12px] leading-5">
+            {companyHref ? (
+              <Link
+                href={companyHref}
+                className="font-extrabold text-ink underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                {companyName}
+              </Link>
+            ) : (
+              <span className="font-extrabold text-ink">{companyName}</span>
+            )}
+            <span className="font-semibold text-muted">리서치 진행 중</span>
+          </div>
+          <Link
+            href={primary.href}
+            className="group mt-0.5 flex min-w-0 items-center justify-between gap-sm rounded-[6px] py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label={`${companyName} 리서치 열기`}
+            onClick={openResearch}
+          >
+            <span className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold leading-5 text-body">
+              {isRunning ? <span className="material-symbols-outlined pulse-refresh-turn shrink-0 text-[14px] text-primary" aria-hidden="true">progress_activity</span> : null}
+              <span className="truncate">{item.title}</span>
+            </span>
+            <span className="material-symbols-outlined shrink-0 text-[18px] text-primary transition-transform group-hover:translate-x-0.5" aria-hidden="true">arrow_forward</span>
+          </Link>
+        </div>
+      ) : (
+        <div className="min-w-0 flex-1">
+          <p className="text-[12px] font-extrabold text-ink">{companyName}</p>
+          <p className="mt-0.5 truncate text-[13px] font-semibold text-body">{item.title}</p>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -882,32 +1060,32 @@ function FirstValuePulseContext({
 
 function PulseFeedLoadingSkeleton() {
   return (
-    <section aria-busy="true" aria-label="피드를 불러오는 중" className="space-y-base">
+    <section aria-busy="true" aria-label="피드를 불러오는 중" className="motion-route-loading space-y-base">
       <div className="flex items-center justify-center gap-xs py-sm text-[13px] font-semibold text-muted" role="status">
-        <span className="material-symbols-outlined animate-spin text-[17px]" aria-hidden="true">progress_activity</span>
+        <span className="material-symbols-outlined pulse-refresh-turn text-[17px]" aria-hidden="true">progress_activity</span>
         피드를 불러오는 중
       </div>
       <div className="rounded-[16px] border border-hairline bg-white px-base py-base shadow-[0_8px_24px_rgba(16,24,40,0.04)] sm:px-lg" aria-hidden="true">
-        <div className="h-3 w-28 animate-pulse rounded-full bg-surface-strong motion-reduce:animate-none" />
-        <div className="mt-3 h-5 w-48 max-w-[70%] animate-pulse rounded-[7px] bg-surface-strong motion-reduce:animate-none" />
-        <div className="mt-2 h-3 w-full max-w-[540px] animate-pulse rounded-full bg-surface-strong motion-reduce:animate-none" />
+        <div className="motion-loading-block h-3 w-28 rounded-full bg-surface-strong" />
+        <div className="motion-loading-block mt-3 h-5 w-48 max-w-[70%] rounded-[7px] bg-surface-strong" />
+        <div className="motion-loading-block mt-2 h-3 w-full max-w-[540px] rounded-full bg-surface-strong" />
       </div>
       {[0, 1, 2].map((index) => (
         <div key={index} className="rounded-[18px] border border-hairline bg-white p-lg pl-[22px] shadow-[0_12px_36px_rgba(16,24,40,0.055)] sm:p-xl sm:pl-[26px]" aria-hidden="true">
           <div className="flex items-start justify-between gap-base">
             <div className="flex items-center gap-sm">
-              <div className="size-9 animate-pulse rounded-[11px] bg-surface-strong motion-reduce:animate-none" />
+              <div className="motion-loading-block size-9 rounded-[11px] bg-surface-strong" />
               <div className="space-y-2">
-                <div className="h-3 w-24 animate-pulse rounded-full bg-surface-strong motion-reduce:animate-none" />
-                <div className="h-3 w-16 animate-pulse rounded-full bg-surface-strong motion-reduce:animate-none" />
+                <div className="motion-loading-block h-3 w-24 rounded-full bg-surface-strong" />
+                <div className="motion-loading-block h-3 w-16 rounded-full bg-surface-strong" />
               </div>
             </div>
-            <div className="h-3 w-10 animate-pulse rounded-full bg-surface-strong motion-reduce:animate-none" />
+            <div className="motion-loading-block h-3 w-10 rounded-full bg-surface-strong" />
           </div>
-          <div className="mt-base h-6 w-[84%] animate-pulse rounded-[8px] bg-surface-strong motion-reduce:animate-none" />
-          <div className="mt-sm h-4 w-full animate-pulse rounded-full bg-surface-strong motion-reduce:animate-none" />
-          <div className="mt-2 h-4 w-[68%] animate-pulse rounded-full bg-surface-strong motion-reduce:animate-none" />
-          <div className="mt-lg h-11 w-32 animate-pulse rounded-[10px] bg-surface-strong motion-reduce:animate-none" />
+          <div className="motion-loading-block mt-base h-6 w-[84%] rounded-[8px] bg-surface-strong" />
+          <div className="motion-loading-block mt-sm h-4 w-full rounded-full bg-surface-strong" />
+          <div className="motion-loading-block mt-2 h-4 w-[68%] rounded-full bg-surface-strong" />
+          <div className="motion-loading-block mt-lg h-11 w-32 rounded-[10px] bg-surface-strong" />
         </div>
       ))}
     </section>

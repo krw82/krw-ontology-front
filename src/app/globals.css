@@ -1,4 +1,12 @@
-@import "tailwindcss";
+/*
+ * Only application source is allowed to contribute utility candidates.
+ * The repository can contain archived Next build directories (for E2E and
+ * visual verification), and Tailwind's automatic scanner would otherwise
+ * treat their stale JavaScript as live source. That can resurrect removed
+ * arbitrary utilities and break a fresh Turbopack CSS build.
+ */
+@import "tailwindcss" source(none);
+@source "../";
 
 @font-face {
   font-family: "Material Symbols Outlined";
@@ -23,6 +31,60 @@
   font-feature-settings: "liga";
   -webkit-font-feature-settings: "liga";
   -webkit-font-smoothing: antialiased;
+}
+
+/* Keep the iOS safe-area offset outside Tailwind's arbitrary-value parser.
+   The parser can corrupt `env(safe-area-inset-bottom)` when generating a
+   `bottom-[…]` utility in a fresh development build. */
+.floating-ask-bar {
+  bottom: calc(16px + env(safe-area-inset-bottom));
+}
+
+.chat-mobile-composer-safe-bottom,
+.chat-compact-composer-safe-bottom {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 10px);
+}
+
+.bottom-sheet-safe-content {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 20px);
+}
+
+.pwa-install-toast {
+  bottom: calc(68px + env(safe-area-inset-bottom));
+}
+
+.pwa-offline-safe-top {
+  padding-top: max(8px, env(safe-area-inset-top));
+}
+
+.pwa-update-safe-bottom {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+@media (max-width: 639px) {
+  .company-context-picker-safe-content,
+  .guru-lens-picker-safe-content {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 20px);
+  }
+}
+
+@media (min-width: 640px) {
+  .floating-ask-bar {
+    bottom: auto;
+  }
+}
+
+@media (min-width: 768px) {
+  .chat-mobile-composer-safe-bottom {
+    padding-bottom: 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .pwa-install-toast {
+    bottom: 0;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
 }
 
 @theme inline {
@@ -469,7 +531,7 @@ body {
     rgba(0, 82, 255, 0.18),
     transparent
   );
-  animation: notebook-refresh-scan 1600ms var(--ease-out-expo) infinite;
+  animation: notebook-refresh-scan 880ms var(--ease-out-expo) both;
 }
 
 .notebook-refresh-line {
@@ -483,7 +545,7 @@ body {
     rgba(0, 82, 255, 0.22),
     var(--color-hairline-soft)
   );
-  animation: notebook-refresh-line-flow 1200ms var(--ease-out-expo) infinite;
+  animation: notebook-refresh-line-flow 560ms var(--ease-out-expo) both;
 }
 
 .notebook-refresh-line:nth-child(2) {
@@ -495,7 +557,179 @@ body {
 }
 
 .notebook-refresh-icon {
-  animation: notebook-refresh-icon-pulse 900ms var(--ease-out-expo) infinite;
+  animation: notebook-refresh-icon-pulse 540ms var(--ease-out-expo) both;
+}
+
+/* Workspace motion: each transition describes a concrete state change and
+   settles into the existing visual system without changing layout or copy. */
+@keyframes motion-evidence-settle {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes motion-source-rail-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes motion-refresh-turn {
+  from {
+    transform: rotate(-34deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes motion-update-emphasis {
+  0% {
+    box-shadow: 0 8px 24px rgba(0, 62, 199, 0.28);
+    transform: translateY(0);
+  }
+  42% {
+    box-shadow: 0 12px 30px rgba(0, 62, 199, 0.42);
+    transform: translateY(-2px);
+  }
+  100% {
+    box-shadow: 0 8px 24px rgba(0, 62, 199, 0.28);
+    transform: translateY(0);
+  }
+}
+
+@keyframes motion-notebook-result-settle {
+  from {
+    opacity: 0.72;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes motion-saved-settle {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 82, 255, 0.32);
+    transform: scale(0.985);
+  }
+  55% {
+    box-shadow: 0 0 0 5px rgba(0, 82, 255, 0);
+    transform: scale(1.015);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 82, 255, 0);
+    transform: scale(1);
+  }
+}
+
+@keyframes motion-status-settle {
+  from {
+    opacity: 0.5;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes motion-loading-cursor {
+  0% {
+    opacity: 0;
+    transform: translateX(-40px) scaleX(0.45);
+  }
+  28% {
+    opacity: 0.72;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(150px) scaleX(1);
+  }
+}
+
+.motion-13f-header {
+  animation: motion-evidence-settle 420ms var(--ease-out-expo) both;
+}
+
+.motion-13f-context {
+  animation: motion-source-rail-in 420ms var(--ease-out-expo) 80ms both;
+}
+
+.motion-13f-story {
+  animation: motion-evidence-settle 460ms var(--ease-out-expo) 120ms both;
+}
+
+.motion-13f-change,
+.motion-13f-core {
+  animation: motion-evidence-settle 380ms var(--ease-out-expo) 180ms both;
+}
+
+.motion-13f-row {
+  animation: motion-evidence-settle 320ms var(--ease-out-expo)
+    calc(220ms + var(--motion-delay, 0ms)) both;
+}
+
+.motion-13f-manager-card:active {
+  transform: scale(0.985);
+}
+
+.pulse-refresh-turn,
+.motion-progress-turn {
+  animation: motion-refresh-turn 460ms var(--ease-out-expo) both;
+}
+
+.motion-pulse-update {
+  animation: motion-update-emphasis 520ms var(--ease-out-expo) both;
+}
+
+.notebook-refresh-settled {
+  animation: motion-notebook-result-settle 420ms var(--ease-out-expo) both;
+}
+
+.motion-watchlist-saved {
+  animation: motion-saved-settle 420ms var(--ease-out-expo) both;
+}
+
+.motion-active-analysis-dot {
+  animation: motion-status-settle 380ms var(--ease-out-expo) both;
+}
+
+.motion-filing-diff {
+  animation: motion-evidence-settle 300ms var(--ease-out-expo) both;
+}
+
+.motion-filing-diff-line {
+  animation: motion-evidence-settle 240ms var(--ease-out-expo)
+    calc(80ms + var(--motion-delay, 0ms)) both;
+}
+
+.motion-route-loading {
+  position: relative;
+}
+
+.motion-route-loading::before {
+  position: absolute;
+  top: 0;
+  left: max(16px, calc((100% - 48rem) / 2));
+  z-index: 1;
+  width: 88px;
+  height: 1px;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(0, 82, 255, 0.72), transparent);
+  animation: motion-loading-cursor 920ms var(--ease-out-expo) both;
 }
 
 /* Reduced motion: disable all animations for accessibility */

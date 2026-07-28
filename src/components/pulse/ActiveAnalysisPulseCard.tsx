@@ -59,7 +59,7 @@ export default function ActiveAnalysisPulseCard({
           ranking_version: rankingVersion,
           reason_code: item.reason_code,
         });
-        onDeviceSignal(item, "impression");
+        onDeviceSignal(item, "view");
         window.sessionStorage.setItem(sessionKey, "1");
         observer.disconnect();
       }, 1_000);
@@ -122,7 +122,7 @@ export default function ActiveAnalysisPulseCard({
               ].join(" ")}
             >
               {index === progress.activeStep ? (
-                <span className="mr-1 inline-block size-1.5 animate-pulse rounded-full bg-current motion-reduce:animate-none" aria-hidden="true" />
+                <span className="motion-active-analysis-dot mr-1 inline-block size-1.5 rounded-full bg-current" aria-hidden="true" />
               ) : null}
               {step}
             </li>

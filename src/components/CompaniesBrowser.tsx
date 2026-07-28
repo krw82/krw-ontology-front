@@ -43,7 +43,7 @@ const EMPTY_COMPANIES: CompanyCardData[] = [];
 function CompanyCatalogSkeleton() {
   return (
     <div
-      className="mt-5 overflow-hidden rounded-[8px] border border-hairline bg-canvas"
+      className="motion-route-loading mt-5 overflow-hidden rounded-[8px] border border-hairline bg-canvas"
       aria-live="polite"
       aria-busy="true"
     >
@@ -53,18 +53,18 @@ function CompanyCatalogSkeleton() {
           key={index}
           className="grid min-h-[112px] grid-cols-[88px_minmax(0,1fr)] gap-4 border-b border-hairline-soft px-4 py-4 last:border-b-0 xl:grid-cols-[148px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)]"
         >
-          <div className="h-5 w-14 animate-pulse rounded bg-surface-soft" />
+          <div className="motion-loading-block h-5 w-14 rounded bg-surface-soft" />
           <div className="space-y-2">
-            <div className="h-5 w-36 animate-pulse rounded bg-surface-soft" />
-            <div className="h-4 w-24 animate-pulse rounded bg-surface-soft" />
+            <div className="motion-loading-block h-5 w-36 rounded bg-surface-soft" />
+            <div className="motion-loading-block h-4 w-24 rounded bg-surface-soft" />
           </div>
           <div className="hidden space-y-2 xl:block">
-            <div className="h-4 w-4/5 animate-pulse rounded bg-surface-soft" />
-            <div className="h-4 w-3/5 animate-pulse rounded bg-surface-soft" />
+            <div className="motion-loading-block h-4 w-4/5 rounded bg-surface-soft" />
+            <div className="motion-loading-block h-4 w-3/5 rounded bg-surface-soft" />
           </div>
           <div className="hidden space-y-2 xl:block">
-            <div className="h-4 w-3/4 animate-pulse rounded bg-surface-soft" />
-            <div className="h-4 w-1/2 animate-pulse rounded bg-surface-soft" />
+            <div className="motion-loading-block h-4 w-3/4 rounded bg-surface-soft" />
+            <div className="motion-loading-block h-4 w-1/2 rounded bg-surface-soft" />
           </div>
         </div>
       ))}

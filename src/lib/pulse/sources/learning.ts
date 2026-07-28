@@ -5,6 +5,17 @@ import { getEditorialLearningCandidates } from "@/lib/pulse/sources/editorial";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 
+// A browser needs enough active stories to make its device-local choice feel
+// varied, while leaving room in the 48-card candidate reservoir for filings.
+// The device selects at most one early company story. Retain alternatives for
+// rotation, but do not let them crowd out the general feed reservoir.
+const MAX_EARLY_EDITORIAL_CANDIDATES = 8;
+const MAX_PERSONAL_EARLY_EDITORIAL_CANDIDATES = 3;
+const MAX_PRIORITY_EARLY_EDITORIAL_CANDIDATES = 3;
+const MAX_EXPLORATION_EARLY_EDITORIAL_CANDIDATES = 2;
+
+type EarlyEditorialCandidateRole = "personal" | "editorial" | "explore";
+
 /** Returns all active static entries; weekly rotation follows item-state filtering. */
 export function buildLearningCandidates(now: Date): PulseCandidate[] {
   const current = now.getTime();
@@ -77,17 +88,135 @@ export function selectLearningCandidate(
   userId: string,
   now: Date,
 ): PulseCandidate[] {
+  const earlyEditorial = candidates.filter((candidate) =>
+    candidate.metadata.editorial_placement === "early");
+  if (earlyEditorial.length > 0) {
+    return buildEarlyEditorialReservoir(earlyEditorial, userId, now);
+  }
+
   const sorted = [...candidates].sort((left, right) => left.item_key.localeCompare(right.item_key));
   if (sorted.length === 0) return [];
   const weekIndex = Math.floor((Math.floor(now.getTime() / 86_400_000) + 3) / 7);
   return [sorted[stableIndex(`${userId}:${weekIndex}`, sorted.length)]];
 }
 
+/**
+ * Keep the choice private to the device, but make the server-provided story
+ * reservoir account-relevant. This gives the browser meaningful alternatives
+ * after a manual refresh without uploading its exposure history.
+ */
+function buildEarlyEditorialReservoir(
+  candidates: PulseCandidate[],
+  userId: string,
+  now: Date,
+): PulseCandidate[] {
+  const byEditorialPriority = [...candidates].sort(compareEditorialPriority);
+  const selected: PulseCandidate[] = [];
+  const selectedKeys = new Set<string>();
+  const add = (candidate: PulseCandidate, role: EarlyEditorialCandidateRole) => {
+    if (selected.length >= MAX_EARLY_EDITORIAL_CANDIDATES || selectedKeys.has(candidate.item_key)) return;
+    selected.push(withEarlyEditorialRole(candidate, role));
+    selectedKeys.add(candidate.item_key);
+  };
+
+  // A person can have both explicit interest and completed research for the
+  // same company. Keep those stories first in the reservoir, but cap them so
+  // a broad watchlist cannot turn the feed into a single-topic stream.
+  const personal = byEditorialPriority
+    .filter(isPersonallyRelevantStory)
+    .sort(comparePersonalStory);
+  for (const candidate of personal.slice(0, MAX_PERSONAL_EARLY_EDITORIAL_CANDIDATES)) {
+    add(candidate, "personal");
+  }
+
+  // Editorial priority is still a deliberate publishing control. Reserve
+  // enough room for it even when an account has many research signals.
+  for (const candidate of byEditorialPriority) {
+    if (selected.length >= MAX_PERSONAL_EARLY_EDITORIAL_CANDIDATES + MAX_PRIORITY_EARLY_EDITORIAL_CANDIDATES) break;
+    add(candidate, "editorial");
+  }
+
+  // Exploration is stable for the account/week, not random on every request.
+  // The device may still rotate its chosen story per refresh generation.
+  const weekIndex = Math.floor((Math.floor(now.getTime() / 86_400_000) + 3) / 7);
+  const exploration = byEditorialPriority
+    .filter((candidate) => !selectedKeys.has(candidate.item_key))
+    .sort((left, right) => compareStableSeed(
+      left.item_key,
+      right.item_key,
+      `${userId}:${weekIndex}:company-story-exploration`,
+    ));
+  for (const candidate of exploration.slice(0, MAX_EXPLORATION_EARLY_EDITORIAL_CANDIDATES)) {
+    add(candidate, "explore");
+  }
+
+  // Small editorial catalogs and cold-start accounts should still get a full
+  // authorized reservoir whenever one exists. Remaining cards retain the
+  // editorial role rather than being mislabeled as personal or exploratory.
+  for (const candidate of byEditorialPriority) {
+    add(candidate, "editorial");
+  }
+
+  return selected;
+}
+
+function isPersonallyRelevantStory(candidate: PulseCandidate): boolean {
+  return candidate.coverage_level === "interest"
+    || candidate.has_recent_research === true
+    || (candidate.research_affinity ?? 0) > 0;
+}
+
+function comparePersonalStory(left: PulseCandidate, right: PulseCandidate): number {
+  const score = personalStoryScore(right) - personalStoryScore(left);
+  return score !== 0 ? score : compareEditorialPriority(left, right);
+}
+
+function personalStoryScore(candidate: PulseCandidate): number {
+  return Number(candidate.coverage_level === "interest") * 60
+    + Number(candidate.has_recent_research === true) * 30
+    + Math.min(20, Math.max(0, candidate.research_affinity ?? 0))
+    + editorialPriority(candidate);
+}
+
+function compareEditorialPriority(left: PulseCandidate, right: PulseCandidate): number {
+  const priority = editorialPriority(right) - editorialPriority(left);
+  return priority !== 0 ? priority : left.item_key.localeCompare(right.item_key);
+}
+
+function withEarlyEditorialRole(
+  candidate: PulseCandidate,
+  role: EarlyEditorialCandidateRole,
+): PulseCandidate {
+  return {
+    ...candidate,
+    metadata: {
+      ...candidate.metadata,
+      editorial_candidate_role: role,
+    },
+  };
+}
+
+function editorialPriority(candidate: PulseCandidate): number {
+  const priority = candidate.metadata.editorial_priority;
+  return typeof priority === "number" && Number.isFinite(priority) ? priority : 0;
+}
+
 function stableIndex(seed: string, size: number): number {
+  if (size <= 1) return 0;
+  return stableHash(seed) % size;
+}
+
+function compareStableSeed(left: string, right: string, namespace: string): number {
+  const leftHash = stableHash(`${namespace}:${left}`);
+  const rightHash = stableHash(`${namespace}:${right}`);
+  return leftHash - rightHash || left.localeCompare(right);
+}
+
+function stableHash(seed: string): number {
   let hash = 2166136261;
   for (const character of seed) {
     hash ^= character.charCodeAt(0);
     hash = Math.imul(hash, 16777619);
   }
-  return Math.abs(hash) % size;
+  return hash >>> 0;
 }

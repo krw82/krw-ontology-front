@@ -76,9 +76,13 @@ export async function getFilingCandidates(
       p_snapshot_at: snapshotAt,
       p_preferred_tickers: [],
       p_urgent_limit: 24,
-      p_priority_limit: 32,
+      // The client needs a reservoir after regular Form 4 filings collapse
+      // into one visual card. Pull the RPC's bounded maximum here; the
+      // ranking layer later retains only twelve expandable Form 4 rows and
+      // protects room for distinct filings.
+      p_priority_limit: 60,
       p_preferred_limit: 0,
-      p_discovery_limit: 24,
+      p_discovery_limit: 50,
     }),
   );
   const preferredRows = preferredTickers.length === 0

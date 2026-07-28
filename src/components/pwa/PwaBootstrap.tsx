@@ -30,6 +30,13 @@ type UpdateState = "idle" | "ready" | "blocked" | "updating" | "failed";
 
 const UPDATE_TIMEOUT_MS = 12_000;
 const VERSION_REQUEST_TIMEOUT_MS = 2_000;
+const IS_PWA_DEVELOPMENT_RUNTIME =
+  process.env.NODE_ENV === "development" &&
+  process.env.NEXT_PUBLIC_ENABLE_PWA_IN_DEV === "1";
+const IS_PWA_RUNTIME_ENABLED =
+  process.env.NODE_ENV === "production" || IS_PWA_DEVELOPMENT_RUNTIME;
+const IS_DEVELOPMENT_INSTALL_PREVIEW =
+  process.env.NODE_ENV === "development" && !IS_PWA_DEVELOPMENT_RUNTIME;
 
 function serviceWorkerScriptUrl() {
   return `/sw.js?v=${encodeURIComponent(APP_VERSION)}`;
@@ -87,6 +94,8 @@ export default function PwaBootstrap() {
   const [installMode, setInstallMode] =
     useState<PwaInstallToastMode>("offer");
   const [installEvaluationTime, setInstallEvaluationTime] = useState(0);
+  const [isDevelopmentInstallPreviewDismissed, setIsDevelopmentInstallPreviewDismissed] =
+    useState(false);
   const updateRequestedRef = useRef(false);
   const hadControllerRef = useRef(false);
   const reloadedRef = useRef(false);
@@ -123,6 +132,15 @@ export default function PwaBootstrap() {
         .standalone,
     });
     let engagedAt = readLocalTimestamp(PWA_INSTALL_STORAGE_KEYS.engagedAt);
+
+    // The dedicated PWA development server uses the browser's real install
+    // event. Seed only the engagement gate there so the complete flow can be
+    // tested without performing a production-only value action first.
+    if (IS_PWA_DEVELOPMENT_RUNTIME) {
+      engagedAt = engagedAt ?? now;
+      writeLocalTimestamp(PWA_INSTALL_STORAGE_KEYS.engagedAt, engagedAt);
+      installSurfaceRef.current = "development_pwa_test";
+    }
 
     if (
       isPwaProductRoute(window.location.pathname) &&
@@ -231,13 +249,13 @@ export default function PwaBootstrap() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
-    // A service worker must not control the Next.js development server. The
-    // dev server reuses the `development` app version while Turbopack emits
-    // changing HMR chunks; caching those chunks can mix module graphs from
+    // A service worker must not control the standard Next.js development
+    // server. `dev:pwa` explicitly opts into a separate PWA test runtime;
+    // otherwise Turbopack's changing HMR chunks can mix module graphs from
     // different refreshes and produce a client-only "module factory is not
     // available" error. Remove registrations left by an earlier local run so
     // the fix also repairs an already-controlled development tab.
-    if (process.env.NODE_ENV !== "production") {
+    if (!IS_PWA_RUNTIME_ENABLED) {
       let disposed = false;
       void navigator.serviceWorker
         .getRegistrations()
@@ -459,6 +477,16 @@ export default function PwaBootstrap() {
 
   const dismissInstall = useCallback(() => {
     if (installMode === "prompting") return;
+
+    // Development intentionally renders the install surface without waiting
+    // for an installable browser event, so it can be reviewed with `npm run
+    // dev`. Keep the close control useful for the current page, but reset the
+    // preview on the next reload instead of persisting a real dismissal.
+    if (IS_DEVELOPMENT_INSTALL_PREVIEW) {
+      setIsDevelopmentInstallPreviewDismissed(true);
+      return;
+    }
+
     const dismissedAt = Date.now();
     writeLocalTimestamp(PWA_INSTALL_STORAGE_KEYS.dismissedAt, dismissedAt);
     setInstallDismissedAt(dismissedAt);
@@ -511,18 +539,26 @@ export default function PwaBootstrap() {
     !waitingWorker &&
     !controllerReloadPending &&
     !isOffline &&
-    shouldOfferPwaInstall({
-      hasDeferredPrompt: deferredInstallPrompt !== null,
-      isAppleMobile,
-      isStandalone,
-      isInstalled,
-      hasEngagement: hasInstallEngagement,
-      dismissedAt: installDismissedAt,
-      now: installEvaluationTime,
-    });
+    !isDevelopmentInstallPreviewDismissed &&
+    (IS_DEVELOPMENT_INSTALL_PREVIEW ||
+      shouldOfferPwaInstall({
+        hasDeferredPrompt: deferredInstallPrompt !== null,
+        isAppleMobile,
+        isStandalone,
+        isInstalled,
+        hasEngagement: hasInstallEngagement,
+        dismissedAt: installDismissedAt,
+        now: installEvaluationTime,
+      }));
 
   useEffect(() => {
-    if (!showInstallOffer || installOfferTrackedRef.current) return;
+    if (
+      IS_DEVELOPMENT_INSTALL_PREVIEW ||
+      !showInstallOffer ||
+      installOfferTrackedRef.current
+    ) {
+      return;
+    }
     installOfferTrackedRef.current = true;
     trackClientEventSilently("pwa_install_prompt_seen", {
       surface: installSurfaceRef.current,
@@ -533,7 +569,7 @@ export default function PwaBootstrap() {
   return (
     <>
       {isOffline ? (
-        <div className="pointer-events-none fixed inset-x-0 top-0 z-[180] flex justify-center px-base pt-[max(8px,env(safe-area-inset-top))]">
+        <div className="pwa-offline-safe-top pointer-events-none fixed inset-x-0 top-0 z-[180] flex justify-center px-base">
           <div
             className="rounded-full border border-[#f3d8a5] bg-[#fff8e9] px-base py-xs text-center text-[12px] font-bold leading-5 text-[#76510e] shadow-sm"
             role="status"
@@ -545,7 +581,7 @@ export default function PwaBootstrap() {
       ) : null}
 
       {waitingWorker || controllerReloadPending ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[180] flex justify-center px-base pb-[max(12px,env(safe-area-inset-bottom))]">
+        <div className="pwa-update-safe-bottom pointer-events-none fixed inset-x-0 bottom-0 z-[180] flex justify-center px-base">
           <div
             className="pointer-events-auto flex w-full max-w-[520px] items-center gap-sm rounded-[14px] border border-hairline bg-ink px-base py-sm text-white shadow-[0_16px_48px_rgba(10,11,13,0.24)]"
             role="status"

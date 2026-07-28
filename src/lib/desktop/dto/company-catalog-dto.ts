@@ -4,7 +4,7 @@ import {
   getSuggestedPromptDisplaysForTickers,
 } from "@/content/companies/display";
 import { DEFAULT_LOCALE } from "@/i18n/config";
-import { buildBrandfetchTickerLogoUrl } from "@/lib/brandfetch-logo";
+import { buildCompanyTickerLogoUrl } from "@/lib/brandfetch-logo";
 
 export const DESKTOP_COMPANY_CATALOG_CONTRACT =
   "desktop-company-catalog/v2" as const;
@@ -66,7 +66,7 @@ export function toDesktopCompanySummary(
     document_count: company.document_count,
     document_types: company.document_types,
     coverage_label: company.coverage,
-    logo_url: buildBrandfetchTickerLogoUrl(company.ticker),
+    logo_url: buildCompanyTickerLogoUrl(company.ticker),
     suggested_prompts: suggestedPrompts,
   };
 }

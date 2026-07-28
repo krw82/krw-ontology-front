@@ -1213,7 +1213,7 @@ function ChatContent({
             ref={composerHostRef}
             data-onboarding-target="chat-composer"
             className={[
-              "pointer-events-none fixed inset-x-0 bottom-0 z-30 transform-gpu pb-[calc(env(safe-area-inset-bottom)+10px)] transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:pointer-events-auto md:static md:z-auto md:translate-y-0 md:pb-0 md:opacity-100 md:transition-none",
+              "chat-mobile-composer-safe-bottom pointer-events-none fixed inset-x-0 bottom-0 z-30 transform-gpu transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:pointer-events-auto md:static md:z-auto md:translate-y-0 md:opacity-100 md:transition-none",
               isComposerCompact || shouldHideDiscoverComposer
                 ? "opacity-0"
                 : "opacity-100",
@@ -1328,7 +1328,7 @@ function ChatContent({
             {isComposerCompact && !shouldHideDiscoverComposer && (
               <motion.div
                 key="compact-composer-pill"
-                className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-base pb-[calc(env(safe-area-inset-bottom)+10px)] md:hidden"
+                className="chat-compact-composer-safe-bottom fixed inset-x-0 bottom-0 z-40 flex justify-center px-base md:hidden"
                 style={{
                   transform: `translate3d(0, -${keyboardOffset}px, 0)`,
                 }}

@@ -419,7 +419,7 @@ export default function BottomSheet({
             ) : null}
             <div
               className={cn(
-                "max-h-[min(82dvh,660px)] overflow-y-auto overscroll-contain pb-[calc(env(safe-area-inset-bottom)+20px)]",
+                "bottom-sheet-safe-content max-h-[min(82dvh,660px)] overflow-y-auto overscroll-contain",
                 contentClassName,
               )}
             >

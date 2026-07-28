@@ -190,6 +190,13 @@ function truthyEnv(value) {
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 }
 
+// Content work (for example an editorial Storage import) does not need the
+// queue consumers.  Keeping them opt-out makes a local DB incident easier to
+// isolate and prevents background claims/cleanup from competing with a manual
+// content bootstrap.  `npm run dev` keeps the existing all-workers behavior.
+const shouldRunAgentWorker = !truthyEnv(process.env.KRW_DEV_SKIP_AGENT_WORKER);
+const shouldRunDocumentWorker = !truthyEnv(process.env.KRW_DEV_SKIP_DOCUMENT_WORKER);
+
 function isStockNewsEnabled() {
   if (truthyEnv(process.env.STOCK_NEWS_FORCE_DISABLED)) return false;
   if (!truthyEnv(process.env.STOCK_NEWS_ENABLED)) return false;
@@ -340,6 +347,7 @@ async function stopChild(child) {
 }
 
 async function restartWorker() {
+  if (!shouldRunAgentWorker) return;
   if (shuttingDown) return;
   if (workerStartQueued) return;
   workerStartQueued = true;
@@ -365,6 +373,7 @@ async function restartWorker() {
 }
 
 async function restartDocumentWorker() {
+  if (!shouldRunDocumentWorker) return;
   if (shuttingDown) return;
   if (documentWorkerStartQueued) return;
   documentWorkerStartQueued = true;
@@ -623,7 +632,7 @@ const documentWorkerRestartPlugin = {
   },
 };
 
-const workerContext = await context({
+const workerContext = shouldRunAgentWorker ? await context({
   entryPoints: [workerEntry],
   bundle: true,
   platform: "node",
@@ -632,9 +641,9 @@ const workerContext = await context({
   packages: "external",
   outfile: workerOutfile,
   plugins: [workerRestartPlugin],
-});
+}) : null;
 
-const documentWorkerContext = await context({
+const documentWorkerContext = shouldRunDocumentWorker ? await context({
   entryPoints: [documentWorkerEntry],
   bundle: true,
   platform: "node",
@@ -643,7 +652,7 @@ const documentWorkerContext = await context({
   packages: "external",
   outfile: documentWorkerOutfile,
   plugins: [documentWorkerRestartPlugin],
-});
+}) : null;
 
 async function shutdown(signal) {
   if (shuttingDown) return;
@@ -651,8 +660,8 @@ async function shutdown(signal) {
   console.info(`[dev] shutting down after ${signal}`);
 
   await Promise.allSettled([
-    workerContext.dispose(),
-    documentWorkerContext.dispose(),
+    workerContext?.dispose(),
+    documentWorkerContext?.dispose(),
     stopChild(worker),
     stopChild(documentWorker),
     stopChild(devMcp),
@@ -677,8 +686,16 @@ if (isStockNewsEnabled()) {
 nextDev = spawnLabeled("web", "npm", ["run", "dev:web"], (code) => {
   void shutdown("web-exit").finally(() => process.exit(code ?? 1));
 });
-await workerContext.watch();
-await documentWorkerContext.watch();
+if (workerContext) {
+  await workerContext.watch();
+} else {
+  console.info("[dev:worker] disabled by KRW_DEV_SKIP_AGENT_WORKER");
+}
+if (documentWorkerContext) {
+  await documentWorkerContext.watch();
+} else {
+  console.info("[dev:document-worker] disabled by KRW_DEV_SKIP_DOCUMENT_WORKER");
+}
 await new Promise(() => {
   // Keep the wrapper alive; child exit handlers and signal handlers own shutdown.
 });

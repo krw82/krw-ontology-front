@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pulse 새로고침 피드 랭킹 검토</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #101828;
+        --muted: #667085;
+        --line: #dfe3ea;
+        --blue: #155eef;
+        --blue-soft: #eff4ff;
+        --green: #027a48;
+        --surface: #fff;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: #f8fafc;
+        color: var(--ink);
+        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.65;
+      }
+      main { max-width: 940px; margin: 0 auto; padding: 48px 24px 80px; }
+      h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.12; margin: 0 0 12px; }
+      h2 { margin-top: 48px; font-size: 26px; line-height: 1.25; }
+      h3 { margin-top: 28px; font-size: 19px; }
+      p, li { font-size: 16px; }
+      .eyebrow { color: var(--blue); font-size: 12px; font-weight: 800; letter-spacing: .16em; }
+      .lead { color: var(--muted); font-size: 18px; max-width: 760px; }
+      .callout {
+        margin: 28px 0; padding: 20px 22px; border: 1px solid #b2ccff; border-radius: 14px;
+        background: var(--blue-soft);
+      }
+      .callout strong { color: #004eeb; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+      .card { border: 1px solid var(--line); border-radius: 14px; padding: 20px; background: var(--surface); }
+      .card h3 { margin-top: 0; }
+      table { width: 100%; border-collapse: collapse; margin: 20px 0; background: var(--surface); }
+      th, td { border: 1px solid var(--line); padding: 12px; text-align: left; vertical-align: top; }
+      th { background: #f2f4f7; font-weight: 700; }
+      code { padding: 2px 5px; border-radius: 5px; background: #f2f4f7; font-size: .92em; }
+      pre {
+        overflow: auto; padding: 20px; border-radius: 14px; background: #101828; color: #e5efff;
+        font-size: 13px; line-height: 1.55;
+      }
+      figure { margin: 20px 0 34px; }
+      figure img { display: block; width: 100%; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 28px rgba(16, 24, 40, .09); }
+      figcaption { color: var(--muted); font-size: 14px; margin-top: 8px; }
+      .pill { display: inline-block; margin-right: 6px; padding: 3px 8px; border-radius: 999px; background: #ecfdf3; color: var(--green); font-size: 13px; font-weight: 700; }
+      .muted { color: var(--muted); }
+      a { color: #004eeb; }
+      @media (max-width: 680px) { .grid { grid-template-columns: 1fr; } main { padding: 32px 16px 56px; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">PULSE FEED · RANKING REVIEW · 2026-07-28</p>
+      <h1>새로고침해도 같은 피드처럼 보이는 근본 원인</h1>
+      <p class="lead">문제는 “랜덤이 약해서”가 아니라, 실제로 화면에 펼칠 수 있는 후보가 너무 적고, 반복 노출을 숨기는 규칙이 그 풀을 더 줄인다는 점이다.</p>
+
+      <section class="callout">
+        <strong>결론:</strong> 새로고침은 전체 셔플이 아니라 <em>핵심 8~9개는 유지하고, 보통 공시 3개와 회사 이야기 1개만 교체</em>해야 한다. 이를 가능하게 하려면 서버가 Form 4 중심 후보가 아닌 <strong>일반 공시 30개</strong>를 반드시 포함해 내려줘야 한다.
+      </section>
+
+      <h2>현재 화면</h2>
+      <figure>
+        <img src="references/current.png" alt="현재 Pulse 피드 화면" />
+        <figcaption>현재 화면에는 하나의 내부자 거래 묶음이 큰 비중을 차지한다. 여기서 새로고침할 수 있는 독립 카드가 부족하다.</figcaption>
+      </figure>
+
+      <h2>지금 방식과 바꿀 방식의 차이</h2>
+      <table>
+        <thead>
+          <tr><th>구간</th><th>지금</th><th>변경 후</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>후보 수집</td>
+            <td>상위 60개가 Form 4에 치우친다. 발견용 쿼리도 우선순위 쿼리와 겹쳐 실제 신규 후보가 거의 없다.</td>
+            <td>긴급·관심 종목과 별개로 <strong>일반 공시 30개</strong>, Form 4 후보 10개, 회사 이야기 후보 8개를 서로 다르게 수집한다.</td>
+          </tr>
+          <tr>
+            <td>화면 카드 수</td>
+            <td>Form 4 여러 건이 하나의 스택 카드로 합쳐지고, 회사 이야기도 한 장만 보인다. 보통 계정은 약 9개 카드뿐이다.</td>
+            <td>일반 공시 30개는 개별 카드로 유지해 <strong>약 32개</strong>의 화면 후보를 확보한다.</td>
+          </tr>
+          <tr>
+            <td>새로고침</td>
+            <td>회사 이야기 위치만 바뀌거나, 안 읽은 카드를 3번 봤다는 이유로 통째로 숨겨 화면이 더 비어 보인다.</td>
+            <td>중요 카드는 고정하고 일반 카드 3개만 교체한다. “미클릭”은 삭제가 아니라 점수 감점으로 처리한다.</td>
+          </tr>
+          <tr>
+            <td>개인화 저장</td>
+            <td>기기에서 본 횟수·새로고침 세대가 후보를 강하게 제거한다.</td>
+            <td>기기 쿠키/로컬 저장소에는 최근 본 항목, 클릭/저장, 새로고침 횟수만 보관한다. 새 기기면 새 출발해도 된다.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>왜 지금은 회사 이야기만 바뀌어 보이나</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>1. 후보가 “카드” 기준으로 부족하다</h3>
+          <p>서버 후보 풀은 수십 건처럼 보여도, 대부분 Form 4다. 화면에서는 이들이 한 장의 “내부자 거래” 카드로 합쳐진다. 회사 이야기도 16개 후보 중 화면에는 한 시리즈만 나온다.</p>
+          <p><span class="pill">결과</span> 서버에는 많이 있어도 화면에서는 약 9개다.</p>
+        </article>
+        <article class="card">
+          <h3>2. 미클릭을 “싫어요”로 오해한다</h3>
+          <p>새로고침 3회 동안 클릭하지 않은 카드를 7일 동안 숨기는 규칙이 있다. 사용자가 단지 스크롤하지 않았을 뿐인데 후보가 제거되므로, 반복 새로고침할수록 남은 카드가 줄어든다.</p>
+          <p><span class="pill">결과</span> 8회 새로고침 시 평균 화면 카드가 약 4.8개까지 감소했다.</p>
+        </article>
+      </div>
+
+      <h2>권장 아키텍처</h2>
+      <pre>공시·회사 이야기·내부자 거래
+          │
+          ▼
+  ① 후보 수집 (48개, 소스별 쿼터 보장)
+          │
+          ▼
+  ② 필터 (만료·중복·안전성·숨김 요청)
+          │
+          ▼
+  ③ 점수 (신선도 + 중요도 + 관심 종목 + 기기 행동)
+          │
+          ▼
+  ④ 다양성 선택 (같은 티커/형식 과밀 방지)
+          │
+          ▼
+  ⑤ 새로고침 교체 (일반 3개 + 회사 이야기 최대 1개)
+          │
+          ▼
+  ⑥ 백필 (비어 있으면 감점을 완화해 12개를 채움)
+          │
+          ▼
+   화면 12개 + 기기 행동 기록</pre>
+
+      <h2>세부 구현 계획</h2>
+
+      <h3>1. 서버: “일반 공시 30개”를 별도 확보</h3>
+      <ul>
+        <li>후보 최대 48개는 유지하되, 소스를 <code>긴급</code>, <code>관심 종목</code>, <code>일반 8-K/6-K·기타 공시 30</code>, <code>Form 4 10</code>, <code>회사 이야기 8</code>로 나눈다.</li>
+        <li>“발견” 쿼리가 우선순위 쿼리의 복사본이 되지 않도록, 이미 선택된 행을 제외한 다음 순위의 비-Form 4 공시를 가져온다.</li>
+        <li>Form 4는 소스에서 10건까지만 받아 한 장의 스택 카드로 합친다. 이 카드가 일반 공시 30개의 자리를 먹지 않게 한다.</li>
+        <li>예상 화면 풀: 일반 30 + Form 4 스택 1 + 회사 이야기 1 = <strong>32개</strong>. 12개 화면을 여러 번 갱신할 여지가 생긴다.</li>
+      </ul>
+
+      <h3>2. 기기별 선택: 중요도는 유지하고, 새로움만 제어</h3>
+      <table>
+        <thead><tr><th>값</th><th>권장값</th><th>의미</th></tr></thead>
+        <tbody>
+          <tr><td>화면 수</td><td>12</td><td>현재와 같은 정보 밀도</td></tr>
+          <tr><td>수동 새로고침 교체</td><td>일반 카드 3개</td><td>한 번에 4개(회사 이야기 포함) 정도가 새로 보여 “새 피드”로 인식</td></tr>
+          <tr><td>일반 카드 쿨다운</td><td>3회 새로고침</td><td>방금 보던 카드가 곧바로 되돌아오지 않음</td></tr>
+          <tr><td>탐색 폭</td><td>상위 점수에서 6등 범위</td><td>무작위 뽑기가 아닌, 좋은 후보끼리의 제한된 교체</td></tr>
+          <tr><td>회사 이야기 쿨다운</td><td>2회 새로고침</td><td>이미 있는 동작을 유지하되 한 시리즈만 과도하게 반복하지 않음</td></tr>
+          <tr><td>같은 티커 제한</td><td>상단 6개 중 최대 2개</td><td>한 회사 공시가 화면을 잠식하지 않음</td></tr>
+        </tbody>
+      </table>
+
+      <h3>3. “미클릭” 규칙을 삭제가 아닌 감점으로 전환</h3>
+      <ul>
+        <li><strong>클릭·저장·대화 시작</strong>: 같은 티커/형식의 점수를 올리고, 관련 후보를 더 자주 허용한다.</li>
+        <li><strong>노출만 됨</strong>: 즉시 숨기지 않는다. 세 번 연속 노출된 뒤에는 점수만 낮춘다.</li>
+        <li><strong>풀 부족 시</strong>: 가장 오래 본 카드부터 감점을 풀어 12개를 항상 채운다.</li>
+        <li><strong>기기 변경</strong>: 쿠키/로컬 저장소가 없으면 초기값으로 시작한다. 사용자는 “새 피드”로 시작하고, 서버 계정 데이터에 의존하지 않는다.</li>
+      </ul>
+
+      <h3>4. 새로고침의 정확한 동작</h3>
+      <pre>첫 진입
+  [긴급/활성] [상위 일반 8개] [내부자 스택?] [회사 이야기?]
+
+첫 새로고침
+  긴급/활성은 유지
+  일반 3개: 쿨다운을 지킨 새 후보로 교체
+  회사 이야기: 최근 2회에 보지 않은 시리즈가 있을 때 1개 교체
+  → 화면에서 약 4개가 변함
+
+두 번째~세 번째 새로고침
+  직전 3회 동안 본 일반 카드는 우선 제외
+  점수가 비슷한 상위 6개 후보에서만 선택
+  → 새로우면서도 저품질·낮은 중요도의 카드가 튀어나오지 않음
+
+후보가 부족한 경우
+  쿨다운을 오래된 카드부터 한 단계씩 완화
+  → 빈 피드나 “같은 카드만 남는” 상태를 만들지 않음</pre>
+
+      <h3>5. 검증과 안전한 배포</h3>
+      <ol>
+        <li>후보 수, 실제 화면 후보 수, 각 소스 비중을 로그로 남긴다.</li>
+        <li>새로고침마다 <code>유지 수 / 교체 수 / 쿨다운 완화 여부 / 중복 티커 수</code>를 기록한다.</li>
+        <li>첫 주는 50% 기기에 새 규칙을 적용해 “12개 유지율”, “새로고침 후 클릭/저장”, “동일 카드 재노출”을 비교한다.</li>
+        <li>목표는 더 자주 바꾸는 것이 아니라, <strong>매 새로고침 때 4개 안팎이 바뀌고도 중요도 품질을 95% 이상 보존</strong>하는 것이다.</li>
+      </ol>
+
+      <h2>검토에 참고한 패턴</h2>
+      <figure>
+        <img src="references/meta-ranking.png" alt="Meta Instagram Explore ranking engineering article" />
+        <figcaption><a href="https://engineering.fb.com/2023/08/09/ml-applications/scaling-instagram-explore-recommendations-system/">Meta Engineering</a>은 후보 수집 → 랭킹 → 최종 재정렬을 분리하고, 마지막 단계에서 같은 유형의 연속 노출을 막는 규칙으로 다양성을 제어한다. Pulse에도 “무작위 셔플”이 아니라 이 역할 분리가 맞다. [Web]</figcaption>
+      </figure>
+      <figure>
+        <img src="references/spotify-shuffle.png" alt="Spotify shuffle engineering article" />
+        <figcaption><a href="https://engineering.atspotify.com/2025/11/shuffle-making-random-feel-more-human/">Spotify Engineering</a>의 “사람다운 셔플” 원칙처럼, 최근에 본 항목을 단순 제거하지 않고 반복·다양성·품질을 함께 다루는 것이 적절하다. [Web]</figcaption>
+      </figure>
+
+      <h2>바꾸지 않을 것</h2>
+      <ul>
+        <li>긴급 공시, 진행 중 리서치, 사용자가 저장하거나 열어 본 항목은 새로고침 때문에 밀어내지 않는다.</li>
+        <li>자동 폴링은 순서를 흔들지 않는다. 오직 사용자가 누른 새로고침과 풀투리프레시만 화면 조합을 바꾼다.</li>
+        <li>새 기기에서 알고리즘이 초기화되는 것은 허용한다. 개인식별 정보를 늘리지 않는다.</li>
+      </ul>
+    </main>
+  </body>
+</html>

@@ -96,7 +96,7 @@ export default function InsiderTradeStackCard({
           ranking_version: rankingVersion,
         });
         for (const { item } of items.slice(0, COLLAPSED_ROW_COUNT)) {
-          onDeviceSignal(item, "impression");
+          onDeviceSignal(item, "view");
           window.sessionStorage.setItem(pulseImpressionStorageKey(feedSessionId, item.id), "1");
         }
         window.sessionStorage.setItem(sessionKey, "1");
@@ -114,15 +114,14 @@ export default function InsiderTradeStackCard({
 
   if (completed && !completedExpanded) {
     return (
-      <article ref={ref} className="relative overflow-hidden rounded-[14px] border border-hairline bg-surface-soft px-base py-sm" data-pulse-kind="filing" data-pulse-state="reviewed-collapsed">
-        <div className="absolute inset-y-0 left-0 w-1 bg-primary opacity-55" aria-hidden="true" />
-        <div className="flex min-w-0 items-center gap-sm pl-xs">
+      <article ref={ref} className="border-b border-hairline py-base" data-pulse-kind="filing" data-pulse-state="reviewed-collapsed">
+        <div className="flex min-w-0 items-center gap-sm">
           <span className="material-symbols-outlined text-[18px] text-muted" aria-hidden="true">task_alt</span>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-muted">검토 완료 · 내부자 거래</p>
-            <p className="mt-0.5 truncate text-[13px] font-extrabold text-body">{items.length}건의 내부자 거래 요약</p>
+            <p className="text-[12px] font-semibold text-muted">내부자 거래 · 검토함</p>
+            <p className="mt-0.5 truncate text-[13px] font-bold text-body">{items.length}건의 내부자 거래 요약</p>
           </div>
-          <button type="button" onClick={() => setExpandedCompletedKey(completedKey)} className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-[9px] px-sm text-[12px] font-extrabold text-muted hover:bg-white hover:text-ink" aria-expanded={false}>
+          <button type="button" onClick={() => setExpandedCompletedKey(completedKey)} className="inline-flex min-h-11 shrink-0 items-center gap-1 text-[12px] font-bold text-primary hover:text-ink" aria-expanded={false}>
             다시 보기
             <span className="material-symbols-outlined text-[16px]" aria-hidden="true">expand_more</span>
           </button>
@@ -152,44 +151,34 @@ export default function InsiderTradeStackCard({
   }
 
   return (
-    <div className="relative pb-3" data-pulse-kind="filing" data-pulse-variant="insider-stack">
-      <div aria-hidden="true" className="absolute inset-x-3 bottom-1 top-4 rounded-[18px] border border-primary/15 bg-primary-fixed/35" />
-      <div aria-hidden="true" className="absolute inset-x-1.5 bottom-2 top-2 rounded-[18px] border border-primary/20 bg-white shadow-[0_10px_28px_rgba(0,62,199,0.08)]" />
-      <article
-        ref={ref}
-        className="relative z-10 overflow-hidden rounded-[18px] border border-hairline bg-white shadow-[0_12px_36px_rgba(16,24,40,0.055)]"
-        aria-label={`내부자 거래 ${items.length}건`}
-      >
-        <div className="absolute inset-y-0 left-0 w-1 bg-primary" aria-hidden="true" />
-        <div className="p-lg pl-[22px] sm:p-xl sm:pl-[26px]">
-          <div className="flex items-start justify-between gap-base">
-            <div className="flex min-w-0 items-center">
-              <div className="min-w-0">
-                <p className="text-[11px] font-black uppercase tracking-[0.13em] text-muted">내부자 거래</p>
-                <p className="mt-0.5 text-[12px] font-extrabold text-primary">중요 거래 요약</p>
-              </div>
-            </div>
-            <time className="shrink-0 text-[11px] font-semibold text-muted" dateTime={latestAvailableAt}>
+    <article
+      ref={ref}
+      className="border-b border-hairline py-lg sm:py-xl"
+      data-pulse-kind="filing"
+      data-pulse-variant="insider-stack"
+      aria-label={`내부자 거래 ${items.length}건`}
+    >
+      <div className="flex items-start gap-sm">
+        <span className="grid size-9 shrink-0 place-items-center rounded-full border border-hairline bg-white text-[12px] font-black text-primary" aria-hidden="true">4</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-sm">
+            <p className="text-[12px] font-semibold leading-5 text-muted">SEC Form 4 · 내부자 거래</p>
+            <time className="shrink-0 pt-0.5 text-[11px] font-medium text-muted" dateTime={latestAvailableAt}>
               {summaryTimeLabel}
             </time>
           </div>
 
-          <div className="mt-base flex flex-wrap items-end justify-between gap-sm">
-            <div>
-              <h2 className="text-[22px] font-black leading-[1.25] tracking-[-0.035em] text-ink sm:text-[25px]">{title}</h2>
-              <p className="mt-xs text-[14px] font-semibold leading-6 text-body">총 {items.length}건 · {summary.purchaseCount > 0 ? `매수 ${summary.purchaseCount}` : "매수 없음"} · {summary.saleCount > 0 ? `매도 ${summary.saleCount}` : "매도 없음"}</p>
-            </div>
-            <div className="flex flex-wrap justify-end gap-xs">
-              {summary.researchCount > 0 ? <span className="rounded-full bg-[#f3f0ff] px-sm py-xs text-[11px] font-black text-[#5c43ca]">최근 리서치 {summary.researchCount}</span> : null}
-            </div>
-          </div>
-
-          <p className="mt-sm text-[13px] leading-6 text-muted">
-            SEC Form 4에 공개시장 매수·매도로 보고된 거래만 모았습니다.
-            {collapsedHiddenCount > 0 ? ` 중요도 순으로 ${COLLAPSED_ROW_COUNT}건만 먼저 보여줍니다.` : null}
+          <h2 className="mt-xs text-[17px] font-bold leading-[1.45] tracking-[-0.02em] text-ink sm:text-[19px]">{title}</h2>
+          <p className="mt-xs text-[14px] leading-6 text-body">
+            총 {items.length}건 · {summary.purchaseCount > 0 ? `매수 ${summary.purchaseCount}` : "매수 없음"} · {summary.saleCount > 0 ? `매도 ${summary.saleCount}` : "매도 없음"}
+            {summary.researchCount > 0 ? ` · 최근 리서치 ${summary.researchCount}개` : ""}
+          </p>
+          <p className="mt-0.5 text-[12px] leading-5 text-muted">
+            SEC Form 4에 보고된 공개시장 거래입니다.
+            {collapsedHiddenCount > 0 ? ` 중요도 순으로 ${COLLAPSED_ROW_COUNT}건을 먼저 보여줍니다.` : null}
           </p>
 
-          <div className="mt-base space-y-xs" aria-label={expanded ? "모든 내부자 거래" : "중요 내부자 거래"}>
+          <div className="mt-sm border-y border-hairline" aria-label={expanded ? "모든 내부자 거래" : "중요 내부자 거래"}>
             {visibleItems.map(({ item, position }, index) => (
               <InsiderTradeRow
                 key={item.id}
@@ -204,26 +193,24 @@ export default function InsiderTradeStackCard({
           </div>
 
           {hiddenCount > 0 ? (
-            <p className="mt-sm text-[12px] font-semibold text-muted">+ {hiddenCount}건의 거래가 더 있습니다</p>
+            <p className="mt-xs text-[12px] font-medium text-muted">+ {hiddenCount}건의 거래가 더 있습니다</p>
           ) : null}
 
           {items.length > COLLAPSED_ROW_COUNT ? (
-            <div className="mt-lg flex flex-wrap items-center gap-sm">
-              <button
-                type="button"
-                onClick={toggleExpanded}
-                aria-expanded={expanded}
-                disabled={pending}
-                className="inline-flex min-h-11 items-center gap-xs rounded-[10px] bg-ink px-base text-[13px] font-extrabold text-white transition-colors hover:bg-primary disabled:opacity-50"
-              >
-                {expanded ? "거래 접기" : `나머지 ${collapsedHiddenCount}건 보기`}
-                <span className="material-symbols-outlined text-[16px]" aria-hidden="true">{expanded ? "expand_less" : "expand_more"}</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={toggleExpanded}
+              aria-expanded={expanded}
+              disabled={pending}
+              className="mt-xs inline-flex min-h-11 items-center gap-1 text-[13px] font-bold text-primary hover:text-ink disabled:opacity-50"
+            >
+              {expanded ? "거래 접기" : `나머지 ${collapsedHiddenCount}건 보기`}
+              <span className="material-symbols-outlined text-[16px]" aria-hidden="true">{expanded ? "expand_less" : "expand_more"}</span>
+            </button>
           ) : null}
         </div>
-      </article>
-    </div>
+      </div>
+    </article>
   );
 }
 
@@ -263,7 +250,7 @@ function InsiderTradeRow({
       if (!visible || timer !== null) return;
       timer = window.setTimeout(() => {
         timer = null;
-        onDeviceSignal(item, "impression");
+        onDeviceSignal(item, "view");
         window.sessionStorage.setItem(storageKey, "1");
         observer.disconnect();
       }, 1_000);
@@ -277,49 +264,44 @@ function InsiderTradeRow({
 
   const content = (
     <>
-      <div className="flex min-w-0 items-start gap-sm">
-        <span className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-[8px] ${detail.tone}`} aria-hidden="true">
-          <span className="material-symbols-outlined text-[15px]">{detail.icon}</span>
-        </span>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-x-sm gap-y-0.5">
-            <span className="font-black text-ink">{item.ticker ?? "SEC"}</span>
-            <span className={`text-[12px] font-extrabold ${detail.textTone}`}>{detail.label}</span>
-            {item.priority === "urgent" ? <span className="text-[11px] font-black text-[#c43c22]">긴급</span> : null}
-          </div>
-          <p className="mt-0.5 truncate text-[12px] font-semibold leading-5 text-body">{detail.amountLabel}</p>
-          <p className="mt-0.5 truncate text-[11px] font-semibold leading-5 text-muted">{[relationship, planLabel(item)].filter(Boolean).join(" · ") || "SEC Form 4"}</p>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-sm gap-y-0.5">
+          <span className="font-bold text-ink">{item.ticker ?? "SEC"}</span>
+          <span className={`text-[12px] font-bold ${detail.textTone}`}>{detail.label}</span>
+          {item.priority === "urgent" ? <span className="text-[11px] font-bold text-[#c43c22]">우선 확인</span> : null}
         </div>
+        <p className="mt-0.5 truncate text-[12px] font-medium leading-5 text-body">{detail.amountLabel}</p>
+        <p className="mt-0.5 truncate text-[11px] font-medium leading-5 text-muted">{[relationship, planLabel(item)].filter(Boolean).join(" · ") || "SEC Form 4"}</p>
       </div>
       <span className="material-symbols-outlined shrink-0 text-[18px] text-muted" aria-hidden="true">arrow_forward</span>
     </>
   );
 
   return (
-    <div ref={rowRef} className="rounded-[12px] border border-hairline bg-canvas p-sm transition-colors hover:border-primary/30">
-      <div className="flex items-center gap-xs">
-        {primary.type === "link" ? (
-          <Link
-            href={primary.href}
-            className="flex min-h-11 min-w-0 flex-1 items-start justify-between gap-sm text-left"
-            onClick={() => {
-              onDeviceSignal(item, "open");
-              trackClientEventSilently("pulse_item_opened", {
-                item_kind: item.kind,
-                action: "insider_stack_row",
-                item_state: item.state,
-                phase: item.phase,
-                position,
-                feed_session_id: feedSessionId,
-                ranking_version: rankingVersion,
-                reason_code: item.reason_code,
-              });
-            }}
-          >
-            {content}
-          </Link>
-        ) : null}
-      </div>
+    <div ref={rowRef} className="border-b border-hairline last:border-b-0">
+      {primary.type === "link" ? (
+        <Link
+          href={primary.href}
+          className="flex min-h-14 min-w-0 items-center justify-between gap-sm py-sm text-left transition-colors hover:bg-surface-soft"
+          onClick={() => {
+            onDeviceSignal(item, "open");
+            trackClientEventSilently("pulse_item_opened", {
+              item_kind: item.kind,
+              action: "insider_stack_row",
+              item_state: item.state,
+              phase: item.phase,
+              position,
+              feed_session_id: feedSessionId,
+              ranking_version: rankingVersion,
+              reason_code: item.reason_code,
+            });
+          }}
+        >
+          {content}
+        </Link>
+      ) : (
+        <div className="flex min-h-14 min-w-0 items-center justify-between gap-sm py-sm">{content}</div>
+      )}
     </div>
   );
 }
@@ -339,15 +321,15 @@ function transactionDetail(item: PulseItem) {
   const purchase = numberMetadata(item, "form4_reported_purchase_value");
   const sale = numberMetadata(item, "form4_reported_sale_value");
   if (purchase > 0 && sale > 0) {
-    return { label: "매수·매도", amountLabel: `매수 ${formatUsd(purchase)} · 매도 ${formatUsd(sale)}`, icon: "swap_horiz", tone: "bg-[#fff7e8] text-[#8a5a00]", textTone: "text-[#8a5a00]" };
+    return { label: "매수·매도", amountLabel: `매수 ${formatUsd(purchase)} · 매도 ${formatUsd(sale)}`, textTone: "text-[#8a5a00]" };
   }
   if (purchase > 0) {
-    return { label: "매수", amountLabel: `매수 ${formatUsd(purchase)}`, icon: "north_east", tone: "bg-[#eaf8f3] text-[#137357]", textTone: "text-[#137357]" };
+    return { label: "매수", amountLabel: `매수 ${formatUsd(purchase)}`, textTone: "text-[#137357]" };
   }
   if (sale > 0) {
-    return { label: "매도", amountLabel: `매도 ${formatUsd(sale)}`, icon: "south_east", tone: "bg-[#fff0ed] text-[#b83b25]", textTone: "text-[#b83b25]" };
+    return { label: "매도", amountLabel: `매도 ${formatUsd(sale)}`, textTone: "text-[#b83b25]" };
   }
-  return { label: "거래 신고", amountLabel: "공개시장 거래 금액 정보 없음", icon: "description", tone: "bg-surface-soft text-muted", textTone: "text-muted" };
+  return { label: "거래 신고", amountLabel: "공개시장 거래 금액 정보 없음", textTone: "text-muted" };
 }
 
 function relationshipLabel(item: PulseItem): string | null {

@@ -14,6 +14,7 @@ describe("Research Pulse state migration", () => {
   const v4DeviceAffinityMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260720043000_pulse_v4_device_private_affinity.sql"), "utf8");
   const unifiedCoverageMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260721000000_unify_company_coverage_interest.sql"), "utf8");
   const form4SupersessionMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260722200000_pulse_form4_transaction_supersessions.sql"), "utf8");
+  const refreshCandidateDiversityMigration = readFileSync(join(process.cwd(), "supabase/migrations/20260728040216_pulse_refresh_candidate_diversity.sql"), "utf8");
 
   it("creates additive preference and item-state tables with ownership RLS", () => {
     expect(migration).toContain("create table if not exists public.user_pulse_preferences");
@@ -135,5 +136,15 @@ describe("Research Pulse state migration", () => {
     expect(form4SupersessionMigration).toContain("form4_reported_sale_value");
     expect(form4SupersessionMigration).toContain("trg_z_refresh_sec_form4_transaction_supersessions");
     expect(form4SupersessionMigration).toContain("to service_role");
+  });
+
+  it("keeps discovery distinct from priority work and reserves it for non-Form 4 filings", () => {
+    expect(refreshCandidateDiversityMigration).toContain("create or replace function public.get_pulse_global_filing_candidates_v1");
+    expect(refreshCandidateDiversityMigration).toContain("eligible.occurred_at >= bounds.snapshot_at - interval '14 days'");
+    expect(refreshCandidateDiversityMigration).toContain("coalesce(eligible.form_type, '') not in ('4', '4/A')");
+    expect(refreshCandidateDiversityMigration).toContain("select 1 from urgent");
+    expect(refreshCandidateDiversityMigration).toContain("select 1 from priority");
+    expect(refreshCandidateDiversityMigration).toContain("from public, anon, authenticated");
+    expect(refreshCandidateDiversityMigration).toContain("to service_role");
   });
 });

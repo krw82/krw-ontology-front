@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/dev-with-worker.mjs",
+    "dev:content": "KRW_DEV_SKIP_AGENT_WORKER=1 KRW_DEV_SKIP_DOCUMENT_WORKER=1 node scripts/dev-with-worker.mjs",
     "dev:web": "next dev",
+    "dev:pwa": "NEXT_DIST_DIR=.next-pwa NEXT_PUBLIC_ENABLE_PWA_IN_DEV=1 next dev",
     "dev:worker": "npm run build:worker && node scripts/start-worker.mjs",
     "dev:document-worker": "npm run build:worker && node .worker/document-worker.mjs",
     "dev:filing-brief-worker": "npm run build:worker && node .worker/filing-brief-worker.mjs",
@@ -66,6 +68,8 @@
     "stock-news:coverage:export": "node scripts/export-stock-news-coverage.mjs",
     "13f": "node scripts/refresh-sec-13f.mjs",
     "13f:dry": "npm run 13f -- --dry-run",
+    "editorial:seed:local": "node scripts/seed-local-editorial-series.mjs",
+    "editorial:publish": "node scripts/publish-editorial-company-story.mjs",
     "typecheck": "next typegen && tsc --noEmit -p tsconfig.typecheck.json",
     "check": "npm run typecheck && npm run lint && npm run test:unit && npm run build",
     "prod:status": "scripts/status-production-fast.sh",

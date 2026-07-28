@@ -91,7 +91,7 @@ export default function CompanyContextPicker({
       presentation="responsive-dialog"
       initialFocusRef={searchInputRef}
       panelClassName="sm:max-w-[560px]"
-      contentClassName="px-base pb-[calc(env(safe-area-inset-bottom)+20px)] sm:p-lg"
+      contentClassName="company-context-picker-safe-content px-base sm:p-lg"
       testId="company-context-picker"
     >
       <section className="grid gap-4" data-onboarding-target={dataOnboardingTarget}>

@@ -37,6 +37,72 @@ describe("Pulse learning source", () => {
     expect(first[0]?.metadata.source_label).toBeTruthy();
   });
 
+  it("keeps a small priority-sorted early company-story reservoir for the device", () => {
+    const [base] = buildLearningCandidates(new Date("2026-07-15T00:00:00.000Z"));
+    expect(base).toBeTruthy();
+    const lowPriority = {
+      ...base!,
+      item_key: "learning:company-low",
+      source_id: "company-low",
+      metadata: { ...base!.metadata, editorial_placement: "early", editorial_priority: 1 },
+    };
+    const highPriority = {
+      ...base!,
+      item_key: "learning:company-high",
+      source_id: "company-high",
+      metadata: { ...base!.metadata, editorial_placement: "early", editorial_priority: 9 },
+    };
+    const first = selectLearningCandidate([lowPriority, highPriority], "user-1", new Date("2026-07-15T00:00:00.000Z"));
+    const refreshed = selectLearningCandidate([lowPriority, highPriority], "user-1", new Date("2026-07-15T22:00:00.000Z"));
+
+    expect(first.map((candidate) => candidate.source_id)).toEqual(["company-high", "company-low"]);
+    expect(refreshed.map((candidate) => candidate.source_id)).toEqual(["company-high", "company-low"]);
+  });
+
+  it("mixes personally relevant, editorial, and exploratory company-story candidates", () => {
+    const [base] = buildLearningCandidates(new Date("2026-07-15T00:00:00.000Z"));
+    expect(base).toBeTruthy();
+    const story = (id: string, options: {
+      priority: number;
+      coverage?: "interest" | null;
+      recentResearch?: boolean;
+      affinity?: number;
+    }) => ({
+      ...base!,
+      item_key: `learning:${id}`,
+      source_id: id,
+      ticker: id.toUpperCase(),
+      coverage_level: options.coverage ?? null,
+      has_recent_research: options.recentResearch ?? false,
+      research_affinity: options.affinity ?? 0,
+      metadata: {
+        ...base!.metadata,
+        editorial_placement: "early",
+        editorial_priority: options.priority,
+      },
+    });
+    const candidates = [
+      story("personal-interest", { priority: 0, coverage: "interest" }),
+      story("personal-research", { priority: 0, recentResearch: true, affinity: 8 }),
+      ...Array.from({ length: 10 }, (_, index) => story(`editorial-${index}`, { priority: 10 - index })),
+    ];
+
+    const selected = selectLearningCandidate(
+      candidates,
+      "user-1",
+      new Date("2026-07-15T00:00:00.000Z"),
+    );
+
+    expect(selected).toHaveLength(8);
+    expect(selected.map((candidate) => candidate.source_id)).toContain("personal-interest");
+    expect(selected.map((candidate) => candidate.source_id)).toContain("personal-research");
+    expect(selected.filter((candidate) => candidate.metadata.editorial_candidate_role === "personal"))
+      .toHaveLength(2);
+    expect(selected.filter((candidate) => candidate.metadata.editorial_candidate_role === "explore"))
+      .toHaveLength(2);
+    expect(new Set(selected.map((candidate) => candidate.item_key))).toHaveLength(8);
+  });
+
   it("rejects content without a source link and incomplete four-panel text", () => {
     const invalid = {
       slug: "invalid",

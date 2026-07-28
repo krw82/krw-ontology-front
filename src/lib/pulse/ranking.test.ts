@@ -111,4 +111,32 @@ describe("Pulse V5 flat server candidate pool", () => {
 
     expect(buildPulseCandidatePool(ranked, now).map((item) => item.item_key)).toEqual(["filing:fresh"]);
   });
+
+  it("reserves thirty ordinary candidates while bounding Form 4 and company-story reservoirs", () => {
+    const ordinary = Array.from({ length: 40 }, (_, index) => candidate(`filing:ordinary:${index}`, {
+      ticker: `ORD${index}`,
+      metadata: { form_type: "8-K" },
+    }));
+    const form4 = Array.from({ length: 20 }, (_, index) => candidate(`filing:form4:${index}`, {
+      ticker: `FORM${index}`,
+      metadata: { form_type: "4", form4_has_reported_open_market_trade: true },
+    }));
+    const stories = Array.from({ length: 16 }, (_, index) => candidate(`learning:story:${index}`, {
+      kind: "learning",
+      source_type: "learning",
+      ticker: `STORY${index}`,
+      metadata: { editorial_placement: "early", editorial_priority: 5 },
+    }));
+
+    const pool = buildPulseCandidatePool(rankPulseCandidates([...ordinary, ...form4, ...stories], now), now);
+    const selectedForm4 = pool.filter((item) => String(item.metadata.form_type) === "4");
+    const selectedStories = pool.filter((item) => item.kind === "learning" && item.metadata.editorial_placement === "early");
+    const selectedOrdinary = pool.filter((item) => !selectedForm4.includes(item) && !selectedStories.includes(item));
+
+    expect(pool).toHaveLength(PULSE_CANDIDATE_POOL_MAX);
+    expect(selectedForm4).toHaveLength(10);
+    expect(selectedStories).toHaveLength(8);
+    expect(selectedOrdinary).toHaveLength(30);
+  });
+
 });

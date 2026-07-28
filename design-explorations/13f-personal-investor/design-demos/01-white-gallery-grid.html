@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KRW.O — 13F 방향 1 · White Gallery Grid</title>
+    <style>
+      :root {
+        --paper: #fbfbfa;
+        --paper-blue: #f0f4ff;
+        --ink: #0a0b0d;
+        --sub: #5b616e;
+        --line: #d9dde2;
+        --blue: #003ec7;
+        --up: #007b4a;
+        --down: #b4232f;
+        --serif: "Iowan Old Style", "AppleMyungjo", "Songti SC", "Noto Serif KR", serif;
+        --sans: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+        --mono: "SFMono-Regular", "Menlo", "Consolas", monospace;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--paper);
+        font-family: var(--sans);
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: inherit; text-decoration: none; }
+      .site-header {
+        min-height: 72px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        padding: 0 32px;
+      }
+      .topbar {
+        width: min(1240px, 100%);
+        margin: auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+      }
+      .brand { display: inline-flex; align-items: center; min-height: 44px; }
+      .brand img { width: 73px; height: auto; display: block; }
+      .nav { display: flex; align-items: center; gap: 26px; font-size: 14px; font-weight: 700; color: var(--sub); }
+      .nav .active { color: var(--ink); position: relative; }
+      .nav .active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -10px; height: 2px; background: var(--blue); }
+      .account { min-width: 44px; min-height: 44px; display: grid; place-items: center; border: 1px solid var(--line); font-size: 12px; font-family: var(--mono); }
+      main { width: min(1240px, calc(100% - 64px)); margin: 0 auto; padding: 58px 0 80px; }
+      .eyebrow { margin: 0; color: var(--blue); font: 700 12px/1.4 var(--mono); letter-spacing: .13em; }
+      .page-head { display: flex; justify-content: space-between; align-items: end; gap: 24px; padding-bottom: 29px; border-bottom: 1px solid var(--line); }
+      h1 { margin: 9px 0 0; font: 500 clamp(38px, 5.2vw, 70px)/1.05 var(--serif); letter-spacing: -.05em; }
+      .subhead { margin: 0; max-width: 365px; color: var(--sub); font-size: 15px; line-height: 1.65; }
+      .filing-strip { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 0; border-bottom: 1px solid var(--line); color: var(--sub); font-size: 13px; }
+      .filing-strip strong { color: var(--ink); }
+      .filing-strip .source { color: var(--blue); font-weight: 800; }
+      .board { display: grid; grid-template-columns: 1.46fr .77fr .77fr; grid-template-rows: 272px 190px; gap: 12px; padding-top: 36px; }
+      .tile { min-width: 0; border: 1px solid var(--line); padding: 24px; }
+      .lead { grid-row: span 2; display: flex; flex-direction: column; justify-content: space-between; padding: 30px; background: var(--paper-blue); border-color: #cad4f3; }
+      .lead .number { font: 600 14px/1 var(--mono); color: var(--blue); }
+      .lead h2 { margin: 20px 0 14px; max-width: 630px; font: 500 clamp(33px, 3.5vw, 53px)/1.14 var(--serif); letter-spacing: -.05em; }
+      .lead p { max-width: 530px; margin: 0; color: #394152; font-size: 16px; line-height: 1.7; }
+      .lead-foot { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-top: 26px; font-size: 12px; color: var(--sub); }
+      .lead-foot span:last-child { color: var(--blue); font-weight: 800; white-space: nowrap; }
+      .movement { display: flex; flex-direction: column; justify-content: space-between; }
+      .movement h3, .holdings h2 { margin: 0; font-size: 14px; letter-spacing: -.02em; }
+      .movement .tag { font: 700 11px/1 var(--mono); letter-spacing: .09em; }
+      .up .tag { color: var(--up); }
+      .down .tag { color: var(--down); }
+      .ticker { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 18px; }
+      .ticker strong { font: 700 28px/1 var(--mono); letter-spacing: -.06em; }
+      .ticker em { font-style: normal; font: 700 16px/1 var(--mono); }
+      .up em { color: var(--up); }
+      .down em { color: var(--down); }
+      .ticker small { display: block; margin-top: 5px; color: var(--sub); font-size: 12px; }
+      .quiet { background: #f4f5f6; display: flex; flex-direction: column; justify-content: space-between; }
+      .quiet p { margin: 0; max-width: 210px; font: 500 23px/1.35 var(--serif); letter-spacing: -.035em; }
+      .quiet .rule { color: var(--sub); font-size: 12px; line-height: 1.55; }
+      .quiet .rule b { color: var(--ink); }
+      .holdings { margin-top: 50px; border-top: 1px solid var(--ink); }
+      .holdings-head { display: flex; align-items: end; justify-content: space-between; gap: 20px; padding: 22px 0 16px; }
+      .holdings h2 { font: 500 28px/1.15 var(--serif); letter-spacing: -.045em; }
+      .holdings-head p { margin: 0; color: var(--sub); font-size: 13px; }
+      .rows { border-top: 1px solid var(--line); }
+      .row { display: grid; grid-template-columns: 40px minmax(220px, 1fr) 112px 128px 50px; align-items: center; gap: 16px; min-height: 72px; border-bottom: 1px solid var(--line); font-size: 14px; }
+      .rank { font: 11px/1 var(--mono); color: var(--sub); }
+      .company b { display: block; font-size: 15px; }
+      .company span { color: var(--sub); font: 11px/1.5 var(--mono); }
+      .row .weight, .row .value { text-align: right; font: 700 13px/1 var(--mono); }
+      .row .label { display: none; }
+      .arrow { color: var(--blue); text-align: right; font-size: 21px; }
+      .footer-note { margin: 22px 0 0; color: var(--sub); font-size: 12px; line-height: 1.6; }
+      @media (max-width: 720px) {
+        .site-header { min-height: 62px; padding: 0 20px; }
+        .brand img { width: 62px; }
+        .nav { display: none; }
+        main { width: min(100% - 40px, 560px); padding: 36px 0 52px; }
+        .page-head { display: block; padding-bottom: 24px; }
+        h1 { font-size: 42px; }
+        .subhead { margin-top: 18px; font-size: 16px; }
+        .filing-strip { align-items: flex-start; line-height: 1.55; }
+        .filing-strip .source { width: 100%; }
+        .board { display: flex; flex-direction: column; gap: 10px; padding-top: 26px; }
+        .tile { min-height: 0; padding: 20px; }
+        .lead { min-height: 380px; padding: 25px 22px; order: -1; }
+        .lead h2 { margin-top: 16px; font-size: 37px; }
+        .lead p { font-size: 16px; }
+        .movement { min-height: 190px; }
+        .quiet { min-height: 175px; }
+        .holdings { margin-top: 36px; }
+        .holdings-head { display: block; padding: 18px 0 13px; }
+        .holdings h2 { font-size: 25px; }
+        .holdings-head p { margin-top: 8px; line-height: 1.5; }
+        .row { grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; padding: 13px 0; min-height: 0; }
+        .company b { font-size: 15px; }
+        .row .weight, .row .value { display: none; }
+        .arrow { font-size: 19px; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Direction 1: a quiet, asymmetric grid; data mirrors the current NPS 13F screen. -->
+    <header class="site-header">
+      <div class="topbar">
+        <a class="brand" href="#" aria-label="KRW.O 홈"><img src="../assets/krw-logo.svg" alt="KRW.O" /></a>
+        <nav class="nav" aria-label="주요 메뉴"><a href="#">홈</a><a href="#">기업</a><a href="#">시장</a><a class="active" href="#">13F 보유</a></nav>
+        <a class="account" href="#" aria-label="내 계정">JW</a>
+      </div>
+    </header>
+    <main>
+      <div class="page-head">
+        <div>
+          <p class="eyebrow">SEC 13F / INSTITUTIONAL NOTES</p>
+          <h1>국민연금공단</h1>
+        </div>
+        <p class="subhead">기관의 공시를 한 장의 투자 메모처럼 읽습니다. 지금의 보유가 아니라 <b>2026년 1분기 말</b>의 기록입니다.</p>
+      </div>
+      <div class="filing-strip">
+        <span><strong>2026.03.31 기준</strong> · 상위 보유 시가 $66.4B</span>
+        <span>직전 분기와 비교한 비중 변화</span>
+        <a class="source" href="#">원문 13F 보기 ↗</a>
+      </div>
+
+      <section class="board" aria-label="이번 분기 핵심 변화">
+        <article class="tile lead">
+          <div>
+            <span class="number">01 / THIS QUARTER</span>
+            <h2>에너지 쪽으로,<br />조금 더 무게를 옮겼어요.</h2>
+            <p>Exxon Mobil과 Chevron의 비중이 모두 늘었습니다. 숫자를 따라가기 전에, 이 변화가 내 관심 종목과 겹치는지 먼저 확인해 보세요.</p>
+          </div>
+          <div class="lead-foot">
+            <span>공시의 ‘증가’는 매수 추천이 아니라<br />직전 분기와의 보유 비중 비교입니다.</span>
+            <span>변화 종목 보기 →</span>
+          </div>
+        </article>
+
+        <article class="tile movement up">
+          <div><span class="tag">비중 증가 / 1</span><h3>가장 크게 늘린 종목</h3></div>
+          <div class="ticker"><div><strong>XOM</strong><small>Exxon Mobil</small></div><em>+0.39%p</em></div>
+        </article>
+        <article class="tile movement down">
+          <div><span class="tag">비중 감소 / 1</span><h3>가장 크게 줄인 종목</h3></div>
+          <div class="ticker"><div><strong>MSFT</strong><small>Microsoft</small></div><em>−1.00%p</em></div>
+        </article>
+        <article class="tile quiet">
+          <p>처음 보는 숫자라면, ‘왜 바뀌었나’보다 ‘무엇이 바뀌었나’부터.</p>
+          <span class="rule"><b>+ 3</b> XOM · CVX · JNJ<br /><b>− 3</b> MSFT · TSLA · META</span>
+        </article>
+        <article class="tile movement up">
+          <div><span class="tag">비중 증가 / 2</span><h3>에너지 변화</h3></div>
+          <div class="ticker"><div><strong>CVX</strong><small>Chevron</small></div><em>+0.21%p</em></div>
+        </article>
+      </section>
+
+      <section class="holdings" aria-labelledby="holding-title">
+        <div class="holdings-head">
+          <div><p class="eyebrow">THE BIGGEST POSITIONS</p><h2 id="holding-title">계속 크게 보유하는 종목</h2></div>
+          <p>시가 기준 상위 보유 · 공시 시점의 스냅샷</p>
+        </div>
+        <div class="rows">
+          <a class="row" href="#"><span class="rank">01</span><span class="company"><b>NVIDIA</b><span>NVDA · NVIDIA CORPORATION</span></span><span class="weight">6.79%</span><span class="value">$8.9B</span><span class="arrow">→</span></a>
+          <a class="row" href="#"><span class="rank">02</span><span class="company"><b>Apple</b><span>AAPL · APPLE INC.</span></span><span class="weight">5.98%</span><span class="value">$7.9B</span><span class="arrow">→</span></a>
+          <a class="row" href="#"><span class="rank">03</span><span class="company"><b>Microsoft</b><span>MSFT · MICROSOFT CORPORATION</span></span><span class="weight">4.19%</span><span class="value">$5.5B</span><span class="arrow">→</span></a>
+          <a class="row" href="#"><span class="rank">04</span><span class="company"><b>Amazon</b><span>AMZN · AMAZON.COM INC.</span></span><span class="weight">3.23%</span><span class="value">$4.3B</span><span class="arrow">→</span></a>
+        </div>
+        <p class="footer-note">13F에는 미국 상장 증권 중심의 분기말 보유가 담깁니다. 공시 이후 거래나 전체 자산 배분은 반영되지 않을 수 있습니다.</p>
+      </section>
+    </main>
+  </body>
+</html>

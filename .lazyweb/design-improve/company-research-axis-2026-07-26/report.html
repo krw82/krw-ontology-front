@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>회사별 리서치 축을 피드 비주얼로 확장</title>
+    <style>
+      :root { color-scheme: light; --ink:#101828; --body:#475467; --line:#d0d5dd; --blue:#155eef; --blue-soft:#eff4ff; --canvas:#f8fafc; }
+      * { box-sizing: border-box; }
+      body { margin:0; background:var(--canvas); color:var(--ink); font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; line-height:1.62; }
+      main { max-width:900px; margin:0 auto; padding:48px 24px 72px; }
+      h1 { font-size:clamp(30px,5vw,46px); line-height:1.12; letter-spacing:-.045em; margin:0; }
+      h2 { margin:48px 0 12px; font-size:24px; letter-spacing:-.03em; }
+      h3 { margin:0 0 10px; font-size:19px; letter-spacing:-.02em; }
+      p { margin:0 0 12px; color:var(--body); }
+      .eyebrow { color:var(--blue); font-size:12px; font-weight:850; letter-spacing:.16em; text-transform:uppercase; }
+      .lede { margin-top:16px; max-width:700px; font-size:18px; }
+      .callout { margin-top:28px; padding:20px 22px; border:1px solid #bfd3ff; border-radius:14px; background:var(--blue-soft); }
+      .callout strong { color:#00359d; }
+      .image { width:100%; border:1px solid var(--line); border-radius:14px; background:white; box-shadow:0 8px 28px rgb(16 24 40 / 8%); }
+      .caption { margin-top:8px; color:#667085; font-size:13px; }
+      .idea { margin-top:22px; padding:24px; border:1px solid var(--line); border-radius:16px; background:#fff; }
+      .tag { display:inline-block; margin:0 0 8px; padding:3px 8px; border-radius:999px; background:#eef4ff; color:#175cd3; font-size:12px; font-weight:800; }
+      .why { margin-top:14px; padding-left:14px; border-left:3px solid #84adff; }
+      pre { overflow:auto; margin:18px 0 0; padding:16px; border-radius:10px; background:#101828; color:#f9fafb; font:13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+      table { width:100%; margin-top:16px; border-collapse:collapse; background:white; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+      th, td { padding:13px 14px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+      th { background:#f2f4f7; font-size:13px; }
+      tr:last-child td { border-bottom:0; }
+      .gallery { display:grid; gap:16px; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); }
+      .ref { overflow:hidden; border:1px solid var(--line); border-radius:12px; background:#fff; }
+      .ref img { display:block; width:100%; max-height:420px; object-fit:cover; object-position:top; }
+      .ref div { padding:12px; font-size:13px; color:var(--body); }
+      a { color:#175cd3; font-weight:700; }
+      ul { margin:8px 0 0; padding-left:20px; color:var(--body); }
+      @media (max-width:600px) { main { padding:32px 16px 56px; } .idea { padding:18px; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Design improvement · Company research axis</p>
+      <h1>회사 소개의 리서치 축을<br />피드의 그림 콘텐츠로</h1>
+      <p class="lede">범용적인 공시 공부 카드보다, 사용자가 보고 있는 회사가 무엇으로 돈을 벌고 무엇이 흔들릴 수 있는지를 짧은 시각 카드로 보여주는 편이 KRW.O의 리서치 흐름과 맞습니다.</p>
+
+      <section class="callout">
+        <strong>결론</strong><br />회사 소개의 ‘리서치 축’은 원본 데이터로 유지하고, 피드에는 그중 <em>지금 확인할 한 축</em>만 4:5 카드로 보여주세요. 같은 내용을 이미지와 표로 반복하는 것이 아니라, 이미지는 이해의 입구, 회사 소개는 전체 지도의 역할을 맡습니다.
+      </section>
+
+      <h2>현재 화면</h2>
+      <img class="image" src="references/current.png" alt="애질런트 테크놀로지스 회사 소개의 리서치 축" />
+      <p class="caption">현재 회사 소개는 ‘사업 활동’과 ‘추적 변수’를 분리해, 클릭하면 공시 근거 리서치로 이어지는 구조다.</p>
+
+      <h2>개선 아이디어</h2>
+
+      <article class="idea">
+        <span class="tag">가장 큰 기회</span>
+        <h3>1. 회사마다 ‘한 장의 투자 지도’를 만든다</h3>
+        <p>피드의 비주얼 카드는 회사 로고만 바꾼 템플릿이 아니라, 해당 회사의 사업 구조를 한 문장으로 잡아주는 표지여야 합니다. 애질런트라면 “장비 판매 + 소모성 시약의 반복 매출”처럼요. 그 아래에는 오늘 클릭할 리서치 축 하나만 둡니다.</p>
+        <p class="why"><strong>왜:</strong> Public의 모바일 종목 화면은 회사명·현재 상태·차트를 첫 화면에 밀도 있게 모읍니다. KRW.O에서는 차트 대신 ‘이 회사의 핵심 수익 구조’를 첫 시각 신호로 두는 편이 차별점이 됩니다.</p>
+        <pre>┌──────────────────────────┐
+│  A  애질런트 테크놀로지스   │
+│                            │
+│  장비 + 소모성 시약으로      │
+│  반복 수요를 쌓는 회사        │
+│                            │
+│  이번에 볼 축               │
+│  소모성 시약과 반복 매출 비중 │
+│                       01/03 │
+└──────────────────────────┘</pre>
+      </article>
+
+      <article class="idea">
+        <span class="tag">정보 구조</span>
+        <h3>2. 이미지에는 한 축, 회사 소개에는 전체 축</h3>
+        <p>회사 소개의 현재 5개 사업 축과 2개 위험 변수를 모두 피드 카드에 넣지 마세요. 피드는 ‘이번 주에 이해할 한 가지’, 회사 소개는 ‘이 회사를 계속 볼 때의 전체 목차’로 역할을 분리하는 편이 읽기 쉽습니다.</p>
+        <p class="why"><strong>왜:</strong> Stock Analysis처럼 회사 페이지의 탭과 요약은 전체 탐색에 적합합니다. 하지만 스크롤 피드에서 같은 밀도로 반복하면 카드가 무거워집니다. 카드 탭 시 회사 소개의 해당 축으로 이동하거나, 그 축을 이미 채운 리서치 질문으로 바로 진입시키면 됩니다.</p>
+        <pre>피드 카드                  회사 소개
+────────                  ───────────────
+오늘 볼 1개 축  ──탭──→   사업 활동 5개
+짧은 맥락 · 1개 질문      추적 변수 2개
+4:5 스와이프               전체 리서치 목차</pre>
+      </article>
+
+      <article class="idea">
+        <span class="tag">콘텐츠 운영</span>
+        <h3>3. 회사 데이터와 이미지 편집을 분리한다</h3>
+        <p>리서치 축 문구는 회사 소개의 검수된 프로필을 원본으로 사용하고, 비주얼은 별도의 편집 자산으로 관리하세요. 이미지 생성 결과를 원본 진술처럼 다루지 않으면 사실성·업데이트 문제가 커집니다.</p>
+        <table>
+          <thead><tr><th>층</th><th>무엇을 담나</th><th>갱신 기준</th></tr></thead>
+          <tbody>
+            <tr><td>회사 리서치 프로필</td><td>사업 서명, 사업 축, 위험 변수, 연결 질문</td><td>사업 구조나 투자 논지가 바뀔 때</td></tr>
+            <tr><td>비주얼 카드</td><td>표지 이미지·색·아이콘·짧은 설명·선택된 축</td><td>필요할 때 편집자가 제작</td></tr>
+            <tr><td>피드 노출</td><td>사용자 관심 종목과 최근 공시 맥락에 맞는 카드 1개</td><td>세션·주간 쿨다운 규칙</td></tr>
+          </tbody>
+        </table>
+        <p class="why"><strong>왜:</strong> Simply Wall St의 회사 페이지도 ‘회사 설명’, ‘내러티브’, ‘리스크’를 구분해 보여줍니다. KRW.O도 축 자체와 그 축을 쉽게 이해시키는 그림을 분리해야 오래 운영할 수 있습니다.</p>
+      </article>
+
+      <h2>처음에 만들 카드 3종</h2>
+      <table>
+        <thead><tr><th>카드</th><th>언제 보이나</th><th>연결 위치</th></tr></thead>
+        <tbody>
+          <tr><td>사업 구조 카드</td><td>처음 보는 관심 종목 또는 회사 소개 첫 방문</td><td>회사 소개의 ‘사업 활동’</td></tr>
+          <tr><td>핵심 변수 카드</td><td>실적·8-K·뉴스가 특정 축과 연결될 때</td><td>해당 축의 리서치 질문</td></tr>
+          <tr><td>리스크 카드</td><td>리스크 관련 공시·가이던스·수요 변화가 있을 때</td><td>회사 소개의 ‘추적 변수’</td></tr>
+        </tbody>
+      </table>
+
+      <h2>현재 화면에서 유지할 것</h2>
+      <ul>
+        <li>사업 활동과 추적 변수를 나눈 정보 구조</li>
+        <li>각 축이 막연한 설명이 아니라 공시 근거 리서치로 이어지는 점</li>
+        <li>회사 페이지의 절제된 목록형 밀도 — 이미지는 이 구조를 대체하지 않고 보완해야 함</li>
+      </ul>
+
+      <h2>참고 화면</h2>
+      <div class="gallery">
+        <article class="ref"><img src="references/public-agilent-mobile.png" alt="Public의 Agilent 모바일 종목 화면" /><div><a href="https://public.com/stocks/a">Public · Agilent 모바일 종목 화면</a> [Web]<br />회사 정체성과 현재 상태를 한 화면 상단에 압축한다는 점을 참고.</div></article>
+        <article class="ref"><img src="references/stockanalysis-agilent-mobile.png" alt="Stock Analysis의 Agilent 개요 화면" /><div><a href="https://stockanalysis.com/stocks/a/">Stock Analysis · Agilent 개요</a> [Web]<br />한 회사의 전체 탐색 구조는 별도 화면의 목차로 남겨두는 패턴을 참고.</div></article>
+      </div>
+      <p class="caption">추가 참고: <a href="https://simplywall.st/stocks/us/pharmaceuticals-biotech/nyse-a/agilent-technologies">Simply Wall St의 Agilent 회사 분석</a>은 회사 설명·내러티브·리스크를 구분해 제공한다. [Web]</p>
+    </main>
+  </body>
+</html>

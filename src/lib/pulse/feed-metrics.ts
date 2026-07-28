@@ -1,4 +1,5 @@
 import type { PulseFeedDisplayEntry } from "@/lib/pulse/insider-trade-stack";
+import type { PulseStoryContext } from "@/lib/pulse/device-ranking";
 import type { PulseFeedResponse, PulseItem } from "@/types/api-contracts";
 
 export interface PulseFeedViewMetrics {
@@ -50,6 +51,7 @@ export function pulseViewProperties(
     entry: "first_value" | null;
     onboardingIntent: string | null;
     degradedSources: string[];
+    storyContext?: PulseStoryContext;
   },
 ): Record<string, string | number | string[] | null> {
   return {
@@ -60,5 +62,6 @@ export function pulseViewProperties(
     entry: options.entry,
     onboarding_intent: options.onboardingIntent,
     degraded_sources: options.degradedSources,
+    story_context: options.storyContext ?? "none",
   };
 }

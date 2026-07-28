@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useSearchParams } from "next/navigation";
 import { filingClassificationReason, filingEventTagLabel } from "@/lib/filing-notifications/classification";
 import { trackClientEventSilently } from "@/lib/analytics/client";
@@ -243,9 +243,9 @@ function FilingBriefPanel({ brief, filingEventId, contextTicker }: { brief: Fili
 function AmendmentComparisonPanel({ comparison, contextTicker }: { comparison: AmendmentComparison; contextTicker: string }) {
   if (!comparison.available) return <p className="mt-md rounded-[7px] bg-surface-soft px-sm py-sm text-sm leading-6 text-muted">{comparison.message ?? "비교 가능한 원본 공시를 찾지 못했습니다."}</p>;
   const textDiff = comparison.text_diff;
-  return <div className="mt-md space-y-sm">
+  return <div className="motion-filing-diff mt-md space-y-sm">
     {comparison.original ? <Link href={`/filings/${encodeURIComponent(comparison.original.id)}?${new URLSearchParams({ ticker: contextTicker }).toString()}`} className="inline-flex min-h-11 items-center px-xs text-sm font-bold text-primary underline underline-offset-4">원본 {comparison.original.form_type} · {formatDate(comparison.original.filing_date)} 보기</Link> : null}
-    {textDiff ? <div className="rounded-[7px] bg-surface-soft px-sm py-sm"><p className="text-sm font-extrabold text-ink">원본 대비 <span className="text-emerald-700">{textDiff.addedLines}줄 추가</span> · <span className="text-rose-700">{textDiff.removedLines}줄 삭제</span></p><p className="mt-1 text-xs leading-5 text-muted">원본 {textDiff.comparedOriginalLines}줄과 정정본 {textDiff.comparedAmendmentLines}줄의 정규화된 앞부분을 비교했습니다.</p>{textDiff.lines.length ? <div className="mt-sm space-y-1">{textDiff.lines.map((line, index) => <p key={`${line.kind}-${index}`} className={`rounded-[5px] px-2 py-1 text-xs leading-5 ${line.kind === "added" ? "bg-emerald-50 text-emerald-900" : "bg-rose-50 text-rose-900"}`}><span className="mr-1 font-black" aria-hidden="true">{line.kind === "added" ? "+" : "−"}</span>{line.text}</p>)}</div> : null}</div> : null}
+    {textDiff ? <div className="rounded-[7px] bg-surface-soft px-sm py-sm"><p className="text-sm font-extrabold text-ink">원본 대비 <span className="text-emerald-700">{textDiff.addedLines}줄 추가</span> · <span className="text-rose-700">{textDiff.removedLines}줄 삭제</span></p><p className="mt-1 text-xs leading-5 text-muted">원본 {textDiff.comparedOriginalLines}줄과 정정본 {textDiff.comparedAmendmentLines}줄의 정규화된 앞부분을 비교했습니다.</p>{textDiff.lines.length ? <div className="mt-sm space-y-1">{textDiff.lines.map((line, index) => <p key={`${line.kind}-${index}`} className={`motion-filing-diff-line rounded-[5px] px-2 py-1 text-xs leading-5 ${line.kind === "added" ? "bg-emerald-50 text-emerald-900" : "bg-rose-50 text-rose-900"}`} style={{ "--motion-delay": `${index * 45}ms` } as CSSProperties}><span className="mr-1 font-black" aria-hidden="true">{line.kind === "added" ? "+" : "−"}</span>{line.text}</p>)}</div> : null}</div> : null}
     {comparison.document_changes && (comparison.document_changes.added.length || comparison.document_changes.removed.length) ? <div className="rounded-[7px] border border-hairline px-sm py-sm text-xs leading-5 text-muted">{comparison.document_changes.added.length ? <p>새 첨부: {comparison.document_changes.added.join(", ")}</p> : null}{comparison.document_changes.removed.length ? <p>제외된 첨부: {comparison.document_changes.removed.join(", ")}</p> : null}</div> : null}
     {comparison.note ? <p className="text-xs leading-5 text-muted">{comparison.note}</p> : null}
   </div>;
