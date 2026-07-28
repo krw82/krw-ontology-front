@@ -76,12 +76,12 @@ export function parseMarketIssueSourceSeeds(value: string | undefined): MarketIs
     if (!item || typeof item !== "object" || Array.isArray(item)) continue;
     const record = item as Record<string, unknown>;
     const accountHandle = normalizeHandle(record.accountHandle ?? record.handle);
-    const displayName = normalizedText(record.displayName) || accountHandle;
     const sourceClass = typeof record.sourceClass === "string"
       && SOURCE_CLASSES.includes(record.sourceClass as MarketIssueSourceClass)
       ? record.sourceClass as MarketIssueSourceClass
       : null;
     if (!accountHandle || !sourceClass) continue;
+    const displayName = normalizedText(record.displayName) || accountHandle;
 
     const sourceTags = Array.isArray(record.sourceTags)
       ? record.sourceTags

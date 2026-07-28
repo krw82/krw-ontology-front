@@ -402,10 +402,9 @@ export async function getMarketIssueDetail(input: {
     .from("market_issues")
     .select("*")
     .eq("id", issueId)
-    .eq("env", settings.env)
-    .maybeSingle();
+    .eq("env", settings.env);
   if (!includeUnpublished) query = query.eq("state", "published");
-  const { data, error } = await query;
+  const { data, error } = await query.maybeSingle();
   if (error) throw error;
   const issue = asRow(data);
   if (!issue) return null;
