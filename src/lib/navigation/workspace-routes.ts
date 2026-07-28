@@ -9,6 +9,7 @@ import { buildNewChatHref } from "@/lib/chat/history-state";
 
 export type WorkspaceRouteId =
   | "feed"
+  | "news"
   | "discover"
   | "wideResearch"
   | "perspectives"
@@ -83,6 +84,15 @@ const WORKSPACE_ROUTES: WorkspaceRouteDefinition[] = [
     onboardingTarget: "research-pulse-nav",
     href: (locale) => queryLocalizedPath(locale, "/pulse"),
     matches: (pathname) => pathname === "/pulse" || pathname.startsWith("/pulse/"),
+  },
+  {
+    id: "news",
+    group: "now",
+    icon: "newspaper",
+    labels: { ko: "뉴스", en: "News" },
+    onboardingTarget: "market-issues-nav",
+    href: (locale) => queryLocalizedPath(locale, "/news"),
+    matches: (pathname) => pathname === "/news" || pathname.startsWith("/news/"),
   },
   {
     id: "companies",
@@ -175,6 +185,7 @@ export function getWorkspaceShellMode(pathname: string): WorkspaceShellMode {
 
   if (
     matchesSegment(normalizedPathname, "/pulse") ||
+    matchesSegment(normalizedPathname, "/news") ||
     matchesSegment(normalizedPathname, "/companies") ||
     matchesSegment(normalizedPathname, "/watchlist") ||
     matchesSegment(normalizedPathname, "/filings") ||
