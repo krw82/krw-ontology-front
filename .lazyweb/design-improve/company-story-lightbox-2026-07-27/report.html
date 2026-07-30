@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Company Story — 확대 뷰어 검토</title>
+    <style>
+      :root{--ink:#101828;--muted:#667085;--line:#e4e7ec;--blue:#175cd3;--soft:#eff8ff;--paper:#fff}*{box-sizing:border-box}body{margin:0;background:#f5f6f8;color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;line-height:1.58}main{width:min(920px,calc(100% - 40px));margin:42px auto 72px}.eyebrow{font-size:12px;font-weight:850;letter-spacing:.14em;color:var(--blue)}h1{margin:7px 0 12px;font-size:clamp(29px,4vw,45px);letter-spacing:-.055em;line-height:1.1}h2{margin:0 0 12px;font-size:22px;letter-spacing:-.035em}h3{margin:0 0 8px;font-size:16px}p{margin:0;color:var(--muted)}.lead{font-size:18px;max-width:760px}.card{margin-top:20px;padding:24px;border:1px solid var(--line);border-radius:18px;background:var(--paper);box-shadow:0 1px 2px rgba(16,24,40,.04)}.callout{margin-top:20px;padding:18px 20px;border-radius:14px;background:var(--soft);color:#1849a9;font-weight:700}.shot{display:block;width:100%;border:1px solid var(--line);border-radius:12px;background:#eef2f6}.caption{margin-top:8px;font-size:13px}.idea{display:grid;grid-template-columns:44px 1fr;gap:12px;margin-top:16px}.num{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#eaf2ff;color:#175cd3;font-weight:850}.wire{margin:14px 0 0;overflow:auto;padding:17px;border:1px solid #d0d5dd;border-radius:12px;background:#fcfcfd;color:#344054;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre}.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}.reference{width:100%;display:block;border:1px solid var(--line);border-radius:12px}.table{width:100%;border-collapse:collapse;margin-top:10px}.table th,.table td{padding:12px 10px;border-top:1px solid var(--line);text-align:left;vertical-align:top}.table th{font-size:13px;color:#475467}.table td{font-size:14px;color:var(--muted)}ul,ol{margin:10px 0 0;padding-left:20px;color:var(--muted)}li+li{margin-top:7px}code{padding:1px 5px;border-radius:5px;background:#eff4ff;color:#1849a9;font-weight:700}footer{margin-top:24px;font-size:13px;color:var(--muted)}@media(max-width:700px){main{width:min(100% - 24px,600px);margin-top:24px}.card{padding:18px}.grid{display:block}.grid>*+*{margin-top:16px}}
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">Company Story / lightbox decision</div>
+      <h1>네. 클릭해서 읽는 확대 뷰어가 맞습니다.</h1>
+      <p class="lead">인포그래픽은 썸네일이 아니라 읽는 콘텐츠입니다. 페이지 안의 캐러셀은 맥락을 보여 주는 미리보기로 두고, 탭하면 현재 장부터 여는 전용 뷰어로 전환합니다.</p>
+      <div class="callout"><b>추천 결정:</b> 회사 상세와 펄스에서 같은 “스토리 뷰어”를 열되, 원본 이미지는 어떤 단계에서도 자르지 않습니다. 확대는 크롭의 대안이 아니라, 작은 화면에서 읽기 편하게 만드는 두 번째 읽기 모드입니다.</div>
+      <section class="card">
+        <h2>현재 상태</h2>
+        <img class="shot" src="references/current.png" alt="현재 회사 이야기 캐러셀" />
+        <p class="caption">작은 인라인 프레임에는 제목·도표가 빽빽한 장을 충분히 읽기 어렵습니다. 여기서는 “다음 장이 있다”는 감각만 주고, 읽기는 확대 뷰어에 맡기는 편이 자연스럽습니다.</p>
+      </section>
+      <section class="card">
+        <h2>권장 동작</h2>
+        <div class="idea"><div class="num">1</div><div><h3>인라인에서는 ‘확대해서 보기’가 분명해야 합니다</h3><p>이미지 전체를 클릭 가능하게 하고, 하단에 <b>확대해서 보기</b>와 ⤢ 아이콘을 둡니다. 스와이프는 장 이동, 탭은 확대라는 역할을 분리해 오작동을 줄입니다.</p></div></div>
+        <div class="idea"><div class="num">2</div><div><h3>확대는 전체 화면에 가까운 읽기 뷰어입니다</h3><p>페이지 위에 팝업을 띄우되, 이미지 비율은 유지하고 <code>object-contain</code>으로 전체를 보입니다. 배경은 과한 다크모드가 아니라, 원본을 돋보이게 하는 반투명 차콜 또는 이미지 색을 아주 옅게 확장한 배경이 적절합니다.</p></div></div>
+        <div class="idea"><div class="num">3</div><div><h3>모바일과 데스크톱의 조작만 다르게 합니다</h3><p>모바일은 손가락 스와이프와 하단 진행 표시, 데스크톱은 좌우 키·큰 화살표·Escape를 제공합니다. 양쪽 모두 X 닫기와 “7 / 8” 위치 표시는 고정합니다.</p></div></div>
+        <pre class="wire">┌───────────────────────────────────────┐&#10;│  ×  아메리칸 익스프레스 · 돈 버는 구조     │&#10;│                              07 / 08  │&#10;│                                       │&#10;│          [ 원본 전체 이미지 ]           │&#10;│           object-contain               │&#10;│                                       │&#10;│      ←                         →       │&#10;│                                       │&#10;│              ● ● ● ● ● ● ● ○           │&#10;└───────────────────────────────────────┘</pre>
+      </section>
+      <section class="card grid">
+        <div><h2>왜 이 패턴인가</h2><p>Lazyweb에서 확인한 Airbnb의 전체 화면 이미지 뷰어는 닫기, 현재 위치, 전용 미디어 공간을 분리합니다. KRW.O에서는 영상 조작 대신 “이전/다음 장”과 진행 표시만 남기면 됩니다. 사진 앱의 문법은 가져오되, 금융 리서치의 차분한 톤은 유지하는 방식입니다.</p><ul><li>페이지 맥락을 잃지 않고 자세히 읽을 수 있습니다.</li><li>작은 인라인 카드의 높이를 무리하게 키우지 않습니다.</li><li>회사 페이지와 펄스가 같은 콘텐츠·같은 뷰어를 재사용합니다.</li></ul></div>
+        <div><img class="reference" src="references/airbnb-fullscreen-viewer.png" alt="Airbnb 전체 화면 이미지 뷰어 참고" /><p class="caption">Airbnb — 닫기·위치 표시가 있는 전체 화면 이미지 뷰어. [Lazyweb]</p></div>
+      </section>
+      <section class="card">
+        <h2>세부 규칙</h2>
+        <table class="table"><thead><tr><th>상황</th><th>규칙</th></tr></thead><tbody><tr><td><b>회사 상세 인라인</b></td><td>2:3 공통 캔버스, 전체 이미지 <code>contain</code>, 하단 “확대해서 보기”.</td></tr><tr><td><b>펄스 피드</b></td><td>첫 장을 미리 보여 주고, 탭하면 현재 장부터 동일한 뷰어를 엽니다. 피드에서만 다른 크롭 규칙을 만들지 않습니다.</td></tr><tr><td><b>데스크톱 뷰어</b></td><td>이미지는 <b>최대 88dvh</b> 안에서 비율 유지. 카드보다 큰 이미지는 축소만 하고 절대 자르지 않습니다. 좌우 버튼은 이미지 밖에 배치합니다.</td></tr><tr><td><b>모바일 뷰어</b></td><td>화면 안전영역을 제외한 높이에서 <code>contain</code>. 스와이프, 상단 X, 하단 진행 점. 브라우저 뒤로 가기 시 닫기.</td></tr><tr><td><b>접근성</b></td><td><code>&lt;dialog&gt;</code> 또는 접근성 있는 모달로 포커스 고정, Escape 닫기, 이미지별 대체 텍스트, 화살표 버튼 라벨을 제공합니다.</td></tr></tbody></table>
+      </section>
+      <section class="card"><h2>구현 순서</h2><ol><li>공통 <b>StoryViewer</b>를 만들고 <code>slides</code>와 <code>initialSlideIndex</code>를 받습니다.</li><li>기존 캐러셀의 이미지를 누르면 해당 인덱스로 StoryViewer를 엽니다.</li><li>회사 상세·펄스가 같은 컴포넌트를 호출합니다.</li><li>이미지는 여전히 <code>contain</code>으로 바꾸고, 화살표를 이미지 바깥으로 옮깁니다.</li><li><code>story_viewer_open</code>, <code>slide_view</code>, <code>story_viewer_complete</code> 이벤트를 기록해 실제로 읽히는지 검증합니다.</li></ol></section>
+      <section class="card"><h2>유지할 점</h2><ul><li>현재의 세로형, 한 장씩 넘기는 서사는 개인투자자가 내용을 따라가기에 좋습니다.</li><li>회사 상세 안에 시리즈가 바로 보이는 구조도 유지합니다. 팝업은 상세 페이지를 대체하지 않습니다.</li><li>작품 같은 그림 톤을 유지하되, 조작 UI만 절제해 별도 다크 서비스처럼 보이지 않게 합니다.</li></ul></section>
+      <footer>현재 캐러셀과 전체 화면 미디어 뷰어 패턴을 비교한 검토입니다. 제품 코드는 변경하지 않았습니다.</footer>
+    </main>
+  </body>
+</html>

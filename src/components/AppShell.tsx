@@ -122,9 +122,9 @@ export default function AppShell({
             initialUserProfile={initialUserProfile}
             initialAuthResolved={initialAuthResolved}
             preserveInitialUserProfile={preserveInitialUserProfile}
-            brandHref="/companies"
+            brandHref="/pulse"
             brandAriaLabel={
-              isEnglishCompanyPath ? "Go to companies" : "회사 목록으로 이동"
+              isEnglishCompanyPath ? "Go to Pulse" : "펄스로 이동"
             }
             showLocaleSwitcher={showLocaleSwitcher}
           />

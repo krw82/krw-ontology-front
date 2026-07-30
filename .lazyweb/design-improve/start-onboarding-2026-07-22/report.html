@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KRW.O 온보딩 흐름 검토</title>
+    <style>
+      :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #121318; background: #f6f7fb; }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 48px 20px 80px; }
+      main { max-width: 920px; margin: 0 auto; }
+      h1 { font-size: clamp(30px, 5vw, 48px); letter-spacing: -0.045em; margin: 0 0 10px; }
+      h2 { margin: 52px 0 16px; font-size: 23px; letter-spacing: -0.025em; }
+      h3 { margin: 0 0 10px; font-size: 18px; }
+      p, li { color: #4e5564; line-height: 1.65; }
+      .eyebrow { color: #2357f4; font: 800 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .12em; text-transform: uppercase; }
+      .lede { max-width: 720px; font-size: 18px; }
+      .callout { margin-top: 26px; padding: 22px 24px; border: 1px solid #c6d6ff; border-radius: 14px; background: #eaf0ff; }
+      .callout strong { color: #153aab; }
+      .flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0; }
+      .step { position: relative; min-height: 152px; padding: 20px; border: 1px solid #dfe3ec; border-radius: 14px; background: #fff; }
+      .step b { display: inline-grid; width: 27px; height: 27px; place-items: center; border-radius: 50%; background: #121318; color: #fff; font-size: 13px; }
+      .step strong { display: block; margin-top: 18px; font-size: 16px; }
+      .step span { display: block; margin-top: 6px; color: #667085; font-size: 14px; line-height: 1.5; }
+      .card { margin: 16px 0; padding: 24px; border: 1px solid #dfe3ec; border-radius: 14px; background: #fff; }
+      .priority { display: inline-block; margin-bottom: 10px; padding: 4px 8px; border-radius: 999px; background: #f0f3f8; color: #485164; font: 800 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .refs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+      figure { margin: 0; overflow: hidden; border: 1px solid #dfe3ec; border-radius: 12px; background: #fff; }
+      figure img { display: block; width: 100%; height: 220px; object-fit: cover; object-position: top; background: #fff; }
+      figcaption { padding: 11px 12px 13px; color: #667085; font-size: 12px; line-height: 1.45; }
+      a { color: #1e4be1; }
+      code { padding: 2px 5px; border-radius: 4px; background: #f0f3f8; color: #252b3a; }
+      .good { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+      .good div { padding: 16px; border-radius: 12px; background: #fff; border: 1px solid #dfe3ec; }
+      .small { font-size: 13px; }
+      @media (max-width: 700px) { .flow, .refs, .good { grid-template-columns: 1fr; } figure img { height: auto; } body { padding-top: 28px; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">KRW.O · Onboarding design review</p>
+      <h1>회사 선택은 먼저. 하지만 “회사 목록 + 설명 투어”는 아닙니다.</h1>
+      <p class="lede">추천 흐름은 <strong>회사 선택 → 그 회사의 첫 공시 변화 확인 → 필요한 순간에 짧은 안내</strong>입니다. 사용자가 선택한 맥락 없이 회사 목록과 제품 설명을 먼저 보게 하면, KRW.O의 핵심 가치인 “질문에 대한 근거”까지 가는 시간이 늘어납니다.</p>
+
+      <section class="callout">
+        <strong>결론</strong>
+        <p>“관심 회사가 있나요?”라는 한 가지 질문은 유지하되, 자유 입력 질문을 첫 화면의 주인공으로 두지 않는 편이 더 낫습니다. 회사가 있는 사람은 바로 선택하게 하고, 없는 사람에게만 <em>오늘의 공시 변화 둘러보기</em>라는 안전한 우회로를 제공합니다. 일반 회사 목록은 탐색 도구이지 첫 성공 자체가 아닙니다.</p>
+      </section>
+
+      <h2>권장 첫 세션</h2>
+      <div class="flow" aria-label="권장 온보딩 흐름">
+        <div class="step"><b>1</b><strong>관심 회사 있나요?</strong><span>있으면 회사 검색·선택, 없으면 회사 목록으로 이동.</span></div>
+        <div class="step"><b>2</b><strong>회사 맥락으로 질문</strong><span>선택한 회사 칩과 실적·리스크·성장 시작 질문을 함께 제시.</span></div>
+        <div class="step"><b>3</b><strong>근거 확인으로 완료</strong><span>답변 뒤 원문 확인을 완료 기준으로 두고 필요한 안내만 표시.</span></div>
+      </div>
+
+      <section class="callout">
+        <strong>사용자 제안 반영</strong>
+        <p>관심 회사가 있으면 <em>회사 선택 → 해당 회사 맥락의 질문</em>으로 바로 들어갑니다. 관심 회사가 없으면 <em>회사 목록 → 회사 선택 → 동일한 질문 흐름</em>으로 이어집니다. 목록에서는 기능 전부를 설명하는 투어가 아니라, 회사 선택·질문·원문 확인의 세 단계만 해당 행동 옆에 짧게 보여줍니다.</p>
+      </section>
+
+      <h2>개선 제안</h2>
+      <article class="card">
+        <span class="priority">최우선 · 첫 화면</span>
+        <h3>회사 선택을 ‘개인화’로 쓰고, 질문 입력은 두 번째 행동으로 내리기</h3>
+        <p>첫 화면의 제목을 <strong>“관심 있는 회사가 있나요?”</strong>로 바꾸고, <strong>“회사 선택”</strong>과 <strong>“아직 없어요”</strong>의 두 갈래만 둡니다. 선택한 뒤에는 회사 칩이 붙은 질문 화면에서 실적·리스크·성장 시작 질문을 제시합니다.</p>
+        <p>현재의 넓은 질문 입력은 경험 많은 사용자에게는 좋지만, 처음 온 사람에게는 “무엇을 물어야 하지?”라는 빈 화면 부담을 만듭니다. 회사 선택은 KRW.O가 바로 공시 맥락을 붙일 수 있는 최소한의 개인화 신호입니다.</p>
+        <p class="small"><a href="https://www.appcues.com/blog/saas-onboarding-screens">Appcues의 온보딩 사례</a>와 <a href="https://userpilot.com/blog/onboarding-screens-examples/">Userpilot의 사례</a> 모두 첫 성공에 맞는 목표/맥락을 먼저 받고, 안내를 점진적으로 공개하는 패턴을 강조합니다. 이 판단은 해당 원칙을 KRW.O의 기업 리서치 흐름에 적용한 설계 추론입니다.</p>
+      </article>
+
+      <article class="card">
+        <span class="priority">높음 · 회사 선택 직후</span>
+        <h3>선택 후에는 회사 목록이 아니라 ‘회사 맥락의 질문’으로 바로 보내기</h3>
+        <p>“회사 선택 → 회사 목록 → 온보딩 설명”은 두 번의 탐색을 요구합니다. 선택한 회사의 질문 화면에서 <strong>최근 실적 변화</strong>, <strong>새 리스크</strong>, <strong>성장 신호</strong>를 시작 질문으로 보여주면, 사용자는 회사 맥락을 잃지 않고 바로 리서치를 시작합니다.</p>
+        <p>회사 목록은 <strong>“아직 없어요”</strong>를 눌렀을 때의 탐색 화면으로 유지하세요. 그 경우에는 검색창에 초점을 두고, 첫 선택 뒤에는 같은 회사 맥락 질문 흐름으로 합류하게 합니다.</p>
+      </article>
+
+      <article class="card">
+        <span class="priority">높음 · 제품 설명</span>
+        <h3>설명은 투어 대신 행동에 붙이기</h3>
+        <p>회사 목록 전체를 가리는 순차형 제품 투어는 아직 사용자의 목표가 생기기 전이라 기억되지 않을 가능성이 큽니다. 대신 실제 첫 회사 화면에서만 다음 세 가지를 1문장씩 보여주세요.</p>
+        <ul>
+          <li><strong>최근 변화</strong> — “공시에서 달라진 점부터 확인합니다.”</li>
+          <li><strong>질문하기</strong> — “이 회사 맥락을 붙여 더 깊게 물어볼 수 있어요.”</li>
+          <li><strong>원문 확인</strong> — “판단 근거가 된 SEC 원문으로 돌아갑니다.”</li>
+        </ul>
+      </article>
+
+      <h2>측정해야 할 것</h2>
+      <p>완료율보다 다음 순서를 봐야 합니다: <code>로그인 → 회사 선택</code>, <code>회사 선택 → 첫 공시 변화 노출</code>, <code>첫 공시 변화 → 원문 열기</code>, <code>첫 질문 제출</code>. KRW.O의 활성화는 단순 회사 선택이 아니라 <strong>근거를 확인한 첫 리서치</strong>로 두는 것이 맞습니다.</p>
+
+      <h2>현재 화면에서 유지할 점</h2>
+      <div class="good">
+        <div><strong>차분한 에디토리얼 톤</strong><p>과장 없이 “원문으로 돌아갈 수 있다”는 약속을 전면에 둔 점이 제품 신뢰와 맞습니다.</p></div>
+        <div><strong>탈출구가 있는 구조</strong><p>강제 설정 없이 회사 목록으로 갈 수 있는 보조 동작은 유지해야 합니다.</p></div>
+      </div>
+
+      <h2>참고 화면</h2>
+      <div class="refs">
+        <figure><img src="references/current.png" alt="현재 KRW.O 시작 화면" /><figcaption><strong>현재 화면</strong><br />자유 질문을 첫 행동으로 둔 KRW.O 시작 화면.</figcaption></figure>
+        <figure><img src="references/appcues-onboarding-article.png" alt="Appcues 온보딩 패턴 기사" /><figcaption><strong><a href="https://www.appcues.com/blog/saas-onboarding-screens">Appcues</a> · Web</strong><br />목표 기반 첫 행동, 점진적 안내, 맥락형 빈 상태 패턴을 검토한 자료.</figcaption></figure>
+        <figure><img src="references/userpilot-onboarding-article.png" alt="Userpilot 온보딩 패턴 기사" /><figcaption><strong><a href="https://userpilot.com/blog/onboarding-screens-examples/">Userpilot</a> · Web</strong><br />개인화와 점진적 공개를 다룬 온보딩 사례 자료.</figcaption></figure>
+      </div>
+      <p class="small">Lazyweb MCP 도구는 이 환경에 노출되지 않아, 이번 검토는 현재 화면 캡처와 공개 웹 레퍼런스로 작성했습니다. 외부 자료는 원칙을 뒷받침하는 참고이며, 수치 개선을 보장하는 근거로 사용하지 않았습니다.</p>
+    </main>
+  </body>
+</html>

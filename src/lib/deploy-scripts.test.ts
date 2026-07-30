@@ -176,6 +176,12 @@ describe("production deploy scripts", () => {
     expect(deployProd).toContain("--apply-migrations");
     expect(deployFast).toContain("krw-ontology-front-web:candidate-");
     expect(deployFast).toContain("Fast activation failed; restoring the previous VM image.");
+    expect(deployFast).toContain("--billing-v2-cutover");
+    expect(deployFast).toContain("Caddyfile.billing-readonly");
+    expect(deployFast).toContain("run_remote_pause_billing_for_cutover");
+    expect(deployFast).toContain(
+      "preserving billing read-only mode instead of restoring legacy payment writes",
+    );
     expect(deployFast).toContain("docker compose");
     expect(deployFast).toContain("run_schema_smoke()");
     expect(deployFast).toContain("run_schema_smoke");
@@ -514,6 +520,10 @@ describe("production deploy scripts", () => {
 
     expect(caddy).toContain("header_up X-KRW-Client-IP {remote_host}");
     expect(caddy).not.toContain("header_up +X-KRW-Client-IP");
+    expect(caddy).toContain("request>uri query");
+    expect(caddy).toContain("replace authKey REDACTED");
+    expect(caddy).toContain("replace customerKey REDACTED");
+    expect(caddy).toContain("replace callbackToken REDACTED");
     expect(compose).toContain(
       "TRUSTED_CLIENT_IP_HEADER=${TRUSTED_CLIENT_IP_HEADER:-x-krw-client-ip}",
     );
@@ -538,7 +548,8 @@ describe("production deploy scripts", () => {
     expect(deployVm).toContain("live_ck_");
     expect(deployVm).toContain("live_sk_");
 
-    expect(readiness).toContain("/api/billing/toss/checkout");
+    expect(readiness).toContain("/api/billing/toss/quote");
+    expect(readiness).toContain("Legacy Toss checkout route must be removed");
     expect(readiness).toContain("401");
     expect(readiness).toContain("ANALYSIS_CREDIT_ENFORCEMENT_MODE");
     expect(readiness).toContain("TOSS_PAYMENTS_CLIENT_KEY");

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AAPL 회사 페이지 UI 점검</title>
+  <style>
+    :root { --ink:#111827; --muted:#556070; --line:#dce2eb; --blue:#0f56d8; --blue-soft:#eef5ff; --surface:#f8fafc; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#f5f7fb; color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; line-height:1.58; }
+    main { max-width:900px; margin:0 auto; padding:48px 24px 80px; }
+    h1 { font-size:32px; letter-spacing:-.045em; margin:0 0 8px; }
+    h2 { font-size:22px; letter-spacing:-.03em; margin:38px 0 12px; }
+    h3 { font-size:17px; margin:0 0 6px; }
+    p { margin:0 0 12px; color:#344054; }
+    .lede { font-size:17px; color:var(--muted); }
+    .callout { margin:24px 0 34px; padding:20px 22px; border:1px solid #bed6ff; border-radius:14px; background:var(--blue-soft); }
+    .callout strong { display:block; margin-bottom:4px; }
+    .grid { display:grid; gap:18px; grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .full { grid-column:1/-1; }
+    figure { margin:0; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:#fff; }
+    figure img { display:block; width:100%; height:auto; }
+    figcaption { padding:10px 12px; color:var(--muted); font-size:13px; }
+    .idea { padding:20px; margin:14px 0; border:1px solid var(--line); border-radius:14px; background:#fff; }
+    .tag { display:inline-block; margin-bottom:8px; padding:3px 8px; border-radius:999px; background:#e8efff; color:#0f56d8; font-size:12px; font-weight:750; }
+    pre { margin:12px 0 0; padding:14px; overflow:auto; border-radius:10px; background:#111827; color:#eef2ff; font-size:12px; line-height:1.45; }
+    a { color:#0f56d8; }
+    ul { padding-left:20px; color:#344054; }
+    @media (max-width:640px) { main { padding:32px 16px 56px; } h1 { font-size:27px; } .grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="tag">DESIGN CHECK · AAPL COMPANY PAGE</p>
+    <h1>스타일은 정돈됐지만, 화면의 우선순위가 아직 분산돼 있습니다.</h1>
+    <p class="lede">현재 화면은 로고·제목·여백·선의 톤이 일관되고 모바일도 읽기 쉽습니다. 다만 939px 전후에서 행동 버튼이 어색하게 줄바꿈되고, 데이터가 없는 공시 영역이 첫 콘텐츠를 차지해 “애플을 이해할 이야기”가 첫 화면에서 보이지 않습니다.</p>
+
+    <section class="callout">
+      <strong>가장 먼저 손볼 한 가지</strong>
+      <span>태블릿 폭에서 <b>분석 시작 / 구루 관점 / 관심</b>을 동일한 행동 묶음으로 정렬하세요. 지금은 2개 버튼 아래에 ‘관심’만 남아, 의도하지 않은 빈 공간처럼 보입니다.</span>
+    </section>
+
+    <h2>현재 상태</h2>
+    <div class="grid">
+      <figure>
+        <img src="references/current.png" alt="AAPL 회사 페이지 데스크톱 현재 화면" />
+        <figcaption>939px 데스크톱: 2개 버튼 뒤에 ‘관심’만 다음 줄로 내려갑니다.</figcaption>
+      </figure>
+      <figure>
+        <img src="references/current-mobile.png" alt="AAPL 회사 페이지 모바일 현재 화면" />
+        <figcaption>430px 모바일: 읽기는 좋지만 행동 3개가 모두 큰 블록이 되어 첫 콘텐츠를 아래로 밉니다.</figcaption>
+      </figure>
+    </div>
+
+    <h2>권장 수정</h2>
+
+    <article class="idea">
+      <span class="tag">P0 · 레이아웃 버그에 가까운 지점</span>
+      <h3>939px 폭의 ‘2 + 1’ 버튼 배치를 없앤다</h3>
+      <p>현재 <code>sm:grid-cols-2</code>에서 분석 시작과 구루만 한 줄을 채우고 관심이 다음 줄에 홀로 남습니다. 768px 이상에서는 <b>주요 CTA 1개 + 보조 행동 2개</b>를 한 줄로 두거나, ‘관심’을 로고/티커 옆의 작은 토글로 옮기면 됩니다. 모바일만 세로 3개를 유지합니다.</p>
+      <pre>데스크톱/태블릿
+[ AAPL 분석 시작 ───────── ] [ 구루 ] [ ♡ 관심 ]
+
+모바일
+[ AAPL 분석 시작            ]
+[ 구루 관점으로 보기         ]
+[ ♡ 관심                    ]</pre>
+      <p><b>왜:</b> StockAnalysis는 가격/핵심 정보 옆에 Watchlist·Alerts·Compare를 한 줄 도구로 묶고, Google Finance는 ‘Add to list’를 회사 식별 정보 근처에 작게 둡니다. 둘 다 주 작업과 보조 작업의 위계를 분리합니다.</p>
+    </article>
+
+    <article class="idea">
+      <span class="tag">P1 · 정보 순서</span>
+      <h3>비어 있는 ‘최근 공시’를 축소하고 회사 이야기를 위로 올린다</h3>
+      <p>지금은 “최근 90일 공시가 없습니다”가 첫 번째 본문 섹션을 차지합니다. 이는 유용한 사실이지만 AAPL을 이해하려 들어온 개인투자자에게는 첫 가치가 아닙니다. 공시가 없을 때는 한 줄 상태로 접거나 13F 뒤로 보내고, <b>회사 이야기 캐러셀을 영웅 영역 바로 다음</b>에 배치하는 편이 목적과 맞습니다.</p>
+      <pre>회사 식별 + 행동
+↓
+이번에 읽을 회사 이야기 (6컷)
+↓
+13F 기관 동향
+↓
+최근 공시 (있을 때 강조 / 없으면 한 줄 상태)</pre>
+      <p><b>왜:</b> Google Finance와 StockAnalysis 모두 회사 식별 바로 다음에 가격·핵심 정보·탭을 보여주고, 빈 상태를 페이지의 주인공으로 만들지 않습니다. KRW.O에서는 그 자리를 ‘회사 이야기’가 맡는 것이 차별점입니다.</p>
+    </article>
+
+    <article class="idea">
+      <span class="tag">P2 · 제목부 밀도</span>
+      <h3>큰 제목의 여백 일부를 ‘회사를 한 문장으로 설명하는 정보’로 바꾼다</h3>
+      <p>“애플 공시 기반 리서치”라는 제목은 명확하지만, 제목 아래에는 지금 행동 버튼만 있습니다. 티커 아래에 <b>Apple · NASDAQ · 소비자 전자제품</b>처럼 짧은 맥락을 넣고, 첫 캐러셀의 제목을 한 줄 미리보기로 노출하면 빈 여백이 의도된 정보 공간으로 바뀝니다. 숫자 대시보드로 과밀하게 만들 필요는 없습니다.</p>
+      <pre>[ 로고 ] AAPL · Apple · NASDAQ
+애플 공시 기반 리서치
+아이폰 너머의 애플 — 서비스 생태계를 6장으로 보기 →</pre>
+    </article>
+
+    <h2>유지할 점</h2>
+    <ul>
+      <li>큰 제목, 얇은 구분선, 절제된 파랑은 KRW.O의 리서치 톤을 잘 만듭니다.</li>
+      <li>모바일의 44px 이상 터치 영역과 읽기 쉬운 행간은 좋습니다.</li>
+      <li>회사 로고와 한국 회사명·티커의 조합은 개인투자자에게 빠른 식별을 제공합니다.</li>
+      <li>13F를 표가 아닌 읽기 쉬운 행으로 보여주는 방향은 유지할 가치가 있습니다.</li>
+    </ul>
+
+    <h2>참고 화면</h2>
+    <div class="grid">
+      <figure>
+        <img src="references/stockanalysis-aapl.png" alt="StockAnalysis AAPL 개요 화면" />
+        <figcaption><a href="https://stockanalysis.com/stocks/aapl/">StockAnalysis · AAPL Overview</a> [Web] — 핵심 맥락과 보조 도구를 같은 상단 정보 영역에 조밀하게 배치합니다.</figcaption>
+      </figure>
+      <figure>
+        <img src="references/google-finance-aapl.png" alt="Google Finance AAPL 개요 화면" />
+        <figcaption><a href="https://www.google.com/finance/beta/quote/AAPL%3ANASDAQ?hl=en">Google Finance · AAPL</a> [Web] — 종목 식별, 목록 추가, 차트·탭을 행동 우선순위에 맞게 분리합니다.</figcaption>
+      </figure>
+    </div>
+    <p style="margin-top:28px;color:#667085;font-size:13px;">참고: 사용자 코멘트 스크린샷의 파란색 덮개와 숫자 마커는 디자인 리뷰 도구 표시이며, 제품 UI 문제로 계산하지 않았습니다.</p>
+  </main>
+</body>
+</html>

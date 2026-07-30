@@ -23,7 +23,7 @@ export default function FloatingAskBar({ selectedTicker }: FloatingAskBarProps) 
   };
 
   return (
-    <div className="pointer-events-none fixed bottom-[calc(16px+env(safe-area-inset-bottom))] left-1/2 z-[100] w-full max-w-[700px] -translate-x-1/2 px-base sm:top-[75%] sm:bottom-auto sm:px-md">
+    <div className="floating-ask-bar pointer-events-none fixed left-1/2 z-[100] w-full max-w-[700px] -translate-x-1/2 px-base sm:top-[75%] sm:px-md">
       <form
         onSubmit={handleSubmit}
         className="pointer-events-auto flex items-center rounded-[10px] border border-hairline bg-surface/95 p-[4px] pl-sm shadow-lg backdrop-blur-sm transition-shadow hover:shadow-xl sm:pl-base"

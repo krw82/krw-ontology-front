@@ -1039,3 +1039,128 @@ test.describe("protected API under dev auth bypass", () => {
     });
   });
 });
+
+test.describe("Billing Flow V2", () => {
+  test.use({ serviceWorkers: "block" });
+
+  test("shows the billed amount before it invokes Toss authorization", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    let quotePayload: Record<string, unknown> | null = null;
+    let confirmPayload: Record<string, unknown> | null = null;
+
+    await page.addInitScript(() => {
+      const testWindow = window as unknown as {
+        TossPayments?: () => {
+          payment: () => {
+            requestBillingAuth: () => void;
+          };
+        };
+        __billingV2TossCalls?: number;
+      };
+      testWindow.__billingV2TossCalls = 0;
+      testWindow.TossPayments = () => ({
+        payment: () => ({
+          requestBillingAuth: () => {
+            testWindow.__billingV2TossCalls =
+              (testWindow.__billingV2TossCalls ?? 0) + 1;
+          },
+        }),
+      });
+    });
+
+    await page.route("**/api/billing/toss/quote", async (route) => {
+      quotePayload = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          operationId: "billing-v2-e2e-operation",
+          kind: "subscribe",
+          fromPlanKey: null,
+          targetPlanKey: "standard",
+          chargedTodayKrw: 7900,
+          nextChargeKrw: 7900,
+          effectiveAt: "2026-07-30T00:00:00.000Z",
+          nextBillingAt: "2026-08-30T00:00:00.000Z",
+          expiresAt: "2026-07-30T00:10:00.000Z",
+        }),
+      });
+    });
+    await page.route("**/api/billing/toss/confirm", async (route) => {
+      confirmPayload = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          operationId: "billing-v2-e2e-operation",
+          status: "awaiting_auth",
+          checkout: {
+            clientKey: "test_ck_billing_v2_e2e",
+            customerKey: "billing-v2-e2e-customer",
+            method: "CARD",
+            successUrl: "https://example.test/success",
+            failUrl: "https://example.test/fail",
+          },
+        }),
+      });
+    });
+
+    await page.goto("/dev/components/billing-v2-e2e", {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(page.getByText("Billing V2 E2E")).toBeVisible();
+    await expect(page.getByText("결제창 준비 중")).toHaveCount(0);
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        }),
+    );
+
+    await page.getByRole("button", { name: "금액 확인 후 구독" }).click();
+    const confirmationDialog = page.getByRole("dialog", { name: "결제 금액 확인" });
+    await expect(confirmationDialog).toBeVisible();
+    await expect(
+      confirmationDialog.getByRole("heading", {
+        name: "결제 내용을 확인해 주세요.",
+      }),
+    ).toBeVisible();
+    await expect(confirmationDialog.getByText("오늘 청구")).toBeVisible();
+    await expect(
+      confirmationDialog.getByText("7,900원", { exact: true }),
+    ).toBeVisible();
+    expect(quotePayload).toMatchObject({
+      kind: "subscribe",
+      targetPlanKey: "standard",
+    });
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const testWindow = window as unknown as {
+            __billingV2TossCalls?: number;
+          };
+          return testWindow.__billingV2TossCalls ?? 0;
+        }),
+      )
+      .toBe(0);
+
+    await confirmationDialog
+      .getByRole("button", { name: "7,900원 확인" })
+      .click();
+    expect(confirmPayload).toMatchObject({
+      operationId: "billing-v2-e2e-operation",
+    });
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const testWindow = window as unknown as {
+            __billingV2TossCalls?: number;
+          };
+          return testWindow.__billingV2TossCalls ?? 0;
+        }),
+      )
+      .toBe(1);
+  });
+});

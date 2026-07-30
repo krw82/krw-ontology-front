@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trackClientEventWithTimeout } from "@/lib/analytics/client";
 import { cn } from "@/lib/utils";
 import { signalPwaInstallEngagement } from "@/components/pwa/lifecycle";
@@ -47,7 +47,17 @@ export default function CompanyWatchlistActions({
   const [coverageLevel, setCoverageLevel] = useState<CoverageLevel | null>(
     initialCoverageLevel ?? null,
   );
+  const [coverageSavedSettled, setCoverageSavedSettled] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!coverageSavedSettled) return;
+    const timeoutId = window.setTimeout(
+      () => setCoverageSavedSettled(false),
+      700,
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [coverageSavedSettled]);
 
   if (!isAuthenticated) {
     return (
@@ -62,6 +72,7 @@ export default function CompanyWatchlistActions({
   const saveCoverageLevel = async (nextLevel: CoverageLevel | null) => {
     if (pendingLevel) return;
     setPendingLevel(nextLevel ?? coverageLevel);
+    setCoverageSavedSettled(false);
     setError(null);
 
     try {
@@ -98,6 +109,7 @@ export default function CompanyWatchlistActions({
       }
 
       setCoverageLevel(nextLevel);
+      setCoverageSavedSettled(nextLevel !== null);
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : labels.error);
     } finally {
@@ -121,6 +133,7 @@ export default function CompanyWatchlistActions({
         <WatchlistButton
           icon={coverageLevel === "interest" ? "check" : "bookmark"}
           selected={coverageLevel === "interest"}
+          settled={coverageSavedSettled}
           disabled={pendingLevel !== null}
           onClick={() => void saveCoverageLevel(coverageLevel === "interest" ? null : "interest")}
         >
@@ -265,6 +278,7 @@ function WatchlistButton({
   icon,
   emphasis = false,
   selected = false,
+  settled = false,
   disabled,
   onClick,
   children,
@@ -272,6 +286,7 @@ function WatchlistButton({
   icon: string;
   emphasis?: boolean;
   selected?: boolean;
+  settled?: boolean;
   disabled: boolean;
   onClick: () => void;
   children: ReactNode;
@@ -282,7 +297,7 @@ function WatchlistButton({
       disabled={disabled}
       onClick={onClick}
       aria-pressed={selected}
-      className={actionClassName(emphasis, selected)}
+      className={cn(actionClassName(emphasis, selected), settled && "motion-watchlist-saved")}
     >
       <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
         {icon}

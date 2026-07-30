@@ -70,8 +70,8 @@ describe("Pulse filing source", () => {
     expect(rpc).toHaveBeenCalledWith("get_pulse_global_filing_candidates_v1", expect.objectContaining({
       p_preferred_tickers: [],
       p_urgent_limit: 24,
-      p_priority_limit: 32,
-      p_discovery_limit: 24,
+      p_priority_limit: 60,
+      p_discovery_limit: 50,
     }));
     expect(rpc).toHaveBeenCalledWith("get_pulse_global_filing_candidates_v1", expect.objectContaining({
       p_preferred_tickers: ["AAPL"],

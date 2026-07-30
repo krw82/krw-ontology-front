@@ -81,7 +81,8 @@ async function reconcileOnce() {
     expiredReservations > 0 ||
     reconciledCoverageUsers > 0 ||
     renewals.checked > 0 ||
-    renewals.expired > 0
+    renewals.expired > 0 ||
+    renewals.recovered > 0
   ) {
     console.info("[billing-worker] reconciled", {
       workerId: WORKER_ID,

@@ -179,6 +179,12 @@ export type StockNewsMCPToolName =
   | "build_news_timeline"
   | "audit_news_sources";
 
+/** Allowed read-only KRW X-feed MCP tool names. */
+export type KrwFeedMCPToolName =
+  | "get_feed_items"
+  | "list_feed_items"
+  | "get_feed_context";
+
 /** Allowed Yahoo Finance MCP tool names */
 export type YahooFinanceMCPToolName =
   "get_yahoo_finance_news" | "get_stock_info";
@@ -221,6 +227,7 @@ export type GuruMCPToolName =
 export type MCPToolName =
   | KRWOntologyMCPToolName
   | StockNewsMCPToolName
+  | KrwFeedMCPToolName
   | YahooFinanceMCPToolName
   | VisualizationMCPToolName
   | KrwFilingsMCPToolName
@@ -1876,7 +1883,7 @@ export interface PulseFeedResponse {
   revision: string;
   generated_at: string;
   snapshot_at: string;
-  ranking_version: "rule_v4" | "rule_v5_flat";
+  ranking_version: "rule_v4" | "rule_v5_flat" | "rule_v6_device" | "rule_v7_refresh" | "rule_v8_hybrid";
   timezone: string;
   date_label: string;
   filter: PulseFilter;

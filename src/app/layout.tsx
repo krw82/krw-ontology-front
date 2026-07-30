@@ -186,8 +186,12 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-canvas text-on-surface">
         {process.env.NODE_ENV !== "production" ? (
+          // This raw inline script needs the request CSP nonce. Browsers
+          // intentionally mask nonce attributes after parsing, so suppress the
+          // resulting false hydration warning in `next dev` for this tag only.
           <script
             nonce={requestHeaders.get("x-nonce") ?? undefined}
+            suppressHydrationWarning
             dangerouslySetInnerHTML={{
               __html: DEVELOPMENT_SERVICE_WORKER_RESET_SCRIPT,
             }}

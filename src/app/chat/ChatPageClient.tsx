@@ -138,6 +138,7 @@ function ChatContent({
   const searchParams = useSearchParams();
   const ticker = searchParams.get("ticker");
   const queryParam = searchParams.get("query");
+  const marketIssueId = searchParams.get("news_issue_id");
   const shareToken = searchParams.get("shareToken");
   const templateId = searchParams.get("templateId");
   const draftMessageId = searchParams.get("draftMessageId");
@@ -461,7 +462,7 @@ function ChatContent({
     activeTicker,
   });
   const hasComposerPrefillParams = Boolean(
-    queryParam || templateId || shareToken || shareStarter,
+    queryParam || marketIssueId || templateId || shareToken || shareStarter,
   );
   const serializedSearchParams = searchParams.toString();
 
@@ -501,6 +502,7 @@ function ChatContent({
 
     const nextParams = new URLSearchParams(serializedSearchParams);
     nextParams.delete("query");
+    nextParams.delete("news_issue_id");
     nextParams.delete("templateId");
     nextParams.delete("shareToken");
     const nextQuery = nextParams.toString();
@@ -536,6 +538,14 @@ function ChatContent({
   // ---------------------------------------------------------------------------
   // Handlers
   // ---------------------------------------------------------------------------
+
+  const recordMarketIssueResearchSubmitted = useCallback(() => {
+    if (!marketIssueId) return;
+    void fetch(
+      `/api/news/issues/${encodeURIComponent(marketIssueId)}/research-submitted`,
+      { method: "POST", keepalive: true },
+    ).catch(() => undefined);
+  }, [marketIssueId]);
 
   const handleSend = useCallback(
     async (
@@ -591,6 +601,7 @@ function ChatContent({
 
         setComposerDraftResetKey((value) => value + 1);
         clearShareStarter();
+        recordMarketIssueResearchSubmitted();
 
         const nextParams = new URLSearchParams({
           sessionId: createdSessionId,
@@ -629,7 +640,10 @@ function ChatContent({
           userUrls: options?.userUrls,
           attachmentIds: options?.attachmentIds,
         });
-        if (result.ok) return { ok: true };
+        if (result.ok) {
+          recordMarketIssueResearchSubmitted();
+          return { ok: true };
+        }
         return { ok: false, message: result.message };
       } catch (error) {
         return {
@@ -646,6 +660,7 @@ function ChatContent({
       clearComposerPrefillParams,
       clearShareStarter,
       createSessionForDraft,
+      recordMarketIssueResearchSubmitted,
       router,
       sendMessage,
       sessionId,
@@ -1213,7 +1228,7 @@ function ChatContent({
             ref={composerHostRef}
             data-onboarding-target="chat-composer"
             className={[
-              "pointer-events-none fixed inset-x-0 bottom-0 z-30 transform-gpu pb-[calc(env(safe-area-inset-bottom)+10px)] transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:pointer-events-auto md:static md:z-auto md:translate-y-0 md:pb-0 md:opacity-100 md:transition-none",
+              "chat-mobile-composer-safe-bottom pointer-events-none fixed inset-x-0 bottom-0 z-30 transform-gpu transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform md:pointer-events-auto md:static md:z-auto md:translate-y-0 md:opacity-100 md:transition-none",
               isComposerCompact || shouldHideDiscoverComposer
                 ? "opacity-0"
                 : "opacity-100",
@@ -1328,7 +1343,7 @@ function ChatContent({
             {isComposerCompact && !shouldHideDiscoverComposer && (
               <motion.div
                 key="compact-composer-pill"
-                className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-base pb-[calc(env(safe-area-inset-bottom)+10px)] md:hidden"
+                className="chat-compact-composer-safe-bottom fixed inset-x-0 bottom-0 z-40 flex justify-center px-base md:hidden"
                 style={{
                   transform: `translate3d(0, -${keyboardOffset}px, 0)`,
                 }}

@@ -135,6 +135,7 @@ describe("materialize-ontology-plugin", () => {
   it("adds Stock News MCP when explicitly enabled and Finnhub is configured", () => {
     const { stdout, mcpConfig } = runMaterialize({
       FINNHUB_API_KEY: "test-finnhub-key",
+      STOCK_NEWS_RELEASE_ENABLED: "1",
       STOCK_NEWS_ENABLED: "1",
       ZAI_API_KEY: undefined,
     });

@@ -114,7 +114,7 @@ function GuruCard({
   return (
     <Link
       href={buildGuruLensHref(lens.key, locale, company?.ticker)}
-      className="group flex min-h-[260px] min-w-0 flex-col rounded-[8px] border border-hairline bg-canvas p-4 text-left text-ink transition-[background-color,border-color,color,transform] hover:border-outline hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-fixed-dim/35"
+      className="group flex min-h-[260px] min-w-0 flex-col rounded-[8px] border border-hairline bg-canvas p-4 text-left text-ink transition-[background-color,border-color,color,transform] hover:border-outline hover:bg-surface-soft active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-fixed-dim/35"
       aria-label={`${displayName} ${
         company
           ? isKo

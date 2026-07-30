@@ -26,7 +26,7 @@ const privacyCopy = {
       {
         title: "1. 수집하는 정보",
         body: [
-          "KRW.O는 서비스 제공을 위해 Google 로그인 과정에서 제공되는 기본 계정 정보(이메일 주소, 이름, 프로필 이미지)와 이메일 로그인에 필요한 계정 정보를 처리할 수 있습니다.",
+          "KRW.O는 서비스 제공을 위해 Google 로그인 과정에서 제공되는 기본 계정 정보(이메일 주소, 이름, 프로필 이미지)를 처리할 수 있습니다.",
           "서비스 이용 과정에서 사용자가 입력한 질문, 채팅 기록, 회사 검색 기록, 리서치 결과, 첨부하거나 붙여넣은 자료가 저장될 수 있습니다.",
           "사용자가 공시 알림을 켜면 브라우저가 발급한 푸시 구독 식별자와 알림 수신 설정, 공시 알림 읽음·클릭 기록이 저장될 수 있습니다. 이 정보에는 기기 이름이나 모델을 저장하지 않습니다.",
           "서비스 안정성 확인을 위해 요청 시각, 오류 기록, 접속 환경 등 운영에 필요한 기술 정보가 처리될 수 있습니다.",
@@ -89,7 +89,7 @@ const privacyCopy = {
       {
         title: "1. Information we collect",
         body: [
-          "KRW.O may process basic account information provided during Google sign-in, such as email address, name, and profile image, as well as account information needed for email sign-in.",
+          "KRW.O may process basic account information provided during Google sign-in, such as email address, name, and profile image.",
           "Questions, chat history, company searches, research results, and materials submitted or pasted by users may be stored as part of the service.",
           "If a user enables filing alerts, the service may store the browser-issued push subscription identifier, alert preferences, and filing-alert read/click records. It does not store a device name or model.",
           "Operational information such as request time, error logs, and access environment may be processed to maintain service reliability.",

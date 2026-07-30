@@ -44,6 +44,7 @@ describe("workspace route model", () => {
       getWorkspaceNavigationItems("ko", "/companies").map((item) => item.id),
     ).toEqual([
       "feed",
+      "news",
       "companies",
       "perspectives",
       "discover",

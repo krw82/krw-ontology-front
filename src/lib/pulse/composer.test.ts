@@ -7,6 +7,7 @@ describe("createUnavailablePulseFeed", () => {
 
     expect(feed.candidate_items).toEqual([]);
     expect(feed.active_analysis_items).toEqual([]);
+    expect(feed.ranking_version).toBe("rule_v8_hybrid");
     expect(feed.source_statuses.every((source) => source.status === "degraded")).toBe(true);
   });
 });

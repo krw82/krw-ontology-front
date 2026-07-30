@@ -2363,15 +2363,17 @@ describe("production cutover fault injection", () => {
 
     expect(mutatingAliases.length).toBeGreaterThan(10);
     for (const [name, command] of mutatingAliases) {
+      const normalizedCommand = command.replace(/^\/bin\/sh\s+/, "");
       const expectedEntrypoint =
         name === "prod:deploy:recover"
           ? /^scripts\/deploy-with-queue-pause\.sh(?:\s|$)/
           : name === "prod:deploy:bootstrap"
             ? /^scripts\/deploy-production-simple\.sh(?:\s|$)/
             : /^scripts\/deploy-production-fast\.sh(?:\s|$)/;
-      expect(command, `${name} bypasses the canonical deploy path`).toMatch(
-        expectedEntrypoint,
-      );
+      expect(
+        normalizedCommand,
+        `${name} bypasses the canonical deploy path`,
+      ).toMatch(expectedEntrypoint);
     }
 
     for (const name of ["prod:deploy:dry", "deploy:prod:dry"]) {

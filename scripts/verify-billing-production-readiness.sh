@@ -3,7 +3,7 @@ set -eu
 
 usage() {
   cat <<'EOF'
-Usage: scripts/verify-billing-production-readiness.sh [--skip-gcp] [--allow-test-toss-keys]
+Usage: scripts/verify-billing-production-readiness.sh [--skip-gcp] [--allow-test-toss-keys] [--require-v2-zero-state]
 
 Verify the paid billing launch gate for production without printing secrets.
 
@@ -14,11 +14,16 @@ Environment:
   REMOTE_FRONT_DIR      Defaults to /home/username/krw-ontology-front
   COMPOSE_PROJECT_NAME  Defaults to krw-ontology-front
   REMOTE_ENV_FILE       Defaults to .env
+
+Use --require-v2-zero-state only for the one-time V2 cutover after V2 is active.
+It requires BILLING_WRITES_ENABLED=0 and asserts that no paid/open billing
+state exists from the active release's V2 verifier.
 EOF
 }
 
 SKIP_GCP=0
 ALLOW_TEST_TOSS_KEYS=0
+REQUIRE_V2_ZERO_STATE=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -31,6 +36,9 @@ while [ "$#" -gt 0 ]; do
       ;;
     --allow-test-toss-keys)
       ALLOW_TEST_TOSS_KEYS=1
+      ;;
+    --require-v2-zero-state)
+      REQUIRE_V2_ZERO_STATE=1
       ;;
     *)
       usage >&2
@@ -79,15 +87,30 @@ require_command curl
 echo "Checking production billing endpoints at $BASE_URL..."
 curl -fsS "$BASE_URL/api/healthz" >/dev/null
 
-checkout_status=$(
+quote_status=$(
   curl -sS -o "$TMP_BODY" -w "%{http_code}" \
     -X POST \
+    -H "Origin: $BASE_URL" \
+    -H "Content-Type: application/json" \
+    --data '{"kind":"subscribe","targetPlanKey":"standard"}' \
+    "$BASE_URL/api/billing/toss/quote" || true
+)
+if [ "$quote_status" != "401" ]; then
+  echo "Unauthenticated Toss V2 quote should return 401, got $quote_status." >&2
+  sed -n '1,20p' "$TMP_BODY" >&2
+  exit 1
+fi
+
+legacy_checkout_status=$(
+  curl -sS -o "$TMP_BODY" -w "%{http_code}" \
+    -X POST \
+    -H "Origin: $BASE_URL" \
     -H "Content-Type: application/json" \
     --data '{"planKey":"standard"}' \
     "$BASE_URL/api/billing/toss/checkout" || true
 )
-if [ "$checkout_status" != "401" ]; then
-  echo "Unauthenticated Toss checkout should return 401, got $checkout_status." >&2
+if [ "$legacy_checkout_status" != "404" ]; then
+  echo "Legacy Toss checkout route must be removed, got $legacy_checkout_status." >&2
   sed -n '1,20p' "$TMP_BODY" >&2
   exit 1
 fi
@@ -113,9 +136,11 @@ require_command gcloud
 cat > "$TMP_REMOTE" <<EOF
 set -eu
 cd '$REMOTE_FRONT_DIR'
+REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR'
 ENV_FILE='$REMOTE_ENV_FILE'
 COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME'
 ALLOW_TEST_TOSS_KEYS='$ALLOW_TEST_TOSS_KEYS'
+REQUIRE_V2_ZERO_STATE='$REQUIRE_V2_ZERO_STATE'
 
 value_of() {
   key="\$1"
@@ -166,6 +191,27 @@ mode_for_toss_key() {
 
 test -f "\$ENV_FILE"
 
+billing_redirect_origin=\$(value_of AUTH_REDIRECT_ORIGIN)
+if [ -z "\$billing_redirect_origin" ]; then
+  billing_redirect_origin=\$(value_of NEXT_PUBLIC_SITE_URL)
+fi
+if [ -z "\$billing_redirect_origin" ]; then
+  billing_redirect_origin=\$(value_of NEXT_PUBLIC_APP_URL)
+fi
+case "\$billing_redirect_origin" in
+  https://0.0.0.0*|https://127.0.0.1*|https://localhost*|http://*|"")
+    echo "A public HTTPS billing redirect origin is required; refusing local or insecure origin: \${billing_redirect_origin:-unset}" >&2
+    exit 1
+    ;;
+  https://*)
+    ;;
+  *)
+    echo "Billing redirect origin must be an absolute HTTPS URL." >&2
+    exit 1
+    ;;
+esac
+echo "OK public billing redirect origin."
+
 mode=\$(value_of ANALYSIS_CREDIT_ENFORCEMENT_MODE)
 if [ "\$mode" != "enforced" ]; then
   echo "ANALYSIS_CREDIT_ENFORCEMENT_MODE must be enforced, got: \${mode:-unset}" >&2
@@ -208,6 +254,51 @@ require_running_key_mode() {
 require_running_key_mode web
 require_running_key_mode billing-worker
 echo "OK running web and billing-worker key mode."
+
+require_running_billing_write_mode() {
+  service="\$1"
+  expected="\$2"
+  docker compose --project-name "\$COMPOSE_PROJECT_NAME" --env-file "\$ENV_FILE" \
+    exec -T "\$service" node -e '
+      const expected = process.argv[1];
+      if ((process.env.BILLING_WRITES_ENABLED || "") !== expected) {
+        throw new Error("Billing write mode mismatch in running container");
+      }
+    ' "\$expected"
+}
+
+if [ "\$REQUIRE_V2_ZERO_STATE" = "1" ]; then
+  writes_enabled=\$(value_of BILLING_WRITES_ENABLED)
+  if [ "\$writes_enabled" != "0" ]; then
+    echo "V2 zero-state cutover requires BILLING_WRITES_ENABLED=0 before activation, got: \${writes_enabled:-unset}" >&2
+    exit 1
+  fi
+  require_running_billing_write_mode web 0
+  require_running_billing_write_mode billing-worker 0
+  echo "OK running web and billing-worker are read-only."
+  ACTIVE_RELEASE_DIR="\$REMOTE_FRONT_DIR"
+  if [ -d "\$REMOTE_FRONT_DIR/.simple-deploy/current" ]; then
+    ACTIVE_RELEASE_DIR=\$(CDPATH= cd -- "\$REMOTE_FRONT_DIR/.simple-deploy/current" && pwd -P)
+  fi
+  ZERO_STATE_SCRIPT="\$ACTIVE_RELEASE_DIR/scripts/verify-billing-v2-zero-state.mjs"
+  if [ ! -f "\$ZERO_STATE_SCRIPT" ]; then
+    echo "Active release is missing the Billing Flow V2 zero-state verifier." >&2
+    exit 1
+  fi
+  zero_state_supabase_url=\$(value_of SUPABASE_URL)
+  if [ -z "\$zero_state_supabase_url" ]; then
+    zero_state_supabase_url=\$(value_of NEXT_PUBLIC_SUPABASE_URL)
+  fi
+  zero_state_service_role_key=\$(value_of SUPABASE_SERVICE_ROLE_KEY)
+  if [ -z "\$zero_state_supabase_url" ] || [ -z "\$zero_state_service_role_key" ]; then
+    echo "Billing Flow V2 zero-state gate is missing Supabase runtime configuration." >&2
+    exit 1
+  fi
+  SUPABASE_URL="\$zero_state_supabase_url" \\
+    SUPABASE_SERVICE_ROLE_KEY="\$zero_state_service_role_key" \\
+    node "\$ZERO_STATE_SCRIPT"
+  echo "OK Billing Flow V2 zero-state gate."
+fi
 EOF
 
 echo "Checking production GCP billing environment..."

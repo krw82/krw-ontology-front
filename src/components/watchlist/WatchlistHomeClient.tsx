@@ -333,7 +333,7 @@ export default function WatchlistHomeClient({
 function WatchlistOverviewSkeleton() {
   return (
     <section
-      className="mt-5 overflow-hidden rounded-[8px] border border-hairline bg-canvas"
+      className="motion-route-loading mt-5 overflow-hidden rounded-[8px] border border-hairline bg-canvas"
       aria-busy="true"
       aria-label="리서치 노트북을 불러오는 중"
     >
@@ -342,12 +342,12 @@ function WatchlistOverviewSkeleton() {
           key={index}
           className="grid min-h-[94px] grid-cols-[104px_minmax(0,1fr)] gap-4 border-b border-hairline px-4 py-3.5 last:border-b-0 xl:grid-cols-[104px_minmax(220px,1fr)_120px]"
         >
-          <div className="h-5 w-16 animate-pulse rounded bg-surface-soft" />
+          <div className="motion-loading-block h-5 w-16 rounded bg-surface-soft" />
           <div className="space-y-2">
-            <div className="h-5 w-36 animate-pulse rounded bg-surface-soft" />
-            <div className="h-4 w-4/5 animate-pulse rounded bg-surface-soft" />
+            <div className="motion-loading-block h-5 w-36 rounded bg-surface-soft" />
+            <div className="motion-loading-block h-4 w-4/5 rounded bg-surface-soft" />
           </div>
-          <div className="hidden h-4 w-14 animate-pulse rounded bg-surface-soft xl:block" />
+          <div className="motion-loading-block hidden h-4 w-14 rounded bg-surface-soft xl:block" />
         </div>
       ))}
     </section>

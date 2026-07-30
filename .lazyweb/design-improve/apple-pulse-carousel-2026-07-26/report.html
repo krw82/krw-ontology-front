@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Apple Pulse 캐러셀 구현 계획</title>
+  <style>
+    :root { color-scheme: light; --ink:#101828; --muted:#667085; --line:#d9e0ea; --blue:#155eef; --blue-soft:#eff4ff; --green:#067647; --paper:#fff; --canvas:#f8fafc; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--canvas); color:var(--ink); font:15px/1.65 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    main { width:min(900px, calc(100% - 32px)); margin:32px auto 72px; }
+    h1,h2,h3 { line-height:1.22; letter-spacing:-.035em; }
+    h1 { margin:0; font-size:36px; }
+    h2 { margin:42px 0 14px; font-size:24px; }
+    h3 { margin:24px 0 8px; font-size:18px; }
+    p { margin:8px 0; }
+    a { color:#1544b4; font-weight:700; }
+    .eyebrow { margin:0 0 8px; color:var(--blue); font-size:12px; font-weight:900; letter-spacing:.15em; }
+    .lead { color:#475467; font-size:18px; }
+    .card { margin-top:18px; padding:22px; border:1px solid var(--line); border-radius:18px; background:var(--paper); box-shadow:0 8px 24px rgba(16,24,40,.04); }
+    .callout { border-color:#c7d7fe; background:var(--blue-soft); }
+    .callout strong { color:#103690; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .grid img { display:block; width:100%; border:1px solid var(--line); border-radius:12px; }
+    .caption { margin:7px 2px 0; color:var(--muted); font-size:12px; }
+    .plan { padding-left:22px; }
+    .plan li { margin:14px 0; }
+    .tag { display:inline-block; margin-right:6px; padding:2px 8px; border-radius:999px; background:#eef2f6; color:#344054; font-size:12px; font-weight:800; }
+    .good { color:var(--green); font-weight:800; }
+    pre { overflow:auto; margin:12px 0; padding:16px; border-radius:12px; background:#101828; color:#eaf0ff; font:12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    table { width:100%; border-collapse:collapse; }
+    th,td { padding:12px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { background:#f8fafc; font-size:13px; }
+    ul { padding-left:20px; }
+    @media (max-width:640px) { main { width:min(100% - 24px,900px); margin-top:20px; } h1 { font-size:28px; } .grid { grid-template-columns:1fr; } .card { padding:16px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">PULSE EDITORIAL · IMPLEMENTATION PLAN</p>
+    <h1>애플 6컷 캐러셀을 Pulse에 넣는 방법</h1>
+    <p class="lead">결론은 기존 <code>carousel</code> 파이프라인을 유지하면서 <strong>시리즈·피드 배포</strong> 개념을 추가하는 것입니다. 이미지와 콘텐츠는 한 번만 저장하고, 애플 회사 페이지는 원본 콘텐츠의 상시 보관소로, Pulse는 일정 기간 발견을 만드는 배포 채널로 사용합니다.</p>
+
+    <section class="card callout">
+      <strong>권장 출시 단위</strong>
+      <p>① AAPL 서비스 생태계 시리즈 생성 → ② 이미지 6장을 한 편의 콘텐츠로 등록 → ③ 애플 회사 페이지에 상시 노출 → ④ 같은 콘텐츠를 Pulse 배포 레코드가 재사용 → ⑤ 최초/재방문 피드에서 2~3번째에 안정적으로 배치합니다. 급한 공시·진행 중 리서치는 절대 밀어내지 않습니다.</p>
+    </section>
+
+    <h2>최종 콘텐츠 구조</h2>
+    <div class="card">
+      <pre>회사 AAPL
+└─ 시리즈: apple-services-ecosystem
+   ├─ 1편: 왜 서비스가 중요해질까?
+   │  └─ 이미지 01~06
+   ├─ 2편: 서비스 마진은 어떻게 봐야 하나?
+   └─ 3편: 앱스토어 규제는 무엇을 바꾸나?
+
+1편 콘텐츠
+├─ 애플 회사 소개: 상시 조회
+└─ Pulse 배포
+   ├─ 노출 기간
+   ├─ 대상 사용자
+   ├─ early / standard 배치
+   └─ 노출 종료 후에도 회사 페이지에는 유지</pre>
+      <p>회사 페이지와 피드는 별도 콘텐츠를 만들지 않습니다. 두 화면 모두 같은 <code>entry_id</code>와 같은 <code>pulse_editorial_assets</code>를 읽습니다. 피드 재노출이 필요할 때는 이미지를 다시 올리는 대신 새 <code>distribution</code>만 생성합니다.</p>
+    </div>
+
+    <h2>DB 설계</h2>
+    <div class="card">
+      <table>
+        <thead><tr><th>테이블</th><th>역할</th><th>핵심 필드</th></tr></thead>
+        <tbody>
+          <tr><td><code>pulse_editorial_series</code> 신규</td><td>종목별 콘텐츠 묶음</td><td><code>id</code>, <code>ticker</code>, <code>slug</code>, <code>title</code>, <code>description</code>, <code>status</code>, 생성자·시간</td></tr>
+          <tr><td><code>pulse_editorial_entries</code> 확장</td><td>한 편의 캐러셀 원본</td><td>기존 필드 + nullable <code>series_id</code>, nullable <code>issue_number</code></td></tr>
+          <tr><td><code>pulse_editorial_assets</code> 유지</td><td>슬라이드와 순서</td><td><code>entry_id</code>, <code>position</code>, 불변 <code>storage_path</code>, alt, 크기·용량</td></tr>
+          <tr><td><code>pulse_editorial_distributions</code> 신규</td><td>원본 콘텐츠의 피드 배포 계획</td><td><code>entry_id</code>, <code>channel</code>, <code>starts_at</code>, <code>ends_at</code>, <code>placement</code>, <code>audience</code>, <code>status</code></td></tr>
+        </tbody>
+      </table>
+      <p><code>series_id</code>는 nullable로 추가해 기존 단발 콘텐츠를 그대로 유지합니다. 회사 페이지의 공개 여부는 entry의 발행 상태가 결정하고, 피드 노출 여부는 distribution이 결정합니다.</p>
+    </div>
+
+    <h2>Storage 설계</h2>
+    <div class="card">
+      <pre>pulse-editorial/                         공개 전달 버킷 1개
+└─ v2/companies/AAPL/
+   └─ series/{series-id}/
+      └─ entries/{entry-id}/
+         └─ slides/
+            ├─ 01-{asset-id}.png
+            ├─ 02-{asset-id}.png
+            └─ 06-{asset-id}.png</pre>
+      <ul>
+        <li>종목별 버킷은 만들지 않습니다. 동일한 공개 읽기 정책을 가진 자산은 <code>pulse-editorial</code> 한 버킷에 둡니다.</li>
+        <li>현재 <code>editorial/{entry-id}/00-image.png</code> 경로도 계속 허용해 기존 콘텐츠를 이동하지 않습니다.</li>
+        <li>경로는 제목이 아니라 UUID를 기준으로 하므로 시리즈·콘텐츠 제목을 바꿔도 URL이 변하지 않습니다.</li>
+        <li>현재 1년 CDN 캐시와 <code>upsert: false</code>를 유지합니다. 슬라이드 수정 시 파일을 덮어쓰지 않고 새 <code>asset-id</code> 경로를 올립니다.</li>
+        <li>공개된 자산은 archive만으로 즉시 삭제하지 않습니다. DB에서 참조가 사라진 파일만 유예 기간 후 정리합니다.</li>
+      </ul>
+      <p>고해상도 원본이나 PSD까지 보관할 요구가 생기기 전에는 별도 원본 버킷을 만들지 않습니다. 필요해질 때만 비공개 <code>pulse-editorial-source</code>를 추가합니다.</p>
+    </div>
+
+    <h2>확인한 입력물</h2>
+    <div class="card">
+      <p><span class="good">적합</span> 제공받은 6장은 모두 1122 × 1402 PNG(약 1.2~1.6MB)입니다. 현재 관리 도구의 제약인 <strong>2~8장, 장당 8MB</strong>를 만족하므로 변환이나 분할 없이 업로드할 수 있습니다.</p>
+      <div class="grid">
+        <figure><img src="references/apple-slide-01.png" alt="아이폰 회사인데 왜 서비스가 중요한가를 묻는 첫 장" /><figcaption class="caption">01 · 훅 — 서비스가 중요한 이유</figcaption></figure>
+        <figure><img src="references/apple-slide-02.png" alt="아이폰 판매만으로 애플을 이해할 수 있는지 묻는 두 번째 장" /><figcaption class="caption">02 · 질문 — 아이폰 판매만 보면 되는가</figcaption></figure>
+        <figure><img src="references/apple-slide-03.png" alt="아이폰 판매가 생태계의 시작임을 설명하는 세 번째 장" /><figcaption class="caption">03 · 전환 — 하드웨어는 생태계 진입점</figcaption></figure>
+        <figure><img src="references/apple-slide-04.png" alt="앱, 광고, 클라우드, 결제와 보증 서비스의 연결을 설명하는 네 번째 장" /><figcaption class="caption">04 · 구조 — 서비스 수익원</figcaption></figure>
+        <figure><img src="references/apple-slide-05.png" alt="고객 관계와 장기 가치를 설명하는 다섯 번째 장" /><figcaption class="caption">05 · 해석 — 고객 관계와 LTV</figcaption></figure>
+        <figure><img src="references/apple-slide-06.png" alt="생태계까지 읽는 투자라는 결론의 여섯 번째 장" /><figcaption class="caption">06 · 결론 — 투자 관점</figcaption></figure>
+      </div>
+    </div>
+
+    <h2>사용자에게 보이는 결과</h2>
+    <div class="card">
+      <p>피드 카드의 머리는 얇게 유지합니다. <strong>애플 아이콘 · 애플 · 리서치 읽기</strong>만 보여주고, 제목과 요약은 이미지 안에 이미 있으므로 중복 표기하지 않습니다. 아이콘과 회사명은 현재처럼 애플 회사 소개로 연결합니다.</p>
+      <pre>피드 첫 진입
+  ├─ 긴급 공시 / 진행 중 리서치 (있으면 우선)
+  ├─ 일반 카드 1개
+  ├─ [애플 6컷 캐러셀]  ← 일별로 2번째 또는 3번째
+  └─ 나머지 일반 카드
+
+캐러셀 카드
+  [애플 로고] 애플 · 리서치 읽기        1 / 6
+  ┌─────────────────────────────────────┐
+  │                                     │
+  │          제공 이미지 한 장           │  ← 좌우로 자연스럽게 스와이프
+  │                                     │
+  └─────────────────────────────────────┘
+  좌우로 넘겨 보기                  ━ ● ○ ○ ○ ○</pre>
+      <p>모바일은 이미지 비율을 원본 그대로 <code>4:5</code>로 고정하고, 데스크톱에서는 카드 폭만 넓어집니다. 자동 넘김은 넣지 않습니다. 이미지 속 문장을 읽는 콘텐츠라서 사용자가 속도를 통제해야 합니다.</p>
+    </div>
+
+    <h2>개발 단계</h2>
+    <ol class="plan">
+      <li><strong>호환 가능한 DB 마이그레이션.</strong><br /><code>pulse_editorial_series</code>와 <code>pulse_editorial_distributions</code>를 만들고 entry에 nullable <code>series_id</code>를 추가합니다. 신규 FK·유니크 인덱스·발행 시간 체크·RLS/service-role 권한을 적용합니다. 기존 entry와 asset은 변경하지 않습니다. distribution 변경도 Pulse 전역 revision을 올리도록 trigger를 추가합니다.</li>
+      <li><strong>불변 Storage 경로와 업로드 API.</strong><br />API가 entry와 asset UUID를 먼저 생성하고 <code>v2/companies/{ticker}/series/{series-id}/entries/{entry-id}/slides/{position}-{asset-id}.{ext}</code>를 사용하게 합니다. 기존·신규 경로를 모두 허용하도록 DB path constraint를 확장합니다. 업로드 실패 시 이번 요청에서 올린 객체만 제거하는 현재 보상 로직은 유지합니다.</li>
+      <li><strong>관리자 콘텐츠 제작 흐름.</strong><br />관리자가 종목을 고른 뒤 기존 시리즈를 선택하거나 새 시리즈를 만들 수 있게 합니다. entry 제목·요약·회차·이미지 2~8장·alt·순서를 작성하고 회사 페이지용 발행 상태를 정합니다. 별도의 Pulse 배포 패널에서 시작/종료 시간, early/standard, 대상 범위를 설정합니다. 회사 페이지와 피드 두 가지 미리보기를 발행 전에 확인합니다.</li>
+      <li><strong>공용 스와이프 컴포넌트.</strong><br /><code>EditorialImageCarousel</code>은 슬라이드 렌더링만 담당합니다. 회사 페이지와 <code>PulseCard</code>는 각각 얇은 wrapper를 두고 제목·여백·행동만 다르게 구성합니다. 6장을 가로로 놓고 <code>overflow-x-auto + scroll-snap</code>으로 한 장씩 정렬합니다. 첫 장은 우선 로드하고 나머지는 lazy load하며 DB의 width/height로 레이아웃 이동을 막습니다.</li>
+      <li><strong>애플 회사 페이지에 원본 콘텐츠 배치.</strong><br />현재 ‘분석 범위/리서치 축’ 자리를 <strong>애플을 읽는 시리즈</strong>로 교체합니다. 발행된 시리즈가 있는 종목은 최신 entry의 캐러셀을 보여주고, 시리즈가 없는 종목은 기존 분석 범위를 그대로 보여주는 fallback을 둡니다. 이후 한 종목에 여러 시리즈가 쌓이면 시리즈 선택과 이전 편 목록을 같은 데이터로 확장합니다.</li>
+      <li><strong>Pulse는 distribution을 읽습니다.</strong><br />피드 소스가 모든 published entry를 직접 읽는 대신, 현재 활성인 distribution과 entry·series·asset을 join합니다. candidate의 <code>source_id</code>는 distribution ID, metadata에는 <code>entry_id</code>와 <code>series_id</code>를 넣습니다. 같은 entry를 나중에 재홍보해도 이미지 복제 없이 새 배포 단위로 노출 상태를 관리할 수 있습니다.</li>
+      <li><strong>2~3번째 안정 배치.</strong><br />early distribution은 긴급 공시·진행 중 리서치를 보호한 다음 2번째 또는 3번째에 삽입합니다. 위치는 <code>user + local-date + distribution</code> 기반 해시로 정해 같은 날 새로고침해도 흔들리지 않습니다. 첫 화면에는 편집 캐러셀을 최대 1개만 둡니다. 서버와 기기 정렬 양쪽에서 같은 예외 규칙을 사용합니다.</li>
+      <li><strong>노출 억제와 대체.</strong><br />배포 기간 종료·일시중지·숨김·학습 끄기·피로도 억제 상태면 피드 후보에서 제외합니다. 다음 활성 distribution이 있으면 대체하고 없으면 일반 피드로 채웁니다. 회사 페이지의 원본 entry는 영향을 받지 않습니다.</li>
+      <li><strong>접근성·분석·검수.</strong><br /><code>aria-roledescription="carousel"</code>, 현재 장, 점 버튼, 데스크톱 이전/다음, 키보드 이동, reduced motion을 제공합니다. 카드 노출뿐 아니라 최대 도달 슬라이드·마지막 장 완료·회사 페이지 이동을 distribution/entry ID 기준으로 기록합니다. 모바일 375/430px, 데스크톱, 느린 네트워크, 이미지 오류, 긴급 카드 다수 상황을 검수합니다.</li>
+    </ol>
+
+    <h2>수정 대상과 이유</h2>
+    <div class="card">
+      <table>
+        <thead><tr><th>대상</th><th>변경</th><th>이유</th></tr></thead>
+        <tbody>
+          <tr><td><code>supabase/migrations/*</code></td><td>series/distribution 테이블, entry FK, path 호환 제약, revision trigger</td><td>콘텐츠 수명과 피드 배포 기간을 분리합니다.</td></tr>
+          <tr><td><code>src/lib/editorial/repository.ts</code></td><td>회사별 시리즈 조회와 활성 distribution join</td><td>두 화면이 같은 원본 데이터를 읽게 합니다.</td></tr>
+          <tr><td><code>src/app/api/editorial/route.ts</code></td><td>series 입력, v2 불변 경로, 이미지 크기 기록</td><td>종목별 다중 시리즈와 장기 캐시를 안전하게 지원합니다.</td></tr>
+          <tr><td><code>src/components/editorial/EditorialImageCarousel.tsx</code></td><td>가로 스크롤·페이지 점·접근성 컨트롤 공용화</td><td>회사 페이지와 피드가 동일한 동작을 재사용합니다.</td></tr>
+          <tr><td><code>companies/[ticker]/page.tsx</code></td><td>시리즈가 있으면 캐러셀, 없으면 기존 분석 범위</td><td>점진적으로 종목별 콘텐츠를 확대할 수 있습니다.</td></tr>
+          <tr><td><code>src/lib/pulse/sources/editorial.ts</code></td><td>published entry 직접 조회 → 활성 distribution 조회</td><td>피드 재노출과 회사 페이지 상시 보관을 분리합니다.</td></tr>
+          <tr><td><code>src/lib/pulse/composer.ts</code></td><td>긴급/활성 분석을 보호한 뒤 2~3번째에 안정 배치</td><td>서버 응답 자체가 올바른 순서를 갖게 하므로 분석·노출 통계도 일관됩니다.</td></tr>
+          <tr><td><code>src/lib/pulse/device-ranking.ts</code></td><td>early 편집 캐러셀을 상단 혼합 예외로 허용</td><td>클라이언트의 개인화 정렬이 다시 캐러셀을 뒤로 보내지 않게 합니다.</td></tr>
+          <tr><td>migration/API/repository/component/ranking tests</td><td>순서, 경로, 발행·배포 분리, 스와이프, 긴급 보호, 억제/대체</td><td>스토리지와 UI가 함께 바뀌므로 계층별 회귀를 막아야 합니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>현재 구조에서 그대로 활용하는 것</h2>
+    <div class="card">
+      <ul>
+        <li><strong>Storage와 DB:</strong> <code>pulse-editorial</code> 버킷, <code>pulse_editorial_entries</code>, <code>pulse_editorial_assets</code>가 이미 있습니다.</li>
+        <li><strong>이미지 수·순서:</strong> 현재 API가 최대 8장, 순번 저장, 캐러셀 검증을 지원합니다. 이번 6장은 정확히 그 범위입니다.</li>
+        <li><strong>회사 표기:</strong> 합성 단계가 AAPL에 <strong>애플</strong> 한국어 이름을 붙이고, 피드 아이콘/회사명은 회사 소개 페이지 링크로 이미 처리합니다.</li>
+        <li><strong>기본 폴백:</strong> 편집 콘텐츠를 읽지 못해도 기존 정적 학습 카드는 사라지지 않습니다.</li>
+      </ul>
+      <p><strong>이번 1차에는 Supabase 마이그레이션이 필요합니다.</strong> 다만 기존 테이블을 갈아엎는 방식이 아니라 series/distribution을 추가하고 nullable FK와 신규 경로를 허용하는 backward-compatible 확장입니다. 애플을 올리기 전에 이 구조부터 넣어야 이후 종목별 시리즈를 다시 이관하지 않습니다.</p>
+    </div>
+
+    <h2>배포 순서와 롤백</h2>
+    <div class="card">
+      <ol class="plan">
+        <li>기존 코드가 그대로 작동하는 DB 마이그레이션부터 배포합니다.</li>
+        <li>repository·API·공용 캐러셀을 배포하되 기존 entry/path 읽기를 유지합니다.</li>
+        <li>AAPL 시리즈와 1편을 draft로 만들고 두 화면을 미리 봅니다.</li>
+        <li>entry를 발행해 애플 회사 페이지에서 먼저 검수합니다.</li>
+        <li>Pulse distribution을 활성화해 early 위치와 피로도 동작을 검수합니다.</li>
+        <li>문제가 생기면 distribution만 pause해 피드에서 즉시 제외합니다. 회사 콘텐츠와 Storage 자산은 삭제하지 않습니다.</li>
+      </ol>
+    </div>
+
+    <h2>검수 기준</h2>
+    <div class="card">
+      <ul>
+        <li>모바일 375px, 430px 및 데스크톱에서 원본 4:5 비율·글자 선명도가 유지된다.</li>
+        <li>1→6 순서가 보장되고, 손가락·트랙패드·마우스·키보드 모두 한 장씩 이동한다.</li>
+        <li>새로고침해도 같은 날 같은 사용자에게는 동일한 2/3번째 위치다.</li>
+        <li>긴급 공시/진행 중 리서치가 앞자리를 차지해도 콘텐츠가 사라지거나 중복되지 않는다.</li>
+        <li>숨김, 학습 끄기, 만료, 억제일 때 빈 슬롯이 생기지 않는다.</li>
+        <li>아이콘과 ‘애플’ 텍스트는 애플 회사 소개로 이동하고, 캐러셀에는 중복 CTA가 없다.</li>
+      </ul>
+    </div>
+
+    <h2>근거</h2>
+    <div class="card">
+      <p>CSS scroll snap은 스크롤이 이미지 중간에서 끝나지 않고 완전한 한 장에 정렬되도록 설계된 기능입니다. <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Scroll_snap/Basic_concepts">MDN Scroll Snap</a></p>
+      <p>캐러셀은 자동 회전보다 사용자가 이동을 통제하고, 장면 상태와 조작 수단을 제공해야 합니다. <a href="https://www.w3.org/WAI/ARIA/apg/patterns/carousel/">W3C WAI-ARIA Carousel Pattern</a></p>
+    </div>
+  </main>
+</body>
+</html>

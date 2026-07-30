@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>기관 13F 보유 공시 — 디자인 리뷰</title>
+    <style>
+      :root {
+        --ink: #101828;
+        --muted: #667085;
+        --line: #e4e7ec;
+        --canvas: #ffffff;
+        --surface: #f8fafc;
+        --blue: #175cd3;
+        --blue-soft: #eff6ff;
+        --green: #067647;
+        --red: #b42318;
+        --amber: #b54708;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: #f8fafc;
+        color: var(--ink);
+        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 16px;
+        line-height: 1.65;
+      }
+      main {
+        width: min(900px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 56px 0 80px;
+      }
+      h1, h2, h3, p { margin-top: 0; }
+      h1 { font-size: clamp(30px, 5vw, 42px); line-height: 1.15; letter-spacing: -0.04em; margin-bottom: 12px; }
+      h2 { font-size: 22px; line-height: 1.3; letter-spacing: -0.02em; margin: 48px 0 16px; }
+      h3 { font-size: 17px; line-height: 1.35; margin-bottom: 8px; }
+      a { color: var(--blue); }
+      .eyebrow {
+        color: var(--blue);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: .13em;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+      }
+      .meta { color: var(--muted); font-size: 14px; }
+      .card {
+        background: var(--canvas);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 24px;
+        box-shadow: 0 1px 2px rgb(16 24 40 / 4%);
+      }
+      .callout {
+        margin-top: 28px;
+        border: 1px solid #b2ddff;
+        border-radius: 14px;
+        background: var(--blue-soft);
+        padding: 22px 24px;
+      }
+      .callout strong { color: #1849a9; }
+      .score {
+        display: flex;
+        gap: 18px;
+        align-items: baseline;
+        margin-top: 28px;
+      }
+      .score-num { font-size: 46px; line-height: 1; font-weight: 850; letter-spacing: -0.06em; }
+      .score-label { color: var(--muted); font-size: 14px; }
+      .screen {
+        display: block;
+        width: 100%;
+        height: auto;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+        box-shadow: 0 10px 25px rgb(16 24 40 / 8%);
+      }
+      .caption { margin-top: 9px; color: var(--muted); font-size: 13px; }
+      .score-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .metric {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px;
+        background: var(--canvas);
+      }
+      .metric dt { color: var(--muted); font-size: 13px; font-weight: 700; }
+      .metric dd { margin: 3px 0 0; font-size: 25px; font-weight: 800; letter-spacing: -0.04em; }
+      .metric p { margin: 3px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+      .keep { padding-left: 20px; }
+      .keep li { margin: 9px 0; }
+      .issue {
+        border-left: 4px solid var(--line);
+        padding: 20px 20px 18px;
+        margin: 18px 0;
+        background: var(--canvas);
+        border-radius: 0 12px 12px 0;
+        box-shadow: 0 1px 2px rgb(16 24 40 / 3%);
+      }
+      .issue.fatal { border-color: var(--red); }
+      .issue.important { border-color: var(--amber); }
+      .issue.optimize { border-color: var(--blue); }
+      .severity { font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+      .fatal .severity { color: var(--red); }
+      .important .severity { color: var(--amber); }
+      .optimize .severity { color: var(--blue); }
+      .issue p { margin-bottom: 10px; }
+      .issue p:last-child { margin-bottom: 0; }
+      .label { font-weight: 800; }
+      pre {
+        overflow-x: auto;
+        margin: 14px 0 0;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #101828;
+        color: #e4e7ec;
+        font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .reference {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 240px;
+        gap: 20px;
+        align-items: start;
+        margin-top: 16px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--canvas);
+      }
+      .reference img { width: 100%; border: 1px solid var(--line); border-radius: 8px; }
+      .quick { list-style: none; padding: 0; }
+      .quick li {
+        margin: 10px 0;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--canvas);
+      }
+      .check { color: var(--blue); font-weight: 900; margin-right: 8px; }
+      .fine { color: var(--muted); font-size: 13px; }
+      @media (max-width: 650px) {
+        main { width: min(100% - 28px, 900px); padding-top: 36px; }
+        .card, .callout { padding: 18px; }
+        .score-grid { grid-template-columns: 1fr; }
+        .reference { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Huashu + Lazyweb design critique</p>
+      <h1>기관 13F 보유 공시 화면</h1>
+      <p class="meta">검토 화면: 국민연금공단 / National Pension Service · 데스크톱 1280×720 · 2026-07-26</p>
+
+      <section class="callout">
+        <strong>TL;DR</strong>
+        <p>
+          기본기는 탄탄합니다. 차분한 여백, 명확한 제목, 증가/감소를 나눈 첫 번째 분석 단위는
+          기관 리서치 제품에 잘 맞습니다. 다만 현재 화면이 전달하는 첫인상은
+          「정돈된 보유 종목 표」에 가깝고, 13F에서 가장 중요한
+          「언제 기준의 공시이며 이전 분기 대비 무엇이 바뀌었는가」는 너무 조용합니다.
+          숫자를 더 넣기보다 공시 맥락과 변화의 우선순위를 더 전면에 세우면 한 단계 올라갑니다.
+        </p>
+      </section>
+
+      <div class="score">
+        <div class="score-num">6.9</div>
+        <div>
+          <strong>좋은 프로덕션 베이스라인</strong>
+          <div class="score-label">완성도는 높지만, 아직은 고유한 13F 리서치 화면보다는 좋은 범용 금융 테이블에 가깝습니다.</div>
+        </div>
+      </div>
+
+      <h2>현재 화면</h2>
+      <img class="screen" src="references/current.png" alt="현재 기관 13F 보유 공시 화면의 데스크톱 캡처" />
+      <p class="caption">현재 화면. 로컬 개발 환경의 Next.js 이슈 배지는 제품 UI 평가에서 제외했습니다.</p>
+
+      <h2>분항 평가</h2>
+      <dl class="score-grid">
+        <div class="metric">
+          <dt>개념 / 입장</dt><dd>6.2 / 10</dd>
+          <p>「분기 변화가 있는 기관 보유 공시」라는 내용은 있으나, 시각적 중심은 아직 일반 보유 테이블입니다.</p>
+        </div>
+        <div class="metric">
+          <dt>철학 일관성</dt><dd>7.7 / 10</dd>
+          <p>과장 없이 신뢰를 주는 흰 캔버스와 얇은 경계선이 기관 데이터라는 톤에 잘 맞습니다.</p>
+        </div>
+        <div class="metric">
+          <dt>시각적 위계</dt><dd>7.2 / 10</dd>
+          <p>제목 → 리밸런싱 → 보유 현황의 흐름은 명확하지만, 공시 맥락과 테이블 변화량의 우선순위가 약합니다.</p>
+        </div>
+        <div class="metric">
+          <dt>디테일 실행</dt><dd>7.3 / 10</dd>
+          <p>정렬과 간격은 안정적입니다. 반면 데스크톱 테이블의 11–13px 보조 텍스트는 장시간 읽기에 작습니다.</p>
+        </div>
+        <div class="metric">
+          <dt>기능성</dt><dd>6.8 / 10</dd>
+          <p>검색과 증감 분리는 유용하지만, 기준일·제출일·비교 분기·원문 출처가 접힌 요약 안에 머뭅니다.</p>
+        </div>
+        <div class="metric">
+          <dt>독창성</dt><dd>5.1 / 10</dd>
+          <p>유행하는 SaaS 장식은 피했지만, 「13F 변화 읽기」만의 시각적 서명은 아직 약합니다.</p>
+        </div>
+      </dl>
+
+      <h2>유지할 점</h2>
+      <ul class="keep">
+        <li><strong>절제된 표면.</strong> 불필요한 그래디언트, 과한 그림자, 장식 아이콘 없이 신뢰 중심의 분위기를 유지합니다.</li>
+        <li><strong>첫 화면의 방향성.</strong> 「보유 비중 증가 / 감소」를 나란히 두어, 단순 보유 목록보다 먼저 변화의 이야기를 제시합니다.</li>
+        <li><strong>제목의 존재감.</strong> 한국어 기관명과 영문명을 함께 둔 큰 제목은 데이터의 주체를 빠르게 고정합니다.</li>
+        <li><strong>보수적인 밀도.</strong> 30개 보유 목록을 카드로 잘게 쪼개지 않은 판단은 맞습니다. 이 화면은 표가 주인공이어야 합니다.</li>
+      </ul>
+
+      <h2>수정 우선순위</h2>
+
+      <article class="issue fatal">
+        <p class="severity">⚠️ 핵심</p>
+        <h3>공시의 시간 맥락을 접어 두지 마세요</h3>
+        <p><span class="label">현재:</span> 헤드라인 아래의 넓은 「공시 요약」 행에는 기준일과 금액만 작게 보이고, 비교 기준·제출일·원문 출처는 열어야 알 수 있습니다.</p>
+        <p><span class="label">문제:</span> 13F는 현재 보유 계좌가 아니라 분기별 공시 스냅샷입니다. 이 사실이 약하면 사용자는 수치의 시간성을 놓치고, 화면은 일반 포트폴리오 트래커처럼 읽힙니다.</p>
+        <p><span class="label">수정:</span> 제목 바로 아래에 접히지 않는 얇은 컨텍스트 바를 두세요. <strong>「2026 Q1 · 보유 기준일 · 제출일 · 직전 분기와 비교 · SEC 원문」</strong>을 한 줄로 보이고, 상세 지표만 펼침 영역으로 남기는 편이 좋습니다.</p>
+        <pre>2026 Q1  ·  보유 기준일  YYYY.MM.DD  ·  제출일  YYYY.MM.DD
+직전 분기와 비교  [2025 Q4 ▾]                 [SEC 원문 ↗]</pre>
+      </article>
+
+      <article class="issue important">
+        <p class="severity">⚡ 중요</p>
+        <h3>보유 테이블의 「변화」를 읽기 쉬운 하나의 축으로 만드세요</h3>
+        <p><span class="label">현재:</span> 비중·수량·평가액 아래에 각각 변화값이 두 줄로 배치됩니다. 정보는 충분하지만, 작은 11px 보조 값과 적녹 색만으로 의미를 구분해야 합니다. 헤더도 한국어 화면 안에서 <em>weight / shares / value</em>로 바뀝니다.</p>
+        <p><span class="label">문제:</span> 수량은 늘었는데 평가액은 줄 수 있는 13F 특성상, 색만 훑으면 사용자가 「무엇이 변했는지」를 잘못 읽기 쉽습니다.</p>
+        <p><span class="label">수정:</span> 데스크톱에서도 본문 수치를 최소 14px, 보조 수치를 최소 12px로 올리고, 헤더 언어를 통일하세요. 각 칼럼의 변화값에는 <strong>Δ 비중 / Δ 수량 / Δ 평가액</strong>이라는 짧은 문맥을 반복 노출하거나, 변화량을 한 개의 명시적 보조 칼럼으로 묶으세요. 적·녹은 보조 신호여야지 유일한 신호가 아니어야 합니다.</p>
+      </article>
+
+      <article class="issue important">
+        <p class="severity">⚡ 중요</p>
+        <h3>증가/감소 카드에 「크기」를 보이게 하세요</h3>
+        <p><span class="label">현재:</span> 두 패널은 행 구조와 텍스트 밀도가 거의 같아, 1위와 5위의 변화량 차이가 숫자를 읽기 전에는 잘 드러나지 않습니다. 로고 배지와 순위 숫자도 섞여 리듬이 조금 흔들립니다.</p>
+        <p><span class="label">수정:</span> 카드의 표 구조는 유지하되, 변화 폭에 비례한 아주 얇은 막대 또는 한 줄의 상대 크기 표시를 넣으세요. 순위 표시는 모두 숫자로 통일하고, 티커는 이름 옆의 보조 정보로 두는 편이 더 정돈됩니다. 큰 차트가 아니라 <strong>랭킹의 시각적 무게</strong>만 추가하는 것이 핵심입니다.</p>
+      </article>
+
+      <article class="issue optimize">
+        <p class="severity">💡 최적화</p>
+        <h3>정보 밀도는 올리되, 카드 수는 늘리지 마세요</h3>
+        <p><span class="label">현재:</span> 첫 화면의 넓은 공시 요약 행은 조용하지만, 바로 아래 리밸런싱과 테이블은 모두 비슷한 흰 패널·얇은 선·행 목록으로 보입니다.</p>
+        <p><span class="label">수정:</span> 새로운 KPI 카드 행을 추가하기보다, 컨텍스트 바와 리밸런싱의 첫 행을 조금 더 강하게 만드세요. 예를 들어 「이번 분기 최대 비중 확대: XOM +0.39%p」를 리밸런싱 제목 오른쪽에 한 줄로 두면, 빈 공간도 줄이고 화면의 서사가 생깁니다.</p>
+      </article>
+
+      <article class="issue optimize">
+        <p class="severity">💡 최적화</p>
+        <h3>개발 전용 이슈 배지는 최종 화면에서 제거하세요</h3>
+        <p>좌하단의 빨간 「1 Issue」 배지는 개발 환경의 Next.js 오버레이로 보입니다. 제품 UI가 아니더라도 데모·스크린샷·QA 환경에서는 신뢰감을 크게 떨어뜨리므로 배포 화면에서 보이지 않도록 확인하세요.</p>
+      </article>
+
+      <h2>참조: 내용상 맞는 패턴</h2>
+      <div class="reference">
+        <div>
+          <p class="eyebrow">[Web] 13F.info</p>
+          <h3>원문·기준일·비교 분기를 표보다 먼저 보여 주기</h3>
+          <p>
+            이 레퍼런스는 미학적으로 복사할 대상은 아닙니다. 다만 표 상단에서
+            <strong>보유 기준일, 제출일, SEC 원문 링크, 비교 분기 선택</strong>을 노출한다는
+            정보 구조는 13F 화면에 정확히 맞습니다. 위의 첫 번째 개선안은 이 패턴을
+            KRW.O의 더 차분한 디자인 시스템에 맞춰 축약해 가져오자는 제안입니다.
+          </p>
+          <p class="fine"><a href="https://13f.info/13f/000160804626000001-national-pension-service-q4-2025">원본 화면 열기 ↗</a></p>
+        </div>
+        <img src="references/13f-info-nps.png" alt="13F.info의 National Pension Service 13F 페이지 캡처" />
+      </div>
+
+      <h2>5분 Quick Wins</h2>
+      <ul class="quick">
+        <li><span class="check">□</span>「공시 요약」을 제목 아래의 1줄 컨텍스트 바 + 선택적 상세 영역으로 분리하기</li>
+        <li><span class="check">□</span>테이블 보조 글자를 12px 이상, 주요 수치를 14px 이상으로 올리고 헤더 언어를 한국어로 통일하기</li>
+        <li><span class="check">□</span>리밸런싱 제목 옆에 최대 증감 종목을 한 줄로 노출하고, 두 리스트의 순위 표기 규칙을 통일하기</li>
+      </ul>
+
+      <p class="fine">
+        평가 범위: 제공된 로컬 데스크톱 화면의 시각·정보 구조. 로그인 이후 상태, 모바일, 실제 정렬·필터 상호작용은 이번 리뷰 범위에 포함하지 않았습니다.
+      </p>
+    </main>
+  </body>
+</html>

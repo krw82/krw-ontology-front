@@ -31,6 +31,8 @@ Options:
   --skip-web               Do not build or switch GCP containers.
   --skip-mac               Do not restart local Mac MCP/worker services.
   --require-live-toss      Require a matching live Toss key pair in the GCP runtime env.
+  --billing-v2-cutover     Freeze billing behind Caddy, deploy V2 read-only, and never
+                          restore legacy billing writes on an activation failure.
   --skip-worker-restart    Compatibility alias for --skip-mac.
   --release-id ID          Safe deployment identifier.
   --env-file FILE          Mac production environment file.
@@ -49,6 +51,7 @@ WITH_DATA=0
 SKIP_WEB=0
 SKIP_MAC=0
 REQUIRE_LIVE_TOSS=0
+BILLING_V2_CUTOVER=0
 RELEASE_ID=
 ENV_FILE=.env.mac-worker.production
 TMP_DIR=
@@ -84,6 +87,7 @@ while [ "$#" -gt 0 ]; do
     --skip-web) SKIP_WEB=1 ;;
     --skip-mac|--skip-worker-restart) SKIP_MAC=1 ;;
     --require-live-toss) REQUIRE_LIVE_TOSS=1 ;;
+    --billing-v2-cutover) BILLING_V2_CUTOVER=1 ;;
     --skip-data|--skip-db-check|--no-restart-queue)
       echo "Compatibility option $1 has no effect on the fast path." >&2
       ;;
@@ -115,6 +119,12 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
+
+if [ "$BILLING_V2_CUTOVER" = "1" ]; then
+  [ "$APPLY_MIGRATIONS" = "1" ] || fail "--billing-v2-cutover requires --apply-migrations."
+  [ "$SKIP_WEB" = "0" ] || fail "--billing-v2-cutover cannot be combined with --skip-web."
+  [ "$REQUIRE_LIVE_TOSS" = "1" ] || fail "--billing-v2-cutover requires --require-live-toss."
+fi
 
 case "$RELEASE_ID" in
   "") RELEASE_ID=$(date +%Y%m%d%H%M%S)-$$ ;;
@@ -183,6 +193,9 @@ require_file "$TARGET_FILE"
 require_file "$ENV_PATH"
 require_file "$SCRIPT_DIR/verify-supabase-production-target.mjs"
 require_file "$SCRIPT_DIR/supabase-cli.sh"
+if [ "$BILLING_V2_CUTOVER" = "1" ]; then
+  require_file "$SCRIPT_DIR/verify-billing-production-readiness.sh"
+fi
 node "$SCRIPT_DIR/verify-supabase-production-target.mjs" "$ENV_PATH" "$FRONT_DIR/supabase/.temp/project-ref" "$TARGET_FILE" --require-origins
 
 GCP_PROJECT=$(target_value gcpProject)
@@ -339,7 +352,7 @@ create_archives() {
   # Keep local test/review artifacts out of the upload. They are not part of
   # the Docker build and can otherwise make a release archive hundreds of MB.
   # Avoid macOS extended attributes so GNU tar on the VM stays quiet too.
-  tar --no-xattrs -C "$FRONT_DIR" --exclude=.git --exclude=.next --exclude=.next-'*' --exclude=.worker --exclude=.services --exclude=node_modules --exclude=.deploy --exclude=.agents --exclude=.codex --exclude=.claude --exclude=.gstack --exclude=.lazyweb --exclude=.vendor --exclude=.pytest_cache --exclude=.env --exclude='.env.*' --exclude=output --exclude=dist --exclude=_workspace --exclude=_temp --exclude=logs --exclude=marketing-video --exclude=.playwright-cli --exclude=.playwright-mcp --exclude=krw-ontology -czf "$FRONT_ARCHIVE" .
+  tar --no-xattrs -C "$FRONT_DIR" --exclude=.git --exclude=.next --exclude=.next-'*' --exclude=.worker --exclude=.services --exclude=node_modules --exclude=.deploy --exclude=.agents --exclude=.codex --exclude=.claude --exclude=.gstack --exclude=.lazyweb --exclude=.vendor --exclude=.pytest_cache --exclude=.env --exclude='.env.*' --exclude=supabase/.temp --exclude=output --exclude=dist --exclude=_workspace --exclude=_temp --exclude=logs --exclude=marketing-video --exclude=.playwright-cli --exclude=.playwright-mcp --exclude=krw-ontology -czf "$FRONT_ARCHIVE" .
 
 }
 
@@ -366,7 +379,7 @@ upload_archive() {
 }
 
 run_remote_prepare() {
-  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="RELEASE_ID='$RELEASE_ID' REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' REMOTE_FRONT_ARCHIVE='$REMOTE_FRONT_ARCHIVE' COMPOSE_PROJECT='$COMPOSE_PROJECT' REQUIRE_LIVE_TOSS='$REQUIRE_LIVE_TOSS' /bin/sh -s"
+  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="RELEASE_ID='$RELEASE_ID' REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' REMOTE_FRONT_ARCHIVE='$REMOTE_FRONT_ARCHIVE' COMPOSE_PROJECT='$COMPOSE_PROJECT' REQUIRE_LIVE_TOSS='$REQUIRE_LIVE_TOSS' BILLING_V2_CUTOVER='$BILLING_V2_CUTOVER' SITE_ORIGIN_ONE='$SITE_ORIGIN_ONE' /bin/sh -s"
 set -e
 test -f "$REMOTE_FRONT_DIR/.env"
 test ! -e "$REMOTE_STAGE"
@@ -374,8 +387,61 @@ mkdir -p "$REMOTE_STAGE"
 tar -xzf "$REMOTE_FRONT_ARCHIVE" -C "$REMOTE_STAGE"
 test -f "$REMOTE_STAGE/docker-compose.yml"
 test -f "$REMOTE_STAGE/Dockerfile.web"
+
+upsert_env_value() {
+  env_file="$1"
+  env_key="$2"
+  env_value="$3"
+  tmp_file=$(mktemp "${env_file}.XXXXXX")
+  awk -v key="$env_key" -v value="$env_value" '
+    $0 !~ /^[[:space:]]*#/ && $0 ~ ("^" key "=") {
+      if (!seen++) print key "=" value
+      next
+    }
+    { print }
+    END { if (!seen) print key "=" value }
+  ' "$env_file" > "$tmp_file"
+  chmod 600 "$tmp_file"
+  mv "$tmp_file" "$env_file"
+}
+
+if [ "$BILLING_V2_CUTOVER" = "1" ]; then
+  case "$SITE_ORIGIN_ONE" in
+    https://*) ;;
+    *)
+      echo "Billing V2 cutover requires a public HTTPS primary origin." >&2
+      exit 1
+      ;;
+  esac
+  # The active V1 container does not read this until a restart. Caddy is
+  # frozen separately below; persisting the value here ensures both the V2
+  # candidate and every future release start in read-only mode.
+  upsert_env_value "$REMOTE_FRONT_DIR/.env" BILLING_WRITES_ENABLED 0
+  upsert_env_value "$REMOTE_FRONT_DIR/.env" AUTH_REDIRECT_ORIGIN "$SITE_ORIGIN_ONE"
+fi
+
 cp "$REMOTE_FRONT_DIR/.env" "$REMOTE_STAGE/runtime.env"
 chmod 600 "$REMOTE_STAGE/runtime.env"
+
+if [ "$BILLING_V2_CUTOVER" = "1" ]; then
+  readonly_caddy="$REMOTE_STAGE/Caddyfile.billing-readonly"
+  awk '
+    /^[[:space:]]*# BILLING_READ_ONLY_GATE_INSERTION_POINT[[:space:]]*$/ {
+      print
+      print "    @billing_v2_cutover path /api/billing/toss/*"
+      print "    handle @billing_v2_cutover {"
+      print "        respond \"Billing is temporarily read-only.\" 503"
+      print "    }"
+      print ""
+      inserted = 1
+      next
+    }
+    { print }
+    END { if (!inserted) exit 1 }
+  ' "$REMOTE_STAGE/Caddyfile" > "$readonly_caddy"
+  test -s "$readonly_caddy"
+fi
+
 value_of() {
   key="$1"
   awk -F= -v key="$key" '
@@ -406,11 +472,22 @@ require_live_toss_key() {
       ;;
   esac
 }
+require_market_issue_x_token() {
+  value=$(value_of MARKET_ISSUE_X_BEARER_TOKEN)
+  case "$value" in
+    ""|*"..."*)
+      echo "Production market-issue worker requires MARKET_ISSUE_X_BEARER_TOKEN." >&2
+      exit 1
+      ;;
+  esac
+}
 if [ "$REQUIRE_LIVE_TOSS" = "1" ]; then
   require_live_toss_key TOSS_PAYMENTS_CLIENT_KEY live_ck_
   require_live_toss_key TOSS_PAYMENTS_SECRET_KEY live_sk_
   echo "Verified matching live Toss key prefixes in the GCP runtime env."
 fi
+require_market_issue_x_token
+echo "Verified market-issue X bearer token is present in the GCP runtime env."
 printf '\nFRONT_DIR=%s\nNEXT_PUBLIC_APP_VERSION=%s\n' "$REMOTE_STAGE" "$RELEASE_ID" >> "$REMOTE_STAGE/runtime.env"
 OLD_IMAGE=$(docker image inspect --format '{{.Id}}' krw-ontology-front-web:local 2>/dev/null || true)
 test -n "$OLD_IMAGE"
@@ -441,12 +518,60 @@ echo "Prepared fast VM candidate: $RELEASE_ID"
 REMOTE_SCRIPT
 }
 
+run_remote_pause_billing_for_cutover() {
+  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+set -eu
+
+READONLY_CADDY="$REMOTE_STAGE/Caddyfile.billing-readonly"
+test -f "$READONLY_CADDY"
+
+ACTIVE_ROOT="$REMOTE_FRONT_DIR"
+ACTIVE_ENV="$REMOTE_FRONT_DIR/.env"
+if [ -L "$REMOTE_FRONT_DIR/.simple-deploy/current" ] \
+  && [ -f "$REMOTE_FRONT_DIR/.simple-deploy/current/runtime.env" ]; then
+  ACTIVE_ROOT=$(cd "$REMOTE_FRONT_DIR/.simple-deploy/current" && pwd -P)
+  ACTIVE_ENV="$ACTIVE_ROOT/runtime.env"
+fi
+
+compose_active() {
+  FRONT_DIR="$ACTIVE_ROOT" docker compose \
+    --project-name "$COMPOSE_PROJECT" \
+    --project-directory "$ACTIVE_ROOT" \
+    --env-file "$ACTIVE_ENV" \
+    -f "$ACTIVE_ROOT/docker-compose.yml" "$@"
+}
+
+proxy_id=$(compose_active ps -q reverse-proxy)
+test -n "$proxy_id"
+docker cp "$READONLY_CADDY" "$proxy_id:/tmp/Caddyfile.billing-readonly"
+docker exec "$proxy_id" caddy adapt \
+  --config /tmp/Caddyfile.billing-readonly \
+  --adapter caddyfile >/dev/null
+docker exec "$proxy_id" caddy reload \
+  --config /tmp/Caddyfile.billing-readonly \
+  --adapter caddyfile >/dev/null
+
+# The proxy blocks browser callbacks and direct API calls. Stop the legacy
+# scheduler too, so a rollback cannot make a new charge while V2 is read-only.
+compose_active stop billing-worker
+worker_id=$(compose_active ps -q billing-worker || true)
+if [ -n "$worker_id" ]; then
+  worker_running=$(docker inspect --format '{{.State.Running}}' "$worker_id")
+  [ "$worker_running" = "false" ]
+fi
+
+echo "Billing V2 cutover freeze active: Caddy read-only gate loaded and legacy billing worker stopped."
+REMOTE_SCRIPT
+}
+
 run_remote_activate() {
-  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="RELEASE_ID='$RELEASE_ID' REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' SITE_ORIGIN_ONE='$SITE_ORIGIN_ONE' SITE_ORIGIN_TWO='$SITE_ORIGIN_TWO' /bin/sh -s"
+  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="RELEASE_ID='$RELEASE_ID' REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' SITE_ORIGIN_ONE='$SITE_ORIGIN_ONE' SITE_ORIGIN_TWO='$SITE_ORIGIN_TWO' BILLING_V2_CUTOVER='$BILLING_V2_CUTOVER' /bin/sh -s"
 set -e
 . "$REMOTE_STAGE/rollback.env"
 SERVICES="web reverse-proxy llm-gateway filings-mcp document-worker document-outbox-dispatcher filing-notification-worker filing-brief-worker billing-worker"
 ROLLBACK_ARMED=1
+MARKET_ISSUE_STARTED=0
+OLD_MARKET_ISSUE_WORKER=0
 compose_stage() {
   FRONT_DIR="$REMOTE_STAGE" NEXT_PUBLIC_APP_VERSION="$RELEASE_ID" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_STAGE" --env-file "$REMOTE_STAGE/runtime.env" -f "$REMOTE_STAGE/docker-compose.yml" "$@"
 }
@@ -457,16 +582,67 @@ compose_old() {
     FRONT_DIR="$REMOTE_FRONT_DIR" NEXT_PUBLIC_APP_VERSION="$OLD_APP_VERSION" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_FRONT_DIR" --env-file "$REMOTE_FRONT_DIR/.env" -f "$REMOTE_FRONT_DIR/docker-compose.yml" "$@"
   fi
 }
+if compose_old config --services | grep -qx "market-issue-worker"; then
+  OLD_MARKET_ISSUE_WORKER=1
+fi
 matches_version() {
   printf '%s' "$1" | node -e 'const fs=require("fs"); const expected=process.argv[1]; try { const value=JSON.parse(fs.readFileSync(0,"utf8")); process.exit(value.status==="ok"&&value.deployment_id===expected?0:1); } catch { process.exit(1); }' "$2"
+}
+reload_billing_readonly_proxy() {
+  readonly_caddy="$REMOTE_STAGE/Caddyfile.billing-readonly"
+  test -f "$readonly_caddy" || return 1
+  proxy_id=$(docker ps -q \
+    --filter "label=com.docker.compose.project=$COMPOSE_PROJECT" \
+    --filter "label=com.docker.compose.service=reverse-proxy" | head -1)
+  if [ -z "$proxy_id" ]; then
+    docker tag "$OLD_IMAGE" krw-ontology-front-web:local || return 1
+    compose_old up -d --no-deps --force-recreate reverse-proxy || return 1
+    attempt=1
+    while [ "$attempt" -le 15 ]; do
+      proxy_id=$(docker ps -q \
+        --filter "label=com.docker.compose.project=$COMPOSE_PROJECT" \
+        --filter "label=com.docker.compose.service=reverse-proxy" | head -1)
+      if [ -n "$proxy_id" ] \
+        && docker exec "$proxy_id" caddy version >/dev/null 2>&1; then
+        break
+      fi
+      sleep 1
+      attempt=$((attempt + 1))
+    done
+  fi
+  [ -n "$proxy_id" ] || return 1
+  docker cp "$readonly_caddy" "$proxy_id:/tmp/Caddyfile.billing-readonly" \
+    && docker exec "$proxy_id" caddy adapt \
+      --config /tmp/Caddyfile.billing-readonly \
+      --adapter caddyfile >/dev/null \
+    && docker exec "$proxy_id" caddy reload \
+      --config /tmp/Caddyfile.billing-readonly \
+      --adapter caddyfile >/dev/null
 }
 rollback() {
   exit_code=$?
   set +e
   if [ "$ROLLBACK_ARMED" = "1" ]; then
-    echo "Fast activation failed; restoring the previous VM image." >&2
-    docker tag "$OLD_IMAGE" krw-ontology-front-web:local
-    compose_old up -d --force-recreate --wait $SERVICES
+    if [ "$BILLING_V2_CUTOVER" = "1" ]; then
+      echo "Billing V2 activation failed; preserving billing read-only mode instead of restoring legacy payment writes." >&2
+      if reload_billing_readonly_proxy; then
+        docker tag "$OLD_IMAGE" krw-ontology-front-web:local
+        compose_old up -d --no-deps --force-recreate --wait web
+        compose_old stop billing-worker
+      else
+        echo "Unable to restore the Caddy billing read-only gate; leaving the application stopped rather than re-enabling legacy payment writes." >&2
+      fi
+    else
+      echo "Fast activation failed; restoring the previous VM image." >&2
+      if [ "$MARKET_ISSUE_STARTED" = "1" ]; then
+        compose_stage rm -sf market-issue-worker || true
+      fi
+      docker tag "$OLD_IMAGE" krw-ontology-front-web:local
+      compose_old up -d --force-recreate --wait $SERVICES
+      if [ "$OLD_MARKET_ISSUE_WORKER" = "1" ]; then
+        compose_old up -d --force-recreate --wait market-issue-worker
+      fi
+    fi
   fi
   exit "$exit_code"
 }
@@ -506,6 +682,24 @@ for origin in "$SITE_ORIGIN_ONE" "$SITE_ORIGIN_TWO"; do
   done
   [ "$public_ready" = "1" ]
 done
+MARKET_ISSUE_STARTED=1
+compose_stage up -d --force-recreate --wait market-issue-worker
+compose_stage exec -T market-issue-worker node -e '
+  const token = (process.env.MARKET_ISSUE_X_BEARER_TOKEN || "").trim();
+  if (!token || token.includes("...")) throw new Error("MARKET_ISSUE_X_BEARER_TOKEN is missing");
+  const baseUrl = (process.env.MARKET_ISSUE_X_API_BASE_URL || "https://api.x.com").replace(/\/+$/, "");
+  fetch(baseUrl + "/2/users/by/username/nvidia", {
+    headers: { Authorization: "Bearer " + token },
+  }).then(async (response) => {
+    if (!response.ok) throw new Error("X API token check failed: " + response.status);
+    const payload = await response.json();
+    if (!payload?.data?.id) throw new Error("X API token check returned no account");
+    console.log(JSON.stringify({ worker: "market-issue-worker", xApiTokenConfigured: true, xApiStatus: response.status }));
+  }).catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  });
+'
 rm -f "$REMOTE_FRONT_DIR/.simple-deploy/current"
 ln -s "$REMOTE_STAGE" "$REMOTE_FRONT_DIR/.simple-deploy/current"
 ROLLBACK_ARMED=0
@@ -545,6 +739,250 @@ for origin in "$SITE_ORIGIN_ONE" "$SITE_ORIGIN_TWO"; do
   matches_version "$health" "$RELEASE_ID"
 done
 echo "OK deep production health: $RELEASE_ID"
+REMOTE_SCRIPT
+}
+
+run_remote_verify_billing_callback_redaction() {
+  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="RELEASE_ID='$RELEASE_ID' COMPOSE_PROJECT='$COMPOSE_PROJECT' SITE_ORIGIN_ONE='$SITE_ORIGIN_ONE' /bin/sh -s"
+set -eu
+
+probe="billing-v2-redaction-${RELEASE_ID}"
+status=$(curl --connect-timeout 5 --max-time 15 -sS -o /dev/null -w '%{http_code}' \
+  "${SITE_ORIGIN_ONE}/api/billing/toss/success?sessionId=${probe}-session&callbackToken=${probe}-callback&authKey=${probe}-auth&customerKey=${probe}-customer" || true)
+case "$status" in
+  302|303|307|308) ;;
+  *)
+    echo "Billing callback redaction probe expected a redirect, got HTTP $status." >&2
+    exit 1
+    ;;
+esac
+
+proxy_id=$(docker ps -q \
+  --filter "label=com.docker.compose.project=$COMPOSE_PROJECT" \
+  --filter "label=com.docker.compose.service=reverse-proxy" | head -1)
+test -n "$proxy_id"
+
+probe_logs=
+attempt=1
+while [ "$attempt" -le 10 ]; do
+  probe_logs=$(docker logs --since 2m "$proxy_id" 2>&1 | grep "$probe" || true)
+  [ -n "$probe_logs" ] && break
+  sleep 1
+  attempt=$((attempt + 1))
+done
+[ -n "$probe_logs" ] || {
+  echo "Billing callback redaction probe did not reach the Caddy access log." >&2
+  exit 1
+}
+
+for leaked in "$probe-auth" "$probe-customer" "$probe-callback"; do
+  case "$probe_logs" in
+    *"$leaked"*)
+      echo "Caddy access log retained a Billing callback secret value." >&2
+      exit 1
+      ;;
+  esac
+done
+for redacted_key in authKey customerKey callbackToken; do
+  case "$probe_logs" in
+    *"${redacted_key}=REDACTED"*) ;;
+    *)
+      echo "Caddy access log is missing redaction for $redacted_key." >&2
+      exit 1
+      ;;
+  esac
+done
+
+echo "OK Caddy callback access-log redaction."
+REMOTE_SCRIPT
+}
+
+run_remote_enable_billing_v2_writes() {
+  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+set -eu
+
+ACTIVE_ROOT=$(cd "$REMOTE_FRONT_DIR/.simple-deploy/current" && pwd -P)
+ACTIVE_ENV="$ACTIVE_ROOT/runtime.env"
+CANONICAL_ENV="$REMOTE_FRONT_DIR/.env"
+test -f "$ACTIVE_ENV"
+test -f "$CANONICAL_ENV"
+test -f "$ACTIVE_ROOT/src/lib/billing/billing-writes.ts"
+
+value_of() {
+  env_file="$1"
+  env_key="$2"
+  awk -F= -v key="$env_key" '
+    $0 !~ /^[[:space:]]*#/ && $1 == key {
+      sub(/^[^=]*=/, "")
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+      gsub(/^"|"$/, "")
+      gsub(/^'\''|'\''$/, "")
+      print
+    }
+  ' "$env_file" | tail -n 1
+}
+upsert_env_value() {
+  env_file="$1"
+  env_key="$2"
+  env_value="$3"
+  tmp_file=$(mktemp "${env_file}.XXXXXX")
+  awk -v key="$env_key" -v value="$env_value" '
+    $0 !~ /^[[:space:]]*#/ && $0 ~ ("^" key "=") {
+      if (!seen++) print key "=" value
+      next
+    }
+    { print }
+    END { if (!seen) print key "=" value }
+  ' "$env_file" > "$tmp_file"
+  chmod 600 "$tmp_file"
+  mv "$tmp_file" "$env_file"
+}
+compose_active() {
+  FRONT_DIR="$ACTIVE_ROOT" docker compose \
+    --project-name "$COMPOSE_PROJECT" \
+    --project-directory "$ACTIVE_ROOT" \
+    --env-file "$ACTIVE_ENV" \
+    -f "$ACTIVE_ROOT/docker-compose.yml" "$@"
+}
+ensure_running_write_mode() {
+  service="$1"
+  expected="$2"
+  compose_active exec -T "$service" node -e '
+    if ((process.env.BILLING_WRITES_ENABLED || "") !== process.argv[1]) {
+      throw new Error("billing write mode mismatch");
+    }
+  ' "$expected"
+}
+force_read_only() {
+  upsert_env_value "$ACTIVE_ENV" BILLING_WRITES_ENABLED 0
+  upsert_env_value "$CANONICAL_ENV" BILLING_WRITES_ENABLED 0
+  if compose_active up -d --no-deps --force-recreate --wait web billing-worker \
+    && ensure_running_write_mode web 0 \
+    && ensure_running_write_mode billing-worker 0; then
+    return 0
+  fi
+
+  # If a container cannot be recreated, block every billing route at Caddy and
+  # stop the scheduler. This retains the no-legacy-write invariant even if an
+  # old web container is still responding elsewhere in the product.
+  readonly_caddy="$ACTIVE_ROOT/Caddyfile.billing-readonly"
+  test -f "$readonly_caddy" || return 1
+  proxy_id=$(docker ps -q \
+    --filter "label=com.docker.compose.project=$COMPOSE_PROJECT" \
+    --filter "label=com.docker.compose.service=reverse-proxy" | head -1)
+  test -n "$proxy_id" || return 1
+  docker cp "$readonly_caddy" "$proxy_id:/tmp/Caddyfile.billing-readonly" \
+    && docker exec "$proxy_id" caddy adapt \
+      --config /tmp/Caddyfile.billing-readonly \
+      --adapter caddyfile >/dev/null \
+    && docker exec "$proxy_id" caddy reload \
+      --config /tmp/Caddyfile.billing-readonly \
+      --adapter caddyfile >/dev/null \
+    && compose_active stop billing-worker
+}
+
+[ "$(value_of "$ACTIVE_ENV" BILLING_WRITES_ENABLED)" = "0" ] || {
+  echo "Refusing to enable billing writes: active V2 runtime is not read-only." >&2
+  exit 1
+}
+[ "$(value_of "$CANONICAL_ENV" BILLING_WRITES_ENABLED)" = "0" ] || {
+  echo "Refusing to enable billing writes: canonical runtime is not read-only." >&2
+  exit 1
+}
+
+writes_changed=0
+restore_read_only() {
+  exit_code=$?
+  set +e
+  if [ "$writes_changed" = "1" ]; then
+    force_read_only || echo "CRITICAL: Billing read-only fallback could not be applied." >&2
+  fi
+  exit "$exit_code"
+}
+trap restore_read_only EXIT
+
+upsert_env_value "$ACTIVE_ENV" BILLING_WRITES_ENABLED 1
+upsert_env_value "$CANONICAL_ENV" BILLING_WRITES_ENABLED 1
+writes_changed=1
+compose_active up -d --no-deps --force-recreate --wait web
+compose_active up -d --no-deps --force-recreate --wait billing-worker
+ensure_running_write_mode web 1
+ensure_running_write_mode billing-worker 1
+
+writes_changed=0
+trap - EXIT
+echo "Billing Flow V2 writes enabled for web and billing-worker."
+REMOTE_SCRIPT
+}
+
+run_remote_disable_billing_v2_writes() {
+  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+set -eu
+
+ACTIVE_ROOT=$(cd "$REMOTE_FRONT_DIR/.simple-deploy/current" && pwd -P)
+ACTIVE_ENV="$ACTIVE_ROOT/runtime.env"
+CANONICAL_ENV="$REMOTE_FRONT_DIR/.env"
+test -f "$ACTIVE_ENV"
+test -f "$CANONICAL_ENV"
+upsert_env_value() {
+  env_file="$1"
+  env_key="$2"
+  env_value="$3"
+  tmp_file=$(mktemp "${env_file}.XXXXXX")
+  awk -v key="$env_key" -v value="$env_value" '
+    $0 !~ /^[[:space:]]*#/ && $0 ~ ("^" key "=") {
+      if (!seen++) print key "=" value
+      next
+    }
+    { print }
+    END { if (!seen) print key "=" value }
+  ' "$env_file" > "$tmp_file"
+  chmod 600 "$tmp_file"
+  mv "$tmp_file" "$env_file"
+}
+compose_active() {
+  FRONT_DIR="$ACTIVE_ROOT" docker compose \
+    --project-name "$COMPOSE_PROJECT" \
+    --project-directory "$ACTIVE_ROOT" \
+    --env-file "$ACTIVE_ENV" \
+    -f "$ACTIVE_ROOT/docker-compose.yml" "$@"
+}
+ensure_running_write_mode() {
+  service="$1"
+  expected="$2"
+  compose_active exec -T "$service" node -e '
+    if ((process.env.BILLING_WRITES_ENABLED || "") !== process.argv[1]) {
+      throw new Error("billing write mode mismatch");
+    }
+  ' "$expected"
+}
+force_read_only() {
+  upsert_env_value "$ACTIVE_ENV" BILLING_WRITES_ENABLED 0
+  upsert_env_value "$CANONICAL_ENV" BILLING_WRITES_ENABLED 0
+  if compose_active up -d --no-deps --force-recreate --wait web billing-worker \
+    && ensure_running_write_mode web 0 \
+    && ensure_running_write_mode billing-worker 0; then
+    return 0
+  fi
+
+  readonly_caddy="$ACTIVE_ROOT/Caddyfile.billing-readonly"
+  test -f "$readonly_caddy" || return 1
+  proxy_id=$(docker ps -q \
+    --filter "label=com.docker.compose.project=$COMPOSE_PROJECT" \
+    --filter "label=com.docker.compose.service=reverse-proxy" | head -1)
+  test -n "$proxy_id" || return 1
+  docker cp "$readonly_caddy" "$proxy_id:/tmp/Caddyfile.billing-readonly" \
+    && docker exec "$proxy_id" caddy adapt \
+      --config /tmp/Caddyfile.billing-readonly \
+      --adapter caddyfile >/dev/null \
+    && docker exec "$proxy_id" caddy reload \
+      --config /tmp/Caddyfile.billing-readonly \
+      --adapter caddyfile >/dev/null \
+    && compose_active stop billing-worker
+}
+
+force_read_only
+echo "Billing Flow V2 returned to read-only mode."
 REMOTE_SCRIPT
 }
 
@@ -643,6 +1081,9 @@ if [ "$SKIP_WEB" = "0" ]; then
   create_archives
   upload_archive "$FRONT_ARCHIVE" "$REMOTE_FRONT_ARCHIVE" "frontend archive"
   run_remote_prepare
+  if [ "$BILLING_V2_CUTOVER" = "1" ]; then
+    run_remote_pause_billing_for_cutover
+  fi
 fi
 
 if [ "$APPLY_MIGRATIONS" = "1" ]; then
@@ -668,6 +1109,16 @@ fi
 
 if [ "$SKIP_WEB" = "0" ]; then
   run_remote_deep_verify
+fi
+
+if [ "$BILLING_V2_CUTOVER" = "1" ]; then
+  "$SCRIPT_DIR/verify-billing-production-readiness.sh" --require-v2-zero-state
+  run_remote_verify_billing_callback_redaction
+  run_remote_enable_billing_v2_writes
+  if ! "$SCRIPT_DIR/verify-billing-production-readiness.sh"; then
+    run_remote_disable_billing_v2_writes
+    fail "Billing Flow V2 post-activation readiness failed; writes were returned to read-only mode."
+  fi
 fi
 
 echo "Production release complete: $RELEASE_ID"

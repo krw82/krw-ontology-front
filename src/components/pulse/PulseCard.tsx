@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import { type PulseDeviceSignal } from "@/lib/pulse/device-ranking";
+import { pulseCompanyHref, pulseCompanyName } from "@/lib/pulse/company-display";
 import CompanyLogo from "@/components/CompanyLogo";
+import EditorialImageCarousel from "@/components/editorial/EditorialImageCarousel";
 import type { PulseFeedResponse, PulseItem, PulseMutationAction } from "@/types/api-contracts";
 
 interface PulseCardProps {
@@ -16,15 +18,6 @@ interface PulseCardProps {
   onMutation: (item: PulseItem, action: PulseMutationAction) => void;
   onDeviceSignal: (item: PulseItem, signal: PulseDeviceSignal) => void;
 }
-
-const KIND_STYLES = {
-  filing: { icon: "description", rail: "bg-primary", wash: "bg-primary-fixed/50" },
-  analysis: { icon: "manage_search", rail: "bg-[#4f46e5]", wash: "bg-[#eef0ff]" },
-  checkup: { icon: "fact_check", rail: "bg-[#ff6b4a]", wash: "bg-[#fff1ed]" },
-  question: { icon: "help", rail: "bg-[#7259d9]", wash: "bg-[#f3f0ff]" },
-  resurface: { icon: "history", rail: "bg-[#a56a14]", wash: "bg-[#fff7e8]" },
-  learning: { icon: "school", rail: "bg-[#178768]", wash: "bg-[#eaf8f3]" },
-} as const;
 
 function pulseImpressionStorageKey(feedSessionId: string, itemId: string): string {
   return `pulse-impression:${feedSessionId}:${itemId}`;
@@ -41,9 +34,7 @@ export default function PulseCard({
 }: PulseCardProps) {
   const ref = useRef<HTMLElement>(null);
   const impressionSent = useRef(false);
-  const style = KIND_STYLES[item.kind];
   const isDevelopmentShowcase = item.metadata.development_showcase === true;
-  const showsCompanyLogo = Boolean(item.ticker);
   const hasSourceGroundedBrief = item.kind === "filing" && item.metadata.filing_brief_ready === true;
 
   useEffect(() => {
@@ -70,13 +61,13 @@ export default function PulseCard({
           item_state: item.state,
           phase: item.phase,
           has_ticker: Boolean(item.ticker),
-          visible_ms: 1000,
+          visible_ms: 1_000,
           feed_session_id: feedSessionId,
           ranking_version: rankingVersion,
           reason_code: item.reason_code,
           has_source_grounded_brief: hasSourceGroundedBrief,
         });
-        onDeviceSignal(item, "impression");
+        onDeviceSignal(item, "view");
         window.sessionStorage.setItem(sessionKey, "1");
         observer.disconnect();
       }, 1_000);
@@ -91,6 +82,12 @@ export default function PulseCard({
   const primary = item.primary_action;
   const analysisStatus = item.kind === "analysis" ? String(item.metadata.run_status ?? "") : null;
   const analysisActive = item.kind === "analysis" && item.phase === "active";
+  const isFourPanelLearning = item.kind === "learning" && item.metadata.learning_kind === "four_panel";
+  const isCompanyStory = item.kind === "learning"
+    && typeof item.metadata.editorial_series_id === "string";
+  const visibleDetail = pulseVisibleDetail(item);
+  const companyName = pulseCompanyName(item);
+  const companyHref = pulseCompanyHref(item.ticker);
   const recordPrimaryOpen = () => {
     onDeviceSignal(item, item.kind === "filing" ? "source_open" : "open");
     trackClientEventSilently("pulse_item_opened", {
@@ -108,198 +105,282 @@ export default function PulseCard({
   return (
     <article
       ref={ref}
-      className={`group relative overflow-hidden rounded-[18px] border border-hairline bg-white shadow-[0_12px_36px_rgba(16,24,40,0.055)] transition-transform duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none ${primary.type === "link" ? "cursor-pointer" : ""}`}
+      className="group border-b border-hairline py-lg sm:py-xl"
       data-pulse-kind={item.kind}
       data-pulse-state={item.state}
     >
-      {primary.type === "link" ? (
-        <Link
-          href={primary.href}
-          className="absolute inset-0 z-0 rounded-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
-          aria-label={`${item.title} · ${primary.label}`}
-          onClick={recordPrimaryOpen}
-        />
-      ) : null}
-      <div className={`pointer-events-none absolute inset-y-0 left-0 z-20 w-1 ${style.rail}`} aria-hidden="true" />
-      <div className="relative z-10 pointer-events-none p-lg pl-[22px] sm:p-xl sm:pl-[26px]">
-        <div className="flex items-start justify-between gap-base">
-          <div className="flex min-w-0 items-center gap-sm">
-            {showsCompanyLogo && item.ticker ? (
-              <span className={`grid size-9 shrink-0 place-items-center rounded-[11px] ${style.wash}`} aria-hidden="true">
-                <CompanyLogo
-                  ticker={item.ticker}
-                  companyName={item.ticker}
-                  className="size-7 text-[10px] text-ink"
-                  imageSize={48}
-                />
-              </span>
-            ) : null}
-            <div className="min-w-0">
-              <p className="truncate text-[11px] font-black uppercase tracking-[0.13em] text-muted">{item.eyebrow}</p>
-              <p className="mt-0.5 line-clamp-1 text-[12px] font-extrabold text-primary">{item.reason_label}</p>
-              {item.priority === "urgent" ? <p className="mt-0.5 text-[11px] font-black text-[#c43c22]">긴급 · 먼저 확인</p> : null}
-              {item.state === "reviewed" ? <p className="mt-0.5 text-[11px] font-black text-muted">이전에 검토함</p> : null}
-              {item.ticker ? <p className="mt-0.5 text-[12px] font-extrabold text-primary">{item.ticker}</p> : null}
-            </div>
-          </div>
-          <time className="shrink-0 text-[11px] font-semibold text-muted" dateTime={item.occurred_at}>
-            {formatRelativeTime(item.occurred_at)}
-          </time>
-        </div>
-
-        {item.kind === "filing" ? (
-          <FilingChangeBrief item={item} />
+      <div className="flex items-start gap-sm">
+        {companyHref ? (
+          <Link
+            href={companyHref}
+            className="shrink-0 rounded-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label={`${companyName} 회사 소개`}
+          >
+            <PulseIdentity item={item} companyName={companyName} />
+          </Link>
         ) : (
-          <>
-            <h2 className="mt-base text-[19px] font-black leading-[1.35] tracking-[-0.025em] text-ink sm:text-[21px]">
-              {item.kind === "analysis" && item.phase === "completed"
-                ? "분석 결과가 준비됐습니다"
-                : item.title}
-            </h2>
-            {item.kind === "analysis" && item.phase === "completed" ? (
-              <p className="mt-xs line-clamp-2 text-[13px] font-semibold leading-5 text-muted">
-                {item.title}
-              </p>
-            ) : null}
-          </>
+          <PulseIdentity item={item} companyName={companyName} />
         )}
-        {analysisActive ? (
-          <div className="mt-sm inline-flex items-center gap-xs rounded-full bg-[#eef0ff] px-sm py-xs text-[12px] font-extrabold text-[#4338ca]" role="status">
-            <span className="material-symbols-outlined animate-spin text-[16px]" aria-hidden="true">progress_activity</span>
-            {analysisStatus === "running" ? "근거 확인 중" : "분석 대기 중"}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-sm">
+            <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] leading-5">
+              {companyHref ? (
+                <Link
+                  href={companyHref}
+                  className="font-extrabold text-ink underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {companyName}
+                </Link>
+              ) : (
+                <span className="font-extrabold text-ink">{companyName}</span>
+              )}
+              <span className="text-muted" aria-hidden="true">·</span>
+              <span className="font-semibold text-muted">{pulseKindLabel(item)}</span>
+              {item.priority === "urgent" ? <span className="font-bold text-[#c43c22]">우선 확인</span> : null}
+              {item.state === "reviewed" ? <span className="font-medium text-muted">검토함</span> : null}
+            </p>
+            <time className="shrink-0 pt-0.5 text-[11px] font-medium text-muted" dateTime={item.occurred_at}>
+              {formatRelativeTime(item.occurred_at)}
+            </time>
           </div>
-        ) : null}
-        {item.kind === "learning" && item.metadata.learning_kind === "four_panel" ? (
-          <div className="mt-base grid grid-cols-2 gap-xs" aria-label="공시 알림 4컷">
-            {[1, 2, 3, 4].map((panel) => (
-              <div key={panel} className="min-h-24 whitespace-pre-line rounded-[11px] border border-[#cfe8df] bg-[#f3fbf8] p-sm text-[12px] font-bold leading-5 text-body">
-                {String(item.metadata[`panel_${panel}`] ?? "")}
-              </div>
-            ))}
-          </div>
-        ) : null}
-        {item.kind === "learning" && (item.metadata.learning_kind === "image" || item.metadata.learning_kind === "carousel") ? (
-          <PulseEditorialMedia item={item} />
-        ) : null}
-        {item.kind !== "filing" ? (
-          <p className="mt-sm text-[14px] leading-6 text-body">{item.body}</p>
-        ) : null}
 
-        {item.kind === "filing" ? <FilingSourceStrip item={item} /> : null}
-
-        <div className="mt-lg flex flex-wrap items-center gap-sm">
-          {primary.type === "link" ? (
-            <span className="inline-flex min-h-11 items-center gap-xs rounded-[10px] bg-ink px-base text-[13px] font-extrabold text-white">
-              {primary.label}<span className="material-symbols-outlined text-[16px]" aria-hidden="true">arrow_forward</span>
-            </span>
+          {item.kind === "filing" ? (
+            <FilingChangeBrief item={item} />
           ) : (
-            <button type="button" disabled={pending} onClick={() => onMutation(item, primary.action)} className="pointer-events-auto inline-flex min-h-11 items-center rounded-[10px] bg-ink px-base text-[13px] font-extrabold text-white disabled:opacity-50">
-              {primary.label}
-            </button>
+            <h2 className="mt-xs text-[17px] font-bold leading-[1.45] tracking-[-0.02em] text-ink sm:text-[19px]">
+              {item.title}
+            </h2>
           )}
-          {item.secondary_actions.map((action) => action.type === "link" ? (
-            <Link
-              key={`${action.type}-${action.label}`}
-              href={action.href}
-              className="pointer-events-auto inline-flex min-h-11 items-center rounded-[10px] px-sm text-[13px] font-bold text-primary hover:bg-primary-fixed/60"
-              onClick={() => {
-                onDeviceSignal(item, "open");
-                trackClientEventSilently(action.analytics_name === "pulse_answer_prefilled" ? "pulse_answer_prefilled" : "pulse_item_opened", { item_kind: item.kind, action: action.label, item_state: item.state, phase: item.phase, feed_session_id: feedSessionId, ranking_version: rankingVersion, reason_code: item.reason_code, has_source_grounded_brief: hasSourceGroundedBrief });
-              }}
-            >
-              {action.label}
-            </Link>
-          ) : (() => {
-            const effectiveAction = action.action === "save" && item.saved_at ? "unsave" : action.action;
-            const reviewAction = effectiveAction === "review" && item.reviewed_at ? "unreview" : effectiveAction;
-            const label = action.action === "save" && item.saved_at
-              ? "저장됨"
-              : effectiveAction === "review" && item.reviewed_at ? "다시 미검토" : action.label;
-            return (
-              <button
-                key={`${action.type}-${action.action}`}
-                type="button"
-                disabled={pending}
-                onClick={() => onMutation(item, reviewAction)}
-                className="pointer-events-auto inline-flex min-h-11 items-center rounded-[10px] px-sm text-[13px] font-bold text-muted transition-colors hover:bg-surface-soft hover:text-ink disabled:opacity-45"
-              >
-                {label}
-              </button>
-            );
-          })())}
+
+          {analysisActive ? (
+            <p className="mt-xs flex items-center gap-xs text-[12px] font-semibold text-muted" role="status">
+              <span className="material-symbols-outlined pulse-refresh-turn text-[15px] text-primary" aria-hidden="true">progress_activity</span>
+              {analysisStatus === "running" ? "근거 확인 중" : "분석 대기 중"}
+            </p>
+          ) : null}
+
+          {item.kind === "learning" && (item.metadata.learning_kind === "image" || item.metadata.learning_kind === "carousel") ? (
+            <PulseEditorialMedia item={item} />
+          ) : null}
+          {visibleDetail ? (
+            <p className="mt-xs line-clamp-2 text-[14px] leading-6 text-body">{visibleDetail}</p>
+          ) : null}
+
+          {item.kind === "filing" ? <FilingSourceLine item={item} /> : null}
+
+          {!isFourPanelLearning && !isCompanyStory ? (
+            <div className="mt-sm flex min-h-11 flex-wrap items-center gap-x-base gap-y-0.5">
+              {item.kind !== "filing" && !analysisActive ? (
+                <span className="text-[12px] font-medium text-muted">{pulseActionContext(item, analysisStatus)}</span>
+              ) : null}
+              {primary.type === "link" ? (
+                <Link
+                  href={primary.href}
+                  className="inline-flex min-h-11 items-center gap-1 text-[13px] font-bold text-primary transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  onClick={recordPrimaryOpen}
+                >
+                  {primary.label}
+                  <span className="material-symbols-outlined text-[16px]" aria-hidden="true">arrow_forward</span>
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => onMutation(item, primary.action)}
+                  className="inline-flex min-h-11 items-center gap-1 text-[13px] font-bold text-primary underline-offset-4 hover:text-ink hover:underline disabled:opacity-50"
+                >
+                  {primary.label}
+                  <span className="material-symbols-outlined text-[16px]" aria-hidden="true">arrow_forward</span>
+                </button>
+              )}
+              {item.secondary_actions.map((action) => action.type === "link" ? (
+                <Link
+                  key={`${action.type}-${action.label}`}
+                  href={action.href}
+                  className="inline-flex min-h-11 items-center text-[13px] font-semibold text-muted underline-offset-4 hover:text-ink hover:underline"
+                  onClick={() => {
+                    onDeviceSignal(item, "open");
+                    trackClientEventSilently(action.analytics_name === "pulse_answer_prefilled" ? "pulse_answer_prefilled" : "pulse_item_opened", { item_kind: item.kind, action: action.label, item_state: item.state, phase: item.phase, feed_session_id: feedSessionId, ranking_version: rankingVersion, reason_code: item.reason_code, has_source_grounded_brief: hasSourceGroundedBrief });
+                  }}
+                >
+                  {action.label}
+                </Link>
+              ) : (() => {
+                const effectiveAction = action.action === "save" && item.saved_at ? "unsave" : action.action;
+                const reviewAction = effectiveAction === "review" && item.reviewed_at ? "unreview" : effectiveAction;
+                const label = action.action === "save" && item.saved_at
+                  ? "저장됨"
+                  : effectiveAction === "review" && item.reviewed_at ? "다시 미검토" : action.label;
+                return (
+                  <button
+                    key={`${action.type}-${action.action}`}
+                    type="button"
+                    disabled={pending}
+                    onClick={() => onMutation(item, reviewAction)}
+                    className="inline-flex min-h-11 items-center text-[13px] font-semibold text-muted underline-offset-4 hover:text-ink hover:underline disabled:opacity-45"
+                  >
+                    {label}
+                  </button>
+                );
+              })())}
+            </div>
+          ) : null}
         </div>
       </div>
+      {isFourPanelLearning ? <LearningStoryCarousel item={item} /> : null}
     </article>
   );
 }
 
+function PulseIdentity({
+  item,
+  companyName,
+}: {
+  item: PulseItem;
+  companyName: string;
+}) {
+  if (item.ticker) {
+    return (
+      <CompanyLogo
+        ticker={item.ticker}
+        companyName={companyName}
+        className="size-9 text-[10px] text-ink"
+        imageSize={48}
+      />
+    );
+  }
+
+  return (
+    <span className="grid size-9 shrink-0 place-items-center rounded-full border border-hairline bg-white text-[11px] font-black text-primary" aria-hidden="true">
+      K
+    </span>
+  );
+}
+
+function LearningStoryCarousel({ item }: { item: PulseItem }) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const slides = [1, 2, 3, 4].map((panel) => String(item.metadata[`panel_${panel}`] ?? ""));
+
+  const moveToSlide = (index: number) => {
+    const slide = scrollerRef.current?.children.item(index);
+    if (!slide) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    slide.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "nearest", inline: "start" });
+  };
+
+  return (
+    <section className="mt-base" aria-label="공시 알림 흐름 슬라이드" aria-roledescription="carousel">
+      <div
+        ref={scrollerRef}
+        className="flex snap-x snap-mandatory overflow-x-auto rounded-[16px] border border-hairline bg-surface-soft [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onScroll={(event) => {
+          const width = event.currentTarget.clientWidth;
+          if (width === 0) return;
+          const nextIndex = Math.min(slides.length - 1, Math.max(0, Math.round(event.currentTarget.scrollLeft / width)));
+          setActiveIndex((current) => current === nextIndex ? current : nextIndex);
+        }}
+      >
+        {slides.map((copy, index) => {
+          const [headline, ...detail] = copy.split("\n").map((line) => line.trim()).filter(Boolean);
+          return (
+            <article
+              key={`${copy}-${index}`}
+              aria-label={`${index + 1}번째 장면: ${headline ?? "공시 흐름"}`}
+              className={`relative flex aspect-[4/5] w-full shrink-0 snap-center overflow-hidden p-lg text-white sm:aspect-[16/10] ${LEARNING_SLIDE_STYLES[index]}`}
+            >
+              <span className="absolute -right-12 -top-14 size-52 rounded-full bg-white/15 blur-2xl" aria-hidden="true" />
+              <span className="absolute -bottom-16 -left-12 size-48 rounded-full border-[28px] border-white/10" aria-hidden="true" />
+              <div className="relative flex w-full flex-col justify-between">
+                <div className="flex items-center justify-between text-[11px] font-black tracking-[0.16em] text-white/80">
+                  <span>FILING FLOW</span>
+                  <span>{String(index + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}</span>
+                </div>
+                <div>
+                  <span className="material-symbols-outlined text-[46px]" aria-hidden="true">{LEARNING_SLIDE_ICONS[index]}</span>
+                  <h3 className="mt-base whitespace-pre-line text-[30px] font-black leading-[1.12] tracking-[-0.045em] sm:text-[34px]">{headline ?? `장면 ${index + 1}`}</h3>
+                  {detail.length > 0 ? <p className="mt-sm max-w-[22rem] text-[15px] font-semibold leading-6 text-white/85">{detail.join(" ")}</p> : null}
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      <div className="mt-sm flex items-center justify-between gap-sm">
+        <p className="text-[12px] font-semibold text-muted">좌우로 넘겨 네 장면 보기</p>
+        <div className="flex items-center gap-1.5" aria-label="슬라이드 페이지">
+          {slides.map((copy, index) => (
+            <button
+              key={`${copy}-${index}`}
+              type="button"
+              aria-label={`${index + 1}번째 장면으로 이동`}
+              aria-current={activeIndex === index ? "true" : undefined}
+              className={`h-2 rounded-full transition-[width,background-color] ${activeIndex === index ? "w-5 bg-primary" : "w-2 bg-hairline hover:bg-outline"}`}
+              onClick={() => moveToSlide(index)}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const LEARNING_SLIDE_STYLES = [
+  "bg-[#155EEF]",
+  "bg-[#7F56D9]",
+  "bg-[#027A48]",
+  "bg-[#B54708]",
+] as const;
+
+const LEARNING_SLIDE_ICONS = [
+  "notifications_active",
+  "manage_search",
+  "description",
+  "edit_note",
+] as const;
+
 function PulseEditorialMedia({ item }: { item: PulseItem }) {
   const assetCount = Math.max(0, Math.min(8, Number(item.metadata.asset_count ?? 0)));
   const assets = Array.from({ length: assetCount }, (_, index) => ({
-    url: String(item.metadata[`asset_${index + 1}`] ?? ""),
+    src: String(item.metadata[`asset_${index + 1}`] ?? ""),
     alt: String(item.metadata[`asset_alt_${index + 1}`] ?? `${item.title} 이미지 ${index + 1}`),
-  })).filter((asset) => asset.url.length > 0);
-  const [activeIndex, setActiveIndex] = useState(0);
+    width: numberMetadata(item, `asset_width_${index + 1}`) || null,
+    height: numberMetadata(item, `asset_height_${index + 1}`) || null,
+  })).filter((asset) => asset.src.length > 0);
   if (assets.length === 0) return null;
-  const active = assets[Math.min(activeIndex, assets.length - 1)]!;
-  const isCarousel = assets.length > 1;
 
   return (
-    <section className="mt-base" aria-label={isCarousel ? "편집 이미지 캐러셀" : "편집 이미지"}>
-      <div className="overflow-hidden rounded-[13px] border border-hairline bg-surface-soft">
-        {/* External editorial assets are uploaded through the authenticated server route. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={active.url} alt={active.alt} className="block max-h-[560px] w-full object-contain" />
-      </div>
-      {isCarousel ? (
-        <div className="mt-sm flex items-center justify-between gap-sm">
-          <div className="flex gap-xs" aria-label="캐러셀 페이지">
-            {assets.map((asset, index) => <button key={asset.url} type="button" onClick={() => setActiveIndex(index)} aria-label={`${index + 1}번째 이미지 보기`} aria-current={index === activeIndex ? "true" : undefined} className={`pointer-events-auto size-8 rounded-full text-[11px] font-black ${index === activeIndex ? "bg-ink text-white" : "bg-surface-soft text-muted hover:bg-primary-fixed"}`}>{index + 1}</button>)}
-          </div>
-          <span className="text-[12px] font-semibold text-muted">{activeIndex + 1} / {assets.length}</span>
-        </div>
-      ) : null}
-    </section>
+    <EditorialImageCarousel
+      slides={assets}
+      ariaLabel={`${item.title} 이미지 슬라이드`}
+      className="mt-sm"
+    />
   );
 }
 
 function FilingChangeBrief({ item }: { item: PulseItem }) {
   const changes = filingChanges(item.body);
   return (
-    <section className="mt-base" aria-label="이번 공시에서 바뀐 것">
-      <p className="text-[11px] font-black uppercase tracking-[0.13em] text-primary">
-        이번 공시에서 바뀐 것
-      </p>
-      <h2 className="mt-xs text-[19px] font-black leading-[1.35] tracking-[-0.025em] text-ink sm:text-[21px]">
+    <section className="mt-xs" aria-label="공시 핵심 변화">
+      <h2 className="text-[17px] font-bold leading-[1.45] tracking-[-0.02em] text-ink sm:text-[19px]">
         {item.title}
       </h2>
       {changes.length > 0 ? (
-        <ul className="mt-sm grid gap-xs">
-          {changes.map((change, index) => (
-            <li key={`${change}-${index}`} className="flex items-start gap-sm text-[14px] leading-6 text-body">
-              <span className="mt-[9px] size-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
-              <span>{change}</span>
-            </li>
-          ))}
-        </ul>
+        <p className="mt-xs line-clamp-2 text-[14px] leading-6 text-body">{changes.join(" ")}</p>
       ) : null}
     </section>
   );
 }
 
-function FilingSourceStrip({ item }: { item: PulseItem }) {
-  const formType = stringMetadata(item, "form_type") ?? "SEC";
+function FilingSourceLine({ item }: { item: PulseItem }) {
+  const formType = stringMetadata(item, "form_type");
   const factCount = numberMetadata(item, "filing_brief_fact_count");
   return (
-    <div className="mt-base flex flex-wrap items-center justify-between gap-xs rounded-[10px] border border-primary/15 bg-[#f7faff] px-sm py-xs">
-      <p className="flex min-h-8 items-center gap-xs text-[12px] font-extrabold text-body">
-        SEC {formType}
-        <span className="font-semibold text-muted">
-          {factCount > 0 ? `· 원문 근거 ${factCount}개` : "· 제출 원문"}
-        </span>
-      </p>
-      <span className="text-[12px] font-extrabold text-primary">카드 전체를 눌러 확인</span>
-    </div>
+    <p className="mt-sm flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] leading-5">
+      <span className="font-semibold text-body">{formType ? `SEC ${formType}` : "SEC 공시"}</span>
+      <span className="text-muted" aria-hidden="true">·</span>
+      <span className="font-medium text-muted">{factCount > 0 ? `원문 근거 ${factCount}개` : "제출 원문"}</span>
+    </p>
   );
 }
 
@@ -309,6 +390,43 @@ export function filingChanges(body: string): string[] {
     .map((sentence) => sentence.trim())
     .filter(Boolean)
     .slice(0, 2);
+}
+
+function pulseKindLabel(item: PulseItem): string {
+  if (item.kind === "filing") {
+    const formType = stringMetadata(item, "form_type");
+    return formType ? `SEC ${formType}` : "새 공시";
+  }
+  if (item.kind === "analysis") {
+    if (item.phase === "active") return "리서치 진행 중";
+    if (item.phase === "failed") return "리서치 다시 시도";
+    return "리서치 대화";
+  }
+  if (item.kind === "checkup") return "오늘의 체크업";
+  if (item.kind === "question") return "다음 질문";
+  if (item.kind === "resurface") return "다시 볼 메모";
+  if (item.kind === "learning" && typeof item.metadata.editorial_series_id === "string") return "회사 이야기";
+  return "리서치 읽기";
+}
+
+function pulseVisibleDetail(item: PulseItem): string | null {
+  if (item.kind === "filing" || item.kind === "analysis" || item.kind === "question") return null;
+  if (item.kind === "learning" && item.metadata.learning_kind === "four_panel") return null;
+  if (item.kind === "learning" && typeof item.metadata.editorial_series_id === "string") return null;
+  const detail = item.body.trim();
+  return detail || null;
+}
+
+function pulseActionContext(item: PulseItem, analysisStatus: string | null): string {
+  if (item.kind === "analysis") {
+    if (item.phase === "active") return analysisStatus === "running" ? "근거 확인 중" : "분석 대기 중";
+    if (item.phase === "failed") return "다시 시도 가능";
+    return "답변과 근거 준비됨";
+  }
+  if (item.kind === "question") return "이 질문으로 이어서 보기";
+  if (item.kind === "resurface") return "저장한 관점";
+  if (item.kind === "checkup") return "오늘의 확인 항목";
+  return stringMetadata(item, "source_label") ?? "리서치 읽기";
 }
 
 function stringMetadata(item: PulseItem, key: string): string | null {

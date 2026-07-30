@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ko">
+<!--
+  가정 / 방향 메모
+  - 방향 B는 "AI가 설명하는 카드"가 아니라, 사용자가 회사·시점·변화·근거를 비교하는 연구 장부입니다.
+  - 각 행의 밀도를 높이되, 실제 결론은 원문을 열어 확인하도록 소스 문자열을 명시합니다.
+  - 모든 회사·시간·사건은 시각 검토용 샘플입니다. 실제 공시나 거래로 해석하면 안 됩니다.
+  - form은 공시·리서치 기록의 열(column)에서 왔습니다. 화면 자체가 우선순위를 판단하게 합니다.
+-->
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pulse prototype B — Research ledger</title>
+  <style>
+    :root {
+      --brand-primary: #003ec7;
+      --brand-ink: #0a0b0d;
+      --brand-body: #5b616e;
+      --brand-muted: #7c828a;
+      --brand-hairline: #dee1e6;
+      --brand-hairline-soft: #eef0f3;
+      --brand-canvas: #ffffff;
+      --brand-paper: #f8f7f3;
+      --font-body: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-mono: "SFMono-Regular", Menlo, Consolas, ui-monospace, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: #eef0f3; font-synthesis: none; line-break: strict; }
+    body { margin: 0; background: #eef0f3; color: var(--brand-ink); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+    button { font: inherit; }
+
+    .canvas { min-height: 100vh; max-width: 430px; margin: 0 auto; background: var(--brand-canvas); }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 72px;
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--brand-hairline);
+    }
+
+    .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--brand-ink); text-decoration: none; font-size: 15px; font-weight: 800; letter-spacing: .06em; }
+    .brand img { width: 31px; height: 31px; display: block; border-radius: 7px; }
+    .view-label { color: var(--brand-muted); font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+
+    .masthead { padding: 28px 22px 18px; }
+    .eyebrow { margin: 0 0 7px; color: var(--brand-primary); font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .16em; }
+    h1 { margin: 0; font-size: 32px; font-weight: 800; line-height: 1.15; letter-spacing: -.045em; }
+    .subhead { margin: 10px 0 0; color: var(--brand-muted); font-size: 14px; line-height: 1.55; }
+
+    .modes { display: flex; gap: 7px; margin-top: 21px; }
+    .mode {
+      min-height: 31px;
+      padding: 0 10px;
+      border: 1px solid var(--brand-hairline);
+      border-radius: 4px;
+      background: var(--brand-canvas);
+      color: var(--brand-muted);
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .03em;
+    }
+    .mode[aria-pressed="true"] { border-color: var(--brand-ink); background: var(--brand-ink); color: #fff; }
+
+    .context-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 13px 22px;
+      border-top: 1px solid var(--brand-hairline);
+      border-bottom: 1px solid var(--brand-hairline);
+      background: var(--brand-paper);
+      color: var(--brand-body);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .context-strip strong { color: var(--brand-ink); font-weight: 750; }
+    .context-strip span { flex: 0 0 auto; color: var(--brand-primary); font-family: var(--font-mono); font-size: 10px; font-weight: 700; }
+
+    .ledger { padding: 0 22px; }
+    .ledger-labels {
+      display: grid;
+      grid-template-columns: 43px minmax(0, 1fr) 50px;
+      gap: 9px;
+      padding: 17px 0 9px;
+      color: var(--brand-muted);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .08em;
+    }
+    .ledger-labels span:last-child { text-align: right; }
+
+    .ledger-row {
+      display: grid;
+      width: 100%;
+      grid-template-columns: 43px minmax(0, 1fr) 50px;
+      gap: 9px;
+      padding: 14px 0 15px;
+      border: 0;
+      border-top: 1px solid var(--brand-hairline);
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+    }
+    .ledger-row:last-of-type { border-bottom: 1px solid var(--brand-hairline); }
+    .ledger-row:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 3px; }
+
+    .stamp { padding-top: 2px; color: var(--brand-muted); font-family: var(--font-mono); font-size: 10px; font-variant-numeric: tabular-nums; line-height: 1.3; }
+    .entry { min-width: 0; }
+    .entry-top { display: flex; align-items: baseline; gap: 7px; }
+    .ticker { color: var(--brand-primary); font-family: var(--font-mono); font-size: 11px; font-weight: 800; letter-spacing: .02em; }
+    .event { overflow: hidden; color: var(--brand-muted); font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+    .change { display: block; margin-top: 4px; color: var(--brand-ink); font-size: 15px; font-weight: 760; line-height: 1.43; letter-spacing: -.02em; text-wrap: pretty; }
+    .source { display: block; margin-top: 5px; color: var(--brand-body); font-size: 11px; line-height: 1.35; }
+    .basis { align-self: center; color: var(--brand-muted); font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .03em; text-align: right; }
+    .ledger-row:hover .change, .ledger-row.is-selected .change { color: var(--brand-primary); }
+    .ledger-row:hover .basis, .ledger-row.is-selected .basis { color: var(--brand-primary); }
+
+    .insight {
+      margin: 20px 22px 0;
+      padding: 14px 0 24px;
+      border-top: 2px solid var(--brand-ink);
+      color: var(--brand-body);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    .insight-label { display: block; margin-bottom: 5px; color: var(--brand-primary); font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .1em; }
+    .insight strong { color: var(--brand-ink); }
+    .sample-note { margin: 0 22px; padding: 14px 0 30px; border-top: 1px solid var(--brand-hairline-soft); color: var(--brand-muted); font-size: 10px; line-height: 1.5; }
+    [hidden] { display: none !important; }
+    @media (min-width: 431px) { .canvas { box-shadow: 0 0 0 1px rgba(10, 11, 13, .05), 0 20px 50px rgba(10, 11, 13, .08); } }
+  </style>
+</head>
+<body>
+  <main class="canvas" aria-label="Pulse research ledger prototype">
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="KRW.O 피드 처음으로"><img src="../../../public/krw-logo.svg" alt=""><span>KRW.O</span></a>
+      <span class="view-label">LEDGER / 01</span>
+    </header>
+
+    <section class="masthead" id="top" aria-labelledby="page-title">
+      <p class="eyebrow">RESEARCH FEED</p>
+      <h1 id="page-title">변화 기록</h1>
+      <p class="subhead">7월 26일 토요일 · 우선순위를 정하기 위한 작은 장부</p>
+      <div class="modes" role="group" aria-label="기록 유형">
+        <button class="mode" type="button" data-mode="all" aria-pressed="true">ALL 5</button>
+        <button class="mode" type="button" data-mode="filing" aria-pressed="false">FILINGS 2</button>
+        <button class="mode" type="button" data-mode="research" aria-pressed="false">RESEARCH 2</button>
+      </div>
+    </section>
+
+    <section class="context-strip" aria-label="오늘의 우선순위"><div><strong id="context-title">먼저 확인할 기록 2개</strong><br><span id="context-copy">공시 원문 1개 · 이어볼 대화 1개</span></div><span id="visible-total">5/5</span></section>
+
+    <section class="ledger" aria-label="변화 기록 목록">
+      <div class="ledger-labels"><span>시점</span><span>회사 · 변화</span><span>근거</span></div>
+
+      <button class="ledger-row" type="button" data-type="filing" data-title="AAPL 공시 원문" data-copy="공시 상세에서 원문과 바뀐 항목을 같은 화면에 둡니다.">
+        <span class="stamp">14:32</span>
+        <span class="entry"><span class="entry-top"><span class="ticker">AAPL</span><span class="event">8-K</span></span><span class="change">실적 발표 자료가 제출됐습니다</span><span class="source">이번 공시에서 바뀐 항목을 먼저 확인</span></span>
+        <span class="basis">SEC<br>원문</span>
+      </button>
+
+      <button class="ledger-row" type="button" data-type="research" data-title="ABNB 리서치 대화" data-copy="지난 질문과 연결할 공시 근거를 확인한 뒤 바로 대화로 이어갑니다.">
+        <span class="stamp">11:06</span>
+        <span class="entry"><span class="entry-top"><span class="ticker">ABNB</span><span class="event">연구 맥락</span></span><span class="change">지난 질문과 연결할 공시가 있습니다</span><span class="source">대화 2회 · 확인할 원문 근거 1개</span></span>
+        <span class="basis">CHAT<br>2X</span>
+      </button>
+
+      <button class="ledger-row" type="button" data-type="filing" data-title="XOM Form 4" data-copy="여러 건의 거래는 요약 행 하나로 시작하고, 원문에서 개별 기록을 확인합니다.">
+        <span class="stamp">어제</span>
+        <span class="entry"><span class="entry-top"><span class="ticker">XOM</span><span class="event">Form 4</span></span><span class="change">내부자 거래 3건이 들어왔습니다</span><span class="source">묶음 보기 · 필요할 때만 개별 거래 열기</span></span>
+        <span class="basis">SEC<br>3X</span>
+      </button>
+
+      <button class="ledger-row" type="button" data-type="research" data-title="NVDA 분석 결과" data-copy="분석을 길게 다시 설명하지 않고, 완료된 근거와 대화의 다음 행동만 보입니다.">
+        <span class="stamp">09:18</span>
+        <span class="entry"><span class="entry-top"><span class="ticker">NVDA</span><span class="event">분석 완료</span></span><span class="change">실적 변화의 근거 정리가 준비됐습니다</span><span class="source">근거 4개 · 지난 분석과 연결</span></span>
+        <span class="basis">RUN<br>DONE</span>
+      </button>
+
+      <button class="ledger-row" type="button" data-type="other" data-title="SLB 새 공시" data-copy="관심 기업 밖의 공시는 낮은 우선순위 행으로 남겨 선택권만 제공합니다.">
+        <span class="stamp">어제</span>
+        <span class="entry"><span class="entry-top"><span class="ticker">SLB</span><span class="event">8-K</span></span><span class="change">확인할 공시가 새로 들어왔습니다</span><span class="source">관심 기업 외 · 원문 확인 가능</span></span>
+        <span class="basis">SEC<br>원문</span>
+      </button>
+    </section>
+
+    <aside class="insight" aria-live="polite"><span class="insight-label">SELECTED RECORD</span><strong id="selected-title">기록을 선택하면</strong><br><span id="selected-copy">다음에 열 화면과 근거의 역할을 이 자리에 짧게 설명합니다.</span></aside>
+    <p class="sample-note">프로토타입 · 샘플 데이터입니다. 실제 공시·거래·분석 상태를 나타내지 않습니다.</p>
+  </main>
+
+  <script>
+    const ledgerRows = Array.from(document.querySelectorAll('.ledger-row'));
+    const ledgerModes = Array.from(document.querySelectorAll('.mode'));
+    const visibleTotal = document.querySelector('#visible-total');
+    const contextTitle = document.querySelector('#context-title');
+    const contextCopy = document.querySelector('#context-copy');
+    const selectedTitle = document.querySelector('#selected-title');
+    const selectedCopy = document.querySelector('#selected-copy');
+
+    ledgerModes.forEach((mode) => {
+      mode.addEventListener('click', () => {
+        const modeName = mode.dataset.mode;
+        ledgerModes.forEach((item) => item.setAttribute('aria-pressed', String(item === mode)));
+        let visible = 0;
+        ledgerRows.forEach((row) => {
+          const show = modeName === 'all' || row.dataset.type === modeName;
+          row.hidden = !show;
+          if (show) visible += 1;
+        });
+        visibleTotal.textContent = `${visible}/5`;
+        contextTitle.textContent = modeName === 'filing' ? '원문을 확인할 공시 2개' : modeName === 'research' ? '이어 볼 리서치 2개' : '먼저 확인할 기록 2개';
+        contextCopy.textContent = modeName === 'filing' ? '공시 사건과 원문만 남겼습니다' : modeName === 'research' ? '지난 질문과 완료된 분석만 남겼습니다' : '공시 원문 1개 · 이어볼 대화 1개';
+      });
+    });
+
+    ledgerRows.forEach((row) => {
+      row.addEventListener('click', () => {
+        ledgerRows.forEach((item) => item.classList.toggle('is-selected', item === row));
+        selectedTitle.textContent = `${row.dataset.title}로 이동`;
+        selectedCopy.textContent = row.dataset.copy;
+      });
+    });
+
+    window.__prototypeReady = true;
+  </script>
+</body>
+</html>

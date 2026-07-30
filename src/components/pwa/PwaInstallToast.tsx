@@ -23,19 +23,13 @@ export default function PwaInstallToast({
   const isPrompting = mode === "prompting";
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-[170] flex justify-center px-base pb-sm lg:bottom-0 lg:pb-[max(12px,env(safe-area-inset-bottom))]">
+    <div className="pwa-install-toast pointer-events-none fixed inset-x-0 z-[170] flex justify-center px-base pb-sm">
       <section
         className="pointer-events-auto flex w-full max-w-[520px] items-center gap-sm rounded-[14px] border border-hairline bg-canvas px-base py-sm text-ink shadow-[0_16px_48px_rgba(10,11,13,0.2)]"
         aria-label="KRW.O 앱 설치"
         role="status"
         aria-live="polite"
       >
-        <span
-          aria-hidden="true"
-          className="material-symbols-outlined inline-flex size-11 shrink-0 items-center justify-center rounded-[11px] bg-primary-soft text-[22px] text-primary"
-        >
-          install_mobile
-        </span>
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-black leading-5">
             {isInstructions

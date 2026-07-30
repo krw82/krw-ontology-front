@@ -20,8 +20,13 @@ export const PULSE_ITEM_KINDS = [
   "learning",
 ] as const satisfies readonly PulseItemKind[];
 
-export const PULSE_PAGE_SIZE = 20;
-export const PULSE_MAX_PAGE_SIZE = 20;
+/**
+ * Candidate reservoir, not the number of cards rendered. The device receives
+ * enough authorized alternatives to compose twelve visual cards without one
+ * busy Form 4 day monopolising the first screen.
+ */
+export const PULSE_PAGE_SIZE = 48;
+export const PULSE_MAX_PAGE_SIZE = 48;
 export const PULSE_VISIBLE_ITEM_LIMIT = 12;
 
 const pulseLinkActionSchema = z.object({

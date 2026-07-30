@@ -10,6 +10,7 @@
         }
     }
 
+    # BILLING_READ_ONLY_GATE_INSERTION_POINT
     handle {
         reverse_proxy web:3000 {
             # Set (rather than append) the ingress-owned header. This replaces
@@ -25,6 +26,17 @@
 
     log {
         output stdout
+        format filter {
+            # Toss returns one-time authorization values in the callback query.
+            # Preserve the request path for observability, but never retain a
+            # usable auth key/customer key/token in access logs.
+            request>uri query {
+                replace authKey REDACTED
+                replace customerKey REDACTED
+                replace callbackToken REDACTED
+                replace state REDACTED
+            }
+        }
     }
 }
 
@@ -42,5 +54,13 @@ dalim.krwontology.com {
 
     log {
         output stdout
+        format filter {
+            request>uri query {
+                replace authKey REDACTED
+                replace customerKey REDACTED
+                replace callbackToken REDACTED
+                replace state REDACTED
+            }
+        }
     }
 }

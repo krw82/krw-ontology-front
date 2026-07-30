@@ -400,6 +400,7 @@ rsync -a --delete \
   --exclude '/krw-ontology/' \
   --exclude '/.env' \
   --exclude '/.env.*' \
+  --exclude '/supabase/.temp/' \
   --exclude '/.supabase-prod-db-password' \
   --exclude '/*.png' \
   --exclude '/*.tsbuildinfo' \

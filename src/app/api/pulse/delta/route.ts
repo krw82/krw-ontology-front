@@ -3,12 +3,11 @@ import { z } from "zod";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
 import { canAccessMenuFeature } from "@/lib/billing/feature-access-server";
 import { composePulseFeed } from "@/lib/pulse/composer";
-import { isPulseItemVersionMap } from "@/lib/pulse/delta";
+import { buildPulseFeedDelta, isPulseItemVersionMap } from "@/lib/pulse/delta";
 import { PULSE_PAGE_SIZE } from "@/lib/pulse/contract";
 import { getPulseFeedRevision } from "@/lib/pulse/revision";
 import type {
   PulseFeedDeltaResponse,
-  PulseFeedResponse,
   PulseFeedRefreshSummary,
   PulseItem,
 } from "@/types/api-contracts";
@@ -72,50 +71,13 @@ export async function POST(request: NextRequest) {
       now,
       revision,
     });
-    return Response.json(buildDelta(feed, parsed.data.item_versions), { headers: PRIVATE_HEADERS });
+    return Response.json(buildPulseFeedDelta(feed, parsed.data.item_versions), { headers: PRIVATE_HEADERS });
   } catch {
     return Response.json(
       { error: { code: "service_unavailable", message: "피드 변경사항을 불러오지 못했습니다." } },
       { status: 503 },
     );
   }
-}
-
-export function buildDelta(
-  feed: PulseFeedResponse,
-  knownItemVersions: Record<string, string>,
-): PulseFeedDeltaResponse {
-  const currentItems = [...feed.candidate_items, ...feed.active_analysis_items];
-  const currentIds = new Set(currentItems.map((item) => item.id));
-  const knownIds = new Set(Object.keys(knownItemVersions));
-  const upserts = currentItems.filter((item) =>
-    knownItemVersions[item.id] !== feed.item_versions[item.id]);
-  const removedItemIds = Object.keys(knownItemVersions).filter((id) => !currentIds.has(id));
-  return {
-    generated_at: feed.generated_at,
-    revision: feed.revision,
-    changed: true,
-    snapshot: {
-      ranking_version: feed.ranking_version,
-      timezone: feed.timezone,
-      date_label: feed.date_label,
-      filter: feed.filter,
-      visible_limit: feed.visible_limit,
-      new_item_count: feed.new_item_count,
-      source_statuses: feed.source_statuses,
-    },
-    ordered_candidate_ids: feed.candidate_items.map((item) => item.id),
-    active_analysis_item_ids: feed.active_analysis_items.map((item) => item.id),
-    upserts,
-    removed_item_ids: removedItemIds,
-    item_versions: feed.item_versions,
-    refresh_summary: buildRefreshSummary(
-      feed,
-      knownIds,
-      upserts,
-      removedItemIds,
-    ),
-  };
 }
 
 function unchangedDelta(revision: string, now: Date): PulseFeedDeltaResponse {
@@ -130,21 +92,6 @@ function unchangedDelta(revision: string, now: Date): PulseFeedDeltaResponse {
     removed_item_ids: [],
     item_versions: {},
     refresh_summary: emptyRefreshSummary(),
-  };
-}
-
-function buildRefreshSummary(
-  feed: PulseFeedResponse,
-  knownIds: Set<string>,
-  upserts: PulseItem[],
-  removedItemIds: string[],
-): PulseFeedRefreshSummary {
-  return {
-    // A card that was already in the device snapshot but moved between the
-    // active-analysis and candidate lists is an update, not a false “new”.
-    added_candidate_count: feed.candidate_items.filter((item) => !knownIds.has(item.id)).length,
-    updated_item_count: upserts.filter((item) => knownIds.has(item.id)).length,
-    removed_item_count: removedItemIds.length,
   };
 }
 

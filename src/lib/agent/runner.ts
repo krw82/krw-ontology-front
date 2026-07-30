@@ -20,6 +20,8 @@ import {
 import {
   GURU_ADVISOR_SDK_ALLOWED_TOOLS,
   GURU_MCP_TOOLS,
+  KRW_FEED_MCP_TOOLS,
+  KRW_FEED_SDK_ALLOWED_TOOLS,
   KRW_ONTOLOGY_DIRECT_SDK_ALLOWED_TOOLS,
   KRW_ONTOLOGY_MCP_TOOLS,
   KRW_ONTOLOGY_SDK_ALLOWED_TOOLS,
@@ -32,6 +34,7 @@ import {
   KRW_FILINGS_SDK_ALLOWED_TOOLS,
   KRW_PERSONAL_FILINGS_MCP_TOOLS,
   KRW_PERSONAL_FILINGS_SDK_ALLOWED_TOOLS,
+  getKrwFeedSdkAllowedTools,
   getStockNewsSdkAllowedTools,
   getKrwOntologyPluginPath,
   isVisualizationSdkTool,
@@ -40,10 +43,13 @@ import {
   isKrwPersonalFilingsMcpEnabled,
   isKrwFilingsSdkTool,
   isKrwPersonalFilingsSdkTool,
+  isKrwFeedMcpEnabled,
+  isKrwFeedSdkTool,
   filingsMcpToken,
   isKrwOntologySdkTool,
   isStockNewsEnabled,
   isStockNewsSdkTool,
+  krwFeedMcpToken,
   isYahooFinanceSdkTool,
   resolveGuruAdvisorPluginPath,
 } from "./mcp-client";
@@ -118,6 +124,7 @@ import type {
   DocumentType,
   VisualizationMCPToolName,
   GuruMCPToolName,
+  KrwFeedMCPToolName,
   KrwFilingsMCPToolName,
   KRWOntologyMCPToolName,
   MCPToolName,
@@ -128,6 +135,7 @@ import type {
 
 const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const STOCK_NEWS_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_MCP_TOOLS);
+const KRW_FEED_MCP_TOOL_SET = new Set<string>(KRW_FEED_MCP_TOOLS);
 const GURU_MCP_TOOL_SET = new Set<string>(GURU_MCP_TOOLS);
 const YAHOO_FINANCE_MCP_TOOL_SET = new Set<string>(YAHOO_FINANCE_MCP_TOOLS);
 const VISUALIZATION_MCP_TOOL_SET = new Set<string>(VISUALIZATION_MCP_TOOLS);
@@ -1279,6 +1287,7 @@ function readStrictHttpMcpServerConfigs(
   const includeFilingsMcp = Boolean(
     options.requireFilingsMcp || options.personalUserId,
   );
+  const includeKrwFeedMcp = isKrwFeedMcpEnabled();
   if (includeFilingsMcp && !isKrwFilingsMcpEnabled()) {
     throw new Error("On-demand filings MCP requires FILINGS_MCP_ENABLED=1 and a filings MCP auth token");
   }
@@ -1288,7 +1297,10 @@ function readStrictHttpMcpServerConfigs(
 
   const serverConfigs = Object.fromEntries(
     Object.entries(rawServers)
-      .filter(([serverName]) => serverName !== "krw-filings" || includeFilingsMcp)
+      .filter(([serverName]) =>
+        (serverName !== "krw-filings" || includeFilingsMcp)
+        && (serverName !== "krw-feed" || includeKrwFeedMcp),
+      )
       .map(([serverName, rawConfig]) => {
       const config = validateHttpMcpServerConfig(serverName, rawConfig);
       const overriddenUrl =
@@ -1298,7 +1310,9 @@ function readStrictHttpMcpServerConfigs(
             ? process.env.STOCK_NEWS_MCP_URL
             : serverName === "krw-filings"
               ? process.env.KRW_FILINGS_MCP_URL
-            : undefined;
+              : serverName === "krw-feed"
+                ? process.env.KRW_FEED_MCP_URL
+              : undefined;
       const runtimeHeaders = serverName === "krw-filings"
         ? {
             ...((config as { headers?: Record<string, string> }).headers ?? {}),
@@ -1315,13 +1329,17 @@ function readStrictHttpMcpServerConfigs(
               : {}),
           }
         : undefined;
+      const feedRuntimeHeaders = serverName === "krw-feed"
+        ? { Authorization: `Bearer ${krwFeedMcpToken() ?? ""}` }
+        : undefined;
       return [
         serverName,
-        overriddenUrl || runtimeHeaders
+        overriddenUrl || runtimeHeaders || feedRuntimeHeaders
           ? validateHttpMcpServerConfig(serverName, {
               ...config,
               ...(overriddenUrl ? { url: overriddenUrl } : {}),
               ...(runtimeHeaders ? { headers: runtimeHeaders } : {}),
+              ...(feedRuntimeHeaders ? { headers: feedRuntimeHeaders } : {}),
             })
           : config,
       ];
@@ -1760,6 +1778,9 @@ function canonicalSdkToolNameForHook(toolName: string): string {
   const stockNewsToolName = normalizeStockNewsToolName(toolName);
   if (stockNewsToolName) return `mcp__stock-news__${stockNewsToolName}`;
 
+  const feedToolName = normalizeKrwFeedToolName(toolName);
+  if (feedToolName) return `mcp__krw-feed__${feedToolName}`;
+
   const yahooFinanceToolName = normalizeYahooFinanceToolName(toolName);
   if (yahooFinanceToolName) {
     return `mcp__yahoo_finance__${yahooFinanceToolName}`;
@@ -1882,6 +1903,15 @@ export async function canUseTool(
     return { behavior: "allow" };
   }
 
+  if (isKrwFeedSdkTool(toolName)) {
+    return isKrwFeedMcpEnabled()
+      ? { behavior: "allow" }
+      : {
+          behavior: "deny",
+          message: "KRW Feed MCP is disabled for this runtime.",
+        };
+  }
+
   if (isGuruAdvisorSdkTool(toolName)) {
     return { behavior: "allow" };
   }
@@ -1893,7 +1923,7 @@ export async function canUseTool(
   return {
     behavior: "deny",
     message:
-      "Only configured ontology, current market-news, stock-news, and presentation tools are allowed in web chat.",
+      "Only configured ontology, KRW feed, current market-news, stock-news, and presentation tools are allowed in web chat.",
   };
 }
 
@@ -1942,6 +1972,14 @@ function allowedSdkToolsForResearchMode(
       );
     },
   );
+  const allowedKrwFeedTools = getKrwFeedSdkAllowedTools().filter(
+    (toolName) => {
+      const feedToolName = normalizeKrwFeedToolName(toolName);
+      return Boolean(
+        feedToolName && isKrwFeedToolAllowedForRunKind(feedToolName, runKind),
+      );
+    },
+  );
   const allowedYahooFinanceTools = YAHOO_FINANCE_SDK_ALLOWED_TOOLS.filter(
     (toolName) => {
       const yahooFinanceToolName = normalizeYahooFinanceToolName(toolName);
@@ -1957,6 +1995,7 @@ function allowedSdkToolsForResearchMode(
       ? []
       : allowedOntologyTools),
     ...(isStockNewsRunKind(runKind) ? allowedStockNewsTools : []),
+    ...(isKrwFeedRunKind(runKind) ? allowedKrwFeedTools : []),
     ...(isYahooFinanceRunKind(runKind) ? allowedYahooFinanceTools : []),
     ...(visualizationGenerationEnabled
       ? VISUALIZATION_SDK_ALLOWED_TOOLS
@@ -2359,13 +2398,14 @@ function createToolPermissionGuard(
     if (
       !isKrwOntologySdkTool(toolName) &&
       !isStockNewsSdkTool(toolName) &&
+      !isKrwFeedSdkTool(toolName) &&
       !isYahooFinanceSdkTool(toolName) &&
       !isVisualizationSdkTool(toolName)
     ) {
       return {
         behavior: "deny",
         message:
-          "Only configured ontology, current market-news, stock-news, and presentation tools are allowed in web chat.",
+          "Only configured ontology, KRW feed, current market-news, stock-news, and presentation tools are allowed in web chat.",
       };
     }
 
@@ -2470,6 +2510,35 @@ function createToolPermissionGuard(
         };
       }
 
+      return { behavior: "allow" };
+    }
+
+    if (isKrwFeedSdkTool(toolName)) {
+      const feedToolName = normalizeKrwFeedToolName(toolName);
+      if (analysisMode !== "news" || !isKrwFeedRunKind(runKind)) {
+        return {
+          behavior: "deny",
+          message: "KRW Feed MCP is only available for feed and market-move research.",
+        };
+      }
+      if (!isKrwFeedMcpEnabled() || !feedToolName) {
+        return {
+          behavior: "deny",
+          message: "KRW Feed MCP is disabled for this runtime.",
+        };
+      }
+      if (!isKrwFeedToolAllowedForRunKind(feedToolName, runKind)) {
+        return {
+          behavior: "deny",
+          message: "This KRW Feed tool is not available for this research workflow.",
+        };
+      }
+      if (!reserveToolSlots(permissionContext, "stock_news")) {
+        return {
+          behavior: "deny",
+          message: buildToolBudgetDenyMessage(),
+        };
+      }
       return { behavior: "allow" };
     }
 
@@ -3190,6 +3259,18 @@ function isStockNewsToolAllowedForRunKind(
 function isStockNewsRunKind(runKind: RunKind): boolean {
   void runKind;
   return false;
+}
+
+function isKrwFeedToolAllowedForRunKind(
+  toolName: KrwFeedMCPToolName,
+  runKind: RunKind,
+): boolean {
+  void toolName;
+  return isKrwFeedRunKind(runKind);
+}
+
+function isKrwFeedRunKind(runKind: RunKind): boolean {
+  return runKind === "news_discovery" || runKind === "market_move_research";
 }
 
 function isYahooFinanceRunKind(runKind: RunKind): boolean {
@@ -3971,6 +4052,7 @@ function normalizeMcpToolName(name: unknown): MCPToolName | null {
     normalizeKrwOntologyToolName(name) ??
     normalizeKrwFilingsToolName(name) ??
     normalizeStockNewsToolName(name) ??
+    normalizeKrwFeedToolName(name) ??
     normalizeGuruAdvisorToolName(name) ??
     normalizeYahooFinanceToolName(name) ??
     normalizeVisualizationToolName(name)
@@ -4002,6 +4084,15 @@ function normalizeStockNewsToolName(
   const bareName = name.includes("__") ? name.split("__").at(-1) : name;
   if (!bareName || !STOCK_NEWS_MCP_TOOL_SET.has(bareName)) return null;
   return bareName as StockNewsMCPToolName;
+}
+
+function normalizeKrwFeedToolName(
+  name: unknown,
+): KrwFeedMCPToolName | null {
+  if (typeof name !== "string") return null;
+  const bareName = name.includes("__") ? name.split("__").at(-1) : name;
+  if (!bareName || !KRW_FEED_MCP_TOOL_SET.has(bareName)) return null;
+  return bareName as KrwFeedMCPToolName;
 }
 
 function normalizeGuruAdvisorToolName(name: unknown): GuruMCPToolName | null {

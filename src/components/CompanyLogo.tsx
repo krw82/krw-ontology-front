@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { buildBrandfetchTickerLogoUrl } from "@/lib/brandfetch-logo";
+import { buildCompanyTickerLogoUrl } from "@/lib/brandfetch-logo";
 
 interface CompanyLogoProps {
   ticker: string;
@@ -18,7 +18,7 @@ export default function CompanyLogo({
 }: CompanyLogoProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const logoUrl = buildBrandfetchTickerLogoUrl(ticker, { size: imageSize });
+  const logoUrl = buildCompanyTickerLogoUrl(ticker, { size: imageSize });
   const fallbackLabel = ticker.slice(0, 2).toUpperCase();
   const logoSrc = logoUrl && !imageFailed ? logoUrl : undefined;
   const showImage = Boolean(logoSrc);
@@ -28,7 +28,7 @@ export default function CompanyLogo({
     <span
       aria-hidden="true"
       className={[
-        "relative grid shrink-0 place-items-center overflow-hidden font-black leading-none text-muted",
+        "relative grid shrink-0 place-items-center overflow-hidden rounded-[8px] border border-hairline bg-surface font-black leading-none text-muted",
         className,
       ].join(" ")}
     >
@@ -49,7 +49,7 @@ export default function CompanyLogo({
           referrerPolicy="origin"
           draggable={false}
           className={[
-            "absolute inset-0 h-full w-full object-contain transition-opacity duration-150",
+            "absolute inset-0 h-full w-full object-contain p-1 transition-opacity duration-150",
             imageLoaded ? "opacity-100" : "opacity-0",
           ].join(" ")}
           onError={() => setImageFailed(true)}

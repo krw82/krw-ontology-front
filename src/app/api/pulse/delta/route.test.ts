@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDelta } from "@/app/api/pulse/delta/route";
+import { buildPulseFeedDelta } from "@/lib/pulse/delta";
 import type { PulseFeedResponse, PulseItem } from "@/types/api-contracts";
 
 function item(id: string): PulseItem {
@@ -21,7 +21,7 @@ describe("Pulse V5 delta", () => {
       timezone: "Asia/Seoul", date_label: "7월 20일", filter: "all", candidate_items: [first, second], active_analysis_items: [], visible_limit: 12,
       item_versions: { first: "same", second: "new" }, new_item_count: 0, source_statuses: [],
     };
-    const delta = buildDelta(feed, { first: "same", removed: "old" });
+    const delta = buildPulseFeedDelta(feed, { first: "same", removed: "old" });
     expect(delta.upserts.map((candidate) => candidate.id)).toEqual(["second"]);
     expect(delta.ordered_candidate_ids).toEqual(["first", "second"]);
     expect(delta.removed_item_ids).toEqual(["removed"]);
@@ -40,7 +40,7 @@ describe("Pulse V5 delta", () => {
       item_versions: { first: "new-version" }, new_item_count: 0, source_statuses: [],
     };
 
-    expect(buildDelta(feed, { first: "old-version" }).refresh_summary).toEqual({
+    expect(buildPulseFeedDelta(feed, { first: "old-version" }).refresh_summary).toEqual({
       added_candidate_count: 0,
       updated_item_count: 1,
       removed_item_count: 0,

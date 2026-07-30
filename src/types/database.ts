@@ -1504,6 +1504,26 @@ export interface BillingPlanVersionRow extends Record<string, unknown> {
 
 export type BillingTossPlanKey = "standard" | "pro";
 
+export type BillingTossOperationKind =
+  | "subscribe"
+  | "upgrade"
+  | "downgrade"
+  | "cancel_subscription"
+  | "resume_subscription"
+  | "cancel_plan_change"
+  | "replace_payment_method";
+
+export type BillingTossOperationStatus =
+  | "prepared"
+  | "awaiting_auth"
+  | "processing"
+  | "payment_uncertain"
+  | "paid_pending_apply"
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | "expired";
+
 export interface BillingTossCustomerRow extends Record<string, unknown> {
   user_id: string;
   customer_key: string;
@@ -1533,6 +1553,9 @@ export interface BillingTossCheckoutSessionRow extends Record<string, unknown> {
   fail_url: string;
   auth_key_received_at: string | null;
   billing_key_idempotency_key: string;
+  purpose: "initial_subscription" | "replace_payment_method";
+  operation_id: string | null;
+  callback_token_hash: string | null;
   processing_started_at: string | null;
   failure_code: string | null;
   failure_message: string | null;
@@ -1575,6 +1598,9 @@ export interface BillingTossSubscriptionRow extends Record<string, unknown> {
   billing_key_delete_pending: boolean;
   billing_key_deleted_at: string | null;
   last_payment_id: string | null;
+  state_version: number;
+  active_operation_id: string | null;
+  active_operation_expires_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1584,6 +1610,7 @@ export interface BillingTossPaymentRow extends Record<string, unknown> {
   user_id: string;
   subscription_id: string | null;
   checkout_session_id: string | null;
+  operation_id: string | null;
   plan_key: BillingTossPlanKey;
   plan_version_id: string | null;
   payment_kind: "initial" | "renewal" | "upgrade";
@@ -1608,6 +1635,46 @@ export interface BillingTossPaymentRow extends Record<string, unknown> {
   requested_at: string | null;
   approved_at: string | null;
   paid_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingTossOperationRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  subscription_id: string | null;
+  kind: BillingTossOperationKind;
+  status: BillingTossOperationStatus;
+  from_plan_key: BillingTossPlanKey | null;
+  target_plan_key: BillingTossPlanKey | null;
+  from_plan_version_id: string | null;
+  target_plan_version_id: string | null;
+  expected_subscription_version: number | null;
+  quoted_amount_krw: number;
+  next_amount_krw: number;
+  effective_at: string | null;
+  next_billing_at: string | null;
+  payment_id: string | null;
+  checkout_session_id: string | null;
+  idempotency_key: string;
+  failure_code: string | null;
+  failure_message: string | null;
+  expires_at: string;
+  confirmed_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingTossRetiredBillingKeyRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  subscription_id: string;
+  billing_key: string;
+  status: "pending" | "deleted" | "failed";
+  failure_code: string | null;
+  attempted_at: string | null;
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1882,6 +1949,9 @@ export interface AnalyticsEventRow extends Record<string, unknown> {
 
 export interface PulseEditorialEntryRow extends Record<string, unknown> {
   id: string;
+  series_id: string | null;
+  episode_number: number | null;
+  company_visible: boolean;
   slug: string;
   status: "draft" | "published" | "archived";
   format: "single_image" | "carousel" | "text";
@@ -1892,6 +1962,18 @@ export interface PulseEditorialEntryRow extends Record<string, unknown> {
   action_href: string | null;
   publish_at: string | null;
   expires_at: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PulseEditorialSeriesRow extends Record<string, unknown> {
+  id: string;
+  ticker: string;
+  slug: string;
+  status: "draft" | "published" | "archived";
+  title: string;
+  summary: string;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -1908,6 +1990,20 @@ export interface PulseEditorialAssetRow extends Record<string, unknown> {
   width: number | null;
   height: number | null;
   created_at: string;
+}
+
+export interface PulseEditorialDistributionRow extends Record<string, unknown> {
+  id: string;
+  entry_id: string;
+  channel: "pulse";
+  status: "draft" | "active" | "paused" | "archived";
+  placement: "early" | "standard";
+  priority: number;
+  starts_at: string | null;
+  ends_at: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Supabase Database type for createClient generic
@@ -3782,6 +3878,9 @@ export interface Database {
           | "currency"
           | "status"
           | "auth_key_received_at"
+          | "purpose"
+          | "operation_id"
+          | "callback_token_hash"
           | "processing_started_at"
           | "failure_code"
           | "failure_message"
@@ -3795,6 +3894,9 @@ export interface Database {
           status?: BillingTossCheckoutSessionRow["status"];
           auth_key_received_at?: string | null;
           billing_key_idempotency_key?: string;
+          purpose?: BillingTossCheckoutSessionRow["purpose"];
+          operation_id?: string | null;
+          callback_token_hash?: string | null;
           processing_started_at?: string | null;
           failure_code?: string | null;
           failure_message?: string | null;
@@ -3829,6 +3931,9 @@ export interface Database {
           | "billing_key_delete_pending"
           | "billing_key_deleted_at"
           | "last_payment_id"
+          | "state_version"
+          | "active_operation_id"
+          | "active_operation_expires_at"
           | "created_at"
           | "updated_at"
         > & {
@@ -3849,6 +3954,9 @@ export interface Database {
           billing_key_delete_pending?: boolean;
           billing_key_deleted_at?: string | null;
           last_payment_id?: string | null;
+          state_version?: number;
+          active_operation_id?: string | null;
+          active_operation_expires_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -3860,6 +3968,7 @@ export interface Database {
         Insert: Omit<
           BillingTossPaymentRow,
           | "id"
+          | "operation_id"
           | "currency"
           | "billing_period_start"
           | "billing_period_end"
@@ -3881,6 +3990,7 @@ export interface Database {
           | "updated_at"
         > & {
           id?: string;
+          operation_id?: string | null;
           currency?: "KRW";
           billing_period_start?: string | null;
           billing_period_end?: string | null;
@@ -3902,6 +4012,58 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Omit<BillingTossPaymentRow, "id" | "user_id" | "created_at">>;
+        Relationships: [];
+      };
+      billing_toss_operations: {
+        Row: BillingTossOperationRow;
+        Insert: Omit<
+          BillingTossOperationRow,
+          | "id"
+          | "status"
+          | "idempotency_key"
+          | "failure_code"
+          | "failure_message"
+          | "expires_at"
+          | "confirmed_at"
+          | "completed_at"
+          | "created_at"
+          | "updated_at"
+        > & {
+          id?: string;
+          status?: BillingTossOperationStatus;
+          idempotency_key?: string;
+          failure_code?: string | null;
+          failure_message?: string | null;
+          expires_at?: string;
+          confirmed_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<BillingTossOperationRow, "id" | "user_id" | "created_at">>;
+        Relationships: [];
+      };
+      billing_toss_retired_billing_keys: {
+        Row: BillingTossRetiredBillingKeyRow;
+        Insert: Omit<
+          BillingTossRetiredBillingKeyRow,
+          | "id"
+          | "status"
+          | "failure_code"
+          | "attempted_at"
+          | "deleted_at"
+          | "created_at"
+          | "updated_at"
+        > & {
+          id?: string;
+          status?: BillingTossRetiredBillingKeyRow["status"];
+          failure_code?: string | null;
+          attempted_at?: string | null;
+          deleted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<BillingTossRetiredBillingKeyRow, "id" | "user_id" | "created_at">>;
         Relationships: [];
       };
       usage_credit_balances: {
@@ -4131,6 +4293,9 @@ export interface Database {
         Row: PulseEditorialEntryRow;
         Insert: Omit<PulseEditorialEntryRow, "id" | "created_at" | "updated_at"> & {
           id?: string;
+          series_id?: string | null;
+          episode_number?: number | null;
+          company_visible?: boolean;
           status?: PulseEditorialEntryRow["status"];
           format?: PulseEditorialEntryRow["format"];
           body?: string;
@@ -4151,6 +4316,24 @@ export interface Database {
           referencedColumns: string[];
         }>;
       };
+      pulse_editorial_series: {
+        Row: PulseEditorialSeriesRow;
+        Insert: Omit<PulseEditorialSeriesRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          status?: PulseEditorialSeriesRow["status"];
+          summary?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<PulseEditorialSeriesRow, "id" | "created_at" | "created_by">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
       pulse_editorial_assets: {
         Row: PulseEditorialAssetRow;
         Insert: Omit<PulseEditorialAssetRow, "id" | "created_at" | "width" | "height"> & {
@@ -4160,6 +4343,28 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<Omit<PulseEditorialAssetRow, "id" | "entry_id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      pulse_editorial_distributions: {
+        Row: PulseEditorialDistributionRow;
+        Insert: Omit<PulseEditorialDistributionRow, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          channel?: PulseEditorialDistributionRow["channel"];
+          status?: PulseEditorialDistributionRow["status"];
+          placement?: PulseEditorialDistributionRow["placement"];
+          priority?: number;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<PulseEditorialDistributionRow, "id" | "created_at" | "created_by">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];
@@ -4718,6 +4923,108 @@ export interface Database {
         Returns: Array<{
           subscription_id: string;
         }>;
+      };
+      prepare_toss_billing_operation: {
+        Args: {
+          p_user_id: string;
+          p_kind: BillingTossOperationKind;
+          p_target_plan_key: BillingTossPlanKey | null;
+          p_now?: string;
+        };
+        Returns: Array<{
+          operation_id: string;
+        }>;
+      };
+      confirm_toss_billing_operation: {
+        Args: {
+          p_user_id: string;
+          p_operation_id: string;
+          p_now?: string;
+        };
+        Returns: Array<{
+          operation_id: string;
+          operation_status: BillingTossOperationStatus;
+        }>;
+      };
+      mark_toss_billing_operation_recoverable: {
+        Args: {
+          p_user_id: string;
+          p_operation_id: string;
+          p_status: "failed" | "payment_uncertain" | "paid_pending_apply";
+          p_failure_code: string;
+          p_failure_message: string;
+          p_now?: string;
+        };
+        Returns: boolean;
+      };
+      finalize_toss_billing_v2_payment: {
+        Args: {
+          p_user_id: string;
+          p_operation_id: string;
+          p_payment_id: string;
+          p_billing_key: string | null;
+          p_billing_key_issued_at: string | null;
+          p_card_snapshot: Json;
+          p_now?: string;
+        };
+        Returns: Array<{
+          subscription_id: string;
+          already_applied: boolean;
+        }>;
+      };
+      finalize_toss_billing_key_replacement: {
+        Args: {
+          p_user_id: string;
+          p_operation_id: string;
+          p_billing_key: string;
+          p_billing_key_issued_at: string | null;
+          p_card_snapshot: Json;
+          p_now?: string;
+        };
+        Returns: Array<{
+          subscription_id: string;
+          already_applied: boolean;
+        }>;
+      };
+      expire_toss_billing_operations: {
+        Args: { p_now?: string };
+        Returns: number;
+      };
+      claim_toss_subscription_for_payment_recovery: {
+        Args: {
+          p_user_id: string;
+          p_subscription_id: string;
+          p_worker_id: string;
+          p_now?: string;
+          p_lease_seconds?: number;
+        };
+        Returns: boolean;
+      };
+      cancel_toss_billing_operation: {
+        Args: {
+          p_user_id: string;
+          p_operation_id: string;
+          p_now?: string;
+        };
+        Returns: boolean;
+      };
+      apply_toss_renewal_failure: {
+        Args: {
+          p_user_id: string;
+          p_subscription_id: string;
+          p_grace_until: string;
+          p_retry_at: string | null;
+          p_next_attempt_count: number;
+          p_now?: string;
+        };
+        Returns: string;
+      };
+      finalize_toss_terminal_subscriptions: {
+        Args: {
+          p_now?: string;
+          p_limit?: number;
+        };
+        Returns: number;
       };
       finalize_toss_billing_payment: {
         Args: {

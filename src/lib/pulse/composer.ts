@@ -43,6 +43,8 @@ import { getRawResurfaceCandidates, selectResurfaceCandidate } from "@/lib/pulse
 import { buildPulseItemVersions } from "@/lib/pulse/delta";
 import { getPulseFeedRevision, type PulseFeedRevision } from "@/lib/pulse/revision";
 import { getPulseFilingDecisionContext } from "@/lib/judgments/read-model";
+import { getCompanyDisplayCopyForTicker } from "@/content/companies/display";
+import { DEFAULT_LOCALE } from "@/i18n/config";
 import type {
   PulseFeedResponse,
   PulseFilter,
@@ -177,9 +179,10 @@ export async function composePulseFeed({
   // first candidate never makes the whole resurface/learning source disappear.
   const scheduledReviews = stateful.filter((item) =>
     item.kind === "resurface" && item.metadata.monitoring_rule_type === "scheduled_review");
-  // Rotation and fatigue are device-local in the flat feed. The server only emits one
-  // eligible resurface/learning candidate; a device may suppress it based on
-  // its own recent exposure history without creating a database write.
+  // Rotation and fatigue are device-local in the flat feed. Resurface remains
+  // account-scoped, while early editorial stories are emitted as a small
+  // approved reservoir for the browser to choose from without a per-device
+  // database write.
   const resurface = selectResurfaceCandidate(
     stateful.filter((item) => item.kind === "resurface" && item.metadata.monitoring_rule_type !== "scheduled_review"),
     userId,
@@ -210,10 +213,13 @@ export async function composePulseFeed({
   const developmentActiveAnalysis = developmentShowcase.filter(isActiveAnalysis);
 
   const boundedLimit = Math.max(1, Math.min(limit, PULSE_PAGE_SIZE));
-  const candidateItems = buildPulseCandidatePool(
-    [...developmentFeed, ...rankedFeed],
-    snapshotAt,
-  ).slice(0, boundedLimit);
+  const rankedCandidates = [...developmentFeed, ...rankedFeed];
+  const pooledCandidates = buildPulseCandidatePool(rankedCandidates, snapshotAt);
+  // V8 sends an account-relevant, server-authorized reservoir rather than
+  // forcing one editorial item into the account-level order. The browser
+  // chooses one story with private device-local state and keeps it stable
+  // until an intentional refresh.
+  const candidateItems = pooledCandidates.slice(0, boundedLimit);
   const candidateRankByKey = new Map(
     candidateItems.map((candidate) => [candidate.item_key, candidate.server_rank]),
   );
@@ -238,7 +244,7 @@ export async function composePulseFeed({
     revision: revision.value,
     generated_at: snapshotAt.toISOString(),
     snapshot_at: snapshotAt.toISOString(),
-    ranking_version: "rule_v5_flat",
+    ranking_version: "rule_v8_hybrid",
     timezone: preferences.timezone,
     date_label: formatDateLabel(snapshotAt, preferences.timezone),
     filter,
@@ -269,7 +275,7 @@ export function createUnavailablePulseFeed(now = new Date()): PulseFeedResponse 
     revision: "unavailable",
     generated_at: now.toISOString(),
     snapshot_at: now.toISOString(),
-    ranking_version: "rule_v5_flat",
+    ranking_version: "rule_v8_hybrid",
     timezone: "Asia/Seoul",
     date_label: formatDateLabel(now, "Asia/Seoul"),
     filter: "all",
@@ -313,7 +319,7 @@ function toPublicItem(candidate: PulseRankedCandidate): PulseItem | null {
   const parsed = pulseItemSchema.safeParse({
     ...item,
     id: encodePulseItemId(item_key),
-    metadata: item.metadata,
+    metadata: withCompanyDisplayMetadata(item.ticker, item.metadata),
     phase: item.phase ?? null,
     occurred_at: normalizePulseDateTime(item.occurred_at),
     available_at: normalizePulseDateTime(item.available_at),
@@ -328,6 +334,19 @@ function toPublicItem(candidate: PulseRankedCandidate): PulseItem | null {
     issue_count: parsed.error.issues.length,
   });
   return null;
+}
+
+function withCompanyDisplayMetadata(
+  ticker: string | null,
+  metadata: PulseItem["metadata"],
+): PulseItem["metadata"] {
+  if (!ticker || typeof metadata.company_name_ko === "string") return metadata;
+
+  const copy = getCompanyDisplayCopyForTicker(DEFAULT_LOCALE, ticker);
+  const companyName = copy.companyNameKo ?? copy.name;
+  if (!companyName) return metadata;
+
+  return { ...metadata, company_name_ko: companyName };
 }
 
 async function loadSource(

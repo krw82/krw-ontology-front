@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { createServer, request as createUpstreamRequest } from "node:http";
@@ -18,10 +18,42 @@ const e2eEnv = {
   KRW_E2E_PRODUCTION_AUTH_BYPASS: "1",
   KRW_E2E_SERVER_BIND: "127.0.0.1",
   KRW_E2E_AUTH_TOKEN: e2eAuthToken,
+  NEXT_PUBLIC_KRW_E2E_BILLING_FIXTURE: "1",
   NEXT_DIST_DIR: distDir,
   NEXT_PUBLIC_APP_VERSION: appVersion,
   TRUSTED_CLIENT_IP_HEADER: "x-krw-client-ip",
 };
+
+function findStandaloneServer(directory) {
+  const directServerPath = path.join(directory, "server.js");
+  if (existsSync(directServerPath)) {
+    return directServerPath;
+  }
+
+  const directories = [directory];
+  while (directories.length > 0) {
+    const currentDirectory = directories.shift();
+    if (!currentDirectory) {
+      continue;
+    }
+
+    for (const entry of readdirSync(currentDirectory, { withFileTypes: true })) {
+      if (entry.name === "node_modules") {
+        continue;
+      }
+
+      const entryPath = path.join(currentDirectory, entry.name);
+      if (entry.isFile() && entry.name === "server.js") {
+        return entryPath;
+      }
+      if (entry.isDirectory()) {
+        directories.push(entryPath);
+      }
+    }
+  }
+
+  throw new Error("Next standalone server.js was not generated.");
+}
 
 rmSync(path.join(root, distDir), { recursive: true, force: true });
 
@@ -40,9 +72,11 @@ if (build.status !== 0) {
 }
 
 const standaloneRoot = path.join(root, distDir, "standalone");
-const standaloneDistRoot = path.join(standaloneRoot, distDir);
+const standaloneServerPath = findStandaloneServer(standaloneRoot);
+const standaloneAppRoot = path.dirname(standaloneServerPath);
+const standaloneDistRoot = path.join(standaloneAppRoot, distDir);
 mkdirSync(standaloneDistRoot, { recursive: true });
-cpSync(path.join(root, "public"), path.join(standaloneRoot, "public"), {
+cpSync(path.join(root, "public"), path.join(standaloneAppRoot, "public"), {
   recursive: true,
 });
 cpSync(
@@ -53,9 +87,9 @@ cpSync(
 
 const server = spawn(
   process.execPath,
-  [path.join(standaloneRoot, "server.js")],
+  [standaloneServerPath],
   {
-    cwd: root,
+    cwd: standaloneAppRoot,
     env: {
       ...e2eEnv,
       HOSTNAME: "127.0.0.1",

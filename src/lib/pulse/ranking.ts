@@ -14,8 +14,17 @@ const FLAT_MIX_TOP_WINDOW = 6;
 const MAX_TOP_TICKER_COUNT = 2;
 const MAX_COMPLETED_ANALYSIS_COUNT = 2;
 
-/** The server ships a compact, authorized candidate slate. */
-export const PULSE_CANDIDATE_POOL_MAX = 20;
+/**
+ * The server ships an authorized reservoir, not a final rendered list. The
+ * device later turns repeated Form 4 rows into one display entry and chooses
+ * a single company story for its own browser.
+ */
+export const PULSE_CANDIDATE_POOL_MAX = 48;
+// A Form 4 stack ultimately becomes one display card and one company story
+// is selected on-device. Keep their reservoirs deliberately small so the
+// server can still authorize a full screen of distinct ordinary cards.
+const MAX_REGULAR_FORM4_CANDIDATES = 10;
+const MAX_EARLY_EDITORIAL_CANDIDATES = 8;
 
 /**
  * Produces a single utility order. `feed_slot` remains a reason/category for
@@ -141,7 +150,36 @@ export function buildPulseCandidatePool(
   const available = ranked
     .filter((candidate) => !candidate.reviewed_at && !isStaleTerminalAnalysis(candidate, now))
     .sort(compareRankedCandidates);
-  const selected = mixFlatCandidates(available, PULSE_CANDIDATE_POOL_MAX);
+  // Form 4 rows collapse to a single display card later. Retain a bounded
+  // expansion set for that card, but reserve the rest of the reservoir for
+  // distinct filings/questions so the feed can still fill one useful screen.
+  // Early company stories are also kept as alternatives; the browser picks a
+  // single stable one and rotates only after an intentional refresh.
+  const earlyEditorial = available
+    .filter(isEarlyEditorialCandidate)
+    .slice(0, MAX_EARLY_EDITORIAL_CANDIDATES);
+  const regularForm4 = available
+    .filter(isRegularForm4Candidate)
+    .slice(0, MAX_REGULAR_FORM4_CANDIDATES);
+  const reservedKeys = new Set([
+    ...earlyEditorial.map((candidate) => candidate.item_key),
+    ...regularForm4.map((candidate) => candidate.item_key),
+  ]);
+  const mainCapacity = Math.max(
+    0,
+    PULSE_CANDIDATE_POOL_MAX - earlyEditorial.length - regularForm4.length,
+  );
+  const mainCandidates = mixFlatCandidates(
+    available.filter((candidate) =>
+      !reservedKeys.has(candidate.item_key)
+      && !isRegularForm4Candidate(candidate)
+      && !isEarlyEditorialCandidate(candidate)),
+    mainCapacity,
+  );
+  // Keep the mixer order for ordinary candidates. Re-sorting here would undo
+  // its top-six diversity guarantees before the device receives the reservoir.
+  const selected = [...mainCandidates, ...regularForm4, ...earlyEditorial]
+    .slice(0, PULSE_CANDIDATE_POOL_MAX);
 
   return selected.map((candidate, serverRank) => ({
     ...candidate,
@@ -267,6 +305,15 @@ function isForm4(candidate: Pick<PulseCandidate, "kind" | "metadata">): boolean 
   if (candidate.kind !== "filing") return false;
   const formType = String(candidate.metadata.form_type ?? "");
   return formType === "4" || formType === "4/A";
+}
+
+function isRegularForm4Candidate(candidate: PulseRankedCandidate): boolean {
+  return isForm4(candidate) && candidate.priority !== "urgent";
+}
+
+function isEarlyEditorialCandidate(candidate: PulseRankedCandidate): boolean {
+  return candidate.kind === "learning"
+    && candidate.metadata.editorial_placement === "early";
 }
 
 function sameCalendarDay(left: PulseRankedCandidate, right: PulseRankedCandidate): boolean {

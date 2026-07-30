@@ -39,6 +39,7 @@ import {
   checkMcpHealth,
   checkMcpReady,
   isKrwFilingsMcpEnabled,
+  isKrwFeedMcpEnabled,
   isKrwPersonalFilingsMcpEnabled,
   isKrwOntologySdkTool,
   resolveGuruAdvisorPluginPath,
@@ -129,6 +130,16 @@ describe("mcp-client readiness probes", () => {
     expect(isKrwFilingsMcpEnabled(env)).toBe(true);
     expect(isKrwPersonalFilingsMcpEnabled(env)).toBe(false);
   });
+
+  it.each(["1", "true", "yes", "on"])(
+    "enables KRW Feed MCP with internal credentials for %s",
+    (enabled) => {
+      expect(isKrwFeedMcpEnabled({
+        KRW_FEED_MCP_ENABLED: enabled,
+        KRW_FEED_MCP_TOKEN: "feed-secret",
+      })).toBe(true);
+    },
+  );
 
   it("checks /readyz for worker readiness", async () => {
     const fetchMock = vi.fn(async () =>

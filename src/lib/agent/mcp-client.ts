@@ -12,6 +12,7 @@ import {
 } from "@/lib/env";
 import type {
   GuruMCPToolName,
+  KrwFeedMCPToolName,
   KrwFilingsMCPToolName,
   KRWOntologyMCPToolName,
   StockNewsMCPToolName,
@@ -38,6 +39,8 @@ const YAHOO_FINANCE_MCP_TOOL_PREFIX =
 export const KRW_FILINGS_MCP_SERVER_NAME = "krw-filings";
 const KRW_FILINGS_DIRECT_TOOL_PREFIX =
   `mcp__${KRW_FILINGS_MCP_SERVER_NAME}__`;
+export const KRW_FEED_MCP_SERVER_NAME = "krw-feed";
+const KRW_FEED_DIRECT_TOOL_PREFIX = `mcp__${KRW_FEED_MCP_SERVER_NAME}__`;
 
 export const KRW_ONTOLOGY_MCP_TOOLS = [
   "krw_ontology_catalog",
@@ -67,6 +70,12 @@ export const STOCK_NEWS_MCP_TOOLS = [
   "build_news_timeline",
   "audit_news_sources",
 ] as const satisfies readonly StockNewsMCPToolName[];
+
+export const KRW_FEED_MCP_TOOLS = [
+  "get_feed_items",
+  "list_feed_items",
+  "get_feed_context",
+] as const satisfies readonly KrwFeedMCPToolName[];
 
 export const VISUALIZATION_MCP_TOOLS = [
   "compose_visualization",
@@ -124,6 +133,10 @@ export const STOCK_NEWS_SDK_ALLOWED_TOOLS = STOCK_NEWS_MCP_TOOLS.map(
   (toolName) => `${STOCK_NEWS_DIRECT_TOOL_PREFIX}${toolName}`,
 );
 
+export const KRW_FEED_SDK_ALLOWED_TOOLS = KRW_FEED_MCP_TOOLS.map(
+  (toolName) => `${KRW_FEED_DIRECT_TOOL_PREFIX}${toolName}`,
+);
+
 export const GURU_ADVISOR_SDK_ALLOWED_TOOLS = GURU_MCP_TOOLS.map(
   (toolName) => `${GURU_ADVISOR_PLUGIN_TOOL_PREFIX}${toolName}`,
 );
@@ -143,6 +156,7 @@ export const KRW_PERSONAL_FILINGS_SDK_ALLOWED_TOOLS =
 
 const KRW_ONTOLOGY_MCP_TOOL_SET = new Set<string>(KRW_ONTOLOGY_MCP_TOOLS);
 const STOCK_NEWS_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_MCP_TOOLS);
+const KRW_FEED_MCP_TOOL_SET = new Set<string>(KRW_FEED_MCP_TOOLS);
 const GURU_MCP_TOOL_SET = new Set<string>(GURU_MCP_TOOLS);
 const YAHOO_FINANCE_MCP_TOOL_SET = new Set<string>(YAHOO_FINANCE_MCP_TOOLS);
 const VISUALIZATION_MCP_TOOL_SET = new Set<string>(VISUALIZATION_MCP_TOOLS);
@@ -165,6 +179,12 @@ export function isStockNewsSdkTool(toolName: string): boolean {
   const bareName = toolName.slice(STOCK_NEWS_DIRECT_TOOL_PREFIX.length);
 
   return Boolean(bareName && STOCK_NEWS_MCP_TOOL_SET.has(bareName));
+}
+
+export function isKrwFeedSdkTool(toolName: string): boolean {
+  if (!toolName.startsWith(KRW_FEED_DIRECT_TOOL_PREFIX)) return false;
+  const bareName = toolName.slice(KRW_FEED_DIRECT_TOOL_PREFIX.length);
+  return Boolean(bareName && KRW_FEED_MCP_TOOL_SET.has(bareName));
 }
 
 export function isGuruAdvisorSdkTool(toolName: string): boolean {
@@ -228,6 +248,7 @@ export function filingsMcpToken(
 export function isStockNewsEnabled(
   env: Record<string, string | undefined> = process.env,
 ): boolean {
+  if (!truthyEnv(env.STOCK_NEWS_RELEASE_ENABLED)) return false;
   if (truthyEnv(env.STOCK_NEWS_FORCE_DISABLED)) return false;
   if (!truthyEnv(env.STOCK_NEWS_ENABLED)) return false;
   if (!env.FINNHUB_API_KEY) return false;
@@ -239,6 +260,24 @@ export function getStockNewsSdkAllowedTools(
   env: Record<string, string | undefined> = process.env,
 ): string[] {
   return isStockNewsEnabled(env) ? STOCK_NEWS_SDK_ALLOWED_TOOLS : [];
+}
+
+export function krwFeedMcpToken(
+  env: Record<string, string | undefined> = process.env,
+): string | null {
+  return env.KRW_FEED_MCP_TOKEN?.trim() || env.FEED_MCP_AUTH_TOKEN?.trim() || null;
+}
+
+export function isKrwFeedMcpEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return truthyEnv(env.KRW_FEED_MCP_ENABLED) && Boolean(krwFeedMcpToken(env));
+}
+
+export function getKrwFeedSdkAllowedTools(
+  env: Record<string, string | undefined> = process.env,
+): string[] {
+  return isKrwFeedMcpEnabled(env) ? KRW_FEED_SDK_ALLOWED_TOOLS : [];
 }
 
 function truthyEnv(value: string | undefined): boolean {

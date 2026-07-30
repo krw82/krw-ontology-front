@@ -68,13 +68,13 @@ describe("GET /api/pulse", () => {
     expect(mocks.composePulseFeed).not.toHaveBeenCalled();
   });
 
-  it("rejects pagination cursors and limits over the twenty-item session", async () => {
+  it("rejects pagination cursors and limits over the candidate reservoir", async () => {
     expect(
       (await GET(new NextRequest("http://localhost/api/pulse?cursor=broken")))
         .status,
     ).toBe(400);
     expect(
-      (await GET(new NextRequest("http://localhost/api/pulse?limit=21")))
+      (await GET(new NextRequest("http://localhost/api/pulse?limit=49")))
         .status,
     ).toBe(400);
     expect(mocks.composePulseFeed).not.toHaveBeenCalled();
@@ -119,7 +119,7 @@ describe("GET /api/pulse", () => {
 
   it("returns a private no-store response without starting any research run", async () => {
     const response = await GET(
-      new NextRequest("http://localhost/api/pulse?filter=all&limit=20"),
+      new NextRequest("http://localhost/api/pulse?filter=all&limit=48"),
     );
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toContain("private");
@@ -129,7 +129,7 @@ describe("GET /api/pulse", () => {
         userId: "user-1",
         includeNotebookSources: true,
         filter: "all",
-        limit: 20,
+        limit: 48,
       }),
     );
   });

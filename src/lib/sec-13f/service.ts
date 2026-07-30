@@ -36,8 +36,15 @@ import {
 const REBALANCING_LIST_LIMIT = 5;
 const SHARE_TREND_LIMIT = 10;
 const CUSIP_TICKER_OVERRIDES: Record<string, string> = {
+  "023135106": "AMZN",
   "037833100": "AAPL",
+  "166764100": "CVX",
   "30231G102": "XOM",
+  "30303M102": "META",
+  "478160104": "JNJ",
+  "594918104": "MSFT",
+  "67066G104": "NVDA",
+  "88160R101": "TSLA",
 };
 
 function knownManagerForCik(cik: string): Known13FManager | null {

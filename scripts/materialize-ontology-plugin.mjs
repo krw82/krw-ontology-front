@@ -37,10 +37,11 @@ let out = "";
 let mcpUrl = process.env.KRW_ONTOLOGY_MCP_URL || "";
 let stockNewsMcpUrl = process.env.STOCK_NEWS_MCP_URL || "";
 let filingsMcpUrl = process.env.KRW_FILINGS_MCP_URL || "";
+let feedMcpUrl = process.env.KRW_FEED_MCP_URL || "";
 
 function usage() {
   console.error(
-    `Usage: scripts/materialize-ontology-plugin.mjs --env dev|prod [--source DIR] [--out DIR] [--mcp-url URL] [--stock-news-url URL] [--filings-mcp-url URL]`,
+    `Usage: scripts/materialize-ontology-plugin.mjs --env dev|prod [--source DIR] [--out DIR] [--mcp-url URL] [--stock-news-url URL] [--filings-mcp-url URL] [--feed-mcp-url URL]`,
   );
 }
 
@@ -64,6 +65,9 @@ for (let index = 0; index < args.length; index += 1) {
       break;
     case "--filings-mcp-url":
       filingsMcpUrl = args[++index] || "";
+      break;
+    case "--feed-mcp-url":
+      feedMcpUrl = args[++index] || "";
       break;
     case "--help":
     case "-h":
@@ -96,15 +100,23 @@ if (!filingsMcpUrl) {
   const port = env === "prod" ? 8785 : 8786;
   filingsMcpUrl = `http://127.0.0.1:${port}/mcp`;
 }
+if (!feedMcpUrl) {
+  const port = env === "prod" ? 8795 : 8796;
+  feedMcpUrl = `http://127.0.0.1:${port}/mcp`;
+}
 
 const stockNewsEnabled = isStockNewsEnabled();
 const filingsMcpEnabled = isFilingsMcpEnabled();
+const feedMcpEnabled = isKrwFeedMcpEnabled();
 mcpUrl = validateMcpUrl(mcpUrl, "KRW Ontology MCP");
 if (stockNewsEnabled) {
   stockNewsMcpUrl = validateMcpUrl(stockNewsMcpUrl, "Stock News MCP");
 }
 if (filingsMcpEnabled) {
   filingsMcpUrl = validateMcpUrl(filingsMcpUrl, "On-demand filings MCP");
+}
+if (feedMcpEnabled) {
+  feedMcpUrl = validateMcpUrl(feedMcpUrl, "KRW Feed MCP");
 }
 
 const resolvedSource = path.resolve(source);
@@ -151,6 +163,12 @@ if (filingsMcpEnabled) {
     url: filingsMcpUrl,
   };
 }
+if (feedMcpEnabled) {
+  mcpServers["krw-feed"] = {
+    type: "http",
+    url: feedMcpUrl,
+  };
+}
 
 const mcpConfigPath = path.join(resolvedOut, ".mcp.json");
 writeFileSync(
@@ -193,11 +211,13 @@ console.log(`Materialized ${env} KRW Ontology plugin: ${resolvedOut}`);
 console.log(`MCP URL: ${mcpUrl}`);
 console.log(`Stock News MCP: ${stockNewsEnabled ? "enabled" : "disabled"}`);
 console.log(`On-demand filings MCP: ${filingsMcpEnabled ? "enabled" : "disabled"}`);
+console.log(`KRW Feed MCP: ${feedMcpEnabled ? "enabled" : "disabled"}`);
 console.log(`Plugin content SHA-256: ${materializedContentSha256}`);
 console.log(`MCP tool schema SHA-256: ${toolSchemaSha256}`);
 console.log(`MCP build fingerprint SHA-256: ${buildFingerprintSha256}`);
 
 function isStockNewsEnabled() {
+  if (!truthyEnv(process.env.STOCK_NEWS_RELEASE_ENABLED)) return false;
   if (truthyEnv(process.env.STOCK_NEWS_FORCE_DISABLED)) return false;
   if (!truthyEnv(process.env.STOCK_NEWS_ENABLED)) return false;
   if (!process.env.FINNHUB_API_KEY) {
@@ -210,6 +230,14 @@ function isFilingsMcpEnabled() {
   if (!truthyEnv(process.env.FILINGS_MCP_ENABLED)) return false;
   if (!process.env.FILINGS_MCP_AUTH_TOKEN?.trim()) {
     throw new Error("FILINGS_MCP_ENABLED=1 but FILINGS_MCP_AUTH_TOKEN is missing");
+  }
+  return true;
+}
+
+function isKrwFeedMcpEnabled() {
+  if (!truthyEnv(process.env.KRW_FEED_MCP_ENABLED)) return false;
+  if (!(process.env.KRW_FEED_MCP_TOKEN || process.env.FEED_MCP_AUTH_TOKEN)?.trim()) {
+    throw new Error("KRW_FEED_MCP_ENABLED=1 but KRW_FEED_MCP_TOKEN is missing");
   }
   return true;
 }

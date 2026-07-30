@@ -24,6 +24,22 @@ const developmentConnectSources = [
   "ws://127.0.0.1:*",
 ];
 
+const productionImageSources = [
+  "'self'",
+  "data:",
+  "blob:",
+  "https://lh3.googleusercontent.com",
+  "https://cdn.brandfetch.io",
+];
+
+// Local Supabase Storage runs on 54321. Keep this development-only so the
+// production image policy remains limited to known HTTPS origins.
+const developmentImageSources = [
+  ...productionImageSources,
+  "http://localhost:54321",
+  "http://127.0.0.1:54321",
+];
+
 export function buildContentSecurityPolicy({
   isDevelopment = false,
   nonce,
@@ -44,7 +60,7 @@ export function buildContentSecurityPolicy({
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",
-    "img-src 'self' data: blob: https://lh3.googleusercontent.com https://cdn.brandfetch.io",
+    `img-src ${(isDevelopment ? developmentImageSources : productionImageSources).join(" ")}`,
     "font-src 'self' data:",
     "media-src 'self' data: blob:",
     "style-src 'self' 'unsafe-inline'",

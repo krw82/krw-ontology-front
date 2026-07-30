@@ -114,7 +114,7 @@ export default function CompanyGuruLensPicker({
               exit={{ opacity: 0, y: 18, scale: 0.98 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
             >
-              <div className="max-h-[min(84dvh,720px)] overflow-y-auto px-base pb-[calc(env(safe-area-inset-bottom)+20px)] pt-md sm:p-lg">
+              <div className="guru-lens-picker-safe-content max-h-[min(84dvh,720px)] overflow-y-auto px-base pt-md sm:p-lg">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-mono text-[11px] font-black uppercase tracking-[0.16em] text-primary">
@@ -169,7 +169,7 @@ export default function CompanyGuruLensPicker({
                           company_name: companyName,
                           guru_lens: lens.key,
                         }}
-                        className="group flex min-h-[218px] min-w-0 flex-col rounded-[8px] border border-hairline bg-canvas p-4 text-left text-ink transition-[background-color,border-color,color] hover:border-primary hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        className="group flex min-h-[218px] min-w-0 flex-col rounded-[8px] border border-hairline bg-canvas p-4 text-left text-ink transition-[background-color,border-color,color,transform] hover:border-primary hover:bg-surface-soft active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       >
                         <span className="block min-w-0 text-[17px] font-black leading-6 text-ink">
                           {displayName}
