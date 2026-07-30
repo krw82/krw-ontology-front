@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   formatIssueDate,
   formatIssueRelativeTime,
-  marketIssueStatusClass,
   normalizeMarketIssueDetail,
   type MarketIssueCard,
 } from "@/components/news/news-model";
@@ -19,8 +18,6 @@ export default function MarketIssueDetail({ issueId }: { issueId: string }) {
   const [detail, setDetail] = useState<DetailState>({ kind: "loading" });
   const [draftError, setDraftError] = useState<string | null>(null);
   const [openingDraft, setOpeningDraft] = useState(false);
-  const [stateError, setStateError] = useState<string | null>(null);
-  const [updatingState, setUpdatingState] = useState<"save" | "hide" | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
 
   const loadDetail = useCallback(async () => {
@@ -69,40 +66,6 @@ export default function MarketIssueDetail({ issueId }: { issueId: string }) {
     }
   };
 
-  const updateIssueState = async (kind: "save" | "hide") => {
-    if (detail.kind !== "ready" || updatingState) return;
-    setUpdatingState(kind);
-    setStateError(null);
-    const isSaved = kind === "save" ? !detail.issue.userState?.saved : undefined;
-    const isHidden = kind === "hide" ? true : undefined;
-    try {
-      const response = await fetch(`/api/news/issues/${encodeURIComponent(detail.issue.id)}/state`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...(isSaved !== undefined ? { isSaved } : {}), ...(isHidden !== undefined ? { isHidden } : {}) }),
-      });
-      if (!response.ok) throw new Error("market_issue_state_failed");
-      if (kind === "hide") {
-        window.location.assign("/news");
-        return;
-      }
-      setDetail({
-        kind: "ready",
-        issue: {
-          ...detail.issue,
-          userState: {
-            saved: isSaved === true,
-            hidden: detail.issue.userState?.hidden === true,
-          },
-        },
-      });
-    } catch {
-      setStateError("이슈 상태를 저장하지 못했습니다. 잠시 후 다시 시도해주세요.");
-    } finally {
-      setUpdatingState(null);
-    }
-  };
-
   return (
     <main id="main-content" className="mx-auto w-full max-w-4xl px-base pb-3xl pt-xl sm:px-xl sm:pt-2xl">
       <Link href="/news" className="inline-flex min-h-10 items-center gap-1.5 text-[13px] font-bold text-muted transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
@@ -118,9 +81,6 @@ export default function MarketIssueDetail({ issueId }: { issueId: string }) {
           openingDraft={openingDraft}
           draftError={draftError}
           onOpenResearchDraft={() => void openResearchDraft()}
-          updatingState={updatingState}
-          stateError={stateError}
-          onUpdateState={(kind) => void updateIssueState(kind)}
         />
       ) : null}
     </main>
@@ -132,17 +92,11 @@ function IssueDetailContent({
   openingDraft,
   draftError,
   onOpenResearchDraft,
-  updatingState,
-  stateError,
-  onUpdateState,
 }: {
   issue: MarketIssueCard;
   openingDraft: boolean;
   draftError: string | null;
   onOpenResearchDraft: () => void;
-  updatingState: "save" | "hide" | null;
-  stateError: string | null;
-  onUpdateState: (kind: "save" | "hide") => void;
 }) {
   const sourceCount = Math.max(issue.sourceCount, issue.sources.length);
   const impactPath = issue.impactPath.slice(0, 5);
@@ -151,9 +105,6 @@ function IssueDetailContent({
     <article className="mt-base">
       <header className="border-b border-hairline pb-xl sm:pb-2xl">
         <div className="flex flex-wrap items-center gap-sm">
-          <span className={`inline-flex min-h-7 items-center rounded-full border px-sm text-[11px] font-extrabold ${marketIssueStatusClass(issue.statusTone)}`}>
-            {issue.statusLabel}
-          </span>
           <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted">
             <span className="material-symbols-outlined text-[16px]" aria-hidden="true">source</span>
             원문 {sourceCount}개
@@ -168,26 +119,6 @@ function IssueDetailContent({
         <p className="mt-base max-w-2xl text-[14px] leading-6 text-muted">
           시장의 변화와 기업의 연결고리를 검토하기 위한 리서치 화면입니다. 아래 원문과 공시를 함께 확인해주세요.
         </p>
-        <div className="mt-base flex flex-wrap items-center gap-sm">
-          <button
-            type="button"
-            onClick={() => onUpdateState("save")}
-            disabled={updatingState !== null}
-            className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-hairline bg-white px-base text-[12px] font-bold text-body transition hover:border-primary hover:text-primary disabled:opacity-50"
-          >
-            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">{issue.userState?.saved ? "bookmark_added" : "bookmark"}</span>
-            {issue.userState?.saved ? "저장됨" : "이슈 저장"}
-          </button>
-          <button
-            type="button"
-            onClick={() => onUpdateState("hide")}
-            disabled={updatingState !== null}
-            className="min-h-10 rounded-full px-base text-[12px] font-bold text-muted transition hover:text-ink disabled:opacity-50"
-          >
-            관심없음
-          </button>
-          {stateError ? <p className="text-[12px] text-[#9b4e25]" role="alert">{stateError}</p> : null}
-        </div>
       </header>
 
       <section className="mt-xl rounded-[22px] border border-[#d8e4fa] bg-[#f6f9ff] p-base sm:p-lg" aria-labelledby="korean-context-title">
@@ -211,6 +142,21 @@ function IssueDetailContent({
         </section>
       ) : null}
 
+      <section className="mt-xl rounded-[22px] bg-ink px-lg py-xl text-white sm:flex sm:items-center sm:justify-between sm:gap-xl">
+        <div className="max-w-[36rem]">
+          <p className="text-[12px] font-extrabold tracking-[0.08em] text-[#adc8ff]">NEXT RESEARCH STEP</p>
+          <h2 className="mt-1 text-[21px] font-extrabold tracking-[-0.035em]">공시와 실적콜에서 이 연결을 검증해보세요.</h2>
+          <p className="mt-2 text-[13px] leading-6 text-[#d2d9ea]">이슈의 핵심을 담은 질문 초안을 열고, 직접 수정한 뒤 분석을 시작할 수 있습니다.</p>
+        </div>
+        <div className="mt-base shrink-0 sm:mt-0">
+          <button type="button" onClick={onOpenResearchDraft} disabled={openingDraft} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white px-lg text-[13px] font-extrabold text-ink transition hover:bg-[#dce8ff] disabled:cursor-not-allowed disabled:opacity-65">
+            {openingDraft ? <span className="material-symbols-outlined animate-spin text-[18px]" aria-hidden="true">progress_activity</span> : <span className="material-symbols-outlined text-[18px]" aria-hidden="true">manage_search</span>}
+            {openingDraft ? "질문 초안 여는 중" : "공시·실적콜로 검증하기"}
+          </button>
+          {draftError ? <p className="mt-2 max-w-xs text-[12px] leading-5 text-[#ffcfbf]" role="alert">{draftError}</p> : null}
+        </div>
+      </section>
+
       {(issue.confirmed.length > 0 || issue.unconfirmed.length > 0) ? (
         <section className="mt-xl" aria-labelledby="confirmation-title">
           <div className="flex items-baseline justify-between gap-base">
@@ -218,7 +164,7 @@ function IssueDetailContent({
             <span className="text-[11px] font-medium text-muted">사실과 추가 검토 항목을 나눠 봅니다.</span>
           </div>
           <div className="mt-base grid gap-base md:grid-cols-2">
-            <EvidenceList title="원문에서 확인된 내용" icon="verified" tone="confirmed" items={issue.confirmed} emptyCopy="원문에서 별도로 확인된 항목이 아직 정리되지 않았습니다." />
+            <EvidenceList title="원문에서 확인된 내용" tone="confirmed" items={issue.confirmed} emptyCopy="원문에서 별도로 확인된 항목이 아직 정리되지 않았습니다." />
             <EvidenceList title="추가 확인이 필요한 부분" icon="rule" tone="caution" items={issue.unconfirmed} emptyCopy="현재 별도로 표시된 추가 확인 항목은 없습니다." />
           </div>
         </section>
@@ -286,30 +232,16 @@ function IssueDetailContent({
         )}
       </section>
 
-      <section className="mt-xl rounded-[22px] bg-ink px-lg py-xl text-white sm:flex sm:items-center sm:justify-between sm:gap-xl">
-        <div className="max-w-xl">
-          <p className="text-[12px] font-extrabold tracking-[0.08em] text-[#adc8ff]">NEXT RESEARCH STEP</p>
-          <h2 className="mt-1 text-[21px] font-extrabold tracking-[-0.035em]">공시와 실적콜에서 이 연결을 검증해보세요.</h2>
-          <p className="mt-2 text-[13px] leading-6 text-[#d2d9ea]">이슈의 핵심을 담은 질문 초안을 열고, 직접 수정한 뒤 분석을 시작할 수 있습니다.</p>
-        </div>
-        <div className="mt-base shrink-0 sm:mt-0">
-          <button type="button" onClick={onOpenResearchDraft} disabled={openingDraft} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white px-lg text-[13px] font-extrabold text-ink transition hover:bg-[#dce8ff] disabled:cursor-not-allowed disabled:opacity-65">
-            {openingDraft ? <span className="material-symbols-outlined animate-spin text-[18px]" aria-hidden="true">progress_activity</span> : <span className="material-symbols-outlined text-[18px]" aria-hidden="true">manage_search</span>}
-            {openingDraft ? "질문 초안 여는 중" : "공시·실적콜로 검증하기"}
-          </button>
-          {draftError ? <p className="mt-2 max-w-xs text-[12px] leading-5 text-[#ffcfbf]" role="alert">{draftError}</p> : null}
-        </div>
-      </section>
     </article>
   );
 }
 
-function EvidenceList({ title, icon, tone, items, emptyCopy }: { title: string; icon: string; tone: "confirmed" | "caution"; items: readonly string[]; emptyCopy: string }) {
+function EvidenceList({ title, icon, tone, items, emptyCopy }: { title: string; icon?: string; tone: "confirmed" | "caution"; items: readonly string[]; emptyCopy: string }) {
   const accent = tone === "confirmed" ? "text-[#287450]" : "text-[#8a6318]";
   const border = tone === "confirmed" ? "border-[#cbe3d6] bg-[#fbfefc]" : "border-[#eeddb6] bg-[#fffdf7]";
   return (
     <div className={`rounded-[18px] border p-base ${border}`}>
-      <h3 className={`flex items-center gap-xs text-[14px] font-extrabold ${accent}`}><span className="material-symbols-outlined text-[18px]" aria-hidden="true">{icon}</span>{title}</h3>
+      <h3 className={`flex items-center gap-xs text-[14px] font-extrabold ${accent}`}>{icon ? <span className="material-symbols-outlined text-[18px]" aria-hidden="true">{icon}</span> : null}{title}</h3>
       {items.length > 0 ? (
         <ul className="mt-sm grid gap-sm text-[13px] leading-6 text-body">
           {items.map((item, index) => <li key={`${item}-${index}`} className="flex gap-sm"><span className={`mt-[9px] size-1.5 shrink-0 rounded-full ${tone === "confirmed" ? "bg-[#4e9d75]" : "bg-[#c69635]"}`} aria-hidden="true" />{item}</li>)}

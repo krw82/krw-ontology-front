@@ -236,25 +236,14 @@ export async function updateMarketIssueSettings(
 }
 
 async function loadFocusTickers(db: Db, userId: string): Promise<Set<string>> {
-  const [{ data: follows, error: followsError }, { data: marks, error: marksError }] =
-    await Promise.all([
-      db
-        .from("market_issue_user_company_follows")
-        .select("ticker")
-        .eq("user_id", userId),
-      db
-        .from("user_company_marks")
-        .select("ticker, is_watchlisted, is_holding")
-        .eq("user_id", userId)
-        .or("is_watchlisted.eq.true,is_holding.eq.true"),
-    ]);
-  if (followsError) throw followsError;
-  if (marksError) throw marksError;
+  const { data: marks, error } = await db
+    .from("user_company_marks")
+    .select("ticker, coverage_level")
+    .eq("user_id", userId)
+    .not("coverage_level", "is", null);
+  if (error) throw error;
 
-  return new Set([
-    ...asRows(follows).map((row) => text(row.ticker).toUpperCase()),
-    ...asRows(marks).map((row) => text(row.ticker).toUpperCase()),
-  ].filter(Boolean));
+  return new Set(asRows(marks).map((row) => text(row.ticker).toUpperCase()).filter(Boolean));
 }
 
 async function loadUserStates(

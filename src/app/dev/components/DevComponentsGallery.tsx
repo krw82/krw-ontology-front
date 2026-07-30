@@ -1210,9 +1210,13 @@ export default function DevComponentsGallery() {
                 monthlyPriceKrw={0}
                 currentMonthlyPriceKrw={0}
                 billingProviderReady={false}
-                subscriptionPlanKey={null}
-                pendingPlanKey={null}
-                cancelAtPeriodEnd={false}
+                billingState="free"
+                subscription={{
+                  planKey: null,
+                  pendingPlanKey: null,
+                  currentPeriodEnd: null,
+                }}
+                activeOperation={null}
               />
             </PreviewCard>
             <PreviewCard title="Pro current">
@@ -1222,9 +1226,13 @@ export default function DevComponentsGallery() {
                 monthlyPriceKrw={29_000}
                 currentMonthlyPriceKrw={29_000}
                 billingProviderReady
-                subscriptionPlanKey="pro"
-                pendingPlanKey={null}
-                cancelAtPeriodEnd={false}
+                billingState="active"
+                subscription={{
+                  planKey: "pro",
+                  pendingPlanKey: null,
+                  currentPeriodEnd: "2026-08-30T00:00:00.000Z",
+                }}
+                activeOperation={null}
               />
             </PreviewCard>
             <PreviewCard title="Pending downgrade">
@@ -1234,9 +1242,13 @@ export default function DevComponentsGallery() {
                 monthlyPriceKrw={14_000}
                 currentMonthlyPriceKrw={29_000}
                 billingProviderReady
-                subscriptionPlanKey="pro"
-                pendingPlanKey="standard"
-                cancelAtPeriodEnd={false}
+                billingState="active"
+                subscription={{
+                  planKey: "pro",
+                  pendingPlanKey: "standard",
+                  currentPeriodEnd: "2026-08-30T00:00:00.000Z",
+                }}
+                activeOperation={null}
               />
             </PreviewCard>
             <PreviewCard title="Provider disabled">
@@ -1246,9 +1258,13 @@ export default function DevComponentsGallery() {
                 monthlyPriceKrw={29_000}
                 currentMonthlyPriceKrw={0}
                 billingProviderReady={false}
-                subscriptionPlanKey={null}
-                pendingPlanKey={null}
-                cancelAtPeriodEnd={false}
+                billingState="free"
+                subscription={{
+                  planKey: null,
+                  pendingPlanKey: null,
+                  currentPeriodEnd: null,
+                }}
+                activeOperation={null}
               />
             </PreviewCard>
           </div>

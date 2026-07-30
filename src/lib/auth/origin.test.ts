@@ -54,6 +54,21 @@ describe("auth origin helpers", () => {
     ).toBe("https://app.krwontology.com");
   });
 
+  it("rejects local or insecure billing redirect origins in production", () => {
+    expect(
+      getConfiguredBillingRedirectOrigin("https://request.example", {
+        NODE_ENV: "production",
+        AUTH_REDIRECT_ORIGIN: "https://0.0.0.0:3000",
+      }),
+    ).toBeNull();
+    expect(
+      getConfiguredBillingRedirectOrigin("https://request.example", {
+        NODE_ENV: "production",
+        AUTH_REDIRECT_ORIGIN: "http://krwontology.com",
+      }),
+    ).toBeNull();
+  });
+
   it("allows request-origin fallback for billing redirects outside production", () => {
     expect(
       getConfiguredBillingRedirectOrigin("http://localhost:3000", {

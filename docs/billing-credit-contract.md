@@ -282,7 +282,9 @@ Paid production launch requires all of these to pass:
 - `TOSS_PAYMENTS_CLIENT_KEY` starts with `live_ck_`.
 - `TOSS_PAYMENTS_SECRET_KEY` starts with `live_sk_`.
 - `/api/healthz` is healthy.
-- unauthenticated `POST /api/billing/toss/checkout` returns `401`.
+- unauthenticated `POST /api/billing/toss/quote` returns `401`.
+- the removed `POST /api/billing/toss/checkout` route returns `404`; V2 never
+  falls back to the former direct checkout contract.
 - `/ko/pricing` renders the public Standard and Pro prices and weekly credits.
 - GCP `web` and `billing-worker` compose services are running.
 

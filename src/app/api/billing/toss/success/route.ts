@@ -1,87 +1,80 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getAuthUser } from "@/lib/auth";
+import { getConfiguredBillingRedirectOrigin } from "@/lib/auth/origin";
 import {
-  completeTossBillingCheckout,
-  TossBillingFlowError,
+  completeTossBillingOperationCallback,
+  getTossBillingOperationIdForCallback,
 } from "@/lib/billing/toss-subscriptions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function redirectToBilling(origin: string, params: Record<string, string>) {
+function billingRedirectOrigin(request: NextRequest): string | null {
+  return getConfiguredBillingRedirectOrigin(request.nextUrl.origin);
+}
+
+function redirectOriginNotConfigured() {
+  return NextResponse.json(
+    {
+      error: {
+        code: "billing_redirect_origin_not_configured",
+        message: "결제 리다이렉트 주소가 설정되지 않았습니다.",
+      },
+    },
+    { status: 503 },
+  );
+}
+
+function redirectToBilling(origin: string, operationId?: string | null) {
   const url = new URL("/settings/billing", origin);
-  for (const [key, value] of Object.entries(params)) {
-    url.searchParams.set(key, value);
-  }
-  return NextResponse.redirect(url);
+  if (operationId) url.searchParams.set("operation", operationId);
+  const response = NextResponse.redirect(url);
+  response.headers.set("Cache-Control", "no-store");
+  response.headers.set("Referrer-Policy", "no-referrer");
+  return response;
 }
 
-function safeMessage(error: unknown): string {
-  if (error instanceof TossBillingFlowError) return error.message;
-  if (
-    error instanceof Error &&
-    error.message.includes("Missing required environment variable")
-  ) {
-    return "Toss Payments 환경변수가 설정되지 않았습니다.";
+async function callbackOperationId({
+  sessionId,
+  callbackToken,
+}: {
+  sessionId: string | null;
+  callbackToken: string | null;
+}): Promise<string | null> {
+  if (!sessionId || !callbackToken) return null;
+  try {
+    return await getTossBillingOperationIdForCallback({
+      sessionId,
+      callbackToken,
+    });
+  } catch {
+    return null;
   }
-  return "결제 처리 중 오류가 발생했습니다.";
-}
-
-function safeCode(error: unknown): string {
-  if (error instanceof TossBillingFlowError) return error.code;
-  if (
-    error instanceof Error &&
-    error.message.includes("Missing required environment variable")
-  ) {
-    return "billing_provider_not_configured";
-  }
-  return "billing_confirm_failed";
 }
 
 export async function GET(request: NextRequest) {
-  const origin = request.nextUrl.origin;
+  const origin = billingRedirectOrigin(request);
+  if (!origin) return redirectOriginNotConfigured();
   const sessionId = request.nextUrl.searchParams.get("sessionId");
   const authKey = request.nextUrl.searchParams.get("authKey");
   const customerKey = request.nextUrl.searchParams.get("customerKey");
+  const callbackToken = request.nextUrl.searchParams.get("callbackToken");
 
-  let user;
-  try {
-    user = await getAuthUser();
-  } catch {
-    const loginUrl = new URL("/login", origin);
-    loginUrl.searchParams.set("next", "/settings/billing");
-    return NextResponse.redirect(loginUrl);
-  }
-  if (!user) {
-    const loginUrl = new URL("/login", origin);
-    loginUrl.searchParams.set("next", "/settings/billing");
-    return NextResponse.redirect(loginUrl);
-  }
-
-  if (!sessionId || !authKey || !customerKey) {
-    return redirectToBilling(origin, {
-      billing_error: "missing_billing_auth",
-      billing_message: "자동결제 인증 정보가 부족합니다.",
-    });
+  if (!sessionId || !callbackToken || !authKey || !customerKey) {
+    return redirectToBilling(origin);
   }
 
   try {
-    await completeTossBillingCheckout({
-      userId: user.id,
+    const result = await completeTossBillingOperationCallback({
       sessionId,
+      callbackToken,
       authKey,
       customerKey,
-      userEmail: user.email ?? null,
-      userName:
-        typeof user.user_metadata?.name === "string"
-          ? user.user_metadata.name
-          : null,
     });
-    return redirectToBilling(origin, { billing: "success" });
-  } catch (error) {
-    return redirectToBilling(origin, {
-      billing_error: safeCode(error),
-      billing_message: safeMessage(error),
-    });
+    return redirectToBilling(origin, result.operationId);
+  } catch {
+    return redirectToBilling(
+      origin,
+      await callbackOperationId({ sessionId, callbackToken }),
+    );
   }
 }

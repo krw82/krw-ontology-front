@@ -1,11 +1,15 @@
 import { redirect } from "next/navigation";
+import Script from "next/script";
 import BillingPlanAction from "@/components/BillingPlanAction";
 import { getAuthUser } from "@/lib/auth";
+import {
+  getBillingPageModel,
+  operationResultMessage,
+} from "@/lib/billing/billing-page-model";
 import { getEntitlementStatus } from "@/lib/billing/entitlement";
 import { MENU_FEATURE_DEFINITIONS } from "@/lib/billing/feature-access";
 import { listPublicBillingPlansFromStore } from "@/lib/billing/plan-store";
 import { isTossPaymentsCheckoutConfigured } from "@/lib/billing/toss";
-import { getCurrentTossSubscriptionSummary } from "@/lib/billing/toss-subscriptions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,48 +40,7 @@ function billingNotice(
     };
   }
 
-  const billing = firstParam(searchParams.billing);
-  if (billing === "success") {
-    return {
-      tone: "success",
-      message: "구독 결제가 완료되었습니다. 새 플랜이 적용되었습니다.",
-    };
-  }
-  if (billing === "cancel_scheduled") {
-    return {
-      tone: "success",
-      message:
-        "구독 해지가 예약되었습니다. 이미 결제된 기간이 끝날 때까지 플랜은 유지됩니다.",
-    };
-  }
-  if (billing === "upgrade_success") {
-    return {
-      tone: "success",
-      message:
-        "업그레이드가 즉시 반영되었습니다. 새 플랜의 기능을 이용할 수 있습니다.",
-    };
-  }
-  if (billing === "downgrade_scheduled") {
-    return {
-      tone: "success",
-      message: "다운그레이드가 다음 월 갱신에 예약되었습니다.",
-    };
-  }
-  if (billing === "plan_change_cancelled") {
-    return {
-      tone: "success",
-      message: "예약된 플랜 변경을 취소했습니다.",
-    };
-  }
-
-  const billingError = firstParam(searchParams.billing_error);
-  if (!billingError) return null;
-  return {
-    tone: "error",
-    message:
-      firstParam(searchParams.billing_message) ??
-      "결제 처리 중 오류가 발생했습니다.",
-  };
+  return null;
 }
 
 function monthlyPriceLabel(value: number): string {
@@ -104,28 +67,90 @@ function planDescription(planKey: string): string {
   return "기능별로 리서치 메뉴를 확장할 수 있는 플랜입니다.";
 }
 
+function billingDateLabel(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(date);
+}
+
 export default async function BillingSettingsPage({
   searchParams,
 }: BillingSettingsPageProps) {
   const resolvedSearchParams = await searchParams;
+  const requestedOperationId = firstParam(resolvedSearchParams.operation);
   const user = await getAuthUser().catch(() => null);
   if (!user) {
-    redirect("/login?next=/settings/billing");
+    const next = new URL("/settings/billing", "https://billing.local");
+    if (requestedOperationId) {
+      next.searchParams.set("operation", requestedOperationId);
+    }
+    redirect(`/login?next=${encodeURIComponent(`${next.pathname}${next.search}`)}`);
   }
 
-  const entitlement = await getEntitlementStatus(user.id, user.email ?? null);
-  const plans = await listPublicBillingPlansFromStore();
-  const subscription = await getCurrentTossSubscriptionSummary(user.id).catch(
-    () => null,
-  );
+  const [entitlement, plans, billingModel] = await Promise.all([
+    getEntitlementStatus(user.id, user.email ?? null),
+    listPublicBillingPlansFromStore(),
+    getBillingPageModel({
+      userId: user.id,
+      requestedOperationId,
+    }),
+  ]);
+  // Billing mutations and card state must use the single server-owned billing
+  // model. Entitlement is still used below for feature presentation, but it
+  // must not independently decide which subscription action is available.
+  const billingCurrentPlanKey =
+    billingModel.subscription?.plan_key ??
+    (billingModel.state === "free" ? "free" : entitlement.plan.key);
   const currentPlan =
-    plans.find((plan) => plan.key === subscription?.planKey) ??
+    plans.find((plan) => plan.key === billingCurrentPlanKey) ??
     plans.find((plan) => plan.key === entitlement.plan.key) ??
     plans.find((plan) => plan.key === "free");
   const billingProviderReady = isTossPaymentsCheckoutConfigured();
-  const notice = billingNotice(resolvedSearchParams);
+  const notice =
+    billingNotice(resolvedSearchParams) ??
+    operationResultMessage(billingModel.requestedOperation) ??
+    (billingModel.unavailableReason
+      ? { tone: "error" as const, message: billingModel.unavailableReason }
+      : null);
+  const processingMessage = billingModel.activeOperation
+    ? billingModel.activeOperation.status === "payment_uncertain"
+      ? "결제 결과를 확인하고 있습니다. 같은 결제가 다시 청구되지 않도록 기존 주문만 재조회합니다."
+      : billingModel.activeOperation.status === "paid_pending_apply"
+        ? "결제는 승인됐고 구독 반영을 다시 확인하고 있습니다."
+        : billingModel.activeOperation.status === "awaiting_auth"
+          ? "자동결제 인증을 기다리고 있습니다. Toss 창을 완료하면 이 화면에 반영됩니다."
+          : "결제 작업을 안전하게 처리하고 있습니다. 페이지를 닫아도 서버에서 계속 확인합니다."
+    : null;
+  const subscriptionDate = billingDateLabel(
+    billingModel.subscription?.current_period_end,
+  );
+  const currentPlanPrice = currentPlan?.monthlyPriceKrw ?? 0;
+  const currentPlanDetail =
+    billingModel.state === "pending_cancel"
+      ? `${subscriptionDate ?? "현재 결제 기간 종료일"}까지 이용할 수 있으며, 이후 Free로 전환됩니다.`
+      : billingModel.state === "grace" || billingModel.state === "past_due"
+        ? "결제 수단을 변경하면 미납 결제를 같은 주문 기준으로 다시 확인합니다."
+        : billingModel.state === "processing"
+          ? processingMessage
+          : billingModel.state === "unavailable"
+            ? billingModel.unavailableReason
+            : billingModel.subscription && subscriptionDate
+              ? `${subscriptionDate}에 월 ${currentPlanPrice.toLocaleString("ko-KR")}원 결제 예정`
+              : "언제든 플랜과 금액을 확인한 뒤 구독을 시작할 수 있습니다.";
   return (
     <div className="bg-canvas">
+      {billingProviderReady && (
+        <Script
+          id="toss-payments-sdk"
+          src="https://js.tosspayments.com/v2/standard"
+          strategy="afterInteractive"
+        />
+      )}
       <main
         id="main-content"
         className="px-base pb-xl pt-xl sm:px-md md:px-xl md:pb-[96px] md:pt-[72px]"
@@ -153,7 +178,9 @@ export default async function BillingSettingsPage({
               className={`mt-8 rounded-[8px] border p-base text-[13px] font-bold leading-5 ${
                 notice.tone === "success"
                   ? "border-primary-container bg-primary-fixed text-on-primary-fixed"
-                  : "border-error bg-error-container text-on-error-container"
+                  : notice.tone === "info"
+                    ? "border-hairline bg-surface-soft text-body"
+                    : "border-error bg-error-container text-on-error-container"
               }`}
             >
               {notice.message}
@@ -166,14 +193,29 @@ export default async function BillingSettingsPage({
                 CURRENT PLAN
               </p>
               <p className="mt-2 text-[22px] font-black leading-7 text-ink">
-                {entitlement.plan.label}
+                {currentPlan?.label ?? entitlement.plan.label}
               </p>
               <p className="mt-1 text-[13px] font-semibold leading-5 text-muted">
-                {entitlement.plan.status_label}
+                {billingModel.state === "pending_cancel"
+                  ? "해지 예약됨"
+                  : billingModel.state === "grace"
+                    ? "결제 유예 · 결제 수단 변경 필요"
+                    : billingModel.state === "past_due"
+                      ? "결제 확인 필요"
+                      : billingModel.state === "processing"
+                        ? "결제 처리 중"
+                        : billingModel.state === "unavailable"
+                          ? "구독 상태 확인 중"
+                          : entitlement.plan.status_label}
               </p>
               <p className="mt-3 text-[14px] font-semibold leading-6 text-body">
-                {planDescription(entitlement.plan.key)}
+                {planDescription(currentPlan?.key ?? entitlement.plan.key)}
               </p>
+              {currentPlanDetail && (
+                <p className="mt-2 text-[12px] font-bold leading-5 text-muted">
+                  {currentPlanDetail}
+                </p>
+              )}
             </div>
           </section>
 
@@ -190,7 +232,7 @@ export default async function BillingSettingsPage({
             </div>
             <div className="mt-base grid gap-sm lg:grid-cols-3">
               {plans.map((plan) => {
-                const isCurrent = plan.key === entitlement.plan.key;
+                const isCurrent = plan.key === billingCurrentPlanKey;
                 const isFeatured = plan.key === "standard";
 
                 return (
@@ -231,16 +273,32 @@ export default async function BillingSettingsPage({
                     <div className="mt-auto pt-base">
                       <BillingPlanAction
                         planKey={plan.key}
-                        currentPlanKey={entitlement.plan.key}
+                        currentPlanKey={billingCurrentPlanKey}
                         monthlyPriceKrw={plan.monthlyPriceKrw}
                         currentMonthlyPriceKrw={
                           currentPlan?.monthlyPriceKrw ?? 0
                         }
                         billingProviderReady={billingProviderReady}
-                        subscriptionPlanKey={subscription?.planKey ?? null}
-                        pendingPlanKey={subscription?.pendingPlanKey ?? null}
-                        cancelAtPeriodEnd={
-                          subscription?.cancelAtPeriodEnd ?? false
+                        billingState={billingModel.state}
+                        subscription={{
+                          planKey: billingModel.subscription?.plan_key ?? null,
+                          pendingPlanKey:
+                            billingModel.subscription?.pending_plan_key ?? null,
+                          currentPeriodEnd:
+                            billingModel.subscription?.current_period_end ?? null,
+                        }}
+                        processingMessage={processingMessage}
+                        activeOperation={
+                          billingModel.activeOperation
+                            ? {
+                                id: billingModel.activeOperation.id,
+                                status: billingModel.activeOperation.status,
+                                targetPlanKey:
+                                  billingModel.activeOperation.target_plan_key,
+                                fromPlanKey:
+                                  billingModel.activeOperation.from_plan_key,
+                              }
+                            : null
                         }
                       />
                     </div>

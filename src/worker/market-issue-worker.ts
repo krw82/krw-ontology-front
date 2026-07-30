@@ -1,5 +1,9 @@
+import nextEnv from "@next/env";
 import { readMarketIssueRuntimeConfig } from "@/lib/market-issues/config";
 import { runMarketIssueIngestionCycle } from "@/lib/market-issues/worker";
+
+const { loadEnvConfig } = nextEnv;
+loadEnvConfig(process.cwd());
 
 const config = readMarketIssueRuntimeConfig();
 let running = false;

@@ -11,6 +11,9 @@ vi.mock("@/lib/ontology/catalog", () => ({
 import { canUseTool } from "./runner";
 import {
   isKrwOntologySdkTool,
+  isKrwFeedSdkTool,
+  KRW_FEED_MCP_TOOLS,
+  KRW_FEED_SDK_ALLOWED_TOOLS,
   isStockNewsSdkTool,
   KRW_ONTOLOGY_DIRECT_SDK_ALLOWED_TOOLS,
   KRW_ONTOLOGY_MCP_TOOLS,
@@ -21,14 +24,19 @@ import {
 
 describe("agent permission boundary", () => {
   beforeEach(() => {
+    delete process.env.STOCK_NEWS_RELEASE_ENABLED;
     delete process.env.STOCK_NEWS_ENABLED;
     delete process.env.STOCK_NEWS_FORCE_DISABLED;
     delete process.env.FINNHUB_API_KEY;
     delete process.env.ZAI_API_KEY;
+    delete process.env.KRW_FEED_MCP_ENABLED;
+    delete process.env.KRW_FEED_MCP_TOKEN;
+    delete process.env.FEED_MCP_AUTH_TOKEN;
   });
 
   it("allows Stock News MCP when explicitly enabled at the global MCP boundary", async () => {
     process.env.FINNHUB_API_KEY = "test-finnhub-key";
+    process.env.STOCK_NEWS_RELEASE_ENABLED = "1";
     process.env.STOCK_NEWS_ENABLED = "1";
 
     for (const toolName of STOCK_NEWS_SDK_ALLOWED_TOOLS) {
@@ -40,6 +48,7 @@ describe("agent permission boundary", () => {
   });
 
   it("denies Stock News MCP when Finnhub is missing", async () => {
+    process.env.STOCK_NEWS_RELEASE_ENABLED = "1";
     process.env.STOCK_NEWS_ENABLED = "1";
 
     for (const toolName of STOCK_NEWS_SDK_ALLOWED_TOOLS) {
@@ -51,6 +60,7 @@ describe("agent permission boundary", () => {
 
   it("denies Stock News MCP unless explicitly enabled", async () => {
     process.env.FINNHUB_API_KEY = "test-finnhub-key";
+    process.env.STOCK_NEWS_RELEASE_ENABLED = "1";
 
     for (const toolName of STOCK_NEWS_SDK_ALLOWED_TOOLS) {
       await expect(canUseTool(toolName)).resolves.toMatchObject({
@@ -61,6 +71,7 @@ describe("agent permission boundary", () => {
 
   it("denies Stock News MCP when explicitly disabled", async () => {
     process.env.FINNHUB_API_KEY = "test-finnhub-key";
+    process.env.STOCK_NEWS_RELEASE_ENABLED = "1";
     process.env.STOCK_NEWS_ENABLED = "1";
     process.env.STOCK_NEWS_FORCE_DISABLED = "1";
 
@@ -68,6 +79,24 @@ describe("agent permission boundary", () => {
       await expect(canUseTool(toolName)).resolves.toMatchObject({
         behavior: "deny",
       });
+    }
+  });
+
+  it("allows KRW Feed MCP only with explicit internal enablement", async () => {
+    process.env.KRW_FEED_MCP_ENABLED = "1";
+    process.env.KRW_FEED_MCP_TOKEN = "feed-secret";
+
+    for (const toolName of KRW_FEED_SDK_ALLOWED_TOOLS) {
+      await expect(canUseTool(toolName)).resolves.toEqual({ behavior: "allow" });
+      expect(isKrwFeedSdkTool(toolName)).toBe(true);
+    }
+  });
+
+  it("denies KRW Feed MCP when its internal token is missing", async () => {
+    process.env.KRW_FEED_MCP_ENABLED = "1";
+
+    for (const toolName of KRW_FEED_SDK_ALLOWED_TOOLS) {
+      await expect(canUseTool(toolName)).resolves.toMatchObject({ behavior: "deny" });
     }
   });
 
@@ -135,6 +164,9 @@ describe("agent permission boundary", () => {
     );
     expect(STOCK_NEWS_SDK_ALLOWED_TOOLS).toEqual(
       STOCK_NEWS_MCP_TOOLS.map((toolName) => `mcp__stock-news__${toolName}`),
+    );
+    expect(KRW_FEED_SDK_ALLOWED_TOOLS).toEqual(
+      KRW_FEED_MCP_TOOLS.map((toolName) => `mcp__krw-feed__${toolName}`),
     );
   });
 });

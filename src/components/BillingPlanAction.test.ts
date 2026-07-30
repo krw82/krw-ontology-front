@@ -7,13 +7,18 @@ const source = readFileSync(
   "utf8",
 );
 
-describe("BillingPlanAction checkout guard", () => {
-  it("keeps a single checkout request in flight and recovers from SDK load failures", () => {
-    expect(source).toContain("let checkoutRequestInFlight = false");
-    expect(source).toContain("if (checkoutRequestInFlight)");
-    expect(source).toContain('id="toss-payments-sdk"');
-    expect(source).toContain("onError={() => {");
-    expect(source).toContain("결제창 다시 불러오기");
-    expect(source).toContain("responsePayload(response)");
+describe("BillingPlanAction V2", () => {
+  it("requires a server quote before confirmation and has no legacy direct routes", () => {
+    expect(source).toContain('"/api/billing/toss/quote"');
+    expect(source).toContain('"/api/billing/toss/confirm"');
+    expect(source).toContain("오늘 청구");
+    expect(source).toContain("결제 내용을 확인해 주세요.");
+    expect(source).toContain("해지 예약 취소 · 업그레이드");
+    expect(source).toContain("해지 예약 취소 · 변경 예약");
+    expect(source).toContain("billingActionInFlight");
+    expect(source).not.toContain('"/api/billing/toss/checkout"');
+    expect(source).not.toContain('"/api/billing/toss/change-plan"');
+    expect(source).not.toContain('"/api/billing/toss/cancel"');
+    expect(source).not.toContain("결제창 준비 중");
   });
 });

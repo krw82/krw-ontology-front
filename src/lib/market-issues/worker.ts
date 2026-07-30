@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
+import { Client } from "@xdevplatform/xdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildReviewOnlyDraft,
@@ -218,42 +219,40 @@ async function fetchRecentTweets(input: {
   config: MarketIssueRuntimeConfig;
   sinceId: string | null;
 }): Promise<XTweet[]> {
-  const params = new URLSearchParams({
-    query: "from:" + text(input.source.account_handle) + " -is:retweet",
-    "tweet.fields": "created_at,lang,public_metrics",
-    max_results: String(input.config.maxPostsPerSource),
+  const client = new Client({
+    baseUrl: input.config.xApiBaseUrl,
+    bearerToken: input.config.xBearerToken,
   });
-  if (input.sinceId) params.set("since_id", input.sinceId);
-  const response = await fetch(
-    input.config.xApiBaseUrl + "/2/tweets/search/recent?" + params.toString(),
+  const payload = await client.posts.searchRecent(
+    "from:" + text(input.source.account_handle) + " -is:retweet",
     {
-      headers: {
-        Authorization: "Bearer " + input.config.xBearerToken,
-        Accept: "application/json",
-      },
-      cache: "no-store",
+      maxResults: input.config.maxPostsPerSource,
+      ...(input.sinceId ? { sinceId: input.sinceId } : {}),
+      postFields: ["created_at", "lang", "public_metrics"],
     },
   );
-  if (!response.ok) throw new Error("x_recent_search_failed_" + response.status);
-  const payload = await response.json() as { data?: unknown };
-  return Array.isArray(payload.data)
-    ? payload.data
-      .map((item): XTweet | null => {
-        const row = asRow(item);
-        const id = text(row?.id);
-        const body = text(row?.text);
-        return id && body
-          ? {
-            id,
-            text: body,
-            created_at: text(row?.created_at) || undefined,
-            lang: text(row?.lang) || undefined,
-            public_metrics: asRow(row?.public_metrics) || undefined,
-          }
-          : null;
-      })
-      .filter((tweet): tweet is XTweet => tweet !== null)
-    : [];
+  return (payload.data || [])
+    .map((post): XTweet | null => {
+      const id = text(post.id);
+      const body = text(post.text);
+      return id && body
+        ? {
+          id,
+          text: body,
+          created_at: text(post.createdAt) || undefined,
+          lang: text(post.lang) || undefined,
+          public_metrics: post.publicMetrics
+            ? {
+              like_count: post.publicMetrics.likeCount,
+              retweet_count: post.publicMetrics.repostCount,
+              reply_count: post.publicMetrics.replyCount,
+              quote_count: post.publicMetrics.quoteCount,
+            }
+            : undefined,
+        }
+        : null;
+    })
+    .filter((tweet): tweet is XTweet => tweet !== null);
 }
 
 async function persistSourceItem(

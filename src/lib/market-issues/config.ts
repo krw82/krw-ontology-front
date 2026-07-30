@@ -32,6 +32,104 @@ const SOURCE_CLASSES: readonly MarketIssueSourceClass[] = [
   "expert",
 ];
 
+// Curated against the market-information policy: official issuers, regulators,
+// exchanges, and established newsrooms only. Individual traders and unaffiliated
+// influencers are intentionally excluded. Set MARKET_ISSUE_X_SOURCES to [] to
+// disable this baseline or provide a replacement source list.
+const DEFAULT_X_SOURCE_SEEDS: readonly MarketIssueSourceSeed[] = [
+  {
+    accountHandle: "SECGov",
+    displayName: "U.S. Securities and Exchange Commission",
+    sourceClass: "regulator",
+    sourceTags: [],
+    allowSingleSourcePublish: true,
+  },
+  {
+    accountHandle: "federalreserve",
+    displayName: "Federal Reserve",
+    sourceClass: "regulator",
+    sourceTags: [],
+    allowSingleSourcePublish: true,
+  },
+  {
+    accountHandle: "NYSE",
+    displayName: "New York Stock Exchange",
+    sourceClass: "exchange",
+    sourceTags: [],
+    allowSingleSourcePublish: true,
+  },
+  {
+    accountHandle: "Nasdaq",
+    displayName: "Nasdaq",
+    sourceClass: "exchange",
+    sourceTags: [],
+    allowSingleSourcePublish: true,
+  },
+  {
+    accountHandle: "CMEGroup",
+    displayName: "CME Group",
+    sourceClass: "exchange",
+    sourceTags: [],
+    allowSingleSourcePublish: true,
+  },
+  {
+    accountHandle: "nvidia",
+    displayName: "NVIDIA",
+    sourceClass: "company_official",
+    sourceTags: ["NVDA"],
+    allowSingleSourcePublish: true,
+  },
+  {
+    accountHandle: "AMD",
+    displayName: "AMD",
+    sourceClass: "company_official",
+    sourceTags: ["AMD"],
+    allowSingleSourcePublish: true,
+  },
+  {
+    accountHandle: "TSMCGlobal",
+    displayName: "TSMC",
+    sourceClass: "company_official",
+    sourceTags: ["TSM"],
+    allowSingleSourcePublish: true,
+  },
+  {
+    accountHandle: "Microsoft",
+    displayName: "Microsoft",
+    sourceClass: "company_official",
+    sourceTags: ["MSFT"],
+    allowSingleSourcePublish: true,
+  },
+  {
+    accountHandle: "Apple",
+    displayName: "Apple",
+    sourceClass: "company_official",
+    sourceTags: ["AAPL"],
+    allowSingleSourcePublish: true,
+  },
+  {
+    accountHandle: "Google",
+    displayName: "Google",
+    sourceClass: "company_official",
+    sourceTags: ["GOOGL"],
+    allowSingleSourcePublish: true,
+  },
+  {
+    accountHandle: "Reuters",
+    displayName: "Reuters",
+    sourceClass: "registered_media",
+    sourceTags: [],
+    allowSingleSourcePublish: false,
+  },
+  {
+    accountHandle: "business",
+    displayName: "Bloomberg",
+    sourceClass: "registered_media",
+    sourceTags: [],
+    allowSingleSourcePublish: false,
+  },
+];
+
 export function marketIssueEnvironment(): MarketIssueEnvironment {
   const raw = (
     process.env.MARKET_ISSUE_ENV ||
@@ -56,7 +154,9 @@ export function readMarketIssueRuntimeConfig(): MarketIssueRuntimeConfig {
     xBearerToken: normalizedText(process.env.MARKET_ISSUE_X_BEARER_TOKEN),
     summarizerUrl: normalizedText(process.env.MARKET_ISSUE_SUMMARIZER_URL),
     summarizerToken: normalizedText(process.env.MARKET_ISSUE_SUMMARIZER_TOKEN),
-    sourceSeeds: parseMarketIssueSourceSeeds(process.env.MARKET_ISSUE_X_SOURCES),
+    sourceSeeds: !process.env.MARKET_ISSUE_X_SOURCES?.trim()
+      ? [...DEFAULT_X_SOURCE_SEEDS]
+      : parseMarketIssueSourceSeeds(process.env.MARKET_ISSUE_X_SOURCES),
   };
 }
 

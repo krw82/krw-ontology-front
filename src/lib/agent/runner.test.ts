@@ -80,6 +80,7 @@ vi.mock("./mcp-client", () => {
     "build_news_timeline",
     "audit_news_sources",
   ];
+  const feedTools = ["get_feed_items", "list_feed_items", "get_feed_context"];
   const visualizationTools = ["compose_visualization"];
   const yahooFinanceTools = ["get_yahoo_finance_news", "get_stock_info"];
   const filingsTools = [
@@ -116,6 +117,7 @@ vi.mock("./mcp-client", () => {
   return {
     KRW_ONTOLOGY_MCP_TOOLS: tools,
     STOCK_NEWS_MCP_TOOLS: stockNewsTools,
+    KRW_FEED_MCP_TOOLS: feedTools,
     YAHOO_FINANCE_MCP_TOOLS: yahooFinanceTools,
     VISUALIZATION_MCP_TOOLS: visualizationTools,
     KRW_FILINGS_MCP_TOOLS: filingsTools,
@@ -129,6 +131,9 @@ vi.mock("./mcp-client", () => {
     ),
     STOCK_NEWS_SDK_ALLOWED_TOOLS: stockNewsTools.map(
       (toolName) => `mcp__stock-news__${toolName}`,
+    ),
+    KRW_FEED_SDK_ALLOWED_TOOLS: feedTools.map(
+      (toolName) => `mcp__krw-feed__${toolName}`,
     ),
     YAHOO_FINANCE_SDK_ALLOWED_TOOLS: yahooFinanceTools.map(
       (toolName) => `mcp__yahoo_finance__${toolName}`,
@@ -153,6 +158,11 @@ vi.mock("./mcp-client", () => {
       process.env.STOCK_NEWS_FORCE_DISABLED !== "1"
         ? stockNewsTools.map((toolName) => `mcp__stock-news__${toolName}`)
         : [],
+    getKrwFeedSdkAllowedTools: () =>
+      process.env.KRW_FEED_MCP_ENABLED === "1" &&
+      Boolean(process.env.KRW_FEED_MCP_TOKEN)
+        ? feedTools.map((toolName) => `mcp__krw-feed__${toolName}`)
+        : [],
     isKrwOntologySdkTool: (toolName: string) =>
       toolName.startsWith("mcp__krw-ontology__krw_ontology_"),
     isStockNewsEnabled: () =>
@@ -160,6 +170,11 @@ vi.mock("./mcp-client", () => {
       process.env.STOCK_NEWS_FORCE_DISABLED !== "1",
     isStockNewsSdkTool: (toolName: string) =>
       toolName.startsWith("mcp__stock-news__"),
+    isKrwFeedMcpEnabled: () =>
+      process.env.KRW_FEED_MCP_ENABLED === "1" &&
+      Boolean(process.env.KRW_FEED_MCP_TOKEN),
+    isKrwFeedSdkTool: (toolName: string) =>
+      toolName.startsWith("mcp__krw-feed__"),
     isGuruAdvisorSdkTool: (toolName: string) =>
       toolName.startsWith("mcp__plugin_krw-guru-advisor_krw-guru-advisor__"),
     isYahooFinanceSdkTool: (toolName: string) =>
@@ -182,6 +197,7 @@ vi.mock("./mcp-client", () => {
         (candidate) => toolName === `mcp__krw-filings__${candidate}`,
       ),
     filingsMcpToken: () => process.env.FILINGS_MCP_AUTH_TOKEN ?? null,
+    krwFeedMcpToken: () => process.env.KRW_FEED_MCP_TOKEN ?? null,
   };
 });
 

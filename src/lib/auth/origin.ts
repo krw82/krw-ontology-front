@@ -45,12 +45,32 @@ export function getConfiguredBillingRedirectOrigin(
   fallbackOrigin: string,
   env: OriginEnv = process.env,
 ): string | null {
-  const configuredOrigin = getConfiguredRedirectOriginOrNull(env);
-  if (configuredOrigin) return configuredOrigin;
+  for (const key of REDIRECT_ORIGIN_ENV_KEYS) {
+    const configuredOrigin = normalizeRedirectOrigin(env[key]);
+    if (!configuredOrigin) continue;
+    if (
+      env.NODE_ENV !== "production" ||
+      isProductionBillingRedirectOrigin(configuredOrigin)
+    ) {
+      return configuredOrigin;
+    }
+  }
   if (env.NODE_ENV !== "production") {
     return normalizeRedirectOrigin(fallbackOrigin);
   }
   return null;
+}
+
+function isProductionBillingRedirectOrigin(origin: string): boolean {
+  const url = new URL(origin);
+  if (url.protocol !== "https:") return false;
+  return ![
+    "0.0.0.0",
+    "127.0.0.1",
+    "localhost",
+    "[::1]",
+    "::1",
+  ].includes(url.hostname.toLowerCase());
 }
 
 function getConfiguredRedirectOriginOrNull(env: OriginEnv): string | null {

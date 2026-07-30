@@ -72,6 +72,8 @@ function configureDevOntologyEnv() {
   const mcpUrl = process.env.KRW_DEV_MCP_URL || "http://127.0.0.1:8766/mcp";
   const stockNewsMcpUrl =
     process.env.STOCK_NEWS_MCP_URL || "http://127.0.0.1:8776/mcp";
+  const feedMcpUrl =
+    process.env.KRW_FEED_MCP_URL || "http://127.0.0.1:8796/mcp";
 
   if (!allowProdOntology || !process.env.KRW_ONTOLOGY_ENV) {
     process.env.KRW_ONTOLOGY_ENV = "dev";
@@ -111,6 +113,9 @@ function configureDevOntologyEnv() {
   process.env.STOCK_NEWS_MCP_PORT = new URL(stockNewsMcpUrl).port || "80";
   process.env.STOCK_NEWS_MCP_PATH =
     new URL(stockNewsMcpUrl).pathname || "/mcp";
+  process.env.KRW_FEED_MCP_URL = feedMcpUrl;
+  process.env.KRW_FEED_MCP_HOST = new URL(feedMcpUrl).hostname;
+  process.env.KRW_FEED_MCP_PORT = new URL(feedMcpUrl).port || "80";
   if (process.env.KRW_DEV_ALLOW_CUSTOM_MCP_BASE_URL !== "1") {
     process.env.MCP_BASE_URL = new URL(mcpUrl).origin;
   }
@@ -120,6 +125,7 @@ function configureDevOntologyEnv() {
     guruPluginPath: process.env.KRW_GURU_ADVISOR_PLUGIN_PATH,
     mcpUrl: process.env.KRW_ONTOLOGY_MCP_URL,
     stockNewsMcpUrl: process.env.STOCK_NEWS_MCP_URL,
+    feedMcpUrl: process.env.KRW_FEED_MCP_URL,
   });
 }
 
@@ -155,6 +161,7 @@ let documentWorker = null;
 let nextDev = null;
 let devMcp = null;
 let stockNewsMcp = null;
+let feedMcp = null;
 let shuttingDown = false;
 let workerStartQueued = false;
 let workerRestarting = false;
@@ -190,6 +197,11 @@ function truthyEnv(value) {
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 }
 
+function isKrwFeedMcpEnabled() {
+  return truthyEnv(process.env.KRW_FEED_MCP_ENABLED)
+    && Boolean(process.env.KRW_FEED_MCP_TOKEN || process.env.FEED_MCP_AUTH_TOKEN);
+}
+
 // Content work (for example an editorial Storage import) does not need the
 // queue consumers.  Keeping them opt-out makes a local DB incident easier to
 // isolate and prevents background claims/cleanup from competing with a manual
@@ -198,6 +210,7 @@ const shouldRunAgentWorker = !truthyEnv(process.env.KRW_DEV_SKIP_AGENT_WORKER);
 const shouldRunDocumentWorker = !truthyEnv(process.env.KRW_DEV_SKIP_DOCUMENT_WORKER);
 
 function isStockNewsEnabled() {
+  if (!truthyEnv(process.env.STOCK_NEWS_RELEASE_ENABLED)) return false;
   if (truthyEnv(process.env.STOCK_NEWS_FORCE_DISABLED)) return false;
   if (!truthyEnv(process.env.STOCK_NEWS_ENABLED)) return false;
   if (!process.env.FINNHUB_API_KEY) {
@@ -567,6 +580,73 @@ async function ensureStockNewsMcpServer() {
   await waitForStockNewsMcpHealth();
 }
 
+async function readKrwFeedMcpHealth() {
+  try {
+    const response = await fetch(healthUrlFromMcpUrl(process.env.KRW_FEED_MCP_URL));
+    return { response, payload: await response.json() };
+  } catch {
+    return null;
+  }
+}
+
+async function waitForKrwFeedMcpHealth() {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    const result = await readKrwFeedMcpHealth();
+    if (
+      result?.response.status === 200 &&
+      result.payload?.ok === true &&
+      result.payload?.name === "krw-feed-mcp" &&
+      result.payload?.enabled === true
+    ) {
+      console.info("[dev:krw-feed-mcp] ready", {
+        environment: result.payload.environment,
+      });
+      return;
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 500));
+  }
+  throw new Error("KRW Feed dev MCP server did not become healthy");
+}
+
+async function ensureKrwFeedMcpServer() {
+  const reuseDeadline = Date.now() + 5_000;
+  while (Date.now() < reuseDeadline) {
+    const existing = await readKrwFeedMcpHealth();
+    if (
+      existing?.response.status === 200 &&
+      existing.payload?.ok === true &&
+      existing.payload?.name === "krw-feed-mcp" &&
+      existing.payload?.enabled === true
+    ) {
+      console.info("[dev:krw-feed-mcp] reusing existing server", {
+        environment: existing.payload.environment,
+      });
+      return;
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 500));
+  }
+
+  feedMcp = spawnLabeled(
+    "krw-feed-mcp",
+    "nice",
+    ["-n", String(devMcpNice), "scripts/start-krw-feed-mcp-dev.sh"],
+    async (code) => {
+      const existing = await readKrwFeedMcpHealth();
+      if (
+        existing?.response.status === 200 &&
+        existing.payload?.ok === true &&
+        existing.payload?.name === "krw-feed-mcp"
+      ) {
+        feedMcp = null;
+        return;
+      }
+      void shutdown("krw-feed-mcp-exit").finally(() => process.exit(code ?? 1));
+    },
+  );
+  await waitForKrwFeedMcpHealth();
+}
+
 function stockNewsCoverageMatches(payload) {
   if (!expectedStockNewsCoverageCount) return true;
   return payload?.coverage_count === expectedStockNewsCoverageCount;
@@ -666,6 +746,7 @@ async function shutdown(signal) {
     stopChild(documentWorker),
     stopChild(devMcp),
     stopChild(stockNewsMcp),
+    stopChild(feedMcp),
     stopChild(nextDev),
   ]);
 }
@@ -681,6 +762,11 @@ if (isStockNewsEnabled()) {
   await ensureStockNewsMcpServer();
 } else {
   console.info("[dev:stock-news-mcp] disabled");
+}
+if (isKrwFeedMcpEnabled()) {
+  await ensureKrwFeedMcpServer();
+} else {
+  console.info("[dev:krw-feed-mcp] disabled");
 }
 
 nextDev = spawnLabeled("web", "npm", ["run", "dev:web"], (code) => {

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   formatIssueRelativeTime,
-  marketIssueStatusClass,
   normalizeMarketIssueList,
   normalizeMarketIssuesStatus,
   type MarketIssueCard,
@@ -15,7 +14,7 @@ import {
 const SCOPE_COPY: Record<MarketIssueScope, { label: string; description: string }> = {
   mine: {
     label: "내 기업",
-    description: "최근 리서치하거나 관심 있게 본 기업과 연결된 변화만 모았습니다.",
+    description: "관심종목으로 지정한 기업과 연결된 변화만 모았습니다.",
   },
   market: {
     label: "시장 전체",
@@ -132,7 +131,7 @@ export default function MarketIssuesPage() {
             RESEARCH INBOX
           </p>
           <h1 className="mt-sm text-[32px] font-black tracking-[-0.05em] text-ink sm:text-[42px]">시장 이슈</h1>
-          <p className="mt-sm max-w-xl text-[15px] leading-7 text-body sm:text-[16px]">
+          <p className="mt-sm max-w-[36rem] text-[15px] leading-7 text-body sm:text-[16px]">
             시끄러운 속보를 더하기보다, 기업과 산업에 연결되는 변화를 원문과 함께 살펴봅니다.
           </p>
           <p className="mt-base text-[12px] leading-5 text-muted">
@@ -236,10 +235,7 @@ function MarketIssueCard({ issue }: { issue: MarketIssueCard }) {
 
   return (
     <article className="group flex min-h-full flex-col rounded-[22px] border border-hairline bg-white p-base shadow-[0_5px_22px_rgba(30,50,85,0.035)] transition duration-200 hover:-translate-y-0.5 hover:border-[#bdcff0] hover:shadow-[0_14px_34px_rgba(34,70,136,0.09)] sm:p-lg">
-      <div className="flex items-center justify-between gap-sm">
-        <span className={`inline-flex min-h-7 items-center rounded-full border px-sm text-[11px] font-extrabold ${marketIssueStatusClass(issue.statusTone)}`}>
-          {issue.statusLabel}
-        </span>
+      <div className="flex justify-end">
         <time className="shrink-0 text-[11px] font-medium text-muted" dateTime={issue.updatedAt ?? issue.publishedAt ?? undefined}>
           {formatIssueRelativeTime(issue.updatedAt ?? issue.publishedAt)}
         </time>
@@ -269,9 +265,8 @@ function MarketIssueCard({ issue }: { issue: MarketIssueCard }) {
         </div>
       ) : null}
 
-      <div className="mt-auto pt-base">
-        {visibleCompanies.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5" aria-label="관련 기업">
+      {visibleCompanies.length > 0 ? (
+        <div className="mt-auto flex flex-wrap gap-1.5 pt-base" aria-label="관련 기업">
             {visibleCompanies.map((company) => (
               <span key={`${company.id ?? company.name}-${company.ticker ?? ""}`} className="inline-flex items-center gap-1 rounded-full border border-hairline bg-white px-sm py-1 text-[11px] font-bold text-body">
                 {company.ticker ? <span className="text-primary">{company.ticker}</span> : null}
@@ -279,20 +274,8 @@ function MarketIssueCard({ issue }: { issue: MarketIssueCard }) {
               </span>
             ))}
             {issue.companies.length > visibleCompanies.length ? <span className="px-sm py-1 text-[11px] font-semibold text-muted">+{issue.companies.length - visibleCompanies.length}</span> : null}
-          </div>
-        ) : null}
-        <div className="mt-base flex items-center justify-between gap-sm border-t border-hairline pt-sm">
-          <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted">
-            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">source</span>
-            원문 {issue.sourceCount}개
-          </span>
-          {issue.userState?.saved ? <span className="text-[11px] font-bold text-[#3f6d57]">저장됨</span> : null}
-          <Link href={href} className="inline-flex min-h-9 items-center gap-1 text-[12px] font-extrabold text-primary transition hover:text-ink">
-            이슈 보기
-            <span className="material-symbols-outlined text-[15px]" aria-hidden="true">arrow_forward</span>
-          </Link>
         </div>
-      </div>
+      ) : null}
     </article>
   );
 }
@@ -334,7 +317,7 @@ function MarketIssuesEmpty({ scope, onMarketScope }: { scope: MarketIssueScope; 
       <h3 className="mt-sm text-[18px] font-extrabold tracking-[-0.03em] text-ink">
         {mine ? "내 기업과 연결된 이슈가 아직 없습니다." : "지금 표시할 시장 이슈가 없습니다."}
       </h3>
-      <p className="mx-auto mt-2 max-w-md text-[13px] leading-6 text-body">
+      <p className="mx-auto mt-2 max-w-[28rem] text-[13px] leading-6 text-body">
         {mine
           ? "회사 리서치를 시작하거나 관심 기업을 확인하면, 연결된 시장 변화를 이곳에서 다시 볼 수 있습니다."
           : "새 이슈가 확인되면 원문과 함께 이 화면에 정리됩니다."}
