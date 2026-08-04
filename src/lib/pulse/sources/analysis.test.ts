@@ -89,4 +89,66 @@ describe("Pulse analysis activity source", () => {
     const candidates = buildAnalysisCandidates([session], [failed], messages, new Date("2026-07-15T02:00:00.000Z"));
     expect(candidates).toHaveLength(0);
   });
+
+  describe("wide research (ticker-less global session)", () => {
+    const wideSession = {
+      ...session,
+      id: "session-wide",
+      title: "PCE 인플레이션 전망",
+      default_tickers: [] as string[],
+    };
+    const wideRunning = { ...running, id: "run-wide", session_id: wideSession.id };
+
+    it("maps a ticker-less run to a candidate with wide-research copy and idea_generation link", () => {
+      const messages = new Map([
+        ["message-user", { id: "message-user", content: "PCE 인플레이션 전망이 빗나가는 원인?" }],
+      ]);
+      const [candidate] = buildAnalysisCandidates([wideSession], [wideRunning], messages);
+
+      expect(candidate.ticker).toBeNull();
+      expect(candidate.eyebrow).toBe("와이드 리서치 · 진행 중");
+      expect(candidate.reason_label).toContain("매크로/와이드 리서치");
+      // No ticker param; runKind=idea_generation so the chat opens in wide mode.
+      expect(candidate.primary_action).toMatchObject({
+        type: "link",
+        href: "/chat?sessionId=session-wide&runKind=idea_generation",
+      });
+      expect(candidate.metadata).toMatchObject({ scope_type: "global" });
+    });
+
+    it("uses a completed wide-research phase identity", () => {
+      const completed = {
+        ...wideRunning,
+        status: "completed" as const,
+        finished_at: "2026-07-15T01:06:00.000Z",
+      };
+      const messages = new Map([
+        ["message-user", { id: "message-user", content: "PCE 인플레이션 전망이 빗나가는 원인?" }],
+      ]);
+      const [candidate] = buildAnalysisCandidates(
+        [wideSession],
+        [completed],
+        messages,
+        new Date("2026-07-15T02:00:00.000Z"),
+      );
+
+      expect(candidate.eyebrow).toBe("와이드 리서치 · 완료");
+      expect(candidate.ticker).toBeNull();
+    });
+
+    it("keeps company-scoped copy unchanged for ticker-bearing sessions (regression)", () => {
+      const messages = new Map([
+        ["message-user", { id: "message-user", content: "서비스 매출" }],
+      ]);
+      const [candidate] = buildAnalysisCandidates([session], [running], messages);
+
+      expect(candidate.eyebrow).toBe("내가 시작한 분석 · 진행 중");
+      expect(candidate.reason_label).toContain("회사 채팅");
+      expect(candidate.metadata).toMatchObject({ scope_type: "company" });
+      expect(candidate.primary_action).toMatchObject({
+        type: "link",
+        href: "/chat?sessionId=session-1&ticker=AAPL",
+      });
+    });
+  });
 });
