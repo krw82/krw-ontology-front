@@ -19,6 +19,7 @@ export function buildPulseSummary(
       analysis: actionable.filter((item) => item.kind === "analysis" && item.phase !== "active").length,
       question: count(actionable, "question"),
       resurface: count(actionable, "resurface"),
+      news: count(actionable, "news"),
     },
     primary_action: toLinkAction(actionable[0]?.primary_action),
   };

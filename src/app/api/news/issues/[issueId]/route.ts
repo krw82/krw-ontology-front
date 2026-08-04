@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/auth";
+import { getOptionalAuthUser } from "@/lib/auth";
 import { getMarketIssueDetail } from "@/lib/market-issues/repository";
 import { getMarketIssueServiceClient } from "@/lib/market-issues/service";
 
@@ -10,13 +10,12 @@ export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ issueId: string }> },
 ) {
-  const user = await getAuthUser().catch(() => null);
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const user = await getOptionalAuthUser();
   const { issueId } = await context.params;
   try {
     const payload = await getMarketIssueDetail({
       db: getMarketIssueServiceClient(),
-      userId: user.id,
+      userId: user?.id ?? null,
       issueId,
     });
     if (!payload) return NextResponse.json({ error: "not_found" }, { status: 404 });

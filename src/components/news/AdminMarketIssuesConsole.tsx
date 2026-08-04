@@ -11,6 +11,12 @@ type AdminIssue = {
   source_count: number;
   updated_at: string;
   entities?: Array<{ ticker?: string | null; entity_name?: string | null }>;
+  research_paths?: Array<{
+    id?: string;
+    question?: string;
+    evidence_targets?: string[];
+    related_tickers?: string[];
+  }>;
   sources?: Array<{
     id: string;
     publisher: string;
@@ -198,6 +204,19 @@ export default function AdminMarketIssuesConsole() {
               <p className="mt-sm text-[12px] text-muted">
                 {(issue.entities || []).map((entity) => entity.ticker || entity.entity_name).filter(Boolean).join(" · ") || "연결 기업 미지정"}
               </p>
+              {(issue.research_paths || []).length > 0 ? (
+                <section className="mt-base rounded-[14px] border border-[#d6e1f8] bg-[#f8faff] p-sm" aria-label="생성된 다음 리서치 질문">
+                  <p className="text-[11px] font-extrabold text-primary">다음 리서치 질문</p>
+                  <ul className="mt-2 grid gap-2">
+                    {issue.research_paths?.map((path, index) => (
+                      <li key={path.id || `${path.question}-${index}`} className="rounded-[10px] bg-white px-sm py-2">
+                        <p className="text-[12px] font-bold leading-5 text-ink">{path.question || "질문이 비어 있습니다."}</p>
+                        {(path.evidence_targets || []).length > 0 ? <p className="mt-1 text-[11px] leading-5 text-muted">확인 자료 · {path.evidence_targets?.join(" · ")}</p> : null}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
               {(issue.sources || []).length > 0 ? (
                 <div className="mt-base grid gap-sm border-t border-hairline pt-base">
                   {issue.sources?.map((source) => (

@@ -7,9 +7,9 @@
     "https://www.krwontology.com"
   ],
   "gcpProject": "project-6c11ac2d-6c8f-4149-82e",
-  "gcpInstance": "krw-onto-v1",
+  "gcpInstance": "krw-onto-v2",
   "gcpZone": "asia-northeast3-a",
-  "gcpInstanceId": "5285568228446944489",
+  "gcpInstanceId": "6293107138785121416",
   "remoteFrontDir": "/home/username/krw-ontology-front",
   "remoteOntologyDir": "/home/username/krw-ontology",
   "composeProject": "krw-ontology-front"

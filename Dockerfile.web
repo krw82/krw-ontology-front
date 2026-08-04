@@ -64,6 +64,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.worker/document-outbox-dispatche
 COPY --from=builder --chown=nextjs:nodejs /app/.worker/filing-notification-worker.mjs ./.worker/filing-notification-worker.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/.worker/filing-brief-worker.mjs ./.worker/filing-brief-worker.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/.worker/market-issue-worker.mjs ./.worker/market-issue-worker.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/.worker/market-web-source-worker.mjs ./.worker/market-web-source-worker.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/.worker/market-issue-stream-worker.mjs ./.worker/market-issue-stream-worker.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/.worker/market-issue-enrichment-worker.mjs ./.worker/market-issue-enrichment-worker.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/.worker/filings-mcp-server.mjs ./.worker/filings-mcp-server.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/.worker/billing-worker.mjs ./.worker/billing-worker.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/.services ./.services

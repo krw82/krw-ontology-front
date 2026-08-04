@@ -48,6 +48,7 @@ function feed(candidateItems: PulseItem[], activeAnalysisItems: PulseItem[] = []
     filter: "all",
     candidate_items: candidateItems,
     active_analysis_items: activeAnalysisItems,
+    completed_analysis_items: [],
     visible_limit: 12,
     item_versions: {},
     new_item_count: 0,

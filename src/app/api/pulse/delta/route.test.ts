@@ -18,7 +18,7 @@ describe("Pulse V5 delta", () => {
     const second = { ...item("second"), server_rank: 1, title: "new" };
     const feed: PulseFeedResponse = {
       revision: "revision", generated_at: "2026-07-20T00:00:00.000Z", snapshot_at: "2026-07-20T00:00:00.000Z", ranking_version: "rule_v5_flat",
-      timezone: "Asia/Seoul", date_label: "7월 20일", filter: "all", candidate_items: [first, second], active_analysis_items: [], visible_limit: 12,
+      timezone: "Asia/Seoul", date_label: "7월 20일", filter: "all", candidate_items: [first, second], active_analysis_items: [], completed_analysis_items: [], visible_limit: 12,
       item_versions: { first: "same", second: "new" }, new_item_count: 0, source_statuses: [],
     };
     const delta = buildPulseFeedDelta(feed, { first: "same", removed: "old" });
@@ -36,7 +36,7 @@ describe("Pulse V5 delta", () => {
     const first = item("first");
     const feed: PulseFeedResponse = {
       revision: "revision", generated_at: "2026-07-20T00:00:00.000Z", snapshot_at: "2026-07-20T00:00:00.000Z", ranking_version: "rule_v5_flat",
-      timezone: "Asia/Seoul", date_label: "7월 20일", filter: "all", candidate_items: [first], active_analysis_items: [], visible_limit: 12,
+      timezone: "Asia/Seoul", date_label: "7월 20일", filter: "all", candidate_items: [first], active_analysis_items: [], completed_analysis_items: [], visible_limit: 12,
       item_versions: { first: "new-version" }, new_item_count: 0, source_statuses: [],
     };
 

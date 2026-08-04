@@ -17,10 +17,10 @@ export function pulseItemVersion(item: PulseItem): string {
 }
 
 export function buildPulseItemVersions(
-  feed: Pick<PulseFeedResponse, "candidate_items" | "active_analysis_items">,
+  feed: Pick<PulseFeedResponse, "candidate_items" | "active_analysis_items" | "completed_analysis_items">,
 ): PulseItemVersions {
   return Object.fromEntries(
-    [...feed.candidate_items, ...feed.active_analysis_items].map((item) => [item.id, pulseItemVersion(item)]),
+    [...feed.candidate_items, ...feed.active_analysis_items, ...feed.completed_analysis_items].map((item) => [item.id, pulseItemVersion(item)]),
   );
 }
 
@@ -43,7 +43,7 @@ export function buildPulseFeedDelta(
   feed: PulseFeedResponse,
   knownItemVersions: Record<string, string>,
 ): PulseFeedDeltaResponse {
-  const currentItems = [...feed.candidate_items, ...feed.active_analysis_items];
+  const currentItems = [...feed.candidate_items, ...feed.active_analysis_items, ...feed.completed_analysis_items];
   const currentIds = new Set(currentItems.map((item) => item.id));
   const knownIds = new Set(Object.keys(knownItemVersions));
   const upserts = currentItems.filter((item) =>
@@ -64,6 +64,7 @@ export function buildPulseFeedDelta(
     },
     ordered_candidate_ids: feed.candidate_items.map((item) => item.id),
     active_analysis_item_ids: feed.active_analysis_items.map((item) => item.id),
+    completed_analysis_item_ids: feed.completed_analysis_items.map((item) => item.id),
     upserts,
     removed_item_ids: removedItemIds,
     item_versions: feed.item_versions,

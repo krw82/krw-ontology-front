@@ -262,6 +262,44 @@ function filingReason(
   return null;
 }
 
+function newsReason(
+  candidate: PulseCandidate,
+  ticker: string | null,
+  coverageLevel: UserCompanyCoverageLevel | null,
+  hasRecentResearch: boolean,
+  researchTier: PulseResearchContextTier,
+): Pick<PulseCandidate, "reason_code" | "reason_label"> | null {
+  if (candidate.kind !== "news") return null;
+  const followed = candidate.metadata.market_issue_followed_match === true;
+  if (coverageLevel === "interest" && hasRecentResearch && ticker) {
+    return {
+      reason_code: "news_covered_research_followup",
+      reason_label: researchTier === "strong"
+        ? `관심 기업 ${ticker}의 리서치 흐름과 연결된 뉴스`
+        : `최근 ${ticker} 리서치와 연결된 뉴스`,
+    };
+  }
+  if (coverageLevel === "interest" && ticker) {
+    return {
+      reason_code: "news_covered_company",
+      reason_label: `관심 기업 ${ticker}과 연결된 뉴스`,
+    };
+  }
+  if (hasRecentResearch && ticker) {
+    return {
+      reason_code: "news_recent_research_followup",
+      reason_label: `최근 ${ticker} 리서치와 연결된 뉴스`,
+    };
+  }
+  if (followed && ticker) {
+    return {
+      reason_code: "news_followed_company",
+      reason_label: `팔로우한 ${ticker}과 연결된 뉴스`,
+    };
+  }
+  return null;
+}
+
 function personalizeCandidate(
   candidate: PulseCandidate,
   signals: PulseUserTickerSignals,
@@ -290,6 +328,12 @@ function personalizeCandidate(
     coverageLevel,
     hasRecentResearch,
     researchTier,
+  ) ?? newsReason(
+    contextualized,
+    ticker,
+    coverageLevel,
+    hasRecentResearch,
+    researchTier,
   );
 
   return {
@@ -301,6 +345,7 @@ function personalizeCandidate(
       ...contextualized.metadata,
       has_recent_research: hasRecentResearch,
       research_context_tier: researchTier === "history" ? null : researchTier,
+      market_issue_research_match: contextualized.kind === "news" && hasRecentResearch,
     },
     ...(personalizedReason ?? {}),
   };

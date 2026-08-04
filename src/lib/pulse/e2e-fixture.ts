@@ -82,6 +82,7 @@ export function createStaticPulseE2EFeed(): PulseFeedResponse {
     date_label: "7월 17일 금요일",
     filter: "all",
     active_analysis_items: [],
+    completed_analysis_items: [],
     candidate_items: [item],
     visible_limit: 12,
     item_versions: {},

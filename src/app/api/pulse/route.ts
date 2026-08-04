@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { getAuthUser, handleAuthError } from "@/lib/auth";
+import { ANONYMOUS_PULSE_USER_ID, getOptionalAuthUser, handleAuthError } from "@/lib/auth";
 import { canAccessMenuFeature } from "@/lib/billing/feature-access-server";
 import { composePulseFeed } from "@/lib/pulse/composer";
 import { PULSE_MAX_PAGE_SIZE, PULSE_PAGE_SIZE } from "@/lib/pulse/contract";
@@ -30,11 +30,11 @@ export async function GET(request: NextRequest) {
   const timing = new ServerTiming();
   let user;
   try {
-    user = await timing.measure("auth", () => getAuthUser());
+    user = await timing.measure("auth", () => getOptionalAuthUser());
   } catch (error) {
     return handleAuthError(error);
   }
-  if (!user) return handleAuthError(new Error("No user"));
+  const userId = user?.id ?? ANONYMOUS_PULSE_USER_ID;
 
   const parsed = querySchema.safeParse(Object.fromEntries(request.nextUrl.searchParams));
   if (!parsed.success) {
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabaseAdmin();
   try {
     const revision = await timing.measure("revision", () =>
-      getPulseFeedRevision(supabase, user.id, now));
+      getPulseFeedRevision(supabase, userId, now));
     if (matchesPulseFeedETag(request.headers.get("if-none-match"), revision.value)) {
       return new Response(null, {
         status: 304,
@@ -65,11 +65,11 @@ export async function GET(request: NextRequest) {
 
     const includeNotebookSources = await timing.measure(
       "access",
-      () => canAccessMenuFeature(user.id, user.email, "research_notebook").catch(() => false),
+      () => canAccessMenuFeature(userId, user?.email, "research_notebook").catch(() => false),
     );
     const response = await timing.measure("compose", () => composePulseFeed({
       supabase,
-      userId: user.id,
+      userId,
       includeNotebookSources,
       ...parsed.data,
       now,

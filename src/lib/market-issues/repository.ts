@@ -3,8 +3,10 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   isMarketIssueStatusLabel,
+  parseMarketIssueResearchPaths,
   toJsonRecord,
   toTextArray,
+  type MarketIssueResearchPath,
   type MarketIssueScope,
   type MarketIssueStatusLabel,
 } from "@/lib/market-issues/contract";
@@ -22,6 +24,7 @@ export type MarketIssueEventName =
   | "news_tab_viewed"
   | "market_issue_opened"
   | "market_issue_source_opened"
+  | "market_issue_research_path_selected"
   | "market_issue_research_draft_opened"
   | "market_issue_research_submitted"
   | "market_issue_saved"
@@ -52,10 +55,18 @@ export type MarketIssueAdminUpdate = {
   impactPath?: string[];
   confirmedFacts?: string[];
   unconfirmedFacts?: string[];
+  researchPaths?: MarketIssueResearchPath[];
   statusLabels?: MarketIssueStatusLabel[];
   riskLevel?: "low" | "medium" | "high";
   reason?: string;
 };
+
+export class MarketIssueResearchPathError extends Error {
+  constructor() {
+    super("invalid_market_issue_research_path");
+    this.name = "MarketIssueResearchPathError";
+  }
+}
 
 function asRows(value: unknown): Row[] {
   return Array.isArray(value)
@@ -139,6 +150,27 @@ function serializeEntity(row: Row, focusTickers: ReadonlySet<string>): Row {
   };
 }
 
+function orderedResearchPaths(value: unknown, focusTickers: ReadonlySet<string>): MarketIssueResearchPath[] {
+  return parseMarketIssueResearchPaths(value).sort((left, right) => {
+    const leftFollowed = left.relatedTickers.some((ticker) => focusTickers.has(ticker));
+    const rightFollowed = right.relatedTickers.some((ticker) => focusTickers.has(ticker));
+    return Number(rightFollowed) - Number(leftFollowed)
+      || left.priority - right.priority
+      || left.id.localeCompare(right.id);
+  });
+}
+
+function researchPathsForStorage(paths: readonly MarketIssueResearchPath[]): Row[] {
+  return paths.map((path) => ({
+    id: path.id,
+    question: path.question,
+    evidence_targets: path.evidenceTargets,
+    related_tickers: path.relatedTickers,
+    priority: path.priority,
+    chat_query: path.chatQuery,
+  }));
+}
+
 function serializeIssue(
   issue: Row,
   entities: Row[],
@@ -161,13 +193,14 @@ function serializeIssue(
     impact_path: toTextArray(issue.impact_path, 5),
     confirmed: toTextArray(issue.confirmed_facts, 5),
     unconfirmed: toTextArray(issue.unconfirmed_facts, 5),
+    research_paths: orderedResearchPaths(issue.research_paths, focusTickers),
     status_label: labels[0],
     status_labels: labels,
     status_tone: statusTone(labels),
     source_count: Math.max(0, number(issue.source_count)),
     source_summary: toJsonRecord(issue.source_summary),
     update_count: Math.max(0, number(issue.update_count)),
-    published_at: iso(issue.last_published_at) || iso(issue.published_at),
+    published_at: iso(issue.published_at),
     updated_at: iso(issue.updated_at),
     companies: issueEntities,
     entities: issueEntities,
@@ -235,7 +268,8 @@ export async function updateMarketIssueSettings(
   return getMarketIssueSettings(db);
 }
 
-async function loadFocusTickers(db: Db, userId: string): Promise<Set<string>> {
+async function loadFocusTickers(db: Db, userId: string | null): Promise<Set<string>> {
+  if (!userId) return new Set();
   const { data: marks, error } = await db
     .from("user_company_marks")
     .select("ticker, coverage_level")
@@ -248,10 +282,10 @@ async function loadFocusTickers(db: Db, userId: string): Promise<Set<string>> {
 
 async function loadUserStates(
   db: Db,
-  userId: string,
+  userId: string | null,
   issueIds: readonly string[],
 ): Promise<Map<string, Row>> {
-  if (issueIds.length === 0) return new Map();
+  if (!userId || issueIds.length === 0) return new Map();
   const { data, error } = await db
     .from("market_issue_user_states")
     .select("*")
@@ -269,8 +303,8 @@ async function loadPublishedIssues(db: Db): Promise<CachedPublishedIssue[]> {
     .eq("env", env)
     .eq("state", "published")
     .is("merged_into_issue_id", null)
+    .order("published_at", { ascending: false, nullsFirst: false })
     .order("market_score", { ascending: false })
-    .order("last_published_at", { ascending: false, nullsFirst: false })
     .order("updated_at", { ascending: false })
     .limit(100);
   if (error) throw error;
@@ -300,7 +334,7 @@ async function loadPublishedIssues(db: Db): Promise<CachedPublishedIssue[]> {
 
 export async function listMarketIssues(input: {
   db: Db;
-  userId: string;
+  userId: string | null;
   scope: MarketIssueScope;
   cursor?: string | null;
 }): Promise<Row> {
@@ -311,11 +345,13 @@ export async function listMarketIssues(input: {
     loadFocusTickers(db, userId),
   ]);
 
-  await recordMarketIssueEvent(db, {
-    userId,
-    eventName: "news_tab_viewed",
-    metadata: { scope },
-  });
+  if (userId) {
+    await recordMarketIssueEvent(db, {
+      userId,
+      eventName: "news_tab_viewed",
+      metadata: { scope },
+    });
+  }
 
   if (!settings.feedEnabled) {
     return {
@@ -379,7 +415,7 @@ export async function listMarketIssues(input: {
 
 export async function getMarketIssueDetail(input: {
   db: Db;
-  userId: string;
+  userId: string | null;
   issueId: string;
   includeUnpublished?: boolean;
 }): Promise<Row | null> {
@@ -398,32 +434,36 @@ export async function getMarketIssueDetail(input: {
   const issue = asRow(data);
   if (!issue) return null;
 
-  const [{ data: entities, error: entitiesError }, { data: state, error: stateError }] =
-    await Promise.all([
-      db.from("market_issue_entities").select("*").eq("issue_id", issueId),
-      db.from("market_issue_user_states").select("*").eq("user_id", userId).eq("issue_id", issueId).maybeSingle(),
-    ]);
+  const entitiesPromise = db.from("market_issue_entities").select("*").eq("issue_id", issueId);
+  const statePromise = userId
+    ? db.from("market_issue_user_states").select("*").eq("user_id", userId).eq("issue_id", issueId).maybeSingle()
+    : Promise.resolve({ data: null, error: null as unknown });
+  const [{ data: entities, error: entitiesError }, stateResult] =
+    await Promise.all([entitiesPromise, statePromise]);
   if (entitiesError) throw entitiesError;
-  if (stateError) throw stateError;
+  const state = stateResult as { data: Row | null; error: unknown };
+  if (state.error) throw state.error;
 
   const focusTickers = await loadFocusTickers(db, userId);
-  const now = new Date().toISOString();
-  await db
-    .from("market_issue_user_states")
-    .upsert({
-      user_id: userId,
-      issue_id: issueId,
-      opened_at: asRow(state)?.opened_at || now,
-      last_seen_at: now,
-      is_saved: asRow(state)?.is_saved === true,
-      is_hidden: asRow(state)?.is_hidden === true,
-      updated_at: now,
-    }, { onConflict: "user_id,issue_id" });
-  await recordMarketIssueEvent(db, {
-    userId,
-    issueId,
-    eventName: "market_issue_opened",
-  });
+  if (userId) {
+    const now = new Date().toISOString();
+    await db
+      .from("market_issue_user_states")
+      .upsert({
+        user_id: userId,
+        issue_id: issueId,
+        opened_at: asRow(state.data)?.opened_at || now,
+        last_seen_at: now,
+        is_saved: asRow(state.data)?.is_saved === true,
+        is_hidden: asRow(state.data)?.is_hidden === true,
+        updated_at: now,
+      }, { onConflict: "user_id,issue_id" });
+    await recordMarketIssueEvent(db, {
+      userId,
+      issueId,
+      eventName: "market_issue_opened",
+    });
+  }
 
   const { data: links, error: linksError } = await db
     .from("market_issue_items")
@@ -467,7 +507,7 @@ export async function getMarketIssueDetail(input: {
   const card = serializeIssue(
     issue,
     asRows(entities),
-    asRow(state),
+    asRow(state.data),
     focusTickers,
     "market",
   );
@@ -566,10 +606,11 @@ export async function createMarketIssueResearchDraft(input: {
   db: Db;
   userId: string;
   issueId: string;
+  researchPathId?: string | null;
 }): Promise<{ href: string }> {
   const { data: issue, error: issueError } = await input.db
     .from("market_issues")
-    .select("id, title_ko")
+    .select("id, title_ko, research_paths")
     .eq("id", input.issueId)
     .eq("env", marketIssueEnvironment())
     .eq("state", "published")
@@ -578,38 +619,65 @@ export async function createMarketIssueResearchDraft(input: {
   const issueRow = asRow(issue);
   if (!issueRow) throw new Error("market_issue_not_found");
 
-  const { data: entities, error: entitiesError } = await input.db
+  const [{ data: entities, error: entitiesError }, focusTickers] = await Promise.all([
+    input.db
     .from("market_issue_entities")
     .select("ticker, entity_name, relationship")
     .eq("issue_id", input.issueId)
     .not("ticker", "is", null)
     .order("confidence", { ascending: false })
-    .limit(1);
+    .limit(1),
+    loadFocusTickers(input.db, input.userId),
+  ]);
   if (entitiesError) throw entitiesError;
   const entity = asRows(entities)[0] || null;
-  const ticker = nullableText(entity?.ticker)?.toUpperCase() || null;
+  const researchPaths = orderedResearchPaths(issueRow.research_paths, focusTickers);
+  const requestedPathId = nullableText(input.researchPathId);
+  const selectedPath = requestedPathId
+    ? researchPaths.find((path) => path.id === requestedPathId) || null
+    : researchPaths[0] || null;
+  if (requestedPathId && !selectedPath) {
+    throw new MarketIssueResearchPathError();
+  }
+  const ticker = selectedPath?.relatedTickers.find((value) => focusTickers.has(value))
+    || selectedPath?.relatedTickers[0]
+    || nullableText(entity?.ticker)?.toUpperCase()
+    || null;
   const company = ticker || text(entity?.entity_name, "관련 기업");
-  const prompt = text(issueRow.title_ko) + " 이슈가 " + company
+  const fallbackPrompt = text(issueRow.title_ko) + " 이슈가 " + company
     + "의 기존 투자 논지에 미치는 영향을 분석해줘. "
     + "최근 공시와 경영진 코멘트를 기준으로 확인된 내용과 추가 검토할 내용을 나눠줘.";
+  const prompt = selectedPath?.chatQuery || fallbackPrompt;
   const params = new URLSearchParams({
     query: prompt,
     news_issue_id: input.issueId,
   });
   if (ticker) params.set("ticker", ticker);
 
+  if (selectedPath) {
+    await recordMarketIssueEvent(input.db, {
+      userId: input.userId,
+      issueId: input.issueId,
+      eventName: "market_issue_research_path_selected",
+      metadata: { research_path_id: selectedPath.id, ticker: ticker || null },
+    });
+  }
+
   await recordMarketIssueEvent(input.db, {
     userId: input.userId,
     issueId: input.issueId,
     eventName: "market_issue_research_draft_opened",
-    metadata: ticker ? { ticker } : {},
+    metadata: {
+      ...(ticker ? { ticker } : {}),
+      ...(selectedPath ? { research_path_id: selectedPath.id } : {}),
+    },
   });
   return { href: "/chat/new?" + params.toString() };
 }
 
 export async function getMarketIssueSourceRedirect(input: {
   db: Db;
-  userId: string;
+  userId: string | null;
   sourceItemId: string;
 }): Promise<string | null> {
   const { data, error } = await input.db
@@ -642,11 +710,13 @@ export async function getMarketIssueSourceRedirect(input: {
     .maybeSingle();
   if (issueError) throw issueError;
   if (!asRow(issue)) return null;
-  await recordMarketIssueEvent(input.db, {
-    userId: input.userId,
-    issueId,
-    eventName: "market_issue_source_opened",
-  });
+  if (input.userId) {
+    await recordMarketIssueEvent(input.db, {
+      userId: input.userId,
+      issueId,
+      eventName: "market_issue_source_opened",
+    });
+  }
   return href;
 }
 
@@ -800,6 +870,7 @@ export async function updateMarketIssueByAdmin(
   if (input.impactPath) update.impact_path = toTextArray(input.impactPath, 5);
   if (input.confirmedFacts) update.confirmed_facts = toTextArray(input.confirmedFacts, 5);
   if (input.unconfirmedFacts) update.unconfirmed_facts = toTextArray(input.unconfirmedFacts, 5);
+  if (input.researchPaths) update.research_paths = researchPathsForStorage(input.researchPaths);
   if (input.statusLabels) {
     update.status_labels = input.statusLabels.filter(isMarketIssueStatusLabel).slice(0, 3);
   }
@@ -841,6 +912,44 @@ export async function listMarketIssueSources(db: Db): Promise<Row[]> {
   return asRows(data);
 }
 
+export async function getMarketIssueSourceHealth(input: {
+  db: Db;
+  sourceId: string;
+}): Promise<Row | null> {
+  const environment = marketIssueEnvironment();
+  const { data: sourceData, error: sourceError } = await input.db
+    .from("market_issue_sources")
+    .select("*")
+    .eq("id", input.sourceId)
+    .eq("env", environment)
+    .maybeSingle();
+  if (sourceError) throw sourceError;
+  const source = asRow(sourceData);
+  if (!source) return null;
+
+  const [{ data: stateData, error: stateError }, { data: runData, error: runError }, { data: candidateData, error: candidateError }] = await Promise.all([
+    input.db.from("market_source_fetch_states").select("*").eq("source_id", input.sourceId).maybeSingle(),
+    input.db.from("market_source_fetch_runs").select("*").eq("source_id", input.sourceId).order("created_at", { ascending: false }).limit(25),
+    input.db.from("market_source_candidates").select("*").eq("source_id", input.sourceId).order("updated_at", { ascending: false }).limit(25),
+  ]);
+  if (stateError) throw stateError;
+  if (runError) throw runError;
+  if (candidateError) throw candidateError;
+
+  const candidates = asRows(candidateData);
+  return {
+    source,
+    fetch_state: asRow(stateData),
+    recent_runs: asRows(runData),
+    recent_candidates: candidates,
+    candidate_counts: {
+      queued: candidates.filter((candidate) => text(candidate.status) === "queued").length,
+      processing: candidates.filter((candidate) => text(candidate.status) === "processing").length,
+      failed: candidates.filter((candidate) => text(candidate.status) === "failed").length,
+    },
+  };
+}
+
 export async function createMarketIssueSource(input: {
   db: Db;
   actorUserId: string;
@@ -860,13 +969,17 @@ export async function createMarketIssueSource(input: {
     .upsert({
       env: marketIssueEnvironment(),
       source_type: "x",
+      source_key: accountHandle,
       account_handle: accountHandle,
+      adapter_type: "x_api",
+      channel_type: "social",
+      canonical_host: "x.com",
       display_name: displayName,
       source_class: input.sourceClass,
       source_tags: toTextArray(input.sourceTags || [], 20).map((tag) => tag.toUpperCase()),
       active: true,
       updated_at: new Date().toISOString(),
-    }, { onConflict: "env,source_type,account_handle" })
+    }, { onConflict: "env,source_type,source_key" })
     .select("*")
     .single();
   if (error) throw error;
@@ -879,6 +992,70 @@ export async function createMarketIssueSource(input: {
   return asRow(data) || {};
 }
 
+export async function createMarketIssueWebSource(input: {
+  db: Db;
+  actorUserId: string;
+  sourceKey: string;
+  displayName: string;
+  sourceType?: "web" | "sec";
+  sourceClass: "government" | "regulator" | "company_official" | "exchange" | "registered_media" | "journalist" | "expert";
+  sourceTags?: string[];
+  adapterType: "rss" | "atom" | "json_feed" | "sitemap" | "html_list" | "json_api" | "sec_catalog";
+  channelType?: string;
+  discoveryUrl: string;
+  canonicalHost: string;
+  pollIntervalSeconds?: number;
+  priority?: number;
+  maxItemsPerPoll?: number;
+  requiresBrowser?: boolean;
+  adapterConfig?: Row;
+}): Promise<Row> {
+  const sourceKey = normalizeMarketWebSourceKey(input.sourceKey);
+  const displayName = text(input.displayName).slice(0, 100);
+  if (!displayName) throw new Error("invalid_market_issue_source_name");
+  const sourceType = input.sourceType || "web";
+  if (!["web", "sec"].includes(sourceType)) throw new Error("invalid_market_issue_web_source_type");
+  if (!["rss", "atom", "json_feed", "sitemap", "html_list", "json_api", "sec_catalog"].includes(input.adapterType)) {
+    throw new Error("invalid_market_issue_web_adapter_type");
+  }
+
+  const discoveryUrl = normalizeMarketWebSourceUrl(input.discoveryUrl);
+  const canonicalHost = normalizeMarketWebSourceHost(input.canonicalHost);
+  const { data, error } = await input.db
+    .from("market_issue_sources")
+    .upsert({
+      env: marketIssueEnvironment(),
+      source_type: sourceType,
+      source_key: sourceKey,
+      account_handle: null,
+      display_name: displayName,
+      source_class: input.sourceClass,
+      source_tags: toTextArray(input.sourceTags || [], 20).map((tag) => tag.toUpperCase()),
+      active: true,
+      allow_single_source_publish: false,
+      adapter_type: input.adapterType,
+      channel_type: text(input.channelType, "newsroom").slice(0, 50),
+      discovery_url: discoveryUrl,
+      canonical_host: canonicalHost,
+      poll_interval_seconds: boundedMarketSourceInteger(input.pollIntervalSeconds, 900, 60, 86400),
+      priority: boundedMarketSourceInteger(input.priority, 50, 1, 100),
+      max_items_per_poll: boundedMarketSourceInteger(input.maxItemsPerPoll, 25, 1, 100),
+      requires_browser: input.requiresBrowser === true,
+      adapter_config: normalizeMarketWebAdapterConfig(input.adapterConfig),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "env,source_type,source_key" })
+    .select("*")
+    .single();
+  if (error) throw error;
+  await recordMarketIssueAdminAction(input.db, {
+    actorUserId: input.actorUserId,
+    sourceId: text(asRow(data)?.id),
+    action: "source_update",
+    metadata: ["created", sourceType, input.adapterType],
+  });
+  return asRow(data) || {};
+}
+
 export async function updateMarketIssueSource(input: {
   db: Db;
   actorUserId: string;
@@ -887,6 +1064,15 @@ export async function updateMarketIssueSource(input: {
   displayName?: string;
   sourceTags?: string[];
   allowSingleSourcePublish?: boolean;
+  adapterType?: "rss" | "atom" | "json_feed" | "sitemap" | "html_list" | "json_api" | "sec_catalog";
+  channelType?: string;
+  discoveryUrl?: string;
+  canonicalHost?: string;
+  pollIntervalSeconds?: number;
+  priority?: number;
+  maxItemsPerPoll?: number;
+  requiresBrowser?: boolean;
+  adapterConfig?: Row;
 }): Promise<Row> {
   const update: Row = { updated_at: new Date().toISOString() };
   if (typeof input.active === "boolean") update.active = input.active;
@@ -896,6 +1082,24 @@ export async function updateMarketIssueSource(input: {
   if (typeof input.allowSingleSourcePublish === "boolean") {
     update.allow_single_source_publish = input.allowSingleSourcePublish;
   }
+  if (input.adapterType) {
+    if (!["rss", "atom", "json_feed", "sitemap", "html_list", "json_api", "sec_catalog"].includes(input.adapterType)) {
+      throw new Error("invalid_market_issue_web_adapter_type");
+    }
+    update.adapter_type = input.adapterType;
+  }
+  if (typeof input.channelType === "string") update.channel_type = text(input.channelType, "newsroom").slice(0, 50);
+  if (typeof input.discoveryUrl === "string") update.discovery_url = normalizeMarketWebSourceUrl(input.discoveryUrl);
+  if (typeof input.canonicalHost === "string") update.canonical_host = normalizeMarketWebSourceHost(input.canonicalHost);
+  if (typeof input.pollIntervalSeconds === "number") {
+    update.poll_interval_seconds = boundedMarketSourceInteger(input.pollIntervalSeconds, 900, 60, 86400);
+  }
+  if (typeof input.priority === "number") update.priority = boundedMarketSourceInteger(input.priority, 50, 1, 100);
+  if (typeof input.maxItemsPerPoll === "number") {
+    update.max_items_per_poll = boundedMarketSourceInteger(input.maxItemsPerPoll, 25, 1, 100);
+  }
+  if (typeof input.requiresBrowser === "boolean") update.requires_browser = input.requiresBrowser;
+  if (input.adapterConfig) update.adapter_config = normalizeMarketWebAdapterConfig(input.adapterConfig);
   const { data, error } = await input.db
     .from("market_issue_sources")
     .update(update)
@@ -911,6 +1115,59 @@ export async function updateMarketIssueSource(input: {
     metadata: Object.keys(update).filter((key) => key !== "updated_at"),
   });
   return asRow(data) || {};
+}
+
+function normalizeMarketWebSourceKey(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9._-]{1,99}$/.test(normalized)) {
+    throw new Error("invalid_market_issue_web_source_key");
+  }
+  return normalized;
+}
+
+function normalizeMarketWebSourceUrl(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    throw new Error("invalid_market_issue_web_discovery_url");
+  }
+  if (url.protocol !== "https:" || url.username || url.password) {
+    throw new Error("invalid_market_issue_web_discovery_url");
+  }
+  url.hash = "";
+  return url.toString();
+}
+
+function normalizeMarketWebSourceHost(value: string): string {
+  const candidate = value.trim().replace(/^https?:\/\//i, "").replace(/\/$/, "").toLowerCase();
+  if (!candidate || /[/?#@]/.test(candidate)) throw new Error("invalid_market_issue_web_canonical_host");
+  let host: string;
+  try {
+    host = new URL(`https://${candidate}`).hostname.toLowerCase();
+  } catch {
+    throw new Error("invalid_market_issue_web_canonical_host");
+  }
+  if (!host || host === "localhost" || host.endsWith(".local") || host.endsWith(".internal")) {
+    throw new Error("invalid_market_issue_web_canonical_host");
+  }
+  return host;
+}
+
+function boundedMarketSourceInteger(value: number | undefined, fallback: number, min: number, max: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.min(max, Math.max(min, Math.floor(parsed))) : fallback;
+}
+
+function normalizeMarketWebAdapterConfig(value: Row | undefined): Row {
+  if (!value) return {};
+  const serialized = JSON.stringify(value);
+  if (serialized.length > 12_000) throw new Error("market_issue_web_adapter_config_too_large");
+  const parsed = JSON.parse(serialized) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("invalid_market_issue_web_adapter_config");
+  }
+  return parsed as Row;
 }
 
 export async function recordMarketIssueEvent(

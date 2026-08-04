@@ -40,6 +40,7 @@ import { getAnalysisCandidates } from "@/lib/pulse/sources/analysis";
 import { getFilingCandidates } from "@/lib/pulse/sources/filings";
 import { getQuestionCandidates } from "@/lib/pulse/sources/questions";
 import { getRawResurfaceCandidates, selectResurfaceCandidate } from "@/lib/pulse/sources/resurface";
+import { getNewsCandidates } from "@/lib/pulse/sources/news";
 import { buildPulseItemVersions } from "@/lib/pulse/delta";
 import { getPulseFeedRevision, type PulseFeedRevision } from "@/lib/pulse/revision";
 import { getPulseFilingDecisionContext } from "@/lib/judgments/read-model";
@@ -54,7 +55,7 @@ import type {
 } from "@/types/api-contracts";
 import type { Database } from "@/types/database";
 
-const SOURCE_KINDS = ["filing", "analysis", "question", "resurface", "learning"] as const satisfies readonly PulseItemKind[];
+const SOURCE_KINDS = ["filing", "analysis", "question", "resurface", "learning", "news"] as const satisfies readonly PulseItemKind[];
 
 export interface ComposePulseFeedOptions {
   supabase: SupabaseClient<Database>;
@@ -129,6 +130,11 @@ export async function composePulseFeed({
         && preferences.learning_enabled
         && enabledKinds.has("learning"),
       async () => getLearningCandidates(supabase, snapshotAt),
+    ),
+    loadSource(
+      "news",
+      enabledKinds.has("news"),
+      () => getNewsCandidates(supabase, userId, snapshotAt, userSignals.preferredTickers),
     ),
   ] as const);
 
@@ -205,17 +211,22 @@ export async function composePulseFeed({
     ? rankPulseCandidates(buildDevelopmentPulseShowcase(snapshotAt), snapshotAt)
     : [];
   const activeAnalysis = ranked.filter(isActiveAnalysis);
+  // V10 separates completed analyses into a transient notification lane and
+  // removes them from the ordinary candidate pool so a finished run no longer
+  // competes with new filings and news for screen space.
+  const completedAnalysis = ranked.filter(isCompletedAnalysis);
   // Active analyses are also candidates in V5. The separate field remains a
   // compact status channel for polling and summaries; the client de-duplicates
   // it and renders one continuous stream.
-  const rankedFeed = ranked;
-  const developmentFeed = developmentShowcase;
+  const rankedFeed = ranked.filter((item) => !isCompletedAnalysis(item));
+  const developmentFeed = developmentShowcase.filter((item) => !isCompletedAnalysis(item));
   const developmentActiveAnalysis = developmentShowcase.filter(isActiveAnalysis);
+  const developmentCompletedAnalysis = developmentShowcase.filter(isCompletedAnalysis);
 
   const boundedLimit = Math.max(1, Math.min(limit, PULSE_PAGE_SIZE));
   const rankedCandidates = [...developmentFeed, ...rankedFeed];
   const pooledCandidates = buildPulseCandidatePool(rankedCandidates, snapshotAt);
-  // V8 sends an account-relevant, server-authorized reservoir rather than
+  // V9 sends an account-relevant, server-authorized reservoir rather than
   // forcing one editorial item into the account-level order. The browser
   // chooses one story with private device-local state and keeps it stable
   // until an intentional refresh.
@@ -235,24 +246,30 @@ export async function composePulseFeed({
         ?? candidateItems.length + activeIndex,
     }));
 
+  const visibleCompletedAnalysis = [...developmentCompletedAnalysis, ...completedAnalysis]
+    .slice(0, 3);
+
   const sinceTime = since && !Number.isNaN(Date.parse(since)) ? Date.parse(since) : null;
 
   const publicActiveAnalysis = toPublicItems(visibleActiveAnalysis);
+  const publicCompletedAnalysis = toPublicItems(visibleCompletedAnalysis);
   const publicCandidateItems = toPublicItems(candidateItems);
 
   return {
     revision: revision.value,
     generated_at: snapshotAt.toISOString(),
     snapshot_at: snapshotAt.toISOString(),
-    ranking_version: "rule_v8_hybrid",
+    ranking_version: "rule_v10_research_completion",
     timezone: preferences.timezone,
     date_label: formatDateLabel(snapshotAt, preferences.timezone),
     filter,
     active_analysis_items: publicActiveAnalysis,
+    completed_analysis_items: publicCompletedAnalysis,
     candidate_items: publicCandidateItems,
     visible_limit: PULSE_VISIBLE_ITEM_LIMIT,
     item_versions: buildPulseItemVersions({
       active_analysis_items: publicActiveAnalysis,
+      completed_analysis_items: publicCompletedAnalysis,
       candidate_items: publicCandidateItems,
     }),
     new_item_count: sinceTime === null
@@ -275,11 +292,12 @@ export function createUnavailablePulseFeed(now = new Date()): PulseFeedResponse 
     revision: "unavailable",
     generated_at: now.toISOString(),
     snapshot_at: now.toISOString(),
-    ranking_version: "rule_v8_hybrid",
+    ranking_version: "rule_v10_research_completion",
     timezone: "Asia/Seoul",
     date_label: formatDateLabel(now, "Asia/Seoul"),
     filter: "all",
     active_analysis_items: [],
+    completed_analysis_items: [],
     candidate_items: [],
     visible_limit: PULSE_VISIBLE_ITEM_LIMIT,
     item_versions: {},
@@ -383,6 +401,10 @@ function formatDateLabel(now: Date, timezone: string): string {
 
 function isActiveAnalysis(item: PulseRankedCandidate): boolean {
   return item.kind === "analysis" && item.phase === "active";
+}
+
+function isCompletedAnalysis(item: PulseRankedCandidate): boolean {
+  return item.kind === "analysis" && item.phase === "completed";
 }
 
 function isQuestionCadenceDay(

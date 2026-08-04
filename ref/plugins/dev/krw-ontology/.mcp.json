@@ -4,6 +4,10 @@
       "type": "http",
       "url": "http://127.0.0.1:8766/mcp",
       "alwaysLoad": true
+    },
+    "krw-feed": {
+      "type": "http",
+      "url": "http://127.0.0.1:8796/mcp"
     }
   }
 }

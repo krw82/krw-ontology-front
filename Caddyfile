@@ -39,28 +39,3 @@
         }
     }
 }
-
-dalim.krwontology.com {
-    reverse_proxy host.docker.internal:3100 {
-        # Set (rather than append) the ingress-owned header. This replaces
-        # any browser-supplied value before it reaches an upstream.
-        header_up X-KRW-Client-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up -CF-Connecting-IP
-        header_up -X-Real-IP
-    }
-
-    encode zstd gzip
-
-    log {
-        output stdout
-        format filter {
-            request>uri query {
-                replace authKey REDACTED
-                replace customerKey REDACTED
-                replace callbackToken REDACTED
-                replace state REDACTED
-            }
-        }
-    }
-}

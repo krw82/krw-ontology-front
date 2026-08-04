@@ -1,6 +1,8 @@
 import {
   isMarketIssueStatusLabel,
+  parseMarketIssueResearchPaths,
   type MarketIssueEntity,
+  type MarketIssueResearchPath,
   type MarketIssueStatusLabel,
 } from "@/lib/market-issues/contract";
 
@@ -40,6 +42,7 @@ export interface MarketIssueGeneratedBrief {
   impactPath: string[];
   confirmedFacts: string[];
   unconfirmedFacts: string[];
+  researchPaths: MarketIssueResearchPath[];
   statusLabels: MarketIssueStatusLabel[];
   entities: Omit<MarketIssueEntity, "id" | "followed">[];
   riskLevel: "low" | "medium" | "high";
@@ -57,7 +60,12 @@ export function containsProhibitedInvestmentLanguage(value: unknown): boolean {
 
 export function classifyMarketIssueRisk(value: unknown): "low" | "medium" | "high" {
   const normalized = normalizeMarketIssueText(value, 4000);
-  if (HIGH_RISK_LANGUAGE.some((pattern) => pattern.test(normalized))) return "high";
+  if (HIGH_RISK_LANGUAGE.some((pattern) => pattern.test(normalized))) {
+    const preliminaryInquiry = /예비(?:적)?|비구속(?:적)?|preliminary|non-binding|inquiry/i.test(normalized);
+    const noDetermination = /(?:위법행위|벌금|제재|구제조치|finding|fine|penalty|remedy).{0,100}(?:없(?:다|으며|고)?|없음|확정되지|확정된\s*바가\s*없|미확정|not\s+(?:been\s+)?(?:made|determined))|no\s+(?:finding|fine|penalty|remedy)/i.test(normalized);
+    if (preliminaryInquiry && noDetermination) return "medium";
+    return "high";
+  }
   return normalized ? "medium" : "low";
 }
 
@@ -80,6 +88,7 @@ export function parseMarketIssueGeneratedBrief(value: unknown): MarketIssueGener
   const impactPath = stringArray(record.impact_path, 5, 180);
   const confirmedFacts = stringArray(record.confirmed_facts, 5, 260);
   const unconfirmedFacts = stringArray(record.unconfirmed_facts, 5, 260);
+  const researchPaths = parseMarketIssueResearchPaths(record.research_paths ?? record.researchPaths);
   const statusLabels = stringArray(record.status_labels, 3, 30)
     .filter(isMarketIssueStatusLabel);
   const entities = parseEntities(record.entities);
@@ -98,6 +107,7 @@ export function parseMarketIssueGeneratedBrief(value: unknown): MarketIssueGener
     impactPath,
     confirmedFacts,
     unconfirmedFacts,
+    researchPaths,
     statusLabels: statusLabels.length > 0 ? statusLabels : ["추가 확인 필요"],
     entities,
     riskLevel,
@@ -125,6 +135,7 @@ export function buildReviewOnlyDraft(input: {
     impactPath: [],
     confirmedFacts: [],
     unconfirmedFacts: ["한국어 요약과 사건 분류를 검토해야 합니다."],
+    researchPaths: [],
     statusLabels: ["추가 확인 필요"],
     entities: input.sourceTags.slice(0, 3).map((ticker) => ({
       type: "company",

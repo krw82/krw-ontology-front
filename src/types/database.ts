@@ -961,7 +961,7 @@ export interface UserFilingNotificationRow extends Record<string, unknown> {
 export interface UserPulsePreferencesRow extends Record<string, unknown> {
   user_id: string;
   timezone: string;
-  enabled_kinds: Array<"filing" | "analysis" | "checkup" | "question" | "resurface" | "learning">;
+  enabled_kinds: Array<"filing" | "analysis" | "checkup" | "question" | "resurface" | "learning" | "news">;
   muted_tickers: string[];
   daily_checkup_enabled: boolean;
   daily_checkup_at: string;
@@ -991,9 +991,9 @@ export interface UserOnboardingStateRow extends Record<string, unknown> {
 export interface UserPulseItemStateRow extends Record<string, unknown> {
   user_id: string;
   item_key: string;
-  source_type: "filing" | "analysis" | "checkup" | "question" | "resurface" | "learning";
+  source_type: "filing" | "analysis" | "checkup" | "question" | "resurface" | "learning" | "news";
   source_id: string;
-  kind: "filing" | "analysis" | "checkup" | "question" | "resurface" | "learning";
+  kind: "filing" | "analysis" | "checkup" | "question" | "resurface" | "learning" | "news";
   first_seen_at: string | null;
   reviewed_at: string | null;
   saved_at: string | null;

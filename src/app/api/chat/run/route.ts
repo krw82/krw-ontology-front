@@ -50,6 +50,10 @@ import {
   buildUserUrlsNewsEventContext,
   UserUrlContextError,
 } from "@/lib/news-discovery/user-url-context";
+import {
+  buildMarketIssueAgentContext,
+  MarketIssueAgentContextError,
+} from "@/lib/market-issues/agent-context";
 import { attachCompletedDocumentsToMessage } from "@/lib/document-ingestion/prompt-context";
 import {
   assessChatPromptSafety,
@@ -252,13 +256,16 @@ export async function POST(request: NextRequest) {
   }
 
   let selectedNewsEventContext: Record<string, unknown> | null = null;
+  const marketIssueId = body.market_issue_id ?? null;
   const userUrls = body.user_urls?.length
     ? body.user_urls
     : body.user_url
       ? [body.user_url]
       : [];
-  const userMessageMetadata =
-    userUrls.length > 0 ? { user_urls: userUrls } : {};
+  const userMessageMetadata = {
+    ...(userUrls.length > 0 ? { user_urls: userUrls } : {}),
+    ...(marketIssueId ? { market_issue_id: marketIssueId } : {}),
+  };
 
   const safetyAssessment = assessChatPromptSafety(content);
   if (safetyAssessment.blocked) {
@@ -333,7 +340,39 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (userUrls.length > 0 && effectiveRunKind === "idea_generation") {
+  if (marketIssueId && userUrls.length > 0) {
+    return errorResponse(
+      400,
+      "validation_error",
+      "뉴스 기반 분석과 URL 첨부는 동시에 사용할 수 없습니다.",
+      request_id,
+    );
+  }
+
+  if (marketIssueId) {
+    try {
+      selectedNewsEventContext = await buildMarketIssueAgentContext({
+        db: getSupabaseAdmin(),
+        issueId: marketIssueId,
+      });
+      // Macro/policy issues without a ticker resolve to wide research
+      // (idea_generation); ticker-bearing issues stay on company_research.
+      const contextTickers = (selectedNewsEventContext?.primary_tickers as string[]) ?? [];
+      if (contextTickers.length > 0) {
+        effectiveAnalysisMode = "company";
+        effectiveRunKind = "company_research";
+      } else {
+        effectiveAnalysisMode = "news";
+        effectiveRunKind = "idea_generation";
+      }
+      routingMode = "preserve";
+    } catch (error) {
+      if (error instanceof MarketIssueAgentContextError) {
+        return errorResponse(400, "validation_error", "선택한 뉴스 분석을 준비하지 못했습니다.", request_id);
+      }
+      return errorResponse(500, "internal_error", "선택한 뉴스 분석을 준비하지 못했습니다.", request_id);
+    }
+  } else if (userUrls.length > 0 && effectiveRunKind === "idea_generation") {
     try {
       selectedNewsEventContext = await buildIdeaGenerationUserUrlContext({
         urls: userUrls,

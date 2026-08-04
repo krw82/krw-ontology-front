@@ -1506,8 +1506,7 @@ const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({
       testId="composer-tools-sheet"
     >
       <div className="grid gap-2">
-        <div className="flex min-h-11 items-center justify-between gap-3 px-3">
-          <p className="text-[16px] font-black leading-6 text-ink">입력 도구</p>
+        <div className="flex min-h-11 items-center justify-end gap-3 px-3">
           <button
             type="button"
             className="inline-flex h-11 w-11 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-dim hover:text-ink"

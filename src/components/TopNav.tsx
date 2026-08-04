@@ -41,7 +41,6 @@ interface TopNavProps {
   brandHref?: string;
   brandAriaLabel?: string;
   hideAccountMenu?: boolean;
-  showChatHistoryTrigger?: boolean;
   mobileCollapsed?: boolean;
   mobileOverlay?: boolean;
   preserveInitialUserProfile?: boolean;
@@ -109,7 +108,6 @@ export default function TopNav({
   brandHref = "/companies",
   brandAriaLabel,
   hideAccountMenu = false,
-  showChatHistoryTrigger = false,
   mobileCollapsed = false,
   mobileOverlay = false,
   preserveInitialUserProfile = false,
@@ -292,21 +290,6 @@ export default function TopNav({
         </div>
 
         <div className="flex shrink-0 items-center justify-end gap-xs sm:gap-md">
-          {showChatHistoryTrigger ? (
-            <Pressable
-              className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] border border-hairline bg-canvas text-ink shadow-sm disabled:cursor-not-allowed disabled:opacity-55 lg:w-auto lg:gap-1.5 lg:px-sm lg:text-[13px] lg:font-extrabold"
-              hoverEffect="surface"
-              aria-label={currentLocale === "ko" ? "채팅 기록 열기" : "Open chat history"}
-              aria-controls="chat-history-panel"
-              onClick={() => {
-                dispatchOpenChatSidebar();
-              }}
-              disabled={!clientReady}
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-[19px]">history</span>
-              <span className="hidden lg:inline">{currentLocale === "ko" ? "채팅 기록" : "History"}</span>
-            </Pressable>
-          ) : null}
           {actionSlot}
           {showLocaleSwitcher && <LocaleSwitcher compact />}
           {hideAccountMenu ? null : !authChecked ? (

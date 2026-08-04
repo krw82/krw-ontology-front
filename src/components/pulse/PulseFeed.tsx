@@ -164,14 +164,27 @@ export default function PulseFeed({
     ),
     [feed.active_analysis_items],
   );
+  const completedAnalysisItems = useMemo(
+    () => (feed.completed_analysis_items ?? []).filter(
+      (item) => item.kind === "analysis" && item.phase === "completed",
+    ),
+    [feed.completed_analysis_items],
+  );
   const activeResearchIds = useMemo(
     () => new Set(activeResearchItems.map((item) => item.id)),
     [activeResearchItems],
   );
+  const completedAnalysisIds = useMemo(
+    () => new Set(completedAnalysisItems.map((item) => item.id)),
+    [completedAnalysisItems],
+  );
   const hasActiveAnalysis = activeResearchItems.length > 0;
+  const hasCompletedAnalysis = completedAnalysisItems.length > 0;
   const feedItems = useMemo(
-    () => slate.items.filter((item) => !activeResearchIds.has(item.id)),
-    [activeResearchIds, slate.items],
+    () => slate.items.filter(
+      (item) => !activeResearchIds.has(item.id) && !completedAnalysisIds.has(item.id),
+    ),
+    [activeResearchIds, completedAnalysisIds, slate.items],
   );
   const displayEntries = useMemo(
     () => buildPulseFeedDisplayEntries(feedItems, feed.timezone, feed.visible_limit),
@@ -740,12 +753,15 @@ export default function PulseFeed({
               ? `${pendingIds.size}개 항목의 변경을 저장하는 중입니다.`
               : ""}
         </p>
-        {activeResearchItems.length > 0 ? (
-          <ActiveResearchRail
-            items={activeResearchItems}
+        {hasActiveAnalysis || hasCompletedAnalysis ? (
+          <ResearchActivityRail
+            activeItems={activeResearchItems}
+            completedItems={completedAnalysisItems}
             feedSessionId={feedSessionId}
             rankingVersion={feed.ranking_version}
+            onMutation={mutate}
             onDeviceSignal={recordDeviceSignal}
+            reducedMotion={reducedMotion}
           />
         ) : null}
         {firstValueEntry ? (
@@ -889,34 +905,112 @@ export default function PulseFeed({
   );
 }
 
-function ActiveResearchRail({
-  items,
+function ResearchActivityRail({
+  activeItems,
+  completedItems,
   feedSessionId,
   rankingVersion,
+  onMutation,
   onDeviceSignal,
+  reducedMotion,
 }: {
-  items: PulseItem[];
+  activeItems: PulseItem[];
+  completedItems: PulseItem[];
   feedSessionId: string;
   rankingVersion: PulseFeedResponse["ranking_version"];
+  onMutation: (item: PulseItem, action: PulseMutationAction) => void;
   onDeviceSignal: (item: PulseItem, signal: PulseDeviceSignal) => void;
+  reducedMotion: boolean;
 }) {
+  const counts = [
+    activeItems.length > 0 ? `진행 ${activeItems.length}` : null,
+    completedItems.length > 0 ? `완료 ${completedItems.length}` : null,
+  ].filter((value): value is string => Boolean(value));
+
   return (
-    <section className="mb-base border-y border-hairline" aria-labelledby="active-research-title">
-      <div className="flex min-h-9 items-center justify-between border-b border-hairline">
-        <h2 id="active-research-title" className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
-          진행 중인 리서치
+    <section className="mb-base overflow-hidden rounded-[22px] bg-ink text-white" aria-labelledby="research-activity-title">
+      <div className="flex min-h-9 items-center justify-between border-b border-white/15 px-lg py-sm">
+        <h2 id="research-activity-title" className="text-[12px] font-extrabold tracking-[0.08em] text-[#adc8ff]">
+          리서치 활동
         </h2>
-        <span className="text-[11px] font-semibold text-muted">{items.length}개</span>
+        <span className="text-[11px] font-semibold text-[#d2d9ea]">{counts.join(" · ")}</span>
       </div>
-      {items.map((item) => (
-        <ActiveResearchRow
-          key={item.id}
-          item={item}
-          feedSessionId={feedSessionId}
-          rankingVersion={rankingVersion}
-          onDeviceSignal={onDeviceSignal}
-        />
-      ))}
+      <div className="px-lg py-base">
+        <AnimatePresence initial={false}>
+          {activeItems.length > 0 ? (
+            <motion.div
+              key="active-research"
+              layout="position"
+              initial={reducedMotion ? false : { opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+              transition={{ duration: reducedMotion ? 0 : 0.22, ease: easeOutExpo }}
+            >
+              <p className="mb-1 px-sm text-[11px] font-bold tracking-[0.08em] text-[#adc8ff]">
+                진행 중
+              </p>
+              {activeItems.map((item) => (
+                <motion.div
+                  key={item.id}
+                  layout="position"
+                  initial={reducedMotion ? false : { opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+                  transition={{ duration: reducedMotion ? 0 : 0.22, ease: easeOutExpo }}
+                >
+                  <ActiveResearchRow
+                    item={item}
+                    feedSessionId={feedSessionId}
+                    rankingVersion={rankingVersion}
+                    onDeviceSignal={onDeviceSignal}
+                  />
+                </motion.div>
+              ))}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+
+        {activeItems.length > 0 && completedItems.length > 0 ? (
+          <div className="my-xs border-t border-white/15" aria-hidden="true" />
+        ) : null}
+
+        <AnimatePresence initial={false}>
+          {completedItems.length > 0 ? (
+            <motion.div
+              key="completed-research"
+              layout="position"
+              initial={reducedMotion ? false : { opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+              transition={{ duration: reducedMotion ? 0 : 0.24, ease: easeOutExpo }}
+              aria-live="polite"
+              aria-relevant="additions text"
+            >
+              <p className="mb-1 px-sm text-[11px] font-bold tracking-[0.08em] text-[#adc8ff]">
+                방금 완료
+              </p>
+              {completedItems.map((item) => (
+                <motion.div
+                  key={item.id}
+                  layout="position"
+                  initial={reducedMotion ? false : { opacity: 0, y: -8, scale: 0.985 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.985 }}
+                  transition={{ duration: reducedMotion ? 0 : 0.28, ease: easeOutExpo }}
+                >
+                  <CompletedResearchRow
+                    item={item}
+                    feedSessionId={feedSessionId}
+                    rankingVersion={rankingVersion}
+                    onMutation={onMutation}
+                    onDeviceSignal={onDeviceSignal}
+                  />
+                </motion.div>
+              ))}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
     </section>
   );
 }
@@ -958,15 +1052,15 @@ function ActiveResearchRow({
       imageSize={48}
     />
   ) : (
-    <span className="grid size-9 shrink-0 place-items-center rounded-[8px] border border-hairline bg-surface text-[11px] font-black text-primary" aria-hidden="true">K</span>
+    <span className="grid size-9 shrink-0 place-items-center rounded-[8px] border border-white/20 bg-white/[0.08] text-[11px] font-black text-[#adc8ff]" aria-hidden="true">K</span>
   );
 
   return (
-    <div className="flex min-h-[72px] items-center gap-sm py-sm">
+    <div className="flex min-h-[72px] items-center gap-sm rounded-[14px] px-sm py-sm transition hover:bg-white/[0.06]">
       {companyHref ? (
         <Link
           href={companyHref}
-          className="shrink-0 rounded-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="shrink-0 rounded-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
           aria-label={`${companyName} 회사 소개`}
         >
           {identity}
@@ -978,34 +1072,123 @@ function ActiveResearchRow({
             {companyHref ? (
               <Link
                 href={companyHref}
-                className="font-extrabold text-ink underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="font-extrabold text-white underline-offset-4 hover:text-[#adc8ff] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 {companyName}
               </Link>
             ) : (
-              <span className="font-extrabold text-ink">{companyName}</span>
+              <span className="font-extrabold text-white">{companyName}</span>
             )}
-            <span className="font-semibold text-muted">리서치 진행 중</span>
+            <span className="font-semibold text-[#d2d9ea]">리서치 진행 중</span>
           </div>
           <Link
             href={primary.href}
-            className="group mt-0.5 flex min-w-0 items-center justify-between gap-sm rounded-[6px] py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="group mt-0.5 flex min-w-0 items-center justify-between gap-sm rounded-[6px] py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
             aria-label={`${companyName} 리서치 열기`}
             onClick={openResearch}
           >
-            <span className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold leading-5 text-body">
-              {isRunning ? <span className="material-symbols-outlined pulse-refresh-turn shrink-0 text-[14px] text-primary" aria-hidden="true">progress_activity</span> : null}
+            <span className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold leading-5 text-white">
+              {isRunning ? <span className="material-symbols-outlined progress-spin shrink-0 text-[14px] text-[#adc8ff]" aria-hidden="true">progress_activity</span> : null}
               <span className="truncate">{item.title}</span>
             </span>
-            <span className="material-symbols-outlined shrink-0 text-[18px] text-primary transition-transform group-hover:translate-x-0.5" aria-hidden="true">arrow_forward</span>
+            <span className="material-symbols-outlined shrink-0 text-[18px] text-[#adc8ff] transition-transform group-hover:translate-x-0.5" aria-hidden="true">arrow_forward</span>
           </Link>
         </div>
       ) : (
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-extrabold text-ink">{companyName}</p>
-          <p className="mt-0.5 truncate text-[13px] font-semibold text-body">{item.title}</p>
+          <p className="text-[12px] font-extrabold text-white">{companyName}</p>
+          <p className="mt-0.5 truncate text-[13px] font-semibold text-[#d2d9ea]">{item.title}</p>
         </div>
       )}
+    </div>
+  );
+}
+
+function CompletedResearchRow({
+  item,
+  feedSessionId,
+  rankingVersion,
+  onMutation,
+  onDeviceSignal,
+}: {
+  item: PulseItem;
+  feedSessionId: string;
+  rankingVersion: PulseFeedResponse["ranking_version"];
+  onMutation: (item: PulseItem, action: PulseMutationAction) => void;
+  onDeviceSignal: (item: PulseItem, signal: PulseDeviceSignal) => void;
+}) {
+  const companyName = pulseCompanyName(item);
+  const companyHref = pulseCompanyHref(item.ticker);
+  const primary = item.primary_action;
+  const openResult = () => {
+    onDeviceSignal(item, "open");
+    trackClientEventSilently("pulse_item_opened", {
+      item_kind: item.kind,
+      action: "completed_research",
+      item_state: item.state,
+      phase: item.phase,
+      feed_session_id: feedSessionId,
+      ranking_version: rankingVersion,
+      reason_code: item.reason_code,
+      has_source_grounded_brief: false,
+    });
+  };
+  const identity = item.ticker ? (
+    <CompanyLogo
+      ticker={item.ticker}
+      companyName={companyName}
+      className="size-9 text-[10px] text-ink"
+      imageSize={48}
+    />
+  ) : (
+    <span className="grid size-9 shrink-0 place-items-center rounded-[8px] border border-white/20 bg-white/[0.08] text-[11px] font-black text-[#adc8ff]" aria-hidden="true">K</span>
+  );
+
+  return (
+    <div className="group relative flex min-h-[72px] items-center gap-sm rounded-[14px] border border-[#adc8ff]/20 bg-[#adc8ff]/[0.08] px-sm py-sm transition-colors hover:bg-[#adc8ff]/[0.13]">
+      {companyHref ? (
+        <Link
+          href={companyHref}
+          className="shrink-0 rounded-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          aria-label={`${companyName} 회사 소개`}
+        >
+          {identity}
+        </Link>
+      ) : identity}
+      {primary.type === "link" ? (
+        <Link
+          href={primary.href}
+          className="flex min-w-0 flex-1 items-center gap-sm rounded-[6px] py-1 pr-9 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          onClick={openResult}
+          aria-label={`${companyName} 리서치 답변과 근거 보기`}
+        >
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-x-1.5 text-[12px] leading-5">
+              <span className="font-extrabold text-white">{companyName}</span>
+              <span className="font-semibold text-[#adc8ff]">리서치 완료</span>
+            </div>
+            <p className="mt-0.5 truncate text-[13px] font-semibold leading-5 text-[#d2d9ea] group-hover:text-white">{item.title}</p>
+          </div>
+          <span className="material-symbols-outlined shrink-0 text-[18px] text-[#adc8ff] transition-transform group-hover:translate-x-0.5 group-hover:text-white" aria-hidden="true">arrow_forward</span>
+        </Link>
+      ) : (
+        <div className="min-w-0 flex-1 pr-9">
+          <div className="flex min-w-0 items-center gap-x-1.5 text-[12px] leading-5">
+            <span className="font-extrabold text-white">{companyName}</span>
+            <span className="font-semibold text-[#adc8ff]">리서치 완료</span>
+          </div>
+          <p className="mt-0.5 truncate text-[13px] font-semibold text-[#d2d9ea]">{item.title}</p>
+        </div>
+      )}
+      <button
+        type="button"
+        className="absolute right-sm top-sm inline-flex size-8 items-center justify-center rounded-full text-[#d2d9ea] opacity-70 transition hover:bg-white/[0.08] hover:text-white hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        onClick={() => onMutation(item, "dismiss")}
+        aria-label="완료 알림 숨기기"
+        title="완료 알림 숨기기"
+      >
+        <span className="material-symbols-outlined text-[17px]" aria-hidden="true">close</span>
+      </button>
     </div>
   );
 }
@@ -1101,6 +1284,7 @@ function isItemActionable(item: PulseItem): boolean {
   return item.kind === "filing"
     || item.kind === "question"
     || item.kind === "resurface"
+    || item.kind === "news"
     || (item.kind === "analysis" && item.phase !== "active");
 }
 
@@ -1109,6 +1293,8 @@ export interface PulseItemMutationSnapshot {
   itemIndex: number;
   activeAnalysisItem: PulseItem | null;
   activeAnalysisIndex: number;
+  completedAnalysisItem: PulseItem | null;
+  completedAnalysisIndex: number;
 }
 
 export function capturePulseItemSnapshot(
@@ -1119,9 +1305,17 @@ export function capturePulseItemSnapshot(
   const activeAnalysisIndex = feed.active_analysis_items.findIndex(
     (item) => item.id === itemId,
   );
+  const completedItems = feed.completed_analysis_items ?? [];
+  const completedAnalysisIndex = completedItems.findIndex(
+    (item) => item.id === itemId,
+  );
   const item = itemIndex >= 0
     ? feed.candidate_items[itemIndex]
-    : feed.active_analysis_items[activeAnalysisIndex];
+    : activeAnalysisIndex >= 0
+      ? feed.active_analysis_items[activeAnalysisIndex]
+      : completedAnalysisIndex >= 0
+        ? completedItems[completedAnalysisIndex]
+        : null;
   if (!item) return null;
   return {
     item,
@@ -1131,6 +1325,11 @@ export function capturePulseItemSnapshot(
         ? feed.active_analysis_items[activeAnalysisIndex]
         : null,
     activeAnalysisIndex,
+    completedAnalysisItem:
+      completedAnalysisIndex >= 0
+        ? completedItems[completedAnalysisIndex]
+        : null,
+    completedAnalysisIndex,
   };
 }
 
@@ -1143,6 +1342,7 @@ export function applyPulseFeedDelta(
   const byId = new Map<string, PulseItem>([
     ...feed.candidate_items,
     ...feed.active_analysis_items,
+    ...(feed.completed_analysis_items ?? []),
   ].map((item) => [item.id, item]));
   for (const item of delta.upserts) byId.set(item.id, item);
 
@@ -1150,6 +1350,9 @@ export function applyPulseFeedDelta(
     .map((id) => byId.get(id))
     .filter((item): item is PulseItem => Boolean(item));
   const activeItems = delta.active_analysis_item_ids
+    .map((id) => byId.get(id))
+    .filter((item): item is PulseItem => Boolean(item));
+  const completedItems = delta.completed_analysis_item_ids
     .map((id) => byId.get(id))
     .filter((item): item is PulseItem => Boolean(item));
 
@@ -1161,6 +1364,7 @@ export function applyPulseFeedDelta(
     snapshot_at: delta.generated_at,
     candidate_items: orderedCandidateItems,
     active_analysis_items: activeItems,
+    completed_analysis_items: completedItems,
     item_versions: delta.item_versions,
   };
 }
@@ -1173,8 +1377,9 @@ export function buildFullPulseRefreshSummary(
   const previousIds = new Set([
     ...previous.candidate_items,
     ...previous.active_analysis_items,
+    ...(previous.completed_analysis_items ?? []),
   ].map((item) => item.id));
-  const nextItems = [...next.candidate_items, ...next.active_analysis_items];
+  const nextItems = [...next.candidate_items, ...next.active_analysis_items, ...(next.completed_analysis_items ?? [])];
   const nextIds = new Set(nextItems.map((item) => item.id));
 
   return {
@@ -1194,7 +1399,8 @@ export function applyPulseItemMutation(
 ): PulseFeedResponse {
   const exists =
     feed.candidate_items.some((candidate) => candidate.id === item.id) ||
-    feed.active_analysis_items.some((candidate) => candidate.id === item.id);
+    feed.active_analysis_items.some((candidate) => candidate.id === item.id)
+    || (feed.completed_analysis_items ?? []).some((candidate) => candidate.id === item.id);
   if (!exists) return feed;
 
   if (action === "dismiss" || action === "snooze") {
@@ -1202,6 +1408,9 @@ export function applyPulseItemMutation(
       ...feed,
       candidate_items: feed.candidate_items.filter((candidate) => candidate.id !== item.id),
       active_analysis_items: feed.active_analysis_items.filter(
+        (candidate) => candidate.id !== item.id,
+      ),
+      completed_analysis_items: (feed.completed_analysis_items ?? []).filter(
         (candidate) => candidate.id !== item.id,
       ),
     };
@@ -1219,6 +1428,11 @@ export function applyPulseItemMutation(
         ? applyPulseItemState(candidate, action, timestamp)
         : candidate,
     ),
+    completed_analysis_items: (feed.completed_analysis_items ?? []).map((candidate) =>
+      candidate.id === item.id
+        ? applyPulseItemState(candidate, action, timestamp)
+        : candidate,
+    ),
   };
 }
 
@@ -1232,6 +1446,7 @@ export function rollbackPulseItemMutation(
     let restored = false;
     let candidateItems = feed.candidate_items;
     let activeAnalysisItems = feed.active_analysis_items;
+    let completedAnalysisItems = feed.completed_analysis_items ?? [];
 
     if (
       snapshot.itemIndex >= 0 &&
@@ -1252,12 +1467,25 @@ export function rollbackPulseItemMutation(
       );
       restored = true;
     }
+    if (
+      snapshot.completedAnalysisItem &&
+      snapshot.completedAnalysisIndex >= 0 &&
+      !completedAnalysisItems.some((item) => item.id === snapshot.item.id)
+    ) {
+      completedAnalysisItems = insertAt(
+        completedAnalysisItems,
+        snapshot.completedAnalysisIndex,
+        snapshot.completedAnalysisItem,
+      );
+      restored = true;
+    }
 
     if (!restored) return feed;
     return {
       ...feed,
       candidate_items: candidateItems,
       active_analysis_items: activeAnalysisItems,
+      completed_analysis_items: completedAnalysisItems,
     };
   }
 
@@ -1275,11 +1503,13 @@ export function rollbackPulseItemMutation(
   };
   const candidateItems = feed.candidate_items.map(restoreItem);
   const activeAnalysisItems = feed.active_analysis_items.map(restoreItem);
+  const completedAnalysisItems = (feed.completed_analysis_items ?? []).map(restoreItem);
   if (!restored) return feed;
   return {
     ...feed,
     candidate_items: candidateItems,
     active_analysis_items: activeAnalysisItems,
+    completed_analysis_items: completedAnalysisItems,
   };
 }
 

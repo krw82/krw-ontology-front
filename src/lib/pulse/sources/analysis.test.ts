@@ -43,6 +43,27 @@ describe("Pulse analysis activity source", () => {
   });
 
   it("uses a terminal phase identity and keeps answer text out of the feed when completed", () => {
+    const finishedAt = "2026-07-15T01:06:00.000Z";
+    const completed = {
+      ...running,
+      status: "completed" as const,
+      finished_at: finishedAt,
+    };
+    const messages = new Map([
+      ["message-user", { id: "message-user", content: "서비스 매출과 현금흐름을 연결해줘" }],
+      ["message-assistant", { id: "message-assistant", content: "저장된 답변 미리보기입니다." }],
+    ]);
+    // Pass `now` close to finished_at so the 24h notification window still applies.
+    const [candidate] = buildAnalysisCandidates([session], [completed], messages, new Date("2026-07-15T02:00:00.000Z"));
+
+    expect(candidate.item_key).toBe("analysis:run-1:completed");
+    expect(candidate.eyebrow).toContain("완료");
+    expect(candidate.body).toContain("원래 채팅");
+    expect(candidate.primary_action).toMatchObject({ label: "결과 이어보기" });
+    expect(candidate.secondary_actions).toEqual([]);
+  });
+
+  it("drops a completed run older than 24 hours", () => {
     const completed = {
       ...running,
       status: "completed" as const,
@@ -50,14 +71,22 @@ describe("Pulse analysis activity source", () => {
     };
     const messages = new Map([
       ["message-user", { id: "message-user", content: "서비스 매출과 현금흐름을 연결해줘" }],
-      ["message-assistant", { id: "message-assistant", content: "저장된 답변 미리보기입니다." }],
     ]);
-    const [candidate] = buildAnalysisCandidates([session], [completed], messages);
+    // 25 hours later — beyond the 24h notification window.
+    const candidates = buildAnalysisCandidates([session], [completed], messages, new Date("2026-07-16T02:06:00.000Z"));
+    expect(candidates).toHaveLength(0);
+  });
 
-    expect(candidate.item_key).toBe("analysis:run-1:completed");
-    expect(candidate.eyebrow).toContain("완료");
-    expect(candidate.body).toContain("원래 채팅");
-    expect(candidate.primary_action).toMatchObject({ label: "결과 이어보기" });
-    expect(candidate.secondary_actions).toEqual([]);
+  it("drops a failed run instead of surfacing it", () => {
+    const failed = {
+      ...running,
+      status: "failed" as const,
+      finished_at: "2026-07-15T01:06:00.000Z",
+    };
+    const messages = new Map([
+      ["message-user", { id: "message-user", content: "서비스 매출과 현금흐름을 연결해줘" }],
+    ]);
+    const candidates = buildAnalysisCandidates([session], [failed], messages, new Date("2026-07-15T02:00:00.000Z"));
+    expect(candidates).toHaveLength(0);
   });
 });

@@ -1,6 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { isMarketIssueAdmin } from "@/lib/market-issues/access";
+import {
+  isMarketIssueStatusLabel,
+  parseMarketIssueResearchPaths,
+  type MarketIssueStatusLabel,
+} from "@/lib/market-issues/contract";
 import {
   updateMarketIssueByAdmin,
   type MarketIssueAdminUpdate,
@@ -21,8 +27,11 @@ function parseUpdate(value: unknown): MarketIssueAdminUpdate | null {
   if (Array.isArray(body.impactPath)) result.impactPath = body.impactPath.filter((item): item is string => typeof item === "string");
   if (Array.isArray(body.confirmedFacts)) result.confirmedFacts = body.confirmedFacts.filter((item): item is string => typeof item === "string");
   if (Array.isArray(body.unconfirmedFacts)) result.unconfirmedFacts = body.unconfirmedFacts.filter((item): item is string => typeof item === "string");
+  if (Array.isArray(body.researchPaths)) result.researchPaths = parseMarketIssueResearchPaths(body.researchPaths);
   if (Array.isArray(body.statusLabels)) {
-    result.statusLabels = body.statusLabels.filter((item): item is any => typeof item === "string");
+    result.statusLabels = body.statusLabels.filter(
+      (item): item is MarketIssueStatusLabel => isMarketIssueStatusLabel(item),
+    );
   }
   if (body.riskLevel === "low" || body.riskLevel === "medium" || body.riskLevel === "high") {
     result.riskLevel = body.riskLevel;

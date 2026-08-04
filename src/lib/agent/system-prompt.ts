@@ -212,23 +212,23 @@ function buildStockNewsPolicy(features: PromptRuntimeFeatures): string {
     return [
       "Do not use built-in WebSearch or WebFetch.",
       features.yahooFinanceNewsRequired
-        ? "This run requires current ticker market/news context: use the configured read-only current market-news MCP tools for that current context before the final answer."
-        : "When current ticker-news context is needed, use only the configured read-only current market-news MCP tools.",
-      "Provider news is market reporting, not confirmed company disclosure.",
-      "Provider stock_info is safe quote/identity/technical context only. For market/technical interpretation, use only currentPrice, previousClose, regularMarketChangePercent, volume, averageVolume, fiftyDayAverage, twoHundredDayAverage, fiftyTwoWeekLow, fiftyTwoWeekHigh, and marketCap. Do not use provider valuation, analyst consensus, target price, recommendation, forward PE, PEG, or growth-estimate fields in the answer.",
-      "Never mention provider names such as Yahoo Finance, MCP/tool names, API names, or raw provider payloads in the final answer unless the user explicitly asks about data/debug provenance. Use investor-facing phrases like recent market data, price data, or market reporting instead.",
-      `Preserve market-news-vs-filing provenance internally, but synthesize the answer into one ${investorInterpretation}.`,
+        ? "This run requires current ticker news context: use KRW Feed MCP tools first, then make at most one bounded configured current market-news MCP call only to cross-check or fill a feed coverage gap before the final answer."
+        : "When current ticker-news context is needed, use KRW Feed MCP tools first and use at most one configured current market-news MCP call only as a bounded supplement.",
+      "Stored feed posts and supplementary market reports are market reporting, not confirmed company disclosure.",
+      "A separate stock-info result is safe quote/identity/technical context only, never a news source. For market/technical interpretation, use only currentPrice, previousClose, regularMarketChangePercent, volume, averageVolume, fiftyDayAverage, twoHundredDayAverage, fiftyTwoWeekLow, fiftyTwoWeekHigh, and marketCap. Do not use provider valuation, analyst consensus, target price, recommendation, forward PE, PEG, or growth-estimate fields in the answer.",
+      "Never mention X, provider names, MCP/tool names, API names, or raw payload fields in the final answer unless the user explicitly asks about data/debug provenance. Use investor-facing phrases like recent feed items, price data, or market reporting instead.",
+      `Preserve feed-vs-market-report-vs-filing provenance internally, but synthesize the answer into one ${investorInterpretation}.`,
       features.yahooFinanceNewsRequired
-        ? "If the current market-news tool call fails, times out, returns no useful results, or the question has no resolvable ticker context, state that current news context could not be confirmed and do not invent a news explanation."
-        : "If the current market-news tool call fails, times out, or returns no useful results, continue from available evidence and state that no additional current news context was confirmed.",
+        ? "If the KRW Feed call returns no useful result, use one bounded supplementary current-market news read when ticker context is resolvable. If neither source is useful, state that relevant news context could not be confirmed and do not invent an explanation."
+        : "If the KRW Feed call returns no useful result, continue from available evidence and state that no additional relevant news context was confirmed.",
     ].join("\n");
   }
 
   if (features.yahooFinanceNewsUnavailableForNews) {
     return [
       "Do not use built-in WebSearch or WebFetch.",
-      "The user selected news mode, but the configured current market-news tools are unavailable in this runtime.",
-      "Do not attempt current-news search. State that current news context could not be checked.",
+      "The user selected news mode, but the configured feed and supplementary current-market news tools are unavailable in this runtime.",
+      "Do not attempt built-in web search. State that relevant news context could not be checked.",
     ].join("\n");
   }
 

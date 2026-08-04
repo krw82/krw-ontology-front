@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { getAuthUser, handleAuthError } from "@/lib/auth";
+import { ANONYMOUS_PULSE_USER_ID, getOptionalAuthUser, handleAuthError } from "@/lib/auth";
 import { getPulseFeedStatus } from "@/lib/pulse/status";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -15,11 +15,11 @@ const querySchema = z.object({
 export async function GET(request: NextRequest) {
   let user;
   try {
-    user = await getAuthUser();
+    user = await getOptionalAuthUser();
   } catch (error) {
     return handleAuthError(error);
   }
-  if (!user) return handleAuthError(new Error("No user"));
+  const userId = user?.id ?? ANONYMOUS_PULSE_USER_ID;
 
   const parsed = querySchema.safeParse(Object.fromEntries(request.nextUrl.searchParams));
   if (!parsed.success) {
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   try {
     const status = await getPulseFeedStatus({
       supabase: getSupabaseAdmin(),
-      userId: user.id,
+      userId,
       revision: parsed.data.revision ?? null,
     });
     return Response.json(status, {

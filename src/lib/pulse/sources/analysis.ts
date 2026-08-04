@@ -30,6 +30,9 @@ const ACTIVE_STATUSES = new Set<AgentRunRow["status"]>([
   "running",
 ]);
 
+/** A completed analysis is a transient notification, not a persistent feed card. */
+const COMPLETED_NOTIFICATION_MS = 24 * 60 * 60 * 1_000;
+
 export async function getAnalysisCandidates(
   supabase: SupabaseClient<Database>,
   userId: string,
@@ -86,6 +89,7 @@ export async function getAnalysisCandidates(
     sessions,
     latestRuns,
     new Map(messageRows.map((message) => [message.id, message])),
+    now,
   );
 }
 
@@ -93,6 +97,7 @@ export function buildAnalysisCandidates(
   sessions: AnalysisSession[],
   runs: AnalysisRun[],
   messagesById: Map<string, AnalysisMessage>,
+  now = new Date(),
 ): PulseCandidate[] {
   const sessionById = new Map(sessions.map((session) => [session.id, session]));
 
@@ -103,10 +108,21 @@ export function buildAnalysisCandidates(
     const question = compactQuestion(messagesById.get(run.user_message_id)?.content, session.title);
     const active = ACTIVE_STATUSES.has(run.status);
     const completed = run.status === "completed";
+    // Failed runs are retried from the original chat; they are not surfaced in
+    // the feed as a separate notification lane.
+    if (!active && !completed) return [];
     const availableAt = run.queued_at ?? run.started_at ?? session.updated_at;
     const occurredAt = run.finished_at ?? run.started_at ?? availableAt;
     const href = buildChatSessionHref(session.id, { ticker });
-    const phase = active ? "active" : completed ? "completed" : "failed";
+    const phase = active ? "active" : "completed";
+    // A completed analysis is a 24-hour notification. After that it leaves the
+    // feed entirely rather than lingering as a stale candidate.
+    if (completed) {
+      const finishedMs = run.finished_at ? Date.parse(run.finished_at) : Date.parse(occurredAt);
+      if (!Number.isFinite(finishedMs) || finishedMs <= now.getTime() - COMPLETED_NOTIFICATION_MS) {
+        return [];
+      }
+    }
 
     return [{
       item_key: makePulseItemKey("analysis", `${run.id}:${phase}`),
@@ -132,7 +148,7 @@ export function buildAnalysisCandidates(
       available_at: availableAt,
       expires_at: active
         ? null
-        : new Date(Date.parse(occurredAt) + 30 * 24 * 60 * 60 * 1_000).toISOString(),
+        : new Date(Date.parse(occurredAt) + COMPLETED_NOTIFICATION_MS).toISOString(),
       saved_at: null,
       snoozed_until: null,
       phase,

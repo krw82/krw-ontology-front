@@ -481,21 +481,69 @@ require_market_issue_x_token() {
       ;;
   esac
 }
+market_issue_x_ingestion_enabled() {
+  value=$(value_of MARKET_ISSUE_X_INGESTION_ENABLED)
+  case "$value" in
+    0|false|FALSE|off|OFF|no|NO) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+market_issue_stream_enabled() {
+  value=$(value_of MARKET_ISSUE_STREAM_ENABLED)
+  case "$value" in
+    1|true|TRUE|on|ON|yes|YES) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 if [ "$REQUIRE_LIVE_TOSS" = "1" ]; then
   require_live_toss_key TOSS_PAYMENTS_CLIENT_KEY live_ck_
   require_live_toss_key TOSS_PAYMENTS_SECRET_KEY live_sk_
   echo "Verified matching live Toss key prefixes in the GCP runtime env."
 fi
-require_market_issue_x_token
-echo "Verified market-issue X bearer token is present in the GCP runtime env."
-printf '\nFRONT_DIR=%s\nNEXT_PUBLIC_APP_VERSION=%s\n' "$REMOTE_STAGE" "$RELEASE_ID" >> "$REMOTE_STAGE/runtime.env"
-OLD_IMAGE=$(docker image inspect --format '{{.Id}}' krw-ontology-front-web:local 2>/dev/null || true)
-test -n "$OLD_IMAGE"
-OLD_APP_VERSION=unknown
-OLD_WEB=$(docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_FRONT_DIR" --env-file "$REMOTE_FRONT_DIR/.env" -f "$REMOTE_FRONT_DIR/docker-compose.yml" ps -q web 2>/dev/null || true)
-if [ -n "$OLD_WEB" ]; then
-  OLD_APP_VERSION=$(docker inspect "$OLD_WEB" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^NEXT_PUBLIC_APP_VERSION=//p' | head -1)
+if market_issue_x_ingestion_enabled; then
+  require_market_issue_x_token
+  echo "Verified market-issue X bearer token is present in the GCP runtime env."
+else
+  echo "Market-issue X ingestion is disabled for this deployment."
 fi
+if market_issue_stream_enabled; then
+  require_market_issue_x_token
+  echo "Verified market-issue stream worker token is present in the GCP runtime env."
+else
+  echo "Market-issue filtered-stream worker is disabled for this deployment."
+fi
+printf '\nFRONT_DIR=%s\nNEXT_PUBLIC_APP_VERSION=%s\n' "$REMOTE_STAGE" "$RELEASE_ID" >> "$REMOTE_STAGE/runtime.env"
+  OLD_WEB=$(docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_FRONT_DIR" --env-file "$REMOTE_FRONT_DIR/.env" -f "$REMOTE_FRONT_DIR/docker-compose.yml" ps -q web 2>/dev/null || true)
+  OLD_IMAGE=
+  if [ -n "$OLD_WEB" ]; then
+    OLD_IMAGE=$(docker inspect "$OLD_WEB" --format '{{.Image}}' 2>/dev/null || true)
+  fi
+  if [ -z "$OLD_IMAGE" ]; then
+    OLD_IMAGE=$(docker image inspect --format '{{.Id}}' krw-ontology-front-web:local 2>/dev/null || true)
+  fi
+  test -n "$OLD_IMAGE"
+  ROLLBACK_TAG="krw-ontology-front-web:rollback-$RELEASE_ID"
+  if docker image inspect "$OLD_IMAGE" >/dev/null 2>&1; then
+    docker tag "$OLD_IMAGE" "$ROLLBACK_TAG"
+  else
+    # This VM can have a running bootstrap container whose image metadata was
+    # removed by an earlier local-tag rebuild. Rebuild the active source as a
+    # rollback image before the staged candidate replaces the local image tag.
+    test -n "$OLD_WEB"
+    FRONT_DIR="$REMOTE_FRONT_DIR" docker compose \
+      --project-name "$COMPOSE_PROJECT" \
+      --project-directory "$REMOTE_FRONT_DIR" \
+      --env-file "$REMOTE_FRONT_DIR/.env" \
+      -f "$REMOTE_FRONT_DIR/docker-compose.yml" \
+      build web
+    docker tag krw-ontology-front-web:local "$ROLLBACK_TAG"
+    OLD_IMAGE=$(docker image inspect --format '{{.Id}}' "$ROLLBACK_TAG")
+  fi
+  echo "Preserved rollback image: $ROLLBACK_TAG"
+  OLD_APP_VERSION=unknown
+  if [ -n "$OLD_WEB" ]; then
+    OLD_APP_VERSION=$(docker inspect "$OLD_WEB" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^NEXT_PUBLIC_APP_VERSION=//p' | head -1)
+  fi
 OLD_CONFIG_ROOT=
 if [ -L "$REMOTE_FRONT_DIR/.simple-deploy/current" ] && [ -f "$REMOTE_FRONT_DIR/.simple-deploy/current/runtime.env" ]; then
   OLD_CONFIG_ROOT=$(cd "$REMOTE_FRONT_DIR/.simple-deploy/current" && pwd -P)
@@ -571,7 +619,11 @@ set -e
 SERVICES="web reverse-proxy llm-gateway filings-mcp document-worker document-outbox-dispatcher filing-notification-worker filing-brief-worker billing-worker"
 ROLLBACK_ARMED=1
 MARKET_ISSUE_STARTED=0
+MARKET_WEB_SOURCE_STARTED=0
+MARKET_ISSUE_STREAM_STARTED=0
 OLD_MARKET_ISSUE_WORKER=0
+OLD_MARKET_WEB_SOURCE_WORKER=0
+OLD_MARKET_ISSUE_STREAM_WORKER=0
 compose_stage() {
   FRONT_DIR="$REMOTE_STAGE" NEXT_PUBLIC_APP_VERSION="$RELEASE_ID" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_STAGE" --env-file "$REMOTE_STAGE/runtime.env" -f "$REMOTE_STAGE/docker-compose.yml" "$@"
 }
@@ -582,11 +634,52 @@ compose_old() {
     FRONT_DIR="$REMOTE_FRONT_DIR" NEXT_PUBLIC_APP_VERSION="$OLD_APP_VERSION" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_FRONT_DIR" --env-file "$REMOTE_FRONT_DIR/.env" -f "$REMOTE_FRONT_DIR/docker-compose.yml" "$@"
   fi
 }
+runtime_value() {
+  key="$1"
+  awk -F= -v key="$key" '
+    $0 !~ /^[[:space:]]*#/ && $1 == key {
+      sub(/^[^=]*=/, "")
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+      gsub(/^"|"$/, "")
+      gsub(/^'\''|'\''$/, "")
+      print
+    }
+  ' "$REMOTE_STAGE/runtime.env" | tail -n 1
+}
+market_issue_x_ingestion_enabled() {
+  value=$(runtime_value MARKET_ISSUE_X_INGESTION_ENABLED)
+  case "$value" in
+    0|false|FALSE|off|OFF|no|NO) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+market_issue_stream_enabled() {
+  value=$(runtime_value MARKET_ISSUE_STREAM_ENABLED)
+  case "$value" in
+    1|true|TRUE|on|ON|yes|YES) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 if compose_old config --services | grep -qx "market-issue-worker"; then
   OLD_MARKET_ISSUE_WORKER=1
 fi
+if compose_old config --services | grep -qx "market-web-source-worker"; then
+  OLD_MARKET_WEB_SOURCE_WORKER=1
+fi
+if compose_old config --services | grep -qx "market-issue-stream-worker"; then
+  OLD_MARKET_ISSUE_STREAM_WORKER=1
+fi
 matches_version() {
-  printf '%s' "$1" | node -e 'const fs=require("fs"); const expected=process.argv[1]; try { const value=JSON.parse(fs.readFileSync(0,"utf8")); process.exit(value.status==="ok"&&value.deployment_id===expected?0:1); } catch { process.exit(1); }' "$2"
+  payload=$(printf '%s' "$1" | tr -d '[:space:]')
+  expected=$2
+  case "$payload" in
+    *'"status":"ok"'*) ;;
+    *) return 1 ;;
+  esac
+  case "$payload" in
+    *'"deployment_id":"'"$expected"'"'*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 reload_billing_readonly_proxy() {
   readonly_caddy="$REMOTE_STAGE/Caddyfile.billing-readonly"
@@ -637,10 +730,22 @@ rollback() {
       if [ "$MARKET_ISSUE_STARTED" = "1" ]; then
         compose_stage rm -sf market-issue-worker || true
       fi
+      if [ "$MARKET_WEB_SOURCE_STARTED" = "1" ]; then
+        compose_stage rm -sf market-web-source-worker || true
+      fi
+      if [ "$MARKET_ISSUE_STREAM_STARTED" = "1" ]; then
+        compose_stage rm -sf market-issue-stream-worker || true
+      fi
       docker tag "$OLD_IMAGE" krw-ontology-front-web:local
       compose_old up -d --force-recreate --wait $SERVICES
       if [ "$OLD_MARKET_ISSUE_WORKER" = "1" ]; then
         compose_old up -d --force-recreate --wait market-issue-worker
+      fi
+      if [ "$OLD_MARKET_WEB_SOURCE_WORKER" = "1" ]; then
+        compose_old up -d --force-recreate --wait market-web-source-worker
+      fi
+      if [ "$OLD_MARKET_ISSUE_STREAM_WORKER" = "1" ]; then
+        compose_old up -d --force-recreate --wait market-issue-stream-worker
       fi
     fi
   fi
@@ -682,24 +787,57 @@ for origin in "$SITE_ORIGIN_ONE" "$SITE_ORIGIN_TWO"; do
   done
   [ "$public_ready" = "1" ]
 done
-MARKET_ISSUE_STARTED=1
-compose_stage up -d --force-recreate --wait market-issue-worker
-compose_stage exec -T market-issue-worker node -e '
-  const token = (process.env.MARKET_ISSUE_X_BEARER_TOKEN || "").trim();
-  if (!token || token.includes("...")) throw new Error("MARKET_ISSUE_X_BEARER_TOKEN is missing");
-  const baseUrl = (process.env.MARKET_ISSUE_X_API_BASE_URL || "https://api.x.com").replace(/\/+$/, "");
-  fetch(baseUrl + "/2/users/by/username/nvidia", {
-    headers: { Authorization: "Bearer " + token },
-  }).then(async (response) => {
-    if (!response.ok) throw new Error("X API token check failed: " + response.status);
-    const payload = await response.json();
-    if (!payload?.data?.id) throw new Error("X API token check returned no account");
-    console.log(JSON.stringify({ worker: "market-issue-worker", xApiTokenConfigured: true, xApiStatus: response.status }));
-  }).catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  });
+MARKET_WEB_SOURCE_STARTED=1
+compose_stage up -d --force-recreate --wait market-web-source-worker
+compose_stage exec -T market-web-source-worker node -e '
+  const sources = JSON.parse(process.env.MARKET_ISSUE_WEB_SOURCES || "[]");
+  if (!Array.isArray(sources) || sources.length === 0) throw new Error("MARKET_ISSUE_WEB_SOURCES is empty");
+  console.log(JSON.stringify({ worker: "market-web-source-worker", configuredSources: sources.length }));
 '
+if market_issue_x_ingestion_enabled; then
+  MARKET_ISSUE_STARTED=1
+  compose_stage up -d --force-recreate --wait market-issue-worker
+  compose_stage exec -T market-issue-worker node -e '
+    const token = (process.env.MARKET_ISSUE_X_BEARER_TOKEN || "").trim();
+    if (!token || token.includes("...")) throw new Error("MARKET_ISSUE_X_BEARER_TOKEN is missing");
+    const baseUrl = (process.env.MARKET_ISSUE_X_API_BASE_URL || "https://api.x.com").replace(/\/+$/, "");
+    fetch(baseUrl + "/2/users/by/username/nvidia", {
+      headers: { Authorization: "Bearer " + token },
+    }).then(async (response) => {
+      if (!response.ok) throw new Error("X API token check failed: " + response.status);
+      const payload = await response.json();
+      if (!payload?.data?.id) throw new Error("X API token check returned no account");
+      console.log(JSON.stringify({ worker: "market-issue-worker", xApiTokenConfigured: true, xApiStatus: response.status }));
+    }).catch((error) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    });
+  '
+else
+  compose_stage stop market-issue-worker || true
+  echo "Skipped X market-issue worker because MARKET_ISSUE_X_INGESTION_ENABLED is disabled."
+fi
+if market_issue_stream_enabled; then
+  MARKET_ISSUE_STREAM_STARTED=1
+  compose_stage up -d --force-recreate --wait market-issue-stream-worker
+  compose_stage exec -T market-issue-stream-worker node -e '
+    const token = (process.env.MARKET_ISSUE_X_BEARER_TOKEN || "").trim();
+    if (!token || token.includes("...")) throw new Error("MARKET_ISSUE_X_BEARER_TOKEN is missing");
+    const baseUrl = (process.env.MARKET_ISSUE_X_API_BASE_URL || "https://api.x.com").replace(/\/+$/, "");
+    fetch(baseUrl + "/2/tweets/search/recent?query=from:nvidia&max_results=10", {
+      headers: { Authorization: "Bearer " + token },
+    }).then(async (response) => {
+      if (!response.ok) throw new Error("X API stream token check failed: " + response.status);
+      console.log(JSON.stringify({ worker: "market-issue-stream-worker", xApiTokenConfigured: true, xApiStatus: response.status }));
+    }).catch((error) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    });
+  '
+else
+  compose_stage stop market-issue-stream-worker || true
+  echo "Skipped X market-issue stream worker because MARKET_ISSUE_STREAM_ENABLED is disabled."
+fi
 rm -f "$REMOTE_FRONT_DIR/.simple-deploy/current"
 ln -s "$REMOTE_STAGE" "$REMOTE_FRONT_DIR/.simple-deploy/current"
 ROLLBACK_ARMED=0
@@ -714,7 +852,16 @@ compose_stage() {
   FRONT_DIR="$REMOTE_STAGE" NEXT_PUBLIC_APP_VERSION="$RELEASE_ID" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_STAGE" --env-file "$REMOTE_STAGE/runtime.env" -f "$REMOTE_STAGE/docker-compose.yml" "$@"
 }
 matches_version() {
-  printf '%s' "$1" | node -e 'const fs=require("fs"); const expected=process.argv[1]; try { const value=JSON.parse(fs.readFileSync(0,"utf8")); process.exit(value.status==="ok"&&value.deployment_id===expected?0:1); } catch { process.exit(1); }' "$2"
+  payload=$(printf '%s' "$1" | tr -d '[:space:]')
+  expected=$2
+  case "$payload" in
+    *'"status":"ok"'*) ;;
+    *) return 1 ;;
+  esac
+  case "$payload" in
+    *'"deployment_id":"'"$expected"'"'*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 deep_ready=0
 last_deep_failure=""

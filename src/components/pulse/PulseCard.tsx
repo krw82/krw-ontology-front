@@ -7,7 +7,7 @@ import { type PulseDeviceSignal } from "@/lib/pulse/device-ranking";
 import { pulseCompanyHref, pulseCompanyName } from "@/lib/pulse/company-display";
 import CompanyLogo from "@/components/CompanyLogo";
 import EditorialImageCarousel from "@/components/editorial/EditorialImageCarousel";
-import type { PulseFeedResponse, PulseItem, PulseMutationAction } from "@/types/api-contracts";
+import type { PulseFeedResponse, PulseItem, PulseLinkAction, PulseMutationAction } from "@/types/api-contracts";
 
 interface PulseCardProps {
   item: PulseItem;
@@ -85,6 +85,14 @@ export default function PulseCard({
   const isFourPanelLearning = item.kind === "learning" && item.metadata.learning_kind === "four_panel";
   const isCompanyStory = item.kind === "learning"
     && typeof item.metadata.editorial_series_id === "string";
+  const hasInteractiveMedia = item.kind === "learning"
+    && (item.metadata.learning_kind === "image" || item.metadata.learning_kind === "carousel");
+  const detailAction = primary.type === "link" && !analysisActive && item.kind !== "question"
+    && !isFourPanelLearning && !isCompanyStory && !hasInteractiveMedia
+    ? primary
+    : null;
+  const researchAction = pulseResearchAction(item);
+  const visibleAction = researchAction ?? primary;
   const visibleDetail = pulseVisibleDetail(item);
   const companyName = pulseCompanyName(item);
   const companyHref = pulseCompanyHref(item.ticker);
@@ -101,19 +109,40 @@ export default function PulseCard({
       has_source_grounded_brief: hasSourceGroundedBrief,
     });
   };
+  const recordResearchOpen = () => {
+    onDeviceSignal(item, "open");
+    trackClientEventSilently(researchAction?.analytics_name === "pulse_answer_prefilled" ? "pulse_answer_prefilled" : "pulse_item_opened", {
+      item_kind: item.kind,
+      action: "research",
+      item_state: item.state,
+      phase: item.phase,
+      feed_session_id: feedSessionId,
+      ranking_version: rankingVersion,
+      reason_code: item.reason_code,
+      has_source_grounded_brief: hasSourceGroundedBrief,
+    });
+  };
 
   return (
     <article
       ref={ref}
-      className="group border-b border-hairline py-lg sm:py-xl"
+      className={`group relative border-b border-hairline py-lg sm:py-xl ${detailAction ? "cursor-pointer" : ""}`}
       data-pulse-kind={item.kind}
       data-pulse-state={item.state}
     >
-      <div className="flex items-start gap-sm">
+      {detailAction ? (
+        <Link
+          href={detailAction.href}
+          className="absolute inset-0 z-0 rounded-[8px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label={`${item.title} 상세 보기`}
+          onClick={recordPrimaryOpen}
+        />
+      ) : null}
+      <div className={`relative z-10 flex items-start gap-sm ${detailAction ? "pointer-events-none" : ""}`}>
         {companyHref ? (
           <Link
             href={companyHref}
-            className="shrink-0 rounded-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="pointer-events-auto shrink-0 rounded-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             aria-label={`${companyName} 회사 소개`}
           >
             <PulseIdentity item={item} companyName={companyName} />
@@ -127,7 +156,7 @@ export default function PulseCard({
               {companyHref ? (
                 <Link
                   href={companyHref}
-                  className="font-extrabold text-ink underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="pointer-events-auto font-extrabold text-ink underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   {companyName}
                 </Link>
@@ -136,7 +165,6 @@ export default function PulseCard({
               )}
               <span className="text-muted" aria-hidden="true">·</span>
               <span className="font-semibold text-muted">{pulseKindLabel(item)}</span>
-              {item.priority === "urgent" ? <span className="font-bold text-[#c43c22]">우선 확인</span> : null}
               {item.state === "reviewed" ? <span className="font-medium text-muted">검토함</span> : null}
             </p>
             <time className="shrink-0 pt-0.5 text-[11px] font-medium text-muted" dateTime={item.occurred_at}>
@@ -170,59 +198,29 @@ export default function PulseCard({
 
           {!isFourPanelLearning && !isCompanyStory ? (
             <div className="mt-sm flex min-h-11 flex-wrap items-center gap-x-base gap-y-0.5">
-              {item.kind !== "filing" && !analysisActive ? (
+              {item.kind !== "filing" && !analysisActive && pulseActionContext(item, analysisStatus) ? (
                 <span className="text-[12px] font-medium text-muted">{pulseActionContext(item, analysisStatus)}</span>
               ) : null}
-              {primary.type === "link" ? (
+              {visibleAction.type === "link" ? (
                 <Link
-                  href={primary.href}
-                  className="inline-flex min-h-11 items-center gap-1 text-[13px] font-bold text-primary transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  onClick={recordPrimaryOpen}
+                  href={visibleAction.href}
+                  className="pointer-events-auto inline-flex min-h-11 items-center gap-1 text-[13px] font-bold text-primary transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  onClick={researchAction ? recordResearchOpen : recordPrimaryOpen}
                 >
-                  {primary.label}
+                  {researchAction ? "이 이슈로 리서치" : visibleAction.label}
                   <span className="material-symbols-outlined text-[16px]" aria-hidden="true">arrow_forward</span>
                 </Link>
               ) : (
                 <button
                   type="button"
                   disabled={pending}
-                  onClick={() => onMutation(item, primary.action)}
-                  className="inline-flex min-h-11 items-center gap-1 text-[13px] font-bold text-primary underline-offset-4 hover:text-ink hover:underline disabled:opacity-50"
+                  onClick={() => onMutation(item, visibleAction.action)}
+                  className="pointer-events-auto inline-flex min-h-11 items-center gap-1 text-[13px] font-bold text-primary underline-offset-4 hover:text-ink hover:underline disabled:opacity-50"
                 >
-                  {primary.label}
+                  {visibleAction.label}
                   <span className="material-symbols-outlined text-[16px]" aria-hidden="true">arrow_forward</span>
                 </button>
               )}
-              {item.secondary_actions.map((action) => action.type === "link" ? (
-                <Link
-                  key={`${action.type}-${action.label}`}
-                  href={action.href}
-                  className="inline-flex min-h-11 items-center text-[13px] font-semibold text-muted underline-offset-4 hover:text-ink hover:underline"
-                  onClick={() => {
-                    onDeviceSignal(item, "open");
-                    trackClientEventSilently(action.analytics_name === "pulse_answer_prefilled" ? "pulse_answer_prefilled" : "pulse_item_opened", { item_kind: item.kind, action: action.label, item_state: item.state, phase: item.phase, feed_session_id: feedSessionId, ranking_version: rankingVersion, reason_code: item.reason_code, has_source_grounded_brief: hasSourceGroundedBrief });
-                  }}
-                >
-                  {action.label}
-                </Link>
-              ) : (() => {
-                const effectiveAction = action.action === "save" && item.saved_at ? "unsave" : action.action;
-                const reviewAction = effectiveAction === "review" && item.reviewed_at ? "unreview" : effectiveAction;
-                const label = action.action === "save" && item.saved_at
-                  ? "저장됨"
-                  : effectiveAction === "review" && item.reviewed_at ? "다시 미검토" : action.label;
-                return (
-                  <button
-                    key={`${action.type}-${action.action}`}
-                    type="button"
-                    disabled={pending}
-                    onClick={() => onMutation(item, reviewAction)}
-                    className="inline-flex min-h-11 items-center text-[13px] font-semibold text-muted underline-offset-4 hover:text-ink hover:underline disabled:opacity-45"
-                  >
-                    {label}
-                  </button>
-                );
-              })())}
             </div>
           ) : null}
         </div>
@@ -230,6 +228,34 @@ export default function PulseCard({
       {isFourPanelLearning ? <LearningStoryCarousel item={item} /> : null}
     </article>
   );
+}
+
+/**
+ * Keep the original primary link as the card's source/detail destination and
+ * promote a research link to the single visible CTA. Mutation actions stay in
+ * the item contract so their eventual source-detail placement does not affect
+ * feed composition.
+ */
+function pulseResearchAction(item: PulseItem): PulseLinkAction | null {
+  if (item.kind === "analysis" || item.kind === "question") {
+    return item.primary_action.type === "link" ? item.primary_action : null;
+  }
+
+  const existing = item.secondary_actions.find((action): action is PulseLinkAction =>
+    action.type === "link" && action.href.startsWith("/chat/"));
+  if (existing) return existing;
+  if (!item.ticker || item.kind === "checkup" || item.kind === "learning") return null;
+
+  const params = new URLSearchParams({
+    ticker: item.ticker,
+    query: `${item.ticker} ${item.title}의 투자 관점과 근거를 확인해줘`,
+  });
+  return {
+    type: "link",
+    label: "이 이슈로 리서치",
+    href: `/chat/new?${params.toString()}`,
+    analytics_name: "pulse_answer_prefilled",
+  };
 }
 
 function PulseIdentity({
@@ -405,6 +431,7 @@ function pulseKindLabel(item: PulseItem): string {
   if (item.kind === "checkup") return "오늘의 체크업";
   if (item.kind === "question") return "다음 질문";
   if (item.kind === "resurface") return "다시 볼 메모";
+  if (item.kind === "news") return "시장 뉴스";
   if (item.kind === "learning" && typeof item.metadata.editorial_series_id === "string") return "회사 이야기";
   return "리서치 읽기";
 }
@@ -424,8 +451,9 @@ function pulseActionContext(item: PulseItem, analysisStatus: string | null): str
     return "답변과 근거 준비됨";
   }
   if (item.kind === "question") return "이 질문으로 이어서 보기";
-  if (item.kind === "resurface") return "저장한 관점";
+  if (item.kind === "resurface") return "";
   if (item.kind === "checkup") return "오늘의 확인 항목";
+  if (item.kind === "news") return "";
   return stringMetadata(item, "source_label") ?? "리서치 읽기";
 }
 

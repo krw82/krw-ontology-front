@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pulse 카드 액션 개선</title>
+    <style>
+      :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif; color: #111827; background: #f8fafc; }
+      body { margin: 0; padding: 36px 20px 56px; }
+      main { max-width: 900px; margin: 0 auto; }
+      h1 { font-size: clamp(28px, 5vw, 42px); letter-spacing: -0.05em; margin: 0 0 8px; }
+      h2 { font-size: 20px; margin: 36px 0 12px; }
+      h3 { font-size: 17px; margin: 0 0 10px; }
+      p, li { line-height: 1.7; color: #374151; }
+      .eyebrow { color: #1555d6; font-size: 12px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+      .callout { margin: 24px 0; padding: 20px; background: #eaf2ff; border: 1px solid #c9dcff; border-radius: 16px; }
+      .current { width: 100%; border: 1px solid #e5e7eb; border-radius: 18px; box-shadow: 0 18px 50px rgb(15 23 42 / .12); }
+      .idea { padding: 22px; margin: 16px 0; background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; }
+      pre { overflow-x: auto; padding: 18px; background: #111827; color: #e5e7eb; border-radius: 12px; font-size: 13px; line-height: 1.45; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .tag { display: inline-block; padding: 3px 8px; margin-right: 6px; border-radius: 999px; background: #f3f4f6; font-size: 12px; font-weight: 700; color: #4b5563; }
+      a { color: #1555d6; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Pulse action model</p>
+      <h1>읽기는 카드에서, 행동은 하나만</h1>
+      <div class="callout">
+        <strong>권고:</strong> 카드 본문을 누르면 해당 공시·뉴스·메모의 상세로 들어가고, 회사 아이콘·이름은 회사 페이지로 유지합니다. 눈에 보이는 강조 액션은 <strong>“이 이슈로 리서치”</strong> 하나만 둡니다. 현재의 저장·숨기기는 피드에서 빼고 상세 화면으로 옮깁니다.
+      </div>
+
+      <h2>현재 상태</h2>
+      <img class="current" src="references/current.png" alt="현재 Pulse 피드 카드. 메모와 뉴스 카드에 상세 보기, 저장, 숨기기 등 여러 액션이 함께 표시된다." />
+      <p>현재 메모·뉴스 카드는 한 줄에 ‘상세 보기 + 저장 + 숨기기’가 나란히 있고, 공시는 ‘공시 보기 + 질문 + 다시 보기’를 보여줍니다. 카드의 다음 행동이 많아질수록 읽기와 선택이 같은 줄에서 경쟁합니다.</p>
+
+      <section class="idea">
+        <span class="tag">가장 큰 변화</span>
+        <h3>1. 카드 표면은 ‘상세 읽기’ 하나의 넓은 링크</h3>
+        <p>아이콘과 회사명만 회사 소개로 분리하고, 제목·요약·여백을 포함한 나머지 카드 표면은 상세 화면으로 연결합니다. 사용자는 기사를 읽듯 카드를 눌러 맥락을 보고, 리서치는 별도의 명확한 행동으로 인식합니다.</p>
+        <pre>┌──────────────────────────────────┐
+│ [로고] 애플                       │  ← 회사 소개
+│        서비스가 더 중요해질까?     │
+│        공시·뉴스 요약…             │  ← 카드 표면: 상세 보기
+│                                  │
+│                 [이 이슈로 리서치 →] │  ← 유일한 강조 액션
+└──────────────────────────────────┘</pre>
+        <p><strong>구현 제약:</strong> 카드 전체를 <code>&lt;Link&gt;</code>로 감싸면 내부의 회사 링크와 채팅 버튼이 중첩됩니다. 상세 링크를 카드의 절대 배경 클릭 영역으로 두고, 회사 링크와 리서치 버튼만 그 위 레이어에 올리는 방식이 안전합니다.</p>
+      </section>
+
+      <section class="idea">
+        <span class="tag">정보 구조</span>
+        <h3>2. 저장·숨기기는 상세 화면으로 이동</h3>
+        <p>피드에서는 저장·숨기기를 기본 노출하지 않습니다. 상세 화면의 상단 더보기 메뉴 또는 하단 액션으로 옮기면, 목록은 ‘무엇을 읽을지’에 집중하고 저장·정리 행동은 문맥을 본 뒤 결정할 수 있습니다. 모바일에서도 버튼이 줄바꿈되거나 오탭될 위험이 줄어듭니다.</p>
+        <p>특히 ‘다시 볼 메모’에서 <em>다시 저장</em>은 의미가 즉시 명확하지 않으므로, 상세 안에서는 상태에 맞춰 ‘저장 해제’ 또는 ‘이번에는 숨기기’처럼 정확한 문구로 보여주는 편이 좋습니다.</p>
+      </section>
+
+      <section class="idea">
+        <span class="tag">예외 규칙</span>
+        <h3>3. 모든 카드에 같은 CTA를 강제하지 않기</h3>
+        <ul>
+          <li><strong>공시·뉴스·메모·질문:</strong> 상세 클릭 + ‘이 이슈로 리서치’ CTA.</li>
+          <li><strong>진행 중인 분석:</strong> 상세와 리서치가 동일한 채팅이므로 ‘대화로 돌아가기’ 하나만 유지.</li>
+          <li><strong>회사 이야기 캐러셀:</strong> 슬라이드 자체가 상세 경험이므로 카드 표면을 다시 링크로 만들지 않고, 이미 있는 확대·슬라이드 조작을 유지.</li>
+          <li><strong>오늘의 체크업·내부자 거래 묶음:</strong> 개별 상세가 아닌 목록 목적이므로 ‘전체 보기’ 하나를 유지.</li>
+        </ul>
+      </section>
+
+      <h2>접근성 기준</h2>
+      <p>카드 표면은 실제 URL을 가진 링크로 만들고, 아이콘·회사명·CTA를 별도의 형제 인터랙션으로 둬야 합니다. 링크나 버튼을 서로 중첩하지 않고, 모바일의 CTA는 최소 44×44px 터치 영역을 유지합니다. 이는 네이티브 링크·버튼을 쓰고 가까운 인터랙션을 분리하라는 <a href="https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Accessibility/HTML">MDN의 HTML 접근성 가이드</a>와 <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/button">버튼 접근성 가이드</a>에 부합합니다.</p>
+
+      <h2>유지할 점</h2>
+      <ul>
+        <li>회사 아이콘과 한글 회사명을 회사 소개 진입점으로 유지하는 구조</li>
+        <li>뉴스·공시·메모별로 다른 요약 밀도와 출처 맥락</li>
+        <li>진행 중 리서치를 피드 상단에서 독립적으로 보여주는 패턴</li>
+      </ul>
+    </main>
+  </body>
+</html>

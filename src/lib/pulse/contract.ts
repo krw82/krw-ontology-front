@@ -18,6 +18,7 @@ export const PULSE_ITEM_KINDS = [
   "question",
   "resurface",
   "learning",
+  "news",
 ] as const satisfies readonly PulseItemKind[];
 
 /**
@@ -50,7 +51,7 @@ const pulseActionSchema = z.discriminatedUnion("type", [
 
 const pulseItemBaseSchema = z.object({
   id: z.string().min(1),
-  feed_slot: z.enum(["signal", "continue", "discovery", "resurface", "learning"]),
+  feed_slot: z.enum(["signal", "continue", "discovery", "resurface", "learning", "news"]),
   server_rank: z.number().int().nonnegative(),
   trigger: z.enum(["event", "schedule", "state", "editorial"]),
   source_id: z.string().min(1),
@@ -104,6 +105,7 @@ export const pulseItemSchema = z.discriminatedUnion("kind", [
   pulseKindSchema("question"),
   pulseKindSchema("resurface"),
   pulseKindSchema("learning"),
+  pulseKindSchema("news"),
 ]);
 
 export interface PulseCandidate extends Omit<
