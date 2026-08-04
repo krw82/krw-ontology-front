@@ -797,22 +797,7 @@ compose_stage exec -T market-web-source-worker node -e '
 if market_issue_x_ingestion_enabled; then
   MARKET_ISSUE_STARTED=1
   compose_stage up -d --force-recreate --wait market-issue-worker
-  compose_stage exec -T market-issue-worker node -e '
-    const token = (process.env.MARKET_ISSUE_X_BEARER_TOKEN || "").trim();
-    if (!token || token.includes("...")) throw new Error("MARKET_ISSUE_X_BEARER_TOKEN is missing");
-    const baseUrl = (process.env.MARKET_ISSUE_X_API_BASE_URL || "https://api.x.com").replace(/\/+$/, "");
-    fetch(baseUrl + "/2/users/by/username/nvidia", {
-      headers: { Authorization: "Bearer " + token },
-    }).then(async (response) => {
-      if (!response.ok) throw new Error("X API token check failed: " + response.status);
-      const payload = await response.json();
-      if (!payload?.data?.id) throw new Error("X API token check returned no account");
-      console.log(JSON.stringify({ worker: "market-issue-worker", xApiTokenConfigured: true, xApiStatus: response.status }));
-    }).catch((error) => {
-      console.error(error instanceof Error ? error.message : String(error));
-      process.exit(1);
-    });
-  '
+  echo "Started X market-issue worker (token verified in pre-activation step)."
 else
   compose_stage stop market-issue-worker || true
   echo "Skipped X market-issue worker because MARKET_ISSUE_X_INGESTION_ENABLED is disabled."
@@ -820,20 +805,7 @@ fi
 if market_issue_stream_enabled; then
   MARKET_ISSUE_STREAM_STARTED=1
   compose_stage up -d --force-recreate --wait market-issue-stream-worker
-  compose_stage exec -T market-issue-stream-worker node -e '
-    const token = (process.env.MARKET_ISSUE_X_BEARER_TOKEN || "").trim();
-    if (!token || token.includes("...")) throw new Error("MARKET_ISSUE_X_BEARER_TOKEN is missing");
-    const baseUrl = (process.env.MARKET_ISSUE_X_API_BASE_URL || "https://api.x.com").replace(/\/+$/, "");
-    fetch(baseUrl + "/2/tweets/search/recent?query=from:nvidia&max_results=10", {
-      headers: { Authorization: "Bearer " + token },
-    }).then(async (response) => {
-      if (!response.ok) throw new Error("X API stream token check failed: " + response.status);
-      console.log(JSON.stringify({ worker: "market-issue-stream-worker", xApiTokenConfigured: true, xApiStatus: response.status }));
-    }).catch((error) => {
-      console.error(error instanceof Error ? error.message : String(error));
-      process.exit(1);
-    });
-  '
+  echo "Started X market-issue stream worker (token verified in pre-activation step)."
 else
   compose_stage stop market-issue-stream-worker || true
   echo "Skipped X market-issue stream worker because MARKET_ISSUE_STREAM_ENABLED is disabled."
