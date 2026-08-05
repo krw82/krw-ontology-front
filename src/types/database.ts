@@ -43,7 +43,7 @@ export interface SessionShareMessage {
   created_at: string;
 }
 
-export interface SessionShareRow {
+export interface SessionShareRow extends Record<string, unknown> {
   id: string;
   token: string;
   owner_user_id: string;
@@ -53,7 +53,7 @@ export interface SessionShareRow {
   locale: string;
   messages: SessionShareMessage[];
   message_count: number;
-  share_context: Record<string, unknown>;
+  share_context: Json;
   snapshot_version: number;
   created_at: string;
   revoked_at: string | null;
@@ -4197,6 +4197,22 @@ export interface Database {
           revoked_at?: string | null;
         };
         Update: Partial<Omit<MessageShareRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      session_shares: {
+        Row: SessionShareRow;
+        Insert: Omit<SessionShareRow, "id" | "created_at" | "revoked_at"> & {
+          id?: string;
+          created_at?: string;
+          revoked_at?: string | null;
+        };
+        Update: Partial<Omit<SessionShareRow, "id" | "created_at">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];
