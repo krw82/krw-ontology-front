@@ -9,7 +9,7 @@ import {
   SHARE_OG_IMAGE_SIZE,
 } from "@/lib/share/share-og";
 
-const tokenPattern = /^[A-Za-z0-9_-]{16,80}$/;
+export const tokenPattern = /^[A-Za-z0-9_-]{16,80}$/;
 
 export async function getPublicShareForPage(token: string) {
   if (!tokenPattern.test(token)) return null;
