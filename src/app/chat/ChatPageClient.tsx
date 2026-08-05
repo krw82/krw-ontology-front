@@ -24,6 +24,7 @@ import SuggestedPromptActions from "@/components/SuggestedPromptActions";
 import RunStatusDock from "@/components/RunStatusDock";
 import CreditLimitErrorCard from "@/components/chat/CreditLimitErrorCard";
 import RecoverableChatErrorCard from "@/components/chat/RecoverableChatErrorCard";
+import ChatSessionShareButton from "@/components/ChatSessionShareButton";
 import ChatWatchlistHeaderActions from "@/components/chat/ChatWatchlistHeaderActions";
 import DiscoverGuideFlow from "@/components/chat/DiscoverGuideFlow";
 import GuruCompanyPicker from "@/components/chat/GuruCompanyPicker";
@@ -772,17 +773,24 @@ function ChatContent({
         mobileOverlay
         mobileCollapsed={mobileHeaderHidden}
         actionSlot={
-          headerActionTicker ? (
-            <ChatWatchlistHeaderActions
-              ticker={headerActionTicker}
-              showNotebookOnboarding={
-                ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV ||
-                hasCompletedAssistantAnswer
-              }
-              forceShowNotebookOnboarding={
-                ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV
-              }
-            />
+          headerActionTicker || sessionId ? (
+            <div className="flex items-center gap-xs">
+              {sessionId ? (
+                <ChatSessionShareButton sessionId={sessionId} />
+              ) : null}
+              {headerActionTicker ? (
+                <ChatWatchlistHeaderActions
+                  ticker={headerActionTicker}
+                  showNotebookOnboarding={
+                    ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV ||
+                    hasCompletedAssistantAnswer
+                  }
+                  forceShowNotebookOnboarding={
+                    ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV
+                  }
+                />
+              ) : null}
+            </div>
           ) : null
         }
       />
