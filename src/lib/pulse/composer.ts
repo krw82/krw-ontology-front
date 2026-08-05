@@ -84,11 +84,13 @@ export async function composePulseFeed({
   revision: suppliedRevision,
 }: ComposePulseFeedOptions): Promise<PulseFeedResponse> {
   const snapshotAt = now;
+  // Stage labels wrap each async read so a thrown error reports which stage
+  // failed ("pulse:setup:preferences") rather than an opaque catch-all.
   const [revision, preferences, userSignals, monitoringRules] = await Promise.all([
-    suppliedRevision ?? getPulseFeedRevision(supabase, userId, snapshotAt),
-    getPulsePreferences(supabase, userId),
-    getPulseUserTickerSignals(supabase, userId, snapshotAt),
-    getPulseMonitoringRules(supabase, userId),
+    suppliedRevision ?? withStage("revision", () => getPulseFeedRevision(supabase, userId, snapshotAt)),
+    withStage("preferences", () => getPulsePreferences(supabase, userId)),
+    withStage("signals", () => getPulseUserTickerSignals(supabase, userId, snapshotAt)),
+    withStage("monitoring", () => getPulseMonitoringRules(supabase, userId)),
   ]);
   const enabledKinds = new Set(preferences.enabled_kinds);
   const resurfaceCadence = preferences.resurface_cadence === "biweekly" ? "biweekly" : "weekly";
@@ -154,12 +156,12 @@ export async function composePulseFeed({
     monitoringRules,
   );
   const [states, filingDecisions] = await Promise.all([
-    getPulseItemStates(supabase, userId, personalized.map((item) => item.item_key)),
-    getPulseFilingDecisionContext(
+    withStage("item-states", () => getPulseItemStates(supabase, userId, personalized.map((item) => item.item_key))),
+    withStage("filing-decisions", () => getPulseFilingDecisionContext(
       supabase,
       userId,
       personalized.filter((item) => item.kind === "filing").map((item) => item.source_id),
-    ),
+    )),
   ]);
   const contextualized = personalized.map((item) => {
     if (item.kind !== "filing") return item;
@@ -388,6 +390,22 @@ async function loadSource(
 
 function degradedStatus(source: (typeof SOURCE_KINDS)[number]): PulseSourceStatus {
   return { source, status: "degraded", item_count: 0 };
+}
+
+/**
+ * Tags an async read with its pipeline stage so a thrown error carries an
+ * identifiable "pulse:<stage>" prefix instead of an opaque message. This makes
+ * the 503 catch block immediately diagnosable in server logs.
+ */
+export async function withStage<T>(stage: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    const base = error instanceof Error ? error.message : String(error);
+    const wrapped = new Error(`pulse:${stage} failed: ${base}`);
+    wrapped.cause = error;
+    throw wrapped;
+  }
 }
 
 function formatDateLabel(now: Date, timezone: string): string {
