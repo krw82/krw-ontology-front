@@ -37,6 +37,28 @@ export interface MessageRow extends Record<string, unknown> {
   updated_at: string;
 }
 
+export interface SessionShareMessage {
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
+export interface SessionShareRow {
+  id: string;
+  token: string;
+  owner_user_id: string;
+  source_session_id: string;
+  title: string;
+  tickers: string[] | null;
+  locale: string;
+  messages: SessionShareMessage[];
+  message_count: number;
+  share_context: Record<string, unknown>;
+  snapshot_version: number;
+  created_at: string;
+  revoked_at: string | null;
+}
+
 export interface ChatAttachmentRow extends Record<string, unknown> {
   id: string;
   user_id: string;
