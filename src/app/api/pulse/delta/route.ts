@@ -73,13 +73,14 @@ export async function POST(request: NextRequest) {
     });
     return Response.json(buildPulseFeedDelta(feed, parsed.data.item_versions), { headers: PRIVATE_HEADERS });
   } catch (error) {
+    const errorDetail = error instanceof Error ? error.message : String(error);
     console.error("[pulse/delta] composePulseFeed failed", {
       userId,
-      message: error instanceof Error ? error.message : String(error),
+      message: errorDetail,
       stack: error instanceof Error ? error.stack : undefined,
     });
     return Response.json(
-      { error: { code: "service_unavailable", message: "피드 변경사항을 불러오지 못했습니다." } },
+      { error: { code: "service_unavailable", message: "피드 변경사항을 불러오지 못했습니다.", detail: errorDetail } },
       { status: 503 },
     );
   }
