@@ -1876,6 +1876,7 @@ export interface AnalyticsEventRow extends Record<string, unknown> {
     | "answer_failed"
     | "citation_opened"
     | "share_created"
+    | "session_share_created"
     | "share_viewed"
     | "share_answer_read"
     | "share_cta_clicked"

@@ -59,6 +59,10 @@ const pulseRefreshAnalyticsMigrationPath = join(
   process.cwd(),
   "supabase/migrations/20260722210000_add_pulse_refresh_analytics.sql",
 );
+const sessionShareAnalyticsMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260805010000_add_session_share_analytics_event.sql",
+);
 const startOnboardingEventNameSet = new Set<string>([
   "onboarding_started",
   "onboarding_company_selected",
@@ -126,6 +130,7 @@ const postInitialAnalyticsEventNameSet = new Set<string>([
   "onboarding_question_started",
   "onboarding_evidence_opened",
   "onboarding_skipped",
+  "session_share_created",
 ]);
 
 describe("analytics events migration", () => {
@@ -223,8 +228,32 @@ describe("analytics events migration", () => {
 
   it("keeps the latest analytics allow-list complete when adding refresh events", () => {
     const pulseRefreshMigration = readFileSync(pulseRefreshAnalyticsMigrationPath, "utf8");
-    for (const eventName of ANALYTICS_EVENT_NAMES) {
+    for (const eventName of ANALYTICS_EVENT_NAMES.filter(
+      (eventName) => eventName !== "session_share_created",
+    )) {
       expect(pulseRefreshMigration).toContain(`'${eventName}'`);
+    }
+  });
+
+  it("adds the session-share creation analytics event to already-created databases", () => {
+    const sessionShareMigration = readFileSync(
+      sessionShareAnalyticsMigrationPath,
+      "utf8",
+    );
+
+    expect(sessionShareMigration).toContain(
+      "drop constraint if exists analytics_events_event_name_check",
+    );
+    expect(sessionShareMigration).toContain("'session_share_created'");
+  });
+
+  it("keeps the latest analytics allow-list complete after adding session share events", () => {
+    const sessionShareMigration = readFileSync(
+      sessionShareAnalyticsMigrationPath,
+      "utf8",
+    );
+    for (const eventName of ANALYTICS_EVENT_NAMES) {
+      expect(sessionShareMigration).toContain(`'${eventName}'`);
     }
   });
 
@@ -278,7 +307,8 @@ describe("analytics events migration", () => {
     );
     for (const eventName of ANALYTICS_EVENT_NAMES.filter(
       (eventName) => !startOnboardingEventNameSet.has(eventName)
-        && !pulseRefreshEventNameSet.has(eventName),
+        && !pulseRefreshEventNameSet.has(eventName)
+        && eventName !== "session_share_created",
     )) {
       expect(repairMigration).toContain(`'${eventName}'`);
     }
