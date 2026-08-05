@@ -240,10 +240,15 @@ async function ingestSource(
     .eq("source_id", source.id)
     .maybeSingle();
   const cursorRow = asRow(cursor);
+  const rawSinceId = text(cursorRow?.cursor_value) || null;
+  // X API recent search only covers the last ~7 days. A since_id older than
+  // that triggers HTTP 400 ("must be a tweet id created after <7d ago>"). If
+  // the cursor is stale, drop it and re-fetch from the natural window start.
+  const sinceId = isXSinceIdStale(rawSinceId) ? null : rawSinceId;
   const tweets = await fetchRecentTweets({
     source,
     config,
-    sinceId: text(cursorRow?.cursor_value) || null,
+    sinceId,
   });
 
   let newestId = text(cursorRow?.cursor_value) || null;
@@ -787,4 +792,26 @@ async function summarizeWithZaiCodingPlan(
     throw new Error("market_issue_zai_coding_invalid_json");
   }
   return parseMarketIssueGeneratedBrief(brief);
+}
+
+/**
+ * X API recent search only covers the last ~7 days. A since_id pointing to a
+ * tweet older than that is rejected with HTTP 400. X snowflake IDs encode a
+ * millisecond timestamp in the upper 41 bits (Twitter epoch 1288834974657).
+ */
+const X_SNOWFLAKE_EPOCH = 1288834974657n;
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+function isXSinceIdStale(sinceId: string | null): boolean {
+  if (!sinceId) return false;
+  let snowflake: bigint;
+  try {
+    snowflake = BigInt(sinceId);
+  } catch {
+    return false;
+  }
+  if (snowflake <= 0n) return false;
+  const timestampMs = Number((snowflake >> 22n) + X_SNOWFLAKE_EPOCH);
+  if (!Number.isFinite(timestampMs)) return false;
+  return Date.now() - timestampMs > SEVEN_DAYS_MS;
 }
