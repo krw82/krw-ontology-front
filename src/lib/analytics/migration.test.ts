@@ -63,6 +63,10 @@ const sessionShareAnalyticsMigrationPath = join(
   process.cwd(),
   "supabase/migrations/20260805010000_add_session_share_analytics_event.sql",
 );
+const sessionShareViewAnalyticsMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/20260805020000_add_session_share_view_analytics_events.sql",
+);
 const startOnboardingEventNameSet = new Set<string>([
   "onboarding_started",
   "onboarding_company_selected",
@@ -131,6 +135,9 @@ const postInitialAnalyticsEventNameSet = new Set<string>([
   "onboarding_evidence_opened",
   "onboarding_skipped",
   "session_share_created",
+  "session_share_viewed",
+  "session_share_answer_read",
+  "session_share_cta_clicked",
 ]);
 
 describe("analytics events migration", () => {
@@ -229,7 +236,11 @@ describe("analytics events migration", () => {
   it("keeps the latest analytics allow-list complete when adding refresh events", () => {
     const pulseRefreshMigration = readFileSync(pulseRefreshAnalyticsMigrationPath, "utf8");
     for (const eventName of ANALYTICS_EVENT_NAMES.filter(
-      (eventName) => eventName !== "session_share_created",
+      (eventName) =>
+        eventName !== "session_share_created"
+        && eventName !== "session_share_viewed"
+        && eventName !== "session_share_answer_read"
+        && eventName !== "session_share_cta_clicked",
     )) {
       expect(pulseRefreshMigration).toContain(`'${eventName}'`);
     }
@@ -252,8 +263,37 @@ describe("analytics events migration", () => {
       sessionShareAnalyticsMigrationPath,
       "utf8",
     );
-    for (const eventName of ANALYTICS_EVENT_NAMES) {
+    for (const eventName of ANALYTICS_EVENT_NAMES.filter(
+      (eventName) =>
+        eventName !== "session_share_viewed"
+        && eventName !== "session_share_answer_read"
+        && eventName !== "session_share_cta_clicked",
+    )) {
       expect(sessionShareMigration).toContain(`'${eventName}'`);
+    }
+  });
+
+  it("adds the session-share view/read/cta analytics events to already-created databases", () => {
+    const sessionShareViewMigration = readFileSync(
+      sessionShareViewAnalyticsMigrationPath,
+      "utf8",
+    );
+
+    expect(sessionShareViewMigration).toContain(
+      "drop constraint if exists analytics_events_event_name_check",
+    );
+    expect(sessionShareViewMigration).toContain("'session_share_viewed'");
+    expect(sessionShareViewMigration).toContain("'session_share_answer_read'");
+    expect(sessionShareViewMigration).toContain("'session_share_cta_clicked'");
+  });
+
+  it("keeps the latest analytics allow-list complete after adding session share view events", () => {
+    const sessionShareViewMigration = readFileSync(
+      sessionShareViewAnalyticsMigrationPath,
+      "utf8",
+    );
+    for (const eventName of ANALYTICS_EVENT_NAMES) {
+      expect(sessionShareViewMigration).toContain(`'${eventName}'`);
     }
   });
 
@@ -308,7 +348,10 @@ describe("analytics events migration", () => {
     for (const eventName of ANALYTICS_EVENT_NAMES.filter(
       (eventName) => !startOnboardingEventNameSet.has(eventName)
         && !pulseRefreshEventNameSet.has(eventName)
-        && eventName !== "session_share_created",
+        && eventName !== "session_share_created"
+        && eventName !== "session_share_viewed"
+        && eventName !== "session_share_answer_read"
+        && eventName !== "session_share_cta_clicked",
     )) {
       expect(repairMigration).toContain(`'${eventName}'`);
     }
