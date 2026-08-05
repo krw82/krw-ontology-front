@@ -916,11 +916,6 @@ function ChatContent({
                         createdAt={
                           msg.role === "assistant" ? msg.created_at : undefined
                         }
-                        answerSaveContext={
-                          msg.role === "assistant" && activeTicker && sessionId
-                            ? { ticker: activeTicker, sessionId }
-                            : undefined
-                        }
                         citations={
                           isLatestAssistantMessage ? chat.citations : undefined
                         }
