@@ -344,7 +344,7 @@ function normalizeShareQuestion(value: string | null | undefined): string | null
   return normalized ? normalized.slice(0, MAX_SHARE_QUESTION_CHARS) : null;
 }
 
-async function resolveShareContext(
+export async function resolveShareContext(
   admin: ReturnType<typeof getSupabaseAdmin>,
   answerMessage: MessageRow,
 ): Promise<PublicShareContext> {

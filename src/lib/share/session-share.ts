@@ -7,9 +7,13 @@ import type {
 } from "@/types/database";
 import type { Locale } from "@/i18n/config";
 import type { PublicShareContext } from "@/lib/share/message-share";
-import { createShareToken } from "@/lib/share/message-share";
+import {
+  createShareToken,
+  resolveShareContext,
+} from "@/lib/share/message-share";
 import { redactSensitiveOutput } from "@/lib/security/sensitive-output";
 import { sanitizeAssistantContent } from "@/lib/chat/assistant-content";
+import { parseChatAttachmentContent } from "@/lib/chat/attachments";
 import { normalizeTickers } from "@/lib/ontology/ticker";
 import { inferShareLocale } from "@/lib/share/share-locale";
 import {
@@ -49,14 +53,14 @@ function normalizeShareTickers(
  */
 export async function findExistingActiveSessionShare(
   sessionId: string,
-): Promise<Pick<SessionShareRow, "token" | "share_context"> | null> {
+): Promise<Pick<SessionShareRow, "token" | "locale"> | null> {
   const admin = getSupabaseAdmin();
   const { data } = await admin
     .from("session_shares")
-    .select("token, share_context")
+    .select("token, locale")
     .eq("source_session_id", sessionId)
     .is("revoked_at", null)
-    .maybeSingle<Pick<SessionShareRow, "token" | "share_context">>();
+    .maybeSingle<Pick<SessionShareRow, "token" | "locale">>();
   return data ?? null;
 }
 
@@ -65,18 +69,15 @@ export async function findExistingActiveSessionShare(
  *
  * - messages 배열을 빌드하고 redaction/sanitization을 적용한다.
  * - 첫 completed assistant 답변으로 title을 생성한다.
- * - locale은 assistant 답변 텍스트를 기반으로 추론한다.
- * - share_context는 현재 빈 컨텍스트({run_kind:null, guru_lens:null})를 기본으로 한다.
- *   (guru_lens / run_kind 추론은 message-share.ts의 internal `resolveShareContext`를
- *    필요로 하지만, 해당 함수는 export되지 않았고 "기존 코드 0줄 변경" 원칙을 지키기 위해
- *    향후 개선 사항으로 남겨둔다 - task report에 명시됨)
+ * - locale은 assistant 답변 텍스트를 기반으로 추론하여 반환한다.
+ * - share_context는 첫 completed assistant 답변을 기반으로 resolveShareContext로 추론한다.
  * - unique-violation(race) 시 기존 활성 공유를 fallback으로 반환한다.
  */
 export async function createSessionShare(params: {
   userId: string;
   session: ChatSessionRow;
   messages: MessageRow[];
-}): Promise<Pick<SessionShareRow, "token">> {
+}): Promise<Pick<SessionShareRow, "token" | "locale">> {
   const admin = getSupabaseAdmin();
   const token = createShareToken();
 
@@ -87,12 +88,16 @@ export async function createSessionShare(params: {
   }
 
   // 정제 적용 (redact + sanitize)
+  // user message: <attached_file> wire format을 visible text로 교체한 뒤 redact.
+  // assistant message: sanitizeAssistantContent가 전용 포맷을 처리.
   const sanitizedMessages: SessionShareMessage[] = selectedMessages.map((m) => ({
     role: m.role,
     content:
       m.role === "assistant"
         ? redactSensitiveOutput(sanitizeAssistantContent(m.content)).content
-        : redactSensitiveOutput(m.content).content,
+        : redactSensitiveOutput(
+            parseChatAttachmentContent(m.content).visibleText,
+          ).content,
     created_at: m.created_at,
   }));
 
@@ -106,8 +111,13 @@ export async function createSessionShare(params: {
     params.session.title,
   );
 
-  // share_context 기본값 (guru_lens/run_kind 추론 미지원 - 향후 개선)
-  const shareContext: PublicShareContext = { run_kind: null, guru_lens: null };
+  // share_context: 첫 completed assistant 답변에서 run_kind/guru_lens 추론
+  const firstAssistantMessage = params.messages.find(
+    (m) => m.role === "assistant" && m.status === "completed",
+  );
+  const shareContext: PublicShareContext = firstAssistantMessage
+    ? await resolveShareContext(admin, firstAssistantMessage)
+    : { run_kind: null, guru_lens: null };
 
   // locale 추론 (모든 assistant 답변 텍스트 기반)
   const locale = inferShareLocale({
@@ -133,8 +143,8 @@ export async function createSessionShare(params: {
   const { data, error } = await admin
     .from("session_shares")
     .insert(payload)
-    .select("token")
-    .single<Pick<SessionShareRow, "token">>();
+    .select("token, locale")
+    .single<Pick<SessionShareRow, "token" | "locale">>();
 
   if (!error && data) return data;
 

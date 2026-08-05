@@ -7,8 +7,8 @@ import {
   findExistingActiveSessionShare,
 } from "@/lib/share/session-share";
 import { buildSessionSharePath } from "@/lib/share/session-share-page";
-import { inferShareLocale } from "@/lib/share/share-locale";
 import { isUuid } from "@/lib/api/validation";
+import type { Locale } from "@/i18n/config";
 import type { ChatSessionRow, MessageRow } from "@/types/database";
 
 export const runtime = "nodejs";
@@ -87,12 +87,10 @@ export async function POST(
         messages,
       }));
 
-    // locale 추론 후 URL 생성
-    const firstAnswer =
-      messages.find((m) => m.role === "assistant" && m.status === "completed")
-        ?.content ?? "";
-    const shareLocale = inferShareLocale({ answerContent: firstAnswer });
-    const shareUrl = buildSessionSharePath(share.token, shareLocale);
+    // locale: createSessionShare/findExistingActiveSessionShare가 저장한 값을 사용.
+    // 동일한 stored locale을 URL에 적용하여 원본-URL locale 불일치(이중 추론) 방지.
+    // (locale은 inferShareLocale로 추론된 값이 저장되므로 런타임에는 항상 Locale)
+    const shareUrl = buildSessionSharePath(share.token, share.locale as Locale);
 
     await recordAnalyticsEventFromRequest(request, {
       eventName: "session_share_created",
