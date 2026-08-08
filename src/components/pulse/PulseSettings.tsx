@@ -14,6 +14,7 @@ const KIND_OPTIONS: Array<{ kind: PulseItemKind; label: string; description: str
   { kind: "question", label: "열린 질문", description: "리서치 노트북의 다음 질문" },
   { kind: "resurface", label: "다시 보기", description: "오래된 메모와 투자 관점" },
   { kind: "learning", label: "짧은 학습", description: "주 1회 공시 읽기 가이드" },
+  { kind: "news", label: "시장 뉴스", description: "관심 기업과 시장 이슈의 검토된 뉴스" },
 ];
 
 export default function PulseSettings({ initialPreferences }: PulseSettingsProps) {

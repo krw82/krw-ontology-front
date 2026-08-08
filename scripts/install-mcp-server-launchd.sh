@@ -45,7 +45,7 @@ FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 TEMPLATE="$FRONT_DIR/ops/launchd/com.krwontology.mcp-server.plist.template"
 PLIST_DIR="$HOME/Library/LaunchAgents"
 PLIST="$PLIST_DIR/com.krwontology.mcp-server.plist"
-DOMAIN="gui/$(id -u)"
+LAUNCHD_DOMAIN="gui/$(id -u)"
 case "$ENV_FILE" in
   /*) ENV_PATH=$ENV_FILE ;;
   *) ENV_PATH="$FRONT_DIR/$ENV_FILE" ;;
@@ -204,8 +204,8 @@ echo "Installed $PLIST"
 
 if [ "$LOAD" != "1" ]; then
   echo "Not loaded. Start later with:"
-  echo "  launchctl bootstrap $DOMAIN $PLIST"
-  echo "  launchctl kickstart -k $DOMAIN/com.krwontology.mcp-server"
+  echo "  launchctl bootstrap $LAUNCHD_DOMAIN $PLIST"
+  echo "  launchctl kickstart -k $LAUNCHD_DOMAIN/com.krwontology.mcp-server"
   exit 0
 fi
 
@@ -262,13 +262,13 @@ if [ -z "$TARGET_RELEASE_ID" ] || [ "$TARGET_RELEASE_ID" = "<missing>" ]; then
   exit 1
 fi
 
-launchctl bootout "$DOMAIN" "$PLIST" >/dev/null 2>&1 || true
+launchctl bootout "$LAUNCHD_DOMAIN" "$PLIST" >/dev/null 2>&1 || true
 if ! wait_for_mcp_port_release 10; then
   stop_lingering_mcp_listeners
 fi
-launchctl bootstrap "$DOMAIN" "$PLIST"
-launchctl enable "$DOMAIN/com.krwontology.mcp-server"
-launchctl kickstart -k "$DOMAIN/com.krwontology.mcp-server"
+launchctl bootstrap "$LAUNCHD_DOMAIN" "$PLIST"
+launchctl enable "$LAUNCHD_DOMAIN/com.krwontology.mcp-server"
+launchctl kickstart -k "$LAUNCHD_DOMAIN/com.krwontology.mcp-server"
 
 VERIFY_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/krw-mcp-prod-verify.XXXXXX")
 verified=0
@@ -289,5 +289,5 @@ if [ "$verified" != "1" ]; then
 fi
 cat "$VERIFY_OUTPUT"
 rm -f "$VERIFY_OUTPUT"
-launchctl print "$DOMAIN/com.krwontology.mcp-server" | sed -n '1,50p'
+launchctl print "$LAUNCHD_DOMAIN/com.krwontology.mcp-server" | sed -n '1,50p'
 echo "OK MCP server launchd service loaded"

@@ -1463,6 +1463,7 @@ export interface ChatRunRequest {
   guru_lens?: string;
   user_url?: string;
   user_urls?: string[];
+  market_issue_id?: string;
   attachment_ids?: string[];
   scope_type?: SessionScopeType;
   default_tickers?: string[];
@@ -1762,7 +1763,8 @@ export type PulseItemKind =
   | "checkup"
   | "question"
   | "resurface"
-  | "learning";
+  | "learning"
+  | "news";
 
 export type PulseFilter = "all" | PulseItemKind;
 
@@ -1839,6 +1841,7 @@ export type PulseCheckupItem = PulseItemBase<"checkup">;
 export type PulseQuestionItem = PulseItemBase<"question">;
 export type PulseResurfaceItem = PulseItemBase<"resurface">;
 export type PulseLearningItem = PulseItemBase<"learning">;
+export type PulseNewsItem = PulseItemBase<"news">;
 
 export type PulseItem =
   | PulseFilingItem
@@ -1846,7 +1849,8 @@ export type PulseItem =
   | PulseCheckupItem
   | PulseQuestionItem
   | PulseResurfaceItem
-  | PulseLearningItem;
+  | PulseLearningItem
+  | PulseNewsItem;
 
 /**
  * An internal diversity/reason label. It never creates a visible feed section;
@@ -1857,7 +1861,8 @@ export type PulseFeedSlot =
   | "continue"
   | "discovery"
   | "resurface"
-  | "learning";
+  | "learning"
+  | "news";
 
 export interface PulseSourceStatus {
   source: PulseItemKind;
@@ -1874,6 +1879,7 @@ export interface PulseFeedSummary {
     analysis: number;
     question: number;
     resurface: number;
+    news: number;
   };
   primary_action: PulseLinkAction | null;
 }
@@ -1883,11 +1889,13 @@ export interface PulseFeedResponse {
   revision: string;
   generated_at: string;
   snapshot_at: string;
-  ranking_version: "rule_v4" | "rule_v5_flat" | "rule_v6_device" | "rule_v7_refresh" | "rule_v8_hybrid";
+  ranking_version: "rule_v4" | "rule_v5_flat" | "rule_v6_device" | "rule_v7_refresh" | "rule_v8_hybrid" | "rule_v9_news_mix" | "rule_v10_research_completion";
   timezone: string;
   date_label: string;
   filter: PulseFilter;
   active_analysis_items: PulseItem[];
+  /** Recently completed analyses shown as a transient notification lane. */
+  completed_analysis_items: PulseItem[];
   /** Server-authorized candidates. The device selects one continuous visible slate. */
   candidate_items: PulseItem[];
   /** Maximum cards the device may render from candidate_items. */
@@ -1921,10 +1929,11 @@ export interface PulseFeedDeltaResponse {
   /** Null when the caller already has the exact current revision. */
   snapshot: Omit<
     PulseFeedResponse,
-    "revision" | "generated_at" | "snapshot_at" | "candidate_items" | "active_analysis_items" | "item_versions"
+    "revision" | "generated_at" | "snapshot_at" | "candidate_items" | "active_analysis_items" | "completed_analysis_items" | "item_versions"
   > | null;
   ordered_candidate_ids: string[];
   active_analysis_item_ids: string[];
+  completed_analysis_item_ids: string[];
   /** Only cards whose rendering fingerprint changed since the device snapshot. */
   upserts: PulseItem[];
   removed_item_ids: string[];

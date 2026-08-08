@@ -593,6 +593,16 @@ body {
   }
 }
 
+@keyframes motion-progress-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.progress-spin {
+  animation: motion-progress-spin 900ms linear infinite;
+}
+
 @keyframes motion-update-emphasis {
   0% {
     box-shadow: 0 8px 24px rgba(0, 62, 199, 0.28);

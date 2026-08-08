@@ -35,18 +35,24 @@ export default function MarketIssueDetail({ issueId }: { issueId: string }) {
       const payload = normalizeMarketIssueDetail(await response.json());
       if (!payload || controller.signal.aborted) throw new Error("invalid_market_issue_detail");
       setDetail({ kind: "ready", issue: payload.issue });
-    } catch (loadError) {
+    } catch {
       if (controller.signal.aborted) return;
       setDetail({ kind: "error" });
     }
   }, [issueId]);
 
   useEffect(() => {
-    void loadDetail();
-    return () => controllerRef.current?.abort();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void loadDetail();
+    });
+    return () => {
+      cancelled = true;
+      controllerRef.current?.abort();
+    };
   }, [loadDetail]);
 
-  const openResearchDraft = async () => {
+  const openResearchDraft = async (researchPathId: string | null) => {
     if (detail.kind !== "ready" || openingDraft) return;
     setOpeningDraft(true);
     setDraftError(null);
@@ -54,6 +60,7 @@ export default function MarketIssueDetail({ issueId }: { issueId: string }) {
       const response = await fetch(`/api/news/issues/${encodeURIComponent(detail.issue.id)}/research-draft`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(researchPathId ? { researchPathId } : {}),
       });
       if (!response.ok) throw new Error("research_draft_failed");
       const payload: unknown = await response.json();
@@ -68,11 +75,6 @@ export default function MarketIssueDetail({ issueId }: { issueId: string }) {
 
   return (
     <main id="main-content" className="mx-auto w-full max-w-4xl px-base pb-3xl pt-xl sm:px-xl sm:pt-2xl">
-      <Link href="/news" className="inline-flex min-h-10 items-center gap-1.5 text-[13px] font-bold text-muted transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-        <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>
-        시장 이슈
-      </Link>
-
       {detail.kind === "loading" ? <DetailSkeleton /> : null}
       {detail.kind === "error" ? <DetailLoadError onRetry={() => void loadDetail()} /> : null}
       {detail.kind === "ready" ? (
@@ -80,7 +82,7 @@ export default function MarketIssueDetail({ issueId }: { issueId: string }) {
           issue={detail.issue}
           openingDraft={openingDraft}
           draftError={draftError}
-          onOpenResearchDraft={() => void openResearchDraft()}
+          onOpenResearchDraft={(researchPathId) => void openResearchDraft(researchPathId)}
         />
       ) : null}
     </main>
@@ -96,10 +98,9 @@ function IssueDetailContent({
   issue: MarketIssueCard;
   openingDraft: boolean;
   draftError: string | null;
-  onOpenResearchDraft: () => void;
+  onOpenResearchDraft: (researchPathId: string | null) => void;
 }) {
   const sourceCount = Math.max(issue.sourceCount, issue.sources.length);
-  const impactPath = issue.impactPath.slice(0, 5);
 
   return (
     <article className="mt-base">
@@ -109,7 +110,7 @@ function IssueDetailContent({
             <span className="material-symbols-outlined text-[16px]" aria-hidden="true">source</span>
             원문 {sourceCount}개
           </span>
-          <time className="text-[12px] font-medium text-muted" dateTime={issue.updatedAt ?? issue.publishedAt ?? undefined}>
+          <time className="sr-only" dateTime={issue.updatedAt ?? issue.publishedAt ?? undefined}>
             {formatIssueRelativeTime(issue.updatedAt ?? issue.publishedAt)}
           </time>
         </div>
@@ -142,74 +143,56 @@ function IssueDetailContent({
         </section>
       ) : null}
 
-      <section className="mt-xl rounded-[22px] bg-ink px-lg py-xl text-white sm:flex sm:items-center sm:justify-between sm:gap-xl">
-        <div className="max-w-[36rem]">
+      <section className="mt-xl overflow-hidden rounded-[22px] bg-ink text-white" aria-labelledby="next-research-title">
+        <div className="px-lg py-xl sm:px-xl">
           <p className="text-[12px] font-extrabold tracking-[0.08em] text-[#adc8ff]">NEXT RESEARCH STEP</p>
-          <h2 className="mt-1 text-[21px] font-extrabold tracking-[-0.035em]">공시와 실적콜에서 이 연결을 검증해보세요.</h2>
-          <p className="mt-2 text-[13px] leading-6 text-[#d2d9ea]">이슈의 핵심을 담은 질문 초안을 열고, 직접 수정한 뒤 분석을 시작할 수 있습니다.</p>
+          <h2 id="next-research-title" className="mt-1 text-[21px] font-extrabold tracking-[-0.035em]">
+            {issue.researchPaths.length > 0 ? "다음 리서치 질문" : "이 소식이 어떤 영향을 미칠지 분석해보세요."}
+          </h2>
+
+          {issue.researchPaths.length > 0 ? (
+            <div className="mt-base grid gap-sm" role="group" aria-label="다음 리서치 질문">
+              {issue.researchPaths.map((path, index) => {
+                const ticker = path.relatedTickers[0] ?? null;
+                const params = new URLSearchParams({
+                  query: path.chatQuery,
+                  news_issue_id: issue.id,
+                });
+                if (ticker) params.set("ticker", ticker);
+                const href = `/chat/new?${params.toString()}`;
+                return (
+                  <a
+                    key={path.id}
+                    href={href}
+                    className="flex min-h-14 w-full items-center gap-sm rounded-[14px] border border-white/15 bg-white/[0.04] px-sm py-sm text-left transition hover:border-white/45 hover:bg-white/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  >
+                    <span className="grid size-6 shrink-0 place-items-center rounded-full bg-white/15 text-[10px] font-black text-[#d9e5ff]" aria-hidden="true">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <span className="min-w-0 flex-1 text-[14px] font-extrabold leading-5 text-white">{path.question}</span>
+                    <span className="material-symbols-outlined shrink-0 text-[19px] text-[#adc8ff]" aria-hidden="true">arrow_forward</span>
+                  </a>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mt-2 text-[13px] leading-6 text-[#d2d9ea]">이슈의 핵심을 담은 질문 초안을 열고, 직접 수정한 뒤 분석을 시작할 수 있습니다.</p>
+          )}
         </div>
-        <div className="mt-base shrink-0 sm:mt-0">
-          <button type="button" onClick={onOpenResearchDraft} disabled={openingDraft} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white px-lg text-[13px] font-extrabold text-ink transition hover:bg-[#dce8ff] disabled:cursor-not-allowed disabled:opacity-65">
-            {openingDraft ? <span className="material-symbols-outlined animate-spin text-[18px]" aria-hidden="true">progress_activity</span> : <span className="material-symbols-outlined text-[18px]" aria-hidden="true">manage_search</span>}
-            {openingDraft ? "질문 초안 여는 중" : "공시·실적콜로 검증하기"}
-          </button>
-          {draftError ? <p className="mt-2 max-w-xs text-[12px] leading-5 text-[#ffcfbf]" role="alert">{draftError}</p> : null}
-        </div>
+        {issue.researchPaths.length === 0 ? (
+          <div className="border-t border-white/15 px-lg py-base sm:flex sm:items-center sm:justify-end sm:px-xl">
+            <button type="button" onClick={() => onOpenResearchDraft(null)} disabled={openingDraft} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-lg text-[13px] font-extrabold text-ink transition hover:bg-[#dce8ff] disabled:cursor-not-allowed disabled:opacity-65 sm:w-auto">
+              {openingDraft ? <span className="material-symbols-outlined animate-spin text-[18px]" aria-hidden="true">progress_activity</span> : <span className="material-symbols-outlined text-[18px]" aria-hidden="true">manage_search</span>}
+              {openingDraft ? "질문 초안 여는 중" : "영향 분석하기"}
+            </button>
+            {draftError ? <p className="mt-2 max-w-xs text-[12px] leading-5 text-[#ffcfbf] sm:ml-base sm:mt-0" role="alert">{draftError}</p> : null}
+          </div>
+        ) : null}
       </section>
 
-      {(issue.confirmed.length > 0 || issue.unconfirmed.length > 0) ? (
-        <section className="mt-xl" aria-labelledby="confirmation-title">
-          <div className="flex items-baseline justify-between gap-base">
-            <h2 id="confirmation-title" className="text-[20px] font-extrabold tracking-[-0.035em] text-ink">확인 범위</h2>
-            <span className="text-[11px] font-medium text-muted">사실과 추가 검토 항목을 나눠 봅니다.</span>
-          </div>
-          <div className="mt-base grid gap-base md:grid-cols-2">
-            <EvidenceList title="원문에서 확인된 내용" tone="confirmed" items={issue.confirmed} emptyCopy="원문에서 별도로 확인된 항목이 아직 정리되지 않았습니다." />
-            <EvidenceList title="추가 확인이 필요한 부분" icon="rule" tone="caution" items={issue.unconfirmed} emptyCopy="현재 별도로 표시된 추가 확인 항목은 없습니다." />
-          </div>
-        </section>
-      ) : null}
-
-      {impactPath.length > 0 ? (
-        <section className="mt-xl" aria-labelledby="impact-path-title">
-          <h2 id="impact-path-title" className="text-[20px] font-extrabold tracking-[-0.035em] text-ink">검토할 영향 경로</h2>
-          <p className="mt-1 text-[13px] leading-6 text-muted">연결은 확정된 결론이 아니라, 공시와 실적콜에서 다시 확인할 질문입니다.</p>
-          <ol className="mt-base flex flex-wrap items-center gap-sm rounded-[18px] border border-hairline bg-white p-base">
-            {impactPath.map((step, index) => (
-              <li key={`${step}-${index}`} className="flex items-center gap-sm">
-                <span className="rounded-full bg-surface-soft px-sm py-1.5 text-[12px] font-bold text-body">{step}</span>
-                {index < impactPath.length - 1 ? <span className="material-symbols-outlined text-[18px] text-muted" aria-hidden="true">arrow_forward</span> : null}
-              </li>
-            ))}
-          </ol>
-        </section>
-      ) : null}
-
-      {issue.companies.length > 0 ? (
-        <section className="mt-xl" aria-labelledby="companies-title">
-          <h2 id="companies-title" className="text-[20px] font-extrabold tracking-[-0.035em] text-ink">관련 기업</h2>
-          <p className="mt-1 text-[13px] leading-6 text-muted">직접적인 수혜나 피해를 의미하지 않으며, 이슈를 검토할 때 함께 볼 기업입니다.</p>
-          <div className="mt-base grid gap-sm sm:grid-cols-2">
-            {issue.companies.map((company) => {
-              const content = (
-                <>
-                  <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[#eff5ff] text-[11px] font-black text-primary">
-                    {company.ticker ?? company.name.slice(0, 1)}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-[14px] font-extrabold text-ink">{company.name}</span>
-                    <span className="mt-0.5 block truncate text-[12px] text-muted">{[company.ticker, company.relationship].filter(Boolean).join(" · ") || "관련 기업"}</span>
-                  </span>
-                  {company.href ? <span className="material-symbols-outlined ml-auto text-[17px] text-muted" aria-hidden="true">arrow_forward</span> : null}
-                </>
-              );
-              return company.href ? (
-                <a key={`${company.id ?? company.name}-${company.ticker ?? ""}`} href={company.href} className="flex min-h-16 items-center gap-sm rounded-[16px] border border-hairline bg-white px-sm py-sm transition hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" >{content}</a>
-              ) : (
-                <div key={`${company.id ?? company.name}-${company.ticker ?? ""}`} className="flex min-h-16 items-center gap-sm rounded-[16px] border border-hairline bg-white px-sm py-sm">{content}</div>
-              );
-            })}
-          </div>
+      {issue.confirmed.length > 0 ? (
+        <section className="mt-xl" aria-label="원문에 나온 내용">
+          <EvidenceList title="원문에 나온 내용" tone="confirmed" items={issue.confirmed} emptyCopy="원문에서 별도로 정리된 항목이 아직 없습니다." />
         </section>
       ) : null}
 

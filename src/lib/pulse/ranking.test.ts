@@ -139,4 +139,49 @@ describe("Pulse V5 flat server candidate pool", () => {
     expect(selectedOrdinary).toHaveLength(30);
   });
 
+  it("preserves a rotating news reservoir without crowding out the whole ordinary feed", () => {
+    const ordinary = Array.from({ length: 48 }, (_, index) => candidate(`filing:ordinary:${index}`, {
+      ticker: `ORD${index}`,
+      metadata: { form_type: "8-K" },
+    }));
+    const news = Array.from({ length: 24 }, (_, index) => candidate(`news:${index}`, {
+      kind: "news",
+      source_type: "news",
+      ticker: `NEWS${index}`,
+      metadata: { market_issue_market_score: 60 },
+    }));
+
+    const pool = buildPulseCandidatePool(rankPulseCandidates([...ordinary, ...news], now), now);
+
+    expect(pool).toHaveLength(PULSE_CANDIDATE_POOL_MAX);
+    expect(pool.filter((item) => item.kind === "news")).toHaveLength(18);
+    expect(pool.filter((item) => item.kind !== "news")).toHaveLength(30);
+  });
+
+  it("ranks fresh news above stale high-score news via time-decayed evidence", () => {
+    // Both news items have identical market_score and source counts, so the
+    // only differentiator is the time-decayed evidence score. The fresh item
+    // (1 hour old) should outrank the stale one (72 hours old).
+    const fresh = candidate("news:fresh", {
+      kind: "news",
+      source_type: "news",
+      ticker: "NVDA",
+      occurred_at: new Date(now.getTime() - 1 * 60 * 60 * 1_000).toISOString(),
+      metadata: { market_issue_market_score: 200, market_issue_source_count: 2, market_issue_official_source_count: 1 },
+    });
+    const stale = candidate("news:stale", {
+      kind: "news",
+      source_type: "news",
+      ticker: "MSFT",
+      occurred_at: new Date(now.getTime() - 72 * 60 * 60 * 1_000).toISOString(),
+      metadata: { market_issue_market_score: 200, market_issue_source_count: 2, market_issue_official_source_count: 1 },
+    });
+
+    const ranked = rankPulseCandidates([fresh, stale], now);
+    expect(ranked[0]?.item_key).toBe("news:fresh");
+    expect(ranked[1]?.item_key).toBe("news:stale");
+    // Fresh evidence (~7.8) vs stale evidence (~0.5): rank_score gap is meaningful
+    expect(ranked[0]!.rank_score).toBeGreaterThan(ranked[1]!.rank_score);
+  });
+
 });

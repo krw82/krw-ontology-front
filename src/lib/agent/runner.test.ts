@@ -3366,17 +3366,17 @@ describe("agent runner research budget recovery", () => {
       "current market-news MCP",
     );
     expect(call.options.systemPrompt.append).toContain(
-      "Never mention provider names such as Yahoo Finance",
+      "Never mention X, provider names, MCP/tool names",
     );
     expect(call.options.systemPrompt.append).toContain(
-      "current ticker market/news context",
+      "current ticker news context",
     );
-    expect(call.prompt).toContain("웹앱 뉴스 discovery 실행");
+    expect(call.prompt).toContain("웹앱 피드 discovery 실행");
     expect(call.prompt).toContain(
-      "현재 시장/뉴스 MCP 도구를 런타임에서 직접 호출",
+      "설정된 KRW Feed MCP 도구를 먼저 사용합니다",
     );
     expect(call.prompt).toContain(
-      "최종 답변에는 Yahoo Finance 같은 provider 이름을 절대 쓰지 말고",
+      "최종 답변은 사용자에게 바로 보여줄 한국어 Markdown 투자 해석만 작성합니다",
     );
     expect(call.prompt).toContain("/krw-ontology:krw-ontology-news-discovery");
   });

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>뉴스 다음 리서치 질문 — 디자인 개선</title>
+    <style>
+      :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172033; background: #f7f8fb; }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 44px 20px 72px; }
+      main { max-width: 900px; margin: 0 auto; }
+      h1 { font-size: clamp(28px, 5vw, 42px); margin: 0; letter-spacing: -.045em; }
+      h2 { margin-top: 48px; font-size: 24px; letter-spacing: -.03em; }
+      h3 { margin-bottom: 8px; font-size: 18px; }
+      p, li { font-size: 16px; line-height: 1.7; color: #4f5b70; }
+      .eyebrow { margin: 0 0 8px; color: #1656d8; font-size: 12px; font-weight: 800; letter-spacing: .12em; }
+      .callout { margin-top: 24px; padding: 20px 22px; border: 1px solid #cddcfb; border-radius: 16px; background: #edf4ff; }
+      .callout p { margin: 0; color: #173b81; }
+      figure { margin: 18px 0; }
+      img { display: block; width: 100%; border: 1px solid #e1e5ed; border-radius: 16px; box-shadow: 0 8px 28px rgba(25, 37, 61, .10); }
+      figcaption { margin-top: 8px; font-size: 13px; color: #728096; }
+      .idea { margin-top: 22px; padding: 22px; border: 1px solid #e1e5ed; border-radius: 18px; background: #fff; }
+      pre { overflow-x: auto; padding: 18px; border-radius: 12px; background: #0b1020; color: #e8efff; font-size: 13px; line-height: 1.45; }
+      .refs { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+      .refs figure { margin: 0; }
+      a { color: #1656d8; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">DESIGN IMPROVEMENT · NEWS DETAIL</p>
+      <h1>다음 리서치 질문을 한 곳에서 고르게 만들기</h1>
+      <section class="callout">
+        <p><strong>핵심:</strong> 검은 “NEXT RESEARCH STEP” 영역과 하단 선택 카드는 같은 결정을 두 번 묻습니다. 검은 영역을 질문 목록 자체로 바꾸고, 선택된 질문 하나만 단일 “리서치 시작” CTA로 넘기면 정보 밀도는 낮아지고 다음 행동은 더 분명해집니다.</p>
+      </section>
+
+      <h2>현재 상태</h2>
+      <figure>
+        <img src="references/current.png" alt="현재 뉴스 상세 화면의 다음 리서치 질문 영역" />
+        <figcaption>같은 질문과 확인 자료가 검은 CTA 영역과 아래 선택 카드에 반복됩니다.</figcaption>
+      </figure>
+
+      <h2>개선안</h2>
+      <article class="idea">
+        <h3>1. 검은 영역을 유일한 질문 선택 목록으로</h3>
+        <p>제목 아래에 최대 두 개의 질문 행을 세로로 배치합니다. 선택 상태는 번호/테두리만으로 표시하고, CTA는 목록 아래에 하나만 둡니다. 아래의 “이 뉴스 다음에 확인할 것” 카드는 제거합니다.</p>
+        <p><strong>왜:</strong> 질문을 읽고 고르는 행동이 화면의 한 영역에서 끝나며, 1개일 때도 미래의 2개 질문을 자연스럽게 수용합니다.</p>
+        <pre>┌ NEXT RESEARCH STEP ─────────────────────┐
+│ 다음에 무엇을 확인할까요?                │
+│ [01] 한국 AI 팩토리 확장과 데이터센터 수요 │
+│ [02] 고객사 투자 일정과 도입 규모          │
+│                              [리서치 시작] │
+└─────────────────────────────────────────┘</pre>
+      </article>
+
+      <article class="idea">
+        <h3>2. 확인 자료 문구는 화면에서 빼기</h3>
+        <p>“최근 실적발표 자료 · 경영진 실적 콜에서 확인…”과 각 질문 카드의 “확인 자료” 보조 텍스트를 숨깁니다. 이 정보는 생성된 리서치 초안 안에서 원문·공시 링크와 함께 보여주는 편이 더 맥락에 맞습니다.</p>
+        <p><strong>왜:</strong> 이 단계의 목적은 자료 목록을 읽는 것이 아니라 <em>어떤 질문을 다음에 할지</em> 고르는 것입니다.</p>
+      </article>
+
+      <article class="idea">
+        <h3>3. 모바일에서는 질문 행과 CTA를 세로로</h3>
+        <p>데스크톱에서는 CTA를 오른쪽 끝에 둘 수 있지만, 모바일에서는 질문 목록 아래 전폭 버튼으로 둡니다. 각 행은 최소 44px 이상의 탭 영역을 가져야 합니다.</p>
+        <p><strong>왜:</strong> 한 손으로 질문을 고르고 바로 시작할 수 있고, 질문 길이가 길어져도 CTA와 서로 밀리지 않습니다.</p>
+      </article>
+
+      <h2>무엇을 유지할지</h2>
+      <ul>
+        <li>기사 본문과 구분되는 잉크색 리서치 영역</li>
+        <li>선택 결과를 채팅 리서치로 연결하는 단일 주요 행동</li>
+        <li>원문에 나온 사실과 해석/검토를 분리하는 구조</li>
+      </ul>
+
+      <h2>참고한 패턴</h2>
+      <div class="refs">
+        <figure>
+          <img src="references/material-lists.png" alt="Material Design 목록 패턴 문서" />
+          <figcaption><a href="https://www.mdui.org/en/design/1/components/lists.html">Material Design lists</a> — 한 가지를 고르는 목록은 행 전체를 주 행동으로 두고 논리적 순서를 유지합니다. [Web]</figcaption>
+        </figure>
+        <figure>
+          <img src="references/notion-ai-prompt-starters.png" alt="Notion AI 프롬프트 시작 화면" />
+          <figcaption><a href="https://aiuxplayground.com/gallery/notion-ai-prompt-starter/">Notion AI prompt starters</a> — 짧고 목적이 분명한 제안을 먼저 보이고, 한 번의 선택으로 다음 작업에 들어갑니다. [Web]</figcaption>
+        </figure>
+      </div>
+    </main>
+  </body>
+</html>

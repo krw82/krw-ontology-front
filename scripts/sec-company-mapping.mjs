@@ -7,6 +7,14 @@ export const VERIFIED_SEC_TICKER_ALIASES = Object.freeze({
   BK: "BNY",
 });
 
+// The SEC entity page and issuer filings identify AEP as CIK 0000004904, but
+// the SEC company_tickers feed can omit it. Keep this fallback small and
+// auditable; a live exact match still wins whenever the feed contains AEP.
+// https://www.sec.gov/edgar/browse/?CIK=0000004904
+export const VERIFIED_SEC_ISSUER_OVERRIDES = Object.freeze({
+  AEP: Object.freeze({ cik: "0000004904", ticker: "AEP" }),
+});
+
 export function normalizeCatalogTicker(value) {
   const ticker = String(value ?? "").trim().toUpperCase();
   return /^[A-Z0-9][A-Z0-9.-]{0,11}$/.test(ticker) ? ticker : null;
@@ -55,6 +63,14 @@ export function resolveCatalogTicker(tickerInput, secTickerIndex) {
       sec_cik: match.cik,
       sec_ticker: match.ticker,
       sec_mapping_source: candidate.source,
+    };
+  }
+  const verifiedOverride = VERIFIED_SEC_ISSUER_OVERRIDES[ticker];
+  if (verifiedOverride) {
+    return {
+      sec_cik: verifiedOverride.cik,
+      sec_ticker: verifiedOverride.ticker,
+      sec_mapping_source: "verified_alias",
     };
   }
   return null;

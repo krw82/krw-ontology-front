@@ -98,11 +98,23 @@ export default function MarketIssuesPage() {
   }, []);
 
   useEffect(() => {
-    void loadIssues(scope);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void loadIssues(scope);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [loadIssues, scope]);
 
   useEffect(() => {
-    void loadStatus();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void loadStatus();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [loadStatus]);
 
   useEffect(() => () => controllerRef.current?.abort(), []);
@@ -122,73 +134,50 @@ export default function MarketIssuesPage() {
   };
 
   return (
-    <main id="main-content" className="mx-auto w-full max-w-5xl px-base pb-3xl pt-xl sm:px-xl sm:pt-2xl">
-      <header className="relative overflow-hidden rounded-[28px] border border-[#dbe5f7] bg-[linear-gradient(135deg,#f6f9ff_0%,#f8fbff_47%,#edf5ff_100%)] px-lg py-xl shadow-[0_18px_50px_rgba(37,83,157,0.07)] sm:px-2xl sm:py-2xl">
-        <div className="pointer-events-none absolute -right-20 -top-24 size-64 rounded-full bg-[#d9e8ff] blur-3xl" aria-hidden="true" />
-        <div className="relative max-w-2xl">
-          <p className="flex items-center gap-xs text-[12px] font-extrabold uppercase tracking-[0.15em] text-primary">
-            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">newspaper</span>
-            RESEARCH INBOX
-          </p>
-          <h1 className="mt-sm text-[32px] font-black tracking-[-0.05em] text-ink sm:text-[42px]">시장 이슈</h1>
-          <p className="mt-sm max-w-[36rem] text-[15px] leading-7 text-body sm:text-[16px]">
-            시끄러운 속보를 더하기보다, 기업과 산업에 연결되는 변화를 원문과 함께 살펴봅니다.
-          </p>
-          <p className="mt-base text-[12px] leading-5 text-muted">
-            종목 추천이나 매매 신호가 아닌 리서치 검토용 정보입니다.
-          </p>
+    <main id="main-content" className="mx-auto w-full max-w-5xl px-base pb-3xl sm:px-xl">
+      <header className="relative overflow-hidden border-b border-hairline bg-white -mx-base sm:-mx-xl">
+        <div className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-primary-fixed/55 blur-3xl" aria-hidden="true" />
+        <div className="relative px-base py-base sm:px-xl sm:py-lg">
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">Research inbox</p>
+          <h1 className="mt-xs text-[32px] font-black leading-none tracking-[-0.05em] text-ink sm:text-[40px]">시장 이슈</h1>
         </div>
       </header>
 
-      <section className="mt-xl" aria-labelledby="market-issues-heading">
-        <div className="flex flex-col gap-base border-b border-hairline pb-base sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 id="market-issues-heading" className="text-[20px] font-extrabold tracking-[-0.03em] text-ink">
-              오늘 확인할 변화
-            </h2>
-            <p className="mt-1 text-[13px] leading-5 text-muted">{SCOPE_COPY[scope].description}</p>
-          </div>
-          <div className="flex items-center justify-between gap-sm sm:justify-end">
-            {status.updatedAt ? (
-              <p className="text-[11px] font-medium text-muted">
-                {status.label ? `${status.label} · ` : ""}{formatIssueRelativeTime(status.updatedAt)}
-              </p>
-            ) : null}
+      <section className="mt-xl">
+        <div className="sticky top-0 z-10 -mx-base border-y border-hairline bg-canvas/95 px-base py-sm backdrop-blur sm:relative sm:top-auto sm:mx-0 sm:border-x-0 sm:px-0">
+          <div className="flex items-center justify-between gap-base">
+            <div className="inline-flex rounded-[14px] border border-hairline bg-white p-1" role="tablist" aria-label="시장 이슈 범위">
+              {(Object.keys(SCOPE_COPY) as MarketIssueScope[]).map((itemScope) => {
+                const active = scope === itemScope;
+                return (
+                  <button
+                    key={itemScope}
+                    id={`market-issues-${itemScope}-tab`}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    aria-controls="market-issues-panel"
+                    onClick={() => changeScope(itemScope)}
+                    className={`min-h-10 rounded-[10px] px-base text-[13px] font-extrabold transition ${
+                      active
+                        ? "bg-ink text-white shadow-sm"
+                        : "text-muted hover:bg-surface-soft hover:text-ink"
+                    }`}
+                  >
+                    {SCOPE_COPY[itemScope].label}
+                  </button>
+                );
+              })}
+            </div>
             <button
               type="button"
               onClick={retry}
               disabled={loading || loadingMore}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-hairline bg-white px-sm text-[12px] font-bold text-body transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-hairline bg-white px-sm text-[12px] font-bold text-body transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
             >
               <span className={`material-symbols-outlined text-[16px] ${loading ? "animate-spin" : ""}`} aria-hidden="true">refresh</span>
               새로고침
             </button>
-          </div>
-        </div>
-
-        <div className="sticky top-0 z-10 -mx-base mt-base border-y border-hairline bg-canvas/95 px-base py-sm backdrop-blur sm:relative sm:top-auto sm:mx-0 sm:border-x-0 sm:px-0">
-          <div className="inline-flex rounded-[14px] border border-hairline bg-white p-1" role="tablist" aria-label="시장 이슈 범위">
-            {(Object.keys(SCOPE_COPY) as MarketIssueScope[]).map((itemScope) => {
-              const active = scope === itemScope;
-              return (
-                <button
-                  key={itemScope}
-                  id={`market-issues-${itemScope}-tab`}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  aria-controls="market-issues-panel"
-                  onClick={() => changeScope(itemScope)}
-                  className={`min-h-10 rounded-[10px] px-base text-[13px] font-extrabold transition ${
-                    active
-                      ? "bg-ink text-white shadow-sm"
-                      : "text-muted hover:bg-surface-soft hover:text-ink"
-                  }`}
-                >
-                  {SCOPE_COPY[itemScope].label}
-                </button>
-              );
-            })}
           </div>
         </div>
 
@@ -236,8 +225,8 @@ function MarketIssueCard({ issue }: { issue: MarketIssueCard }) {
   return (
     <article className="group flex min-h-full flex-col rounded-[22px] border border-hairline bg-white p-base shadow-[0_5px_22px_rgba(30,50,85,0.035)] transition duration-200 hover:-translate-y-0.5 hover:border-[#bdcff0] hover:shadow-[0_14px_34px_rgba(34,70,136,0.09)] sm:p-lg">
       <div className="flex justify-end">
-        <time className="shrink-0 text-[11px] font-medium text-muted" dateTime={issue.updatedAt ?? issue.publishedAt ?? undefined}>
-          {formatIssueRelativeTime(issue.updatedAt ?? issue.publishedAt)}
+        <time className="sr-only" dateTime={issue.publishedAt ?? undefined}>
+          {formatIssueRelativeTime(issue.publishedAt)}
         </time>
       </div>
 

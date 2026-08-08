@@ -12,6 +12,8 @@ const MAX_TICKERS = 5;
 const MAX_ISSUES = 8;
 const MAX_POSTS_PER_ISSUE = 3;
 const MAX_POST_TEXT_CHARS = 1_200;
+const MAX_CONTEXT_POST_TEXT_CHARS = 25_000;
+const MAX_CONTEXT_SOURCE_TEXT_CHARS = 120_000;
 
 export class KrwFeedReaderError extends Error {
   constructor(
@@ -120,7 +122,7 @@ export async function getFeedContext(input: {
   tickers?: string[];
   maxPostsPerIssue?: number;
 }): Promise<{
-  version: "krw-feed-context/v1";
+  version: "krw-feed-context/v2";
   environment: string;
   context_hash: string;
   requested_issue_ids: string[];
@@ -128,6 +130,8 @@ export async function getFeedContext(input: {
   tickers: string[];
   company_groups: Array<{ ticker: string; issue_ids: string[] }>;
   gaps: Array<{ issue_id: string; code: "not_found_or_not_published" }>;
+  source_materials: FeedSourceMaterial[];
+  research_packets: FeedResearchPacket[];
 }> {
   const issueIds = unique(input.issueIds).slice(0, MAX_ISSUES);
   const requestedTickers = normalizeTickers(input.tickers ?? []);
@@ -159,20 +163,186 @@ export async function getFeedContext(input: {
   const gaps = issueIds
     .filter((issueId) => !byId.has(issueId))
     .map((issueId) => ({ issue_id: issueId, code: "not_found_or_not_published" as const }));
+  const researchArtifacts = await loadResearchArtifacts(bundles, maxPostsPerIssue);
+  const sourceMaterials = applySourceTextBudget(researchArtifacts.sourceMaterials);
   const hashPayload = {
-    version: "krw-feed-context/v1" as const,
+    version: "krw-feed-context/v2" as const,
     environment: env,
     requested_issue_ids: issueIds,
     tickers,
     items,
     company_groups: companyGroups,
     gaps,
+    source_materials: sourceMaterials,
+    research_packets: researchArtifacts.researchPackets,
   };
 
   return {
     ...hashPayload,
     context_hash: `sha256:${createHash("sha256").update(JSON.stringify(hashPayload)).digest("hex")}`,
   };
+}
+
+type FeedSourceMaterial = {
+  issue_id: string;
+  source_item_id: string;
+  source_type: string;
+  external_item_id: string;
+  x_post_id: string;
+  filing_event_id: string | null;
+  source_class: string;
+  publisher: string;
+  author_handle: string | null;
+  canonical_url: string;
+  published_at: string;
+  title: string | null;
+  content_kind: string | null;
+  signal_level: string | null;
+  extraction: { method: string | null; confidence: number | null };
+  source_metadata: Record<string, unknown>;
+  original_text: string;
+  original_text_truncated: boolean;
+  original_text_omitted_due_to_budget: boolean;
+  original_text_hash: string | null;
+  public_metrics: Record<string, unknown>;
+  media: Array<{
+    id: string;
+    ordinal: number;
+    media_type: string;
+    media_url: string | null;
+    content_hash: string | null;
+    extraction_status: string;
+    extraction_model: string | null;
+    extraction_confidence: number | null;
+    extraction: Record<string, unknown>;
+  }>;
+};
+
+type FeedResearchPacket = {
+  issue_id: string;
+  id: string;
+  version: number;
+  status: string;
+  source_context_hash: string;
+  generated_at: string | null;
+  packet: Record<string, unknown>;
+};
+
+async function loadResearchArtifacts(
+  bundles: Array<{ issue: Row; entities: FeedEntity[]; posts: FeedSourcePost[] }>,
+  maxPosts: number,
+): Promise<{ sourceMaterials: FeedSourceMaterial[]; researchPackets: FeedResearchPacket[] }> {
+  const issueIds = bundles.map((bundle) => text(bundle.issue.id)).filter(Boolean);
+  if (issueIds.length === 0) return { sourceMaterials: [], researchPackets: [] };
+  const db = getMarketIssueServiceClient();
+  const [{ data: linkData, error: linkError }, { data: packetData, error: packetError }] = await Promise.all([
+    db.from("market_issue_items").select("issue_id,source_item_id").in("issue_id", issueIds),
+    db.from("market_issue_research_packets").select("*").in("issue_id", issueIds),
+  ]);
+  if (linkError) throw queryError(linkError);
+  if (packetError) throw queryError(packetError);
+  const links = rows(linkData);
+  const sourceItemIds = unique(links.map((link) => text(link.source_item_id)).filter(Boolean));
+  const { data: itemData, error: itemError } = sourceItemIds.length > 0
+    ? await db.from("market_source_items").select("*").eq("env", marketIssueEnvironment()).in("id", sourceItemIds)
+    : { data: [], error: null };
+  if (itemError) throw queryError(itemError);
+  const items = rows(itemData).filter((item) => text(item.status, "active") === "active" && !item.deleted_at);
+  const sourceIds = unique(items.map((item) => text(item.source_id)).filter(Boolean));
+  const [{ data: sourceData, error: sourceError }, { data: mediaData, error: mediaError }] = await Promise.all([
+    sourceIds.length > 0
+      ? db.from("market_issue_sources").select("*").in("id", sourceIds)
+      : Promise.resolve({ data: [], error: null }),
+    sourceItemIds.length > 0
+      ? db.from("market_source_media").select("*").in("source_item_id", sourceItemIds).order("ordinal")
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (sourceError) throw queryError(sourceError);
+  if (mediaError) throw queryError(mediaError);
+  const sourceById = new Map(rows(sourceData).map((source) => [text(source.id), source]));
+  const itemById = new Map(items.map((item) => [text(item.id), item]));
+  const mediaByItem = groupRows(rows(mediaData), (media) => text(media.source_item_id));
+  const packetsById = new Map(rows(packetData).map((packet) => [text(packet.id), packet]));
+  const sourceMaterials: FeedSourceMaterial[] = [];
+  const researchPackets: FeedResearchPacket[] = [];
+
+  for (const bundle of bundles) {
+    const issueId = text(bundle.issue.id);
+    const linkedItems = links
+      .filter((link) => text(link.issue_id) === issueId)
+      .map((link) => itemById.get(text(link.source_item_id)))
+      .filter((item): item is Row => Boolean(item))
+      .sort((left, right) => Date.parse(text(right.published_at)) - Date.parse(text(left.published_at)))
+      .slice(0, maxPosts);
+    for (const item of linkedItems) {
+      const source = sourceById.get(text(item.source_id)) || {};
+      sourceMaterials.push({
+        issue_id: issueId,
+        source_item_id: text(item.id),
+        source_type: text(source.source_type, "unknown"),
+        external_item_id: text(item.external_item_id),
+        x_post_id: text(source.source_type) === "x" ? text(item.external_item_id) : "",
+        filing_event_id: nullableText(record(item.source_metadata).filing_event_id),
+        source_class: text(source.source_class, "unknown"),
+        publisher: clip(text(source.display_name, text(source.account_handle)), 120),
+        author_handle: nullableText(source.account_handle),
+        canonical_url: text(item.canonical_url),
+        published_at: text(item.published_at),
+        title: nullableText(item.title),
+        content_kind: nullableText(item.content_kind),
+        signal_level: nullableText(item.signal_level),
+        extraction: {
+          method: nullableText(item.extraction_method),
+          confidence: typeof item.extraction_confidence === "number" ? item.extraction_confidence : null,
+        },
+        source_metadata: record(item.source_metadata),
+        original_text: text(item.original_text),
+        original_text_truncated: false,
+        original_text_omitted_due_to_budget: false,
+        original_text_hash: nullableText(item.normalized_text_hash),
+        public_metrics: record(item.public_metrics),
+        media: (mediaByItem.get(text(item.id)) || []).map((media) => ({
+          id: text(media.id),
+          ordinal: integer(media.ordinal),
+          media_type: text(media.media_type, "unknown"),
+          media_url: nullableText(media.media_url),
+          content_hash: nullableText(media.content_hash),
+          extraction_status: text(media.extraction_status, "pending"),
+          extraction_model: nullableText(media.extraction_model),
+          extraction_confidence: nullableNumber(media.extraction_confidence),
+          extraction: record(media.extraction_payload),
+        })),
+      });
+    }
+    const activePacket = packetsById.get(text(bundle.issue.active_research_packet_id));
+    if (activePacket) {
+      researchPackets.push({
+        issue_id: issueId,
+        id: text(activePacket.id),
+        version: integer(activePacket.version),
+        status: text(activePacket.status, "ready"),
+        source_context_hash: text(activePacket.source_context_hash),
+        generated_at: nullableText(activePacket.updated_at) || nullableText(activePacket.created_at),
+        packet: record(activePacket.payload),
+      });
+    }
+  }
+  return { sourceMaterials, researchPackets };
+}
+
+function applySourceTextBudget(materials: FeedSourceMaterial[]): FeedSourceMaterial[] {
+  let remaining = MAX_CONTEXT_SOURCE_TEXT_CHARS;
+  return materials.map((material) => {
+    const allowed = Math.max(0, Math.min(MAX_CONTEXT_POST_TEXT_CHARS, remaining));
+    const originalText = material.original_text.slice(0, allowed);
+    remaining -= originalText.length;
+    return {
+      ...material,
+      original_text: originalText,
+      original_text_truncated: originalText.length < material.original_text.length,
+      original_text_omitted_due_to_budget: material.original_text.length > 0 && allowed === 0,
+    };
+  });
 }
 
 export async function checkKrwFeedReadiness(): Promise<boolean> {
@@ -292,7 +462,10 @@ type FeedEntity = {
 
 type FeedSourcePost = {
   id: string;
+  source_type: string;
+  external_item_id: string;
   x_post_id: string;
+  filing_event_id: string | null;
   source_class: string;
   publisher: string;
   author_handle: string | null;
@@ -300,6 +473,7 @@ type FeedSourcePost = {
   original_text: string;
   published_at: string;
   public_metrics: Record<string, unknown>;
+  source_metadata: Record<string, unknown>;
 };
 
 function serializeIssue(issue: Row, entities: FeedEntity[], posts: FeedSourcePost[]) {
@@ -338,7 +512,10 @@ function serializeEntity(entity: Row): FeedEntity {
 function serializePost(item: Row, source: Row): FeedSourcePost {
   return {
     id: text(item.id),
-    x_post_id: text(item.external_item_id),
+    source_type: text(source.source_type, "unknown"),
+    external_item_id: text(item.external_item_id),
+    x_post_id: text(source.source_type) === "x" ? text(item.external_item_id) : "",
+    filing_event_id: nullableText(record(item.source_metadata).filing_event_id),
     source_class: text(source.source_class, "unknown"),
     publisher: clip(text(source.display_name, text(source.account_handle)), 120),
     author_handle: nullableText(source.account_handle),
@@ -346,7 +523,23 @@ function serializePost(item: Row, source: Row): FeedSourcePost {
     original_text: clip(text(item.original_text), MAX_POST_TEXT_CHARS),
     published_at: text(item.published_at),
     public_metrics: record(item.public_metrics),
+    source_metadata: record(item.source_metadata),
   };
+}
+
+function groupRows(values: Row[], key: (value: Row) => string): Map<string, Row[]> {
+  const groups = new Map<string, Row[]>();
+  for (const value of values) {
+    const groupKey = key(value);
+    const group = groups.get(groupKey) ?? [];
+    group.push(value);
+    groups.set(groupKey, group);
+  }
+  return groups;
+}
+
+function nullableNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function emptyListResult(environment: string, limit: number) {

@@ -48,6 +48,7 @@ interface UseChatOptions {
   researchMode?: ResearchMode;
   analysisMode?: AnalysisMode;
   runKind?: RunKind;
+  marketIssueId?: string | null;
   responseLocale?: Locale;
   onSessionCreated?: (sessionId: string) => void;
 }
@@ -437,6 +438,7 @@ export function useChat({
   researchMode = DEFAULT_RESEARCH_MODE,
   analysisMode = DEFAULT_ANALYSIS_MODE,
   runKind,
+  marketIssueId,
   responseLocale = DEFAULT_LOCALE,
   onSessionCreated,
 }: UseChatOptions) {
@@ -1432,6 +1434,7 @@ export function useChat({
             ...(normalizedUserUrls.length > 0
               ? { user_urls: normalizedUserUrls }
               : {}),
+            ...(marketIssueId ? { market_issue_id: marketIssueId } : {}),
             ...(attachmentIds.length > 0 ? { attachment_ids: attachmentIds } : {}),
           }),
           signal: abortController.signal,
@@ -1505,6 +1508,7 @@ export function useChat({
       defaultDocumentTypes,
       defaultTickers,
       analysisMode,
+      marketIssueId,
       processRunResponse,
       researchMode,
       runKind,

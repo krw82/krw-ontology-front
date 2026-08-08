@@ -18,6 +18,29 @@ function read(path: string) {
 }
 
 describe("production deploy scripts", () => {
+  it("keeps an auditable SEC fallback for AEP when the live ticker feed omits it", () => {
+    const probe = spawnSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        [
+          'const { pathToFileURL } = await import("node:url");',
+          "const mapping = await import(pathToFileURL(process.argv[1]).href);",
+          "const index = mapping.buildSecTickerIndex({",
+          '  0: { cik_str: 320193, ticker: "AAPL", title: "Apple Inc." },',
+          "});",
+          'const resolved = mapping.resolveCatalogTicker("AEP", index);',
+          'if (JSON.stringify(resolved) !== JSON.stringify({ sec_cik: "0000004904", sec_ticker: "AEP", sec_mapping_source: "verified_alias" })) process.exit(1);',
+        ].join("\n"),
+        join(process.cwd(), "scripts", "sec-company-mapping.mjs"),
+      ],
+      { encoding: "utf8" },
+    );
+
+    expect(probe.status, probe.stderr).toBe(0);
+  });
+
   it("keeps candidate MCP runtimes isolated and rolls failed installs back", () => {
     const startCandidate = read("scripts/start-mcp-server-candidate.sh");
     const verifyCandidate = read("scripts/verify-mcp-server-candidate.sh");
@@ -261,12 +284,21 @@ describe("production deploy scripts", () => {
     expect(deployAll).toContain(
       'KRW_FILINGS_MCP_DEFER_PERSONAL_DATA_SMOKE="$MIGRATIONS_PENDING"',
     );
-    expect(deployWeb).toContain("redis document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker billing-worker");
+    expect(deployWeb).toContain(
+      "redis document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker market-issue-worker market-issue-stream-worker market-web-source-worker market-issue-enrichment-worker billing-worker",
+    );
     expect(deployWeb).toContain(
       "GCP instance identity probe timed out after 30 seconds",
     );
     expect(deployWeb).toContain(
       "Retrying GCP instance identity probe",
+    );
+    expect(deployWeb).toContain('"x-krw-client-ip": "127.0.0.1"');
+    expect(read("scripts/pause-production-cutover.sh")).toContain(
+      'http://127.0.0.1:3000/api/healthz',
+    );
+    expect(read("scripts/pause-production-cutover.sh")).toContain(
+      "rollback shallow health deployment identity mismatch",
     );
     expect(compose).not.toContain('profiles: ["legacy-gcp-agent"]');
     expect(compose).not.toContain("  agent-worker:");
@@ -474,6 +506,9 @@ describe("production deploy scripts", () => {
     expect(publishScript).toContain("ontology_catalog_releases");
     expect(publishScript).toContain("ontology_companies");
     expect(publishScript).toContain("krw-ontology-web-catalog/v1");
+    expect(publishScript).toContain("pulseRebuildMaxAttempts = 3");
+    expect(publishScript).toContain('includes("statement timeout")');
+    expect(publishScript).toContain("attempt * 1_000");
 
     expect(verifyScript).toContain("ontology_catalog_releases");
     expect(verifyScript).toContain("Active web catalog mismatch");
@@ -505,6 +540,7 @@ describe("production deploy scripts", () => {
     );
     expect(dockerfileWeb).toContain("/app/.worker/document-worker.mjs");
     expect(dockerfileWeb).toContain("markitdown[pdf]");
+    expect(dockerfileWeb).toContain("claude-agent-sdk==0.2.85");
     expect(compose).toContain("  document-worker:");
     expect(compose).toContain("  document-outbox-dispatcher:");
     expect(compose).toContain("  filings-mcp:");
@@ -708,6 +744,7 @@ cleanup
     expect(dockerfileWeb).not.toContain(".krw-ontology-contract.json");
     expect(dockerfileWeb).not.toContain("krw-ontology-src");
     expect(dockerfileWeb).toContain("markitdown[pdf]");
+    expect(dockerfileWeb).toContain("claude-agent-sdk==0.2.85");
     expect(dockerfileWeb).not.toContain('"command": "/opt/krw-ontology-venv/bin/krw-ontology-mcp"');
     expect(dockerfileWeb).not.toContain('"stock-news"');
     expect(dockerfileWeb).not.toContain('"http://127.0.0.1:8775/mcp"');
@@ -722,6 +759,8 @@ cleanup
     const uninstallLaunchd = read("scripts/uninstall-mac-worker-launchd.sh");
     const startMcp = read("scripts/start-mcp-server-production.sh");
     const installMcpLaunchd = read("scripts/install-mcp-server-launchd.sh");
+    const installFilingsMcpLaunchd = read("scripts/install-filings-mcp-launchd.sh");
+    const installStockNewsMcpLaunchd = read("scripts/install-stock-news-mcp-launchd.sh");
     const verifyMcp = read("scripts/verify-mcp-server-production.sh");
     const uninstallMcpLaunchd = read("scripts/uninstall-mcp-server-launchd.sh");
     const deployWorker = read("scripts/deploy-worker-production.sh");
@@ -844,6 +883,15 @@ cleanup
     );
     expect(installLaunchd).toContain("launchctl bootstrap");
     expect(installLaunchd).toContain("launchctl kickstart");
+    for (const installer of [
+      installLaunchd,
+      installMcpLaunchd,
+      installFilingsMcpLaunchd,
+      installStockNewsMcpLaunchd,
+    ]) {
+      expect(installer).toContain('LAUNCHD_DOMAIN="gui/$(id -u)"');
+      expect(installer).not.toMatch(/^DOMAIN="gui\/\$\(id -u\)"$/m);
+    }
     expect(uninstallLaunchd).toContain("launchctl bootout");
     expect(uninstallLaunchd).toContain("com.krwontology.agent-worker*.plist");
 

@@ -55,7 +55,7 @@ export function createKrwFeedMcpServer(): McpServer {
 
   server.registerTool("get_feed_context", {
     title: "Build a multi-issue feed research context",
-    description: "Builds one deterministic context from up to eight selected published feed issues and up to five tickers. It preserves the requested issue order and reports unavailable items explicitly.",
+    description: "Builds one deterministic v2 context from up to eight selected published feed issues and up to five tickers. It preserves requested issue order and includes bounded original X wording, image-extraction results, and any internal research packet alongside the public cards.",
     inputSchema: {
       issue_ids: z.array(ISSUE_ID_SCHEMA).min(1).max(8).describe("Selected feed issue IDs in the order the user chose them."),
       tickers: z.array(TICKER_SCHEMA).max(5).optional().describe("Optional companies to emphasize in the context."),

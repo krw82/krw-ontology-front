@@ -30,6 +30,9 @@ const ACTIVE_STATUSES = new Set<AgentRunRow["status"]>([
   "running",
 ]);
 
+/** A completed analysis is a transient notification, not a persistent feed card. */
+const COMPLETED_NOTIFICATION_MS = 24 * 60 * 60 * 1_000;
+
 export async function getAnalysisCandidates(
   supabase: SupabaseClient<Database>,
   userId: string,
@@ -40,7 +43,7 @@ export async function getAnalysisCandidates(
     .from("chat_sessions")
     .select("id, title, default_tickers, latest_run_status, updated_at")
     .eq("user_id", userId)
-    .eq("scope_type", "company")
+    .in("scope_type", ["company", "global"])
     .is("deleted_at", null)
     .gte("updated_at", cutoff)
     .order("updated_at", { ascending: false })
@@ -86,6 +89,7 @@ export async function getAnalysisCandidates(
     sessions,
     latestRuns,
     new Map(messageRows.map((message) => [message.id, message])),
+    now,
   );
 }
 
@@ -93,6 +97,7 @@ export function buildAnalysisCandidates(
   sessions: AnalysisSession[],
   runs: AnalysisRun[],
   messagesById: Map<string, AnalysisMessage>,
+  now = new Date(),
 ): PulseCandidate[] {
   const sessionById = new Map(sessions.map((session) => [session.id, session]));
 
@@ -100,13 +105,28 @@ export function buildAnalysisCandidates(
     const session = sessionById.get(run.session_id);
     if (!session) return [];
     const ticker = session.default_tickers?.[0]?.trim().toUpperCase() || null;
+    const isWideResearch = !ticker;
     const question = compactQuestion(messagesById.get(run.user_message_id)?.content, session.title);
     const active = ACTIVE_STATUSES.has(run.status);
     const completed = run.status === "completed";
+    // Failed runs are retried from the original chat; they are not surfaced in
+    // the feed as a separate notification lane.
+    if (!active && !completed) return [];
     const availableAt = run.queued_at ?? run.started_at ?? session.updated_at;
     const occurredAt = run.finished_at ?? run.started_at ?? availableAt;
-    const href = buildChatSessionHref(session.id, { ticker });
-    const phase = active ? "active" : completed ? "completed" : "failed";
+    const href = buildChatSessionHref(session.id, {
+      ticker,
+      runKind: isWideResearch ? "idea_generation" : null,
+    });
+    const phase = active ? "active" : "completed";
+    // A completed analysis is a 24-hour notification. After that it leaves the
+    // feed entirely rather than lingering as a stale candidate.
+    if (completed) {
+      const finishedMs = run.finished_at ? Date.parse(run.finished_at) : Date.parse(occurredAt);
+      if (!Number.isFinite(finishedMs) || finishedMs <= now.getTime() - COMPLETED_NOTIFICATION_MS) {
+        return [];
+      }
+    }
 
     return [{
       item_key: makePulseItemKey("analysis", `${run.id}:${phase}`),
@@ -118,21 +138,29 @@ export function buildAnalysisCandidates(
       coverage_level: null,
       judgment: null,
       linked_thesis: null,
-      eyebrow: active
-        ? "내가 시작한 분석 · 진행 중"
-        : completed
-          ? "내가 시작한 분석 · 완료"
-          : "내가 시작한 분석 · 확인 필요",
+      eyebrow: isWideResearch
+        ? active
+          ? "와이드 리서치 · 진행 중"
+          : completed
+            ? "와이드 리서치 · 완료"
+            : "와이드 리서치 · 확인 필요"
+        : active
+          ? "내가 시작한 분석 · 진행 중"
+          : completed
+            ? "내가 시작한 분석 · 완료"
+            : "내가 시작한 분석 · 확인 필요",
       title: question,
       body: analysisBody(run.status),
       reason_code: "user_started_analysis",
-      reason_label: "회사 채팅에서 직접 시작한 분석의 저장된 상태입니다. 피드에서 새 분석을 실행하지 않습니다.",
+      reason_label: isWideResearch
+        ? "매크로/와이드 리서치로 시작한 분석의 저장된 상태입니다. 피드에서 새 분석을 실행하지 않습니다."
+        : "회사 채팅에서 직접 시작한 분석의 저장된 상태입니다. 피드에서 새 분석을 실행하지 않습니다.",
       priority: active ? "high" as const : completed ? "normal" as const : "low" as const,
       occurred_at: occurredAt,
       available_at: availableAt,
       expires_at: active
         ? null
-        : new Date(Date.parse(occurredAt) + 30 * 24 * 60 * 60 * 1_000).toISOString(),
+        : new Date(Date.parse(occurredAt) + COMPLETED_NOTIFICATION_MS).toISOString(),
       saved_at: null,
       snoozed_until: null,
       phase,
@@ -152,6 +180,7 @@ export function buildAnalysisCandidates(
         // Keep a completed card stable across unchanged V3 snapshots. Using
         // compose time here made every delta treat the same analysis as new.
         updated_at: session.updated_at,
+        scope_type: isWideResearch ? "global" : "company",
       },
     }];
   });

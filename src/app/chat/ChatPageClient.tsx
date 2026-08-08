@@ -24,10 +24,12 @@ import SuggestedPromptActions from "@/components/SuggestedPromptActions";
 import RunStatusDock from "@/components/RunStatusDock";
 import CreditLimitErrorCard from "@/components/chat/CreditLimitErrorCard";
 import RecoverableChatErrorCard from "@/components/chat/RecoverableChatErrorCard";
+import ChatSessionShareButton from "@/components/ChatSessionShareButton";
 import ChatWatchlistHeaderActions from "@/components/chat/ChatWatchlistHeaderActions";
 import DiscoverGuideFlow from "@/components/chat/DiscoverGuideFlow";
 import GuruCompanyPicker from "@/components/chat/GuruCompanyPicker";
 import GuruLensContextHeader from "@/components/chat/GuruLensContextHeader";
+import MarketIssueChatBanner from "@/components/chat/MarketIssueChatBanner";
 import { useChat } from "@/hooks/useChat";
 import { useChatMobileDock } from "@/hooks/useChatMobileDock";
 import { useEntitlement } from "@/hooks/useEntitlement";
@@ -51,9 +53,6 @@ import { DEFAULT_LOCALE, isLocale } from "@/i18n/config";
 import { findQuestionTopic } from "@/lib/marketing/site";
 import { deriveChatPresentationContext } from "@/lib/chat/presentation-context";
 import { createClientId } from "@/lib/client-id";
-import {
-  storeDraftMessage,
-} from "@/lib/chat/draft-message";
 import {
   buildComposerDraftKey,
   clearComposerDraft,
@@ -169,6 +168,7 @@ function ChatContent({
   const scrollRef = useRef<HTMLDivElement>(null);
   const composerHostRef = useRef<HTMLDivElement>(null);
   const cancelledRef = useRef(false);
+  const routeFirstCompanyResearchToPulseRef = useRef(false);
   const { entitlement, refresh: refreshEntitlement } = useEntitlement();
   const [researchMode, setResearchMode] = useResearchModePreference(sessionId);
   const effectiveResearchMode: ResearchMode = isIdeaGeneration || isGuruAdvisor
@@ -194,6 +194,11 @@ function ChatContent({
   const isDraftRoute = pathname === "/chat/new" || isDiscoverRoute || isGuruRoute;
   const shareStarterTicker = normalizeTicker(shareStarter?.tickers[0] ?? "");
   const activeTicker = normalizeTicker(ticker ?? "") ?? shareStarterTicker;
+  const shouldRouteFirstCompanyResearchToPulse =
+    pathname === "/chat/new" &&
+    Boolean(activeTicker) &&
+    !isIdeaGeneration &&
+    !isGuruAdvisor;
   const selectedGuruLensKey = normalizeGuruLensKey(guruParam) ?? "auto";
   const selectedGuruLens = getGuruLens(selectedGuruLensKey);
 
@@ -207,6 +212,11 @@ function ChatContent({
 
   const handleSessionCreated = useCallback(
     (createdSessionId: string) => {
+      if (routeFirstCompanyResearchToPulseRef.current) {
+        routeFirstCompanyResearchToPulseRef.current = false;
+        router.replace("/pulse", { scroll: false });
+        return;
+      }
       if (!isDraftRoute && existingSessionId) return;
       if (isGuruAdvisor) {
         router.replace(
@@ -249,6 +259,7 @@ function ChatContent({
     defaultTickers: activeTicker ? [activeTicker] : [],
     researchMode: effectiveResearchMode,
     runKind: requestedRunKind,
+    marketIssueId,
     responseLocale,
     onSessionCreated: handleSessionCreated,
   });
@@ -578,57 +589,43 @@ function ChatContent({
           };
         }
 
-        const nextDraftMessageId = createClientId();
         const nextRequestId = createClientId();
+        clearShareStarter();
+        routeFirstCompanyResearchToPulseRef.current =
+          shouldRouteFirstCompanyResearchToPulse;
 
-        if (
-          !storeDraftMessage(nextDraftMessageId, {
-            content: outboundContent,
+        try {
+          const result = await sendMessage(outboundContent, {
+            sessionId: createdSessionId,
             requestId: nextRequestId,
-            ...(requestedRunKind ? { runKind: requestedRunKind } : {}),
-            ...(isGuruAdvisor ? { guruLensKey: selectedGuruLens.key } : {}),
+            runKind: requestedRunKind,
+            guruLensKey: isGuruAdvisor ? selectedGuruLens.key : undefined,
             userUrl: options?.userUrl,
             userUrls: options?.userUrls,
             attachmentIds: options?.attachmentIds,
-          })
-        ) {
-          setSessionError("새 채팅 메시지를 준비하지 못했습니다.");
+          });
+          if (result.ok) {
+            setComposerDraftResetKey((value) => value + 1);
+            recordMarketIssueResearchSubmitted();
+            // draft path에서는 useChat의 onSessionCreated 콜백이 발화하지 않으므로
+            // (sendMessage 직전 activeSessionIdRef가 이미 createdSessionId로 세팅됨)
+            // URL에 sessionId를 반영하기 위해 직접 호출해야 한다.
+            // 이게 없으면 두 번째 메시지에서 다시 !sessionId 분기로 빠져 새 세션이 만들어진다.
+            handleSessionCreated(createdSessionId);
+            return { ok: true };
+          }
+          routeFirstCompanyResearchToPulseRef.current = false;
+          return { ok: false, message: result.message };
+        } catch (error) {
+          routeFirstCompanyResearchToPulseRef.current = false;
           return {
             ok: false,
-            message: "새 채팅 메시지를 준비하지 못했습니다.",
+            message:
+              error instanceof Error
+                ? error.message
+                : "메시지를 보내지 못했습니다. 다시 시도해주세요.",
           };
         }
-
-        setComposerDraftResetKey((value) => value + 1);
-        clearShareStarter();
-        recordMarketIssueResearchSubmitted();
-
-        const nextParams = new URLSearchParams({
-          sessionId: createdSessionId,
-          draftMessageId: nextDraftMessageId,
-        });
-        if (activeTicker) {
-          nextParams.set("ticker", activeTicker);
-        }
-        if (requestedRunKind && !isGuruAdvisor) {
-          nextParams.set("runKind", requestedRunKind);
-        }
-        if (isGuruAdvisor && selectedGuruLens.key !== "auto") {
-          nextParams.set("guru", selectedGuruLens.key);
-        }
-        if (responseLocale !== DEFAULT_LOCALE) {
-          nextParams.set("locale", responseLocale);
-        }
-        if (isStartOnboardingChat) {
-          nextParams.set("entry", ONBOARDING_START_ENTRY);
-        }
-        const nextHref = isGuruAdvisor
-          ? `/guru?${nextParams.toString()}`
-          : `/chat?${nextParams.toString()}`;
-        router.replace(nextHref, {
-          scroll: false,
-        });
-        return { ok: true };
       }
 
       clearComposerPrefillParams();
@@ -660,6 +657,7 @@ function ChatContent({
       clearComposerPrefillParams,
       clearShareStarter,
       createSessionForDraft,
+      handleSessionCreated,
       recordMarketIssueResearchSubmitted,
       router,
       sendMessage,
@@ -672,6 +670,7 @@ function ChatContent({
       setSessionError,
       shouldStickToBottomRef,
       isStartOnboardingChat,
+      shouldRouteFirstCompanyResearchToPulse,
     ],
   );
 
@@ -775,24 +774,30 @@ function ChatContent({
     <div className="min-h-[100dvh] bg-canvas pt-[72px] md:flex md:h-full md:min-h-0 md:flex-col md:overflow-hidden md:pt-0">
       {/* Top Nav */}
       <TopNav
-        brandHref="/companies"
-        brandAriaLabel="회사 목록으로 이동"
+        brandHref="/pulse"
+        brandAriaLabel="펄스로 이동"
         hideAccountMenu
-        showChatHistoryTrigger
         mobileOverlay
         mobileCollapsed={mobileHeaderHidden}
         actionSlot={
-          headerActionTicker ? (
-            <ChatWatchlistHeaderActions
-              ticker={headerActionTicker}
-              showNotebookOnboarding={
-                ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV ||
-                hasCompletedAssistantAnswer
-              }
-              forceShowNotebookOnboarding={
-                ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV
-              }
-            />
+          headerActionTicker || sessionId ? (
+            <div className="flex items-center gap-xs">
+              {sessionId ? (
+                <ChatSessionShareButton sessionId={sessionId} />
+              ) : null}
+              {headerActionTicker ? (
+                <ChatWatchlistHeaderActions
+                  ticker={headerActionTicker}
+                  showNotebookOnboarding={
+                    ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV ||
+                    hasCompletedAssistantAnswer
+                  }
+                  forceShowNotebookOnboarding={
+                    ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV
+                  }
+                />
+              ) : null}
+            </div>
           ) : null
         }
       />
@@ -843,6 +848,12 @@ function ChatContent({
                 </div>
               </div>
             )}
+
+            {/* News (market issue) context — news_issue_id 쿼리 파라미터로 진입했을 때 표시.
+                첫 메시지 전송 후 clearComposerPrefillParams가 URL에서 제거하면 자동 사라짐. */}
+            {marketIssueId ? (
+              <MarketIssueChatBanner issueId={marketIssueId} />
+            ) : null}
 
             {isGuruAdvisor &&
             selectedGuruLens.key !== "auto" &&
@@ -925,11 +936,6 @@ function ChatContent({
                         messageId={msg.role === "assistant" ? msg.id : undefined}
                         createdAt={
                           msg.role === "assistant" ? msg.created_at : undefined
-                        }
-                        answerSaveContext={
-                          msg.role === "assistant" && activeTicker && sessionId
-                            ? { ticker: activeTicker, sessionId }
-                            : undefined
                         }
                         citations={
                           isLatestAssistantMessage ? chat.citations : undefined

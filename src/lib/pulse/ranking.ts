@@ -13,6 +13,10 @@ const TERMINAL_ANALYSIS_FRESH_MS = 7 * DAY_MS;
 const FLAT_MIX_TOP_WINDOW = 6;
 const MAX_TOP_TICKER_COUNT = 2;
 const MAX_COMPLETED_ANALYSIS_COUNT = 2;
+// News evidence decays exponentially: a story half-lives every 24 hours so a
+// 5-day-old high-score issue cannot out-rank today's fresh news. Combined with
+// the step freshnessScore this produces a deliberate double time penalty.
+const NEWS_EVIDENCE_HALF_LIFE_HOURS = 24;
 
 /**
  * The server ships an authorized reservoir, not a final rendered list. The
@@ -25,6 +29,10 @@ export const PULSE_CANDIDATE_POOL_MAX = 48;
 // server can still authorize a full screen of distinct ordinary cards.
 const MAX_REGULAR_FORM4_CANDIDATES = 10;
 const MAX_EARLY_EDITORIAL_CANDIDATES = 8;
+// News has its own device-side three-to-four-card mixing rule. Preserve a
+// larger source reservoir here so manual refresh can genuinely rotate news
+// instead of repeatedly showing the same top three market issues.
+const MAX_NEWS_CANDIDATES = 18;
 
 /**
  * Produces a single utility order. `feed_slot` remains a reason/category for
@@ -81,7 +89,12 @@ export function isActionableCandidate(
   reviewedAt = candidate.reviewed_at ?? candidate.judgment?.updated_at ?? null,
 ): boolean {
   if (reviewedAt) return false;
-  if (candidate.kind === "filing" || candidate.kind === "question" || candidate.kind === "resurface") return true;
+  if (
+    candidate.kind === "filing"
+    || candidate.kind === "question"
+    || candidate.kind === "resurface"
+    || candidate.kind === "news"
+  ) return true;
   return candidate.kind === "analysis" && phase !== "active";
 }
 
@@ -161,24 +174,29 @@ export function buildPulseCandidatePool(
   const regularForm4 = available
     .filter(isRegularForm4Candidate)
     .slice(0, MAX_REGULAR_FORM4_CANDIDATES);
+  const news = available
+    .filter((candidate) => candidate.kind === "news")
+    .slice(0, MAX_NEWS_CANDIDATES);
   const reservedKeys = new Set([
     ...earlyEditorial.map((candidate) => candidate.item_key),
     ...regularForm4.map((candidate) => candidate.item_key),
+    ...news.map((candidate) => candidate.item_key),
   ]);
   const mainCapacity = Math.max(
     0,
-    PULSE_CANDIDATE_POOL_MAX - earlyEditorial.length - regularForm4.length,
+    PULSE_CANDIDATE_POOL_MAX - earlyEditorial.length - regularForm4.length - news.length,
   );
   const mainCandidates = mixFlatCandidates(
     available.filter((candidate) =>
       !reservedKeys.has(candidate.item_key)
       && !isRegularForm4Candidate(candidate)
-      && !isEarlyEditorialCandidate(candidate)),
+      && !isEarlyEditorialCandidate(candidate)
+      && candidate.kind !== "news"),
     mainCapacity,
   );
   // Keep the mixer order for ordinary candidates. Re-sorting here would undo
   // its top-six diversity guarantees before the device receives the reservoir.
-  const selected = [...mainCandidates, ...regularForm4, ...earlyEditorial]
+  const selected = [...mainCandidates, ...regularForm4, ...earlyEditorial, ...news]
     .slice(0, PULSE_CANDIDATE_POOL_MAX);
 
   return selected.map((candidate, serverRank) => ({
@@ -192,6 +210,13 @@ export function classifyPulseFeedSlot(
   candidate: Pick<PulseCandidate, "kind" | "coverage_level" | "has_recent_research" | "linked_thesis" | "metadata">,
   phase: PulseAnalysisPhase | null = null,
 ): PulseFeedSlot {
+  if (candidate.kind === "news") {
+    const personal = isActiveCoverage(candidate.coverage_level)
+      || Boolean(candidate.has_recent_research)
+      || candidate.metadata.market_issue_followed_match === true
+      || candidate.metadata.market_issue_personal_match === true;
+    return personal ? "signal" : "news";
+  }
   if (candidate.kind === "learning") return "learning";
   if (candidate.kind === "resurface") {
     return candidate.metadata.monitoring_rule_type === "scheduled_review"
@@ -342,7 +367,8 @@ function getRankScore(
       + researchAffinity
       + (candidate.linked_thesis ? 7 : 0)
       + (hasMonitoringRuleMatch(candidate) ? 6 : 0)
-      + (candidate.saved_at || candidate.is_pinned ? 4 : 0),
+      + (candidate.saved_at || candidate.is_pinned ? 4 : 0)
+      + newsPersonalizationScore(candidate),
   );
   const continuity = candidate.kind === "analysis"
     ? phase === "completed" ? 18 : phase === "active" ? 12 : 2
@@ -350,7 +376,8 @@ function getRankScore(
       : candidate.kind === "resurface" ? 6 : actionable ? 3 : 0;
   const evidence = candidate.kind === "filing"
     ? candidate.metadata.filing_brief_ready === true ? 6 : isDigestFiling(candidate) ? 1 : 3
-    : candidate.kind === "question" && hasQuestionEvidence(candidate) ? 4 : 0;
+    : candidate.kind === "question" && hasQuestionEvidence(candidate) ? 4
+      : candidate.kind === "news" ? newsTimeDecayedScore(candidate, now) : 0;
   const seenPenalty = state === "seen" ? 6 : 0;
 
   return Math.max(
@@ -389,6 +416,50 @@ function hasMonitoringRuleMatch(candidate: Pick<PulseCandidate, "metadata">): bo
 function hasQuestionEvidence(candidate: PulseCandidate): boolean {
   const value = candidate.metadata.evidence_count ?? candidate.metadata.has_new_evidence;
   return typeof value === "number" ? value > 0 : value === true || value === "true";
+}
+
+function newsPersonalizationScore(candidate: PulseCandidate): number {
+  if (candidate.kind !== "news") return 0;
+  return candidate.metadata.market_issue_followed_match === true ? 5
+    : candidate.metadata.market_issue_personal_match === true ? 3 : 0;
+}
+
+/**
+ * @deprecated Superseded by {@link newsTimeDecayedScore} which applies an
+ * exponential time decay so stale high-score issues yield to fresh news.
+ * Retained for reference and potential non-news reuse.
+ */
+function newsEvidenceScore(candidate: PulseCandidate): number {
+  const sources = numericMetadata(candidate, "market_issue_source_count");
+  const official = numericMetadata(candidate, "market_issue_official_source_count");
+  const score = numericMetadata(candidate, "market_issue_market_score");
+  return Math.min(8, Math.min(3, sources) + Math.min(2, official) + Math.min(3, Math.floor(score / 35)));
+}
+
+/**
+ * Time-decayed news evidence score. Same static evidence base as
+ * {@link newsEvidenceScore}, multiplied by an exponential decay weight
+ * (half-life = {@link NEWS_EVIDENCE_HALF_LIFE_HOURS}) so the score halves
+ * every 24 hours. This prevents a days-old high-market-score story from
+ * burying today's fresh news in the ranked feed.
+ *
+ * Decay weights: 0h=1.0, 12h≈0.71, 24h=0.5, 48h=0.25, 72h≈0.125, 5d≈0.03.
+ */
+function newsTimeDecayedScore(candidate: PulseCandidate, now: Date): number {
+  const marketScore = numericMetadata(candidate, "market_issue_market_score");
+  const sources = numericMetadata(candidate, "market_issue_source_count");
+  const official = numericMetadata(candidate, "market_issue_official_source_count");
+  const evidenceBase = Math.min(3, sources) + Math.min(2, official) + Math.min(3, Math.floor(marketScore / 35));
+  const occurredMs = Date.parse(candidate.occurred_at);
+  if (!Number.isFinite(occurredMs)) return 0;
+  const ageHours = Math.max(0, now.getTime() - occurredMs) / HOUR_MS;
+  const decayWeight = Math.pow(0.5, ageHours / NEWS_EVIDENCE_HALF_LIFE_HOURS);
+  return Math.min(8, evidenceBase * decayWeight);
+}
+
+function numericMetadata(candidate: PulseCandidate, key: string): number {
+  const value = candidate.metadata[key];
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
 function freshnessScore(occurredAt: string, now: Date): number {

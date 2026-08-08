@@ -215,10 +215,10 @@ describe("buildSystemPrompt", () => {
     );
     expect(enabledPrompt).toContain("current market-news MCP");
     expect(enabledPrompt).toContain(
-      "Never mention provider names such as Yahoo Finance",
+      "Never mention X, provider names, MCP/tool names",
     );
     expect(enabledPrompt).toContain(
-      "market-news-vs-filing provenance internally",
+      "feed-vs-market-report-vs-filing provenance internally",
     );
   });
 
@@ -287,28 +287,28 @@ describe("buildSystemPrompt", () => {
     );
   });
 
-  it("marks Yahoo Finance context as required for enabled news workflows", () => {
+  it("marks feed-first market context as required for enabled news workflows", () => {
     const prompt = buildSystemPrompt(undefined, [], {
       yahooFinanceNewsEnabled: true,
       yahooFinanceNewsRequired: true,
     });
 
-    expect(prompt).toContain("requires current ticker market/news context");
+    expect(prompt).toContain("requires current ticker news context");
     expect(prompt).toContain(
-      "current market-news MCP tools for that current context",
+      "use KRW Feed MCP tools first",
     );
-    expect(prompt).toContain("raw provider payloads in the final answer");
-    expect(prompt).toContain("If the current market-news tool call fails");
+    expect(prompt).toContain("raw payload fields in the final answer");
+    expect(prompt).toContain("If the KRW Feed call returns no useful result");
   });
 
-  it("falls back cleanly when news mode is selected but Yahoo Finance MCP is unavailable", () => {
+  it("falls back cleanly when news mode is selected but current-news tools are unavailable", () => {
     const prompt = buildSystemPrompt(undefined, [], {
       yahooFinanceNewsUnavailableForNews: true,
     });
 
     expect(prompt).toContain("selected news mode");
-    expect(prompt).toContain("current market-news tools are unavailable");
-    expect(prompt).toContain("Do not attempt current-news search");
+    expect(prompt).toContain("feed and supplementary current-market news tools are unavailable");
+    expect(prompt).toContain("Do not attempt built-in web search");
   });
 
   it("limits prompt history count and size before adding it to the system prompt", () => {

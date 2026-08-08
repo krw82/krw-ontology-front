@@ -37,6 +37,28 @@ export interface MessageRow extends Record<string, unknown> {
   updated_at: string;
 }
 
+export interface SessionShareMessage {
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
+export interface SessionShareRow extends Record<string, unknown> {
+  id: string;
+  token: string;
+  owner_user_id: string;
+  source_session_id: string;
+  title: string;
+  tickers: string[] | null;
+  locale: string;
+  messages: SessionShareMessage[];
+  message_count: number;
+  share_context: Json;
+  snapshot_version: number;
+  created_at: string;
+  revoked_at: string | null;
+}
+
 export interface ChatAttachmentRow extends Record<string, unknown> {
   id: string;
   user_id: string;
@@ -961,7 +983,7 @@ export interface UserFilingNotificationRow extends Record<string, unknown> {
 export interface UserPulsePreferencesRow extends Record<string, unknown> {
   user_id: string;
   timezone: string;
-  enabled_kinds: Array<"filing" | "analysis" | "checkup" | "question" | "resurface" | "learning">;
+  enabled_kinds: Array<"filing" | "analysis" | "checkup" | "question" | "resurface" | "learning" | "news">;
   muted_tickers: string[];
   daily_checkup_enabled: boolean;
   daily_checkup_at: string;
@@ -991,9 +1013,9 @@ export interface UserOnboardingStateRow extends Record<string, unknown> {
 export interface UserPulseItemStateRow extends Record<string, unknown> {
   user_id: string;
   item_key: string;
-  source_type: "filing" | "analysis" | "checkup" | "question" | "resurface" | "learning";
+  source_type: "filing" | "analysis" | "checkup" | "question" | "resurface" | "learning" | "news";
   source_id: string;
-  kind: "filing" | "analysis" | "checkup" | "question" | "resurface" | "learning";
+  kind: "filing" | "analysis" | "checkup" | "question" | "resurface" | "learning" | "news";
   first_seen_at: string | null;
   reviewed_at: string | null;
   saved_at: string | null;
@@ -1854,9 +1876,13 @@ export interface AnalyticsEventRow extends Record<string, unknown> {
     | "answer_failed"
     | "citation_opened"
     | "share_created"
+    | "session_share_created"
     | "share_viewed"
     | "share_answer_read"
     | "share_cta_clicked"
+    | "session_share_viewed"
+    | "session_share_answer_read"
+    | "session_share_cta_clicked"
     | "share_starter_loaded"
     | "session_renamed"
     | "session_deleted"
@@ -4175,6 +4201,22 @@ export interface Database {
           revoked_at?: string | null;
         };
         Update: Partial<Omit<MessageShareRow, "id" | "created_at">>;
+        Relationships: Array<{
+          foreignKeyName: string;
+          columns: string[];
+          isOneToOne: boolean;
+          referencedRelation: string;
+          referencedColumns: string[];
+        }>;
+      };
+      session_shares: {
+        Row: SessionShareRow;
+        Insert: Omit<SessionShareRow, "id" | "created_at" | "revoked_at"> & {
+          id?: string;
+          created_at?: string;
+          revoked_at?: string | null;
+        };
+        Update: Partial<Omit<SessionShareRow, "id" | "created_at">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];

@@ -3,13 +3,13 @@ import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import WebSocket from "ws";
 
-let client: SupabaseClient<any> | null = null;
+let client: SupabaseClient | null = null;
 
 type RealtimeTransport = NonNullable<
   NonNullable<Parameters<typeof createClient>[2]>["realtime"]
 >["transport"];
 
-export function getMarketIssueServiceClient(): SupabaseClient<any> {
+export function getMarketIssueServiceClient(): SupabaseClient {
   if (client) return client;
 
   const url = (

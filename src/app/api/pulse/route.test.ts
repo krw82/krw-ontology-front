@@ -2,14 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
-  getAuthUser: vi.fn(),
+  getOptionalAuthUser: vi.fn(),
   composePulseFeed: vi.fn(),
   canAccessMenuFeature: vi.fn(),
   getPulseFeedRevision: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({
-  getAuthUser: mocks.getAuthUser,
+  getOptionalAuthUser: mocks.getOptionalAuthUser,
+  ANONYMOUS_PULSE_USER_ID: "00000000-0000-0000-0000-000000000000",
   handleAuthError: () =>
     Response.json({ error: { code: "authentication_error" } }, { status: 401 }),
 }));
@@ -47,7 +48,7 @@ const feed = {
 describe("GET /api/pulse", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getAuthUser.mockResolvedValue({
+    mocks.getOptionalAuthUser.mockResolvedValue({
       id: "user-1",
       email: "user@example.com",
     });
@@ -61,11 +62,15 @@ describe("GET /api/pulse", () => {
     mocks.composePulseFeed.mockResolvedValue(feed);
   });
 
-  it("requires authentication", async () => {
-    mocks.getAuthUser.mockResolvedValue(null);
+  it("degrades to an anonymous feed when no session is present", async () => {
+    mocks.getOptionalAuthUser.mockResolvedValue(null);
     const response = await GET(new NextRequest("http://localhost/api/pulse"));
-    expect(response.status).toBe(401);
-    expect(mocks.composePulseFeed).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(mocks.composePulseFeed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "00000000-0000-0000-0000-000000000000",
+      }),
+    );
   });
 
   it("rejects pagination cursors and limits over the candidate reservoir", async () => {

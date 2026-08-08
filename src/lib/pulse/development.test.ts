@@ -8,6 +8,8 @@ describe("development Pulse showcase", () => {
     expect(showcase.map((item) => item.kind)).toEqual([
       "filing",
       "analysis",
+      "analysis",
+      "analysis",
       "filing",
       "filing",
       "filing",

@@ -45,7 +45,7 @@ FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 TEMPLATE="$FRONT_DIR/ops/launchd/com.krwontology.stock-news-mcp.plist.template"
 PLIST_DIR="$HOME/Library/LaunchAgents"
 PLIST="$PLIST_DIR/com.krwontology.stock-news-mcp.plist"
-DOMAIN="gui/$(id -u)"
+LAUNCHD_DOMAIN="gui/$(id -u)"
 
 case "$ENV_FILE" in
   /*) ENV_PATH=$ENV_FILE ;;
@@ -114,8 +114,8 @@ if [ "$STOCK_NEWS_RUNTIME_ENABLED" != "1" ]; then
   fi
 
   echo "Stock News MCP disabled; unloading launchd service if present."
-  launchctl bootout "$DOMAIN/com.krwontology.stock-news-mcp" >/dev/null 2>&1 || true
-  launchctl bootout "$DOMAIN" "$PLIST" >/dev/null 2>&1 || true
+  launchctl bootout "$LAUNCHD_DOMAIN/com.krwontology.stock-news-mcp" >/dev/null 2>&1 || true
+  launchctl bootout "$LAUNCHD_DOMAIN" "$PLIST" >/dev/null 2>&1 || true
   rm -f "$PLIST"
   exit 0
 fi
@@ -233,13 +233,13 @@ echo "Installed $PLIST"
 
 if [ "$LOAD" != "1" ]; then
   echo "To load now:"
-  echo "  launchctl bootstrap $DOMAIN $PLIST 2>/dev/null || true"
-  echo "  launchctl kickstart -k $DOMAIN/com.krwontology.stock-news-mcp"
+  echo "  launchctl bootstrap $LAUNCHD_DOMAIN $PLIST 2>/dev/null || true"
+  echo "  launchctl kickstart -k $LAUNCHD_DOMAIN/com.krwontology.stock-news-mcp"
   exit 0
 fi
 
-launchctl bootout "$DOMAIN/com.krwontology.stock-news-mcp" >/dev/null 2>&1 || true
-launchctl bootout "$DOMAIN" "$PLIST" >/dev/null 2>&1 || true
+launchctl bootout "$LAUNCHD_DOMAIN/com.krwontology.stock-news-mcp" >/dev/null 2>&1 || true
+launchctl bootout "$LAUNCHD_DOMAIN" "$PLIST" >/dev/null 2>&1 || true
 if ! wait_for_stock_news_port_release 10; then
   stop_lingering_stock_news_listeners
 fi
@@ -248,14 +248,14 @@ BOOTSTRAP_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/stock-news-mcp-bootstrap.XXXXXX")
 VERIFY_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/stock-news-mcp-verify.XXXXXX")
 trap 'rm -f "$BOOTSTRAP_OUTPUT" "$VERIFY_OUTPUT"' EXIT INT TERM
 
-if ! launchctl bootstrap "$DOMAIN" "$PLIST" >"$BOOTSTRAP_OUTPUT" 2>&1; then
+if ! launchctl bootstrap "$LAUNCHD_DOMAIN" "$PLIST" >"$BOOTSTRAP_OUTPUT" 2>&1; then
   cat "$BOOTSTRAP_OUTPUT" >&2
   print_recent_stock_news_logs
   exit 1
 fi
 
-launchctl enable "$DOMAIN/com.krwontology.stock-news-mcp"
-launchctl kickstart -k "$DOMAIN/com.krwontology.stock-news-mcp"
+launchctl enable "$LAUNCHD_DOMAIN/com.krwontology.stock-news-mcp"
+launchctl kickstart -k "$LAUNCHD_DOMAIN/com.krwontology.stock-news-mcp"
 
 verified=0
 for _ in $(seq 1 30); do
@@ -268,7 +268,7 @@ done
 
 if [ "$verified" != "1" ]; then
   cat "$VERIFY_OUTPUT" >&2
-  if ! launchctl print "$DOMAIN/com.krwontology.stock-news-mcp" | sed -n '1,80p'; then
+  if ! launchctl print "$LAUNCHD_DOMAIN/com.krwontology.stock-news-mcp" | sed -n '1,80p'; then
     echo "Stock News MCP launchd service is not registered after bootstrap." >&2
   fi
   print_recent_stock_news_logs
@@ -277,5 +277,5 @@ if [ "$verified" != "1" ]; then
 fi
 
 cat "$VERIFY_OUTPUT"
-launchctl print "$DOMAIN/com.krwontology.stock-news-mcp" | sed -n '1,50p'
+launchctl print "$LAUNCHD_DOMAIN/com.krwontology.stock-news-mcp" | sed -n '1,50p'
 echo "OK Stock News MCP launchd service loaded"

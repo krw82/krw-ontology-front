@@ -53,6 +53,27 @@ async function resolveAuthUser(): Promise<User | null> {
 // Supabase auth round trips; it does not persist one user's result globally.
 export const getAuthUser = cache(resolveAuthUser);
 
+/**
+ * A nil UUID sentinel used in place of a real user id for anonymous public
+ * reads (the /pulse and /news feeds). It is a valid uuid for RPC casts but
+ * never matches a real account, so every `.eq("user_id", ...)` personalization
+ * read simply returns an empty result. Writes are gated separately.
+ */
+export const ANONYMOUS_PULSE_USER_ID = "00000000-0000-0000-0000-000000000000";
+
+/**
+ * Like {@link getAuthUser} but never throws and returns null for anonymous
+ * visitors. Use this on public read routes where a missing session should
+ * degrade to an anonymous feed instead of returning 401.
+ */
+export const getOptionalAuthUser = cache(async (): Promise<User | null> => {
+  try {
+    return await resolveAuthUser();
+  } catch {
+    return null;
+  }
+});
+
 export function authError(requestId?: string) {
   return Response.json(
     {

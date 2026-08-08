@@ -66,6 +66,7 @@ export async function validateRequest(
     guru_lens,
     user_url,
     user_urls,
+    market_issue_id,
     attachment_ids,
     session_id,
     scope_type,
@@ -181,6 +182,20 @@ export async function validateRequest(
     };
   }
 
+  if (market_issue_id !== undefined && typeof market_issue_id !== "string") {
+    return {
+      ok: false,
+      response: errorResponse(400, "validation_error", "market_issue_id must be a string", normalizedRequestId),
+    };
+  }
+
+  if (typeof market_issue_id === "string" && !isUuid(market_issue_id)) {
+    return {
+      ok: false,
+      response: errorResponse(400, "validation_error", "market_issue_id must be a valid UUID", normalizedRequestId),
+    };
+  }
+
   if (!isOptionalStringArray(attachment_ids)) {
     return {
       ok: false,
@@ -291,6 +306,7 @@ export async function validateRequest(
     ...(normalizedUserUrls[0]
       ? { user_url: normalizedUserUrls[0], user_urls: normalizedUserUrls }
       : {}),
+    ...(market_issue_id ? { market_issue_id } : {}),
     ...(normalizedAttachmentIds.length > 0
       ? { attachment_ids: normalizedAttachmentIds }
       : {}),

@@ -10,7 +10,7 @@ applying a document-ingestion database migration. The following compose deploy
 starts the v2 worker binaries again.
 
 Environment:
-  GCP_INSTANCE                 Defaults to krw-onto-v1
+  GCP_INSTANCE                 Defaults to krw-onto-v3
   GCP_ZONE                     Defaults to asia-northeast3-a
   REMOTE_FRONT_DIR             Defaults to /home/username/krw-ontology-front
   COMPOSE_PROJECT_NAME         Defaults to krw-ontology-front
@@ -34,7 +34,7 @@ if [ "$#" -gt 0 ]; then
   exit 1
 fi
 
-GCP_INSTANCE=${GCP_INSTANCE:-krw-onto-v1}
+GCP_INSTANCE=${GCP_INSTANCE:-krw-onto-v3}
 GCP_ZONE=${GCP_ZONE:-asia-northeast3-a}
 REMOTE_FRONT_DIR=${REMOTE_FRONT_DIR:-/home/username/krw-ontology-front}
 COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-krw-ontology-front}

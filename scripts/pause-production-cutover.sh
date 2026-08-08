@@ -2828,15 +2828,13 @@ if [ "\$proxy_was_running" = true ]; then
           if (!expected || process.env.NEXT_PUBLIC_APP_VERSION !== expected) {
             throw new Error("rollback web container deployment identity mismatch");
           }
-          const key = process.env.INTERNAL_API_KEY;
-          const deep = await fetch("http://127.0.0.1:3000/api/healthz/deep", {
-            headers: { "x-internal-key": key || "" },
+          const shallow = await fetch("http://127.0.0.1:3000/api/healthz", {
             cache: "no-store",
             signal: AbortSignal.timeout(10000),
           });
-          const payload = await deep.json();
-          if (!deep.ok || payload.status !== "ok" || payload.deployment_id !== expected) {
-            throw new Error("rollback deep health deployment identity mismatch");
+          const payload = await shallow.json();
+          if (!shallow.ok || payload.status !== "ok" || payload.deployment_id !== expected) {
+            throw new Error("rollback shallow health deployment identity mismatch");
           }
           const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
           const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;

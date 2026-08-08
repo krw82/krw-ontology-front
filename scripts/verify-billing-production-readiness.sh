@@ -9,7 +9,7 @@ Verify the paid billing launch gate for production without printing secrets.
 
 Environment:
   BASE_URL              Defaults to https://krwontology.com
-  GCP_INSTANCE          Defaults to krw-onto-v1
+  GCP_INSTANCE          Defaults to krw-onto-v3
   GCP_ZONE              Defaults to asia-northeast3-a
   REMOTE_FRONT_DIR      Defaults to /home/username/krw-ontology-front
   COMPOSE_PROJECT_NAME  Defaults to krw-ontology-front
@@ -49,7 +49,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 BASE_URL=${BASE_URL:-https://krwontology.com}
-GCP_INSTANCE=${GCP_INSTANCE:-krw-onto-v1}
+GCP_INSTANCE=${GCP_INSTANCE:-krw-onto-v3}
 GCP_ZONE=${GCP_ZONE:-asia-northeast3-a}
 REMOTE_FRONT_DIR=${REMOTE_FRONT_DIR:-/home/username/krw-ontology-front}
 COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-krw-ontology-front}

@@ -39,8 +39,7 @@ export default function CreditLimitErrorCard({
               주간 분석 한도를 모두 사용했습니다.
             </h3>
             <p className="mt-2 w-full max-w-[36rem] break-normal text-[14px] font-semibold leading-6 text-body [overflow-wrap:normal] [word-break:keep-all] sm:text-[15px]">
-              다음 충전 전까지 새 분석은 시작할 수 없습니다. 기존 리서치와
-              노트북은 계속 볼 수 있습니다.
+              다음 충전 전까지 새 분석은 시작할 수 없습니다.
             </p>
           </div>
         </div>

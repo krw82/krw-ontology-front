@@ -44,7 +44,7 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 TEMPLATE="$FRONT_DIR/ops/launchd/com.krwontology.agent-worker.plist.template"
 PLIST_DIR="$HOME/Library/LaunchAgents"
-DOMAIN="gui/$(id -u)"
+LAUNCHD_DOMAIN="gui/$(id -u)"
 LABEL="com.krwontology.agent-worker"
 PLIST="$PLIST_DIR/$LABEL.plist"
 case "$ENV_FILE" in
@@ -81,7 +81,7 @@ bootout_existing_agent_worker_plists() {
     if [ ! -e "$plist" ]; then
       continue
     fi
-    launchctl bootout "$DOMAIN" "$plist" >/dev/null 2>&1 || true
+    launchctl bootout "$LAUNCHD_DOMAIN" "$plist" >/dev/null 2>&1 || true
   done
 }
 
@@ -175,8 +175,8 @@ echo "Installed $PLIST for supervisor $AGENT_SUPERVISOR_ID"
 
 if [ "$LOAD" != "1" ]; then
   echo "Not loaded. Start later with:"
-  echo "  launchctl bootstrap $DOMAIN $PLIST"
-  echo "  launchctl kickstart -k $DOMAIN/$LABEL"
+  echo "  launchctl bootstrap $LAUNCHD_DOMAIN $PLIST"
+  echo "  launchctl kickstart -k $LAUNCHD_DOMAIN/$LABEL"
   exit 0
 fi
 
@@ -202,10 +202,10 @@ done
 
 rm -f "$PLIST_DIR"/com.krwontology.agent-worker.[0-9]*.plist
 
-launchctl bootstrap "$DOMAIN" "$PLIST"
-launchctl enable "$DOMAIN/$LABEL"
-launchctl kickstart -k "$DOMAIN/$LABEL"
+launchctl bootstrap "$LAUNCHD_DOMAIN" "$PLIST"
+launchctl enable "$LAUNCHD_DOMAIN/$LABEL"
+launchctl kickstart -k "$LAUNCHD_DOMAIN/$LABEL"
 
 sleep 2
-launchctl print "$DOMAIN/$LABEL" | sed -n '1,50p'
+launchctl print "$LAUNCHD_DOMAIN/$LABEL" | sed -n '1,50p'
 echo "OK Mac worker supervisor launchd service loaded: $AGENT_SUPERVISOR_ID concurrency=$AGENT_SUPERVISOR_CONCURRENCY"

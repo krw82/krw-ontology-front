@@ -46,7 +46,7 @@ describe("Pulse summary", () => {
     expect(buildPulseSummary(ranked)).toEqual({
       actionable_count: 2,
       active_analysis_count: 1,
-      counts: { filing: 1, analysis: 1, question: 0, resurface: 0 },
+      counts: { filing: 1, analysis: 1, question: 0, resurface: 0, news: 0 },
       primary_action: { type: "link", label: "열기", href: "/filing" },
     });
   });

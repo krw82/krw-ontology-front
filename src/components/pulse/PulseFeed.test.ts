@@ -21,7 +21,7 @@ function item(id: string, serverRank = 0): PulseItem {
 function feed(candidateItems: PulseItem[]): PulseFeedResponse {
   return {
     revision: "old", generated_at: "2026-07-20T00:00:00.000Z", snapshot_at: "2026-07-20T00:00:00.000Z", ranking_version: "rule_v5_flat",
-    timezone: "Asia/Seoul", date_label: "7월 20일", filter: "all", candidate_items: candidateItems, active_analysis_items: [], visible_limit: 12,
+    timezone: "Asia/Seoul", date_label: "7월 20일", filter: "all", candidate_items: candidateItems, active_analysis_items: [], completed_analysis_items: [], visible_limit: 12,
     item_versions: Object.fromEntries(candidateItems.map((candidate) => [candidate.id, candidate.id])), new_item_count: 0, source_statuses: [],
   };
 }
@@ -34,7 +34,7 @@ describe("Pulse V5 feed reconciliation", () => {
     const next = applyPulseFeedDelta(current, {
       generated_at: "2026-07-20T01:00:00.000Z", revision: "new", changed: true,
       snapshot: { ranking_version: "rule_v5_flat", timezone: "Asia/Seoul", date_label: "7월 20일", filter: "all", visible_limit: 12, new_item_count: 1, source_statuses: [] },
-      ordered_candidate_ids: ["second", "first"], active_analysis_item_ids: [],
+      ordered_candidate_ids: ["second", "first"], active_analysis_item_ids: [], completed_analysis_item_ids: [],
       upserts: [{ ...second, title: "updated" }], removed_item_ids: [], item_versions: { first: "first", second: "changed" },
       refresh_summary: { added_candidate_count: 0, updated_item_count: 1, removed_item_count: 0 },
     });

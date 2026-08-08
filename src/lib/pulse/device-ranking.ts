@@ -22,11 +22,15 @@ const MAX_COMPLETED_ANALYSIS_COUNT = 2;
 const FORM4_STACK_TARGET_INDEX = 3;
 const RECENT_STORY_EXCLUSION_GENERATIONS = 2;
 const RECENT_REGULAR_SELECTION_GENERATIONS = 3;
+const RECENT_NEWS_SELECTION_GENERATIONS = 2;
 const TARGET_REGULAR_REFRESH_REPLACEMENT_COUNT = 3;
 const TARGET_REBASE_REFRESH_REPLACEMENT_COUNT = 5;
 const REGULAR_ANCHOR_REBASE_INTERVAL = 4;
+const MIN_VISIBLE_NEWS = 3;
+const MAX_VISIBLE_NEWS = 4;
+const ABUNDANT_NEWS_CANDIDATE_COUNT = 8;
 
-export const PULSE_DEVICE_PROFILE_VERSION = 6;
+export const PULSE_DEVICE_PROFILE_VERSION = 7;
 
 export interface PulseDeviceScoreEntry {
   score: number;
@@ -65,7 +69,7 @@ export interface PulseDeviceStoryAnchor {
  */
 export interface PulseDeviceProfile {
   version: typeof PULSE_DEVICE_PROFILE_VERSION;
-  ranking_version: "rule_v8_hybrid";
+  ranking_version: "rule_v10_research_completion";
   device_id: string | null;
   updated_at: string;
   sequence: number;
@@ -94,7 +98,7 @@ export type PulseDeviceSignal =
 export interface DevicePulseSlate {
   items: PulseItem[];
   summary: PulseFeedSummary;
-  /** IDs rendered as ordinary cards in the current first screen. */
+  /** IDs selected for the current first screen, including rotating news. */
   refreshable_item_ids: string[];
   /** Aggregate context only; no ticker or account identifier is logged. */
   story_context: PulseStoryContext;
@@ -117,7 +121,7 @@ export function createPulseDeviceProfile(
 ): PulseDeviceProfile {
   return {
     version: PULSE_DEVICE_PROFILE_VERSION,
-    ranking_version: "rule_v8_hybrid",
+    ranking_version: "rule_v10_research_completion",
     device_id: deviceId,
     updated_at: now.toISOString(),
     sequence: 0,
@@ -133,7 +137,7 @@ export function isPulseDeviceProfile(value: unknown): value is PulseDeviceProfil
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const profile = value as Partial<PulseDeviceProfile>;
   return profile.version === PULSE_DEVICE_PROFILE_VERSION
-    && profile.ranking_version === "rule_v8_hybrid"
+    && profile.ranking_version === "rule_v10_research_completion"
     && (profile.device_id === null || typeof profile.device_id === "string")
     && typeof profile.updated_at === "string"
     && typeof profile.sequence === "number"
@@ -326,12 +330,20 @@ export function selectDevicePulseSlate(
     .map((item) => applyDeviceSeenState(item, profile));
   const earlyStories = eligible.filter(isEarlyCompanyStory);
   const selectedStory = selectCompanyStory(earlyStories, profile);
+  const newsCandidates = eligible
+    .filter((item) => item.kind === "news")
+    .sort((left, right) => compareItems(left, right, profile));
+  const selectedNews = selectNewsItems(newsCandidates, feed.visible_limit, profile);
+  const selectedNewsIds = new Set(selectedNews.map((item) => item.id));
+  const remainingNews = newsCandidates.filter((item) => !selectedNewsIds.has(item.id));
   const ordered = eligible
-    .filter((item) => !isEarlyCompanyStory(item))
+    .filter((item) => !isEarlyCompanyStory(item) && item.kind !== "news")
     .sort((left, right) => compareItems(left, right, profile));
   const composed = composeDisplayAwareSlate(
     ordered,
     selectedStory,
+    selectedNews,
+    remainingNews,
     profile,
     feed.visible_limit,
   );
@@ -358,6 +370,7 @@ export function buildDevicePulseSummary(
       analysis: actionable.filter((item) => item.kind === "analysis" && item.phase !== "active").length,
       question: countKind(actionable, "question"),
       resurface: countKind(actionable, "resurface"),
+      news: countKind(actionable, "news"),
     },
     primary_action: toLinkAction(actionable[0]?.primary_action),
   };
@@ -366,6 +379,8 @@ export function buildDevicePulseSummary(
 function composeDisplayAwareSlate(
   ordered: PulseItem[],
   story: PulseItem | null,
+  selectedNews: PulseItem[],
+  remainingNews: PulseItem[],
   profile: PulseDeviceProfile,
   visibleLimit: number,
 ): {
@@ -389,29 +404,29 @@ function composeDisplayAwareSlate(
   const fixedDisplayEntryCount = Number(story !== null) + Number(regularForm4.length >= 2);
   const refreshWindow = selectRefreshableWindow(
     mixed,
-    Math.max(0, normalizedVisibleLimit - fixedDisplayEntryCount),
+    Math.max(0, normalizedVisibleLimit - fixedDisplayEntryCount - selectedNews.length),
     profile,
   );
   const withStory = story ? insertCompanyStory(refreshWindow.items, story, profile) : refreshWindow.items;
 
+  const withFixedEntries = regularForm4.length < 2
+    ? withStory
+    : insertAtIndex(
+      withStory,
+      Math.min(
+        Math.max(FORM4_STACK_TARGET_INDEX, leadingProtectedCount(withStory)),
+        withStory.length,
+      ),
+      regularForm4,
+    );
+  const withNews = insertNewsItems(withFixedEntries, selectedNews, normalizedVisibleLimit, profile);
+
   // `buildPulseFeedDisplayEntries` turns this contiguous run into one visual
   // card. Putting it after a few distinct entries prevents one trading day
   // from consuming the first screen, while keeping every trade expandable.
-  if (regularForm4.length < 2) {
-    return {
-      items: withStory,
-      refreshableItemIds: refreshWindow.refreshableItemIds,
-      refresh: refreshWindow.refresh,
-    };
-  }
-  const protectedCount = leadingProtectedCount(withStory);
-  const insertAt = Math.min(
-    Math.max(FORM4_STACK_TARGET_INDEX, protectedCount),
-    withStory.length,
-  );
   return {
-    items: insertAtIndex(withStory, insertAt, regularForm4),
-    refreshableItemIds: refreshWindow.refreshableItemIds,
+    items: [...withNews, ...remainingNews],
+    refreshableItemIds: [...refreshWindow.refreshableItemIds, ...selectedNews.map((item) => item.id)],
     refresh: refreshWindow.refresh,
   };
 }
@@ -720,6 +735,163 @@ function selectCompanyStory(items: PulseItem[], profile: PulseDeviceProfile): Pu
   // browser may reset safely without sending exposure history to Supabase.
   const seed = `${profile.device_id ?? "new-device"}:${profile.refresh_generation}:company-story`;
   return stableWeightedChoice(rotatingCandidates, seed, companyStoryWeight);
+}
+
+/**
+ * News is intentionally chosen as a small, separately rotating lane. It
+ * guarantees three cards whenever the reviewed-news reservoir has three
+ * candidates, adds a fourth only with a healthy supply, and tries a personal
+ * item before filling the remaining market context. All choice state remains
+ * in the browser profile; no exposure history is uploaded.
+ */
+function selectNewsItems(
+  candidates: PulseItem[],
+  visibleLimit: number,
+  profile: PulseDeviceProfile,
+): PulseItem[] {
+  const targetCount = targetNewsCount(candidates.length, visibleLimit);
+  if (targetCount === 0) return [];
+  const fresh = candidates.filter((item) => !wasNewsSelectedRecently(item, profile));
+  const selected: PulseItem[] = [];
+  const add = (items: PulseItem[], count: number, namespace: string) => {
+    const selectedIds = new Set(selected.map((item) => item.id));
+    const picks = stablePickWeightedNews(
+      items.filter((item) => !selectedIds.has(item.id)),
+      count,
+      profile,
+      namespace,
+    );
+    selected.push(...picks);
+  };
+
+  // A follow/watchlist or recent-research match is never a hard filter: cold
+  // starts still receive market breadth, while a personal news item wins the
+  // first available news position when one exists.
+  add(fresh.filter(isPersonalNews), 1, "news-personal");
+  add(fresh, targetCount - selected.length, "news-fresh");
+  if (selected.length < targetCount) {
+    const fallback = candidates
+      .filter((item) => !selected.some((chosen) => chosen.id === item.id))
+      .sort((left, right) => compareByOldestSelection(left, right, profile));
+    add(fallback, targetCount - selected.length, "news-cooldown-fallback");
+  }
+  return selected.slice(0, targetCount);
+}
+
+function targetNewsCount(candidateCount: number, visibleLimit: number): number {
+  const screenCapacity = Math.max(0, Math.floor(visibleLimit));
+  if (candidateCount <= 0 || screenCapacity <= 0) return 0;
+  const desired = candidateCount >= ABUNDANT_NEWS_CANDIDATE_COUNT
+    ? MAX_VISIBLE_NEWS
+    : MIN_VISIBLE_NEWS;
+  return Math.min(desired, candidateCount, screenCapacity);
+}
+
+function stablePickWeightedNews(
+  candidates: PulseItem[],
+  count: number,
+  profile: PulseDeviceProfile,
+  namespace: string,
+): PulseItem[] {
+  const available = [...candidates].sort((left, right) => left.id.localeCompare(right.id));
+  const selected: PulseItem[] = [];
+  for (let slot = 0; slot < count && available.length > 0; slot += 1) {
+    const picked = stableWeightedChoice(
+      available,
+      `${profile.device_id ?? "new-device"}:${profile.refresh_generation}:${namespace}:${slot}`,
+      newsSelectionWeight,
+    );
+    if (!picked) break;
+    selected.push(picked);
+    available.splice(available.findIndex((item) => item.id === picked.id), 1);
+  }
+  return selected;
+}
+
+function newsSelectionWeight(item: PulseItem): number {
+  return 1
+    + Number(item.feed_slot === "signal") * 4
+    + Number(item.coverage_level === "interest") * 3
+    + Number(item.metadata.market_issue_followed_match === true) * 5
+    + Number(item.metadata.market_issue_personal_match === true) * 2
+    + Number(item.metadata.market_issue_research_match === true) * 2
+    + (item.priority === "high" ? 2 : item.priority === "normal" ? 1 : 0);
+}
+
+function isPersonalNews(item: PulseItem): boolean {
+  return item.coverage_level === "interest"
+    || item.feed_slot === "signal"
+    || item.metadata.market_issue_followed_match === true
+    || item.metadata.market_issue_personal_match === true
+    || item.metadata.market_issue_research_match === true;
+}
+
+function wasNewsSelectedRecently(item: PulseItem, profile: PulseDeviceProfile): boolean {
+  const selectedGeneration = profile.item_exposures[item.id]?.last_selected_generation;
+  return typeof selectedGeneration === "number"
+    && selectedGeneration >= 0
+    && selectedGeneration >= profile.refresh_generation - RECENT_NEWS_SELECTION_GENERATIONS;
+}
+
+/** Places news through the first scroll, never in one consecutive block. */
+function insertNewsItems(
+  items: PulseItem[],
+  news: PulseItem[],
+  visibleLimit: number,
+  profile: PulseDeviceProfile,
+): PulseItem[] {
+  const mixed = [...items];
+  for (const [slot, item] of news.entries()) {
+    const requested = requestedNewsIndex(slot, news.length, visibleLimit, profile);
+    const insertionIndex = findNewsInsertionIndex(mixed, item, requested, visibleLimit);
+    mixed.splice(insertionIndex, 0, item);
+  }
+  return mixed;
+}
+
+function requestedNewsIndex(
+  slot: number,
+  count: number,
+  visibleLimit: number,
+  profile: PulseDeviceProfile,
+): number {
+  const capacity = Math.max(1, Math.floor(visibleLimit));
+  const evenlySpaced = Math.floor((slot + 1) * capacity / (count + 1));
+  const jitter = stableIndex(
+    `${profile.device_id ?? "new-device"}:${profile.refresh_generation}:news-position:${slot}`,
+    3,
+  ) - 1;
+  return Math.max(0, Math.min(capacity - 1, evenlySpaced + jitter));
+}
+
+function findNewsInsertionIndex(
+  items: PulseItem[],
+  item: PulseItem,
+  requested: number,
+  visibleLimit: number,
+): number {
+  const minimum = leadingProtectedCount(items);
+  const maximum = Math.min(items.length, Math.max(minimum, Math.floor(visibleLimit) - 1));
+  const target = Math.max(minimum, Math.min(maximum, requested));
+  const options = Array.from({ length: maximum - minimum + 1 }, (_, offset) => minimum + offset)
+    .sort((left, right) => Math.abs(left - target) - Math.abs(right - target) || left - right);
+  const nonAdjacent = options.find((index) => canInsertNewsAt(items, item, index, true));
+  if (nonAdjacent !== undefined) return nonAdjacent;
+  const distinctTicker = options.find((index) => canInsertNewsAt(items, item, index, false));
+  return distinctTicker ?? target;
+}
+
+function canInsertNewsAt(
+  items: PulseItem[],
+  item: PulseItem,
+  index: number,
+  requireTickerDiversity: boolean,
+): boolean {
+  const previous = items[index - 1];
+  const next = items[index];
+  if (previous?.kind === "news" || next?.kind === "news") return false;
+  if (!requireTickerDiversity || !item.ticker) return true;
+  return previous?.ticker !== item.ticker && next?.ticker !== item.ticker;
 }
 
 function insertCompanyStory(
@@ -1067,4 +1239,5 @@ const PULSE_ITEM_KINDS: PulseItemKind[] = [
   "question",
   "resurface",
   "learning",
+  "news",
 ];

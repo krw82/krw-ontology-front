@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
@@ -9,6 +10,8 @@ import {
 import { decodePulseItemId, PULSE_ITEM_KINDS } from "@/lib/pulse/contract";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { PULSE_LEARNING_ENTRIES } from "@/content/pulse/learning";
+import { marketIssueEnvironment } from "@/lib/market-issues/config";
+import { updateMarketIssueUserState } from "@/lib/market-issues/repository";
 import type {
   PulseItemKind,
   PulseItemMutationResponse,
@@ -193,6 +196,30 @@ async function mutateSourceIfRequired(context: MutationContext): Promise<boolean
     return Boolean(data);
   }
   if (context.sourceType === "learning") return PULSE_LEARNING_ENTRIES.some((entry) => entry.slug === context.sourceId);
+  if (context.sourceType === "news") {
+    const marketIssueDb = supabase as unknown as SupabaseClient;
+    const { data, error } = await marketIssueDb
+      .from("market_issues")
+      .select("id")
+      .eq("id", context.sourceId)
+      .eq("env", marketIssueEnvironment())
+      .eq("state", "published")
+      .is("merged_into_issue_id", null)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return false;
+    if (context.action === "save" || context.action === "unsave" || context.action === "dismiss") {
+      await updateMarketIssueUserState({
+        db: marketIssueDb,
+        userId: context.userId,
+        issueId: context.sourceId,
+        ...(context.action === "save" ? { isSaved: true } : {}),
+        ...(context.action === "unsave" ? { isSaved: false } : {}),
+        ...(context.action === "dismiss" ? { isHidden: true } : {}),
+      });
+    }
+    return true;
+  }
   if (context.sourceType === "checkup") return /^\d{4}-\d{2}-\d{2}$/.test(context.sourceId);
   return false;
 }

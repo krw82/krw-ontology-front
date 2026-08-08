@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { getAuthUser, handleAuthError } from "@/lib/auth";
+import { ANONYMOUS_PULSE_USER_ID, getOptionalAuthUser, handleAuthError } from "@/lib/auth";
 import { canAccessMenuFeature } from "@/lib/billing/feature-access-server";
 import { composePulseFeed } from "@/lib/pulse/composer";
 import { buildPulseFeedDelta, isPulseItemVersionMap } from "@/lib/pulse/delta";
@@ -42,28 +42,28 @@ export async function POST(request: NextRequest) {
 
   let user;
   try {
-    user = await getAuthUser();
+    user = await getOptionalAuthUser();
   } catch (error) {
     return handleAuthError(error);
   }
-  if (!user) return handleAuthError(new Error("No user"));
+  const userId = user?.id ?? ANONYMOUS_PULSE_USER_ID;
 
   const now = new Date();
   const supabase = getSupabaseAdmin();
   try {
-    const revision = await getPulseFeedRevision(supabase, user.id, now);
+    const revision = await getPulseFeedRevision(supabase, userId, now);
     if (parsed.data.revision === revision.value) {
       return Response.json(unchangedDelta(revision.value, now), { headers: PRIVATE_HEADERS });
     }
 
     const includeNotebookSources = await canAccessMenuFeature(
-      user.id,
-      user.email,
+      userId,
+      user?.email,
       "research_notebook",
     ).catch(() => false);
     const feed = await composePulseFeed({
       supabase,
-      userId: user.id,
+      userId,
       includeNotebookSources,
       filter: "all",
       limit: PULSE_PAGE_SIZE,
@@ -72,9 +72,15 @@ export async function POST(request: NextRequest) {
       revision,
     });
     return Response.json(buildPulseFeedDelta(feed, parsed.data.item_versions), { headers: PRIVATE_HEADERS });
-  } catch {
+  } catch (error) {
+    const errorDetail = error instanceof Error ? error.message : String(error);
+    console.error("[pulse/delta] composePulseFeed failed", {
+      userId,
+      message: errorDetail,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return Response.json(
-      { error: { code: "service_unavailable", message: "피드 변경사항을 불러오지 못했습니다." } },
+      { error: { code: "service_unavailable", message: "피드 변경사항을 불러오지 못했습니다.", detail: errorDetail } },
       { status: 503 },
     );
   }
@@ -88,6 +94,7 @@ function unchangedDelta(revision: string, now: Date): PulseFeedDeltaResponse {
     snapshot: null,
     ordered_candidate_ids: [],
     active_analysis_item_ids: [],
+    completed_analysis_item_ids: [],
     upserts: [] as PulseItem[],
     removed_item_ids: [],
     item_versions: {},

@@ -676,6 +676,34 @@ function stopManagedStockNewsListener() {
   }
 }
 
+function stopManagedDevMcpListener() {
+  const port = new URL(process.env.KRW_ONTOLOGY_MCP_URL).port || "8766";
+  const result = spawnSync("lsof", ["-nP", `-tiTCP:${port}`, "-sTCP:LISTEN"], {
+    encoding: "utf8",
+  });
+  const pids = result.stdout
+    .split(/\s+/)
+    .map((pid) => pid.trim())
+    .filter(Boolean);
+  for (const pid of pids) {
+    const command = spawnSync("ps", ["-p", pid, "-o", "command="], {
+      encoding: "utf8",
+    }).stdout;
+    if (
+      !command.includes("krw-ontology-mcp") &&
+      !command.includes("krw-ontology") &&
+      !command.includes("uv")
+    ) {
+      throw new Error(`Port ${port} is occupied by an unmanaged process: pid=${pid}`);
+    }
+    try {
+      process.kill(Number(pid), "SIGTERM");
+    } catch {
+      // Process may have exited between lsof and kill.
+    }
+  }
+}
+
 const workerRestartPlugin = {
   name: "worker-restart",
   setup(build) {
@@ -738,6 +766,15 @@ async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
   console.info(`[dev] shutting down after ${signal}`);
+
+  // The dev MCP server (`uv run krw-ontology-mcp`) spawns a child `python3`
+  // that survives SIGTERM on the `uv` parent. Kill any lingering listener on
+  // the MCP port so it does not block the next `npm run dev`.
+  try {
+    stopManagedDevMcpListener();
+  } catch (error) {
+    console.warn(`[dev:mcp] cleanup warning: ${error instanceof Error ? error.message : String(error)}`);
+  }
 
   await Promise.allSettled([
     workerContext?.dispose(),

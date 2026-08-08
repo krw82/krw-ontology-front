@@ -1,3 +1,8 @@
+import {
+  parseMarketIssueResearchPaths,
+  type MarketIssueResearchPath,
+} from "@/lib/market-issues/contract";
+
 export type MarketIssueScope = "mine" | "market";
 
 export type MarketIssueCompany = {
@@ -39,6 +44,7 @@ export type MarketIssueCard = {
   whyShown: string[];
   confirmed: string[];
   unconfirmed: string[];
+  researchPaths: MarketIssueResearchPath[];
   sources: MarketIssueSource[];
 };
 
@@ -204,6 +210,7 @@ export function normalizeMarketIssue(value: unknown, fallbackId = "issue"): Mark
     whyShown: uniqueText(readTextList(firstDefined(record, ["why_shown", "whyShown", "match_reasons", "matchReasons"]))),
     confirmed: uniqueText(readTextList(firstDefined(record, ["confirmed", "confirmed_facts", "confirmedFacts", "facts_confirmed", "factsConfirmed"]))),
     unconfirmed: uniqueText(readTextList(firstDefined(record, ["unconfirmed", "unconfirmed_items", "unconfirmedItems", "needs_verification", "needsVerification"]))),
+    researchPaths: parseMarketIssueResearchPaths(firstDefined(record, ["research_paths", "researchPaths"])),
     sources,
   };
 }
@@ -231,6 +238,7 @@ export function normalizeMarketIssueDetail(value: unknown): MarketIssueDetailRes
   const detailSources = readSources(firstDefined(record, ["sources", "source_items", "sourceItems"]));
   const detailConfirmed = readTextList(firstDefined(record, ["confirmed", "confirmed_facts", "confirmedFacts"]));
   const detailUnconfirmed = readTextList(firstDefined(record, ["unconfirmed", "unconfirmed_items", "unconfirmedItems", "needs_verification", "needsVerification"]));
+  const detailResearchPaths = parseMarketIssueResearchPaths(firstDefined(record, ["research_paths", "researchPaths"]));
   const detailWhyShown = readTextList(firstDefined(record, ["why_shown", "whyShown", "match_reasons", "matchReasons"]));
 
   return {
@@ -238,6 +246,7 @@ export function normalizeMarketIssueDetail(value: unknown): MarketIssueDetailRes
       ...issue,
       confirmed: uniqueText([...issue.confirmed, ...detailConfirmed]),
       unconfirmed: uniqueText([...issue.unconfirmed, ...detailUnconfirmed]),
+      researchPaths: detailResearchPaths.length > 0 ? detailResearchPaths : issue.researchPaths,
       whyShown: uniqueText([...issue.whyShown, ...detailWhyShown]),
       sources: detailSources.length > 0 ? detailSources : issue.sources,
     },

@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/auth";
+import type { NextRequest} from "next/server";
+import { NextResponse } from "next/server";
+import { getOptionalAuthUser } from "@/lib/auth";
 import { isMarketIssueScope } from "@/lib/market-issues/contract";
 import { listMarketIssues } from "@/lib/market-issues/repository";
 import { getMarketIssueServiceClient } from "@/lib/market-issues/service";
@@ -8,15 +9,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const user = await getAuthUser().catch(() => null);
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const user = await getOptionalAuthUser();
 
   const scopeParam = request.nextUrl.searchParams.get("scope");
   const scope = isMarketIssueScope(scopeParam) ? scopeParam : "market";
   try {
     const payload = await listMarketIssues({
       db: getMarketIssueServiceClient(),
-      userId: user.id,
+      userId: user?.id ?? null,
       scope,
       cursor: request.nextUrl.searchParams.get("cursor"),
     });
