@@ -2,7 +2,6 @@ import "server-only";
 
 import { Client } from "@xdevplatform/xdk";
 import {
-  marketIssueEnvironment,
   readMarketIssueRuntimeConfig,
   type MarketIssueRuntimeConfig,
   type MarketIssueSourceSeed,
@@ -13,8 +12,6 @@ import {
   asRows,
   createOrUpdateIssueForItem,
   getWorkerSettings,
-  hashText,
-  normalizeUrlForCorrelation,
   persistSourceItem,
   persistSourceMedia,
   syncMarketIssueSources,
@@ -41,8 +38,8 @@ const KEYWORD_FILTERS: Record<string, string> = {
 };
 
 type StreamEvent = {
-  data: any;
-  includes?: any;
+  data: unknown;
+  includes?: unknown;
   matching_rules?: Array<{ id?: string; tag?: string }>;
 };
 
@@ -77,9 +74,6 @@ async function syncStreamRules(
 
   const existing = await client.stream.getRules();
   const existingRules = asRows((existing as Row)?.data);
-  const toDelete = existingRules
-    .map((r) => text(r.id))
-    .filter(Boolean);
   const staleIds = existingRules
     .filter((r) => !desiredValues.has(text(r.value)))
     .map((r) => text(r.id))
@@ -116,22 +110,26 @@ async function syncStreamRules(
  * by the shared persistence pipeline. Mirrors the mapping in worker.ts's
  * fetchRecentTweets so downstream code is identical.
  */
-function mapStreamPost(data: any, includes: any): XTweet {
+function mapStreamPost(data: unknown, includes: unknown): XTweet {
+  const dataRow = asRow(data) ?? {};
+  const includesRow = asRow(includes) ?? {};
+  const entities = asRow(dataRow.entities) ?? {};
+  const attachments = asRow(dataRow.attachments) ?? {};
   const mediaByKey = new Map<string, Row>();
-  for (const media of asRows(includes?.media)) {
+  for (const media of asRows(includesRow.media)) {
     const key = text(media.media_key);
     if (key) mediaByKey.set(key, media);
   }
 
   const relatedUrls: string[] = [];
-  for (const url of asRows((data as Row)?.entities?.urls)) {
+  for (const url of asRows(entities.urls)) {
     const resolved = text(url.unwound_url || url.unwoundUrl || url.expanded_url || url.expandedUrl || url.url);
     if (resolved) relatedUrls.push(resolved);
   }
 
   // attachments.media_keys may be a string[] or an array of objects; normalize.
-  const rawMediaKeys: unknown[] = Array.isArray((data as Row)?.attachments?.media_keys)
-    ? (data as Row).attachments.media_keys
+  const rawMediaKeys: unknown[] = Array.isArray(attachments.media_keys)
+    ? attachments.media_keys
     : [];
   const mediaKeys: string[] = rawMediaKeys
     .map((k) => text(typeof k === "string" ? k : (k as Row)?.media_key))
@@ -149,12 +147,12 @@ function mapStreamPost(data: any, includes: any): XTweet {
       height: Number(m.height) || null,
     }));
 
-  const metrics = (data as Row)?.public_metrics || (data as Row)?.publicMetrics;
+  const metrics = dataRow.public_metrics || dataRow.publicMetrics;
   return {
-    id: text((data as Row)?.id),
-    text: text((data as Row)?.text),
-    created_at: text((data as Row)?.created_at || (data as Row)?.createdAt) || undefined,
-    lang: text((data as Row)?.lang) || undefined,
+    id: text(dataRow.id),
+    text: text(dataRow.text),
+    created_at: text(dataRow.created_at || dataRow.createdAt) || undefined,
+    lang: text(dataRow.lang) || undefined,
     public_metrics: metrics as Record<string, number> | undefined,
     related_urls: [...new Set(relatedUrls)],
     media,
@@ -283,8 +281,7 @@ export async function runMarketIssueStreamCycle(input: {
   // so a heartbeat-timeout watchdog would only produce noise. The underlying
   // fetch Response.body stays open and the async iterator yields as soon as a
   // real tweet arrives; the outer reconnect loop in the entrypoint handles
-  // genuine disconnects. We still track lastActivity for diagnostic logging.
-  let lastActivity = Date.now();
+  // genuine disconnects. Forward activity to the worker heartbeat callback.
 
   let processed = 0;
   const sourceCache = new Map<string, Row | null>();
@@ -301,7 +298,7 @@ export async function runMarketIssueStreamCycle(input: {
     const stream = await client.stream.posts(streamOptions);
 
     stream.on("keepAlive", () => {
-      lastActivity = Date.now();
+      input.onHeartbeat?.();
     });
     stream.on("error", (err: unknown) => {
       console.error(JSON.stringify({
@@ -316,7 +313,7 @@ export async function runMarketIssueStreamCycle(input: {
         stream.close();
         break;
       }
-      lastActivity = Date.now();
+      input.onHeartbeat?.();
       try {
         const handled = await handleStreamEvent(db, config, settings, sourceCache, event);
         if (handled) processed += 1;
@@ -325,7 +322,7 @@ export async function runMarketIssueStreamCycle(input: {
           worker: config.workerId,
           kind: "market_issue_stream_event_failed",
           tag: text(event.matching_rules?.[0]?.tag),
-          tweet_id: text(event.data?.id),
+          tweet_id: text(asRow(event.data)?.id),
           error: String((err as Error)?.message || err),
         }));
       }

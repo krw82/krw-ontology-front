@@ -785,8 +785,8 @@ export default function DevComponentsGallery() {
               <div className="overflow-hidden rounded-[8px] border border-hairline">
                 <TopNav
                   hideAccountMenu
-                  brandHref="/companies"
-                  brandAriaLabel="회사 목록으로 이동"
+                  brandHref="/pulse"
+                  brandAriaLabel="펄스로 이동"
                   actionSlot={
                     <div className="hidden gap-xs sm:flex">
                       <button className="inline-flex h-10 items-center gap-xs rounded-[8px] border border-primary bg-primary-fixed px-sm text-[13px] font-black text-primary">

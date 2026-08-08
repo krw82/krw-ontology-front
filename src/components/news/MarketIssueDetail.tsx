@@ -42,8 +42,14 @@ export default function MarketIssueDetail({ issueId }: { issueId: string }) {
   }, [issueId]);
 
   useEffect(() => {
-    void loadDetail();
-    return () => controllerRef.current?.abort();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void loadDetail();
+    });
+    return () => {
+      cancelled = true;
+      controllerRef.current?.abort();
+    };
   }, [loadDetail]);
 
   const openResearchDraft = async (researchPathId: string | null) => {
@@ -104,7 +110,7 @@ function IssueDetailContent({
             <span className="material-symbols-outlined text-[16px]" aria-hidden="true">source</span>
             원문 {sourceCount}개
           </span>
-          <time className="text-[12px] font-medium text-muted" dateTime={issue.updatedAt ?? issue.publishedAt ?? undefined}>
+          <time className="sr-only" dateTime={issue.updatedAt ?? issue.publishedAt ?? undefined}>
             {formatIssueRelativeTime(issue.updatedAt ?? issue.publishedAt)}
           </time>
         </div>
@@ -141,7 +147,7 @@ function IssueDetailContent({
         <div className="px-lg py-xl sm:px-xl">
           <p className="text-[12px] font-extrabold tracking-[0.08em] text-[#adc8ff]">NEXT RESEARCH STEP</p>
           <h2 id="next-research-title" className="mt-1 text-[21px] font-extrabold tracking-[-0.035em]">
-            {issue.researchPaths.length > 0 ? "다음 리서치 질문" : "공시와 실적콜에서 이 연결을 검증해보세요."}
+            {issue.researchPaths.length > 0 ? "다음 리서치 질문" : "이 소식이 어떤 영향을 미칠지 분석해보세요."}
           </h2>
 
           {issue.researchPaths.length > 0 ? (
@@ -177,7 +183,7 @@ function IssueDetailContent({
           <div className="border-t border-white/15 px-lg py-base sm:flex sm:items-center sm:justify-end sm:px-xl">
             <button type="button" onClick={() => onOpenResearchDraft(null)} disabled={openingDraft} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-lg text-[13px] font-extrabold text-ink transition hover:bg-[#dce8ff] disabled:cursor-not-allowed disabled:opacity-65 sm:w-auto">
               {openingDraft ? <span className="material-symbols-outlined animate-spin text-[18px]" aria-hidden="true">progress_activity</span> : <span className="material-symbols-outlined text-[18px]" aria-hidden="true">manage_search</span>}
-              {openingDraft ? "질문 초안 여는 중" : "공시·실적콜로 검증하기"}
+              {openingDraft ? "질문 초안 여는 중" : "영향 분석하기"}
             </button>
             {draftError ? <p className="mt-2 max-w-xs text-[12px] leading-5 text-[#ffcfbf] sm:ml-base sm:mt-0" role="alert">{draftError}</p> : null}
           </div>

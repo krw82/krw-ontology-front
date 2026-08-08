@@ -114,8 +114,8 @@ export default async function GuruPage({ searchParams }: GuruPageProps) {
       <TopNav
         initialUserProfile={topNavProfileFromUser(user)}
         preserveInitialUserProfile={shouldPreserveInitialProfile(user)}
-        brandHref="/companies"
-        brandAriaLabel="회사 목록으로 이동"
+        brandHref="/pulse"
+        brandAriaLabel="펄스로 이동"
         showLocaleSwitcher
       />
       <GuruDirectoryClient locale={locale} company={companyContext} />

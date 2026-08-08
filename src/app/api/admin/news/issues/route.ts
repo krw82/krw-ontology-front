@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest} from "next/server";
+import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { isMarketIssueAdmin } from "@/lib/market-issues/access";
 import { listMarketIssueAdminIssues } from "@/lib/market-issues/repository";

@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { marketIssueEnvironment } from "@/lib/market-issues/config";
 
-type Db = SupabaseClient<any>;
+type Db = SupabaseClient;
 type Row = Record<string, unknown>;
 
 export class MarketIssueAgentContextError extends Error {}

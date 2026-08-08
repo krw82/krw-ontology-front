@@ -79,8 +79,13 @@ export default function SharedSessionPageContent({
       ? "guru"
       : "구루";
   const startHref = isGuruShare ? "/guru" : "/";
-
-  let turnIndex = 0;
+  const messagesWithTurns = share.messages.map((message, index) => ({
+    message,
+    index,
+    turn: share.messages
+      .slice(0, index + 1)
+      .filter((candidate) => candidate.role === "user").length,
+  }));
 
   return (
     <div className="min-h-[100dvh] bg-canvas pb-[112px] text-on-surface">
@@ -112,9 +117,8 @@ export default function SharedSessionPageContent({
             </section>
           ) : null}
 
-          {share.messages.map((message, index) => {
+          {messagesWithTurns.map(({ message, index, turn }) => {
             if (message.role === "user") {
-              turnIndex += 1;
               return (
                 <section
                   key={`msg-${index}`}
@@ -122,7 +126,7 @@ export default function SharedSessionPageContent({
                   className="grid gap-md sm:grid-cols-[96px_minmax(0,1fr)]"
                 >
                   <div className="font-mono text-[12px] font-black uppercase leading-5 tracking-[0.16em] text-primary">
-                    {String(turnIndex).padStart(2, "0")} {strings.questionLabel}
+                    {String(turn).padStart(2, "0")} {strings.questionLabel}
                   </div>
                   <div className="border-l-2 border-primary-container pl-md text-ink">
                     <p className="whitespace-pre-wrap break-words text-[18px] font-extrabold leading-[1.55] sm:text-[22px] sm:leading-[1.45]">
@@ -140,7 +144,7 @@ export default function SharedSessionPageContent({
                 className="grid gap-md sm:grid-cols-[96px_minmax(0,1fr)]"
               >
                 <div className="font-mono text-[12px] font-black uppercase leading-5 tracking-[0.16em] text-primary">
-                  {String(turnIndex).padStart(2, "0")} {strings.answerLabel}
+                  {String(turn).padStart(2, "0")} {strings.answerLabel}
                 </div>
                 <div className="min-w-0 text-body">
                   <ResearchMarkdown content={message.content} />

@@ -17,8 +17,8 @@ import { enqueueMarketEventBatch, enqueueMarketIssueEnrichment } from "@/lib/mar
 import { assessMarketIssueFreshness } from "@/lib/market-issues/freshness";
 import { getMarketIssueServiceClient } from "@/lib/market-issues/service";
 
-type Db = SupabaseClient<any>;
-type Row = Record<string, any>;
+type Db = SupabaseClient;
+type Row = Record<string, unknown>;
 
 export type XTweet = {
   id: string;

@@ -17,8 +17,8 @@ import {
 } from "@/lib/market-issues/cache";
 import { getMarketIssueRevision } from "@/lib/market-issues/revision";
 
-type Db = SupabaseClient<any>;
-type Row = Record<string, any>;
+type Db = SupabaseClient;
+type Row = Record<string, unknown>;
 
 export type MarketIssueEventName =
   | "news_tab_viewed"
@@ -181,7 +181,9 @@ function serializeIssue(
   const issueEntities = entities.map((entity) => serializeEntity(entity, focusTickers));
   const matchingTickers = issueEntities
     .map((entity) => entity.ticker)
-    .filter((ticker): ticker is string => Boolean(ticker) && focusTickers.has(ticker));
+    .filter((ticker): ticker is string => (
+      typeof ticker === "string" && Boolean(ticker) && focusTickers.has(ticker)
+    ));
   const labels = statusLabels(issue);
   const reasons = matchingTickers.map((ticker) => ticker + "과 연결된 이슈");
 
@@ -395,7 +397,7 @@ export async function listMarketIssues(input: {
     focusTickers,
     scope,
   ));
-  const matchedTickers = unique(cards.flatMap((card) => card.companies
+  const matchedTickers = unique(cards.flatMap((card) => asRows(card.companies)
     .filter((company: Row) => company.followed)
     .map((company: Row) => text(company.ticker))));
 
@@ -407,7 +409,7 @@ export async function listMarketIssues(input: {
     summary: {
       focus_ticker_count: focusTickers.size,
       matched_tickers: matchedTickers.slice(0, 20),
-      unread_count: cards.filter((card) => !card.user_state.opened_at).length,
+      unread_count: cards.filter((card) => !asRow(card.user_state)?.opened_at).length,
       since_last_visit_count: cards.length,
     },
   };

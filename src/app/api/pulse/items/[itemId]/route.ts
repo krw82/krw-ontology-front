@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
@@ -196,7 +197,8 @@ async function mutateSourceIfRequired(context: MutationContext): Promise<boolean
   }
   if (context.sourceType === "learning") return PULSE_LEARNING_ENTRIES.some((entry) => entry.slug === context.sourceId);
   if (context.sourceType === "news") {
-    const { data, error } = await (supabase as any)
+    const marketIssueDb = supabase as unknown as SupabaseClient;
+    const { data, error } = await marketIssueDb
       .from("market_issues")
       .select("id")
       .eq("id", context.sourceId)
@@ -208,7 +210,7 @@ async function mutateSourceIfRequired(context: MutationContext): Promise<boolean
     if (!data) return false;
     if (context.action === "save" || context.action === "unsave" || context.action === "dismiss") {
       await updateMarketIssueUserState({
-        db: supabase as any,
+        db: marketIssueDb,
         userId: context.userId,
         issueId: context.sourceId,
         ...(context.action === "save" ? { isSaved: true } : {}),

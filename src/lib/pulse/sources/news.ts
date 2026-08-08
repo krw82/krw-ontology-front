@@ -5,7 +5,7 @@ import { marketIssueEnvironment } from "@/lib/market-issues/config";
 import { makePulseItemKey, type PulseCandidate } from "@/lib/pulse/contract";
 import type { Database } from "@/types/database";
 
-type Db = SupabaseClient<any>;
+type Db = SupabaseClient;
 type Row = Record<string, unknown>;
 
 const DAY_MS = 24 * 60 * 60 * 1_000;

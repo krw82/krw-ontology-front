@@ -39,7 +39,7 @@ describe("withStage", () => {
 
   it("preserves non-Error throw values in the stage message", async () => {
     await expect(withStage("revision", async () => {
-      // eslint-disable-next-line no-throw-literal
+       
       throw "string error";
     })).rejects.toThrow("pulse:revision failed: string error");
   });

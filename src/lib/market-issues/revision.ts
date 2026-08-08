@@ -12,7 +12,7 @@ export interface MarketIssueRevision {
 const TIME_BUCKET_MS = 5 * 60 * 1000;
 
 export async function getMarketIssueRevision(
-  supabase: SupabaseClient<any>,
+  supabase: SupabaseClient,
   now = new Date(),
 ): Promise<MarketIssueRevision> {
   const env = marketIssueEnvironment();

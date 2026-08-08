@@ -29,6 +29,7 @@ import ChatWatchlistHeaderActions from "@/components/chat/ChatWatchlistHeaderAct
 import DiscoverGuideFlow from "@/components/chat/DiscoverGuideFlow";
 import GuruCompanyPicker from "@/components/chat/GuruCompanyPicker";
 import GuruLensContextHeader from "@/components/chat/GuruLensContextHeader";
+import MarketIssueChatBanner from "@/components/chat/MarketIssueChatBanner";
 import { useChat } from "@/hooks/useChat";
 import { useChatMobileDock } from "@/hooks/useChatMobileDock";
 import { useEntitlement } from "@/hooks/useEntitlement";
@@ -606,6 +607,11 @@ function ChatContent({
           if (result.ok) {
             setComposerDraftResetKey((value) => value + 1);
             recordMarketIssueResearchSubmitted();
+            // draft path에서는 useChat의 onSessionCreated 콜백이 발화하지 않으므로
+            // (sendMessage 직전 activeSessionIdRef가 이미 createdSessionId로 세팅됨)
+            // URL에 sessionId를 반영하기 위해 직접 호출해야 한다.
+            // 이게 없으면 두 번째 메시지에서 다시 !sessionId 분기로 빠져 새 세션이 만들어진다.
+            handleSessionCreated(createdSessionId);
             return { ok: true };
           }
           routeFirstCompanyResearchToPulseRef.current = false;
@@ -651,6 +657,7 @@ function ChatContent({
       clearComposerPrefillParams,
       clearShareStarter,
       createSessionForDraft,
+      handleSessionCreated,
       recordMarketIssueResearchSubmitted,
       router,
       sendMessage,
@@ -767,8 +774,8 @@ function ChatContent({
     <div className="min-h-[100dvh] bg-canvas pt-[72px] md:flex md:h-full md:min-h-0 md:flex-col md:overflow-hidden md:pt-0">
       {/* Top Nav */}
       <TopNav
-        brandHref="/companies"
-        brandAriaLabel="회사 목록으로 이동"
+        brandHref="/pulse"
+        brandAriaLabel="펄스로 이동"
         hideAccountMenu
         mobileOverlay
         mobileCollapsed={mobileHeaderHidden}
@@ -841,6 +848,12 @@ function ChatContent({
                 </div>
               </div>
             )}
+
+            {/* News (market issue) context — news_issue_id 쿼리 파라미터로 진입했을 때 표시.
+                첫 메시지 전송 후 clearComposerPrefillParams가 URL에서 제거하면 자동 사라짐. */}
+            {marketIssueId ? (
+              <MarketIssueChatBanner issueId={marketIssueId} />
+            ) : null}
 
             {isGuruAdvisor &&
             selectedGuruLens.key !== "auto" &&

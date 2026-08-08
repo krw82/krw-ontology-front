@@ -52,7 +52,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv /opt/krw-ontology-venv \
-    && /opt/krw-ontology-venv/bin/pip install --no-cache-dir 'markitdown[pdf]'
+    && /opt/krw-ontology-venv/bin/pip install --no-cache-dir \
+      'markitdown[pdf]' \
+      'claude-agent-sdk==0.2.85'
 
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

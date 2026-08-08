@@ -32,7 +32,7 @@ TEMPLATE="$FRONT_DIR/ops/launchd/com.krwontology.filings-mcp.plist.template"
 PLIST_DIR="$HOME/Library/LaunchAgents"
 LABEL=com.krwontology.filings-mcp
 PLIST="$PLIST_DIR/$LABEL.plist"
-DOMAIN="gui/$(id -u)"
+LAUNCHD_DOMAIN="gui/$(id -u)"
 case "$ENV_FILE" in
   /*) ENV_PATH=$ENV_FILE ;;
   *) ENV_PATH="$FRONT_DIR/$ENV_FILE" ;;
@@ -63,7 +63,7 @@ if [ "$is_enabled" = "0" ]; then
     echo "Dry run: would stop/remove $LABEL because FILINGS_MCP_ENABLED is false."
     exit 0
   fi
-  launchctl bootout "$DOMAIN" "$PLIST" >/dev/null 2>&1 || true
+  launchctl bootout "$LAUNCHD_DOMAIN" "$PLIST" >/dev/null 2>&1 || true
   rm -f "$PLIST"
   echo "On-demand filings MCP is disabled; no launchd service is installed."
   exit 0
@@ -161,11 +161,11 @@ if [ "$LOAD" != "1" ]; then
   exit 0
 fi
 
-launchctl bootout "$DOMAIN" "$PLIST" >/dev/null 2>&1 || true
+launchctl bootout "$LAUNCHD_DOMAIN" "$PLIST" >/dev/null 2>&1 || true
 stop_managed_listeners
-launchctl bootstrap "$DOMAIN" "$PLIST"
-launchctl enable "$DOMAIN/$LABEL"
-launchctl kickstart -k "$DOMAIN/$LABEL"
+launchctl bootstrap "$LAUNCHD_DOMAIN" "$PLIST"
+launchctl enable "$LAUNCHD_DOMAIN/$LABEL"
+launchctl kickstart -k "$LAUNCHD_DOMAIN/$LABEL"
 
 verified=0
 VERIFY_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/krw-filings-mcp-verify.XXXXXX")
@@ -184,5 +184,5 @@ if [ "$verified" != "1" ]; then
 fi
 cat "$VERIFY_OUTPUT"
 rm -f "$VERIFY_OUTPUT"
-launchctl print "$DOMAIN/$LABEL" | sed -n '1,40p'
+launchctl print "$LAUNCHD_DOMAIN/$LABEL" | sed -n '1,40p'
 echo "OK on-demand filings MCP launchd service loaded"

@@ -152,13 +152,28 @@ if (!activeRelease || activeRelease.release_id !== catalog.release_id) {
   );
 }
 
-const { error: pulseRebuildError } = await client.rpc(
-  "rebuild_pulse_global_filing_candidates",
-  { p_env: catalog.env },
-);
+const pulseRebuildMaxAttempts = 3;
+for (let attempt = 1; attempt <= pulseRebuildMaxAttempts; attempt += 1) {
+  const { error: pulseRebuildError } = await client.rpc(
+    "rebuild_pulse_global_filing_candidates",
+    { p_env: catalog.env },
+  );
 
-if (pulseRebuildError) {
-  throw new Error(`rebuild_pulse_global_filing_candidates failed: ${pulseRebuildError.message}`);
+  if (!pulseRebuildError) break;
+
+  const isTransientStatementTimeout = pulseRebuildError.message
+    .toLowerCase()
+    .includes("statement timeout");
+  if (!isTransientStatementTimeout || attempt === pulseRebuildMaxAttempts) {
+    throw new Error(
+      `rebuild_pulse_global_filing_candidates failed: ${pulseRebuildError.message}`,
+    );
+  }
+
+  console.warn(
+    `Pulse filing candidate rebuild timed out; retrying (${attempt}/${pulseRebuildMaxAttempts})`,
+  );
+  await new Promise((resolve) => setTimeout(resolve, attempt * 1_000));
 }
 
 const { count, error: companyCountError } = await client

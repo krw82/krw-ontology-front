@@ -98,11 +98,23 @@ export default function MarketIssuesPage() {
   }, []);
 
   useEffect(() => {
-    void loadIssues(scope);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void loadIssues(scope);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [loadIssues, scope]);
 
   useEffect(() => {
-    void loadStatus();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void loadStatus();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [loadStatus]);
 
   useEffect(() => () => controllerRef.current?.abort(), []);
@@ -213,7 +225,7 @@ function MarketIssueCard({ issue }: { issue: MarketIssueCard }) {
   return (
     <article className="group flex min-h-full flex-col rounded-[22px] border border-hairline bg-white p-base shadow-[0_5px_22px_rgba(30,50,85,0.035)] transition duration-200 hover:-translate-y-0.5 hover:border-[#bdcff0] hover:shadow-[0_14px_34px_rgba(34,70,136,0.09)] sm:p-lg">
       <div className="flex justify-end">
-        <time className="shrink-0 text-[11px] font-medium text-muted" dateTime={issue.publishedAt ?? undefined}>
+        <time className="sr-only" dateTime={issue.publishedAt ?? undefined}>
           {formatIssueRelativeTime(issue.publishedAt)}
         </time>
       </div>

@@ -97,6 +97,7 @@ export default function CompanyCard({
       <Link
         href={destination}
         onClick={trackSelection}
+        prefetch={false}
         className="group block cursor-pointer"
         aria-label={`${accessibleSummary}. ${
           locale === "ko"

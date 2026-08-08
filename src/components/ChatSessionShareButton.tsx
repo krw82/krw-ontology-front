@@ -78,6 +78,7 @@ export default function ChatSessionShareButton({
   sessionId: string;
 }) {
   const [shareState, setShareState] = useState<ShareState>("idle");
+  const [copiedUrl, setCopiedUrl] = useState<string>("");
 
   useEffect(() => {
     if (
@@ -87,7 +88,10 @@ export default function ChatSessionShareButton({
     ) {
       return;
     }
-    const timeoutId = window.setTimeout(() => setShareState("idle"), 1800);
+    const timeoutId = window.setTimeout(() => {
+      setShareState("idle");
+      setCopiedUrl("");
+    }, 1800);
     return () => window.clearTimeout(timeoutId);
   }, [shareState]);
 
@@ -109,7 +113,12 @@ export default function ChatSessionShareButton({
         setShareState("shared");
       } else {
         const copied = await copyTextToClipboard(shareUrl);
-        setShareState(copied ? "shared" : "failed");
+        if (copied) {
+          setCopiedUrl(shareUrl);
+          setShareState("shared");
+        } else {
+          setShareState("failed");
+        }
       }
     } catch (error) {
       if ((error as DOMException).name === "AbortError") {
@@ -126,7 +135,12 @@ export default function ChatSessionShareButton({
       const copied = shareUrl
         ? await copyTextToClipboard(shareUrl)
         : false;
-      setShareState(copied ? "shared" : "failed");
+      if (copied) {
+        setCopiedUrl(shareUrl);
+        setShareState("shared");
+      } else {
+        setShareState("failed");
+      }
     }
   }, [sessionId, shareState]);
 
@@ -150,24 +164,56 @@ export default function ChatSessionShareButton({
           : shareState === "sharing"
             ? "대화 공유 링크 생성 중"
             : "이 대화 공유";
+  const label =
+    shareState === "shared"
+      ? "복사됨"
+      : shareState === "failed"
+        ? "실패"
+        : shareState === "auth_required"
+          ? "로그인"
+          : shareState === "sharing"
+            ? "생성 중"
+            : "공유";
 
   return (
-    <button
-      type="button"
-      className="inline-flex h-11 w-11 items-center justify-center rounded-[8px] text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-70"
-      aria-label={ariaLabel}
-      disabled={shareState === "sharing"}
-      onClick={handleShare}
-    >
-      <span
-        aria-hidden="true"
+    <div className="relative">
+      <button
+        type="button"
         className={[
-          "material-symbols-outlined text-[20px]",
-          shareState === "sharing" ? "animate-spin" : "",
+          "inline-flex h-9 items-center justify-center gap-1 rounded-[8px] border px-2 text-[12px] font-extrabold leading-4 transition-colors disabled:cursor-not-allowed disabled:opacity-55 sm:h-10 sm:px-3 sm:text-[13px]",
+          shareState === "shared"
+            ? "border-primary bg-primary-fixed text-on-primary-fixed"
+            : "border-hairline bg-canvas text-ink hover:border-primary hover:text-primary",
         ].join(" ")}
+        aria-label={ariaLabel}
+        disabled={shareState === "sharing"}
+        onClick={handleShare}
       >
-        {iconName}
-      </span>
-    </button>
+        <span
+          aria-hidden="true"
+          className={[
+            "material-symbols-outlined text-[17px]",
+            shareState === "sharing" ? "animate-spin" : "",
+          ].join(" ")}
+        >
+          {iconName}
+        </span>
+        <span>{label}</span>
+      </button>
+      {shareState === "shared" && copiedUrl ? (
+        <div className="absolute right-0 top-[calc(100%+8px)] z-50 flex w-max max-w-[320px] items-center gap-2 rounded-[8px] border border-hairline bg-surface px-3 py-2 shadow-lg">
+          <span className="min-w-0 truncate text-[12px] font-medium text-muted">
+            {copiedUrl}
+          </span>
+          <button
+            type="button"
+            className="inline-flex h-7 shrink-0 items-center rounded-[6px] border border-hairline px-2 text-[11px] font-extrabold text-ink transition-colors hover:border-primary hover:text-primary"
+            onClick={() => void copyTextToClipboard(copiedUrl)}
+          >
+            복사
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }

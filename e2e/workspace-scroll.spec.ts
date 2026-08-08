@@ -7,9 +7,8 @@ test.describe("standard workspace scroll restoration", () => {
     page,
   }) => {
     await page.goto("/companies", { waitUntil: "domcontentloaded" });
-    await expect(
-      page.locator("[data-workspace-bottom-navigation]"),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "전체 메뉴 열기" }))
+      .toHaveAttribute("data-workspace-menu-ready", "true");
     await expect(
       page.locator(
         '[data-workspace-scroll-content][data-workspace-scroll-restoration-ready="true"]',
@@ -39,14 +38,12 @@ test.describe("standard workspace scroll restoration", () => {
       .toBe(true);
 
     await page.goto("/pulse", { waitUntil: "domcontentloaded" });
-    await expect(
-      page.locator("[data-workspace-bottom-navigation]"),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "전체 메뉴 열기" }))
+      .toHaveAttribute("data-workspace-menu-ready", "true");
 
     await page.goto("/companies", { waitUntil: "domcontentloaded" });
-    await expect(
-      page.locator("[data-workspace-bottom-navigation]"),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "전체 메뉴 열기" }))
+      .toHaveAttribute("data-workspace-menu-ready", "true");
     await page.addStyleTag({
       content:
         "html { overflow-anchor: none !important; } body { min-height: 4000px !important; }",
@@ -56,9 +53,8 @@ test.describe("standard workspace scroll restoration", () => {
       .toBe(820);
 
     await page.goto("/en/companies", { waitUntil: "domcontentloaded" });
-    await expect(
-      page.locator("[data-workspace-bottom-navigation]"),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Open workspace menu" }))
+      .toHaveAttribute("data-workspace-menu-ready", "true");
     await expect
       .poll(() => page.evaluate(() => Math.round(window.scrollY)))
       .toBe(0);

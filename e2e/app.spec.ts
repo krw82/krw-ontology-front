@@ -231,7 +231,7 @@ test.describe("dev auth bypass", () => {
   }) => {
     await page.goto("/login");
 
-    await expect(page).toHaveURL(/\/(?:ko\/)?companies$/);
+    await expect(page).toHaveURL(/\/pulse$/);
   });
 
   test("opens chat workspace without Google login", async ({ page }) => {
@@ -288,7 +288,24 @@ test.describe("dev auth bypass", () => {
             created_at: createdAt,
             updated_at: createdAt,
           },
-          messages: [],
+          messages: [
+            {
+              id: "55555555-5555-4555-8555-555555555556",
+              session_id: sessionId,
+              role: "user",
+              content: examplePrompt,
+              status: "completed",
+              created_at: createdAt,
+            },
+            {
+              id: assistantMessageId,
+              session_id: sessionId,
+              role: "assistant",
+              content: "종목 발굴 테스트 답변입니다.",
+              status: "completed",
+              created_at: createdAt,
+            },
+          ],
           runs: [],
           tool_calls: [],
           citations: [],
@@ -413,7 +430,7 @@ test.describe("dev auth bypass", () => {
     await expect(koreanLink).not.toHaveAttribute("href", /\/ko\/guru/);
   });
 
-  test("starts a new chat by creating a session before running the agent", async ({
+  test("routes completed first-company research back to Pulse", async ({
     page,
   }) => {
     const sessionId = "11111111-1111-4111-8111-111111111111";
@@ -591,15 +608,13 @@ test.describe("dev auth bypass", () => {
     await expect
       .poll(() => runRequestCount, { timeout: 10000 })
       .toBeGreaterThanOrEqual(sendRequestBaseline + 1);
-    await expect(page).toHaveURL(new RegExp(`/chat\\?sessionId=${sessionId}`), {
+    await expect(page).toHaveURL(/\/pulse$/, {
       timeout: 20000,
     });
-    await expect(page.getByText("테스트 질문")).toBeVisible();
-    await expect(page.getByText("테스트 답변입니다.")).toBeVisible();
     expect(new Set(runRequestIds).size).toBe(1);
   });
 
-  test("saves a completed ticker answer into the company coverage memory", async ({
+  test("does not run the retired coverage-save mutation after first-company research", async ({
     page,
   }) => {
     const sessionId = "11111111-1111-4111-8111-111111111112";
@@ -748,32 +763,19 @@ test.describe("dev auth bypass", () => {
     await page.goto("/chat/new?ticker=AMZN");
     await page.getByLabel("메시지 입력").fill("AMZN 종목 카드 만들어줘");
     await page.getByRole("button", { name: "메시지 보내기" }).click();
-    await expect(page.getByText(answer)).toBeVisible();
-
-    await page
-      .getByRole("button", { name: "이 답변을 기업 커버리지에 저장" })
-      .click();
-
-    await expect.poll(() => noteBody).not.toBeNull();
+    await expect(page).toHaveURL(/\/pulse$/);
     await expect(
       page.getByRole("button", { name: "이 답변을 기업 커버리지에 저장" }),
-    ).toContainText("커버리지에 저장됨");
-    expect(noteBody).toMatchObject({
-      title: "AMZN 채팅 요약",
-      body: answer,
-      note_type: "chat_summary",
-      tags: ["chat", "coverage"],
-      source_chat_session_id: sessionId,
-      source_message_id: assistantMessageId,
-    });
+    ).toHaveCount(0);
+    expect(noteBody).toBeNull();
   });
 
-  test("mobile chat history opens a session without flashing the previous page or empty state", async ({
+  test("mobile research history opens a session without flashing a draft state", async ({
     page,
   }, testInfo) => {
     test.skip(
       testInfo.project.name !== "mobile-chrome",
-      "mobile bottom-sheet behavior is only relevant on small viewports",
+      "mobile workspace navigation is only relevant on small viewports",
     );
 
     const sessionId = "33333333-3333-4333-8333-333333333333";
@@ -887,34 +889,19 @@ test.describe("dev auth bypass", () => {
       });
     });
 
-    await page.goto("/chat?ticker=AAPL", { waitUntil: "domcontentloaded" });
-    await expect(page).toHaveURL(/\/chat\/new\?ticker=AAPL$/);
-    const historyButton = page.getByRole("button", { name: "채팅 기록 열기" });
-    await expect(historyButton).toBeEnabled();
-    await historyButton.click();
-
-    const historyDialog = page.getByRole("dialog", { name: "채팅 기록" });
-    await expect(historyDialog).toBeVisible();
-    const viewport = page.viewportSize();
-    expect(viewport).not.toBeNull();
-    await expect
-      .poll(async () => {
-        const box = await historyDialog.boundingBox();
-        return box
-          ? Math.abs(box.y + box.height - (viewport?.height ?? 0))
-          : Number.POSITIVE_INFINITY;
-      })
-      .toBeLessThanOrEqual(2);
-    const historyBox = await historyDialog.boundingBox();
-    expect(historyBox).not.toBeNull();
-    expect(historyBox?.x).toBeLessThanOrEqual(1);
-    expect(historyBox?.width).toBeGreaterThanOrEqual(
-      (viewport?.width ?? 0) - 2,
+    await page.goto("/companies", { waitUntil: "domcontentloaded" });
+    const workspaceMenuButton = page.getByRole("button", {
+      name: "전체 메뉴 열기",
+    });
+    await expect(workspaceMenuButton).toHaveAttribute(
+      "data-workspace-menu-ready",
+      "true",
     );
-    expect(historyBox?.height).toBeLessThan(
-      viewport?.height ?? Number.POSITIVE_INFINITY,
-    );
-
+    await workspaceMenuButton.click();
+    await page.getByRole("dialog", { name: "메뉴" })
+      .getByRole("link", { name: "최근 채팅" })
+      .click();
+    await expect(page).toHaveURL(/\/watchlist\?tab=history$/);
     await page.getByRole("link", { name: /모바일 전환 회귀 테스트/ }).click();
 
     await expect(page).toHaveURL(new RegExp(`/chat\\?sessionId=${sessionId}`));
@@ -933,12 +920,10 @@ test.describe("dev auth bypass", () => {
     await expect(
       page.getByText("모바일 전환 회귀 테스트 답변입니다."),
     ).toBeVisible();
-    await expect(page.getByRole("dialog", { name: "채팅 기록" })).toHaveCount(
-      0,
-    );
+    await expect(page.getByRole("dialog", { name: "메뉴" })).toHaveCount(0);
   });
 
-  test("mobile workspace menu groups global routes separately from chat history", async ({
+  test("mobile workspace menu groups current routes including recent chats", async ({
     page,
   }, testInfo) => {
     test.skip(
@@ -968,9 +953,8 @@ test.describe("dev auth bypass", () => {
     await expect(
       menu.getByRole("link", { name: "와이드 리서치" }),
     ).toBeVisible();
-    await expect(menu.getByRole("link", { name: "공시 알림" })).toBeVisible();
     await expect(menu.getByRole("link", { name: "13F 보유" })).toBeVisible();
-    await expect(menu.getByRole("link", { name: "채팅 기록" })).toHaveCount(0);
+    await expect(menu.getByRole("link", { name: "최근 채팅" })).toBeVisible();
   });
 });
 

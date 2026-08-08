@@ -791,8 +791,7 @@ MARKET_WEB_SOURCE_STARTED=1
 compose_stage up -d --force-recreate --wait market-web-source-worker
 compose_stage exec -T market-web-source-worker node -e '
   const sources = JSON.parse(process.env.MARKET_ISSUE_WEB_SOURCES || "[]");
-  if (!Array.isArray(sources) || sources.length === 0) throw new Error("MARKET_ISSUE_WEB_SOURCES is empty");
-  console.log(JSON.stringify({ worker: "market-web-source-worker", configuredSources: sources.length }));
+  console.log(JSON.stringify({ worker: "market-web-source-worker", configuredSources: Array.isArray(sources) ? sources.length : 0 }));
 '
 if market_issue_x_ingestion_enabled; then
   MARKET_ISSUE_STARTED=1

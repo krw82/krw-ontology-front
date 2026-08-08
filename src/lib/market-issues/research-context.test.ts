@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildMarketIssueResearchContext } from "@/lib/market-issues/research-context";
 
 describe("market issue research context", () => {
-  it("uses curated source tags for an earnings research route", () => {
+  it("prefers a verified official handle for an earnings research route", () => {
     const context = buildMarketIssueResearchContext({
       claims: [{ id: "revenue", claimKo: "FY26 매출은 $331B+입니다.", rawValue: "$331B+", evidenceIds: ["image:1"] }],
       sources: [{
@@ -17,7 +17,7 @@ describe("market issue research context", () => {
     });
 
     expect(context.primaryTickers).toEqual(["MSFT"]);
-    expect(context.tickerResolution).toEqual([{ ticker: "MSFT", method: "source_tag" }]);
+    expect(context.tickerResolution).toEqual([{ ticker: "MSFT", method: "official_handle" }]);
     expect(context.eventType).toBe("earnings");
     expect(context.route).toBe("company_event_impact");
   });

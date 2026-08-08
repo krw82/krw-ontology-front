@@ -27,8 +27,8 @@ import {
 import { buildMarketIssueResearchContext } from "@/lib/market-issues/research-context";
 import { supplementMarketIssueComposedBrief } from "@/lib/market-issues/fallback-research";
 
-type Db = SupabaseClient<any>;
-type Row = Record<string, any>;
+type Db = SupabaseClient;
+type Row = Record<string, unknown>;
 
 const COMPOSER_PROMPT_VERSION = "market_issue_compose/v6";
 const MAX_BACKFILL_ISSUES = 20;

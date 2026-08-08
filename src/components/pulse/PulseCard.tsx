@@ -167,7 +167,7 @@ export default function PulseCard({
               <span className="font-semibold text-muted">{pulseKindLabel(item)}</span>
               {item.state === "reviewed" ? <span className="font-medium text-muted">검토함</span> : null}
             </p>
-            <time className="shrink-0 pt-0.5 text-[11px] font-medium text-muted" dateTime={item.occurred_at}>
+            <time className="sr-only" dateTime={item.occurred_at}>
               {formatRelativeTime(item.occurred_at)}
             </time>
           </div>
@@ -250,6 +250,10 @@ function pulseResearchAction(item: PulseItem): PulseLinkAction | null {
     ticker: item.ticker,
     query: `${item.ticker} ${item.title}의 투자 관점과 근거를 확인해줘`,
   });
+  // news 아이템은 source_id에 마켓 이슈 UUID를 갖고 있음 — 채팅에서 출처 연결을 위해 전달
+  if (item.source_type === "news" && item.source_id) {
+    params.set("news_issue_id", item.source_id);
+  }
   return {
     type: "link",
     label: "이 이슈로 리서치",

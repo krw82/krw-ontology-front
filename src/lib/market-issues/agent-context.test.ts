@@ -27,7 +27,7 @@ function makeClient(tables: Record<string, MaybeSingleResult>) {
     chain.maybeSingle = () => tables[table] ?? { data: null, error: null };
     return chain;
   };
-  return { from: (table: string) => create(table) } as unknown as SupabaseClient<any>;
+  return { from: (table: string) => create(table) } as unknown as SupabaseClient;
 }
 
 const ENV_BAK = { ...process.env };
