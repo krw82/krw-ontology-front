@@ -60,7 +60,7 @@ const EMPTY_REFRESH_SUMMARY: PulseFeedRefreshSummary = {
   removed_item_count: 0,
 };
 
-type PulseRefreshOrigin = "manual" | "pull" | "pending_update" | "recovery" | "reconnect";
+type PulseRefreshOrigin = "manual" | "pull" | "recovery";
 
 interface PulseRefreshResult {
   changed: boolean;
@@ -102,7 +102,6 @@ export default function PulseFeed({
     () => loadInitialFeed && isUnavailablePulseFeed(initialFeed),
   );
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
-  const [hasPendingUpdate, setHasPendingUpdate] = useState(false);
   const [feedback, setFeedback] = useState<"helpful" | "not_helpful" | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pullDistance, setPullDistance] = useState(0);
@@ -289,7 +288,6 @@ export default function PulseFeed({
         return null;
       }
       setFeed(next);
-      setHasPendingUpdate(false);
       return {
         changed: true,
         generatedAt: next.generated_at,
@@ -350,7 +348,6 @@ export default function PulseFeed({
         || requestId !== firstPageRequestIdRef.current
       ) return null;
       setFeed((existing) => applyPulseFeedDelta(existing, delta));
-      setHasPendingUpdate(false);
       return {
         changed: delta.changed,
         generatedAt: delta.generated_at,
@@ -393,7 +390,6 @@ export default function PulseFeed({
     if (userInitiated) {
       trackClientEventSilently("pulse_refresh_requested", {
         origin,
-        has_pending_update: hasPendingUpdate,
         online: navigator.onLine,
         ranking_version: feedRef.current.ranking_version,
         story_context: previousSlate.story_context,
@@ -454,7 +450,7 @@ export default function PulseFeed({
     } finally {
       if (origin === "pull" && mountedRef.current) setPullRefreshing(false);
     }
-  }, [advanceDeviceRefresh, feedBusy, fetchDelta, fetchFirstPage, hasPendingUpdate, initialFeedLoading, pullRefreshing, slate]);
+  }, [advanceDeviceRefresh, feedBusy, fetchDelta, fetchFirstPage, initialFeedLoading, pullRefreshing, slate]);
 
   const refreshFromPull = useCallback(async () => {
     await refreshFeed("pull");
@@ -508,7 +504,7 @@ export default function PulseFeed({
     resetPullGesture();
   }, [resetPullGesture]);
 
-  const pollStatus = useCallback(async (applyImmediately = false) => {
+  const pollStatus = useCallback(async () => {
     if (
       document.visibilityState !== "visible" ||
       !navigator.onLine ||
@@ -539,12 +535,13 @@ export default function PulseFeed({
         return;
       }
       if (next.changed) {
-        if (applyImmediately) {
-          await fetchDelta();
+        // A status result only says that the private feed revision changed.
+        // Reconcile it immediately so research completion moves from the active
+        // rail to the completed rail without a separate user confirmation.
+        if (needsFullPulseRefresh(feedRef.current)) {
+          await fetchFirstPage();
         } else {
-          // Status is intentionally only a cheap revision read. Do not claim
-          // a fabricated card count before the user asks for its delta.
-          setHasPendingUpdate(true);
+          await fetchDelta();
         }
       }
     } catch (error) {
@@ -556,7 +553,7 @@ export default function PulseFeed({
         statusControllerRef.current = null;
       }
     }
-  }, [cancelStatusRequest, fetchDelta]);
+  }, [cancelStatusRequest, fetchDelta, fetchFirstPage]);
 
   useEffect(() => {
     if (!loadInitialFeed) return;
@@ -581,7 +578,7 @@ export default function PulseFeed({
       if (needsFullPulseRefresh(feedRef.current)) {
         await fetchFirstPage();
       } else {
-        await pollStatus(true);
+        await pollStatus();
       }
       if (active) setInitialFeedLoading(false);
     })();
@@ -643,17 +640,6 @@ export default function PulseFeed({
       window.removeEventListener("online", onOnline);
     };
   }, [cancelStatusRequest, hasActiveAnalysis, pollStatus]);
-
-  async function refreshNewItems() {
-    const refreshed = await refreshFeed("pending_update", { scrollToTop: true });
-    if (!refreshed?.changed) return;
-    trackClientEventSilently("pulse_new_items_seen", {
-      feed_session_id: feedSessionId,
-      item_count: refreshed.summary.added_candidate_count,
-      updated_item_count: refreshed.summary.updated_item_count,
-      removed_item_count: refreshed.summary.removed_item_count,
-    });
-  }
 
   async function mutate(item: PulseItem, action: PulseMutationAction) {
     if (pendingMutationIdsRef.current.has(item.id)) return;
@@ -786,20 +772,6 @@ export default function PulseFeed({
               ? "놓으면 새로고침"
               : "당겨서 새로고침"}
         </div>
-        <div aria-live="polite" className="sticky top-3 z-20 flex justify-center">
-          {hasPendingUpdate ? (
-            <button
-              aria-busy={feedBusy}
-              className="motion-pulse-update min-h-11 rounded-full bg-primary px-base text-[13px] font-extrabold text-white shadow-[0_8px_24px_rgba(0,62,199,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={feedBusy}
-              onClick={() => void refreshNewItems()}
-              type="button"
-            >
-              {loading ? "새 업데이트 불러오는 중…" : pendingIds.size > 0 ? "변경 저장 중…" : "새 업데이트 보기"}
-            </button>
-          ) : null}
-        </div>
-
         {initialFeedLoading ? (
           <PulseFeedLoadingSkeleton />
         ) : (
@@ -1591,7 +1563,7 @@ function insertAt(items: PulseItem[], index: number, item: PulseItem) {
 }
 
 function isUserInitiatedPulseRefresh(origin: PulseRefreshOrigin): boolean {
-  return origin === "manual" || origin === "pull" || origin === "pending_update";
+  return origin === "manual" || origin === "pull";
 }
 
 function isAbortError(error: unknown): boolean {

@@ -18,6 +18,16 @@ function item(id: string, serverRank = 0): PulseItem {
   };
 }
 
+function analysisItem(id: string, phase: "active" | "completed"): PulseItem {
+  return {
+    ...item(id),
+    kind: "analysis",
+    source_type: "analysis",
+    phase,
+    title: phase === "active" ? "진행 중인 분석" : "완료된 분석",
+  };
+}
+
 function feed(candidateItems: PulseItem[]): PulseFeedResponse {
   return {
     revision: "old", generated_at: "2026-07-20T00:00:00.000Z", snapshot_at: "2026-07-20T00:00:00.000Z", ranking_version: "rule_v5_flat",
@@ -41,6 +51,42 @@ describe("Pulse V5 feed reconciliation", () => {
     expect(next.candidate_items.map((candidate) => candidate.id)).toEqual(["second", "first"]);
     expect(next.candidate_items[0]?.title).toBe("updated");
     expect(next.candidate_items[1]?.title).toBe("first");
+  });
+
+  it("moves a completed analysis from the active rail without waiting for a manual refresh", () => {
+    const active = analysisItem("analysis-active", "active");
+    const completed = analysisItem("analysis-completed", "completed");
+    const current = {
+      ...feed([active]),
+      active_analysis_items: [active],
+      item_versions: { [active.id]: "v1-active" },
+    };
+
+    const next = applyPulseFeedDelta(current, {
+      generated_at: "2026-07-20T01:00:00.000Z",
+      revision: "new",
+      changed: true,
+      snapshot: {
+        ranking_version: "rule_v10_research_completion",
+        timezone: "Asia/Seoul",
+        date_label: "7월 20일",
+        filter: "all",
+        visible_limit: 12,
+        new_item_count: 0,
+        source_statuses: [],
+      },
+      ordered_candidate_ids: [],
+      active_analysis_item_ids: [],
+      completed_analysis_item_ids: [completed.id],
+      upserts: [completed],
+      removed_item_ids: [active.id],
+      item_versions: { [completed.id]: "v1-completed" },
+      refresh_summary: { added_candidate_count: 0, updated_item_count: 1, removed_item_count: 1 },
+    });
+
+    expect(next.active_analysis_items).toEqual([]);
+    expect(next.completed_analysis_items).toEqual([completed]);
+    expect(next.candidate_items).toEqual([]);
   });
 
   it("rolls back only the failed optimistic card", () => {

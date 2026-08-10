@@ -603,21 +603,6 @@ body {
   animation: motion-progress-spin 900ms linear infinite;
 }
 
-@keyframes motion-update-emphasis {
-  0% {
-    box-shadow: 0 8px 24px rgba(0, 62, 199, 0.28);
-    transform: translateY(0);
-  }
-  42% {
-    box-shadow: 0 12px 30px rgba(0, 62, 199, 0.42);
-    transform: translateY(-2px);
-  }
-  100% {
-    box-shadow: 0 8px 24px rgba(0, 62, 199, 0.28);
-    transform: translateY(0);
-  }
-}
-
 @keyframes motion-notebook-result-settle {
   from {
     opacity: 0.72;
@@ -698,10 +683,6 @@ body {
 .pulse-refresh-turn,
 .motion-progress-turn {
   animation: motion-refresh-turn 460ms var(--ease-out-expo) both;
-}
-
-.motion-pulse-update {
-  animation: motion-update-emphasis 520ms var(--ease-out-expo) both;
 }
 
 .notebook-refresh-settled {

@@ -103,6 +103,104 @@ test.describe("dev auth bypass", () => {
     ).toBeVisible();
   });
 
+  test("applies a completed research update without showing an update CTA", async ({
+    page,
+  }) => {
+    await page.route("**/api/pulse/status?*", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          generated_at: "2026-07-17T00:02:00.000Z",
+          revision: "p4.1.1.2",
+          changed: true,
+        }),
+      });
+    });
+    await page.route("**/api/pulse/delta", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          generated_at: "2026-07-17T00:02:00.000Z",
+          revision: "p4.1.1.2",
+          changed: true,
+          snapshot: {
+            ranking_version: "rule_v10_research_completion",
+            timezone: "Asia/Seoul",
+            date_label: "7월 17일 금요일",
+            filter: "all",
+            visible_limit: 12,
+            new_item_count: 0,
+            source_statuses: [],
+          },
+          ordered_candidate_ids: ["ZmlsaW5nOmUyZS1maXh0dXJl"],
+          active_analysis_item_ids: [],
+          completed_analysis_item_ids: ["analysis-completed"],
+          upserts: [{
+            id: "analysis-completed",
+            kind: "analysis",
+            feed_slot: "signal",
+            server_rank: 0,
+            trigger: "state",
+            source_type: "analysis",
+            source_id: "run-1:completed",
+            ticker: "AAPL",
+            coverage_level: null,
+            judgment: null,
+            linked_thesis: null,
+            eyebrow: "내가 시작한 분석 · 완료",
+            title: "완료된 리서치 결과",
+            body: "분석이 완료되었습니다.",
+            reason_code: "user_started_analysis",
+            reason_label: "내가 시작한 분석입니다.",
+            priority: "normal",
+            occurred_at: "2026-07-17T00:01:00.000Z",
+            available_at: "2026-07-17T00:00:00.000Z",
+            expires_at: "2026-07-18T00:01:00.000Z",
+            reviewed_at: null,
+            saved_at: null,
+            snoozed_until: null,
+            state: "new",
+            actionable: true,
+            phase: "completed",
+            group_key: "analysis:session-1",
+            primary_action: {
+              type: "link",
+              label: "결과 이어보기",
+              href: "/chat?sessionId=session-1&ticker=AAPL",
+            },
+            secondary_actions: [],
+            metadata: { run_status: "completed" },
+          }],
+          removed_item_ids: [],
+          item_versions: {
+            "ZmlsaW5nOmUyZS1maXh0dXJl": "v1-filing",
+            "analysis-completed": "v1-completed",
+          },
+          refresh_summary: {
+            added_candidate_count: 0,
+            updated_item_count: 1,
+            removed_item_count: 0,
+          },
+        }),
+      });
+    });
+
+    await page.goto("/pulse", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "피드" })).toBeVisible();
+    // The same status check runs immediately after a tab reconnects. It lets
+    // this test exercise passive synchronization without waiting two minutes.
+    await page.waitForTimeout(200);
+    const statusRequest = page.waitForRequest("**/api/pulse/status?*");
+    await page.evaluate(() => window.dispatchEvent(new Event("online")));
+    await statusRequest;
+
+    await expect(page.getByText("방금 완료")).toBeVisible();
+    await expect(page.getByText("완료된 리서치 결과")).toBeVisible();
+    await expect(page.getByRole("button", { name: "새 업데이트 보기" })).toHaveCount(0);
+  });
+
   test("opens protected companies page with stable account nav", async ({
     page,
   }, testInfo) => {
