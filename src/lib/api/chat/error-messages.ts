@@ -26,6 +26,7 @@ const PUBLIC_ERROR_MESSAGES: Record<ErrorCode, string> = {
     "분석 서비스가 잠시 바쁩니다. 잠시 후 다시 시도해주세요.",
   rate_limited: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
   validation_error: "요청 형식이 올바르지 않습니다.",
+  chat_session_closed: "이전 채팅방은 종료되었습니다. 새 채팅방을 만들어주세요.",
   internal_error: "요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.",
 };
 

@@ -58,6 +58,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 VALIDATE_BILLING_WORKER=1
+VALIDATE_AGENT_V1_OUTBOX=1
 VALIDATE_DOCUMENT_WORKER=1
 VALIDATE_DOCUMENT_OUTBOX_DISPATCHER=1
 VALIDATE_FILINGS_MCP=1
@@ -65,6 +66,7 @@ VALIDATE_FILING_NOTIFICATION_WORKER=1
 VALIDATE_FILING_BRIEF_WORKER=1
 if [ "$#" -gt 0 ]; then
   VALIDATE_BILLING_WORKER=0
+  VALIDATE_AGENT_V1_OUTBOX=0
   VALIDATE_DOCUMENT_WORKER=0
   VALIDATE_DOCUMENT_OUTBOX_DISPATCHER=0
   VALIDATE_FILINGS_MCP=0
@@ -73,6 +75,9 @@ if [ "$#" -gt 0 ]; then
   for compose_arg in "$@"; do
     if [ "$compose_arg" = "billing-worker" ]; then
       VALIDATE_BILLING_WORKER=1
+    fi
+    if [ "$compose_arg" = "agent-v1-outbox" ]; then
+      VALIDATE_AGENT_V1_OUTBOX=1
     fi
     if [ "$compose_arg" = "document-worker" ]; then
       VALIDATE_DOCUMENT_WORKER=1
@@ -450,6 +455,7 @@ if [ "$DEPLOY_MODE" = "build-only" ]; then
     const fs = require("fs");
     for (const path of [
       "server.js",
+      ".worker/agent-v1-outbox-worker.mjs",
       ".worker/document-worker.mjs",
       ".worker/document-outbox-dispatcher.mjs",
       ".worker/filing-notification-worker.mjs",
@@ -683,6 +689,50 @@ console.log(JSON.stringify({
 NODE
 else
   echo "Skipping document-outbox-dispatcher validation; compose target excludes document-outbox-dispatcher."
+fi
+
+if [ "$VALIDATE_AGENT_V1_OUTBOX" = "1" ]; then
+  for i in $(seq 1 30); do
+    agent_v1_outbox_container=$(
+      docker compose \
+        --project-name "$COMPOSE_PROJECT_NAME" \
+        --env-file "$ENV_FILE" \
+        -f "$BUILD_CONTEXT/docker-compose.yml" \
+        ps -q agent-v1-outbox
+    )
+    if [ -n "$agent_v1_outbox_container" ] && [ "$(docker inspect --format '{{.State.Status}}' "$agent_v1_outbox_container")" = "running" ]; then
+      health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$agent_v1_outbox_container")
+      if [ "$health" = "healthy" ] || [ "$health" = "none" ]; then
+        break
+      fi
+    fi
+    if [ "$i" -eq 30 ]; then
+      echo "agent-v1-outbox did not become healthy" >&2
+      docker compose \
+        --project-name "$COMPOSE_PROJECT_NAME" \
+        --env-file "$ENV_FILE" \
+        -f "$BUILD_CONTEXT/docker-compose.yml" \
+        ps >&2
+      exit 1
+    fi
+    sleep 2
+  done
+
+  docker compose \
+    --project-name "$COMPOSE_PROJECT_NAME" \
+    --env-file "$ENV_FILE" \
+    -f "$BUILD_CONTEXT/docker-compose.yml" \
+    exec -T agent-v1-outbox node - <<'NODE'
+const fs = require("fs");
+fs.accessSync(".worker/agent-v1-outbox-worker.mjs", fs.constants.R_OK);
+if (!process.env.AGENT_V1_OUTBOX_DATABASE_URL &&
+    !(process.env.SUPABASE_URL && process.env.SUPABASE_DB_PASSWORD)) {
+  throw new Error("agent-v1-outbox missing database configuration");
+}
+console.log(JSON.stringify({ worker: "agent-v1-outbox", databaseConfigured: true }));
+NODE
+else
+  echo "Skipping agent-v1-outbox validation; compose target excludes agent-v1-outbox."
 fi
 
 if [ "$VALIDATE_FILINGS_MCP" = "1" ]; then

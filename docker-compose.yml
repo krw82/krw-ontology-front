@@ -134,6 +134,52 @@ services:
       retries: 3
       start_period: 15s
 
+  # Applies the Rust agent's durable outbox to the chat read model.  It is a
+  # separate bounded worker so a web request never waits for final projection
+  # or billing settlement and no second research execution path is needed.
+  agent-v1-outbox:
+    image: krw-ontology-front-web:local
+    command: ["node", ".worker/agent-v1-outbox-worker.mjs"]
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    environment:
+      - AGENT_V1_OUTBOX_DATABASE_URL=${AGENT_V1_OUTBOX_DATABASE_URL:-}
+      - SUPABASE_DB_URL=${SUPABASE_DB_URL:-}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD:-}
+      - SUPABASE_DB_PORT=${SUPABASE_DB_PORT:-5432}
+      - AGENT_V1_OUTBOX_WORKER_ID=${AGENT_V1_OUTBOX_WORKER_ID:-krw-agent-v1-outbox}
+      - AGENT_V1_OUTBOX_CONCURRENCY=${AGENT_V1_OUTBOX_CONCURRENCY:-4}
+      - AGENT_V1_OUTBOX_BATCH_SIZE=${AGENT_V1_OUTBOX_BATCH_SIZE:-32}
+      - AGENT_V1_OUTBOX_LEASE_MS=${AGENT_V1_OUTBOX_LEASE_MS:-30000}
+      - AGENT_V1_OUTBOX_IDLE_POLL_MS=${AGENT_V1_OUTBOX_IDLE_POLL_MS:-2000}
+      - AGENT_V1_OUTBOX_FAILURE_BACKOFF_MS=${AGENT_V1_OUTBOX_FAILURE_BACKOFF_MS:-5000}
+    networks:
+      - app-network
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('fs').accessSync('.worker/agent-v1-outbox-worker.mjs')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
   llm-gateway:
     image: krw-ontology-front-web:local
     command: ["node", ".services/llm-gateway.mjs"]

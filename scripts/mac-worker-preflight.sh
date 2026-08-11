@@ -515,6 +515,7 @@ else
 fi
 for worker_bundle in \
   agent-worker.mjs \
+  agent-v1-outbox-worker.mjs \
   document-worker.mjs \
   document-outbox-dispatcher.mjs \
   filing-notification-worker.mjs \

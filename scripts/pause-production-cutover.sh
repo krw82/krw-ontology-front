@@ -217,11 +217,11 @@ REMOTE_FRONT_DIR=$CANONICAL_REMOTE_FRONT_DIR
 REMOTE_ONTOLOGY_DIR=$CANONICAL_REMOTE_ONTOLOGY_DIR
 COMPOSE_PROJECT_NAME=$CANONICAL_COMPOSE_PROJECT
 REMOTE_ENV_FILE=${REMOTE_ENV_FILE:-.env}
-REMOTE_PAUSE_SERVICES="reverse-proxy web llm-gateway document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker billing-worker"
-REMOTE_PAUSE_APPLICATION_SERVICES="web llm-gateway document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker billing-worker"
+REMOTE_PAUSE_SERVICES="reverse-proxy web agent-v1-outbox llm-gateway document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker billing-worker"
+REMOTE_PAUSE_APPLICATION_SERVICES="web agent-v1-outbox llm-gateway document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker billing-worker"
 # Production agent and ontology execution belongs exclusively to the Mac
 # launchd supervisors; the GCP sidecars are no longer part of this topology.
-REMOTE_RESUME_SERVICES="web llm-gateway document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker billing-worker reverse-proxy"
+REMOTE_RESUME_SERVICES="web agent-v1-outbox llm-gateway document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker billing-worker reverse-proxy"
 CUTOVER_STATE_FILE="$FRONT_DIR/.deploy/paused-runtime-${NEXT_PUBLIC_APP_VERSION:-manual}.tsv"
 PLIST_SNAPSHOT_DIR="$FRONT_DIR/.deploy/paused-plists-${NEXT_PUBLIC_APP_VERSION:-manual}"
 REMOTE_ROLLBACK_DIR="$REMOTE_FRONT_DIR/.deploy/code-rollback-${NEXT_PUBLIC_APP_VERSION:-manual}"

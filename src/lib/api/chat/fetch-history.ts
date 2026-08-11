@@ -30,6 +30,7 @@ export async function fetchHistory(
   content: string,
   requestId?: string,
   metadata: Json = {},
+  options: { readonly loadHistory?: boolean } = {},
 ): Promise<{ ok: true; result: HistoryResult } | { ok: false; response: Response }> {
   const admin = getSupabaseAdmin();
 
@@ -48,7 +49,19 @@ export async function fetchHistory(
     };
   }
 
-  // Load previous messages for multi-turn context
+  if (options.loadHistory === false) {
+    return {
+      ok: true,
+      result: {
+        userMessageId: userMessageResult.id,
+        userMessageCreated: userMessageResult.created,
+        history: [],
+      },
+    };
+  }
+
+  // Legacy prompt history is intentionally not sent to krw-agent. The Rust
+  // worker reconstructs the same chat session after it acquires the run fence.
   const { data: previousMessages, error: previousMessagesError } = await admin
     .from("messages")
     .select("role, content")

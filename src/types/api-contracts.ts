@@ -68,7 +68,7 @@ export type RunKind =
   | "scenario_sensitivity"
   | "guru_advisor";
 
-export type AgentRunExecutorType = "claude_agent";
+export type AgentRunExecutorType = "claude_agent" | "server_pipeline" | "rust_agent";
 
 /** SSE streaming event types */
 export type StreamingEventType =
@@ -110,6 +110,7 @@ export type ErrorCode =
   | "coverage_limit_reached"
   | "judgment_revision_conflict"
   | "validation_error"
+  | "chat_session_closed"
   | "internal_error";
 
 const VALID_ERROR_CODES: ReadonlySet<string> = new Set<ErrorCode>([
@@ -135,6 +136,7 @@ const VALID_ERROR_CODES: ReadonlySet<string> = new Set<ErrorCode>([
   "coverage_limit_reached",
   "judgment_revision_conflict",
   "validation_error",
+  "chat_session_closed",
   "internal_error",
 ]);
 

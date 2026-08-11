@@ -16,6 +16,8 @@ export interface ChatSessionRow extends Record<string, unknown> {
   scope_type: "global" | "company";
   default_tickers: string[] | null;
   default_document_types: string[] | null;
+  agent_backend?: "rust_agent";
+  closed_at?: string | null;
   source_filing_event_id?: string | null;
   last_message_preview: string | null;
   last_message_at: string | null;

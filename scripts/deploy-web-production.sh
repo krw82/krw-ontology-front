@@ -497,8 +497,8 @@ echo "Remote ontology compatibility path: $REMOTE_ONTOLOGY_DIR"
 echo "Deploy mode: $DEPLOY_MODE"
 echo "Frontend app version: $APP_VERSION"
 
-COMPOSE_SERVICES="reverse-proxy web llm-gateway redis document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker market-issue-worker market-issue-stream-worker market-web-source-worker market-issue-enrichment-worker billing-worker"
-COMPOSE_APPLICATION_SERVICES="web llm-gateway document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker market-issue-worker market-issue-stream-worker market-web-source-worker market-issue-enrichment-worker billing-worker"
+COMPOSE_SERVICES="reverse-proxy web agent-v1-outbox llm-gateway redis document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker market-issue-worker market-issue-stream-worker market-web-source-worker market-issue-enrichment-worker billing-worker"
+COMPOSE_APPLICATION_SERVICES="web agent-v1-outbox llm-gateway document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker market-issue-worker market-issue-stream-worker market-web-source-worker market-issue-enrichment-worker billing-worker"
 ROLLBACK_TRACKED_SERVICES="$COMPOSE_SERVICES"
 
 if [ "$DEPLOY_MODE" = "activate-prepared" ] \

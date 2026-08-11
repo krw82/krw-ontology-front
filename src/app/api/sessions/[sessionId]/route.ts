@@ -8,7 +8,7 @@ import type { UpdateSessionRequest } from "@/types/api-contracts";
 
 const MAX_SESSION_TITLE_LENGTH = 200;
 
-type SessionOwnerRow = Pick<ChatSessionRow, "id" | "user_id"> &
+type SessionOwnerRow = Pick<ChatSessionRow, "id" | "user_id" | "closed_at"> &
   Record<string, unknown>;
 type ActiveRunRow = Pick<AgentRunRow, "id" | "status"> &
   Record<string, unknown>;
@@ -27,7 +27,7 @@ async function getOwnedVisibleSession(sessionId: string, userId: string) {
   const admin = getSupabaseAdmin();
   const { data: session, error } = await admin
     .from("chat_sessions")
-    .select("id, user_id")
+    .select("id, user_id, closed_at")
     .eq("id", sessionId)
     .is("deleted_at", null)
     .maybeSingle<SessionOwnerRow>();
@@ -43,6 +43,13 @@ async function getOwnedVisibleSession(sessionId: string, userId: string) {
     return {
       ok: false as const,
       response: forbiddenError("이 채팅에 접근할 권한이 없습니다."),
+    };
+  }
+
+  if (session.closed_at) {
+    return {
+      ok: false as const,
+      response: errorResponse(410, "chat_session_closed", "이전 채팅방은 종료되었습니다."),
     };
   }
 

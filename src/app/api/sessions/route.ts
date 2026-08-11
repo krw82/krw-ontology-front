@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
       )
       .eq("user_id", user.id)
       .is("deleted_at", null)
+      .is("closed_at", null)
       .or("last_message_at.not.is.null,latest_run_status.in.(pending,queued,running)")
       .order("updated_at", { ascending: false })
       .range(offset, offset + limit)
@@ -280,6 +281,7 @@ export async function POST(request: NextRequest) {
     .from("chat_sessions")
     .insert({
       user_id: user.id,
+      agent_backend: "rust_agent",
       title: sessionTitle,
       scope_type: body.scope_type,
       default_tickers: body.default_tickers ?? [],
@@ -287,7 +289,7 @@ export async function POST(request: NextRequest) {
       source_filing_event_id: sourceFilingEventId,
     })
     .select(
-      "id, user_id, title, scope_type, default_tickers, default_document_types, deleted_at, created_at, updated_at",
+      "id, user_id, agent_backend, closed_at, title, scope_type, default_tickers, default_document_types, deleted_at, created_at, updated_at",
     )
     .single();
 

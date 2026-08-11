@@ -1,10 +1,8 @@
+import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
-import type { McpHealthResult } from "@/lib/agent/mcp-client";
-import { getReadyAgentWorker } from "@/lib/agent/worker-heartbeat";
 import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import {
-  getActiveOntologyCatalogRelease,
   getIndexedCompanies,
 } from "@/lib/ontology/catalog";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -19,9 +17,12 @@ import {
   checkChatRunRateLimit,
   getClientIp,
 } from "@/lib/api/chat/rate-limit";
-import { enqueueAgentRun } from "@/lib/agent/job-queue";
-import { getClaudeAgentModel } from "@/lib/agent/model";
 import { streamAgentRunEventsResponse } from "@/lib/agent/run-events";
+import {
+  getRustAgentRuntime,
+  RustAgentRuntimeError,
+  type RustAgentEnqueueResult,
+} from "@/lib/agent-v1/runtime";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
 import {
   attachAnalysisCreditRunShadow,
@@ -45,52 +46,10 @@ import {
 import { parseChatAttachmentContent } from "@/lib/chat/attachments";
 import { createImmediateAssistantResponse } from "@/lib/api/chat/immediate-response";
 import {
-  buildIdeaGenerationUserUrlContext,
-  buildUserUrlNewsEventContext,
-  buildUserUrlsNewsEventContext,
-  UserUrlContextError,
-} from "@/lib/news-discovery/user-url-context";
-import {
-  buildMarketIssueAgentContext,
-  MarketIssueAgentContextError,
-} from "@/lib/market-issues/agent-context";
-import { attachCompletedDocumentsToMessage } from "@/lib/document-ingestion/prompt-context";
-import {
   assessChatPromptSafety,
   blockedChatSafetyMessage,
 } from "@/lib/security/chat-safety";
 import type { ChatRunRequest, ErrorCode, RunKind } from "@/types/api-contracts";
-
-// --- Agent worker readiness cache ---
-
-let workerReadinessCache: {
-  releaseId: string;
-  result: McpHealthResult;
-  timestamp: number;
-} | null = null;
-const WORKER_READINESS_TTL = 5_000;
-
-async function getCachedReadyWorkerHealth(
-  expectedReleaseId: string,
-): Promise<McpHealthResult> {
-  if (
-    workerReadinessCache &&
-    workerReadinessCache.releaseId === expectedReleaseId &&
-    Date.now() - workerReadinessCache.timestamp < WORKER_READINESS_TTL
-  ) {
-    return workerReadinessCache.result;
-  }
-  const result = await getReadyAgentWorker(new Date(), expectedReleaseId);
-  if (!result.ok) {
-    throw new Error(result.message);
-  }
-  workerReadinessCache = {
-    releaseId: expectedReleaseId,
-    result: result.mcpHealth,
-    timestamp: Date.now(),
-  };
-  return result.mcpHealth;
-}
 
 function errorResponse(
   status: number,
@@ -230,15 +189,15 @@ export async function POST(request: NextRequest) {
   });
   if (!sessionRateLimitResult.ok) return sessionRateLimitResult.response;
 
-  let effectiveAnalysisMode = normalizeAnalysisMode(body.analysis_mode);
-  let effectiveRunKind = normalizeRunKind(
+  const effectiveAnalysisMode = normalizeAnalysisMode(body.analysis_mode);
+  const effectiveRunKind = normalizeRunKind(
     body.run_kind ?? defaultRunKindForAnalysisMode(effectiveAnalysisMode),
   );
   const guruLensKey =
     effectiveRunKind === "guru_advisor"
       ? normalizeGuruLensKey(body.guru_lens)
       : null;
-  let routingMode: "auto" | "preserve" =
+  const routingMode: "auto" | "preserve" =
     effectiveRunKind === "company_research" ? "auto" : "preserve";
 
   if (!featureChecked) {
@@ -255,7 +214,6 @@ export async function POST(request: NextRequest) {
     if (featureResponse) return featureResponse;
   }
 
-  let selectedNewsEventContext: Record<string, unknown> | null = null;
   const marketIssueId = body.market_issue_id ?? null;
   const userUrls = body.user_urls?.length
     ? body.user_urls
@@ -266,6 +224,37 @@ export async function POST(request: NextRequest) {
     ...(userUrls.length > 0 ? { user_urls: userUrls } : {}),
     ...(marketIssueId ? { market_issue_id: marketIssueId } : {}),
   };
+
+  if (marketIssueId || userUrls.length > 0 || (body.attachment_ids?.length ?? 0) > 0) {
+    return errorResponse(
+      400,
+      "validation_error",
+      "현재 전환된 리서치 엔진은 회사·와이드 기본 질문만 지원합니다. 새 채팅방에서 첨부·URL·뉴스를 제외하고 다시 요청해주세요.",
+      request_id,
+    );
+  }
+
+  if (
+    !["company_research", "scenario_sensitivity", "guru_advisor", "idea_generation"].includes(
+      effectiveRunKind,
+    )
+  ) {
+    return errorResponse(
+      400,
+      "validation_error",
+      "현재 전환된 리서치 엔진에서 지원하지 않는 리서치 유형입니다.",
+      request_id,
+    );
+  }
+
+  if (effectiveRunKind !== "idea_generation" && session.defaultTickers.length === 0) {
+    return errorResponse(
+      400,
+      "validation_error",
+      "회사 티커가 있는 새 채팅방에서 질문해주세요.",
+      request_id,
+    );
+  }
 
   const safetyAssessment = assessChatPromptSafety(content);
   if (safetyAssessment.blocked) {
@@ -314,114 +303,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 5. Check catalog/worker readiness before reserving execution budget. The
-  // web route only queues durable work; MCP calls run inside the Mac worker.
-  let mcpHealth: McpHealthResult;
-  try {
-    const activeCatalog = await getActiveOntologyCatalogRelease();
-    if (!activeCatalog?.release_id) {
-      throw new Error("No active ontology web catalog release found");
-    }
-    mcpHealth = await getCachedReadyWorkerHealth(activeCatalog.release_id);
-  } catch {
-    return errorResponse(
-      503,
-      "worker_unavailable",
-      "분석 워커가 준비되지 않았습니다. 잠시 후 다시 시도해주세요.",
-      request_id,
-    );
-  }
-  if (!mcpHealth.connected) {
-    return errorResponse(
-      503,
-      "worker_unavailable",
-      "분석 워커가 준비되지 않았습니다. 잠시 후 다시 시도해주세요.",
-      request_id,
-    );
-  }
-
-  if (marketIssueId && userUrls.length > 0) {
-    return errorResponse(
-      400,
-      "validation_error",
-      "뉴스 기반 분석과 URL 첨부는 동시에 사용할 수 없습니다.",
-      request_id,
-    );
-  }
-
-  if (marketIssueId) {
-    try {
-      selectedNewsEventContext = await buildMarketIssueAgentContext({
-        db: getSupabaseAdmin(),
-        issueId: marketIssueId,
-      });
-      // Macro/policy issues without a ticker resolve to wide research
-      // (idea_generation); ticker-bearing issues stay on company_research.
-      const contextTickers = (selectedNewsEventContext?.primary_tickers as string[]) ?? [];
-      if (contextTickers.length > 0) {
-        effectiveAnalysisMode = "company";
-        effectiveRunKind = "company_research";
-      } else {
-        effectiveAnalysisMode = "news";
-        effectiveRunKind = "idea_generation";
-      }
-      routingMode = "preserve";
-    } catch (error) {
-      if (error instanceof MarketIssueAgentContextError) {
-        return errorResponse(400, "validation_error", "선택한 뉴스 분석을 준비하지 못했습니다.", request_id);
-      }
-      return errorResponse(500, "internal_error", "선택한 뉴스 분석을 준비하지 못했습니다.", request_id);
-    }
-  } else if (userUrls.length > 0 && effectiveRunKind === "idea_generation") {
-    try {
-      selectedNewsEventContext = await buildIdeaGenerationUserUrlContext({
-        urls: userUrls,
-        userQuestion: content,
-      });
-      routingMode = "preserve";
-    } catch (error) {
-      const message =
-        error instanceof UserUrlContextError
-          ? error.message
-          : "URL을 읽지 못했습니다.";
-      return errorResponse(400, "validation_error", message, request_id);
-    }
-  } else if (userUrls.length > 0) {
-    const ticker = session.defaultTickers[0];
-    if (!ticker) {
-      return errorResponse(
-        400,
-        "validation_error",
-        "URL 첨부는 종목 기준 채팅에서만 사용할 수 있습니다.",
-        request_id,
-      );
-    }
-
-    try {
-      selectedNewsEventContext =
-        userUrls.length === 1
-          ? await buildUserUrlNewsEventContext({
-              url: userUrls[0],
-              ticker,
-              userQuestion: content,
-            })
-          : await buildUserUrlsNewsEventContext({
-              urls: userUrls,
-              ticker,
-              userQuestion: content,
-            });
-      effectiveAnalysisMode = "company";
-      effectiveRunKind = "company_research";
-      routingMode = "preserve";
-    } catch (error) {
-      const message =
-        error instanceof UserUrlContextError
-          ? error.message
-          : "URL을 읽지 못했습니다.";
-      return errorResponse(400, "validation_error", message, request_id);
-    }
-  }
-
   // 6. Open an execution-budget record before creating durable chat work.
   const budgetResult = await reserveBudgetStep(
     userId,
@@ -466,6 +347,7 @@ export async function POST(request: NextRequest) {
     content,
     request_id,
     userMessageMetadata,
+    { loadHistory: false },
   );
   if (!historyResult.ok) {
     await releaseExecutionBudget(userId, request_id, null, "history_fetch_failed");
@@ -476,45 +358,6 @@ export async function POST(request: NextRequest) {
       "history_fetch_failed",
     );
     return historyResult.response;
-  }
-
-  const documentAttachmentIds = body.attachment_ids ?? [];
-  if (documentAttachmentIds.length > 0) {
-    const attachmentResult = await attachCompletedDocumentsToMessage(
-      getSupabaseAdmin(),
-      {
-        userId,
-        sessionId: session.id,
-        messageId: historyResult.result.userMessageId,
-        attachmentIds: documentAttachmentIds,
-      },
-    );
-    if (!attachmentResult.ok) {
-      await releaseExecutionBudget(
-        userId,
-        request_id,
-        null,
-        "document_attachment_validation_failed",
-      );
-      await releaseAnalysisCreditsShadow(
-        userId,
-        request_id,
-        null,
-        "document_attachment_validation_failed",
-      );
-      if (historyResult.result.userMessageCreated) {
-        await getSupabaseAdmin()
-          .from("messages")
-          .delete()
-          .eq("id", historyResult.result.userMessageId);
-      }
-      return errorResponse(
-        400,
-        "validation_error",
-        attachmentResult.message,
-        request_id,
-      );
-    }
   }
 
   // 8. A duplicate can arrive while the first request is between session/message
@@ -543,7 +386,7 @@ export async function POST(request: NextRequest) {
       tickers: session.defaultTickers,
       question_length: content.length,
       attachment_count: countAttachedFiles(content),
-      document_attachment_count: documentAttachmentIds.length,
+      document_attachment_count: 0,
       research_mode: body.research_mode,
       analysis_mode: effectiveAnalysisMode,
       run_kind: effectiveRunKind,
@@ -557,61 +400,47 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  // 9. Queue durable agent work. The HTTP response only streams persisted
-  // run events; Claude Agent SDK execution is owned by agent-worker.
-  const model = getClaudeAgentModel();
-  const enqueueResult = await enqueueAgentRun({
-    session,
-    requestId: request_id,
-    history: historyResult.result,
-    model,
-    mcpHealth,
-    researchMode: body.research_mode,
-    analysisMode: effectiveAnalysisMode,
-    runKind: effectiveRunKind,
-    guruLensKey: effectiveGuruLensKey,
-    responseLocale,
-    executorType: "claude_agent",
-    selectedNewsEventContext,
-    routingMode,
-  });
-
-  if (!enqueueResult.ok) {
-    if (enqueueResult.reason === "duplicate_request" && enqueueResult.runId) {
+  // 9. Queue the Rust run through the pinned host contract. The HTTP response
+  // only streams persisted run events; the Rust daemon owns research work.
+  const runId = randomUUID();
+  const rustRunKind = toRustRunKind(effectiveRunKind, effectiveGuruLensKey);
+  const rustContext = effectiveRunKind === "idea_generation"
+    ? { kind: "covered_universe" as const, universe: "covered" as const }
+    : { kind: "company_ticker_set" as const, tickers: session.defaultTickers };
+  let enqueueResult: RustAgentEnqueueResult;
+  try {
+    const runtime = await getRustAgentRuntime();
+    enqueueResult = await runtime.enqueue({
+      runId,
+      requestId: request_id,
+      userId,
+      sessionId: session.id,
+      userMessageId: historyResult.result.userMessageId,
+      runKind: rustRunKind,
+      locale: responseLocale,
+      question: content,
+      context: rustContext,
+    });
+  } catch (error) {
+    const existingAfterFailure = await findExistingRunForRequest(request_id, userId);
+    if (existingAfterFailure) {
       return withSessionHeader(streamAgentRunEventsResponse({
         userId,
-        sessionId: session.id,
-        runId: enqueueResult.runId,
+        sessionId: existingAfterFailure.session_id,
+        runId: existingAfterFailure.id,
         requestId: request_id,
       }), session.id);
     }
-
-    await releaseExecutionBudget(
-      userId,
-      request_id,
-      enqueueResult.runId ?? null,
-      enqueueResult.reason,
-    );
-    await releaseAnalysisCreditsShadow(
-      userId,
-      request_id,
-      enqueueResult.runId ?? null,
-      enqueueResult.reason,
-    );
-    await getSupabaseAdmin()
-      .from("messages")
-      .delete()
-      .eq("id", historyResult.result.userMessageId);
-
-    return errorResponse(
-      enqueueResult.reason === "active_run_exists" ? 409 : 500,
-      enqueueResult.reason === "active_run_exists"
-        ? "active_run_exists"
-        : "internal_error",
-      enqueueResult.reason === "active_run_exists"
-        ? "이미 응답을 생성 중입니다."
-        : "분석 작업을 대기열에 넣지 못했습니다.",
-      request_id,
+    const reason = error instanceof RustAgentRuntimeError ? error.code : "agent_v1_enqueue_failed";
+    await releaseExecutionBudget(userId, request_id, null, reason);
+    await releaseAnalysisCreditsShadow(userId, request_id, null, reason);
+    return withSessionHeader(
+      await createImmediateAssistantResponse({
+        sessionId: session.id,
+        requestId: request_id,
+        content: "리서치 엔진이 잠시 준비되지 않았습니다. 질문은 저장했으며, 새 채팅방에서 다시 시도해 주세요.",
+      }),
+      session.id,
     );
   }
 
@@ -623,6 +452,12 @@ export async function POST(request: NextRequest) {
     runId: enqueueResult.runId,
     requestId: request_id,
   }), session.id);
+}
+
+function toRustRunKind(runKind: RunKind, guruLens: string | null): string {
+  if (runKind !== "guru_advisor") return runKind;
+  const lens = guruLens && guruLens !== "auto" ? guruLens : "buffett";
+  return `guru_${lens}`;
 }
 
 function withSessionHeader(response: Response, sessionId: string): Response {
@@ -648,6 +483,7 @@ async function findExistingRunForRequest(
     .select("id, user_id")
     .eq("id", run.session_id)
     .is("deleted_at", null)
+    .is("closed_at", null)
     .maybeSingle<Pick<ChatSessionRow, "id" | "user_id">>();
 
   return session?.user_id === userId ? run : null;
@@ -696,6 +532,7 @@ async function getOrCreateSessionId(
   const admin = getSupabaseAdmin();
   const insertPayload = {
     user_id: userId,
+    agent_backend: "rust_agent" as const,
     title,
     scope_type: scopeType,
     default_tickers: defaultTickers,

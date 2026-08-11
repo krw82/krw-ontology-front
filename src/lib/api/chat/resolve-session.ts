@@ -6,6 +6,8 @@ import type { ErrorCode } from "@/types/api-contracts";
 export interface ResolvedSession {
   id: string;
   userId: string;
+  agentBackend?: "rust_agent";
+  closedAt?: string | null;
   scopeType: "global" | "company";
   defaultTickers: string[];
   defaultDocumentTypes: string[];
@@ -35,7 +37,7 @@ export async function resolveSession(
   const supabase = await createClient();
   const { data: session, error: sessionError } = await supabase
     .from("chat_sessions")
-    .select("id, user_id, scope_type, default_tickers, default_document_types, source_filing_event_id")
+    .select("id, user_id, agent_backend, closed_at, scope_type, default_tickers, default_document_types, source_filing_event_id")
     .eq("id", sessionId)
     .is("deleted_at", null)
     .single<ChatSessionRow>();
@@ -51,11 +53,37 @@ export async function resolveSession(
     return { ok: false, response: forbiddenError("이 채팅에 접근할 권한이 없습니다.", requestId) };
   }
 
+  if (session.closed_at) {
+    return {
+      ok: false,
+      response: errorResponse(
+        410,
+        "chat_session_closed",
+        "이전 채팅방은 종료되었습니다. 새 채팅방을 만들어주세요.",
+        requestId,
+      ),
+    };
+  }
+
+  if (session.agent_backend !== "rust_agent") {
+    return {
+      ok: false,
+      response: errorResponse(
+        503,
+        "service_unavailable",
+        "리서치 엔진 전환이 아직 준비되지 않았습니다.",
+        requestId,
+      ),
+    };
+  }
+
   return {
     ok: true,
     session: {
       id: session.id,
       userId: session.user_id,
+      agentBackend: "rust_agent",
+      closedAt: session.closed_at ?? null,
       scopeType: session.scope_type,
       defaultTickers: session.default_tickers ?? [],
       defaultDocumentTypes: session.default_document_types ?? [],
