@@ -220,6 +220,17 @@ require_file() {
   [ -f "$1" ] || fail "Missing required file: $1"
 }
 
+assert_release_tree_has_no_generated_artifacts() {
+  generated_paths=$(git -C "$FRONT_DIR" ls-tree -r --name-only "$FRONT_GIT_COMMIT" | awk -F/ '
+    $1 ~ /^\.next-/ || $1 == ".worker" || $1 == ".services" || $0 == "next-env.d.ts" { print }
+  ')
+  [ -z "$generated_paths" ] || {
+    printf '%s\n' "Production commit contains generated build artifacts; remove them before deployment:" >&2
+    printf '%s\n' "$generated_paths" >&2
+    fail "Generated artifacts are excluded from the production release source."
+  }
+}
+
 target_value() {
   node -e 'const target=require(process.argv[1]); const value=target[process.argv[2]]; if(typeof value!=="string"||!value) process.exit(1); process.stdout.write(value);' "$TARGET_FILE" "$1"
 }
@@ -300,12 +311,14 @@ if [ "$SKIP_WEB" = "0" ]; then
   FRONT_GIT_COMMIT=$(git -C "$FRONT_DIR" rev-parse HEAD) || fail "Unable to resolve the frontend Git commit."
   [ "$(git -C "$FRONT_DIR" rev-parse HEAD)" = "$FRONT_GIT_COMMIT" ] || fail "Frontend release commit changed during preflight."
   [ -z "$(git -C "$FRONT_DIR" status --porcelain=v1 --untracked-files=normal)" ] || fail "Production web release requires a clean committed frontend tree."
+  assert_release_tree_has_no_generated_artifacts
 fi
 
 if [ "$WITH_AGENT_RELEASE" = "1" ]; then
   require_command python3
   require_command shasum
   require_file "$SCRIPT_DIR/verify-krw-agent-production-release.mjs"
+  require_file "$FRONT_DIR/ops/certificates/supabase-root-2021-ca.crt"
   [ -n "$AGENT_RELEASE_ROOT" ] || fail "Set KRW_AGENT_RELEASE_ROOT or pass --agent-release-root for a sealed dual-provider release."
   case "$AGENT_LOCAL_INSTALL_ROOT" in
     /*) ;;
@@ -509,6 +522,50 @@ create_agent_descriptor_upload() {
   chmod 0644 "$AGENT_DESCRIPTOR_COPY"
   observed_descriptor_hash="sha256:$(shasum -a 256 "$AGENT_DESCRIPTOR_COPY" | awk '{print $1}')"
   [ "$observed_descriptor_hash" = "$AGENT_DESCRIPTOR_HASH" ] || fail "Copied public descriptor hash does not match the verified release."
+}
+
+prune_remote_stale_deployment_artifacts() {
+  # A release is immutable once activated, but inactive build candidates are
+  # reproducible from Git and must not consume the VM disk forever. Keep the
+  # sole active stage and its running local image; remove only stale tags and
+  # directories under this deployment root before a new candidate is built.
+  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+set -eu
+
+release_base="$REMOTE_FRONT_DIR/.simple-deploy/releases"
+active_release=
+if [ -L "$REMOTE_FRONT_DIR/.simple-deploy/current" ]; then
+  active_release=$(cd "$REMOTE_FRONT_DIR/.simple-deploy/current" && pwd -P)
+fi
+if [ -d "$release_base" ]; then
+  release_base=$(cd "$release_base" && pwd -P)
+  for candidate in "$release_base"/*; do
+    [ -d "$candidate" ] && [ ! -L "$candidate" ] || continue
+    candidate=$(cd "$candidate" && pwd -P)
+    case "$candidate" in
+      "$release_base"/*) ;;
+      *)
+        echo "Refusing to prune an unexpected deployment path." >&2
+        exit 1
+        ;;
+    esac
+    [ "$candidate" = "$active_release" ] && continue
+    rm -rf -- "$candidate"
+  done
+fi
+
+# Every active service is tagged `krw-ontology-front-web:local`; a candidate
+# or rollback tag is never an execution dependency after its attempt ends.
+docker images --format '{{.Repository}}|{{.Tag}}' \
+  | while IFS='|' read -r repository tag; do
+      [ "$repository" = "krw-ontology-front-web" ] || continue
+      case "$tag" in
+        candidate-*|rollback-*) docker image rm "$repository:$tag" >/dev/null 2>&1 || true ;;
+      esac
+    done
+
+echo "Pruned inactive deployment stages and stale web candidate tags."
+REMOTE_SCRIPT
 }
 
 stage_local_agent_release() {
@@ -836,6 +893,7 @@ printf '\nFRONT_DIR=%s\nNEXT_PUBLIC_APP_VERSION=%s\n' "$REMOTE_STAGE" "$RELEASE_
 # local Mac; this VM receives exactly one public JSON descriptor plus hashes.
 if [ "$WITH_AGENT_RELEASE" = "1" ]; then
   test -f "$REMOTE_AGENT_DESCRIPTOR"
+  test -f "$REMOTE_STAGE/ops/certificates/supabase-root-2021-ca.crt"
   install -d -m 0755 "$REMOTE_STAGE/agent-release"
   install -m 0644 "$REMOTE_AGENT_DESCRIPTOR" "$REMOTE_STAGE/agent-release/public-release.json"
   observed_descriptor_hash="sha256:$(sha256sum "$REMOTE_STAGE/agent-release/public-release.json" | awk '{print $1}')"
@@ -850,6 +908,46 @@ if [ "$WITH_AGENT_RELEASE" = "1" ]; then
   upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_FRONT_COMMIT "$FRONT_GIT_COMMIT"
   upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_DAEMON_HEARTBEAT_REQUIRED 1
   upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_RUNTIME_ENVIRONMENT prod
+
+  # The GCP web and outbox must use the same Supabase database as the local
+  # Rust daemon. The existing LISTEN URL is the production-owned connection
+  # source; never copy a Mac secret or create a second database credential.
+  agent_database_url=$(value_of AGENT_V1_DATABASE_URL)
+  if [ -z "$agent_database_url" ]; then
+    agent_database_url=$(value_of AGENT_V1_OUTBOX_DATABASE_URL)
+  fi
+  if [ -z "$agent_database_url" ]; then
+    agent_database_url=$(value_of AGENT_QUEUE_LISTEN_DATABASE_URL)
+  fi
+  case "$agent_database_url" in
+    postgres://*|postgresql://*) ;;
+    *)
+      echo "Rust Agent V1 candidate requires a Supabase PostgreSQL URL from the GCP runtime env." >&2
+      exit 1
+      ;;
+  esac
+  case "$agent_database_url" in
+    *sslmode=disable*|*sslmode=DISABLE*)
+      echo "Rust Agent V1 candidate refuses a non-TLS Supabase database URL." >&2
+      exit 1
+      ;;
+  esac
+  agent_tenant_id=$(value_of KRW_AGENT_TENANT_ID)
+  if [ -z "$agent_tenant_id" ]; then
+    # This is a stable product partition, not a user identity or release id;
+    # changing it would break same-chat session continuity across deploys.
+    agent_tenant_id=krw-ontology-prod
+  fi
+  case "$agent_tenant_id" in
+    "")
+      echo "Rust Agent V1 candidate tenant id is unsafe." >&2
+      exit 1
+      ;;
+  esac
+  upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_TENANT_ID "$agent_tenant_id"
+  upsert_env_value "$REMOTE_STAGE/runtime.env" AGENT_V1_DATABASE_URL "$agent_database_url"
+  upsert_env_value "$REMOTE_STAGE/runtime.env" AGENT_V1_OUTBOX_DATABASE_URL "$agent_database_url"
+  upsert_env_value "$REMOTE_STAGE/runtime.env" AGENT_V1_DATABASE_CA_FILE /run/krw-agent/agent-v1-ca.pem
 fi
 # A Rust Agent V1 candidate is always admitted in a closed state first.  The
 # admission gate is opened only after activation and deep readiness succeed;
@@ -903,11 +1001,151 @@ compose_stage build web
 CANDIDATE_TAG="krw-ontology-front-web:candidate-$RELEASE_ID"
 CANDIDATE_IMAGE=$(docker image inspect --format '{{.Id}}' krw-ontology-front-web:local)
 docker tag "$CANDIDATE_IMAGE" "$CANDIDATE_TAG"
+if [ "$WITH_AGENT_RELEASE" = "1" ]; then
+  # Prove the exact image, descriptor mount, tenant partition, and Supabase
+  # TLS route before any existing public container is replaced. This catches
+  # missing/renamed runtime settings at candidate time, not after cutover.
+  compose_stage run --rm --no-deps -T --entrypoint node web - <<'NODE'
+const fs = require("fs");
+const { Pool } = require("pg");
+
+const providerModels = { glm: "glm-5.2", deepseek: "deepseek-v4-flash" };
+const url = process.env.AGENT_V1_DATABASE_URL;
+const tenant = process.env.KRW_AGENT_TENANT_ID;
+const provider = process.env.KRW_AGENT_PROVIDER;
+const descriptorPath = process.env.KRW_AGENT_RELEASE_DESCRIPTOR_PATH;
+const caPath = process.env.AGENT_V1_DATABASE_CA_FILE;
+
+async function main() {
+  if (!(typeof url === "string" && /^postgres(?:ql)?:\/\//.test(url))) {
+    throw new Error("gcp_agent_v1_database_url_missing");
+  }
+  if (url.includes("sslmode=disable")) {
+    throw new Error("gcp_agent_v1_database_tls_disabled");
+  }
+  if (!(typeof tenant === "string" && tenant.length > 0 && tenant.length <= 128)) {
+    throw new Error("gcp_agent_v1_tenant_missing");
+  }
+  if (!Object.hasOwn(providerModels, provider)) {
+    throw new Error("gcp_agent_v1_provider_invalid");
+  }
+  if (!(typeof caPath === "string" && caPath.startsWith("/"))) {
+    throw new Error("gcp_agent_v1_ca_path_missing");
+  }
+  const ca = fs.readFileSync(caPath, "utf8");
+  if (!ca.includes("BEGIN CERTIFICATE")) {
+    throw new Error("gcp_agent_v1_ca_invalid");
+  }
+  const descriptor = JSON.parse(fs.readFileSync(descriptorPath, "utf8"));
+  if (!Array.isArray(descriptor.entries) || descriptor.entries.length === 0 ||
+      !descriptor.entries.every((entry) => entry?.execution?.resolved_model === providerModels[provider])) {
+    throw new Error("gcp_agent_v1_descriptor_provider_mismatch");
+  }
+  const pool = new Pool({
+    connectionString: url,
+    application_name: "krw-gcp-agent-v1-candidate-preflight",
+    max: 1,
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 5000,
+    ssl: { ca, rejectUnauthorized: true },
+  });
+  try {
+    // A candidate is built before optional migrations run.  Prove the exact
+    // GCP connection now, but defer ABI assertions until after migration so a
+    // valid release never rejects its own pending schema change.
+    await pool.query("select 1 as supabase_tls");
+  } finally {
+    await pool.end();
+  }
+  console.log(JSON.stringify({
+    status: "ok",
+    check: "gcp_agent_v1_candidate_preflight",
+    provider,
+    tenant_configured: true,
+    descriptor_pinned: true,
+    supabase_tls: "verified",
+  }));
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : "gcp_agent_v1_candidate_preflight_failed");
+  process.exit(1);
+});
+NODE
+fi
 docker tag "$OLD_IMAGE" krw-ontology-front-web:local
 printf 'OLD_IMAGE=%s\nCANDIDATE_IMAGE=%s\nOLD_CONFIG_ROOT=%s\nOLD_APP_VERSION=%s\n' "$OLD_IMAGE" "$CANDIDATE_IMAGE" "$OLD_CONFIG_ROOT" "$OLD_APP_VERSION" > "$REMOTE_STAGE/rollback.env"
 chmod 600 "$REMOTE_STAGE/rollback.env"
 rm -f "$REMOTE_FRONT_ARCHIVE"
 echo "Prepared fast VM candidate: $RELEASE_ID"
+REMOTE_SCRIPT
+}
+
+run_remote_validate_agent_candidate_abi() {
+  # Candidate connection/TLS is checked during the image build.  This second
+  # check intentionally runs after optional migrations and before the Mac
+  # daemon or public web container is switched, so the precise GCP runtime
+  # proves the queue and outbox ABI that it will use in production.
+  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+set -eu
+
+compose_stage() {
+  FRONT_DIR="$REMOTE_STAGE" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_STAGE" --env-file "$REMOTE_STAGE/runtime.env" -f "$REMOTE_STAGE/docker-compose.yml" "$@"
+}
+
+compose_stage run --rm --no-deps -T --entrypoint node web - <<'NODE'
+const fs = require("fs");
+const { Pool } = require("pg");
+
+const url = process.env.AGENT_V1_DATABASE_URL;
+const caPath = process.env.AGENT_V1_DATABASE_CA_FILE;
+
+async function main() {
+  if (!(typeof url === "string" && /^postgres(?:ql)?:\/\//.test(url)) || url.includes("sslmode=disable")) {
+    throw new Error("gcp_agent_v1_database_tls_configuration_invalid");
+  }
+  if (!(typeof caPath === "string" && caPath.startsWith("/"))) {
+    throw new Error("gcp_agent_v1_database_ca_path_missing");
+  }
+  const ca = fs.readFileSync(caPath, "utf8");
+  const pool = new Pool({
+    connectionString: url,
+    application_name: "krw-gcp-agent-v1-candidate-abi",
+    max: 1,
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 5000,
+    ssl: { ca, rejectUnauthorized: true },
+  });
+  try {
+    const { rows } = await pool.query(`
+      select
+        to_regprocedure('agent_v1.enqueue_run(jsonb)') is not null as enqueue_run,
+        to_regprocedure('agent_v1.claim_outbox(jsonb)') is not null as claim_outbox,
+        to_regprocedure('agent_v1.ack_outbox(jsonb)') is not null as ack_outbox,
+        to_regprocedure('agent_v1.heartbeat_daemon(jsonb)') is not null as heartbeat_daemon,
+        to_regprocedure('public.apply_agent_v1_product_outbox(jsonb)') is not null as apply_product_outbox,
+        to_regclass('public.agent_v1_product_outbox_receipts') is not null as product_outbox_receipts
+    `);
+    const checks = rows[0] || {};
+    if (!Object.values(checks).every(Boolean)) {
+      throw new Error("gcp_agent_v1_database_abi_missing");
+    }
+  } finally {
+    await pool.end();
+  }
+  console.log(JSON.stringify({
+    status: "ok",
+    check: "gcp_agent_v1_candidate_abi",
+    queue_and_outbox_abi: "verified",
+    supabase_tls: "verified",
+  }));
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : "gcp_agent_v1_candidate_abi_failed");
+  process.exit(1);
+});
+NODE
 REMOTE_SCRIPT
 }
 
@@ -1623,6 +1861,7 @@ if [ "$WITH_AGENT_RELEASE" = "1" ]; then
 fi
 
 if [ "$SKIP_WEB" = "0" ]; then
+  prune_remote_stale_deployment_artifacts
   create_archives
   upload_archive "$FRONT_ARCHIVE" "$REMOTE_FRONT_ARCHIVE" "frontend archive"
   if [ "$WITH_AGENT_RELEASE" = "1" ]; then
@@ -1642,6 +1881,10 @@ if [ "$APPLY_MIGRATIONS" = "1" ]; then
     "$SCRIPT_DIR/supabase-cli.sh" db push
   fi
   run_schema_smoke
+fi
+
+if [ "$WITH_AGENT_RELEASE" = "1" ] && [ "$SKIP_WEB" = "0" ]; then
+  run_remote_validate_agent_candidate_abi
 fi
 
 if [ "$WITH_DATA" = "1" ]; then

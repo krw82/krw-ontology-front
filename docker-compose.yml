@@ -141,6 +141,9 @@ services:
       # plugin worker. GCP receives only this public descriptor file; it never
       # receives a Rust binary, AgentImage, provider key, or DB credential.
       - ${KRW_AGENT_PUBLIC_DESCRIPTOR_HOST_PATH:-/opt/krw-agent/public-release.json}:/run/krw-agent/public-release.json:ro
+      # Public Supabase pooler root used only by the trusted server-side
+      # Agent V1 queue client. Browser code never receives this file or a DB URL.
+      - ${FRONT_DIR:-.}/ops/certificates/supabase-root-2021-ca.crt:/run/krw-agent/agent-v1-ca.pem:ro
       - document_inbox:/srv/krw-document-inbox
     networks:
       - app-network
@@ -185,6 +188,10 @@ services:
       - AGENT_V1_OUTBOX_LEASE_MS=${AGENT_V1_OUTBOX_LEASE_MS:-30000}
       - AGENT_V1_OUTBOX_IDLE_POLL_MS=${AGENT_V1_OUTBOX_IDLE_POLL_MS:-2000}
       - AGENT_V1_OUTBOX_FAILURE_BACKOFF_MS=${AGENT_V1_OUTBOX_FAILURE_BACKOFF_MS:-5000}
+    volumes:
+      # Keep the outbox on the identical, certificate-verified Supabase path
+      # as the web-side Rust enqueue boundary.
+      - ${FRONT_DIR:-.}/ops/certificates/supabase-root-2021-ca.crt:/run/krw-agent/agent-v1-ca.pem:ro
     networks:
       - app-network
     depends_on:

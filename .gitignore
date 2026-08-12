@@ -16,6 +16,10 @@
 # next.js
 /.next/
 /.next-*/
+# Isolated review/verification outputs are generated Next trees. They must
+# never become part of a source commit or a production release archive.
+/.next-review/
+/.next-workspace-nav-verify/
 /.worker/
 /.services/
 /.next-e2e/

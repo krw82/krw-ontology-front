@@ -228,6 +228,12 @@ describe("production deploy scripts", () => {
     expect(deployFast).toContain("stage_local_agent_release");
     expect(deployFast).toContain("public Rust release descriptor");
     expect(deployFast).toContain("KRW_AGENT_DAEMON_HEARTBEAT_REQUIRED 1");
+    expect(deployFast).toContain("assert_release_tree_has_no_generated_artifacts");
+    expect(deployFast).toContain("prune_remote_stale_deployment_artifacts");
+    expect(deployFast).toContain("run_remote_validate_agent_candidate_abi");
+    expect(deployFast).toContain("AGENT_V1_DATABASE_CA_FILE /run/krw-agent/agent-v1-ca.pem");
+    expect(deployFast).toContain("agent_tenant_id=krw-ontology-prod");
+    expect(compose).toContain("supabase-root-2021-ca.crt:/run/krw-agent/agent-v1-ca.pem:ro");
     expect(deployFast).toContain("--with-agent-release requires --apply-migrations for the direct Rust daemon heartbeat ABI.");
     expect(deployFast).not.toContain("local Mac worker heartbeat restart");
     expect(deployFast).not.toContain("install-krw-agent-release-production.sh");
@@ -380,9 +386,9 @@ describe("production deploy scripts", () => {
       '"prod:deploy:mac-runtime": "/bin/sh scripts/deploy-production-fast.sh --skip-web"',
     );
     expect(packageJson).toContain('"prod:deploy:code": "scripts/deploy-production-fast.sh --apply-migrations"');
-    expect(packageJson).toContain('"prod:deploy:full": "scripts/deploy-production-fast.sh --apply-migrations --with-data"');
+    expect(packageJson).toContain('"prod:deploy:full": "scripts/deploy-production-fast.sh --apply-migrations --with-data --with-agent-release"');
     expect(packageJson).toContain('"prod:deploy:dry": "scripts/deploy-production-fast.sh --dry-run --apply-migrations"');
-    expect(packageJson).toContain('"prod:deploy:safe": "scripts/deploy-production-fast.sh --apply-migrations --with-data"');
+    expect(packageJson).toContain('"prod:deploy:safe": "scripts/deploy-production-fast.sh --apply-migrations --with-data --with-agent-release"');
     expect(packageJson).toContain('"prod:release:publish": "scripts/deploy-production-fast.sh --with-data --skip-web --skip-mac"');
     expect(packageJson).toContain('"deploy:data": "scripts/deploy-production-fast.sh --with-data --skip-web --skip-mac"');
     expect(packageJson).toContain('"deploy:worker": "/bin/sh scripts/deploy-production-fast.sh --skip-web"');
@@ -1084,6 +1090,8 @@ cleanup
     expect(fastDeploy).toContain(
       'git -C "$FRONT_DIR" archive --format=tar "$FRONT_GIT_COMMIT"',
     );
+    expect(fastDeploy).toContain("Production commit contains generated build artifacts");
+    expect(fastDeploy).toContain("Pruned inactive deployment stages and stale web candidate tags.");
     expect(fastDeploy).not.toContain("--exclude=coverage");
     expect(fastDeploy).not.toContain("ONTOLOGY_ARCHIVE");
     expect(fastDeploy).not.toContain("KRW_ONTOLOGY_SOURCE_DIR");
