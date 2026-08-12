@@ -81,6 +81,7 @@ AGENT_LOCAL_INSTALLER=
 AGENT_INSTALLED_INSTALLER=
 AGENT_PROVIDER_BUNDLE=
 AGENT_LOCAL_INSTALL_ROOT=${KRW_AGENT_LOCAL_INSTALL_ROOT:-"$HOME/.local/share/krw-agent"}
+AGENT_OPERATOR_ROOT=${KRW_AGENT_OPERATOR_ROOT:-"$HOME/krw-agnet-prod"}
 AGENT_METRICS_PORT=${KRW_AGENT_METRICS_PORT:-15520}
 AGENT_FINAL_EVIDENCE_VERIFIED=0
 AGENT_CUTOVER_ROLLBACK_ARMED=0
@@ -371,11 +372,16 @@ if [ "$WITH_AGENT_RELEASE" = "1" ]; then
   require_command python3
   require_command shasum
   require_file "$SCRIPT_DIR/verify-krw-agent-production-release.mjs"
+  require_file "$SCRIPT_DIR/install-krw-agent-local-mcp-gateways.mjs"
   require_file "$FRONT_DIR/ops/certificates/supabase-root-2021-ca.crt"
   [ -n "$AGENT_RELEASE_ROOT" ] || fail "Set KRW_AGENT_RELEASE_ROOT or pass --agent-release-root for a sealed dual-provider release."
   case "$AGENT_LOCAL_INSTALL_ROOT" in
     /*) ;;
     *) fail "KRW_AGENT_LOCAL_INSTALL_ROOT must be an absolute local Mac path." ;;
+  esac
+  case "$AGENT_OPERATOR_ROOT" in
+    /*) ;;
+    *) fail "KRW_AGENT_OPERATOR_ROOT must be an absolute local Mac path." ;;
   esac
   set -- --release-root "$AGENT_RELEASE_ROOT" --provider "$AGENT_PROVIDER"
   if [ -n "$AGENT_EVIDENCE_INDEX" ]; then
@@ -667,6 +673,20 @@ stage_local_agent_release() {
       --release-root "$AGENT_RELEASE_ROOT" \
       --release-id "$RELEASE_ID" \
       --provider "$AGENT_PROVIDER"
+}
+
+prepare_local_agent_mcp_gateways() {
+  node "$SCRIPT_DIR/install-krw-agent-local-mcp-gateways.mjs" \
+    --mode prepare \
+    --agent-bundle "$AGENT_PROVIDER_BUNDLE" \
+    --operator-root "$AGENT_OPERATOR_ROOT"
+}
+
+activate_local_agent_mcp_gateways() {
+  node "$SCRIPT_DIR/install-krw-agent-local-mcp-gateways.mjs" \
+    --mode activate \
+    --agent-bundle "$AGENT_PROVIDER_BUNDLE" \
+    --operator-root "$AGENT_OPERATOR_ROOT"
 }
 
 verify_sealed_local_agent_database_abi() {
@@ -2169,11 +2189,16 @@ if [ "$WITH_AGENT_RELEASE" = "1" ]; then
   run_remote_close_research_admission
   AGENT_ADMISSION_CLOSED=1
   AGENT_CUTOVER_ROLLBACK_ARMED=1
+  # Materialize the gateway contract from the staged, sealed bundle before
+  # changing the daemon. A missing local MCP boundary therefore aborts before
+  # either the Mac daemon or the web candidate can accept product work.
+  prepare_local_agent_mcp_gateways
   # Arm rollback before switching the local launchd job: a terminal or SSH
   # loss after a successful switch is treated as ambiguous and restores the
   # prior Mac release before public admission can be reopened.
   AGENT_LOCAL_RELEASE_ACTIVATED=1
   activate_local_agent_release
+  activate_local_agent_mcp_gateways
   # `krw-agentd` has already written its own release-bound database heartbeat
   # before its loopback metrics endpoint becomes ready. No Claude/plugin
   # worker is restarted or consulted on the Rust deployment path.
