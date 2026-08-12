@@ -656,7 +656,7 @@ prune_remote_post_activation_artifacts() {
 set -eu
 
 docker image rm "krw-ontology-front-web:candidate-$RELEASE_ID" >/dev/null 2>&1 || true
-docker builder prune --all --force --keep-storage 12GB >/dev/null 2>&1 || true
+docker builder prune --all --force --max-used-space 12GB >/dev/null 2>&1 || true
 echo "Pruned redundant candidate tag and bounded unused BuildKit cache to 12GB."
 REMOTE_SCRIPT
 }
