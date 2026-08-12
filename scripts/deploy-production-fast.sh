@@ -250,6 +250,30 @@ resolve_agent_runtime_env() {
 }
 
 resolve_agent_runtime_env
+
+resolve_agent_release_root() {
+  [ "$WITH_AGENT_RELEASE" = "1" ] || return 0
+  [ -n "$AGENT_RELEASE_ROOT" ] && return 0
+
+  # A normal deploy should not require a copied absolute release path. Pick
+  # the newest operator-owned sealed candidate and let the offline verifier
+  # reject incomplete/unsealed candidates. An explicit --agent-release-root
+  # remains available for rollback and incident recovery.
+  releases_dir="$AGENT_OPERATOR_ROOT/releases"
+  [ -d "$releases_dir" ] || fail "Agent operator releases directory is missing: $releases_dir"
+  newest=""
+  for candidate in "$releases_dir"/20*; do
+    [ -d "$candidate" ] || continue
+    [ -f "$candidate/dual-release-index.json" ] || continue
+    if [ -z "$newest" ] || [ "$candidate/dual-release-index.json" -nt "$newest/dual-release-index.json" ]; then
+      newest=$candidate
+    fi
+  done
+  [ -n "$newest" ] || fail "No sealed dual-provider release candidate exists under $releases_dir"
+  AGENT_RELEASE_ROOT=$newest
+}
+
+resolve_agent_release_root
 case "$ENV_FILE" in
   /*) ENV_PATH=$ENV_FILE ;;
   *) ENV_PATH="$FRONT_DIR/$ENV_FILE" ;;
