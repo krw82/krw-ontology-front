@@ -105,15 +105,17 @@ For routine code deploys with pending migrations but without catalog publication
 npm run prod:deploy:code
 ```
 
-For DB migration, active catalog publication, web, and runtime together:
+For DB migration, web, and the sealed Rust agent runtime together:
 
 ```bash
 npm run prod:deploy:full
 ```
 
-The full path builds the new GCP image before it applies a migration, publishes
-only the already-active catalog, switches the application containers, restarts
-the Mac runtime, and checks private deep health plus both public origins.
+The full path builds the new GCP image before it applies a migration, switches
+the application containers, activates the Mac Rust daemon, and checks private
+deep health plus both public origins. Catalog publication remains the separate
+`prod:release:publish` operation because it validates ontology source/data
+identity and must not block an otherwise independent application release.
 If public GCP health fails during the switch, it retags and starts the previous
 GCP image automatically. Database migrations are not automatically reversed.
 

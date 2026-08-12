@@ -119,6 +119,11 @@ npm run prod:release:publish
 npm run prod:deploy:full
 ```
 
+`prod:deploy:full`은 DB schema, web, 그리고 sealed Rust agent release를 함께
+전환하지만 ontology catalog를 재발행하지는 않는다. catalog publication은 ontology
+source/data release 자체를 검증하는 별도 작업이므로, 실제 catalog 변경이 있을 때만
+`npm run prod:release:publish`를 명시적으로 실행한다.
+
 서로 다른 ontology release를 `prod/current`로 승격하는 자동 경로는 현재
 fail-closed입니다. `--release-id`는 이미 current인 ID만 허용합니다. 운영자가
 symlink를 수동 변경하지 말고, candidate release·plugin·worker를 함께 seal하는

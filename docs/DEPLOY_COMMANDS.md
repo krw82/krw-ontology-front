@@ -164,15 +164,15 @@ npm run prod:deploy:full
 ```text
 새 GCP image build (현재 runtime 계속 서비스)
 -> Supabase migration apply + schema smoke
--> active web catalog publish
 -> GCP web/API + application workers switch
--> prod Mac runtime restart
+-> sealed Rust agent daemon + local MCP gateway activation
 ```
 
-DB migration, 현재 active-release catalog, web code, Mac runtime code를 함께
-반영할 때 쓴다. SQLite release의 `prod/current` pointer를 다른 release로
-promote하지는 않는다. Redis는 persistent service로 유지되고, document worker,
-outbox dispatcher, filing/billing worker는 새 image로 재생성된다.
+DB migration, web code, Rust agent runtime을 함께 반영할 때 쓴다. Catalog publication은
+ontology source/data identity를 검증하는 별도 `prod:release:publish` 명령으로 남긴다.
+SQLite release의 `prod/current` pointer를 다른 release로 promote하지는 않는다. Redis는
+persistent service로 유지되고, document worker, outbox dispatcher, filing/billing worker는
+새 image로 재생성된다.
 
 ### One-time immutable Mac bootstrap
 
@@ -183,8 +183,9 @@ immutable runtime `current` pointer가 없다면, 최초 1회만 다음 명령�
 npm run prod:deploy:bootstrap
 ```
 
-이 명령은 `prod:deploy:full`의 전체 code/data/schema cutover이면서, legacy Mac
-runtime을 immutable runtime으로 옮기는 단 한 번의 경계다. 새 GCP rollback
+이 명령은 `prod:deploy:full`의 code/schema cutover이면서, legacy Mac
+runtime을 immutable runtime으로 옮기는 단 한 번의 경계다. Catalog publication은
+여전히 별도 명령이다. 새 GCP rollback
 transaction과 새 Mac candidate를 먼저 봉인·검증한 뒤 legacy launchd를 멈춘다.
 legacy runtime의 실행 중 bytes를 정확히 재구성할 수 없으므로 이 경계를 지난
 후에는 legacy Mac을 절대 다시 시작하지 않는다.
@@ -223,8 +224,8 @@ owner를 교체한다. migration-started marker가 있으면 두 recovery action
 npm run prod:deploy:safe
 ```
 
-`prod:deploy:full`의 명시적 alias다. migration, active catalog, GCP, Mac
-runtime을 같은 순서로 처리한다.
+`prod:deploy:full`의 명시적 alias다. migration, GCP, Mac Rust runtime을 같은
+순서로 처리한다. active catalog publication은 포함하지 않는다.
 
 ### Planning without mutation
 
@@ -443,7 +444,7 @@ Mac runtime만 전환한다
 현재 active release catalog를 다시 게시한다
   npm run prod:release:publish
 
-DB migration, active catalog, web, runtime을 모두 검증·배포한다
+DB migration, web, sealed Rust runtime을 모두 검증·배포한다
   npm run prod:deploy:full
 
 상태를 본다
