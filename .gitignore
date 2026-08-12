@@ -63,3 +63,7 @@ home-trace-console-demo*.png
 *.tsbuildinfo
 next-env.d.ts
 .gstack/
+/.lazyweb/
+/.tmp/
+/.zcode/
+/krw-home-ko-fixed.png
