@@ -5,11 +5,16 @@ FROM node:20-bookworm-slim AS base
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
+# The Rust agent host is a checked-in file dependency.  It must be present
+# before npm ci resolves the lockfile (the remote production build context is
+# created from git archive, not from the developer's node_modules).
+COPY vendor ./vendor
 RUN npm ci
 
 FROM base AS prod-deps
 WORKDIR /app
 COPY package.json package-lock.json ./
+COPY vendor ./vendor
 RUN npm ci --omit=dev
 
 # Build stage
