@@ -1490,8 +1490,6 @@ compose_stage exec -T market-web-source-worker node -e '
   const sources = JSON.parse(process.env.MARKET_ISSUE_WEB_SOURCES || "[]");
   console.log(JSON.stringify({ worker: "market-web-source-worker", configuredSources: Array.isArray(sources) ? sources.length : 0 }));
 '
-MARKET_ISSUE_ENRICHMENT_STARTED=1
-compose_stage up -d --force-recreate --wait market-issue-enrichment-worker
 if market_issue_x_ingestion_enabled; then
   MARKET_ISSUE_STARTED=1
   compose_stage up -d --force-recreate --wait market-issue-worker
@@ -1508,6 +1506,8 @@ else
   compose_stage stop market-issue-stream-worker || true
   echo "Skipped X market-issue stream worker because MARKET_ISSUE_STREAM_ENABLED is disabled."
 fi
+MARKET_ISSUE_ENRICHMENT_STARTED=1
+compose_stage up -d --force-recreate --wait market-issue-enrichment-worker
 rm -f "$REMOTE_FRONT_DIR/.simple-deploy/current"
 ln -s "$REMOTE_STAGE" "$REMOTE_FRONT_DIR/.simple-deploy/current"
 ROLLBACK_ARMED=0
