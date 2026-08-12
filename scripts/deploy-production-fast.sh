@@ -585,12 +585,18 @@ create_agent_descriptor_upload() {
   [ "$observed_descriptor_hash" = "$AGENT_DESCRIPTOR_HASH" ] || fail "Copied public descriptor hash does not match the verified release."
 }
 
+run_remote_buffered_script() {
+  remote_env=$1
+  remote_command="$remote_env /bin/sh -c 'remote_script=\$(mktemp /tmp/krw-fast-remote.XXXXXX) || exit 1; cat > \"\$remote_script\" || { rm -f \"\$remote_script\"; exit 1; }; /bin/sh \"\$remote_script\"; status=\$?; rm -f \"\$remote_script\"; exit \$status'"
+  gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="$remote_command"
+}
+
 prune_remote_stale_deployment_artifacts() {
   # A release is immutable once activated, but inactive build candidates are
   # reproducible from Git and must not consume the VM disk forever. Keep the
   # sole active stage and its running local image; remove only stale tags and
   # directories under this deployment root before a new candidate is built.
-  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+  cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' COMPOSE_PROJECT='$COMPOSE_PROJECT'"
 set -eu
 
 release_base="$REMOTE_FRONT_DIR/.simple-deploy/releases"
@@ -696,7 +702,7 @@ rollback_local_agent_release() {
 }
 
 run_remote_close_research_admission() {
-  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+  cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT'"
 set -eu
 
 active_root=$REMOTE_FRONT_DIR
@@ -768,7 +774,7 @@ REMOTE_SCRIPT
 }
 
 run_remote_restore_research_admission() {
-  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+  cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT'"
 set -eu
 [ -f "$REMOTE_STAGE/research-admission.previous" ] || exit 0
 previous=$(cat "$REMOTE_STAGE/research-admission.previous")
@@ -820,7 +826,7 @@ REMOTE_SCRIPT
 }
 
 run_remote_rollback_front_candidate() {
-  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+  cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT'"
 set -eu
 test -f "$REMOTE_STAGE/rollback.env"
 . "$REMOTE_STAGE/rollback.env"
@@ -857,7 +863,7 @@ REMOTE_SCRIPT
 }
 
 run_remote_prepare() {
-  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="RELEASE_ID='$RELEASE_ID' FRONT_GIT_COMMIT='$FRONT_GIT_COMMIT' REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' REMOTE_FRONT_ARCHIVE='$REMOTE_FRONT_ARCHIVE' REMOTE_AGENT_DESCRIPTOR='$REMOTE_AGENT_DESCRIPTOR' COMPOSE_PROJECT='$COMPOSE_PROJECT' REQUIRE_LIVE_TOSS='$REQUIRE_LIVE_TOSS' BILLING_V2_CUTOVER='$BILLING_V2_CUTOVER' SITE_ORIGIN_ONE='$SITE_ORIGIN_ONE' WITH_AGENT_RELEASE='$WITH_AGENT_RELEASE' AGENT_PROVIDER='$AGENT_PROVIDER' AGENT_DESCRIPTOR_HASH='$AGENT_DESCRIPTOR_HASH' AGENT_RELEASE_SET_HASH='$AGENT_RELEASE_SET_HASH' /bin/sh -s"
+  cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "RELEASE_ID='$RELEASE_ID' FRONT_GIT_COMMIT='$FRONT_GIT_COMMIT' REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' REMOTE_FRONT_ARCHIVE='$REMOTE_FRONT_ARCHIVE' REMOTE_AGENT_DESCRIPTOR='$REMOTE_AGENT_DESCRIPTOR' COMPOSE_PROJECT='$COMPOSE_PROJECT' REQUIRE_LIVE_TOSS='$REQUIRE_LIVE_TOSS' BILLING_V2_CUTOVER='$BILLING_V2_CUTOVER' SITE_ORIGIN_ONE='$SITE_ORIGIN_ONE' WITH_AGENT_RELEASE='$WITH_AGENT_RELEASE' AGENT_PROVIDER='$AGENT_PROVIDER' AGENT_DESCRIPTOR_HASH='$AGENT_DESCRIPTOR_HASH' AGENT_RELEASE_SET_HASH='$AGENT_RELEASE_SET_HASH'"
 set -e
 test -f "$REMOTE_FRONT_DIR/.env"
 test ! -e "$REMOTE_STAGE"
@@ -1189,7 +1195,7 @@ run_remote_validate_agent_candidate_abi() {
   # check intentionally runs after optional migrations and before the Mac
   # daemon or public web container is switched, so the precise GCP runtime
   # proves the queue and outbox ABI that it will use in production.
-  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+  cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT'"
 set -eu
 
 compose_stage() {
@@ -1253,7 +1259,7 @@ REMOTE_SCRIPT
 }
 
 run_remote_pause_billing_for_cutover() {
-  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+  cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT'"
 set -eu
 
 READONLY_CADDY="$REMOTE_STAGE/Caddyfile.billing-readonly"
@@ -1299,7 +1305,7 @@ REMOTE_SCRIPT
 }
 
 run_remote_activate() {
-  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="RELEASE_ID='$RELEASE_ID' REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' SITE_ORIGIN_ONE='$SITE_ORIGIN_ONE' SITE_ORIGIN_TWO='$SITE_ORIGIN_TWO' BILLING_V2_CUTOVER='$BILLING_V2_CUTOVER' /bin/sh -s"
+  cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "RELEASE_ID='$RELEASE_ID' REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' SITE_ORIGIN_ONE='$SITE_ORIGIN_ONE' SITE_ORIGIN_TWO='$SITE_ORIGIN_TWO' BILLING_V2_CUTOVER='$BILLING_V2_CUTOVER'"
 set -e
 . "$REMOTE_STAGE/rollback.env"
 SERVICES="web reverse-proxy agent-v1-outbox llm-gateway filings-mcp document-worker document-outbox-dispatcher filing-notification-worker filing-brief-worker billing-worker"
@@ -1516,7 +1522,7 @@ REMOTE_SCRIPT
 }
 
 run_remote_deep_verify() {
-  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="RELEASE_ID='$RELEASE_ID' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' SITE_ORIGIN_ONE='$SITE_ORIGIN_ONE' SITE_ORIGIN_TWO='$SITE_ORIGIN_TWO' /bin/sh -s"
+  cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "RELEASE_ID='$RELEASE_ID' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' SITE_ORIGIN_ONE='$SITE_ORIGIN_ONE' SITE_ORIGIN_TWO='$SITE_ORIGIN_TWO'"
 set -e
 compose_stage() {
   FRONT_DIR="$REMOTE_STAGE" NEXT_PUBLIC_APP_VERSION="$RELEASE_ID" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_STAGE" --env-file "$REMOTE_STAGE/runtime.env" -f "$REMOTE_STAGE/docker-compose.yml" "$@"
@@ -1560,7 +1566,7 @@ REMOTE_SCRIPT
 }
 
 run_remote_open_research_admission() {
-  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="RELEASE_ID='$RELEASE_ID' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+  cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "RELEASE_ID='$RELEASE_ID' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT'"
 set -eu
 value_of() {
   key="$1"
@@ -1623,7 +1629,7 @@ REMOTE_SCRIPT
 }
 
 run_remote_verify_billing_callback_redaction() {
-  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="RELEASE_ID='$RELEASE_ID' COMPOSE_PROJECT='$COMPOSE_PROJECT' SITE_ORIGIN_ONE='$SITE_ORIGIN_ONE' /bin/sh -s"
+  cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "RELEASE_ID='$RELEASE_ID' COMPOSE_PROJECT='$COMPOSE_PROJECT' SITE_ORIGIN_ONE='$SITE_ORIGIN_ONE'"
 set -eu
 
 probe="billing-v2-redaction-${RELEASE_ID}"
@@ -1678,7 +1684,7 @@ REMOTE_SCRIPT
 }
 
 run_remote_enable_billing_v2_writes() {
-  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+  cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' COMPOSE_PROJECT='$COMPOSE_PROJECT'"
 set -eu
 
 ACTIVE_ROOT=$(cd "$REMOTE_FRONT_DIR/.simple-deploy/current" && pwd -P)
@@ -1796,7 +1802,7 @@ REMOTE_SCRIPT
 }
 
 run_remote_disable_billing_v2_writes() {
-  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+  cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' COMPOSE_PROJECT='$COMPOSE_PROJECT'"
 set -eu
 
 ACTIVE_ROOT=$(cd "$REMOTE_FRONT_DIR/.simple-deploy/current" && pwd -P)
