@@ -230,6 +230,8 @@ describe("production deploy scripts", () => {
     expect(deployFast).toContain("KRW_AGENT_DAEMON_HEARTBEAT_REQUIRED 1");
     expect(deployFast).toContain("assert_release_tree_has_no_generated_artifacts");
     expect(deployFast).toContain("prune_remote_stale_deployment_artifacts");
+    expect(deployFast).toContain("candidate-*|release-*|rollback-*");
+    expect(deployFast).toContain("market-issue-enrichment-worker");
     expect(deployFast).toContain("run_remote_validate_agent_candidate_abi");
     expect(deployFast).toContain("AGENT_V1_DATABASE_CA_FILE /run/krw-agent/agent-v1-ca.pem");
     expect(deployFast).toContain("agent_tenant_id=krw-ontology-prod");

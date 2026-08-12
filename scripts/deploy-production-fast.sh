@@ -615,13 +615,25 @@ if [ -d "$release_base" ]; then
   done
 fi
 
-# Every active service is tagged `krw-ontology-front-web:local`; a candidate
-# or rollback tag is never an execution dependency after its attempt ends.
+# Every active service is tagged `krw-ontology-front-web:local`. Keep at most
+# the rollback image for the immediately preceding cutover; release and
+# candidate tags are audit labels only and must not retain superseded images.
 docker images --format '{{.Repository}}|{{.Tag}}' \
   | while IFS='|' read -r repository tag; do
       [ "$repository" = "krw-ontology-front-web" ] || continue
       case "$tag" in
-        candidate-*|rollback-*) docker image rm "$repository:$tag" >/dev/null 2>&1 || true ;;
+        candidate-*|release-*|rollback-*) docker image rm "$repository:$tag" >/dev/null 2>&1 || true ;;
+      esac
+    done
+
+# Caddy uses the stable `caddy:2` tag at runtime. Historical release labels
+# otherwise keep no additional image data, but they make image inventories and
+# rollback expectations misleading.
+docker images --format '{{.Repository}}|{{.Tag}}' \
+  | while IFS='|' read -r repository tag; do
+      [ "$repository" = "caddy" ] || continue
+      case "$tag" in
+        candidate-*|release-*|rollback-*) docker image rm "$repository:$tag" >/dev/null 2>&1 || true ;;
       esac
     done
 
@@ -824,12 +836,12 @@ compose_old() {
     FRONT_DIR="$REMOTE_FRONT_DIR" NEXT_PUBLIC_APP_VERSION="$OLD_APP_VERSION" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_FRONT_DIR" --env-file "$REMOTE_FRONT_DIR/.env" -f "$REMOTE_FRONT_DIR/docker-compose.yml" "$@"
   fi
 }
-for worker in market-issue-worker market-web-source-worker market-issue-stream-worker; do
+for worker in market-issue-worker market-web-source-worker market-issue-stream-worker market-issue-enrichment-worker; do
   compose_stage rm -sf "$worker" || true
 done
 docker tag "$OLD_IMAGE" krw-ontology-front-web:local
 compose_old up -d --force-recreate --wait $services
-for worker in market-issue-worker market-web-source-worker market-issue-stream-worker; do
+for worker in market-issue-worker market-web-source-worker market-issue-stream-worker market-issue-enrichment-worker; do
   if compose_old config --services | grep -qx "$worker"; then
     compose_old up -d --force-recreate --wait "$worker"
   fi
@@ -1295,9 +1307,11 @@ ROLLBACK_ARMED=1
 MARKET_ISSUE_STARTED=0
 MARKET_WEB_SOURCE_STARTED=0
 MARKET_ISSUE_STREAM_STARTED=0
+MARKET_ISSUE_ENRICHMENT_STARTED=0
 OLD_MARKET_ISSUE_WORKER=0
 OLD_MARKET_WEB_SOURCE_WORKER=0
 OLD_MARKET_ISSUE_STREAM_WORKER=0
+OLD_MARKET_ISSUE_ENRICHMENT_WORKER=0
 compose_stage() {
   FRONT_DIR="$REMOTE_STAGE" NEXT_PUBLIC_APP_VERSION="$RELEASE_ID" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_STAGE" --env-file "$REMOTE_STAGE/runtime.env" -f "$REMOTE_STAGE/docker-compose.yml" "$@"
 }
@@ -1342,6 +1356,9 @@ if compose_old config --services | grep -qx "market-web-source-worker"; then
 fi
 if compose_old config --services | grep -qx "market-issue-stream-worker"; then
   OLD_MARKET_ISSUE_STREAM_WORKER=1
+fi
+if compose_old config --services | grep -qx "market-issue-enrichment-worker"; then
+  OLD_MARKET_ISSUE_ENRICHMENT_WORKER=1
 fi
 matches_version() {
   payload=$(printf '%s' "$1" | tr -d '[:space:]')
@@ -1410,6 +1427,9 @@ rollback() {
       if [ "$MARKET_ISSUE_STREAM_STARTED" = "1" ]; then
         compose_stage rm -sf market-issue-stream-worker || true
       fi
+      if [ "$MARKET_ISSUE_ENRICHMENT_STARTED" = "1" ]; then
+        compose_stage rm -sf market-issue-enrichment-worker || true
+      fi
       docker tag "$OLD_IMAGE" krw-ontology-front-web:local
       compose_old up -d --force-recreate --wait $SERVICES
       if [ "$OLD_MARKET_ISSUE_WORKER" = "1" ]; then
@@ -1420,6 +1440,9 @@ rollback() {
       fi
       if [ "$OLD_MARKET_ISSUE_STREAM_WORKER" = "1" ]; then
         compose_old up -d --force-recreate --wait market-issue-stream-worker
+      fi
+      if [ "$OLD_MARKET_ISSUE_ENRICHMENT_WORKER" = "1" ]; then
+        compose_old up -d --force-recreate --wait market-issue-enrichment-worker
       fi
     fi
   fi
@@ -1467,6 +1490,8 @@ compose_stage exec -T market-web-source-worker node -e '
   const sources = JSON.parse(process.env.MARKET_ISSUE_WEB_SOURCES || "[]");
   console.log(JSON.stringify({ worker: "market-web-source-worker", configuredSources: Array.isArray(sources) ? sources.length : 0 }));
 '
+MARKET_ISSUE_ENRICHMENT_STARTED=1
+compose_stage up -d --force-recreate --wait market-issue-enrichment-worker
 if market_issue_x_ingestion_enabled; then
   MARKET_ISSUE_STARTED=1
   compose_stage up -d --force-recreate --wait market-issue-worker
