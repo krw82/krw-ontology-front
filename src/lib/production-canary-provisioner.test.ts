@@ -16,6 +16,8 @@ describe("production canary provisioner", () => {
       "SUPABASE_ANON_KEY=anon-key",
       "SUPABASE_SERVICE_ROLE_KEY=service-role-key",
       "NEXT_PUBLIC_APP_URL=https://krwontology.com",
+      "read_env_value() { python3 -; }",
+      "export UNUSED_RUNTIME_KEY=ignored-by-provisioner",
       "",
     ].join("\n"));
     const { stdout } = await execFileAsync("node", [

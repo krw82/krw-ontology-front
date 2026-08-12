@@ -27,6 +27,15 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_ENV_BYTES = 1024 * 1024;
 const ACTIVE_SUBSCRIPTION_STATES = ["active", "past_due", "grace", "pending_cancel"];
+const CRITICAL_ENV_KEYS = new Set([
+  "SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "SUPABASE_ANON_KEY",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "NEXT_PUBLIC_APP_URL",
+  "NEXT_PUBLIC_SITE_URL",
+]);
 
 function fail(message) {
   throw new Error(message);
@@ -91,10 +100,13 @@ function parseEnv(path) {
   for (const raw of readFileSync(path, "utf8").split(/\r?\n/)) {
     const line = raw.trim();
     if (!line || line.startsWith("#")) continue;
-    const equals = line.indexOf("=");
-    if (equals <= 0) continue;
-    const key = line.slice(0, equals).trim();
-    let value = line.slice(equals + 1).trim();
+    // The Mac runtime envelope is a shell file with a few helper functions
+    // below its assignments. Parse assignments only; never source it merely
+    // to obtain Supabase credentials.
+    const assignment = line.match(/^(?:export\s+)?([A-Z][A-Z0-9_]*)=(.*)$/);
+    if (!assignment) continue;
+    const [, key, rawValue] = assignment;
+    let value = rawValue.trim();
     if (
       value.length >= 2 &&
       ((value.startsWith('"') && value.endsWith('"')) ||
@@ -102,8 +114,11 @@ function parseEnv(path) {
     ) {
       value = value.slice(1, -1);
     }
-    if (!/^[A-Z][A-Z0-9_]*$/.test(key) || values.has(key)) {
-      fail("operator env has an invalid or duplicate key");
+    // Generated runtime envelopes may re-export unrelated worker settings at
+    // the end. Last assignment is normal shell semantics for those values;
+    // the few credentials/origins that this command consumes stay strict.
+    if (values.has(key) && CRITICAL_ENV_KEYS.has(key)) {
+      fail(`operator env has a duplicate critical key: ${key}`);
     }
     values.set(key, value);
   }
