@@ -79,6 +79,7 @@ AGENT_DESCRIPTOR_SOURCE=
 AGENT_DESCRIPTOR_COPY=
 AGENT_LOCAL_INSTALLER=
 AGENT_INSTALLED_INSTALLER=
+AGENT_PROVIDER_BUNDLE=
 AGENT_LOCAL_INSTALL_ROOT=${KRW_AGENT_LOCAL_INSTALL_ROOT:-"$HOME/.local/share/krw-agent"}
 AGENT_METRICS_PORT=${KRW_AGENT_METRICS_PORT:-15520}
 AGENT_FINAL_EVIDENCE_VERIFIED=0
@@ -310,6 +311,24 @@ run_schema_smoke() {
   )
 }
 
+run_agent_release_migrations() {
+  (
+    set -a
+    # shellcheck disable=SC1090
+    . "$ENV_PATH"
+    set +a
+    agent_database_url=${KRW_AGENT_DATABASE_URL:-${AGENT_V1_DATABASE_URL:-}}
+    case "$agent_database_url" in
+      postgres://*|postgresql://*) ;;
+      *) fail "Rust Agent V1 migration requires the local Supabase PostgreSQL runtime URL." ;;
+    esac
+    AGENT_V1_PSQL_URL="$agent_database_url" \
+      "$SCRIPT_DIR/apply-agent-v1-production-migrations.sh" \
+        --agent-release "$AGENT_PROVIDER_BUNDLE" \
+        --skip-front-migrations
+  )
+}
+
 require_command node
 require_file "$TARGET_FILE"
 require_file "$ENV_PATH"
@@ -367,9 +386,11 @@ if [ "$WITH_AGENT_RELEASE" = "1" ]; then
   AGENT_RELEASE_SET_HASH=$(node -e 'const value=JSON.parse(process.argv[1]); process.stdout.write(value.selected_release_set_hash);' "$AGENT_RELEASE_REPORT")
   AGENT_FINAL_EVIDENCE_VERIFIED=$(node -e 'const value=JSON.parse(process.argv[1]); process.stdout.write(value.final_evidence_verified ? "1" : "0");' "$AGENT_RELEASE_REPORT")
   AGENT_DESCRIPTOR_SOURCE="$AGENT_RELEASE_ROOT/$AGENT_PROVIDER/public-release.json"
+  AGENT_PROVIDER_BUNDLE="$AGENT_RELEASE_ROOT/$AGENT_PROVIDER"
   AGENT_LOCAL_INSTALLER="$AGENT_RELEASE_ROOT/$AGENT_PROVIDER/packaging/launchd/install-local-mac-agentd-release.sh"
   AGENT_INSTALLED_INSTALLER="$AGENT_LOCAL_INSTALL_ROOT/releases/$RELEASE_ID/$AGENT_PROVIDER/packaging/launchd/install-local-mac-agentd-release.sh"
   require_file "$AGENT_DESCRIPTOR_SOURCE"
+  require_file "$AGENT_PROVIDER_BUNDLE/apply_migrations.sh"
   require_file "$AGENT_LOCAL_INSTALLER"
   [ -x "$AGENT_LOCAL_INSTALLER" ] || fail "Sealed local krw-agent installer is not executable."
   require_file "$ENV_PATH"
@@ -608,6 +629,36 @@ stage_local_agent_release() {
       --release-root "$AGENT_RELEASE_ROOT" \
       --release-id "$RELEASE_ID" \
       --provider "$AGENT_PROVIDER"
+}
+
+verify_sealed_local_agent_database_abi() {
+  # Exercise the selected immutable bundle through the same Mac launcher that
+  # launchd will later use. This is intentionally after migrations and before
+  # admission closure or activation, so a missing procedure/role/TLS binding
+  # cannot become a production cutover failure.
+  TMP_BASE=${TMPDIR:-/tmp}
+  agent_check_dir=$(mktemp -d "$TMP_BASE/krw-agent-release-abi.XXXXXX")
+  agent_overlay="$agent_check_dir/overlay.env"
+  cleanup_agent_check() {
+    rm -rf -- "$agent_check_dir"
+  }
+  ln -s "$AGENT_PROVIDER_BUNDLE" "$agent_check_dir/current"
+  umask 077
+  printf '%s\n' \
+    "KRW_AGENT_CURRENT_DIR=$agent_check_dir/current" \
+    "KRW_AGENT_PROVIDER=$AGENT_PROVIDER" \
+    "KRW_AGENT_ARTIFACT_ROOT=$agent_check_dir/artifacts" \
+    'KRW_AGENT_WORKER_ID=sealed-release-database-check' > "$agent_overlay"
+  chmod 600 "$agent_overlay"
+  if ! "$AGENT_PROVIDER_BUNDLE/packaging/launchd/krw-agentd-start-local" \
+    --env-file "$ENV_PATH" \
+    --overlay-file "$agent_overlay" \
+    --database-check; then
+    cleanup_agent_check
+    return 1
+  fi
+  cleanup_agent_check
+  echo 'Sealed local Rust daemon database ABI verified through the launchd entrypoint.'
 }
 
 activate_local_agent_release() {
@@ -1909,12 +1960,18 @@ if [ "$SKIP_WEB" = "0" ]; then
 fi
 
 if [ "$APPLY_MIGRATIONS" = "1" ]; then
+  if [ "$WITH_AGENT_RELEASE" = "1" ]; then
+    run_agent_release_migrations
+  fi
   if [ "$MIGRATION_INCLUDE_ALL" = "1" ]; then
     "$SCRIPT_DIR/supabase-cli.sh" db push --include-all
   else
     "$SCRIPT_DIR/supabase-cli.sh" db push
   fi
   run_schema_smoke
+  if [ "$WITH_AGENT_RELEASE" = "1" ]; then
+    verify_sealed_local_agent_database_abi
+  fi
 fi
 
 if [ "$WITH_AGENT_RELEASE" = "1" ] && [ "$SKIP_WEB" = "0" ]; then

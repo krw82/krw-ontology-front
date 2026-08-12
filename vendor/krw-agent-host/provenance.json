@@ -1,8 +1,8 @@
 {
   "package": "@krw-agent/host",
   "version": "0.1.0",
-  "agent_git_commit": "70042b11e82cd10e5d2a12af4f8e31ce36436c6b",
-  "agent_git_tree": "1df7c423ef279af4960351311637990df87db1ea",
+  "agent_git_commit": "85592115b946316734c8a17662d2aa0a6127a506",
+  "agent_git_tree": "3602349e559bb2b790547c042bb0674f0370f145",
   "archive": "krw-agent-host-0.1.0.tgz",
   "sha256": "sha256:68ce8e6931d5200519e8676a17e443faa02f407abe50e60adacccc5f35886a06"
 }
