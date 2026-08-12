@@ -578,7 +578,8 @@ describe("production deploy scripts", () => {
     );
     expect(dockerfileWeb).toContain("/app/.worker/document-worker.mjs");
     expect(dockerfileWeb).toContain("markitdown[pdf]");
-    expect(dockerfileWeb).toContain("claude-agent-sdk==0.2.85");
+    expect(dockerfileWeb).not.toContain("claude-agent-sdk==0.2.85");
+    expect(dockerfileWeb).toContain("claude-agent-sdk-linux-x64-musl");
     expect(compose).toContain("  document-worker:");
     expect(compose).toContain("  document-outbox-dispatcher:");
     expect(compose).toContain("  filings-mcp:");
@@ -782,7 +783,7 @@ cleanup
     expect(dockerfileWeb).not.toContain(".krw-ontology-contract.json");
     expect(dockerfileWeb).not.toContain("krw-ontology-src");
     expect(dockerfileWeb).toContain("markitdown[pdf]");
-    expect(dockerfileWeb).toContain("claude-agent-sdk==0.2.85");
+    expect(dockerfileWeb).not.toContain("claude-agent-sdk==0.2.85");
     expect(dockerfileWeb).not.toContain('"command": "/opt/krw-ontology-venv/bin/krw-ontology-mcp"');
     expect(dockerfileWeb).not.toContain('"stock-news"');
     expect(dockerfileWeb).not.toContain('"http://127.0.0.1:8775/mcp"');
