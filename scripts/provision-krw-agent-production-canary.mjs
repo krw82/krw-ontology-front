@@ -178,7 +178,14 @@ async function api(baseUrl, serviceRole, pathname, { method = "GET", body, heade
   if (!response.ok) {
     throw new Error(`Supabase ${method} ${pathname} failed: ${response.status}`);
   }
-  return response.status === 204 ? null : response.json();
+  if (response.status === 204) return null;
+  const raw = await response.text();
+  if (!raw.trim()) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error(`Supabase ${method} ${pathname} returned invalid JSON`);
+  }
 }
 
 function generatePassword() {
