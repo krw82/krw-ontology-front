@@ -647,6 +647,20 @@ echo "Pruned inactive deployment stages and stale web candidate tags."
 REMOTE_SCRIPT
 }
 
+prune_remote_post_activation_artifacts() {
+  # Do this only after the candidate has passed public deep health. Keep the
+  # active `local` tag and the immediately preceding rollback image, but drop
+  # the redundant candidate label and bound unused BuildKit cache. The cache
+  # cap retains the fresh dependency/image layers used by the next deployment.
+  cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "RELEASE_ID='$RELEASE_ID'"
+set -eu
+
+docker image rm "krw-ontology-front-web:candidate-$RELEASE_ID" >/dev/null 2>&1 || true
+docker builder prune --all --force --keep-storage 12GB >/dev/null 2>&1 || true
+echo "Pruned redundant candidate tag and bounded unused BuildKit cache to 12GB."
+REMOTE_SCRIPT
+}
+
 stage_local_agent_release() {
   KRW_AGENT_LOCAL_INSTALL_ROOT="$AGENT_LOCAL_INSTALL_ROOT" \
     "$AGENT_LOCAL_INSTALLER" --mode stage \
@@ -2046,6 +2060,7 @@ fi
 
 if [ "$SKIP_WEB" = "0" ]; then
   run_remote_deep_verify
+  prune_remote_post_activation_artifacts
   if [ "$WITH_AGENT_RELEASE" = "0" ]; then
     run_remote_open_research_admission
   elif [ "$AGENT_FINAL_EVIDENCE_VERIFIED" = "1" ]; then

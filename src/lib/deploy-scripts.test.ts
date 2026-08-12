@@ -230,6 +230,8 @@ describe("production deploy scripts", () => {
     expect(deployFast).toContain("KRW_AGENT_DAEMON_HEARTBEAT_REQUIRED 1");
     expect(deployFast).toContain("assert_release_tree_has_no_generated_artifacts");
     expect(deployFast).toContain("prune_remote_stale_deployment_artifacts");
+    expect(deployFast).toContain("prune_remote_post_activation_artifacts");
+    expect(deployFast).toContain("docker builder prune --all --force --keep-storage 12GB");
     expect(deployFast).toContain("run_remote_buffered_script()");
     expect(deployFast).toContain("krw-fast-remote.XXXXXX");
     expect(deployFast).not.toContain("REMOTE_SCRIPT' | gcloud compute ssh");
