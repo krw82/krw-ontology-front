@@ -4,7 +4,7 @@ import { ANONYMOUS_PULSE_USER_ID, getOptionalAuthUser, handleAuthError } from "@
 import { canAccessMenuFeature } from "@/lib/billing/feature-access-server";
 import { composePulseFeed } from "@/lib/pulse/composer";
 import { buildPulseFeedDelta, isPulseItemVersionMap } from "@/lib/pulse/delta";
-import { PULSE_PAGE_SIZE } from "@/lib/pulse/contract";
+import { PULSE_DELTA_ITEM_VERSION_LIMIT, PULSE_PAGE_SIZE } from "@/lib/pulse/contract";
 import { getPulseFeedRevision } from "@/lib/pulse/revision";
 import type {
   PulseFeedDeltaResponse,
@@ -20,7 +20,7 @@ const bodySchema = z.object({
   revision: z.string().min(1).max(128).nullable().optional(),
   item_versions: z.record(z.string().min(1).max(512), z.string().regex(/^v1-[0-9a-z]+$/)).default({}),
 }).strict().superRefine((input, context) => {
-  if (Object.keys(input.item_versions).length > 50) {
+  if (Object.keys(input.item_versions).length > PULSE_DELTA_ITEM_VERSION_LIMIT) {
     context.addIssue({ code: "custom", message: "Too many cached Pulse items." });
   }
 });

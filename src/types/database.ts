@@ -307,6 +307,18 @@ export interface AgentWorkerHeartbeatRow extends Record<string, unknown> {
   updated_at: string;
 }
 
+export interface AgentV1DaemonHeartbeatRow extends Record<string, unknown> {
+  daemon_id: string;
+  provider: "glm" | "deepseek";
+  descriptor_artifact_hash: string;
+  release_set_hash: string;
+  runtime_version: string;
+  last_seen_at: string;
+  heartbeat_expires_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DesktopDeviceRow extends Record<string, unknown> {
   id: string;
   user_id: string;
@@ -700,8 +712,10 @@ export interface FilingNotificationPreferencesRow extends Record<string, unknown
   notify_8k: boolean;
   notify_6k: boolean;
   notify_form4: boolean;
+  notify_market_news: boolean;
   include_amendments: boolean;
   insider_notification_mode: "none" | "reported_p_s" | "all";
+  form4_immediate_min_value_usd: number;
   delivery_mode: "important_immediate" | "all_immediate" | "daily_digest";
   daily_digest_at: string;
   last_digest_at: string | null;
@@ -967,8 +981,15 @@ export interface PushSubscriptionRow extends Record<string, unknown> {
 export interface UserFilingNotificationRow extends Record<string, unknown> {
   id: string;
   user_id: string;
-  filing_event_id: string;
-  kind: "filing_received" | "analysis_ready" | "filing_digest";
+  filing_event_id: string | null;
+  market_issue_id: string | null;
+  ticker: string | null;
+  kind:
+    | "filing_received"
+    | "analysis_ready"
+    | "filing_digest"
+    | "market_issue_received"
+    | "market_issue_digest";
   title: string;
   body: string;
   destination_path: string;
@@ -1372,7 +1393,7 @@ export interface UsageDailyRow extends Record<string, unknown> {
 
 export interface UserEntitlementRow extends Record<string, unknown> {
   user_id: string;
-  plan_key: "free" | "standard" | "pro" | "power" | "beta" | "internal";
+  plan_key: "free" | "lite" | "standard" | "pro" | "power" | "beta" | "internal";
   status:
     | "active"
     | "paused"
@@ -1398,7 +1419,7 @@ export interface UserEntitlementRow extends Record<string, unknown> {
 }
 
 export interface BillingPlanRow extends Record<string, unknown> {
-  key: "free" | "standard" | "pro" | "power" | "beta" | "internal";
+  key: "free" | "lite" | "standard" | "pro" | "power" | "beta" | "internal";
   label: string;
   status_label: string;
   description: string;
@@ -1514,7 +1535,7 @@ export interface ProviderPricingPolicyRow extends Record<string, unknown> {
 
 export interface BillingPlanVersionRow extends Record<string, unknown> {
   id: string;
-  plan_key: "free" | "standard" | "pro" | "beta" | "internal";
+  plan_key: "free" | "lite" | "standard" | "pro" | "beta" | "internal";
   plan_version: string;
   monthly_price_krw: number;
   weekly_credit_limit_raw: number | null;
@@ -1526,7 +1547,7 @@ export interface BillingPlanVersionRow extends Record<string, unknown> {
   created_at: string;
 }
 
-export type BillingTossPlanKey = "standard" | "pro";
+export type BillingTossPlanKey = "lite" | "standard" | "pro";
 
 export type BillingTossOperationKind =
   | "subscribe"
@@ -1663,6 +1684,30 @@ export interface BillingTossPaymentRow extends Record<string, unknown> {
   updated_at: string;
 }
 
+export type BillingTossRefundStatus =
+  | "processing"
+  | "succeeded"
+  | "failed"
+  | "uncertain";
+
+export interface BillingTossRefundRow extends Record<string, unknown> {
+  id: string;
+  user_id: string;
+  payment_id: string;
+  subscription_id: string | null;
+  amount_krw: number;
+  status: BillingTossRefundStatus;
+  idempotency_key: string;
+  provider_cancel_transaction_key: string | null;
+  provider_response: Json;
+  failure_code: string | null;
+  failure_message: string | null;
+  provider_requested_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface BillingTossOperationRow extends Record<string, unknown> {
   id: string;
   user_id: string;
@@ -1708,7 +1753,7 @@ export interface UsageCreditBalanceRow extends Record<string, unknown> {
   period_kind: "weekly";
   period_start: string;
   period_end: string;
-  plan_key_snapshot: "free" | "standard" | "pro" | "beta" | "internal";
+  plan_key_snapshot: "free" | "lite" | "standard" | "pro" | "beta" | "internal";
   plan_version_id: string | null;
   credit_policy_version: string;
   credits_limit_raw: number;
@@ -1731,7 +1776,7 @@ export interface RunCreditReservationRow extends Record<string, unknown> {
   settled_credits_raw: number;
   status: "reserved" | "running" | "settled" | "released" | "expired";
   terminal_status: string | null;
-  plan_key_snapshot: "free" | "standard" | "pro" | "beta" | "internal";
+  plan_key_snapshot: "free" | "lite" | "standard" | "pro" | "beta" | "internal";
   plan_version_id: string | null;
   credit_policy_version: string;
   provider: string | null;
@@ -2034,6 +2079,117 @@ export interface PulseEditorialDistributionRow extends Record<string, unknown> {
   updated_at: string;
 }
 
+export interface MarketInstrumentRow extends Record<string, unknown> {
+  ticker: string;
+  cik: string | null;
+  company_name: string | null;
+  exchange: string | null;
+  currency: string | null;
+  security_type: "common_stock" | "preferred_stock" | "adr" | "etf" | "other";
+  share_class: string | null;
+  adr_ratio: number | null;
+  status: "active" | "delisted" | "merged" | "unknown";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FundamentalSnapshotRow extends Record<string, unknown> {
+  id: string;
+  ticker: string;
+  cik: string | null;
+  available_at: string;
+  period_end: string;
+  filing_date: string | null;
+  form_type: string | null;
+  accession_numbers: string[];
+  currency: string;
+  diluted_eps_ttm: number | null;
+  net_income_common_ttm: number | null;
+  revenue_ttm: number | null;
+  cost_of_revenue_ttm: number | null;
+  operating_income_ttm: number | null;
+  income_before_tax_ttm: number | null;
+  income_tax_expense_ttm: number | null;
+  operating_cash_flow_ttm: number | null;
+  capital_expenditures_ttm: number | null;
+  free_cash_flow_ttm: number | null;
+  common_equity: number | null;
+  total_assets: number | null;
+  total_current_assets: number | null;
+  total_current_liabilities: number | null;
+  accounts_receivable: number | null;
+  inventory: number | null;
+  accounts_payable: number | null;
+  shares_outstanding: number | null;
+  cash_and_equivalents: number | null;
+  total_debt: number | null;
+  previous_period_end: string | null;
+  previous_common_equity: number | null;
+  previous_total_assets: number | null;
+  previous_cash_and_equivalents: number | null;
+  previous_total_debt: number | null;
+  previous_accounts_receivable: number | null;
+  previous_inventory: number | null;
+  previous_accounts_payable: number | null;
+  input_lineage: Record<string, unknown>;
+  quality_flags: string[];
+  normalization_version: string | null;
+  provider: "fmp" | "sec_companyfacts";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MarketPriceSnapshotRow extends Record<string, unknown> {
+  id: string;
+  ticker: string;
+  session_date: string;
+  price_type: "quote" | "regular_close" | "previous_close" | "adjusted_close";
+  price: number;
+  currency: string;
+  provider: string;
+  observed_at: string;
+  provider_reference: string | null;
+  quality_flags: string[];
+  created_at: string;
+}
+
+export interface ValuationSnapshotRow extends Record<string, unknown> {
+  id: string;
+  ticker: string;
+  session_date: string;
+  reference_price: number;
+  currency: string;
+  price_snapshot_id: string | null;
+  fundamental_snapshot_id: string | null;
+  market_cap: number | null;
+  enterprise_value: number | null;
+  eps_ttm_diluted: number | null;
+  book_value_per_share: number | null;
+  free_cash_flow_per_share: number | null;
+  pe_ttm: number | null;
+  pb: number | null;
+  ps_ttm: number | null;
+  price_to_fcf_ttm: number | null;
+  earnings_yield: number | null;
+  fcf_yield: number | null;
+  roe_ttm: number | null;
+  roa_ttm: number | null;
+  roic_ttm: number | null;
+  current_ratio: number | null;
+  cash_conversion_cycle_days: number | null;
+  days_sales_outstanding: number | null;
+  days_inventory_outstanding: number | null;
+  days_payables_outstanding: number | null;
+  metric_statuses: Record<string, unknown>;
+  metric_inputs: Record<string, unknown>;
+  quality_flags: string[];
+  fundamental_available_at: string | null;
+  fundamental_period_end: string | null;
+  calculation_version: string;
+  computed_at: string;
+  created_at: string;
+}
+
 // Supabase Database type for createClient generic
 export interface Database {
   public: {
@@ -2326,6 +2482,15 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Omit<AgentWorkerHeartbeatRow, "worker_id" | "created_at">>;
+        Relationships: [];
+      };
+      agent_v1_daemon_heartbeats: {
+        Row: AgentV1DaemonHeartbeatRow;
+        Insert: Omit<AgentV1DaemonHeartbeatRow, "created_at" | "updated_at"> & {
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<AgentV1DaemonHeartbeatRow, "daemon_id" | "created_at">>;
         Relationships: [];
       };
       institutional_managers: {
@@ -3213,14 +3378,13 @@ export interface Database {
         Row: UserFilingNotificationRow;
         Insert: Pick<
           UserFilingNotificationRow,
-          "user_id" | "filing_event_id" | "title" | "body" | "destination_path"
+          "user_id" | "title" | "body" | "destination_path"
         > &
           Partial<
             Omit<
               UserFilingNotificationRow,
               | "id"
               | "user_id"
-              | "filing_event_id"
               | "title"
               | "body"
               | "destination_path"
@@ -3230,7 +3394,7 @@ export interface Database {
             id?: string;
             created_at?: string;
           };
-        Update: Partial<Omit<UserFilingNotificationRow, "id" | "user_id" | "filing_event_id" | "created_at">>;
+        Update: Partial<Omit<UserFilingNotificationRow, "id" | "user_id" | "filing_event_id" | "market_issue_id" | "created_at">>;
         Relationships: Array<{
           foreignKeyName: string;
           columns: string[];
@@ -4042,6 +4206,37 @@ export interface Database {
         Update: Partial<Omit<BillingTossPaymentRow, "id" | "user_id" | "created_at">>;
         Relationships: [];
       };
+      billing_toss_refunds: {
+        Row: BillingTossRefundRow;
+        Insert: Omit<
+          BillingTossRefundRow,
+          | "id"
+          | "status"
+          | "idempotency_key"
+          | "provider_cancel_transaction_key"
+          | "provider_response"
+          | "failure_code"
+          | "failure_message"
+          | "provider_requested_at"
+          | "completed_at"
+          | "created_at"
+          | "updated_at"
+        > & {
+          id?: string;
+          status?: BillingTossRefundStatus;
+          idempotency_key?: string;
+          provider_cancel_transaction_key?: string | null;
+          provider_response?: Json;
+          failure_code?: string | null;
+          failure_message?: string | null;
+          provider_requested_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<BillingTossRefundRow, "id" | "user_id" | "created_at">>;
+        Relationships: [];
+      };
       billing_toss_operations: {
         Row: BillingTossOperationRow;
         Insert: Omit<
@@ -4416,6 +4611,65 @@ export interface Database {
           referencedRelation: string;
           referencedColumns: string[];
         }>;
+      };
+      market_instruments: {
+        Row: MarketInstrumentRow;
+        Insert: Pick<MarketInstrumentRow, "ticker"> &
+          Partial<Omit<MarketInstrumentRow, "ticker" | "created_at" | "updated_at">> & {
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<MarketInstrumentRow, "ticker" | "created_at">>;
+        Relationships: [];
+      };
+      fundamental_snapshots: {
+        Row: FundamentalSnapshotRow;
+        Insert: Pick<FundamentalSnapshotRow, "ticker" | "available_at" | "period_end" | "currency"> &
+          Partial<
+            Omit<
+              FundamentalSnapshotRow,
+              "id" | "ticker" | "available_at" | "period_end" | "currency" | "created_at" | "updated_at"
+            >
+          > & {
+            id?: string;
+            created_at?: string;
+            updated_at?: string;
+          };
+        Update: Partial<Omit<FundamentalSnapshotRow, "id" | "created_at">>;
+        Relationships: [];
+      };
+      market_price_snapshots: {
+        Row: MarketPriceSnapshotRow;
+        Insert: Pick<
+          MarketPriceSnapshotRow,
+          "ticker" | "session_date" | "price" | "currency" | "provider" | "observed_at"
+        > &
+          Partial<
+            Omit<
+              MarketPriceSnapshotRow,
+              "id" | "ticker" | "session_date" | "price" | "currency" | "provider" | "observed_at" | "created_at"
+            >
+          > & {
+            id?: string;
+            created_at?: string;
+          };
+        Update: Partial<Omit<MarketPriceSnapshotRow, "id" | "created_at">>;
+        Relationships: [];
+      };
+      valuation_snapshots: {
+        Row: ValuationSnapshotRow;
+        Insert: Pick<ValuationSnapshotRow, "ticker" | "session_date" | "reference_price" | "currency" | "calculation_version"> &
+          Partial<
+            Omit<
+              ValuationSnapshotRow,
+              "id" | "ticker" | "session_date" | "calculation_version" | "created_at"
+            >
+          > & {
+            id?: string;
+            created_at?: string;
+          };
+        Update: Partial<Omit<ValuationSnapshotRow, "id" | "created_at">>;
+        Relationships: [];
       };
     };
     Views: Record<string, never>;
@@ -4966,6 +5220,46 @@ export interface Database {
         };
         Returns: Array<{
           subscription_id: string;
+        }>;
+      };
+      prepare_toss_auto_refund: {
+        Args: {
+          p_user_id: string;
+          p_payment_id: string;
+          p_now?: string;
+        };
+        Returns: Array<{
+          refund_id: string;
+          provider_payment_key: string;
+          amount_krw: number;
+          idempotency_key: string;
+          refund_status: BillingTossRefundStatus;
+          should_call_provider: boolean;
+        }>;
+      };
+      mark_toss_auto_refund_recoverable: {
+        Args: {
+          p_user_id: string;
+          p_refund_id: string;
+          p_status: "failed" | "uncertain";
+          p_failure_code: string;
+          p_failure_message: string;
+          p_now?: string;
+        };
+        Returns: boolean;
+      };
+      finalize_toss_auto_refund: {
+        Args: {
+          p_user_id: string;
+          p_refund_id: string;
+          p_provider_payment_key: string;
+          p_provider_status: string;
+          p_provider_response: Json;
+          p_now?: string;
+        };
+        Returns: Array<{
+          refund_id: string;
+          already_applied: boolean;
         }>;
       };
       prepare_toss_billing_operation: {

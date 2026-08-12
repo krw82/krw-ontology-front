@@ -23,13 +23,22 @@ Fast production path:
   1. Build a new VM image while the current containers keep serving traffic.
   2. Optionally apply already-reviewed Supabase migrations.
   3. Recreate the application containers and verify their public health.
-  4. Restart the Mac MCP/worker runtime and run deep health verification.
+  4. Activate the local Rust daemon when requested and run deep health verification.
 
 Options:
   --apply-migrations       Apply pending Supabase migrations after the image builds.
   --with-data              Publish the active web catalog separately from code.
+  --with-agent-release     Stage a sealed GLM+DeepSeek Rust release on this Mac,
+                           select one provider, and bind the GCP web candidate
+                           to its public descriptor only.
+  --agent-release-root DIR Absolute sealed dual-provider release directory.
+  --agent-evidence-index FILE
+                           Optional final evidence index. When supplied and
+                           verified, admission opens after the private canary;
+                           without it the release deploys closed.
+  --agent-provider NAME    Selected provider (glm or deepseek; default: deepseek).
   --skip-web               Do not build or switch GCP containers.
-  --skip-mac               Do not restart local Mac MCP/worker services.
+  --skip-mac               Do not restart legacy local Mac MCP/worker services.
   --require-live-toss      Require a matching live Toss key pair in the GCP runtime env.
   --billing-v2-cutover     Freeze billing behind Caddy, deploy V2 read-only, and never
                           restore legacy billing writes on an activation failure.
@@ -48,6 +57,7 @@ EOF
 DRY_RUN=0
 APPLY_MIGRATIONS=0
 WITH_DATA=0
+WITH_AGENT_RELEASE=0
 SKIP_WEB=0
 SKIP_MAC=0
 REQUIRE_LIVE_TOSS=0
@@ -58,6 +68,24 @@ TMP_DIR=
 DATA_LOCK_DIR=
 DATA_LOCK_OWNED=0
 MIGRATION_INCLUDE_ALL=0
+AGENT_RELEASE_ROOT=${KRW_AGENT_RELEASE_ROOT:-}
+AGENT_EVIDENCE_INDEX=${KRW_AGENT_PRODUCTION_EVIDENCE_INDEX:-}
+AGENT_PROVIDER=${KRW_AGENT_PROVIDER:-deepseek}
+AGENT_RELEASE_REPORT=
+AGENT_DESCRIPTOR_HASH=
+AGENT_RELEASE_SET_HASH=
+AGENT_DESCRIPTOR_SOURCE=
+AGENT_DESCRIPTOR_COPY=
+AGENT_LOCAL_INSTALLER=
+AGENT_INSTALLED_INSTALLER=
+AGENT_LOCAL_INSTALL_ROOT=${KRW_AGENT_LOCAL_INSTALL_ROOT:-"$HOME/.local/share/krw-agent"}
+AGENT_METRICS_PORT=${KRW_AGENT_METRICS_PORT:-15520}
+AGENT_FINAL_EVIDENCE_VERIFIED=0
+AGENT_CUTOVER_ROLLBACK_ARMED=0
+AGENT_LOCAL_RELEASE_ACTIVATED=0
+AGENT_ADMISSION_CLOSED=0
+FRONT_CANDIDATE_ACTIVATED=0
+MAC_RUNTIME_ACTIVATED=0
 
 fail() {
   echo "$1" >&2
@@ -67,6 +95,20 @@ fail() {
 cleanup() {
   exit_code=$?
   set +e
+  if [ "$exit_code" -ne 0 ] && [ "$AGENT_CUTOVER_ROLLBACK_ARMED" = "1" ]; then
+    if [ "$FRONT_CANDIDATE_ACTIVATED" = "1" ]; then
+      run_remote_rollback_front_candidate || echo "Front candidate rollback failed after agent cutover." >&2
+    fi
+    if [ "$AGENT_LOCAL_RELEASE_ACTIVATED" = "1" ]; then
+      rollback_local_agent_release || echo "Local krw-agent release rollback failed." >&2
+    fi
+    if [ "$MAC_RUNTIME_ACTIVATED" = "1" ]; then
+      restore_previous_mac_runtime || echo "Previous Mac worker runtime restoration failed." >&2
+    fi
+    if [ "$AGENT_ADMISSION_CLOSED" = "1" ]; then
+      run_remote_restore_research_admission || echo "Previous research admission could not be restored." >&2
+    fi
+  fi
   if [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ]; then
     rm -rf "$TMP_DIR"
   fi
@@ -84,6 +126,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --apply-migrations) APPLY_MIGRATIONS=1 ;;
     --with-data) WITH_DATA=1 ;;
+    --with-agent-release) WITH_AGENT_RELEASE=1 ;;
     --skip-web) SKIP_WEB=1 ;;
     --skip-mac|--skip-worker-restart) SKIP_MAC=1 ;;
     --require-live-toss) REQUIRE_LIVE_TOSS=1 ;;
@@ -101,6 +144,24 @@ while [ "$#" -gt 0 ]; do
       shift
       [ "$#" -gt 0 ] || fail "--release-id requires a value."
       RELEASE_ID=$1
+      ;;
+    --agent-release-root)
+      shift
+      [ "$#" -gt 0 ] || fail "--agent-release-root requires a value."
+      AGENT_RELEASE_ROOT=$1
+      WITH_AGENT_RELEASE=1
+      ;;
+    --agent-evidence-index)
+      shift
+      [ "$#" -gt 0 ] || fail "--agent-evidence-index requires a value."
+      AGENT_EVIDENCE_INDEX=$1
+      WITH_AGENT_RELEASE=1
+      ;;
+    --agent-provider)
+      shift
+      [ "$#" -gt 0 ] || fail "--agent-provider requires glm or deepseek."
+      AGENT_PROVIDER=$1
+      WITH_AGENT_RELEASE=1
       ;;
     --env-file)
       shift
@@ -124,6 +185,19 @@ if [ "$BILLING_V2_CUTOVER" = "1" ]; then
   [ "$APPLY_MIGRATIONS" = "1" ] || fail "--billing-v2-cutover requires --apply-migrations."
   [ "$SKIP_WEB" = "0" ] || fail "--billing-v2-cutover cannot be combined with --skip-web."
   [ "$REQUIRE_LIVE_TOSS" = "1" ] || fail "--billing-v2-cutover requires --require-live-toss."
+fi
+
+if [ "$WITH_AGENT_RELEASE" = "1" ]; then
+  [ "$SKIP_WEB" = "0" ] || fail "--with-agent-release requires the web candidate deployment."
+  [ "$APPLY_MIGRATIONS" = "1" ] || fail "--with-agent-release requires --apply-migrations for the direct Rust daemon heartbeat ABI."
+  case "$AGENT_PROVIDER" in
+    glm|deepseek) ;;
+    *) fail "--agent-provider must be glm or deepseek." ;;
+  esac
+  case "$AGENT_METRICS_PORT" in
+    ''|*[!0-9]*) fail "KRW_AGENT_METRICS_PORT must be in 1024..65535." ;;
+    *) [ "$AGENT_METRICS_PORT" -ge 1024 ] && [ "$AGENT_METRICS_PORT" -le 65535 ] || fail "KRW_AGENT_METRICS_PORT must be in 1024..65535." ;;
+  esac
 fi
 
 case "$RELEASE_ID" in
@@ -185,6 +259,9 @@ run_schema_smoke() {
     . "$ENV_PATH"
     set +a
     node "$SCRIPT_DIR/supabase-schema-smoke.mjs"
+    if [ "$WITH_AGENT_RELEASE" = "1" ]; then
+      node "$SCRIPT_DIR/verify-agent-v1-compatibility.mjs"
+    fi
   )
 }
 
@@ -209,35 +286,73 @@ SITE_ORIGIN_TWO=$(node -e 'const target=require(process.argv[1]); if(!Array.isAr
 REMOTE_ARCHIVE_DIR=/tmp
 REMOTE_FRONT_ARCHIVE="$REMOTE_ARCHIVE_DIR/krw-front-$RELEASE_ID.tar.gz"
 REMOTE_STAGE="$REMOTE_FRONT_DIR/.simple-deploy/releases/$RELEASE_ID"
+REMOTE_AGENT_DESCRIPTOR="$REMOTE_ARCHIVE_DIR/krw-agent-public-release-$RELEASE_ID.json"
 
 if [ "$SKIP_WEB" = "0" ]; then
   require_command gcloud
   require_command tar
+  require_command git
   require_command curl
   require_file "$FRONT_DIR/docker-compose.yml"
   require_file "$FRONT_DIR/Dockerfile.web"
   actual_instance_id=$(gcloud compute instances describe "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --format='value(id)')
   [ "$actual_instance_id" = "$GCP_INSTANCE_ID" ] || fail "GCP instance identity does not match ops/production-target.json."
+  FRONT_GIT_COMMIT=$(git -C "$FRONT_DIR" rev-parse HEAD) || fail "Unable to resolve the frontend Git commit."
+  [ "$(git -C "$FRONT_DIR" rev-parse HEAD)" = "$FRONT_GIT_COMMIT" ] || fail "Frontend release commit changed during preflight."
+  [ -z "$(git -C "$FRONT_DIR" status --porcelain=v1 --untracked-files=normal)" ] || fail "Production web release requires a clean committed frontend tree."
 fi
 
-if [ "$SKIP_MAC" = "0" ]; then
+if [ "$WITH_AGENT_RELEASE" = "1" ]; then
+  require_command python3
+  require_command shasum
+  require_file "$SCRIPT_DIR/verify-krw-agent-production-release.mjs"
+  [ -n "$AGENT_RELEASE_ROOT" ] || fail "Set KRW_AGENT_RELEASE_ROOT or pass --agent-release-root for a sealed dual-provider release."
+  case "$AGENT_LOCAL_INSTALL_ROOT" in
+    /*) ;;
+    *) fail "KRW_AGENT_LOCAL_INSTALL_ROOT must be an absolute local Mac path." ;;
+  esac
+  set -- --release-root "$AGENT_RELEASE_ROOT" --provider "$AGENT_PROVIDER"
+  if [ -n "$AGENT_EVIDENCE_INDEX" ]; then
+    set -- "$@" --evidence-index "$AGENT_EVIDENCE_INDEX" --front-commit "$FRONT_GIT_COMMIT"
+  fi
+  AGENT_RELEASE_REPORT=$(node "$SCRIPT_DIR/verify-krw-agent-production-release.mjs" "$@")
+  AGENT_DESCRIPTOR_HASH=$(node -e 'const value=JSON.parse(process.argv[1]); process.stdout.write(value.selected_descriptor_artifact_hash);' "$AGENT_RELEASE_REPORT")
+  AGENT_RELEASE_SET_HASH=$(node -e 'const value=JSON.parse(process.argv[1]); process.stdout.write(value.selected_release_set_hash);' "$AGENT_RELEASE_REPORT")
+  AGENT_FINAL_EVIDENCE_VERIFIED=$(node -e 'const value=JSON.parse(process.argv[1]); process.stdout.write(value.final_evidence_verified ? "1" : "0");' "$AGENT_RELEASE_REPORT")
+  AGENT_DESCRIPTOR_SOURCE="$AGENT_RELEASE_ROOT/$AGENT_PROVIDER/public-release.json"
+  AGENT_LOCAL_INSTALLER="$AGENT_RELEASE_ROOT/$AGENT_PROVIDER/packaging/launchd/install-local-mac-agentd-release.sh"
+  AGENT_INSTALLED_INSTALLER="$AGENT_LOCAL_INSTALL_ROOT/releases/$RELEASE_ID/$AGENT_PROVIDER/packaging/launchd/install-local-mac-agentd-release.sh"
+  require_file "$AGENT_DESCRIPTOR_SOURCE"
+  require_file "$AGENT_LOCAL_INSTALLER"
+  [ -x "$AGENT_LOCAL_INSTALLER" ] || fail "Sealed local krw-agent installer is not executable."
+  require_file "$ENV_PATH"
+  printf '%s\n' "Verified sealed GLM+DeepSeek release for local Mac activation; selected provider: $AGENT_PROVIDER"
+fi
+
+if [ "$WITH_AGENT_RELEASE" = "0" ] && [ "$SKIP_MAC" = "0" ]; then
   require_command npm
   require_command shasum
   require_file "$SCRIPT_DIR/install-mcp-server-launchd.sh"
   require_file "$SCRIPT_DIR/install-stock-news-mcp-launchd.sh"
   require_file "$SCRIPT_DIR/install-filings-mcp-launchd.sh"
   require_file "$SCRIPT_DIR/install-mac-worker-launchd.sh"
+  require_file "$SCRIPT_DIR/install-valuation-refresh-worker-launchd.sh"
+  require_file "$SCRIPT_DIR/valuation-refresh-preflight.sh"
   require_file "$SCRIPT_DIR/materialize-ontology-plugin.mjs"
   require_file "$SCRIPT_DIR/verify-mcp-server-production.sh"
+  require_file "$SCRIPT_DIR/verify-valuation-refresh-worker.sh"
   require_file "$SCRIPT_DIR/verify-mac-worker-heartbeats.mjs"
 fi
 if [ "$APPLY_MIGRATIONS" = "1" ]; then
   require_file "$SCRIPT_DIR/supabase-schema-smoke.mjs"
+  if [ "$WITH_AGENT_RELEASE" = "1" ]; then
+    require_file "$SCRIPT_DIR/verify-agent-v1-compatibility.mjs"
+  fi
 fi
 
 echo "Release: $RELEASE_ID"
 echo "Target VM: $GCP_PROJECT/$GCP_ZONE/$GCP_INSTANCE"
-echo "Web: $SKIP_WEB  Mac runtime: $SKIP_MAC  Migrations: $APPLY_MIGRATIONS  Catalog: $WITH_DATA"
+echo "Web: $SKIP_WEB  Mac runtime: $SKIP_MAC  Migrations: $APPLY_MIGRATIONS  Catalog: $WITH_DATA  Agent release: $WITH_AGENT_RELEASE"
 
 if [ "$APPLY_MIGRATIONS" = "1" ]; then
   run_migration_dry_run
@@ -295,8 +410,10 @@ prepare_dry_run_runtime_plugin() {
 }
 
 if [ "$DRY_RUN" = "1" ]; then
-  if [ "$SKIP_MAC" = "0" ]; then
+  if [ "$WITH_AGENT_RELEASE" = "0" ] && [ "$SKIP_MAC" = "0" ]; then
     prepare_dry_run_runtime_plugin
+    (cd "$FRONT_DIR" && npm run build:worker)
+    "$SCRIPT_DIR/valuation-refresh-preflight.sh" --env-file "$DRY_RUNTIME_ENV"
   fi
   if [ "$WITH_DATA" = "1" ]; then
     "$SCRIPT_DIR/deploy-data-release-production.sh" --env-file "$ENV_PATH" --dry-run
@@ -319,8 +436,9 @@ prepare_mac_runtime() {
   if [ "$SKIP_MAC" = "0" ]; then
     (cd "$FRONT_DIR" && npm run build:worker)
     WORKER_SHA=$(shasum -a 256 "$FRONT_DIR/.worker/agent-worker.mjs" | awk '{print $1}')
-    RUNTIME_SHA=$( (cd "$FRONT_DIR" && { printf '%s\n' "$RELEASE_ID"; shasum -a 256 package.json package-lock.json .worker/agent-worker.mjs scripts/start-mac-worker-production.sh; }) | shasum -a 256 | awk '{print $1}')
+    RUNTIME_SHA=$( (cd "$FRONT_DIR" && { printf '%s\n' "$RELEASE_ID"; shasum -a 256 package.json package-lock.json .worker/agent-worker.mjs .worker/valuation-refresh-worker.mjs scripts/start-mac-worker-production.sh scripts/start-valuation-refresh-worker.sh scripts/install-valuation-refresh-worker-launchd.sh; }) | shasum -a 256 | awk '{print $1}')
     printf 'KRW_MAC_IMMUTABLE_RUNTIME=0\nKRW_MAC_RUNTIME_ROOT=%s\nKRW_WORKER_BUNDLE_SHA256=%s\nKRW_RUNTIME_IDENTITY_SHA256=%s\n' "$FRONT_DIR" "$WORKER_SHA" "$RUNTIME_SHA" >> "$MAC_RUNTIME_ENV"
+    "$FRONT_DIR/scripts/valuation-refresh-preflight.sh" --env-file "$MAC_RUNTIME_ENV"
   fi
   chmod 600 "$MAC_RUNTIME_ENV"
   echo "Materializing versioned production runtime plugin..."
@@ -347,12 +465,11 @@ create_archives() {
     TMP_DIR=$(mktemp -d "$TMP_BASE/krw-fast-deploy.XXXXXX")
   fi
   FRONT_ARCHIVE="$TMP_DIR/front.tar.gz"
-  # Do not exclude a generic "coverage" path: application code lives in
-  # src/lib/coverage and must be present in the Docker build context.
-  # Keep local test/review artifacts out of the upload. They are not part of
-  # the Docker build and can otherwise make a release archive hundreds of MB.
-  # Avoid macOS extended attributes so GNU tar on the VM stays quiet too.
-  tar --no-xattrs -C "$FRONT_DIR" --exclude=.git --exclude=.next --exclude=.next-'*' --exclude=.worker --exclude=.services --exclude=node_modules --exclude=.deploy --exclude=.agents --exclude=.codex --exclude=.claude --exclude=.gstack --exclude=.lazyweb --exclude=.vendor --exclude=.pytest_cache --exclude=.env --exclude='.env.*' --exclude=supabase/.temp --exclude=output --exclude=dist --exclude=_workspace --exclude=_temp --exclude=logs --exclude=marketing-video --exclude=.playwright-cli --exclude=.playwright-mcp --exclude=krw-ontology -czf "$FRONT_ARCHIVE" .
+  # Archive the exact clean commit that passed preflight. This avoids
+  # accidentally shipping ignored/untracked files (or a half-built worker)
+  # from the developer's current directory. The Docker builder recreates
+  # generated workers inside the immutable context.
+  git -C "$FRONT_DIR" archive --format=tar "$FRONT_GIT_COMMIT" | gzip -n > "$FRONT_ARCHIVE"
 
 }
 
@@ -378,8 +495,209 @@ upload_archive() {
   fail "Unable to upload $archive_label after $max_attempts attempts."
 }
 
+create_agent_descriptor_upload() {
+  TMP_BASE=$TMPDIR
+  [ -n "$TMP_BASE" ] || TMP_BASE=/tmp
+  if [ -z "$TMP_DIR" ]; then
+    TMP_DIR=$(mktemp -d "$TMP_BASE/krw-fast-deploy.XXXXXX")
+  fi
+  AGENT_DESCRIPTOR_COPY="$TMP_DIR/public-release.json"
+  # GCP needs this immutable public descriptor to validate user requests. The
+  # full Rust bundle, AgentImages, provider credential, and local DB runtime
+  # never leave this Mac.
+  cp "$AGENT_DESCRIPTOR_SOURCE" "$AGENT_DESCRIPTOR_COPY"
+  chmod 0644 "$AGENT_DESCRIPTOR_COPY"
+  observed_descriptor_hash="sha256:$(shasum -a 256 "$AGENT_DESCRIPTOR_COPY" | awk '{print $1}')"
+  [ "$observed_descriptor_hash" = "$AGENT_DESCRIPTOR_HASH" ] || fail "Copied public descriptor hash does not match the verified release."
+}
+
+stage_local_agent_release() {
+  KRW_AGENT_LOCAL_INSTALL_ROOT="$AGENT_LOCAL_INSTALL_ROOT" \
+    "$AGENT_LOCAL_INSTALLER" --mode stage \
+      --release-root "$AGENT_RELEASE_ROOT" \
+      --release-id "$RELEASE_ID" \
+      --provider "$AGENT_PROVIDER"
+}
+
+activate_local_agent_release() {
+  [ -x "$AGENT_INSTALLED_INSTALLER" ] || fail "Staged local krw-agent installer is unavailable."
+  KRW_AGENT_LOCAL_INSTALL_ROOT="$AGENT_LOCAL_INSTALL_ROOT" \
+    "$AGENT_INSTALLED_INSTALLER" --mode activate \
+      --release-id "$RELEASE_ID" \
+      --provider "$AGENT_PROVIDER" \
+      --metrics-port "$AGENT_METRICS_PORT" \
+      --env-file "$ENV_PATH"
+}
+
+rollback_local_agent_release() {
+  [ -x "$AGENT_INSTALLED_INSTALLER" ] || return 0
+  KRW_AGENT_LOCAL_INSTALL_ROOT="$AGENT_LOCAL_INSTALL_ROOT" \
+    "$AGENT_INSTALLED_INSTALLER" --mode rollback --release-id "$RELEASE_ID"
+}
+
+run_remote_close_research_admission() {
+  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+set -eu
+
+active_root=$REMOTE_FRONT_DIR
+active_env=$REMOTE_FRONT_DIR/.env
+if [ -L "$REMOTE_FRONT_DIR/.simple-deploy/current" ] \
+  && [ -f "$REMOTE_FRONT_DIR/.simple-deploy/current/runtime.env" ]; then
+  active_root=$(cd "$REMOTE_FRONT_DIR/.simple-deploy/current" && pwd -P)
+  active_env=$active_root/runtime.env
+fi
+
+value_of() {
+  awk -F= -v key="$2" '
+    $0 !~ /^[[:space:]]*#/ && $1 == key {
+      sub(/^[^=]*=/, "")
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+      gsub(/^"|"$/, "")
+      gsub(/^'\''|'\''$/, "")
+      print
+    }
+  ' "$1" | tail -n 1
+}
+upsert_env_value() {
+  env_file=$1
+  env_key=$2
+  env_value=$3
+  temporary=$(mktemp "${env_file}.XXXXXX")
+  awk -v key="$env_key" -v value="$env_value" '
+    $0 !~ /^[[:space:]]*#/ && $0 ~ ("^" key "=") {
+      if (!seen++) print key "=" value
+      next
+    }
+    { print }
+    END { if (!seen) print key "=" value }
+  ' "$env_file" > "$temporary"
+  chmod 600 "$temporary"
+  mv "$temporary" "$env_file"
+}
+compose_active() {
+  FRONT_DIR="$active_root" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$active_root" --env-file "$active_env" -f "$active_root/docker-compose.yml" "$@"
+}
+
+if [ "$(value_of "$active_env" KRW_AGENT_BACKEND_MODE)" != "rust" ]; then
+  echo "Active web release does not use Rust Agent V1; no research admission change is needed."
+  exit 0
+fi
+previous=$(value_of "$active_env" KRW_AGENT_ADMISSION_MODE)
+case "$previous" in open|closed|drain) ;; *) previous=open ;; esac
+printf '%s\n' "$previous" > "$REMOTE_STAGE/research-admission.previous"
+chmod 600 "$REMOTE_STAGE/research-admission.previous"
+changed=0
+restore_previous() {
+  status=$?
+  if [ "$changed" = "1" ]; then
+    set +e
+    upsert_env_value "$active_env" KRW_AGENT_ADMISSION_MODE "$previous"
+    compose_active up -d --no-deps --force-recreate --wait web agent-v1-outbox
+  fi
+  exit "$status"
+}
+trap restore_previous EXIT INT TERM
+upsert_env_value "$active_env" KRW_AGENT_ADMISSION_MODE closed
+changed=1
+compose_active up -d --no-deps --force-recreate --wait web agent-v1-outbox
+compose_active exec -T web node -e 'fetch("http://127.0.0.1:3000/api/healthz").then(async response=>{const value=await response.json().catch(()=>null); if(!response.ok||value?.status!=="ok") process.exit(1);}).catch(()=>process.exit(1));'
+changed=0
+trap - EXIT INT TERM
+echo "Research admission closed before Rust agent release switch."
+REMOTE_SCRIPT
+}
+
+run_remote_restore_research_admission() {
+  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+set -eu
+[ -f "$REMOTE_STAGE/research-admission.previous" ] || exit 0
+previous=$(cat "$REMOTE_STAGE/research-admission.previous")
+case "$previous" in open|closed|drain) ;; *) exit 1 ;; esac
+active_root=$REMOTE_FRONT_DIR
+active_env=$REMOTE_FRONT_DIR/.env
+if [ -L "$REMOTE_FRONT_DIR/.simple-deploy/current" ] \
+  && [ -f "$REMOTE_FRONT_DIR/.simple-deploy/current/runtime.env" ]; then
+  active_root=$(cd "$REMOTE_FRONT_DIR/.simple-deploy/current" && pwd -P)
+  active_env=$active_root/runtime.env
+fi
+value_of() {
+  awk -F= -v key="$2" '
+    $0 !~ /^[[:space:]]*#/ && $1 == key {
+      sub(/^[^=]*=/, "")
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+      gsub(/^"|"$/, "")
+      gsub(/^'\''|'\''$/, "")
+      print
+    }
+  ' "$1" | tail -n 1
+}
+if [ "$(value_of "$active_env" KRW_AGENT_BACKEND_MODE)" != "rust" ]; then
+  exit 0
+fi
+upsert_env_value() {
+  env_file=$1
+  env_key=$2
+  env_value=$3
+  temporary=$(mktemp "${env_file}.XXXXXX")
+  awk -v key="$env_key" -v value="$env_value" '
+    $0 !~ /^[[:space:]]*#/ && $0 ~ ("^" key "=") {
+      if (!seen++) print key "=" value
+      next
+    }
+    { print }
+    END { if (!seen) print key "=" value }
+  ' "$env_file" > "$temporary"
+  chmod 600 "$temporary"
+  mv "$temporary" "$env_file"
+}
+compose_active() {
+  FRONT_DIR="$active_root" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$active_root" --env-file "$active_env" -f "$active_root/docker-compose.yml" "$@"
+}
+upsert_env_value "$active_env" KRW_AGENT_ADMISSION_MODE "$previous"
+compose_active up -d --no-deps --force-recreate --wait web agent-v1-outbox
+echo "Previous research admission restored: $previous"
+REMOTE_SCRIPT
+}
+
+run_remote_rollback_front_candidate() {
+  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+set -eu
+test -f "$REMOTE_STAGE/rollback.env"
+. "$REMOTE_STAGE/rollback.env"
+test -n "$OLD_IMAGE"
+services="web reverse-proxy agent-v1-outbox llm-gateway filings-mcp document-worker document-outbox-dispatcher filing-notification-worker filing-brief-worker billing-worker"
+compose_stage() {
+  FRONT_DIR="$REMOTE_STAGE" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_STAGE" --env-file "$REMOTE_STAGE/runtime.env" -f "$REMOTE_STAGE/docker-compose.yml" "$@"
+}
+compose_old() {
+  if [ -n "$OLD_CONFIG_ROOT" ] && [ -f "$OLD_CONFIG_ROOT/runtime.env" ] && [ -f "$OLD_CONFIG_ROOT/docker-compose.yml" ]; then
+    FRONT_DIR="$OLD_CONFIG_ROOT" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$OLD_CONFIG_ROOT" --env-file "$OLD_CONFIG_ROOT/runtime.env" -f "$OLD_CONFIG_ROOT/docker-compose.yml" "$@"
+  else
+    FRONT_DIR="$REMOTE_FRONT_DIR" NEXT_PUBLIC_APP_VERSION="$OLD_APP_VERSION" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_FRONT_DIR" --env-file "$REMOTE_FRONT_DIR/.env" -f "$REMOTE_FRONT_DIR/docker-compose.yml" "$@"
+  fi
+}
+for worker in market-issue-worker market-web-source-worker market-issue-stream-worker; do
+  compose_stage rm -sf "$worker" || true
+done
+docker tag "$OLD_IMAGE" krw-ontology-front-web:local
+compose_old up -d --force-recreate --wait $services
+for worker in market-issue-worker market-web-source-worker market-issue-stream-worker; do
+  if compose_old config --services | grep -qx "$worker"; then
+    compose_old up -d --force-recreate --wait "$worker"
+  fi
+done
+if [ -n "$OLD_CONFIG_ROOT" ]; then
+  rm -f "$REMOTE_FRONT_DIR/.simple-deploy/current"
+  ln -s "$OLD_CONFIG_ROOT" "$REMOTE_FRONT_DIR/.simple-deploy/current"
+else
+  rm -f "$REMOTE_FRONT_DIR/.simple-deploy/current"
+fi
+echo "Rolled back front candidate after Rust agent release failure."
+REMOTE_SCRIPT
+}
+
 run_remote_prepare() {
-  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="RELEASE_ID='$RELEASE_ID' REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' REMOTE_FRONT_ARCHIVE='$REMOTE_FRONT_ARCHIVE' COMPOSE_PROJECT='$COMPOSE_PROJECT' REQUIRE_LIVE_TOSS='$REQUIRE_LIVE_TOSS' BILLING_V2_CUTOVER='$BILLING_V2_CUTOVER' SITE_ORIGIN_ONE='$SITE_ORIGIN_ONE' /bin/sh -s"
+  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="RELEASE_ID='$RELEASE_ID' FRONT_GIT_COMMIT='$FRONT_GIT_COMMIT' REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' REMOTE_FRONT_ARCHIVE='$REMOTE_FRONT_ARCHIVE' REMOTE_AGENT_DESCRIPTOR='$REMOTE_AGENT_DESCRIPTOR' COMPOSE_PROJECT='$COMPOSE_PROJECT' REQUIRE_LIVE_TOSS='$REQUIRE_LIVE_TOSS' BILLING_V2_CUTOVER='$BILLING_V2_CUTOVER' SITE_ORIGIN_ONE='$SITE_ORIGIN_ONE' WITH_AGENT_RELEASE='$WITH_AGENT_RELEASE' AGENT_PROVIDER='$AGENT_PROVIDER' AGENT_DESCRIPTOR_HASH='$AGENT_DESCRIPTOR_HASH' AGENT_RELEASE_SET_HASH='$AGENT_RELEASE_SET_HASH' /bin/sh -s"
 set -e
 test -f "$REMOTE_FRONT_DIR/.env"
 test ! -e "$REMOTE_STAGE"
@@ -513,6 +831,33 @@ else
   echo "Market-issue filtered-stream worker is disabled for this deployment."
 fi
 printf '\nFRONT_DIR=%s\nNEXT_PUBLIC_APP_VERSION=%s\n' "$REMOTE_STAGE" "$RELEASE_ID" >> "$REMOTE_STAGE/runtime.env"
+# A Rust-engine deploy pins the staged web image to the exact sealed provider
+# descriptor before it is built. The daemon and every credential remain on the
+# local Mac; this VM receives exactly one public JSON descriptor plus hashes.
+if [ "$WITH_AGENT_RELEASE" = "1" ]; then
+  test -f "$REMOTE_AGENT_DESCRIPTOR"
+  install -d -m 0755 "$REMOTE_STAGE/agent-release"
+  install -m 0644 "$REMOTE_AGENT_DESCRIPTOR" "$REMOTE_STAGE/agent-release/public-release.json"
+  observed_descriptor_hash="sha256:$(sha256sum "$REMOTE_STAGE/agent-release/public-release.json" | awk '{print $1}')"
+  test "$observed_descriptor_hash" = "$AGENT_DESCRIPTOR_HASH"
+  rm -f "$REMOTE_AGENT_DESCRIPTOR"
+  upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_BACKEND_MODE rust
+  upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_PROVIDER "$AGENT_PROVIDER"
+  upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_PUBLIC_DESCRIPTOR_HOST_PATH "$REMOTE_STAGE/agent-release/public-release.json"
+  upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_RELEASE_DESCRIPTOR_PATH /run/krw-agent/public-release.json
+  upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_RELEASE_ARTIFACT_HASH "$AGENT_DESCRIPTOR_HASH"
+  upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_RELEASE_SET_HASH "$AGENT_RELEASE_SET_HASH"
+  upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_FRONT_COMMIT "$FRONT_GIT_COMMIT"
+  upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_DAEMON_HEARTBEAT_REQUIRED 1
+  upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_RUNTIME_ENVIRONMENT prod
+fi
+# A Rust Agent V1 candidate is always admitted in a closed state first.  The
+# admission gate is opened only after activation and deep readiness succeed;
+# this prevents a web restart from creating runs against a half-started
+# provider or an unverified descriptor.
+if [ "$(value_of KRW_AGENT_BACKEND_MODE)" = "rust" ]; then
+  upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_ADMISSION_MODE closed
+fi
   OLD_WEB=$(docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_FRONT_DIR" --env-file "$REMOTE_FRONT_DIR/.env" -f "$REMOTE_FRONT_DIR/docker-compose.yml" ps -q web 2>/dev/null || true)
   OLD_IMAGE=
   if [ -n "$OLD_WEB" ]; then
@@ -860,6 +1205,69 @@ echo "OK deep production health: $RELEASE_ID"
 REMOTE_SCRIPT
 }
 
+run_remote_open_research_admission() {
+  cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="RELEASE_ID='$RELEASE_ID' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' /bin/sh -s"
+set -eu
+value_of() {
+  key="$1"
+  awk -F= -v key="$key" '
+    $0 !~ /^[[:space:]]*#/ && $1 == key {
+      sub(/^[^=]*=/, "")
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+      gsub(/^"|"$/, "")
+      gsub(/^'\''|'\''$/, "")
+      print
+    }
+  ' "$REMOTE_STAGE/runtime.env" | tail -n 1
+}
+upsert_env_value() {
+  env_file="$1"
+  env_key="$2"
+  env_value="$3"
+  tmp_file=$(mktemp "${env_file}.XXXXXX")
+  awk -v key="$env_key" -v value="$env_value" '
+    $0 !~ /^[[:space:]]*#/ && $0 ~ ("^" key "=") {
+      if (!seen++) print key "=" value
+      next
+    }
+    { print }
+    END { if (!seen) print key "=" value }
+  ' "$env_file" > "$tmp_file"
+  chmod 600 "$tmp_file"
+  mv "$tmp_file" "$env_file"
+}
+if [ "$(value_of KRW_AGENT_BACKEND_MODE)" != "rust" ]; then
+  echo "Research admission is not owned by Rust Agent V1 for this release."
+  exit 0
+fi
+test "$(value_of KRW_AGENT_ADMISSION_MODE)" = "closed"
+compose_stage() {
+  FRONT_DIR="$REMOTE_STAGE" NEXT_PUBLIC_APP_VERSION="$RELEASE_ID" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_STAGE" --env-file "$REMOTE_STAGE/runtime.env" -f "$REMOTE_STAGE/docker-compose.yml" "$@"
+}
+verify_deep_admission() {
+  expected_admission=$1
+  compose_stage exec -T web node -e 'const expected=process.argv[1]; const headers={"x-internal-key":process.env.INTERNAL_API_KEY||"","x-krw-client-ip":"127.0.0.1"}; fetch("http://127.0.0.1:3000/api/healthz/deep",{headers}).then(async response=>{const value=await response.json().catch(()=>null); if(!response.ok||value?.status!=="ok"||value?.checks?.agent_v1?.admission!==expected) process.exit(1);}).catch(()=>process.exit(1));' "$expected_admission"
+}
+restore_closed() {
+  upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_ADMISSION_MODE closed
+  compose_stage up -d --no-deps --force-recreate --wait web agent-v1-outbox || true
+}
+# Prove the local Mac daemon heartbeat and descriptor pins while admission is
+# still closed. This avoids even a short open window for a stale Mac worker.
+verify_deep_admission closed
+upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_ADMISSION_MODE open
+if ! compose_stage up -d --no-deps --force-recreate --wait web agent-v1-outbox; then
+  restore_closed
+  exit 1
+fi
+if ! verify_deep_admission open; then
+  restore_closed
+  exit 1
+fi
+echo "Research admission opened after deep readiness: $RELEASE_ID"
+REMOTE_SCRIPT
+}
+
 run_remote_verify_billing_callback_redaction() {
   cat <<'REMOTE_SCRIPT' | gcloud compute ssh "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --command="RELEASE_ID='$RELEASE_ID' COMPOSE_PROJECT='$COMPOSE_PROJECT' SITE_ORIGIN_ONE='$SITE_ORIGIN_ONE' /bin/sh -s"
 set -eu
@@ -1129,6 +1537,7 @@ restart_mac_services() {
   "$runtime_root/scripts/install-stock-news-mcp-launchd.sh" --env-file "$runtime_env" --load
   "$runtime_root/scripts/install-filings-mcp-launchd.sh" --env-file "$runtime_env" --load
   "$runtime_root/scripts/install-mac-worker-launchd.sh" --env-file "$runtime_env" --load --skip-preflight
+  "$runtime_root/scripts/install-valuation-refresh-worker-launchd.sh" --env-file "$runtime_env" --load --skip-preflight
 }
 
 verify_new_mac_runtime() {
@@ -1137,6 +1546,7 @@ verify_new_mac_runtime() {
   activation_started_at=$3
 
   "$runtime_root/scripts/verify-mcp-server-production.sh" --env-file "$runtime_env"
+  "$runtime_root/scripts/verify-valuation-refresh-worker.sh" --env-file "$runtime_env" --timeout-ms 120000
   node "$runtime_root/scripts/verify-mac-worker-heartbeats.mjs" \
     --env-file "$runtime_env" \
     --seen-after "$activation_started_at" \
@@ -1149,13 +1559,18 @@ verify_new_mac_runtime() {
 capture_previous_mac_runtime() {
   PREVIOUS_MAC_ENV=
   PREVIOUS_MAC_ROOT=
+  PREVIOUS_MAC_RUNTIME_DIR=
+  PREVIOUS_MAC_RUNTIME_BASE=
   for candidate in "$HOME/.local/share/krw-ontology/simple-runtimes/current/runtime.env" "$HOME/.local/share/krw-ontology/mac-runtimes/current/runtime.env"; do
     if [ -f "$candidate" ]; then
       PREVIOUS_MAC_ENV=$candidate
       PREVIOUS_MAC_ROOT=$(/bin/sh -c '. "$1"; printf "%s" "$KRW_MAC_RUNTIME_ROOT"' sh "$candidate")
       if [ ! -x "$PREVIOUS_MAC_ROOT/scripts/install-mcp-server-launchd.sh" ]; then
         PREVIOUS_MAC_ROOT=
+        continue
       fi
+      PREVIOUS_MAC_RUNTIME_DIR=$(CDPATH= cd -- "$(dirname -- "$candidate")" && pwd -P)
+      PREVIOUS_MAC_RUNTIME_BASE=$(dirname -- "$(dirname -- "$candidate")")
       break
     fi
   done
@@ -1171,6 +1586,11 @@ restore_previous_mac_runtime() {
     echo "Previous Mac runtime restoration also failed." >&2
     return 1
   }
+  if [ -n "$PREVIOUS_MAC_RUNTIME_DIR" ] && [ -n "$PREVIOUS_MAC_RUNTIME_BASE" ]; then
+    rm -f "$PREVIOUS_MAC_RUNTIME_BASE/current"
+    ln -s "$PREVIOUS_MAC_RUNTIME_DIR" "$PREVIOUS_MAC_RUNTIME_BASE/current"
+  fi
+  MAC_RUNTIME_ACTIVATED=0
 }
 
 activate_mac_runtime() {
@@ -1181,6 +1601,7 @@ activate_mac_runtime() {
       && verify_new_mac_runtime "$FRONT_DIR" "$MAC_RUNTIME_ENV" "$ACTIVATION_STARTED_AT"; then
       rm -f "$MAC_RUNTIME_BASE/current"
       ln -s "$MAC_RUNTIME_DIR" "$MAC_RUNTIME_BASE/current"
+      MAC_RUNTIME_ACTIVATED=1
       echo "Activated Mac runtime: $MAC_RUNTIME_DIR"
       return 0
     fi
@@ -1189,15 +1610,25 @@ activate_mac_runtime() {
   return 1
 }
 
-if [ "$SKIP_MAC" = "0" ]; then
+if [ "$WITH_AGENT_RELEASE" = "0" ] && [ "$SKIP_MAC" = "0" ]; then
   prepare_mac_runtime
 elif [ "$WITH_DATA" = "1" ]; then
   prepare_data_environment
 fi
 
+if [ "$WITH_AGENT_RELEASE" = "1" ]; then
+  # Copy and offline-verify the complete sealed release locally before any
+  # production traffic changes. This does not start a new daemon yet.
+  stage_local_agent_release
+fi
+
 if [ "$SKIP_WEB" = "0" ]; then
   create_archives
   upload_archive "$FRONT_ARCHIVE" "$REMOTE_FRONT_ARCHIVE" "frontend archive"
+  if [ "$WITH_AGENT_RELEASE" = "1" ]; then
+    create_agent_descriptor_upload
+    upload_archive "$AGENT_DESCRIPTOR_COPY" "$REMOTE_AGENT_DESCRIPTOR" "public Rust release descriptor"
+  fi
   run_remote_prepare
   if [ "$BILLING_V2_CUTOVER" = "1" ]; then
     run_remote_pause_billing_for_cutover
@@ -1217,16 +1648,50 @@ if [ "$WITH_DATA" = "1" ]; then
   run_data_publish
 fi
 
+if [ "$WITH_AGENT_RELEASE" = "1" ]; then
+  run_remote_close_research_admission
+  AGENT_ADMISSION_CLOSED=1
+  AGENT_CUTOVER_ROLLBACK_ARMED=1
+  # Arm rollback before switching the local launchd job: a terminal or SSH
+  # loss after a successful switch is treated as ambiguous and restores the
+  # prior Mac release before public admission can be reopened.
+  AGENT_LOCAL_RELEASE_ACTIVATED=1
+  activate_local_agent_release
+  # `krw-agentd` has already written its own release-bound database heartbeat
+  # before its loopback metrics endpoint becomes ready. No Claude/plugin
+  # worker is restarted or consulted on the Rust deployment path.
+fi
+
 if [ "$SKIP_WEB" = "0" ]; then
+  if [ "$WITH_AGENT_RELEASE" = "1" ]; then
+    FRONT_CANDIDATE_ACTIVATED=1
+  fi
   run_remote_activate
 fi
 
-if [ "$SKIP_MAC" = "0" ]; then
+if [ "$WITH_AGENT_RELEASE" = "0" ] && [ "$SKIP_MAC" = "0" ]; then
   activate_mac_runtime
 fi
 
 if [ "$SKIP_WEB" = "0" ]; then
   run_remote_deep_verify
+  if [ "$WITH_AGENT_RELEASE" = "0" ]; then
+    run_remote_open_research_admission
+  elif [ "$AGENT_FINAL_EVIDENCE_VERIFIED" = "1" ]; then
+    run_remote_open_research_admission
+  else
+    echo "Rust release is healthy on this Mac and the GCP web candidate is live, but research admission remains closed until the private DeepSeek canary evidence is verified."
+  fi
+fi
+
+# The matching agent daemon, web/outbox candidate, and admission gate are all
+# now healthy. Later billing-only checks do not roll back this completed
+# research-engine cutover.
+if [ "$WITH_AGENT_RELEASE" = "1" ]; then
+  AGENT_CUTOVER_ROLLBACK_ARMED=0
+  AGENT_LOCAL_RELEASE_ACTIVATED=0
+  AGENT_ADMISSION_CLOSED=0
+  FRONT_CANDIDATE_ACTIVATED=0
 fi
 
 if [ "$BILLING_V2_CUTOVER" = "1" ]; then

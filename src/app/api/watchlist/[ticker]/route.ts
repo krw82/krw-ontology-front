@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { recordCoverageMutationAnalytics } from "@/lib/coverage/analytics";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
+import { requireMenuFeatureAccess } from "@/lib/billing/feature-access-server";
 import { companyCoverageLevelSchema } from "@/lib/coverage/contracts";
 import {
   CoverageIdempotencyConflictError,
@@ -35,6 +36,13 @@ export async function GET(
     return handleAuthError(err);
   }
   if (!user) return handleAuthError(new Error("No user"));
+
+  const featureAccess = await requireMenuFeatureAccess(
+    user.id,
+    user.email,
+    "research_notebook",
+  );
+  if (featureAccess) return featureAccess;
 
   const { ticker: rawTicker } = await params;
   const tickerResult = await requireIndexedTicker(rawTicker);

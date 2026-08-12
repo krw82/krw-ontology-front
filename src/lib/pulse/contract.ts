@@ -29,6 +29,12 @@ export const PULSE_ITEM_KINDS = [
 export const PULSE_PAGE_SIZE = 48;
 export const PULSE_MAX_PAGE_SIZE = 48;
 export const PULSE_VISIBLE_ITEM_LIMIT = 12;
+// Completed analysis cards sit outside the candidate reservoir but share the
+// device delta version map. Keep the input bound aligned with that response.
+export const PULSE_COMPLETED_ANALYSIS_ITEM_LIMIT = 3;
+export const PULSE_ACTIVE_ANALYSIS_ITEM_LIMIT = 2;
+export const PULSE_DELTA_ITEM_VERSION_LIMIT =
+  PULSE_PAGE_SIZE + PULSE_COMPLETED_ANALYSIS_ITEM_LIMIT;
 
 const pulseLinkActionSchema = z.object({
   type: z.literal("link"),

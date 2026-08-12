@@ -13,10 +13,60 @@ const workerEntry = "src/worker/agent-worker.ts";
 const workerOutfile = ".worker/agent-worker.mjs";
 const documentWorkerEntry = "src/worker/document-worker.ts";
 const documentWorkerOutfile = ".worker/document-worker.mjs";
+const agentV1OutboxEntry = "src/worker/agent-v1-outbox-worker.ts";
+const agentV1OutboxOutfile = ".worker/agent-v1-outbox-worker.mjs";
 const serverOnlyShim = resolve("src/worker/server-only-shim.ts");
 
 const { loadEnvConfig } = nextEnv;
 loadEnvConfig(process.cwd(), true);
+
+// The Rust stack builds an immutable release descriptor on every startup.
+// Read its non-secret, allowlisted pin after `.env.local` so the web process
+// never keeps pointing at an older agent image after the stack is rebuilt.
+const LOCAL_AGENT_RUNTIME_ENV_KEYS = new Set([
+  "KRW_AGENT_BACKEND_MODE",
+  "KRW_AGENT_PROVIDER",
+  "KRW_RUNTIME_ENVIRONMENT",
+  "KRW_AGENT_TENANT_ID",
+  "KRW_AGENT_RELEASE_DESCRIPTOR_PATH",
+  "KRW_AGENT_RELEASE_ARTIFACT_HASH",
+  "KRW_AGENT_RELEASE_SET_HASH",
+  "AGENT_V1_DATABASE_URL",
+]);
+
+function loadLocalAgentRuntimeEnv() {
+  const runtimeEnvPath = process.env.KRW_AGENT_FRONTEND_ENV_FILE || join(
+    homedir(),
+    "krw-agnet",
+    ".local",
+    "agent-gateway-front-dev",
+    "frontend.env",
+  );
+  if (!existsSync(runtimeEnvPath)) return;
+
+  const source = readFileSync(runtimeEnvPath, "utf8");
+  if (Buffer.byteLength(source, "utf8") > 16 * 1024) {
+    throw new Error("local_agent_runtime_env_too_large");
+  }
+  for (const rawLine of source.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const separator = line.indexOf("=");
+    if (separator <= 0) throw new Error("invalid_local_agent_runtime_env");
+    const key = line.slice(0, separator);
+    const value = line.slice(separator + 1);
+    if (!LOCAL_AGENT_RUNTIME_ENV_KEYS.has(key) || value.includes("\0")) {
+      throw new Error("invalid_local_agent_runtime_env");
+    }
+    if (key === "KRW_AGENT_PROVIDER" && value !== "glm" && value !== "deepseek") {
+      throw new Error("invalid_local_agent_provider");
+    }
+    process.env[key] = value;
+  }
+  console.info("[dev] loaded local Agent runtime release");
+}
+
+loadLocalAgentRuntimeEnv();
 
 function configureDevOntologyEnv() {
   const allowProdOntology = process.env.KRW_DEV_ALLOW_PROD_ONTOLOGY === "1";
@@ -158,6 +208,7 @@ configureDevOntologyEnv();
 
 let worker = null;
 let documentWorker = null;
+let agentV1OutboxWorker = null;
 let nextDev = null;
 let devMcp = null;
 let stockNewsMcp = null;
@@ -167,6 +218,8 @@ let workerStartQueued = false;
 let workerRestarting = false;
 let documentWorkerStartQueued = false;
 let documentWorkerRestarting = false;
+let agentV1OutboxStartQueued = false;
+let agentV1OutboxRestarting = false;
 let expectedStockNewsCoverageCount = null;
 
 materializeDevPlugin();
@@ -203,11 +256,17 @@ function isKrwFeedMcpEnabled() {
 }
 
 // Content work (for example an editorial Storage import) does not need the
-// queue consumers.  Keeping them opt-out makes a local DB incident easier to
-// isolate and prevents background claims/cleanup from competing with a manual
-// content bootstrap.  `npm run dev` keeps the existing all-workers behavior.
-const shouldRunAgentWorker = !truthyEnv(process.env.KRW_DEV_SKIP_AGENT_WORKER);
+// queue consumers. Keeping them opt-out makes a local DB incident easier to
+// isolate. In Rust mode the legacy Claude worker stays off; Agent V1 is
+// consumed by the Rust daemon and its product outbox projector below.
+const rustAgentBackend =
+  process.env.KRW_AGENT_BACKEND_MODE?.trim().toLowerCase() === "rust";
+const shouldRunAgentWorker =
+  !truthyEnv(process.env.KRW_DEV_SKIP_AGENT_WORKER) &&
+  (!rustAgentBackend || truthyEnv(process.env.KRW_DEV_RUN_LEGACY_AGENT_WORKER));
 const shouldRunDocumentWorker = !truthyEnv(process.env.KRW_DEV_SKIP_DOCUMENT_WORKER);
+const shouldRunAgentV1Outbox =
+  rustAgentBackend && !truthyEnv(process.env.KRW_DEV_SKIP_AGENT_V1_OUTBOX);
 
 function isStockNewsEnabled() {
   if (!truthyEnv(process.env.STOCK_NEWS_RELEASE_ENABLED)) return false;
@@ -410,6 +469,34 @@ async function restartDocumentWorker() {
   } finally {
     documentWorkerRestarting = false;
     documentWorkerStartQueued = false;
+  }
+}
+
+async function restartAgentV1OutboxWorker() {
+  if (!shouldRunAgentV1Outbox) return;
+  if (shuttingDown) return;
+  if (agentV1OutboxStartQueued) return;
+  agentV1OutboxStartQueued = true;
+
+  try {
+    agentV1OutboxRestarting = true;
+    await stopChild(agentV1OutboxWorker);
+    agentV1OutboxRestarting = false;
+    if (shuttingDown) return;
+    agentV1OutboxWorker = spawnLabeled(
+      "agent-v1-outbox",
+      "nice",
+      ["-n", String(devWorkerNice), process.execPath, agentV1OutboxOutfile],
+      (code) => {
+        if (agentV1OutboxRestarting) return;
+        void shutdown("agent-v1-outbox-exit").finally(() =>
+          process.exit(code ?? 1),
+        );
+      },
+    );
+  } finally {
+    agentV1OutboxRestarting = false;
+    agentV1OutboxStartQueued = false;
   }
 }
 
@@ -740,6 +827,25 @@ const documentWorkerRestartPlugin = {
   },
 };
 
+const agentV1OutboxRestartPlugin = {
+  name: "agent-v1-outbox-restart",
+  setup(build) {
+    build.onResolve({ filter: /^server-only$/ }, () => ({
+      path: serverOnlyShim,
+    }));
+
+    build.onEnd((result) => {
+      if (result.errors.length > 0) {
+        console.error(
+          "[dev:agent-v1-outbox] build failed; keeping previous worker",
+        );
+        return;
+      }
+      void restartAgentV1OutboxWorker();
+    });
+  },
+};
+
 const workerContext = shouldRunAgentWorker ? await context({
   entryPoints: [workerEntry],
   bundle: true,
@@ -762,6 +868,17 @@ const documentWorkerContext = shouldRunDocumentWorker ? await context({
   plugins: [documentWorkerRestartPlugin],
 }) : null;
 
+const agentV1OutboxContext = shouldRunAgentV1Outbox ? await context({
+  entryPoints: [agentV1OutboxEntry],
+  bundle: true,
+  platform: "node",
+  target: "node20",
+  format: "esm",
+  packages: "external",
+  outfile: agentV1OutboxOutfile,
+  plugins: [agentV1OutboxRestartPlugin],
+}) : null;
+
 async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
@@ -779,8 +896,10 @@ async function shutdown(signal) {
   await Promise.allSettled([
     workerContext?.dispose(),
     documentWorkerContext?.dispose(),
+    agentV1OutboxContext?.dispose(),
     stopChild(worker),
     stopChild(documentWorker),
+    stopChild(agentV1OutboxWorker),
     stopChild(devMcp),
     stopChild(stockNewsMcp),
     stopChild(feedMcp),
@@ -806,18 +925,28 @@ if (isKrwFeedMcpEnabled()) {
   console.info("[dev:krw-feed-mcp] disabled");
 }
 
-nextDev = spawnLabeled("web", "npm", ["run", "dev:web"], (code) => {
+const webDevArgs = truthyEnv(process.env.KRW_DEV_WEBPACK)
+  ? ["run", "dev:web", "--", "--webpack"]
+  : ["run", "dev:web"];
+nextDev = spawnLabeled("web", "npm", webDevArgs, (code) => {
   void shutdown("web-exit").finally(() => process.exit(code ?? 1));
 });
 if (workerContext) {
   await workerContext.watch();
 } else {
-  console.info("[dev:worker] disabled by KRW_DEV_SKIP_AGENT_WORKER");
+  console.info(
+    `[dev:worker] disabled${rustAgentBackend ? " in Rust backend mode" : " by KRW_DEV_SKIP_AGENT_WORKER"}`,
+  );
 }
 if (documentWorkerContext) {
   await documentWorkerContext.watch();
 } else {
   console.info("[dev:document-worker] disabled by KRW_DEV_SKIP_DOCUMENT_WORKER");
+}
+if (agentV1OutboxContext) {
+  await agentV1OutboxContext.watch();
+} else if (rustAgentBackend) {
+  console.info("[dev:agent-v1-outbox] disabled by KRW_DEV_SKIP_AGENT_V1_OUTBOX");
 }
 await new Promise(() => {
   // Keep the wrapper alive; child exit handlers and signal handlers own shutdown.

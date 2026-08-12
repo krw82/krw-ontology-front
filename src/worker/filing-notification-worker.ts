@@ -148,7 +148,7 @@ async function queueDailyDigests(): Promise<number> {
       .from("user_filing_notifications")
       .select("*")
       .eq("user_id", preference.user_id)
-      .eq("kind", "filing_received")
+      .in("kind", ["filing_received", "market_issue_received"])
       .or(`created_at.gt.${since},read_at.is.null`)
       .is("archived_at", null)
       .order("created_at", { ascending: false })
@@ -163,17 +163,23 @@ async function queueDailyDigests(): Promise<number> {
     const latest = sourceNotifications[0];
     if (!latest) continue;
     const unreadCount = sourceNotifications.filter((notification) => !notification.read_at).length;
+    const digestKind = latest.market_issue_id ? "market_issue_digest" as const : "filing_digest" as const;
+    const conflictTarget = latest.market_issue_id
+      ? "user_id,market_issue_id,kind,digest_bucket"
+      : "user_id,filing_event_id,kind,digest_bucket";
     const { data: digest, error: digestError } = await admin
       .from("user_filing_notifications")
       .upsert({
         user_id: preference.user_id,
         filing_event_id: latest.filing_event_id,
-        kind: "filing_digest" as const,
+        market_issue_id: latest.market_issue_id,
+        ticker: latest.ticker,
+        kind: digestKind,
         digest_bucket: zonedDateParts(now, preference.timezone).dateKey,
-        title: `밤사이 관심기업 공시 ${sourceNotifications.length}건`,
-        body: `읽지 않음 ${unreadCount}건을 포함해 새 공시를 공시함에 모았습니다.`,
+        title: `밤사이 관심기업 업데이트 ${sourceNotifications.length}건`,
+        body: `읽지 않음 ${unreadCount}건을 포함해 새 공시와 시장 이슈를 공시함에 모았습니다.`,
         destination_path: "/filings",
-      }, { onConflict: "user_id,filing_event_id,kind,digest_bucket", ignoreDuplicates: true })
+      }, { onConflict: conflictTarget, ignoreDuplicates: true })
       .select("*")
       .maybeSingle<UserFilingNotificationRow>();
     if (digestError) throw new Error(`Failed to create daily filing digest: ${digestError.message}`);
@@ -296,12 +302,13 @@ async function deliverPush(join: DeliveryJoin) {
   const payload: FilingPushPayload = {
     schemaVersion: 1,
     notificationId: join.notification.id,
-    filingEventId: join.notification.filing_event_id,
+    ...(join.notification.filing_event_id ? { filingEventId: join.notification.filing_event_id } : {}),
+    ...(join.notification.market_issue_id ? { marketIssueId: join.notification.market_issue_id } : {}),
     kind: join.notification.kind,
     title: join.notification.title,
     body: join.notification.body,
     destinationPath: join.notification.destination_path,
-    tag: `filing:${join.notification.filing_event_id}:${join.notification.kind}`,
+    tag: `krw:${join.notification.filing_event_id ?? join.notification.market_issue_id ?? join.notification.id}:${join.notification.kind}`,
     unreadCount: unreadCount ?? undefined,
   };
   try {

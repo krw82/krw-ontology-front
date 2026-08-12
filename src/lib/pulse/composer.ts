@@ -9,6 +9,8 @@ import {
 import {
   encodePulseItemId,
   normalizePulseDateTime,
+  PULSE_ACTIVE_ANALYSIS_ITEM_LIMIT,
+  PULSE_COMPLETED_ANALYSIS_ITEM_LIMIT,
   PULSE_PAGE_SIZE,
   PULSE_VISIBLE_ITEM_LIMIT,
   pulseItemSchema,
@@ -103,7 +105,13 @@ export async function composePulseFeed({
     loadSource(
       "filing",
       enabledKinds.has("filing"),
-      () => getFilingCandidates(supabase, snapshotAt, userSignals.preferredTickers, revision),
+      () => getFilingCandidates(
+        supabase,
+        snapshotAt,
+        userSignals.preferredTickers,
+        revision,
+        [...userSignals.coverageByTicker.keys()],
+      ),
     ),
     loadSource("analysis", enabledKinds.has("analysis"), () => getAnalysisCandidates(supabase, userId, snapshotAt)),
     loadSource(
@@ -238,7 +246,7 @@ export async function composePulseFeed({
   );
 
   const visibleActiveAnalysis = [...developmentActiveAnalysis, ...activeAnalysis]
-    .slice(0, 2)
+    .slice(0, PULSE_ACTIVE_ANALYSIS_ITEM_LIMIT)
     .map((candidate, activeIndex) => ({
       ...candidate,
       // The status channel duplicates an active card only for polling. Keep
@@ -249,7 +257,7 @@ export async function composePulseFeed({
     }));
 
   const visibleCompletedAnalysis = [...developmentCompletedAnalysis, ...completedAnalysis]
-    .slice(0, 3);
+    .slice(0, PULSE_COMPLETED_ANALYSIS_ITEM_LIMIT);
 
   const sinceTime = since && !Number.isNaN(Date.parse(since)) ? Date.parse(since) : null;
 

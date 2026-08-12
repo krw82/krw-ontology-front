@@ -51,6 +51,12 @@ export interface TossPaymentResponse {
   checkout?: {
     url?: string;
   } | null;
+  cancels?: Array<{
+    transactionKey?: string;
+    cancelReason?: string;
+    cancelAmount?: number;
+    canceledAt?: string;
+  }> | null;
 }
 
 export class TossPaymentsError extends Error {
@@ -317,6 +323,30 @@ export async function getTossPaymentByOrderId(
     `/v1/payments/orders/${encodeURIComponent(orderId)}`,
     {
       method: "GET",
+    },
+  );
+}
+
+export async function cancelTossPayment({
+  paymentKey,
+  cancelReason,
+  cancelAmountKrw,
+  idempotencyKey,
+}: {
+  paymentKey: string;
+  cancelReason: string;
+  cancelAmountKrw?: number;
+  idempotencyKey: string;
+}): Promise<TossPaymentResponse> {
+  const body: Record<string, unknown> = { cancelReason };
+  if (cancelAmountKrw !== undefined) body.cancelAmount = cancelAmountKrw;
+
+  return tossApiRequest<TossPaymentResponse>(
+    `/v1/payments/${encodeURIComponent(paymentKey)}/cancel`,
+    {
+      method: "POST",
+      idempotencyKey,
+      body,
     },
   );
 }

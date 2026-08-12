@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Script from "next/script";
 import BillingPlanAction from "@/components/BillingPlanAction";
+import BillingRefundAction from "@/components/BillingRefundAction";
 import { getAuthUser } from "@/lib/auth";
 import {
   getBillingPageModel,
@@ -10,6 +11,7 @@ import { getEntitlementStatus } from "@/lib/billing/entitlement";
 import { MENU_FEATURE_DEFINITIONS } from "@/lib/billing/feature-access";
 import { listPublicBillingPlansFromStore } from "@/lib/billing/plan-store";
 import { isTossPaymentsCheckoutConfigured } from "@/lib/billing/toss";
+import { listRecentTossRefundablePayments } from "@/lib/billing/toss-refunds";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,21 +50,25 @@ function monthlyPriceLabel(value: number): string {
 }
 
 function planFeatureLabel(planKey: string): string {
-  if (planKey === "free") return "핵심 탐색 기능";
-  if (planKey === "standard") return "와이드 리서치 포함";
-  if (planKey === "pro") return "전체 메뉴 + 노트북";
+  if (planKey === "free") return "모든 리서치 모드";
+  if (planKey === "lite") return "더 넉넉한 분석량";
+  if (planKey === "standard") return "확장 분석량";
+  if (planKey === "pro") return "리서치 노트북 + 최고 분석량";
   return "기능 기반";
 }
 
 function planDescription(planKey: string): string {
   if (planKey === "free") {
-    return "회사 검색, 공시 기반 분석, 기관 보유 공시 확인을 시작할 수 있습니다.";
+    return "모든 리서치 모드와 공시 근거 확인을 시작하고 관심 기업 3개를 저장할 수 있습니다.";
+  }
+  if (planKey === "lite") {
+    return "모든 리서치 모드를 유지하면서 더 넉넉한 주간 분석량을 제공합니다.";
   }
   if (planKey === "standard") {
-    return "Free 기능에 와이드 리서치를 더합니다.";
+    return "정기적인 기업 리서치를 위한 확장 분석량을 제공합니다.";
   }
   if (planKey === "pro") {
-    return "모든 기능과 리서치 노트북을 제공합니다.";
+    return "기업별 가설, 질문, 메모와 다음 확인 조건을 리서치 노트북으로 관리합니다.";
   }
   return "기능별로 리서치 메뉴를 확장할 수 있는 플랜입니다.";
 }
@@ -92,13 +98,14 @@ export default async function BillingSettingsPage({
     redirect(`/login?next=${encodeURIComponent(`${next.pathname}${next.search}`)}`);
   }
 
-  const [entitlement, plans, billingModel] = await Promise.all([
+  const [entitlement, plans, billingModel, refundablePayments] = await Promise.all([
     getEntitlementStatus(user.id, user.email ?? null),
     listPublicBillingPlansFromStore(),
     getBillingPageModel({
       userId: user.id,
       requestedOperationId,
     }),
+    listRecentTossRefundablePayments(user.id),
   ]);
   // Billing mutations and card state must use the single server-owned billing
   // model. Entitlement is still used below for feature presentation, but it
@@ -164,8 +171,8 @@ export default async function BillingSettingsPage({
               내 리서치에 맞는 플랜을 선택하세요.
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-[16px] font-medium leading-7 text-body sm:text-[18px]">
-              Free는 핵심 탐색 기능을, Standard는 와이드 리서치를,
-              Pro는 리서치 노트북을 제공합니다.
+              모든 플랜에서 리서치를 시작하고, 분석량은 필요에 따라 늘릴 수
+              있습니다. Pro에서는 리서치 노트북으로 판단을 계속 관리합니다.
             </p>
             <p className="mx-auto mt-3 max-w-2xl text-[12px] font-medium leading-5 text-muted">
               공시와 시장 자료를 확인하는 리서치 소프트웨어입니다. 투자자문이나
@@ -230,7 +237,7 @@ export default async function BillingSettingsPage({
                 </h2>
               </div>
             </div>
-            <div className="mt-base grid gap-sm lg:grid-cols-3">
+            <div className="mt-base grid gap-sm md:grid-cols-2 xl:grid-cols-4">
               {plans.map((plan) => {
                 const isCurrent = plan.key === billingCurrentPlanKey;
                 const isFeatured = plan.key === "standard";
@@ -308,6 +315,8 @@ export default async function BillingSettingsPage({
             </div>
           </section>
 
+          <BillingRefundAction payments={refundablePayments} />
+
           <section className="mt-8 rounded-[8px] border border-hairline bg-canvas">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
               <div className="p-base sm:p-lg">
@@ -318,8 +327,8 @@ export default async function BillingSettingsPage({
                   플랜별 기능 및 메뉴
                 </h2>
                 <p className="mt-1 text-[13px] font-medium leading-5 text-muted">
-                  Free는 핵심 메뉴를, Standard와 Pro는 확장 리서치 메뉴를
-                  제공합니다.
+                  모든 플랜에서 리서치 메뉴를 사용합니다. Pro의 리서치 노트북은
+                  기업별 가설과 다음 확인 조건을 계속 관리하는 작업공간입니다.
                 </p>
               </div>
             </div>
@@ -338,9 +347,11 @@ export default async function BillingSettingsPage({
                     </p>
                     {!feature.enabled && feature.required_plan ? (
                       <p className="mt-1 text-[12px] font-bold leading-5 text-error">
-                        {feature.required_plan === "standard"
-                          ? "Standard"
-                          : "Pro"}
+                        {feature.required_plan === "lite"
+                          ? "Lite"
+                          : feature.required_plan === "standard"
+                            ? "Standard"
+                            : "Pro"}
                         플랜부터 사용 가능
                       </p>
                     ) : null}

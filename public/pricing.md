@@ -9,22 +9,29 @@ https://krwontology.com/ko/pricing
 
 - Price: KRW 0/month
 - Best for: first analysis and lightweight product evaluation
-- Weekly usage capacity: trial capacity
-- Includes: company search, supported company research, filing-grounded answers, source context, follow-up questions, basic saved chat flow
+- Typical weekly capacity: about 5 standard questions
+- Includes: all research modes, including wide research; company search; filing-grounded answers; source context; follow-up questions; and up to three saved companies
+
+## Lite
+
+- Price: KRW 2,900/month
+- Best for: users who want to keep the core research flow active more often
+- Typical weekly capacity: about 15 standard questions
+- Includes: everything in Free with expanded analysis capacity
 
 ## Standard
 
 - Price: KRW 7,900/month
 - Best for: individual investors who regularly research U.S. companies
-- Weekly usage capacity: standard individual research capacity
-- Includes: company research, 13F-to-company research flow, research notebook basics, wider analysis usage than Free
+- Typical weekly capacity: about 41 standard questions
+- Includes: every research mode and more analysis capacity than Lite
 
 ## Pro
 
 - Price: KRW 29,000/month
 - Best for: users who compare multiple companies or run frequent research workflows
-- Weekly usage capacity: higher weekly research capacity
-- Includes: higher-volume company research, multi-company comparison workflows, repeated thesis checks, research notebook usage
+- Typical weekly capacity: about 207 standard questions
+- Includes: the highest analysis capacity plus the research notebook for maintaining theses, questions, notes, and review conditions
 
 ## How Usage Works
 

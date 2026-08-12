@@ -78,6 +78,10 @@ export function getAgentRunEventListenConnectionString(
   const explicit =
     firstNonEmpty(
       env.AGENT_RUN_EVENT_LISTEN_DATABASE_URL,
+      // Rust Agent V1 deployments intentionally use a dedicated database
+      // variable. Reuse it for LISTEN so terminal outbox events wake the open
+      // chat stream immediately instead of falling back to polling.
+      env.AGENT_V1_DATABASE_URL,
       env.SUPABASE_LISTEN_DATABASE_URL,
       env.SUPABASE_DB_URL,
       env.DATABASE_URL,

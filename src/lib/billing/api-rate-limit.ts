@@ -7,7 +7,13 @@ const DEFAULT_BILLING_MUTATIONS_PER_USER_PER_MINUTE = 5;
 
 export async function checkBillingMutationRateLimit(
   userId: string,
-  action: "quote" | "confirm" | "checkout" | "change_plan" | "cancel",
+  action:
+    | "quote"
+    | "confirm"
+    | "checkout"
+    | "change_plan"
+    | "cancel"
+    | "refund",
 ): Promise<Response | null> {
   const result = await checkDurableRateLimits([
     {

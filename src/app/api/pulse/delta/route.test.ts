@@ -1,6 +1,25 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 import { buildPulseFeedDelta } from "@/lib/pulse/delta";
+import { PULSE_DELTA_ITEM_VERSION_LIMIT } from "@/lib/pulse/contract";
 import type { PulseFeedResponse, PulseItem } from "@/types/api-contracts";
+
+const mocks = vi.hoisted(() => ({
+  getOptionalAuthUser: vi.fn(),
+  getPulseFeedRevision: vi.fn(),
+}));
+
+vi.mock("@/lib/auth", () => ({
+  getOptionalAuthUser: mocks.getOptionalAuthUser,
+  ANONYMOUS_PULSE_USER_ID: "00000000-0000-0000-0000-000000000000",
+  handleAuthError: () => Response.json({ error: { code: "authentication_error" } }, { status: 401 }),
+}));
+vi.mock("@/lib/pulse/revision", () => ({
+  getPulseFeedRevision: mocks.getPulseFeedRevision,
+}));
+vi.mock("@/lib/supabase/admin", () => ({ getSupabaseAdmin: () => ({}) }));
+
+import { POST } from "@/app/api/pulse/delta/route";
 
 function item(id: string): PulseItem {
   return {
@@ -13,6 +32,45 @@ function item(id: string): PulseItem {
 }
 
 describe("Pulse V5 delta", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getOptionalAuthUser.mockResolvedValue({ id: "user-1", email: "user@example.com" });
+    mocks.getPulseFeedRevision.mockResolvedValue({
+      value: "current-revision",
+      globalRevision: 1,
+      userRevision: 1,
+      timeBucket: 1,
+    });
+  });
+
+  it("accepts a full candidate reservoir plus every completed-analysis card", async () => {
+    const itemVersions = Object.fromEntries(
+      Array.from({ length: PULSE_DELTA_ITEM_VERSION_LIMIT }, (_, index) => [`item-${index}`, "v1-a"]),
+    );
+    const response = await POST(new NextRequest("http://localhost/api/pulse/delta", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ revision: "current-revision", item_versions: itemVersions }),
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ changed: false });
+  });
+
+  it("continues to bound oversized cached-version payloads", async () => {
+    const itemVersions = Object.fromEntries(
+      Array.from({ length: PULSE_DELTA_ITEM_VERSION_LIMIT + 1 }, (_, index) => [`item-${index}`, "v1-a"]),
+    );
+    const response = await POST(new NextRequest("http://localhost/api/pulse/delta", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item_versions: itemVersions }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect(mocks.getOptionalAuthUser).not.toHaveBeenCalled();
+  });
+
   it("returns only changed cards and candidate order", () => {
     const first = item("first");
     const second = { ...item("second"), server_rank: 1, title: "new" };

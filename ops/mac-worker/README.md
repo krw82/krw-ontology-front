@@ -100,3 +100,11 @@ Keep these invariants:
 - local queue writer is stopped while Mac worker serves production
 - GCP web never mounts the ontology plugin or full ontology data
 - only the Mac supervisor owns production execution
+
+## Valuation refresh worker
+
+The FMP-backed TTM valuation worker has its own one-shot, foreground, and
+launchd commands. Follow [`valuation-refresh.md`](valuation-refresh.md) for
+preflight, logs, duplicate-process protection, and the macOS service lifecycle.
+Before a full production deploy, sync its key into the existing Mac runtime
+env with `npm run valuation:mac:sync-env -- --from .env --out .env.mac-worker.production`.

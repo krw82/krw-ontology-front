@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import BottomSheet from "@/components/ui/BottomSheet";
 import type { BillingUiState } from "@/lib/billing/billing-page-model";
 import type {
@@ -9,7 +10,7 @@ import type {
 } from "@/types/database";
 import type { EntitlementPlanKey } from "@/types/entitlement";
 
-type PaidPlanKey = "standard" | "pro";
+type PaidPlanKey = "lite" | "standard" | "pro";
 
 let billingActionInFlight = false;
 
@@ -90,11 +91,11 @@ interface BillingAction {
 }
 
 function isPaidPlanKey(planKey: EntitlementPlanKey): planKey is PaidPlanKey {
-  return planKey === "standard" || planKey === "pro";
+  return planKey === "lite" || planKey === "standard" || planKey === "pro";
 }
 
 function isPaidTarget(planKey: unknown): planKey is PaidPlanKey {
-  return planKey === "standard" || planKey === "pro";
+  return planKey === "lite" || planKey === "standard" || planKey === "pro";
 }
 
 function errorMessage(payload: unknown, fallback: string): string {
@@ -581,6 +582,17 @@ export default function BillingPlanAction(props: BillingPlanActionProps) {
                 </dd>
               </div>
             </dl>
+            <p className="mt-sm text-[12px] font-medium leading-5 text-muted">
+              결제를 진행하면 매월 자동결제가 시작됩니다. 결제 후 7일 이내에
+              유료 분석 실행 이력이 없으면 결제 설정에서 자동 환불을 실행할 수
+              있습니다. {" "}
+              <Link
+                href="/ko/refund"
+                className="font-bold text-primary underline underline-offset-2"
+              >
+                환불정책 보기
+              </Link>
+            </p>
             {billingState === "pending_cancel" &&
               (quote.kind === "upgrade" || quote.kind === "downgrade") && (
                 <p className="mt-sm rounded-[8px] bg-primary-fixed px-sm py-sm text-[12px] font-bold leading-5 text-on-primary-fixed">

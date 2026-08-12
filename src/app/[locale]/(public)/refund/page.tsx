@@ -19,14 +19,16 @@ const refundCopy = {
     home: "홈",
     eyebrow: "Refund Policy",
     heading: "환불정책",
+    effectiveDate: "시행일: 2026년 8월 10일",
     paragraphs: [
       "KRW.O는 월 단위로 과금되는 정기구독형 온라인 리서치 및 데이터 분석 서비스입니다.",
       "회원은 언제든지 구독을 해지할 수 있으며, 구독 해지 시 다음 결제일부터 자동결제가 중단됩니다. 이미 결제된 이용기간은 해당 기간 종료일까지 서비스 이용이 가능합니다.",
       "상위 플랜으로 즉시 변경하는 경우 남은 결제기간에 해당하는 월 구독료 차액만 결제합니다. 하위 플랜 변경은 다음 월 결제일부터 적용됩니다.",
-      "결제 후 7일 이내이고 유료 기능 사용 이력이 없는 경우 전액 환불합니다.",
-      "다만 유료 리서치 조회, 데이터 검색, 분석 결과 생성, 다운로드, API 사용 등 유료 서비스 이용이 개시된 경우에는 디지털 콘텐츠 및 온라인 서비스 특성상 해당 결제 건의 환불이 제한될 수 있습니다.",
-      "중복 결제, 오결제, 시스템 장애, 회사 귀책사유로 정상적인 서비스 이용이 불가능한 경우에는 확인 후 전액 또는 잔여기간 기준으로 환불합니다.",
-      "환불 요청은 고객센터 이메일 또는 서비스 내 문의 기능을 통해 접수할 수 있으며, 환불 승인 시 결제수단 취소 방식으로 처리합니다.",
+      "각 결제 건은 결제 후 7일 이내이고 해당 결제 후 유료 분석 실행 이력이 없는 경우, 설정 > 결제에서 즉시 전액 자동 환불할 수 있습니다.",
+      "자동 환불을 실행하면 원래 결제수단을 바로 취소합니다. 최초 결제나 월 정기결제를 환불하면 구독은 즉시 종료되고 Free 플랜으로 전환됩니다. 업그레이드 차액 결제를 환불하면 직전 플랜으로 되돌립니다.",
+      "유료 분석을 실행한 결제 건, 자동 환불 기간이 지난 결제 건, 이후 결제 또는 플랜 변경이 진행 중인 결제 건은 자동 환불 대상이 아닙니다.",
+      "결제 취소 결과를 바로 확인할 수 없는 경우에는 중복 취소 없이 시스템이 결제 상태를 자동으로 다시 확인합니다. 별도의 관리자 승인 절차는 두지 않습니다.",
+      "중복 결제, 오결제, 시스템 장애 등 자동 환불 화면에서 해결되지 않는 결제 문제는 고객센터로 알려 주세요.",
       `고객센터 이메일: ${BUSINESS_CONTACT_EMAIL}.`,
     ],
   },
@@ -36,14 +38,16 @@ const refundCopy = {
     home: "Home",
     eyebrow: "Refund Policy",
     heading: "Refund Policy",
+    effectiveDate: "Effective date: August 10, 2026",
     paragraphs: [
       "KRW.O is a monthly subscription-based online research and data analysis service.",
       "Members may cancel their subscription at any time. When a subscription is cancelled, automatic billing stops from the next billing date. The service remains available until the end of the already paid billing period.",
       "Immediate upgrades charge only the prorated monthly price difference for the remaining billing period. Downgrades take effect from the next monthly billing date.",
-      "A full refund is available if the payment was made within the last 7 days and there is no paid feature usage history.",
-      "However, once paid service usage has started, including paid research views, data searches, analysis result generation, downloads, or API usage, refunds for that payment may be restricted due to the nature of digital content and online services.",
-      "If duplicate billing, incorrect billing, system failures, or causes attributable to the company prevent normal service use, KRW.O will review the case and provide a full refund or a refund based on the remaining period.",
-      "Refund requests may be submitted through the customer support email or in-service inquiry feature. Approved refunds are processed by cancelling the original payment method.",
+      "For each payment, a full automatic refund is available from Settings > Billing within 7 days of payment when there is no paid analysis execution after that payment.",
+      "Starting an automatic refund immediately cancels the original payment method. Refunding an initial or monthly renewal payment ends the subscription and moves the account to Free. Refunding an upgrade difference restores the previous plan.",
+      "Payments with paid analysis execution, payments outside the automatic refund window, or payments with a later payment or plan change in progress are not eligible for automatic refund.",
+      "If the cancellation result cannot be verified immediately, the system automatically checks the payment status again without making a duplicate cancellation. No administrator approval is required.",
+      "For duplicate charges, incorrect charges, or system failures that cannot be resolved in the automatic-refund screen, contact customer support.",
       `Customer support email: ${BUSINESS_CONTACT_EMAIL}.`,
     ],
   },
@@ -55,6 +59,7 @@ const refundCopy = {
     home: string;
     eyebrow: string;
     heading: string;
+    effectiveDate: string;
     paragraphs: string[];
   }
 >;
@@ -110,6 +115,9 @@ export default async function RefundPage({ params }: RefundPageProps) {
         <h1 className="mt-4 text-[34px] font-black leading-[1.08] tracking-normal text-ink sm:text-[48px]">
           {copy.heading}
         </h1>
+        <p className="mt-3 text-[13px] font-semibold text-muted">
+          {copy.effectiveDate}
+        </p>
 
         <section className="mt-10 rounded-[8px] border border-hairline bg-surface-soft px-base py-lg sm:px-lg">
           <div className="space-y-4">

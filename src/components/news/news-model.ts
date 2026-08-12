@@ -29,11 +29,14 @@ export type MarketIssueUserState = {
   hidden: boolean;
 };
 
+export type LocalNewsStage = "standard" | "ai_verified";
+
 export type MarketIssueCard = {
   id: string;
   title: string;
   statusLabel: string;
   statusTone: string;
+  localNewsStage: LocalNewsStage;
   summary: string;
   impactPath: string[];
   companies: MarketIssueCompany[];
@@ -186,6 +189,10 @@ function uniqueText(values: readonly string[]): string[] {
   return Array.from(new Set(values));
 }
 
+function localNewsStage(value: unknown): LocalNewsStage {
+  return value === "ai_verified" ? value : "standard";
+}
+
 export function normalizeMarketIssue(value: unknown, fallbackId = "issue"): MarketIssueCard | null {
   const record = asRecord(value);
   if (!record) return null;
@@ -200,6 +207,7 @@ export function normalizeMarketIssue(value: unknown, fallbackId = "issue"): Mark
     title,
     statusLabel: readString(firstDefined(record, ["status_label", "statusLabel", "status"])) ?? "추가 확인 필요",
     statusTone: readString(firstDefined(record, ["status_tone", "statusTone", "tone"])) ?? "neutral",
+    localNewsStage: localNewsStage(firstDefined(record, ["local_news_stage", "localNewsStage"])),
     summary: readString(firstDefined(record, ["summary", "korean_summary", "koreanSummary", "ai_summary", "aiSummary", "description"])) ?? "아직 한국어 맥락이 정리되지 않았습니다.",
     impactPath: uniqueText(readTextList(firstDefined(record, ["impact_path", "impactPath", "research_path", "researchPath"]))),
     companies: readCompanies(firstDefined(record, ["companies", "related_companies", "relatedCompanies", "entities"])),

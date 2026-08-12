@@ -1,3 +1,5 @@
+import { lstatSync, readFileSync } from "node:fs";
+
 const LOCAL_SUPABASE_DB_PORT = 54_322;
 
 export function deriveSupabaseDatabaseUrl(
@@ -51,6 +53,60 @@ export function shouldUsePostgresListenSsl(connectionString: string): boolean {
   } catch {
     return true;
   }
+}
+
+export type PostgresTlsConfig = {
+  readonly ca?: string;
+  readonly rejectUnauthorized: true;
+};
+
+/**
+ * Resolve one fail-closed TLS policy for Agent V1 PostgreSQL clients.
+ * Local Supabase is deliberately plain TCP; every remote production database
+ * verifies its certificate and requires an operator-provided CA bundle.
+ */
+export function resolvePostgresTls(
+  connectionString: string,
+  env: Record<string, string | undefined> = process.env,
+): PostgresTlsConfig | undefined {
+  let parsed: URL;
+  try {
+    parsed = new URL(connectionString);
+  } catch {
+    return undefined;
+  }
+  if (parsed.protocol !== "postgres:" && parsed.protocol !== "postgresql:") {
+    return undefined;
+  }
+  const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  const local = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  if (local) return undefined;
+
+  const caPem = firstNonEmpty(env.AGENT_V1_DATABASE_CA_PEM);
+  const caFile = firstNonEmpty(env.AGENT_V1_DATABASE_CA_FILE);
+  if (caPem && caFile) throw new Error("agent_v1_database_ca_ambiguous");
+
+  let ca = caPem;
+  if (caFile) {
+    if (!caFile.startsWith("/")) throw new Error("agent_v1_database_ca_file_invalid");
+    try {
+      const metadata = lstatSync(caFile);
+      if (!metadata.isFile()) throw new Error("agent_v1_database_ca_file_invalid");
+      ca = readFileSync(caFile, "utf8");
+    } catch (error) {
+      if (error instanceof Error && error.message === "agent_v1_database_ca_file_invalid") throw error;
+      throw new Error("agent_v1_database_ca_file_unreadable");
+    }
+  }
+
+  const production = env.KRW_RUNTIME_ENVIRONMENT === "prod" || env.NODE_ENV === "production";
+  const sslMode = parsed.searchParams.get("sslmode");
+  if (sslMode === "disable" && production) {
+    throw new Error("agent_v1_database_tls_disabled");
+  }
+  if (production && !ca) throw new Error("agent_v1_database_ca_missing");
+  if (sslMode === "disable") return undefined;
+  return ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: true };
 }
 
 export function firstNonEmpty(

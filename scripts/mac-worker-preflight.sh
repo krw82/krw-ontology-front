@@ -17,7 +17,7 @@ Checks:
   - prod/current satisfies the KRW Ontology v3 startup contract
   - worker bundle builds
   - Claude executable and MCP health work
-  - enabled news translation provider can translate a smoke sentence
+  - enabled local-news provider configuration is present
   - Supabase service role can read the production schema
 
 --deep is accepted for compatibility. KRW Ontology v3 deep release checks run

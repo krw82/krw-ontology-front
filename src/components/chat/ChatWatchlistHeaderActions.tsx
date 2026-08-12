@@ -13,12 +13,14 @@ type CoverageLevel = UserCompanyCoverageLevel;
 
 export interface ChatWatchlistHeaderActionsProps {
   ticker: string;
+  notebookEnabled: boolean;
   showNotebookOnboarding: boolean;
   forceShowNotebookOnboarding: boolean;
 }
 
 export default function ChatWatchlistHeaderActions({
   ticker,
+  notebookEnabled,
   showNotebookOnboarding,
   forceShowNotebookOnboarding,
 }: ChatWatchlistHeaderActionsProps) {
@@ -38,14 +40,14 @@ export default function ChatWatchlistHeaderActions({
     async function loadMark() {
       try {
         const response = await fetch(
-          `/api/watchlist/${encodeURIComponent(tickerForRequest)}`,
+          `/api/watchlist/${encodeURIComponent(tickerForRequest)}/coverage-level`,
           { cache: "no-store" },
         );
         if (!response.ok) return;
         const payload = (await response.json()) as {
-          company?: { mark?: UserCompanyMark };
+          mark?: UserCompanyMark | null;
         };
-        if (!stale) setMark(payload.company?.mark ?? null);
+        if (!stale) setMark(payload.mark ?? null);
       } catch {
         if (!stale) setMark(null);
       }
@@ -60,6 +62,7 @@ export default function ChatWatchlistHeaderActions({
   useEffect(() => {
     if (
       !normalizedTicker ||
+      !notebookEnabled ||
       !showNotebookOnboarding ||
       forceShowNotebookOnboarding
     ) {
@@ -99,7 +102,7 @@ export default function ChatWatchlistHeaderActions({
     return () => {
       stale = true;
     };
-  }, [forceShowNotebookOnboarding, normalizedTicker, showNotebookOnboarding]);
+  }, [forceShowNotebookOnboarding, normalizedTicker, notebookEnabled, showNotebookOnboarding]);
 
   if (!normalizedTicker) return null;
 
@@ -130,6 +133,7 @@ export default function ChatWatchlistHeaderActions({
   const notebookHasBeenUsed =
     notebookUsage?.ticker === normalizedTicker ? notebookUsage.hasBeenUsed : null;
   const shouldShowNotebookHint =
+    notebookEnabled &&
     showNotebookOnboarding &&
     (forceShowNotebookOnboarding || notebookHasBeenUsed === false);
   const currentCoverageLevel = coverageLevelOf(mark);

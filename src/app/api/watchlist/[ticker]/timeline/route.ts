@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
+import { requireMenuFeatureAccess } from "@/lib/billing/feature-access-server";
 import { listCompanyCoverageTimeline } from "@/lib/judgments/timeline";
 import { errorResponse, requireIndexedTicker } from "@/lib/watchlist/api";
 
@@ -17,6 +18,13 @@ export async function GET(
     return handleAuthError(error);
   }
   if (!user) return handleAuthError(new Error("No user"));
+
+  const featureAccess = await requireMenuFeatureAccess(
+    user.id,
+    user.email,
+    "research_notebook",
+  );
+  if (featureAccess) return featureAccess;
 
   const tickerResult = await requireIndexedTicker((await params).ticker);
   if (!tickerResult.ok) return tickerResult.response;

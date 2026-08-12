@@ -24,7 +24,12 @@ type Filing = {
 
 type FilingNotification = {
   id: string;
-  kind: "filing_received" | "analysis_ready" | "filing_digest";
+  kind:
+    | "filing_received"
+    | "analysis_ready"
+    | "filing_digest"
+    | "market_issue_received"
+    | "market_issue_digest";
   title: string;
   body: string;
   destination_path: string;
@@ -172,7 +177,7 @@ export default function FilingInbox() {
         if (options.announceError !== false) {
           setMutationError(
             options.errorMessage ??
-              "공시 상태를 저장하지 못했습니다. 다시 시도해주세요.",
+              "업데이트 상태를 저장하지 못했습니다. 다시 시도해주세요.",
           );
         }
         return false;
@@ -197,8 +202,8 @@ export default function FilingInbox() {
         "archive",
         {
           errorMessage: shouldArchive
-            ? "공시를 보관하지 못했습니다. 원래 위치로 되돌렸습니다."
-            : "공시를 복원하지 못했습니다. 보관 상태로 되돌렸습니다.",
+            ? "업데이트를 보관하지 못했습니다. 원래 위치로 되돌렸습니다."
+            : "업데이트를 복원하지 못했습니다. 보관 상태로 되돌렸습니다.",
         },
       );
       if (!succeeded) return;
@@ -226,7 +231,7 @@ export default function FilingInbox() {
       "archive",
       {
         errorMessage:
-          "보관 실행 취소를 저장하지 못했습니다. 공시는 보관 상태로 유지됩니다.",
+          "보관 실행 취소를 저장하지 못했습니다. 업데이트는 보관 상태로 유지됩니다.",
       },
     );
   }, [clearArchiveUndo, mutateNotification]);
@@ -303,14 +308,14 @@ export default function FilingInbox() {
   const grouped = useMemo(() => groupNotifications(notifications), [notifications]);
   const visible = grouped[view];
 
-  if (loading) return <p className="text-sm text-muted">공시 알림을 불러오는 중…</p>;
+  if (loading) return <p className="text-sm text-muted">관심기업 업데이트를 불러오는 중…</p>;
   if (error) return <p className="rounded-[8px] bg-surface-soft p-md text-sm text-muted">{error}</p>;
-  if (!notifications.length && !recentFilings.length) return <p className="rounded-[8px] border border-dashed border-hairline p-lg text-sm leading-6 text-muted">아직 공시를 추적 중인 기업이 없습니다. 회사 페이지에서 새 8-K·6-K·Form 4 공시 알림을 켜면 최근 공시와 다음 알림이 여기에 표시됩니다.</p>;
+  if (!notifications.length && !recentFilings.length) return <p className="rounded-[8px] border border-dashed border-hairline p-lg text-sm leading-6 text-muted">아직 추적 중인 기업이 없습니다. 회사 페이지에서 알림을 켜면 새 SEC 공시와 검증된 시장 이슈가 여기에 표시됩니다.</p>;
 
   return <div className="space-y-xl">
     <section>
       <div className="mb-sm flex flex-wrap items-center justify-between gap-sm">
-        <div><h2 className="text-base font-extrabold text-ink">새 공시</h2><p className="mt-0.5 text-xs text-muted">읽음, 나중에 보기, 핀, 보관 상태는 이 공시함에 남습니다.</p></div>
+        <div><h2 className="text-base font-extrabold text-ink">관심기업 업데이트</h2><p className="mt-0.5 text-xs text-muted">새 공시와 검증된 시장 이슈를 한곳에서 확인합니다.</p></div>
         <InboxTabs view={view} grouped={grouped} onChange={setView} />
       </div>
       {mutationError ? (
@@ -328,9 +333,9 @@ export default function FilingInbox() {
           className="mb-sm flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-[8px] border border-hairline bg-surface-soft px-sm py-xs text-sm font-bold text-ink"
           role="status"
         >
-          <span>{archiveUndo.ticker} 공시를 보관했습니다.</span>
+          <span>{archiveUndo.ticker} 업데이트를 보관했습니다.</span>
           <button
-            aria-label={`${archiveUndo.ticker} 공시 보관 실행 취소`}
+            aria-label={`${archiveUndo.ticker} 업데이트 보관 실행 취소`}
             className="min-h-11 rounded-[7px] px-sm text-xs font-extrabold text-primary transition-colors hover:bg-primary-fixed disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isMutationBlocked(
               pendingActions,
@@ -346,13 +351,27 @@ export default function FilingInbox() {
       ) : null}
       {!visible.length ? <p className="rounded-[8px] border border-dashed border-hairline p-md text-sm text-muted">{emptyCopy(view)}</p> : <div className="space-y-sm"><AnimatePresence initial={false}>{visible.map((notification) => <motion.div key={notification.id} layout="position" initial={false} animate={{ opacity: 1, y: 0 }} exit={reducedMotion ? undefined : { opacity: 0, y: -6, height: 0 }} transition={{ duration: reducedMotion ? 0 : 0.18, ease: easeOutExpo }} style={{ overflow: "hidden" }}><NotificationCard notification={notification} selected={notification.id === selectedNotificationId} pendingActions={pendingActions} onMutate={mutateNotification} onArchive={archiveNotification} /></motion.div>)}</AnimatePresence></div>}
     </section>
+    <NotificationPermissionNudge notificationCount={notifications.length} />
     {recentFilings.length ? <section><div className="mb-sm flex items-center justify-between gap-sm"><h2 className="text-base font-extrabold text-ink">최근 공시</h2><span className="text-xs text-muted">구독 전 제출된 공시</span></div><div className="space-y-sm">{recentFilings.map((filing) => <HistoryCard key={filing.id} filing={filing} />)}</div></section> : null}
   </div>;
 }
 
+function NotificationPermissionNudge({ notificationCount }: { notificationCount: number }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (!notificationCount || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim()) return;
+    if (!("Notification" in window) || Notification.permission !== "default") return;
+    if (window.sessionStorage.getItem("filing_notification_permission_nudge_dismissed") === "1") return;
+    setVisible(true);
+    trackClientEventSilently("push_permission_requested", { surface: "filing_inbox", notification_count: notificationCount });
+  }, [notificationCount]);
+  if (!visible) return null;
+  return <section className="rounded-[10px] border border-primary/25 bg-primary-fixed p-md"><p className="text-sm font-extrabold text-ink">다음 관심기업 업데이트도 바로 받을까요?</p><p className="mt-1 text-sm leading-6 text-muted">중요 공시와 위험도가 높은 검증 이슈만 이 기기로 보냅니다. 언제든 설정에서 바꿀 수 있습니다.</p><div className="mt-md flex flex-wrap gap-sm"><Link href="/settings/notifications?source=inbox" className="inline-flex min-h-11 items-center rounded-[7px] bg-primary px-sm text-sm font-extrabold text-white hover:bg-primary/90">이 기기 알림 켜기</Link><button type="button" onClick={() => { window.sessionStorage.setItem("filing_notification_permission_nudge_dismissed", "1"); setVisible(false); }} className="min-h-11 rounded-[7px] px-sm text-sm font-extrabold text-muted hover:bg-canvas">나중에</button></div></section>;
+}
+
 function InboxTabs({ view, grouped, onChange }: { view: InboxView; grouped: Record<InboxView, FilingNotification[]>; onChange: (view: InboxView) => void }) {
-  const items: Array<{ id: InboxView; label: string }> = [{ id: "active", label: "처리할 공시" }, { id: "later", label: "나중에" }, { id: "archived", label: "보관" }];
-  return <div className="flex rounded-[7px] border border-hairline p-0.5" role="tablist" aria-label="공시함 상태">
+  const items: Array<{ id: InboxView; label: string }> = [{ id: "active", label: "처리할 업데이트" }, { id: "later", label: "나중에" }, { id: "archived", label: "보관" }];
+  return <div className="flex rounded-[7px] border border-hairline p-0.5" role="tablist" aria-label="관심기업 업데이트 상태">
     {items.map((item) => <button key={item.id} type="button" role="tab" aria-selected={view === item.id} onClick={() => onChange(item.id)} className={`min-h-11 rounded-[5px] px-sm text-xs font-extrabold transition-colors ${view === item.id ? "bg-surface text-ink" : "text-muted hover:text-ink"}`}>{item.label} {grouped[item.id].length}</button>)}
   </div>;
 }
@@ -374,6 +393,8 @@ function NotificationCard({
   const isRead = Boolean(notification.read_at) || selected;
   const isArchived = Boolean(notification.archived_at);
   const isSnoozed = isFuture(notification.snoozed_until);
+  const isMarketIssue = notification.kind === "market_issue_received" || notification.kind === "market_issue_digest";
+  const isDigest = notification.kind === "filing_digest" || notification.kind === "market_issue_digest";
   const destination = notification.destination_path || `/filings/${encodeURIComponent(filing.id)}`;
   const pinBusy = isMutationBlocked(pendingActions, notification.id, "pin");
   const snoozeBusy = isMutationBlocked(pendingActions, notification.id, "snooze");
@@ -385,7 +406,7 @@ function NotificationCard({
       "clicked",
       { announceError: false },
     );
-    trackClientEventSilently(notification.kind === "filing_digest" ? "digest_opened" : "filing_notification_clicked", { ticker: displayTicker(filing), form_type: filing.form_type, notification_id: notification.id, surface: "filing_inbox" });
+    trackClientEventSilently(isDigest ? "digest_opened" : "filing_notification_clicked", { ticker: displayTicker(filing), form_type: filing.form_type, notification_id: notification.id, notification_kind: notification.kind, surface: "filing_inbox" });
   };
   return <article className={`rounded-[10px] border p-md ${isRead || isArchived ? "border-hairline bg-canvas" : "border-primary/35 bg-primary-fixed"}`}>
     <div className="flex items-start justify-between gap-sm"><FilingMeta filing={filing} />{notification.pinned_at ? <span className="inline-flex items-center gap-1 text-xs font-bold text-primary"><span aria-hidden="true" className="material-symbols-outlined text-[15px]">keep</span>핀</span> : null}</div>
@@ -427,7 +448,7 @@ function NotificationCard({
           onClick={() => onArchive(notification)}
           type="button"
         >{archiveBusy ? "저장 중…" : isArchived ? "복원" : "보관"}</button>
-        <Link href={destination} onClick={open} className="inline-flex min-h-11 items-center rounded-[7px] border border-hairline px-sm text-sm font-extrabold text-ink transition-colors hover:border-primary hover:text-primary">{notification.kind === "filing_digest" ? "공시함 보기" : "공시 보기"}<span aria-hidden="true" className="material-symbols-outlined ml-1 text-[16px]">arrow_forward</span></Link>
+        <Link href={destination} onClick={open} className="inline-flex min-h-11 items-center rounded-[7px] border border-hairline px-sm text-sm font-extrabold text-ink transition-colors hover:border-primary hover:text-primary">{isDigest ? "업데이트 보기" : isMarketIssue ? "뉴스 보기" : "공시 보기"}<span aria-hidden="true" className="material-symbols-outlined ml-1 text-[16px]">arrow_forward</span></Link>
       </div>
     </div>
   </article>;
@@ -548,9 +569,9 @@ function groupNotifications(notifications: FilingNotification[]): Record<InboxVi
 }
 
 function emptyCopy(view: InboxView) {
-  if (view === "later") return "나중에 보기로 미룬 공시가 없습니다.";
-  if (view === "archived") return "보관한 공시가 없습니다.";
-  return "처리할 새 공시가 없습니다.";
+  if (view === "later") return "나중에 보기로 미룬 업데이트가 없습니다.";
+  if (view === "archived") return "보관한 업데이트가 없습니다.";
+  return "처리할 새 업데이트가 없습니다.";
 }
 
 function isFuture(value: string | null) {

@@ -10,6 +10,10 @@ describe("run kind", () => {
     expect(normalizeRunKind("idea_generation")).toBe("idea_generation");
   });
 
+  it("accepts wide research for tickerless covered-universe questions", () => {
+    expect(normalizeRunKind("wide_research")).toBe("wide_research");
+  });
+
   it("accepts market move research as a durable run kind", () => {
     expect(normalizeRunKind("market_move_research")).toBe(
       "market_move_research",

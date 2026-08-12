@@ -224,7 +224,7 @@ describe("chat question router", () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  it("corrects sector/cohort macro interpretation away from idea generation", async () => {
+  it("routes sector/cohort macro interpretation to wide research", async () => {
     vi.mocked(query).mockReturnValueOnce(
       makeSdkResult("idea_generation") as never,
     );
@@ -241,7 +241,7 @@ describe("chat question router", () => {
 
     expect(decision).toMatchObject({
       analysisMode: "company",
-      runKind: "company_research",
+      runKind: "wide_research",
       source: "claude_router",
     });
     expect(decision.reason).toContain("company-cohort research");
@@ -252,7 +252,7 @@ describe("chat question router", () => {
       "sector, industry, or company-cohort interpretation questions",
     );
     expect(sdkCall.prompt).toContain(
-      "'소비재 기업들을 살펴보고 소비자들 관련 매크로 현황 어떤지 알고싶어' => {\"run_kind\":\"company_research\"}",
+      "'소비재 기업들을 살펴보고 소비자들 관련 매크로 현황 어떤지 알고싶어' => {\"run_kind\":\"wide_research\"}",
     );
   });
 

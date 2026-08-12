@@ -199,6 +199,7 @@ function serializeIssue(
     status_label: labels[0],
     status_labels: labels,
     status_tone: statusTone(labels),
+    local_news_stage: text(issue.local_news_stage, "standard"),
     source_count: Math.max(0, number(issue.source_count)),
     source_summary: toJsonRecord(issue.source_summary),
     update_count: Math.max(0, number(issue.update_count)),

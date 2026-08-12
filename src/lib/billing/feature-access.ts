@@ -15,7 +15,7 @@ export interface MenuFeatureDefinition {
   key: MenuFeatureKey;
   label: string;
   description: string;
-  required_plan: "free" | "standard" | "pro";
+  required_plan: "free" | "lite" | "standard" | "pro";
 }
 
 export const MENU_FEATURE_DEFINITIONS: readonly MenuFeatureDefinition[] = [
@@ -53,40 +53,37 @@ export const MENU_FEATURE_DEFINITIONS: readonly MenuFeatureDefinition[] = [
     key: "wide_research",
     label: "와이드 리서치",
     description: "여러 자료와 공시 근거를 종합하는 확장 리서치입니다.",
-    required_plan: "standard",
+    required_plan: "free",
   },
   {
     key: "research_notebook",
-    label: "내 커버리지",
+    label: "리서치 노트북",
     description: "기업별 판단, 가설, 질문과 다음 확인 조건을 계속 관리합니다.",
-    required_plan: "free",
+    required_plan: "pro",
   },
 ] as const;
 
-const FREE_REVIEW_FEATURES: readonly MenuFeatureKey[] = [
+const RESEARCH_FEATURES: readonly MenuFeatureKey[] = [
   "company_search",
   "guru_advisor",
   "recent_chats",
   "institutional_holdings",
   "stock_discovery",
-  "research_notebook",
-];
-
-const STANDARD_REVIEW_FEATURES: readonly MenuFeatureKey[] = [
-  ...FREE_REVIEW_FEATURES,
   "wide_research",
 ];
 
 const PRO_REVIEW_FEATURES: readonly MenuFeatureKey[] = [
-  ...STANDARD_REVIEW_FEATURES,
+  ...RESEARCH_FEATURES,
+  "research_notebook",
 ];
 
 const REVIEW_FEATURES_BY_PLAN: Record<
   EntitlementPlanKey,
   readonly MenuFeatureKey[]
 > = {
-  free: FREE_REVIEW_FEATURES,
-  standard: STANDARD_REVIEW_FEATURES,
+  free: RESEARCH_FEATURES,
+  lite: RESEARCH_FEATURES,
+  standard: RESEARCH_FEATURES,
   pro: PRO_REVIEW_FEATURES,
   beta: MENU_FEATURE_DEFINITIONS.map(({ key }) => key),
   internal: MENU_FEATURE_DEFINITIONS.map(({ key }) => key),

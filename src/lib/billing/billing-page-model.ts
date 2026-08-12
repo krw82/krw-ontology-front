@@ -40,7 +40,9 @@ function isPaidEntitlement(
 ): boolean {
   return Boolean(
     entitlement &&
-      (entitlement.plan_key === "standard" || entitlement.plan_key === "pro") &&
+      (entitlement.plan_key === "lite" ||
+        entitlement.plan_key === "standard" ||
+        entitlement.plan_key === "pro") &&
       ["active", "past_due", "grace"].includes(entitlement.status),
   );
 }

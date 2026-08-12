@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { isUuid } from "@/lib/api/validation";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
+import { requireMenuFeatureAccess } from "@/lib/billing/feature-access-server";
 import {
   invalidOriginResponse,
   isExpectedMutationOrigin,
@@ -33,6 +34,13 @@ export async function PUT(
     return handleAuthError(err);
   }
   if (!user) return handleAuthError(new Error("No user"));
+
+  const featureAccess = await requireMenuFeatureAccess(
+    user.id,
+    user.email,
+    "research_notebook",
+  );
+  if (featureAccess) return featureAccess;
 
   const { ticker: rawTicker } = await params;
   const tickerResult = await requireIndexedTicker(rawTicker);

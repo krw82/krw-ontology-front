@@ -18,6 +18,20 @@ function read(path: string) {
 }
 
 describe("production deploy scripts", () => {
+  it("requires an exact krw-agent host archive provenance before a production build", () => {
+    const packageJson = JSON.parse(read("package.json"));
+    expect(packageJson.scripts.build).toContain("verify:agent-host-package");
+    expect(packageJson.scripts["verify:agent-host-package"]).toContain(
+      "verify-krw-agent-host-package.mjs",
+    );
+    expect(read("scripts/sync-krw-agent-host-package.mjs")).toContain(
+      "host_package_provenance",
+    );
+    expect(read("scripts/verify-krw-agent-host-package.mjs")).toContain(
+      "host_package_lock_integrity_mismatch",
+    );
+  });
+
   it("keeps an auditable SEC fallback for AEP when the live ticker feed omits it", () => {
     const probe = spawnSync(
       process.execPath,
@@ -211,6 +225,12 @@ describe("production deploy scripts", () => {
     expect(deployFast).toContain("db push --dry-run");
     expect(deployFast).toContain("run_remote_deep_verify");
     expect(deployFast).toContain("Removing retired GCP ontology sidecars.");
+    expect(deployFast).toContain("stage_local_agent_release");
+    expect(deployFast).toContain("public Rust release descriptor");
+    expect(deployFast).toContain("KRW_AGENT_DAEMON_HEARTBEAT_REQUIRED 1");
+    expect(deployFast).toContain("--with-agent-release requires --apply-migrations for the direct Rust daemon heartbeat ABI.");
+    expect(deployFast).not.toContain("local Mac worker heartbeat restart");
+    expect(deployFast).not.toContain("install-krw-agent-release-production.sh");
     expect(deployFast).not.toContain("ONTOLOGY_ARCHIVE");
     expect(deployFast).not.toContain("KRW_ONTOLOGY_SOURCE_DIR=\"$REMOTE_STAGE/ontology\"");
     expect(deployFast).not.toContain("pause-production-cutover.sh");
@@ -301,6 +321,9 @@ describe("production deploy scripts", () => {
       "rollback shallow health deployment identity mismatch",
     );
     expect(compose).not.toContain('profiles: ["legacy-gcp-agent"]');
+    expect(compose).toContain("KRW_AGENT_PUBLIC_DESCRIPTOR_HOST_PATH");
+    expect(compose).toContain("KRW_AGENT_DAEMON_HEARTBEAT_REQUIRED");
+    expect(compose).not.toContain("KRW_AGENT_RELEASE_DIR");
     expect(compose).not.toContain("  agent-worker:");
     expect(compose).not.toContain("  ontology-mcp:");
     expect(compose).not.toContain("krw-ontology-src");
@@ -590,8 +613,8 @@ describe("production deploy scripts", () => {
     expect(readiness).toContain("ANALYSIS_CREDIT_ENFORCEMENT_MODE");
     expect(readiness).toContain("TOSS_PAYMENTS_CLIENT_KEY");
     expect(readiness).toContain("billing-worker");
-    expect(readiness).toContain('"Standard feature" "와이드 리서치" "Wide research"');
-    expect(readiness).toContain('"Pro feature" "가장 넉넉한 분석량" "Highest research capacity"');
+    expect(readiness).toContain('"Standard feature" "더 넉넉한 분석량" "More research capacity"');
+    expect(readiness).toContain('"Pro feature" "리서치 노트북" "Research notebook"');
     expect(readiness).not.toContain('"Standard weekly credits"');
     expect(readiness).not.toContain('"Pro weekly credits"');
     expect(read("scripts/deploy-production-fast.sh")).toContain(
@@ -1052,16 +1075,16 @@ cleanup
     expect(mcpClient).not.toContain("runStdioMcpHealth");
   });
 
-  it("keeps source directories named coverage in the fast deployment archive", () => {
+  it("archives the exact clean frontend commit for fast deployment", () => {
     const fastDeploy = read("scripts/deploy-production-fast.sh");
 
-    expect(fastDeploy).toContain("tar --no-xattrs -C \"$FRONT_DIR\"");
+    expect(fastDeploy).toContain(
+      'FRONT_GIT_COMMIT=$(git -C "$FRONT_DIR" rev-parse HEAD)',
+    );
+    expect(fastDeploy).toContain(
+      'git -C "$FRONT_DIR" archive --format=tar "$FRONT_GIT_COMMIT"',
+    );
     expect(fastDeploy).not.toContain("--exclude=coverage");
-    expect(fastDeploy).toContain("--exclude=marketing-video");
-    expect(fastDeploy).toContain("--exclude=.playwright-mcp");
-    expect(fastDeploy).toContain("--exclude=.lazyweb");
-    expect(fastDeploy).toContain("--exclude=.vendor");
-    expect(fastDeploy).toContain("--exclude=krw-ontology");
     expect(fastDeploy).not.toContain("ONTOLOGY_ARCHIVE");
     expect(fastDeploy).not.toContain("KRW_ONTOLOGY_SOURCE_DIR");
     expect(fastDeploy).toContain("upload_archive");

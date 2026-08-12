@@ -62,6 +62,7 @@ export type AnalysisMode = "company" | "news";
 /** Durable agent run intent */
 export type RunKind =
   | "company_research"
+  | "wide_research"
   | "idea_generation"
   | "news_discovery"
   | "market_move_research"

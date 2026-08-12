@@ -1,5 +1,6 @@
 export type EntitlementPlanKey =
   | "free"
+  | "lite"
   | "standard"
   | "pro"
   | "beta"

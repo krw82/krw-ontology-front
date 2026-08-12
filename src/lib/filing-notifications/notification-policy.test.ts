@@ -28,6 +28,32 @@ describe("filing notification policy", () => {
     })).toBe(true);
   });
 
+  it("keeps historical Form 4 events out while allowing a new reported trade", () => {
+    const preference = {
+      enabled: true,
+      notify_form4: true,
+      insider_notification_mode: "reported_p_s",
+    } as never;
+    expect(isFilingInboxEligible({
+      formType: "4",
+      isAmendment: false,
+      acceptedAt: "2026-07-14T09:00:00.000Z",
+      firstSeenAt: "2026-07-15T09:00:10.000Z",
+      subscribedAt,
+      baselineCompletedAt: null,
+      preference,
+    })).toBe(false);
+    expect(isFilingInboxEligible({
+      formType: "4",
+      isAmendment: false,
+      acceptedAt: "2026-07-15T09:01:00.000Z",
+      firstSeenAt: "2026-07-15T09:01:10.000Z",
+      subscribedAt,
+      baselineCompletedAt: null,
+      preference,
+    })).toBe(true);
+  });
+
   it("keeps enabled amendments in the inbox but leaves their default push off", () => {
     const preference = {
       enabled: true,
@@ -51,6 +77,30 @@ describe("filing notification policy", () => {
     expect(shouldQueueImmediateFilingPush({ isAmendment: false, priority: "urgent", preference })).toBe(true);
     expect(shouldQueueImmediateFilingPush({ isAmendment: false, priority: "digest", preference })).toBe(false);
     expect(shouldQueueImmediateFilingPush({ isAmendment: false, priority: "digest", preference, deliveryMode: "all_immediate" })).toBe(true);
+  });
+
+  it("keeps smaller reported Form 4 trades in the inbox under the important preset", () => {
+    const preference = {
+      enabled: true,
+      notify_form4: true,
+      insider_notification_mode: "reported_p_s",
+      delivery_mode: "important_immediate",
+      form4_immediate_min_value_usd: 1_000_000,
+    } as never;
+    expect(shouldQueueImmediateFilingPush({
+      formType: "4",
+      isAmendment: false,
+      priority: "normal",
+      preference,
+      form4Summary: { reported_purchase_value: 125_000, reported_sale_value: null },
+    })).toBe(false);
+    expect(shouldQueueImmediateFilingPush({
+      formType: "4",
+      isAmendment: false,
+      priority: "normal",
+      preference,
+      form4Summary: { reported_purchase_value: null, reported_sale_value: 1_250_000 },
+    })).toBe(true);
   });
 
   it("keeps urgent filings out of the short ticker batching window", () => {

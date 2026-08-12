@@ -201,6 +201,7 @@ trap cleanup EXIT INT TERM
     ANTHROPIC_API_KEY \
     ANTHROPIC_AUTH_TOKEN \
     DEEPSEEK_API_KEY \
+    FMP_API_KEY \
     FINNHUB_API_KEY \
     ZAI_API_KEY \
     SEC_USER_AGENT \
@@ -255,6 +256,13 @@ trap cleanup EXIT INT TERM
   echo "MCP_SERVER_NICE=-5"
   echo "STOCK_NEWS_MCP_NICE=0"
   echo "KRW_LOG_DIR=~/krw-ontology-log"
+  copy_key VALUATION_REFRESH_WORKER_ID 2>/dev/null || echo "VALUATION_REFRESH_WORKER_ID=valuation-refresh-mac"
+  copy_key VALUATION_REFRESH_INTERVAL_MS 2>/dev/null || echo "VALUATION_REFRESH_INTERVAL_MS=3600000"
+  copy_key VALUATION_REFRESH_BATCH_SIZE 2>/dev/null || echo "VALUATION_REFRESH_BATCH_SIZE=20"
+  copy_key VALUATION_REFRESH_TICKERS 2>/dev/null || true
+  copy_key VALUATION_REFRESH_LOG_DIR 2>/dev/null || true
+  copy_key VALUATION_REFRESH_NICE 2>/dev/null || echo "VALUATION_REFRESH_NICE=10"
+  copy_key VALUATION_REFRESH_MAXFILES 2>/dev/null || echo "VALUATION_REFRESH_MAXFILES=4096"
   echo "MCP_SERVER_LOG_LEVEL=info"
   echo "MCP_LOG_DIR=~/krw-ontology-log/mcp/prod"
   echo "KRW_DEPLOY_LOG_DIR=~/krw-ontology-log/deploy"

@@ -3286,6 +3286,7 @@ function analysisModeForRunKind(
   }
   if (
     runKind === "company_research" ||
+    runKind === "wide_research" ||
     runKind === "idea_generation" ||
     runKind === "scenario_sensitivity" ||
     runKind === "guru_advisor"

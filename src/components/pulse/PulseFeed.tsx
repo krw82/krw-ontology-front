@@ -716,9 +716,6 @@ export default function PulseFeed({
                 <span className={`material-symbols-outlined text-[20px] ${loading || pullRefreshing ? "pulse-refresh-turn" : ""}`} aria-hidden="true">refresh</span>
                 <span className="hidden sm:inline">새로고침</span>
               </button>
-              <Link href="/pulse/settings" className="inline-flex size-11 items-center justify-center rounded-[12px] border border-hairline bg-white text-muted shadow-sm hover:text-ink" aria-label="피드 설정">
-                <span className="material-symbols-outlined text-[20px]" aria-hidden="true">tune</span>
-              </Link>
             </div>
           </div>
         </div>

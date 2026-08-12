@@ -21,6 +21,7 @@ import {
   type SecSubmissionsRecent,
 } from "@/lib/filing-notifications/sec-edgar";
 import { isFilingInboxEligible, shouldQueueImmediateFilingPush } from "@/lib/filing-notifications/notification-policy";
+import { queuePushDeliveries } from "@/lib/filing-notifications/push-queue";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type {
   FilingNotificationPreferencesRow,
@@ -34,6 +35,7 @@ import type {
 } from "@/types/database";
 
 type CatalogTarget = { cik: string; release_id: string };
+type CatalogReleaseMarker = { release_id: string; updated_at: string } | null;
 type DiscoveryCheckpoint = {
   env: "dev" | "staging" | "prod";
   source_key: SecFilingDiscoveryCheckpointRow["source_key"];
@@ -68,6 +70,7 @@ type FilingDiscoveryMetrics = {
 };
 
 const FILING_DISCOVERY_BATCH_SIZE = 100;
+const catalogSyncMarkers = new Map<GlobalFilingPipelineOptions["env"], string>();
 
 export type GlobalFilingPipelineOptions = {
   env: "dev" | "staging" | "prod";
@@ -159,12 +162,33 @@ async function claimSchedulerLeader(options: GlobalFilingPipelineOptions): Promi
 
 async function ensureCatalogTargets(env: GlobalFilingPipelineOptions["env"]): Promise<void> {
   const admin = getSupabaseAdmin();
-  const [sources, targets] = await Promise.all([
+  const [sources, release] = await Promise.all([
     admin.rpc("ensure_sec_filing_discovery_sources", { p_env: env }),
-    admin.rpc("sync_catalog_sec_filing_reconciliation_targets", { p_env: env }),
+    admin
+      .from("ontology_catalog_releases")
+      .select("release_id, updated_at")
+      .eq("env", env)
+      .eq("active", true)
+      .order("updated_at", { ascending: false })
+      .limit(1),
   ]);
   if (sources.error) throw new Error(`Failed to initialize SEC Atom checkpoints: ${sources.error.message}`);
-  if (targets.error) throw new Error(`Failed to synchronize SEC reconciliation targets: ${targets.error.message}`);
+  if (release.error) throw new Error(`Failed to read active ontology catalog release: ${release.error.message}`);
+
+  const activeRelease = (release.data?.[0] ?? null) as CatalogReleaseMarker;
+  const releaseMarker = activeRelease
+    ? `${activeRelease.release_id}:${activeRelease.updated_at}`
+    : "none";
+  if (catalogSyncMarkers.get(env) === releaseMarker) return;
+
+  const { error: targetsError } = await admin.rpc(
+    "sync_catalog_sec_filing_reconciliation_targets",
+    { p_env: env },
+  );
+  if (targetsError) {
+    throw new Error(`Failed to synchronize SEC reconciliation targets: ${targetsError.message}`);
+  }
+  catalogSyncMarkers.set(env, releaseMarker);
 }
 
 async function loadActiveTargets(env: GlobalFilingPipelineOptions["env"]): Promise<Map<string, string>> {
@@ -658,7 +682,14 @@ async function fanoutEventNotifications(
     .returns<UserFilingNotificationRow[]>();
   if (notificationError) throw new Error(`Failed to create filing notifications: ${notificationError.message}`);
 
-  await queueImmediatePushDeliveries(event, notifications ?? [], preferencesByUser);
+  const immediate = (notifications ?? []).filter((notification) => shouldQueueImmediateFilingPush({
+    formType: event.form_type,
+    isAmendment: event.is_amendment,
+    priority: event.alert_priority,
+    preference: preferencesByUser.get(notification.user_id),
+    form4Summary,
+  }));
+  await queuePushDeliveries({ db: admin, notifications: immediate });
   await completeFanout(job, notifications?.length ?? 0, false);
   return notifications?.length ?? 0;
 }
@@ -669,14 +700,9 @@ function shouldCreateNotification(params: {
   preference: FilingNotificationPreferencesRow | undefined;
   form4Summary: SecForm4EventSummaryRow | null;
 }): boolean {
-  if (params.event.form_type === "4" || params.event.form_type === "4/A") {
-    const preference = params.preference;
-    if (!preference) return true;
-    if (!preference.enabled || !preference.notify_form4 || preference.insider_notification_mode === "none") return false;
-    return preference.insider_notification_mode === "all"
-      || Boolean(params.form4Summary?.has_reported_open_market_trade);
-  }
-  return isFilingInboxEligible({
+  // Every form must first pass the same post-subscription/history gate. Form
+  // 4 then adds its more specific reported-open-market-trade rule below.
+  const isFreshAndEnabled = isFilingInboxEligible({
     formType: params.event.form_type,
     isAmendment: params.event.is_amendment,
     acceptedAt: params.event.accepted_at,
@@ -685,6 +711,15 @@ function shouldCreateNotification(params: {
     baselineCompletedAt: params.event.first_seen_at,
     preference: params.preference,
   });
+  if (!isFreshAndEnabled) return false;
+
+  if (params.event.form_type === "4" || params.event.form_type === "4/A") {
+    const preference = params.preference;
+    if (!preference) return true;
+    return preference.insider_notification_mode === "all"
+      || Boolean(params.form4Summary?.has_reported_open_market_trade);
+  }
+  return true;
 }
 
 async function loadForm4Summary(filingEventId: string): Promise<SecForm4EventSummaryRow | null> {
@@ -704,45 +739,6 @@ function oneSubscriptionPerUser(subscriptions: UserFilingSubscriptionRow[]): Map
     if (!existing || subscription.ticker.localeCompare(existing.ticker) < 0) byUser.set(subscription.user_id, subscription);
   }
   return byUser;
-}
-
-async function queueImmediatePushDeliveries(
-  event: SecFilingEventRow,
-  notifications: UserFilingNotificationRow[],
-  preferencesByUser: Map<string, FilingNotificationPreferencesRow>,
-): Promise<void> {
-  if (!notifications.length) return;
-  const admin = getSupabaseAdmin();
-  const immediate = notifications.filter((notification) => shouldQueueImmediateFilingPush({
-    isAmendment: event.is_amendment,
-    priority: event.alert_priority,
-    preference: preferencesByUser.get(notification.user_id),
-  }));
-  if (!immediate.length) return;
-  const userIds = [...new Set(immediate.map((notification) => notification.user_id))];
-  const { data: subscriptions, error } = await admin
-    .from("push_subscriptions")
-    .select("id, user_id")
-    .in("user_id", userIds)
-    .eq("status", "active");
-  if (error) throw new Error(`Failed to load push subscriptions for filing fanout: ${error.message}`);
-  const pushIdsByUser = new Map<string, string[]>();
-  for (const subscription of subscriptions ?? []) {
-    const ids = pushIdsByUser.get(subscription.user_id) ?? [];
-    ids.push(subscription.id);
-    pushIdsByUser.set(subscription.user_id, ids);
-  }
-  const deliveries = immediate.flatMap((notification) =>
-    (pushIdsByUser.get(notification.user_id) ?? []).map((subscriptionId) => ({
-      notification_id: notification.id,
-      subscription_id: subscriptionId,
-    })),
-  );
-  if (!deliveries.length) return;
-  const { error: deliveryError } = await admin
-    .from("filing_notification_deliveries")
-    .upsert(deliveries, { onConflict: "notification_id,subscription_id", ignoreDuplicates: true });
-  if (deliveryError) throw new Error(`Failed to queue filing push deliveries: ${deliveryError.message}`);
 }
 
 async function completeFanout(job: ProcessingClaim, notificationsCreated: number, suppressedBaseline: boolean): Promise<void> {

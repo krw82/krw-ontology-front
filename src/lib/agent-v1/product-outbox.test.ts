@@ -22,6 +22,7 @@ describe("dispatchProductOutboxOnce", () => {
       claimed: 12,
       applied: 12,
       alreadyApplied: 0,
+      ignored: 0,
       delivered: 12,
       released: 0,
       ackFailures: 0,

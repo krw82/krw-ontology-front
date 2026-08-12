@@ -71,6 +71,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.worker/market-issue-stream-worke
 COPY --from=builder --chown=nextjs:nodejs /app/.worker/market-issue-enrichment-worker.mjs ./.worker/market-issue-enrichment-worker.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/.worker/filings-mcp-server.mjs ./.worker/filings-mcp-server.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/.worker/billing-worker.mjs ./.worker/billing-worker.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/.worker/agent-v1-outbox-worker.mjs ./.worker/agent-v1-outbox-worker.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/.services ./.services
 COPY --from=prod-deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 # Next standalone file tracing misses the Claude Agent SDK native optional

@@ -214,6 +214,9 @@ export default function PwaBootstrap() {
       if (detail.kind === "install_requested") {
         removeLocalValue(PWA_INSTALL_STORAGE_KEYS.dismissedAt);
         setInstallDismissedAt(null);
+        // A direct request from the account menu should reopen the local
+        // development preview even when its dismiss control was used earlier.
+        setIsDevelopmentInstallPreviewDismissed(false);
       }
       writeLocalTimestamp(
         PWA_INSTALL_STORAGE_KEYS.engagedAt,

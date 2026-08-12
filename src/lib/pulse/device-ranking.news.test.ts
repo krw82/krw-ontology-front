@@ -45,28 +45,40 @@ function feed(items: PulseItem[]): Pick<PulseFeedResponse, "candidate_items" | "
   return { candidate_items: items, active_analysis_items: [], visible_limit: 12 };
 }
 
+function newsItem(id: string, serverRank: number, now: Date, ageHours: number): PulseItem {
+  const occurredAt = new Date(now.getTime() - ageHours * 60 * 60 * 1_000).toISOString();
+  return {
+    ...item(id, "news", serverRank),
+    occurred_at: occurredAt,
+    available_at: occurredAt,
+  };
+}
+
 describe("Pulse V9 news mixing", () => {
-  it("puts three news cards into the first twelve without making a news block", () => {
+  it("puts four news cards into the first twelve without making a news block", () => {
+    const now = new Date("2026-07-30T12:00:00.000Z");
     const regular = Array.from({ length: 12 }, (_, index) => item(`filing-${index}`, "filing", index));
     const news = Array.from({ length: 5 }, (_, index) => item(`news-${index}`, "news", index + 20));
     const slate = selectDevicePulseSlate(
       feed([...regular, ...news]),
-      createPulseDeviceProfile(new Date("2026-07-30T12:00:00.000Z"), "device-a"),
+      createPulseDeviceProfile(now, "device-a"),
+      now,
     );
     const firstScreen = slate.items.slice(0, 12);
 
-    expect(firstScreen.filter((candidate) => candidate.kind === "news")).toHaveLength(3);
+    expect(firstScreen.filter((candidate) => candidate.kind === "news")).toHaveLength(4);
     for (let index = 1; index < firstScreen.length; index += 1) {
       expect([firstScreen[index - 1]?.kind, firstScreen[index]?.kind]).not.toEqual(["news", "news"]);
     }
   });
 
-  it("uses four news cards only when the candidate reservoir is abundant", () => {
+  it("uses five news cards when the candidate reservoir is abundant", () => {
+    const now = new Date("2026-07-30T12:00:00.000Z");
     const regular = Array.from({ length: 12 }, (_, index) => item(`filing-${index}`, "filing", index));
     const news = Array.from({ length: 8 }, (_, index) => item(`news-${index}`, "news", index + 20));
-    const slate = selectDevicePulseSlate(feed([...regular, ...news]), createPulseDeviceProfile());
+    const slate = selectDevicePulseSlate(feed([...regular, ...news]), createPulseDeviceProfile(now), now);
 
-    expect(slate.items.slice(0, 12).filter((candidate) => candidate.kind === "news")).toHaveLength(4);
+    expect(slate.items.slice(0, 12).filter((candidate) => candidate.kind === "news")).toHaveLength(5);
   });
 
   it("rotates selected news after a manual refresh and keeps a personal match in the mix", () => {
@@ -84,7 +96,41 @@ describe("Pulse V9 news mixing", () => {
     const refreshed = selectDevicePulseSlate(feed([...regular, ...news]), profile, new Date("2026-07-30T12:01:00.000Z"));
     const refreshedNews = refreshed.items.slice(0, 12).filter((candidate) => candidate.kind === "news");
 
-    expect(refreshedNews).toHaveLength(4);
-    expect(refreshedNews.filter((candidate) => initialNews.some((previous) => previous.id === candidate.id))).toHaveLength(0);
+    expect(refreshedNews).toHaveLength(5);
+    // With five visible slots and an eight-item reservoir, reuse the two
+    // least-recently selected cards only after the three unseen alternatives
+    // are exhausted. This keeps the first screen full while still rotating.
+    expect(refreshedNews.filter((candidate) => initialNews.some((previous) => previous.id === candidate.id))).toHaveLength(2);
+  });
+
+  it("keeps news older than 48 hours out of the first screen when timely news exists", () => {
+    const now = new Date("2026-07-30T12:00:00.000Z");
+    const regular = Array.from({ length: 12 }, (_, index) => item(`filing-${index}`, "filing", index));
+    const timelyNews = Array.from({ length: 8 }, (_, index) => newsItem(`fresh-${index}`, index + 20, now, index + 1));
+    const staleNews = Array.from({ length: 10 }, (_, index) => newsItem(`stale-${index}`, index + 28, now, 96 + index));
+
+    const slate = selectDevicePulseSlate(
+      feed([...regular, ...timelyNews, ...staleNews]),
+      createPulseDeviceProfile(now, "device-a"),
+      now,
+    );
+    const visibleNews = slate.items.slice(0, 12).filter((candidate) => candidate.kind === "news");
+
+    expect(visibleNews).toHaveLength(5);
+    expect(visibleNews.every((candidate) => candidate.id.startsWith("fresh-"))).toBe(true);
+  });
+
+  it("does not fill first-screen news slots with stale news", () => {
+    const now = new Date("2026-07-30T12:00:00.000Z");
+    const regular = Array.from({ length: 12 }, (_, index) => item(`filing-${index}`, "filing", index));
+    const staleNews = Array.from({ length: 8 }, (_, index) => newsItem(`stale-${index}`, index + 20, now, 49 + index));
+
+    const slate = selectDevicePulseSlate(
+      feed([...regular, ...staleNews]),
+      createPulseDeviceProfile(now, "device-a"),
+      now,
+    );
+
+    expect(slate.items.slice(0, 12).filter((candidate) => candidate.kind === "news")).toHaveLength(0);
   });
 });

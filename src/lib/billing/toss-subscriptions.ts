@@ -28,6 +28,8 @@ import {
   type TossPaymentResponse,
 } from "@/lib/billing/toss";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { TossBillingFlowError } from "@/lib/billing/toss-billing-error";
+import { reconcileTossAutoRefunds } from "@/lib/billing/toss-refunds";
 import type {
   BillingPlanVersionRow,
   BillingTossCheckoutSessionRow,
@@ -47,17 +49,7 @@ const CHECKOUT_TTL_MS = 30 * 60 * 1000;
 const MAX_RENEWAL_BATCH = 25;
 const RENEWAL_LEASE_SECONDS = 5 * 60;
 
-export class TossBillingFlowError extends Error {
-  readonly code: string;
-  readonly status: number;
-
-  constructor(code: string, message: string, status = 400) {
-    super(message);
-    this.name = "TossBillingFlowError";
-    this.code = code;
-    this.status = status;
-  }
-}
+export { TossBillingFlowError } from "@/lib/billing/toss-billing-error";
 
 export interface RenewDueTossSubscriptionsResult {
   checked: number;
@@ -99,7 +91,7 @@ export interface CompleteTossBillingCallbackResult {
 }
 
 function isPaidPlanKey(value: unknown): value is BillingTossPlanKey {
-  return value === "standard" || value === "pro";
+  return value === "lite" || value === "standard" || value === "pro";
 }
 
 function stringValue(value: unknown): string | null {
@@ -780,8 +772,14 @@ function getRenewalPlanChangeDeferral({
   creditAnchorAt: string;
   now: Date;
 }): string | null {
+  const planRank = (planKey: string): number => {
+    if (planKey === "pro") return 3;
+    if (planKey === "standard") return 2;
+    if (planKey === "lite") return 1;
+    return 0;
+  };
   const isDowngrade =
-    subscription.plan_key === "pro" && targetPlan.plan_key === "standard";
+    planRank(subscription.plan_key) > planRank(targetPlan.plan_key);
   if (!isDowngrade) return null;
   const effectiveAt = getFirstWeeklyBoundaryAtOrAfterIso({
     anchor: creditAnchorAt,
@@ -1568,6 +1566,14 @@ export async function renewDueTossSubscriptions({
   workerId?: string;
 } = {}): Promise<RenewDueTossSubscriptionsResult> {
   const nowIso = now.toISOString();
+  try {
+    await reconcileTossAutoRefunds();
+  } catch (error) {
+    // A delayed refund check must not stop monthly renewal reconciliation.
+    console.warn("[billing] failed to reconcile automatic refunds", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
   const expired = await finalizeTossTerminalSubscriptions(nowIso);
   await reconcileTerminalTossSubscriptions(nowIso);
   const v2Recovered = await reconcileTossBillingV2Operations({
@@ -1745,7 +1751,7 @@ export async function prepareTossBillingOperation({
   if (isPlanSelectionOperation(kind) && !isPaidPlanKey(targetPlanKey)) {
     throw new TossBillingFlowError(
       "billing_target_plan_invalid",
-      "Standard 또는 Pro 플랜을 선택해 주세요.",
+      "Lite, Standard 또는 Pro 플랜을 선택해 주세요.",
     );
   }
 

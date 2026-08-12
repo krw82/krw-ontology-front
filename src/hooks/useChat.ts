@@ -388,6 +388,15 @@ export function isCurrentRunResponseContext({
   return !targetSessionId || targetSessionId === activeSessionId;
 }
 
+/**
+ * Agent V1 terminal events intentionally carry immutable answer hashes rather
+ * than the full rendered Markdown. In that case the durable session endpoint
+ * is the source of the answer shown to the user.
+ */
+export function shouldSyncSessionAfterDone(content: unknown): boolean {
+  return typeof content !== "string" || content.trim().length === 0;
+}
+
 export function finalizeRunResponseContext({
   generation,
   currentGeneration,
@@ -686,34 +695,36 @@ export function useChat({
       case "done": {
         const d = data as {
           run_id: string;
-          message_id: string;
+          message_id?: string;
+          assistant_message_id?: string;
           content?: string;
           chat_artifacts?: ChatArtifact[];
           visualizations?: ChatMessageVisualization[];
           presentation?: ChatMessagePresentation | null;
-          release: ReleaseMetadata;
-          usage: {
+          release?: ReleaseMetadata;
+          usage?: {
             input_tokens: number;
             output_tokens: number;
             estimated_cost_usd: number;
             latency_ms: number;
           };
-          execution_budget: ExecutionBudgetStatus;
+          execution_budget?: ExecutionBudgetStatus;
         };
+        const finalContent = (d.content ?? "").trim();
+        const messageId = d.message_id ?? d.assistant_message_id ?? "";
         finalizedRef.current = true;
         activeRunIdRef.current = d.run_id;
         activeRequestIdRef.current = null;
-        sessionSyncRequestedRef.current = false;
+        sessionSyncRequestedRef.current = shouldSyncSessionAfterDone(finalContent);
         setState((prev) => {
-          const finalContent = (d.content ?? "").trim();
           let newMessages = prev.messages;
           if (finalContent) {
-            const messageId = d.message_id || createClientId();
+            const completedMessageId = messageId || createClientId();
             const existingIndex = prev.messages.findIndex(
-              (message) => message.id === messageId,
+              (message) => message.id === completedMessageId,
             );
             const completedMessage: Message = {
-              id: messageId,
+              id: completedMessageId,
               session_id: activeSessionIdRef.current || sessionId,
               role: "assistant",
               content: finalContent,
@@ -741,15 +752,15 @@ export function useChat({
             activity: null,
             runId: d.run_id,
             runStartedAt: null,
-            runDurationsByMessageId: d.message_id
+            runDurationsByMessageId: messageId && d.usage
               ? {
                   ...prev.runDurationsByMessageId,
-                  [d.message_id]: d.usage.latency_ms,
+                  [messageId]: d.usage.latency_ms,
                 }
               : prev.runDurationsByMessageId,
-            release: d.release,
-            usage: d.usage,
-            executionBudget: d.execution_budget,
+            release: d.release ?? prev.release,
+            usage: d.usage ?? prev.usage,
+            executionBudget: d.execution_budget ?? prev.executionBudget,
             artifactsByMessageId: (d.chat_artifacts ?? []).reduce(
               addArtifactToState,
               prev.artifactsByMessageId,

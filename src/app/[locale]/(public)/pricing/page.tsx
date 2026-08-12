@@ -23,11 +23,11 @@ const pricingCopy = {
   ko: {
     title: "가격과 기능별 플랜",
     description:
-      "KRW.O의 Free, Standard, Pro 기능별 플랜을 확인하세요.",
+      "KRW.O의 Free, Lite, Standard, Pro 기능별 플랜을 확인하세요.",
     eyebrow: "가격",
     heading: "내 리서치에 맞는 플랜을 선택하세요.",
     intro:
-      "유료 플랜은 매월 정기 결제됩니다. Free에서 핵심 탐색 기능을 시작하고, Standard와 Pro에서 더 넓은 리서치 메뉴를 이용할 수 있습니다.",
+      "모든 플랜에서 공시 근거 기반 리서치를 시작할 수 있습니다. 유료 플랜은 더 넉넉한 분석량을 제공하고, Pro에서는 리서치 노트북으로 판단을 계속 관리할 수 있습니다.",
     serviceNote:
       "공시와 시장 자료를 확인하는 리서치 소프트웨어입니다. 투자자문이나 매수·매도 추천을 제공하지 않으며, 투자 판단은 이용자에게 있습니다.",
     primaryCta: "내 커버리지 만들기",
@@ -37,70 +37,84 @@ const pricingCopy = {
       {
         label: "회사 찾기",
         free: "포함",
+        lite: "포함",
         standard: "포함",
         pro: "포함",
       },
       {
         label: "관점별 분석",
         free: "포함",
+        lite: "포함",
         standard: "포함",
         pro: "포함",
       },
       {
         label: "최근 채팅",
         free: "포함",
+        lite: "포함",
         standard: "포함",
         pro: "포함",
       },
       {
         label: "13F 기관 보유",
         free: "포함",
+        lite: "포함",
         standard: "포함",
         pro: "포함",
       },
       {
         label: "조건으로 기업 검색",
         free: "포함",
+        lite: "포함",
         standard: "포함",
         pro: "포함",
       },
       {
         label: "와이드 리서치",
-        free: "제한",
-        standard: "포함",
-        pro: "포함",
+        free: "포함 · 크레딧 차감",
+        lite: "포함 · 크레딧 차감",
+        standard: "포함 · 크레딧 차감",
+        pro: "포함 · 크레딧 차감",
       },
       {
-        label: "커버리지·판단 기록",
+        label: "관심 기업 저장",
         free: "기업 3개",
-        standard: "확대",
-        pro: "확대",
+        lite: "기업 3개",
+        standard: "기업 3개",
+        pro: "기업 3개",
+      },
+      {
+        label: "리서치 노트북",
+        free: "—",
+        lite: "—",
+        standard: "—",
+        pro: "포함",
       },
     ],
     principlesHeading: "플랜을 나누는 기준",
     principles: [
       {
-        title: "기억은 무료로 시작",
-        body: "Free에서도 기업 3개의 가설, 판단, 질문과 다음 확인 조건을 계속 보관할 수 있습니다.",
+        title: "리서치는 무료로 시작",
+        body: "Free에서도 와이드 리서치와 원문 근거 확인을 포함한 모든 리서치 모드를 사용할 수 있습니다.",
       },
       {
         title: "먼저 가치를 확인",
-        body: "Free 플랜으로 실제 공시를 확인하고 첫 판단을 저장한 뒤 필요한 만큼 커버리지와 분석량을 확장할 수 있습니다.",
+        body: "Free 플랜으로 실제 공시를 확인하고, 분석량이 더 필요할 때만 유료 플랜으로 확장할 수 있습니다.",
       },
       {
-        title: "필요한 기능만 확장",
-        body: "Standard와 Pro는 기억을 잠그는 대신 더 넓은 커버리지, 분석 깊이와 사용량을 제공합니다.",
+        title: "판단을 쌓는 워크플로",
+        body: "Pro에서는 기업별 가설, 질문, 메모와 다음 확인 조건을 리서치 노트북으로 계속 관리합니다.",
       },
     ],
   },
   en: {
     title: "Feature-based pricing",
     description:
-      "Review KRW.O Free, Standard, and Pro feature-based plans.",
+      "Review KRW.O Free, Lite, Standard, and Pro feature-based plans.",
     eyebrow: "Pricing",
     heading: "Choose the plan that fits your workflow.",
     intro:
-      "Paid plans renew monthly. Start with core discovery on Free, then unlock wider research menus with Standard and Pro.",
+      "Every plan includes filing-grounded research. Paid plans add more capacity, while Pro adds a research notebook for maintaining your investment work over time.",
     serviceNote:
       "This is research software for reviewing filings and market materials. It does not provide investment advice or buy/sell recommendations; users make their own decisions.",
     primaryCta: "Build my coverage",
@@ -110,59 +124,73 @@ const pricingCopy = {
       {
         label: "Find companies",
         free: "Included",
+        lite: "Included",
         standard: "Included",
         pro: "Included",
       },
       {
         label: "Perspective analysis",
         free: "Included",
+        lite: "Included",
         standard: "Included",
         pro: "Included",
       },
       {
         label: "Recent chats",
         free: "Included",
+        lite: "Included",
         standard: "Included",
         pro: "Included",
       },
       {
         label: "13F institutional holdings",
         free: "Included",
+        lite: "Included",
         standard: "Included",
         pro: "Included",
       },
       {
         label: "Company search by criteria",
         free: "Included",
+        lite: "Included",
         standard: "Included",
         pro: "Included",
       },
       {
         label: "Wide research",
-        free: "Limited",
-        standard: "Included",
-        pro: "Included",
+        free: "Included · uses credits",
+        lite: "Included · uses credits",
+        standard: "Included · uses credits",
+        pro: "Included · uses credits",
       },
       {
-        label: "Coverage and decision history",
+        label: "Saved companies",
         free: "3 companies",
-        standard: "Expanded",
-        pro: "Expanded",
+        lite: "3 companies",
+        standard: "3 companies",
+        pro: "3 companies",
+      },
+      {
+        label: "Research notebook",
+        free: "—",
+        lite: "—",
+        standard: "—",
+        pro: "Included",
       },
     ],
     principlesHeading: "How plans are separated",
     principles: [
       {
-        title: "Memory starts free",
-        body: "Free permanently keeps theses, judgments, questions, and review conditions for three companies.",
+        title: "Research starts free",
+        body: "Free includes every research mode, including wide research and source checks.",
       },
       {
         title: "Prove value before payment",
-        body: "Use Free to inspect a real filing and save a first decision before expanding coverage and analysis capacity.",
+        body: "Use Free to inspect real filings, then expand only when you need more research capacity.",
       },
       {
-        title: "Expand by workflow",
-        body: "Standard and Pro charge for scale, research depth, and capacity rather than locking away your memory.",
+        title: "Build a durable workflow",
+        body: "Pro adds a research notebook for carrying forward theses, questions, notes, and review conditions.",
       },
     ],
   },
@@ -181,6 +209,7 @@ const pricingCopy = {
     comparisonRows: Array<{
       label: string;
       free: string;
+      lite: string;
       standard: string;
       pro: string;
     }>;
@@ -205,20 +234,26 @@ const englishPlanCopy: Record<string, BillingPlanDisplay> = {
     label: "Free",
     statusLabel: "Free",
     description:
-      "Start with three companies of persistent coverage, filing-based decisions, and core discovery.",
-    featureSummary: "3-company coverage + core discovery",
+      "Use every research mode with filing evidence, plus save up to three companies.",
+    featureSummary: "All research modes",
+  },
+  lite: {
+    label: "Lite",
+    statusLabel: "Starter analysis",
+    description: "Keep every research mode and add more weekly analysis capacity.",
+    featureSummary: "More analysis capacity",
   },
   pro: {
     label: "Pro",
     statusLabel: "Advanced analysis",
-    description: "Use the highest research capacity for broader, more frequent company work.",
-    featureSummary: "Highest research capacity",
+    description: "Maintain theses, questions, and notes in a research notebook with the highest capacity.",
+    featureSummary: "Research notebook + highest capacity",
   },
   standard: {
     label: "Standard",
     statusLabel: "Extended analysis",
-    description: "Add wide research to the Free feature set.",
-    featureSummary: "Wide research included",
+    description: "Add more capacity to the wide research workflow.",
+    featureSummary: "More research capacity",
   },
 };
 
@@ -239,16 +274,20 @@ function getPlanDisplay(
     > = {
       free: {
         description:
-          "기업 3개의 판단 기록과 공시 기반 분석, 핵심 탐색을 시작할 수 있습니다.",
-        featureSummary: "3개 기업 커버리지 + 핵심 탐색",
+          "모든 리서치 모드와 공시 기반 분석을 시작하고 관심 기업 3개를 저장할 수 있습니다.",
+        featureSummary: "모든 리서치 모드",
+      },
+      lite: {
+        description: "모든 리서치 모드를 유지하면서 주간 분석량을 늘립니다.",
+        featureSummary: "더 넉넉한 분석량",
       },
       standard: {
-        description: "Free 기능에 와이드 리서치를 더합니다.",
-        featureSummary: "와이드 리서치 포함",
+        description: "정기적인 기업 리서치를 위한 더 넉넉한 주간 분석량을 제공합니다.",
+        featureSummary: "더 넉넉한 분석량",
       },
       pro: {
-        description: "더 넓고 자주 기업을 리서치할 수 있는 가장 큰 분석량을 제공합니다.",
-        featureSummary: "가장 넉넉한 분석량",
+        description: "가설, 질문, 메모와 다음 확인 조건을 리서치 노트북으로 누적 관리합니다.",
+        featureSummary: "리서치 노트북 + 최고 분석량",
       },
     };
     const copy = koPlanCopy[plan.key] ?? {
@@ -375,7 +414,7 @@ export default async function PricingPage({ params }: PricingPageProps) {
             </div>
           </header>
 
-          <section className="grid gap-4 py-8 md:grid-cols-3">
+          <section className="grid gap-4 py-8 md:grid-cols-2 xl:grid-cols-4">
             {plans.map((plan) => {
               const isFeatured = plan.key === "standard";
               const planDisplay = getPlanDisplay(plan, locale);
@@ -446,9 +485,10 @@ export default async function PricingPage({ params }: PricingPageProps) {
               {copy.comparisonHeading}
             </h2>
             <div className="mt-4 overflow-hidden rounded-[8px] border border-hairline bg-canvas">
-              <div className="grid grid-cols-[minmax(112px,0.9fr)_repeat(3,minmax(92px,1fr))] border-b border-hairline bg-surface px-sm py-2.5 font-mono text-[11px] font-black uppercase tracking-[0.12em] text-muted">
+              <div className="grid grid-cols-[minmax(112px,0.9fr)_repeat(4,minmax(82px,1fr))] border-b border-hairline bg-surface px-sm py-2.5 font-mono text-[11px] font-black uppercase tracking-[0.12em] text-muted">
                 <span>{locale === "ko" ? "항목" : "Item"}</span>
                 <span>Free</span>
+                <span>Lite</span>
                 <span>Standard</span>
                 <span>Pro</span>
               </div>
@@ -456,10 +496,11 @@ export default async function PricingPage({ params }: PricingPageProps) {
                 {copy.comparisonRows.map((row) => (
                   <div
                     key={row.label}
-                    className="grid grid-cols-[minmax(112px,0.9fr)_repeat(3,minmax(92px,1fr))] px-sm py-3 text-[13px] leading-5"
+                    className="grid grid-cols-[minmax(112px,0.9fr)_repeat(4,minmax(82px,1fr))] px-sm py-3 text-[13px] leading-5"
                   >
                     <span className="font-black text-ink">{row.label}</span>
                     <span className="font-semibold text-body">{row.free}</span>
+                    <span className="font-semibold text-body">{row.lite}</span>
                     <span className="font-semibold text-body">{row.standard}</span>
                     <span className="font-semibold text-body">{row.pro}</span>
                   </div>

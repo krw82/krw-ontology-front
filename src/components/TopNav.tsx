@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { KrwBrand } from "@/components/KrwBrand";
+import AccountDeviceQuickActions from "@/components/AccountDeviceQuickActions";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import UsageStatus from "@/components/UsageStatus";
 import {
@@ -347,6 +348,39 @@ export default function TopNav({
                         </p>
                       </div>
                     </div>
+                    <AccountDeviceQuickActions
+                      locale={currentLocale}
+                      open={accountMenuOpen}
+                      onComplete={() => setAccountMenuOpen(false)}
+                    />
+                    <Link
+                      href="/settings/notifications"
+                      className="mt-xs flex w-full items-center justify-between rounded-[8px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-surface-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      role="menuitem"
+                      onClick={() => setAccountMenuOpen(false)}
+                    >
+                      <span>{currentLocale === "ko" ? "알림 설정" : "Notification settings"}</span>
+                      <span
+                        aria-hidden="true"
+                        className="material-symbols-outlined text-[18px]"
+                      >
+                        notifications
+                      </span>
+                    </Link>
+                    <Link
+                      href="/settings"
+                      className="mt-xs flex w-full items-center justify-between rounded-[8px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-surface-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      role="menuitem"
+                      onClick={() => setAccountMenuOpen(false)}
+                    >
+                      <span>{currentLocale === "ko" ? "설정" : "Settings"}</span>
+                      <span
+                        aria-hidden="true"
+                        className="material-symbols-outlined text-[18px]"
+                      >
+                        settings
+                      </span>
+                    </Link>
                     <Link
                       href="/settings/billing"
                       className="mt-xs block rounded-[8px] transition-colors hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"

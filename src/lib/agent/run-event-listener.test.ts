@@ -24,6 +24,15 @@ describe("agent run event listener config", () => {
     ).toBe("postgresql://postgres:secret@db.example.com:5432/postgres");
   });
 
+  it("uses the Rust agent database URL when it is the only local database setting", () => {
+    expect(
+      getAgentRunEventListenConnectionString({
+        AGENT_V1_DATABASE_URL:
+          "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+      }),
+    ).toBe("postgresql://postgres:postgres@127.0.0.1:54322/postgres");
+  });
+
   it("derives a Supabase direct database URL from project URL and password", () => {
     expect(
       getAgentRunEventListenConnectionString({

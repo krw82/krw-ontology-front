@@ -40,7 +40,9 @@ export interface AgentV1OutboxPort {
     limit: number,
     leaseMs: number,
   ): Promise<readonly AgentV1OutboxReceipt[]>;
-  apply(event: AgentV1OutboxReceipt): Promise<"applied" | "already_applied">;
+  apply(
+    event: AgentV1OutboxReceipt,
+  ): Promise<"applied" | "already_applied" | "ignored">;
   ack(
     workerId: string,
     outboxId: number,
@@ -61,6 +63,7 @@ export interface DispatchProductOutboxReport {
   readonly claimed: number;
   readonly applied: number;
   readonly alreadyApplied: number;
+  readonly ignored: number;
   readonly delivered: number;
   readonly released: number;
   readonly ackFailures: number;
@@ -88,6 +91,7 @@ export async function dispatchProductOutboxOnce(
   let cursor = 0;
   let applied = 0;
   let alreadyApplied = 0;
+  let ignored = 0;
   let delivered = 0;
   let released = 0;
   let ackFailures = 0;
@@ -106,7 +110,8 @@ export async function dispatchProductOutboxOnce(
           const outcome = await port.apply(event);
           projectionCommitted = true;
           if (outcome === "applied") applied += 1;
-          else alreadyApplied += 1;
+          else if (outcome === "already_applied") alreadyApplied += 1;
+          else ignored += 1;
 
           try {
             await port.ack(options.workerId, event.outbox_id, { success: true });
@@ -137,6 +142,7 @@ export async function dispatchProductOutboxOnce(
     claimed: events.length,
     applied,
     alreadyApplied,
+    ignored,
     delivered,
     released,
     ackFailures,
@@ -154,6 +160,10 @@ const ACK_STATEMENT = Object.freeze({
 const APPLY_STATEMENT = Object.freeze({
   name: "krw_front_agent_v1_apply_product_outbox",
   text: "SELECT public.apply_agent_v1_product_outbox($1::jsonb) AS result",
+});
+const PRODUCT_MAPPING_STATEMENT = Object.freeze({
+  name: "krw_front_agent_v1_product_mapping_exists",
+  text: "SELECT EXISTS(SELECT 1 FROM public.agent_v1_product_run_mappings WHERE run_id=$1::uuid) AS is_product",
 });
 
 export class PostgresAgentV1OutboxPort implements AgentV1OutboxPort {
@@ -184,7 +194,13 @@ export class PostgresAgentV1OutboxPort implements AgentV1OutboxPort {
 
   async apply(
     event: AgentV1OutboxReceipt,
-  ): Promise<"applied" | "already_applied"> {
+  ): Promise<"applied" | "already_applied" | "ignored"> {
+    // This worker owns only product chat runs. Local CLI/quality runs can use
+    // the same Agent V1 database, but they have no product mapping and must
+    // not poison the product queue with an invalid UUID cast or retries.
+    if (!isUuid(event.run_id) || !(await this.hasProductMapping(event.run_id))) {
+      return "ignored";
+    }
     const eventObject = event as unknown as JsonObject;
     const response = exactObject(
       await executeFixed(this.client, "apply_product_outbox", APPLY_STATEMENT, {
@@ -201,6 +217,21 @@ export class PostgresAgentV1OutboxPort implements AgentV1OutboxPort {
       throw new ProductHostContractError("product_outbox_identity_mismatch");
     }
     return response.outcome;
+  }
+
+  private async hasProductMapping(runId: string): Promise<boolean> {
+    const result = await this.client.query<{ readonly is_product: unknown }>({
+      ...PRODUCT_MAPPING_STATEMENT,
+      values: [runId],
+    });
+    if (result.rowCount !== 1 || result.rows.length !== 1) {
+      throw new ProductHostContractError("product_mapping_response_cardinality");
+    }
+    const isProduct = result.rows[0]?.is_product;
+    if (typeof isProduct !== "boolean") {
+      throw new ProductHostContractError("invalid_product_mapping_response");
+    }
+    return isProduct;
   }
 
   async ack(
@@ -316,6 +347,10 @@ function boundedInteger(
 function asString(value: unknown, field: string): string {
   if (typeof value !== "string") throw new ProductHostContractError(`invalid_${field}`);
   return value;
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 const OUTBOX_KINDS = new Set<AgentV1ProductOutboxKind>([

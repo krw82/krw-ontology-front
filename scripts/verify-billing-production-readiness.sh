@@ -121,8 +121,8 @@ assert_contains_any "$pricing_html" "Pro monthly price" "29,000" "29000"
 # Credit limits are enforced from the active plan version and are intentionally
 # not a hard-coded public-price-page promise. Keep this probe coupled to the
 # visible paid-plan value proposition instead of stale numeric marketing copy.
-assert_contains_any "$pricing_html" "Standard feature" "와이드 리서치" "Wide research"
-assert_contains_any "$pricing_html" "Pro feature" "가장 넉넉한 분석량" "Highest research capacity"
+assert_contains_any "$pricing_html" "Standard feature" "더 넉넉한 분석량" "More research capacity"
+assert_contains_any "$pricing_html" "Pro feature" "리서치 노트북" "Research notebook"
 
 echo "OK public billing endpoints."
 

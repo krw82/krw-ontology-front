@@ -2,14 +2,10 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/agent/worker-heartbeat", () => ({
-  getReadyAgentWorker: vi.fn(),
-}));
 vi.mock("@/lib/analytics/server", () => ({
   recordAnalyticsEventFromRequest: vi.fn(),
 }));
 vi.mock("@/lib/ontology/catalog", () => ({
-  getActiveOntologyCatalogRelease: vi.fn(),
   getIndexedCompanies: vi.fn(),
 }));
 vi.mock("@/lib/api/chat", () => ({
@@ -22,8 +18,23 @@ vi.mock("@/lib/api/chat/rate-limit", () => ({
   checkChatRunRateLimit: vi.fn(),
   getClientIp: vi.fn(() => "127.0.0.1"),
 }));
-vi.mock("@/lib/agent/job-queue", () => ({
-  enqueueAgentRun: vi.fn(),
+vi.mock("@/lib/agent-v1/runtime", () => ({
+  getRustAgentRuntime: vi.fn(),
+  RustAgentRuntimeError: class RustAgentRuntimeError extends Error {
+    readonly code: string;
+
+    constructor(code: string) {
+      super(code);
+      this.name = "RustAgentRuntimeError";
+      this.code = code;
+    }
+  },
+}));
+vi.mock("@/lib/agent-v1/readiness", () => ({
+  getResearchAdmissionMode: vi.fn(),
+}));
+vi.mock("@/lib/agent/daemon-heartbeat", () => ({
+  getReadyRustAgentDaemon: vi.fn(),
 }));
 vi.mock("@/lib/agent/run-events", () => ({
   streamAgentRunEventsResponse: vi.fn(() => new Response("stream")),
@@ -31,91 +42,82 @@ vi.mock("@/lib/agent/run-events", () => ({
 vi.mock("@/lib/concurrency/execution-budget", () => ({
   releaseExecutionBudget: vi.fn(),
 }));
-vi.mock("@/lib/news-discovery/user-url-context", () => ({
-  buildIdeaGenerationUserUrlContext: vi.fn(),
-  buildUserUrlNewsEventContext: vi.fn(),
-  buildUserUrlsNewsEventContext: vi.fn(),
-  UserUrlContextError: class UserUrlContextError extends Error {},
+vi.mock("@/lib/concurrency/analysis-credits", () => ({
+  attachAnalysisCreditRunShadow: vi.fn(),
+  releaseAnalysisCreditsShadow: vi.fn(),
+  reserveAnalysisCreditsShadow: vi.fn(),
+}));
+vi.mock("@/lib/billing/feature-access", () => ({
+  getFeatureSplitMode: vi.fn(() => "off"),
+  getMenuFeatureDefinition: vi.fn(() => ({
+    label: "리서치",
+    required_plan: "free",
+  })),
+  isEntitlementFeatureEnabled: vi.fn(() => true),
+}));
+vi.mock("@/lib/billing/entitlement", () => ({
+  getEntitlementStatus: vi.fn(),
+}));
+vi.mock("@/lib/security/chat-safety", () => ({
+  assessChatPromptSafety: vi.fn(() => ({ blocked: false })),
+  blockedChatSafetyMessage: vi.fn(() => "blocked"),
+}));
+vi.mock("@/lib/api/chat/immediate-response", () => ({
+  createImmediateAssistantResponse: vi.fn(({ content }: { content: string }) =>
+    Response.json({ content }),
+  ),
 }));
 vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: vi.fn(),
 }));
 
-import { getReadyAgentWorker } from "@/lib/agent/worker-heartbeat";
-import type { McpHealthResult } from "@/lib/agent/mcp-client";
+import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import {
-  validateRequest,
+  fetchHistory,
   resolveSession,
   reserveBudgetStep,
-  fetchHistory,
+  validateRequest,
 } from "@/lib/api/chat";
-import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import { checkChatRunRateLimit } from "@/lib/api/chat/rate-limit";
-import { enqueueAgentRun } from "@/lib/agent/job-queue";
+import {
+  getRustAgentRuntime,
+  RustAgentRuntimeError,
+} from "@/lib/agent-v1/runtime";
+import { getResearchAdmissionMode } from "@/lib/agent-v1/readiness";
+import { getReadyRustAgentDaemon } from "@/lib/agent/daemon-heartbeat";
 import { streamAgentRunEventsResponse } from "@/lib/agent/run-events";
 import {
-  getActiveOntologyCatalogRelease,
-  getIndexedCompanies,
-} from "@/lib/ontology/catalog";
+  attachAnalysisCreditRunShadow,
+  releaseAnalysisCreditsShadow,
+  reserveAnalysisCreditsShadow,
+} from "@/lib/concurrency/analysis-credits";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
+import { getIndexedCompanies } from "@/lib/ontology/catalog";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import {
-  buildIdeaGenerationUserUrlContext,
-  buildUserUrlNewsEventContext,
-  buildUserUrlsNewsEventContext,
-} from "@/lib/news-discovery/user-url-context";
 import { POST } from "./route";
 
-const readyMcpHealth = {
-  connected: true,
-  staticOk: true,
-  commandOk: true,
-  liveOk: true,
-  sqliteOk: true,
-  contractOk: true,
-  toolParityOk: true,
-  fingerprintOk: true,
-  fingerprintErrors: [],
-  mcpContractVersion: "krw-ontology-mcp/v2",
-  buildId: "build-1",
-  backendGitSha: "backend-sha-1",
-  toolSchemaSha256: "a".repeat(64),
-  buildFingerprintSha256: "a".repeat(64),
-  releaseManifestSha256: "a".repeat(64),
-  serviceFingerprintSha256: "a".repeat(64),
-  env: "dev",
-  releaseId: "release-1",
-  manifestPath: "~/krw-ontology-data/manifest.json",
-  manifestValid: true,
-  agentIndexSchemaVersion: "agent_index_v1",
-  indexGeneratedAt: "2026-05-27T00:00:00.000Z",
-  companyCount: 10,
-  documentCount: 20,
-  objectCount: 30,
-  toolCount: 13,
-  tools: ["krw_ontology_query_context"],
-  root: "~/krw-ontology-data",
-  indexPath:
-    "~/krw-ontology-data/indexes/global_spine.sqlite",
-  pluginPath: "~/krw-ontology/plugins/krw-ontology",
-  releaseMetadata: {
-    env: "dev",
-    release_id: "release-1",
-    manifest_valid: true,
-  },
-} satisfies McpHealthResult;
+const SESSION_ID = "11111111-1111-4111-8111-111111111111";
+const REQUEST_ID = "550e8400-e29b-41d4-a716-446655440001";
+const USER_MESSAGE_ID = "22222222-2222-4222-8222-222222222222";
+
+type TestBody = {
+  content: string;
+  request_id: string;
+  session_id?: string;
+  scope_type?: "global" | "company";
+  default_tickers?: string[];
+  research_mode: "fast" | "standard" | "deep";
+  analysis_mode: "company" | "news";
+  run_kind?: string;
+};
+
+let body: TestBody;
 
 function request() {
   return new NextRequest("http://localhost/api/chat/run", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      content: "Apple 알려줘",
-      request_id: "550e8400-e29b-41d4-a716-446655440001",
-      session_id: "11111111-1111-4111-8111-111111111111",
-      research_mode: "fast",
-      analysis_mode: "company",
-    }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -126,25 +128,10 @@ function createAdmin({
   existingRuns?: Array<{ id: string; session_id: string } | null>;
   sessionUserId?: string;
 } = {}) {
-  const deleted: Array<{ table: string; key: string; value: unknown }> = [];
-  const insertedMessages: Array<Record<string, unknown>> = [];
   const runLookups = [...existingRuns];
+  const insertedSessions: Array<Record<string, unknown>> = [];
+  const insertedMessages: Array<Record<string, unknown>> = [];
   const admin = {
-    rpc(name: string) {
-      if (name === "reserve_analysis_credits") {
-        return Promise.resolve({
-          data: [
-            {
-              allowed: true,
-              reason: null,
-              reservation_id: "credit-reservation-1",
-            },
-          ],
-          error: null,
-        });
-      }
-      return Promise.resolve({ data: null, error: null });
-    },
     from(table: string) {
       const filters: Record<string, unknown> = {};
       return {
@@ -165,676 +152,316 @@ function createAdmin({
                   error: null,
                 });
               }
-
               if (table === "chat_sessions") {
                 return Promise.resolve({
-                  data: filters.id
-                    ? { id: filters.id, user_id: sessionUserId }
-                    : null,
+                  data: filters.id ? { id: filters.id, user_id: sessionUserId } : null,
                   error: null,
                 });
               }
-
               return Promise.resolve({ data: null, error: null });
             },
           };
           return query;
         },
-        delete() {
-          return {
-            eq(key: string, value: unknown) {
-              deleted.push({ table, key, value });
-              return Promise.resolve({ data: null, error: null });
-            },
-          };
-        },
         insert(payload: Record<string, unknown>) {
-          if (table !== "messages") {
-            throw new Error(`Unexpected insert table: ${table}`);
+          if (table === "chat_sessions") {
+            insertedSessions.push(payload);
+            return {
+              select() {
+                return {
+                  single() {
+                    return Promise.resolve({ data: { id: SESSION_ID }, error: null });
+                  },
+                };
+              },
+            };
           }
-          insertedMessages.push(payload);
-          return {
-            select() {
-              return {
-                single() {
-                  return Promise.resolve({
-                    data: {
-                      id: "assistant-message-safety",
-                      created_at: "2026-05-27T00:00:00.000Z",
-                    },
-                    error: null,
-                  });
-                },
-              };
-            },
-          };
+          if (table === "messages") {
+            insertedMessages.push(payload);
+          }
+          throw new Error(`unexpected admin insert: ${table}`);
         },
       };
     },
   };
-
-  return { admin, deleted, insertedMessages };
+  return { admin, insertedSessions, insertedMessages };
 }
 
-async function json(response: Response) {
-  return response.json() as Promise<{
-    error?: { code: string; message: string };
-    request_id?: string;
-  }>;
+function setSession(session: {
+  scopeType: "global" | "company";
+  defaultTickers: string[];
+}) {
+  vi.mocked(resolveSession).mockResolvedValue({
+    ok: true,
+    session: {
+      id: SESSION_ID,
+      userId: "user-1",
+      scopeType: session.scopeType,
+      defaultTickers: session.defaultTickers,
+      defaultDocumentTypes: [],
+    },
+  });
 }
 
-describe("POST /api/chat/run worker admission", () => {
+async function responseJson(response: Response) {
+  return response.json() as Promise<Record<string, unknown>>;
+}
+
+describe("POST /api/chat/run Rust Agent V1 contract", () => {
+  let runtimeEnqueue: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getSupabaseAdmin).mockReturnValue(createAdmin().admin as never);
+    body = {
+      content: "Apple 알려줘",
+      request_id: REQUEST_ID,
+      session_id: SESSION_ID,
+      research_mode: "fast",
+      analysis_mode: "company",
+      run_kind: "company_research",
+    };
     vi.mocked(validateRequest).mockResolvedValue({
       ok: true,
       data: {
         userId: "user-1",
         userEmail: "user@example.test",
-        body: {
-          content: "Apple 알려줘",
-          request_id: "550e8400-e29b-41d4-a716-446655440001",
-          session_id: "11111111-1111-4111-8111-111111111111",
-          research_mode: "fast",
-          analysis_mode: "company",
-          run_kind: "company_research",
-        },
+        body: { ...body } as never,
       },
     });
     vi.mocked(checkChatRunRateLimit).mockResolvedValue({ ok: true });
-    vi.mocked(getActiveOntologyCatalogRelease).mockResolvedValue({
-      env: "dev",
-      release_id: "release-1",
-      active: true,
-      format: "krw-ontology-web-catalog/v1",
-      generated_at: "2026-05-27T00:00:00.000Z",
-      release_created_at: "2026-05-27T00:00:00.000Z",
-      index_generated_at: "2026-05-27T00:00:00.000Z",
-      company_count: 10,
-      document_count: 20,
-      index_document_count: 20,
-      object_count: 30,
-      manifest_json: null,
-      summary_json: {},
-      source_json: null,
-      catalog_json: {},
-      created_at: "2026-05-27T00:00:00.000Z",
-      updated_at: "2026-05-27T00:00:00.000Z",
+    vi.mocked(resolveSession).mockResolvedValue({
+      ok: true,
+      session: {
+        id: SESSION_ID,
+        userId: "user-1",
+        scopeType: "company",
+        defaultTickers: ["AAPL"],
+        defaultDocumentTypes: [],
+      },
     });
     vi.mocked(reserveBudgetStep).mockResolvedValue({
       ok: true,
-      budget: {
-        allowed: true,
-        reservationId: "budget-reservation-1",
-        budgetUsedUsd: 0,
-        budgetReservedUsd: 0,
-        budgetLimitUsd: 10,
-        dailyBudgetUsedUsd: 0,
-        dailyBudgetReservedUsd: 0,
-        dailyBudgetLimitUsd: 10,
-        reserveCostUsd: 0,
-        runCount: 0,
-      },
-    });
-    vi.mocked(resolveSession).mockResolvedValue({
+      budget: { entitlement: { usage: { unlimited: false } } },
+    } as never);
+    vi.mocked(reserveAnalysisCreditsShadow).mockResolvedValue({
       ok: true,
-      session: {
-        id: "11111111-1111-4111-8111-111111111111",
-        userId: "user-1",
-        scopeType: "global",
-        defaultTickers: [],
-        defaultDocumentTypes: [],
-      },
+      allowed: true,
+      reservationId: "credit-reservation-1",
     });
     vi.mocked(fetchHistory).mockResolvedValue({
       ok: true,
-      result: {
-        userMessageId: "user-message-1",
-        history: [],
-      },
+      result: { userMessageId: USER_MESSAGE_ID, history: [] },
     });
-    vi.mocked(enqueueAgentRun).mockResolvedValue({
+    vi.mocked(getResearchAdmissionMode).mockReturnValue("open");
+    vi.mocked(getReadyRustAgentDaemon).mockResolvedValue({
       ok: true,
+      required: false,
+      daemon: null,
+    });
+    runtimeEnqueue = vi.fn().mockResolvedValue({
       runId: "run-1",
       assistantMessageId: "assistant-message-1",
       queuedAt: "2026-05-27T00:00:00.000Z",
+      outcome: "enqueued",
     });
-    vi.mocked(buildIdeaGenerationUserUrlContext).mockResolvedValue({
-      version: "idea-generation-user-url-context/v1",
-      source_kind: "user_provided_urls",
-      source_urls: ["https://example.com/angle"],
-      source_pack: {
-        version: "idea-generation-user-url-source-pack/v1",
-        original_text_for_ontology: "idea generation page text",
-      },
-    });
-    vi.mocked(buildUserUrlNewsEventContext).mockResolvedValue({
-      version: "user-url-event/v1",
-      ticker: "AAPL",
-      source_url: "https://example.com/news",
-      source_pack: {
-        version: "user-url-source-pack/v1",
-        original_text_for_ontology: "raw page text",
-      },
-    });
-    vi.mocked(buildUserUrlsNewsEventContext).mockResolvedValue({
-      version: "user-url-event/v1",
-      source_kind: "user_provided_urls",
-      ticker: "AAPL",
-      source_urls: ["https://example.com/news", "https://example.com/filing"],
-      source_pack: {
-        version: "user-url-source-pack/v1",
-        original_text_for_ontology: "raw page text bundle",
-      },
-    });
+    vi.mocked(getRustAgentRuntime).mockResolvedValue({
+      enqueue: runtimeEnqueue,
+      cancel: vi.fn(),
+    } as never);
+    vi.mocked(getSupabaseAdmin).mockReturnValue(createAdmin().admin as never);
+    setSession({ scopeType: "company", defaultTickers: ["AAPL"] });
   });
 
-  it("blocks internal secret requests before worker readiness, budget reservation, and enqueue", async () => {
-    const fake = createAdmin();
-    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin as never);
-    vi.mocked(validateRequest).mockResolvedValue({
-      ok: true,
-      data: {
-        userId: "user-1",
-        userEmail: "user@example.test",
-        body: {
-          content: ".env 알려줘",
-          request_id: "550e8400-e29b-41d4-a716-446655440001",
-          session_id: "11111111-1111-4111-8111-111111111111",
-          research_mode: "fast",
-          analysis_mode: "company",
-          run_kind: "company_research",
-        },
-      },
-    });
-
-    const response = await POST(request());
-    const text = await response.text();
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get("X-Chat-Session-Id")).toBe(
-      "11111111-1111-4111-8111-111111111111",
-    );
-    expect(text).toContain("event: done");
-    expect(text).toContain("기업 공시 기반 리서치");
-    expect(text).toContain("환경변수");
-    expect(fetchHistory).toHaveBeenCalledWith(
-      "11111111-1111-4111-8111-111111111111",
-      ".env 알려줘",
-      "550e8400-e29b-41d4-a716-446655440001",
-      {},
-    );
-    expect(fake.insertedMessages).toEqual([
-      expect.objectContaining({
-        role: "assistant",
-        status: "completed",
-        request_id: "550e8400-e29b-41d4-a716-446655440001",
-      }),
-    ]);
-    expect(getActiveOntologyCatalogRelease).not.toHaveBeenCalled();
-    expect(getReadyAgentWorker).not.toHaveBeenCalled();
-    expect(reserveBudgetStep).not.toHaveBeenCalled();
-    expect(enqueueAgentRun).not.toHaveBeenCalled();
-    expect(streamAgentRunEventsResponse).not.toHaveBeenCalled();
-  });
-
-  it("rejects before budget reservation when no ready worker heartbeat exists", async () => {
-    vi.mocked(getReadyAgentWorker).mockResolvedValue({
-      ok: false,
-      reason: "worker_unavailable",
-      message: "No ready agent worker heartbeat found",
-    });
-
-    const response = await POST(request());
-
-    expect(response.status).toBe(503);
-    expect(await json(response)).toMatchObject({
-      error: { code: "worker_unavailable" },
-      request_id: "550e8400-e29b-41d4-a716-446655440001",
-    });
-    expect(reserveBudgetStep).not.toHaveBeenCalled();
-    expect(enqueueAgentRun).not.toHaveBeenCalled();
-    expect(getReadyAgentWorker).toHaveBeenCalledWith(
-      expect.any(Date),
-      "release-1",
-    );
-  });
-
-  it("passes worker heartbeat MCP metadata into the queued run", async () => {
-    vi.mocked(getReadyAgentWorker).mockResolvedValue({
-      ok: true,
-      worker: { worker_id: "mac-worker-jwc-1" } as never,
-      mcpHealth: readyMcpHealth,
-    });
-
+  it("queues company research through the pinned Rust runtime", async () => {
     const response = await POST(request());
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("X-Chat-Session-Id")).toBe(
-      "11111111-1111-4111-8111-111111111111",
-    );
-    expect(checkChatRunRateLimit).toHaveBeenCalledTimes(2);
-    expect(checkChatRunRateLimit).toHaveBeenNthCalledWith(1, {
+    expect(response.headers.get("X-Chat-Session-Id")).toBe(SESSION_ID);
+    expect(runtimeEnqueue).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: REQUEST_ID,
       userId: "user-1",
-      requestId: "550e8400-e29b-41d4-a716-446655440001",
-      ip: "127.0.0.1",
-      scope: "user_ip",
-    });
-    expect(checkChatRunRateLimit).toHaveBeenNthCalledWith(2, {
+      sessionId: SESSION_ID,
+      userMessageId: USER_MESSAGE_ID,
+      runKind: "company_research",
+      locale: "ko-KR",
+      question: "Apple 알려줘",
+      context: { kind: "company_ticker_set", tickers: ["AAPL"] },
+    }));
+    expect(streamAgentRunEventsResponse).toHaveBeenCalledWith(expect.objectContaining({
       userId: "user-1",
-      requestId: "550e8400-e29b-41d4-a716-446655440001",
-      ip: "127.0.0.1",
-      sessionId: "11111111-1111-4111-8111-111111111111",
-      scope: "session",
-    });
-    expect(reserveBudgetStep).toHaveBeenCalledWith(
+      sessionId: SESSION_ID,
+      runId: "run-1",
+      requestId: REQUEST_ID,
+    }));
+    expect(attachAnalysisCreditRunShadow).toHaveBeenCalledWith(
       "user-1",
-      "550e8400-e29b-41d4-a716-446655440001",
-      "user@example.test",
-      "fast",
-    );
-    expect(enqueueAgentRun).toHaveBeenCalledWith(
-      expect.objectContaining({
-        requestId: "550e8400-e29b-41d4-a716-446655440001",
-        model: expect.any(String),
-        mcpHealth: readyMcpHealth,
-        researchMode: "fast",
-        analysisMode: "company",
-        runKind: "company_research",
-        routingMode: "auto",
-        responseLocale: "ko",
-      }),
-    );
-    expect(getReadyAgentWorker).toHaveBeenCalledWith(
-      expect.any(Date),
-      "release-1",
-    );
-    expect(streamAgentRunEventsResponse).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: "user-1",
-        sessionId: "11111111-1111-4111-8111-111111111111",
-        runId: "run-1",
-        requestId: "550e8400-e29b-41d4-a716-446655440001",
-      }),
+      REQUEST_ID,
+      "run-1",
     );
   });
 
-  it("passes the request locale to queued agent work", async () => {
-    vi.mocked(getReadyAgentWorker).mockResolvedValue({
+  it("routes a tickerless global question to wide research with covered-universe context", async () => {
+    body = {
+      ...body,
+      content: "소비재 기업들의 소비 둔화 영향을 비교해줘",
+      run_kind: "company_research",
+      session_id: SESSION_ID,
+    };
+    vi.mocked(validateRequest).mockResolvedValue({
       ok: true,
-      worker: { worker_id: "mac-worker-jwc-1" } as never,
-      mcpHealth: readyMcpHealth,
+      data: { userId: "user-1", userEmail: "user@example.test", body: { ...body } as never },
     });
+    setSession({ scopeType: "global", defaultTickers: [] });
 
-    const response = await POST(
-      new NextRequest("http://localhost/api/chat/run", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-krw-locale": "en",
-        },
-        body: JSON.stringify({
-          content: "Analyze Apple",
-          request_id: "550e8400-e29b-41d4-a716-446655440001",
-          session_id: "11111111-1111-4111-8111-111111111111",
-          research_mode: "fast",
-          analysis_mode: "company",
-        }),
-      }),
-    );
+    const response = await POST(request());
 
     expect(response.status).toBe(200);
-    expect(enqueueAgentRun).toHaveBeenCalledWith(
-      expect.objectContaining({
-        responseLocale: "en",
-      }),
-    );
+    expect(runtimeEnqueue).toHaveBeenCalledWith(expect.objectContaining({
+      runKind: "wide_research",
+      context: { kind: "covered_universe", universe: "covered" },
+    }));
     expect(recordAnalyticsEventFromRequest).toHaveBeenCalledWith(
       expect.any(NextRequest),
       expect.objectContaining({
         properties: expect.objectContaining({
-          response_locale: "en",
-        }),
-      }),
-    );
-  });
-
-  it("queues news discovery for the worker Claude agent", async () => {
-    vi.mocked(getReadyAgentWorker).mockResolvedValue({
-      ok: true,
-      worker: { worker_id: "mac-worker-jwc-1" } as never,
-      mcpHealth: readyMcpHealth,
-    });
-    vi.mocked(validateRequest).mockResolvedValue({
-      ok: true,
-      data: {
-        userId: "user-1",
-        userEmail: "user@example.test",
-        body: {
-          content: "오늘 왜 떨어져?",
-          request_id: "550e8400-e29b-41d4-a716-446655440001",
-          session_id: "11111111-1111-4111-8111-111111111111",
-          research_mode: "fast",
-          analysis_mode: "news",
-          run_kind: "news_discovery",
-        },
-      },
-    });
-    const response = await POST(request());
-
-    expect(response.status).toBe(200);
-    expect(enqueueAgentRun).toHaveBeenCalledWith(
-      expect.objectContaining({
-        requestId: "550e8400-e29b-41d4-a716-446655440001",
-        mcpHealth: readyMcpHealth,
-        researchMode: "fast",
-        analysisMode: "news",
-        runKind: "news_discovery",
-        routingMode: "preserve",
-        executorType: "claude_agent",
-      }),
-    );
-    expect(streamAgentRunEventsResponse).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: "user-1",
-        sessionId: "11111111-1111-4111-8111-111111111111",
-        runId: "run-1",
-        requestId: "550e8400-e29b-41d4-a716-446655440001",
-      }),
-    );
-  });
-
-  it("queues explicit user URL checks as selected company research", async () => {
-    vi.mocked(getReadyAgentWorker).mockResolvedValue({
-      ok: true,
-      worker: { worker_id: "mac-worker-jwc-1" } as never,
-      mcpHealth: readyMcpHealth,
-    });
-    vi.mocked(validateRequest).mockResolvedValue({
-      ok: true,
-      data: {
-        userId: "user-1",
-        userEmail: "user@example.test",
-        body: {
-          content: "이 URL이 AAPL에 어떤 의미인지 봐줘",
-          request_id: "550e8400-e29b-41d4-a716-446655440001",
-          session_id: "11111111-1111-4111-8111-111111111111",
-          research_mode: "fast",
-          analysis_mode: "company",
-          run_kind: "company_research",
-          user_url: "https://example.com/news",
-        },
-      },
-    });
-    vi.mocked(resolveSession).mockResolvedValue({
-      ok: true,
-      session: {
-        id: "11111111-1111-4111-8111-111111111111",
-        userId: "user-1",
-        scopeType: "company",
-        defaultTickers: ["AAPL"],
-        defaultDocumentTypes: [],
-      },
-    });
-
-    const response = await POST(request());
-
-    expect(response.status).toBe(200);
-    expect(buildUserUrlNewsEventContext).toHaveBeenCalledWith({
-      url: "https://example.com/news",
-      ticker: "AAPL",
-      userQuestion: "이 URL이 AAPL에 어떤 의미인지 봐줘",
-    });
-    expect(enqueueAgentRun).toHaveBeenCalledWith(
-      expect.objectContaining({
-        analysisMode: "company",
-        runKind: "company_research",
-        routingMode: "preserve",
-        executorType: "claude_agent",
-        selectedNewsEventContext: expect.objectContaining({
-          version: "user-url-event/v1",
-          source_pack: expect.objectContaining({
-            original_text_for_ontology: "raw page text",
-          }),
-        }),
-      }),
-    );
-    expect(recordAnalyticsEventFromRequest).toHaveBeenCalledWith(
-      expect.any(NextRequest),
-      expect.objectContaining({
-        properties: expect.objectContaining({
-          analysis_mode: "company",
-          run_kind: "company_research",
-          has_user_url: true,
-          user_url_count: 1,
-        }),
-      }),
-    );
-  });
-
-  it("queues multiple explicit user URL checks as one selected company research context", async () => {
-    vi.mocked(getReadyAgentWorker).mockResolvedValue({
-      ok: true,
-      worker: { worker_id: "mac-worker-jwc-1" } as never,
-      mcpHealth: readyMcpHealth,
-    });
-    vi.mocked(validateRequest).mockResolvedValue({
-      ok: true,
-      data: {
-        userId: "user-1",
-        userEmail: "user@example.test",
-        body: {
-          content: "이 URL들이 AAPL에 어떤 의미인지 봐줘",
-          request_id: "550e8400-e29b-41d4-a716-446655440001",
-          session_id: "11111111-1111-4111-8111-111111111111",
-          research_mode: "fast",
-          analysis_mode: "company",
-          run_kind: "company_research",
-          user_url: "https://example.com/news",
-          user_urls: ["https://example.com/news", "https://example.com/filing"],
-        },
-      },
-    });
-    vi.mocked(resolveSession).mockResolvedValue({
-      ok: true,
-      session: {
-        id: "11111111-1111-4111-8111-111111111111",
-        userId: "user-1",
-        scopeType: "company",
-        defaultTickers: ["AAPL"],
-        defaultDocumentTypes: [],
-      },
-    });
-
-    const response = await POST(request());
-
-    expect(response.status).toBe(200);
-    expect(buildUserUrlNewsEventContext).not.toHaveBeenCalled();
-    expect(buildUserUrlsNewsEventContext).toHaveBeenCalledWith({
-      urls: ["https://example.com/news", "https://example.com/filing"],
-      ticker: "AAPL",
-      userQuestion: "이 URL들이 AAPL에 어떤 의미인지 봐줘",
-    });
-    expect(enqueueAgentRun).toHaveBeenCalledWith(
-      expect.objectContaining({
-        analysisMode: "company",
-        runKind: "company_research",
-        routingMode: "preserve",
-        selectedNewsEventContext: expect.objectContaining({
-          source_kind: "user_provided_urls",
-        }),
-      }),
-    );
-    expect(recordAnalyticsEventFromRequest).toHaveBeenCalledWith(
-      expect.any(NextRequest),
-      expect.objectContaining({
-        properties: expect.objectContaining({
-          has_user_url: true,
-          user_url_count: 2,
-        }),
-      }),
-    );
-  });
-
-  it("allows user URLs for idea generation without a ticker", async () => {
-    vi.mocked(getReadyAgentWorker).mockResolvedValue({
-      ok: true,
-      worker: { worker_id: "mac-worker-jwc-1" } as never,
-      mcpHealth: readyMcpHealth,
-    });
-    vi.mocked(validateRequest).mockResolvedValue({
-      ok: true,
-      data: {
-        userId: "user-1",
-        userEmail: "user@example.test",
-        body: {
-          content: "이 URL을 바탕으로 관련 종목을 발굴해줘.",
-          request_id: "550e8400-e29b-41d4-a716-446655440001",
-          session_id: "11111111-1111-4111-8111-111111111111",
-          research_mode: "deep",
-          analysis_mode: "company",
-          run_kind: "idea_generation",
-          user_url: "https://example.com/angle",
-        },
-      },
-    });
-
-    const response = await POST(request());
-
-    expect(response.status).toBe(200);
-    expect(buildIdeaGenerationUserUrlContext).toHaveBeenCalledWith({
-      urls: ["https://example.com/angle"],
-      userQuestion: "이 URL을 바탕으로 관련 종목을 발굴해줘.",
-    });
-    expect(buildUserUrlNewsEventContext).not.toHaveBeenCalled();
-    expect(buildUserUrlsNewsEventContext).not.toHaveBeenCalled();
-    expect(enqueueAgentRun).toHaveBeenCalledWith(
-      expect.objectContaining({
-        analysisMode: "company",
-        runKind: "idea_generation",
-        routingMode: "preserve",
-        selectedNewsEventContext: expect.objectContaining({
-          version: "idea-generation-user-url-context/v1",
-        }),
-      }),
-    );
-  });
-
-  it("queues ordinary company questions for worker-side auto routing", async () => {
-    vi.mocked(getReadyAgentWorker).mockResolvedValue({
-      ok: true,
-      worker: { worker_id: "mac-worker-jwc-1" } as never,
-      mcpHealth: readyMcpHealth,
-    });
-    vi.mocked(validateRequest).mockResolvedValue({
-      ok: true,
-      data: {
-        userId: "user-1",
-        userEmail: "user@example.test",
-        body: {
-          content: "GOOGL 주가가 왜 6% 빠졌어?",
-          request_id: "550e8400-e29b-41d4-a716-446655440001",
-          session_id: "11111111-1111-4111-8111-111111111111",
-          research_mode: "standard",
-          analysis_mode: "company",
-          run_kind: "company_research",
-        },
-      },
-    });
-    vi.mocked(resolveSession).mockResolvedValue({
-      ok: true,
-      session: {
-        id: "11111111-1111-4111-8111-111111111111",
-        userId: "user-1",
-        scopeType: "global",
-        defaultTickers: [],
-        defaultDocumentTypes: [],
-      },
-    });
-    const response = await POST(request());
-
-    expect(response.status).toBe(200);
-    expect(enqueueAgentRun).toHaveBeenCalledWith(
-      expect.objectContaining({
-        analysisMode: "company",
-        runKind: "company_research",
-        routingMode: "auto",
-        executorType: "claude_agent",
-        selectedNewsEventContext: null,
-      }),
-    );
-    expect(recordAnalyticsEventFromRequest).toHaveBeenCalledWith(
-      expect.any(NextRequest),
-      expect.objectContaining({
-        properties: expect.objectContaining({
-          analysis_mode: "company",
-          run_kind: "company_research",
+          run_kind: "wide_research",
           routing_mode: "auto",
+          scope_type: "global",
         }),
       }),
     );
   });
 
-  it("uses one batch catalog lookup before creating a new company session", async () => {
-    vi.mocked(getReadyAgentWorker).mockResolvedValue({
-      ok: true,
-      worker: { worker_id: "mac-worker-jwc-1" } as never,
-      mcpHealth: readyMcpHealth,
-    });
-    vi.mocked(validateRequest).mockResolvedValue({
-      ok: true,
-      data: {
-        userId: "user-1",
-        userEmail: "user@example.test",
-        body: {
-          content: "두 회사를 비교해줘",
-          request_id: "550e8400-e29b-41d4-a716-446655440001",
-          scope_type: "company",
-          default_tickers: ["AAPL", "MSFT"],
-          research_mode: "fast",
+  it("keeps a follow-up in the same chat session while creating a new run", async () => {
+    const firstRequestId = REQUEST_ID;
+    const secondRequestId = "550e8400-e29b-41d4-a716-446655440002";
+    const requests = [firstRequestId, secondRequestId];
+    vi.mocked(validateRequest).mockImplementation(async () => {
+      const requestId = requests.shift() ?? secondRequestId;
+      return {
+        ok: true,
+        data: {
+          userId: "user-1",
+          userEmail: "user@example.test",
+          body: { ...body, request_id: requestId } as never,
         },
-      },
+      };
     });
-    vi.mocked(getIndexedCompanies).mockResolvedValue([
-      { ticker: "AAPL", name: "Apple Inc." },
-    ] as Awaited<ReturnType<typeof getIndexedCompanies>>);
+    vi.mocked(fetchHistory)
+      .mockResolvedValueOnce({ ok: true, result: { userMessageId: "message-1", history: [] } })
+      .mockResolvedValueOnce({ ok: true, result: { userMessageId: "message-2", history: [] } });
+    runtimeEnqueue
+      .mockResolvedValueOnce({ runId: "run-1", assistantMessageId: "assistant-1", queuedAt: "2026-05-27T00:00:00.000Z", outcome: "enqueued" })
+      .mockResolvedValueOnce({ runId: "run-2", assistantMessageId: "assistant-2", queuedAt: "2026-05-27T00:01:00.000Z", outcome: "enqueued" });
+
+    const first = await POST(request());
+    const second = await POST(request());
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(runtimeEnqueue).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      requestId: firstRequestId,
+      sessionId: SESSION_ID,
+      userMessageId: "message-1",
+    }));
+    expect(runtimeEnqueue).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      requestId: secondRequestId,
+      sessionId: SESSION_ID,
+      userMessageId: "message-2",
+    }));
+  });
+
+  it("saves the question and returns a terminal message while admission is closed", async () => {
+    vi.mocked(getResearchAdmissionMode).mockReturnValue("drain");
+
+    const response = await POST(request());
+    const payload = await responseJson(response);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("X-Chat-Session-Id")).toBe(SESSION_ID);
+    expect(payload.content).toContain("전환 중입니다");
+    expect(fetchHistory).toHaveBeenCalledWith(
+      SESSION_ID,
+      "Apple 알려줘",
+      REQUEST_ID,
+      {},
+      { loadHistory: false },
+    );
+    expect(runtimeEnqueue).not.toHaveBeenCalled();
+    expect(reserveBudgetStep).not.toHaveBeenCalled();
+  });
+
+  it("saves the question without reserving a credit when the local Rust daemon is unavailable", async () => {
+    vi.mocked(getReadyRustAgentDaemon).mockResolvedValue({
+      ok: false,
+      reason: "daemon_unavailable",
+      message: "Local Rust research daemon is unavailable",
+    });
+
+    const response = await POST(request());
+    const payload = await responseJson(response);
+
+    expect(response.status).toBe(200);
+    expect(payload.content).toContain("준비 중");
+    expect(fetchHistory).toHaveBeenCalledWith(
+      SESSION_ID,
+      "Apple 알려줘",
+      REQUEST_ID,
+      {},
+      { loadHistory: false },
+    );
+    expect(reserveBudgetStep).not.toHaveBeenCalled();
+    expect(runtimeEnqueue).not.toHaveBeenCalled();
+  });
+
+  it("returns a terminal same-session response when the pinned runtime cannot enqueue", async () => {
+    runtimeEnqueue.mockRejectedValue(new RustAgentRuntimeError("agent_v1_release_pin_missing"));
+
+    const response = await POST(request());
+    const payload = await responseJson(response);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("X-Chat-Session-Id")).toBe(SESSION_ID);
+    expect(payload.content).toContain("리서치 엔진이 잠시 준비되지 않았습니다");
+    expect(releaseExecutionBudget).toHaveBeenCalledWith(
+      "user-1",
+      REQUEST_ID,
+      null,
+      "agent_v1_release_pin_missing",
+    );
+    expect(releaseAnalysisCreditsShadow).toHaveBeenCalledWith(
+      "user-1",
+      REQUEST_ID,
+      null,
+      "agent_v1_release_pin_missing",
+    );
+  });
+
+  it("reattaches an idempotent request to an existing run before reserving work", async () => {
+    vi.mocked(getSupabaseAdmin).mockReturnValue(
+      createAdmin({
+        existingRuns: [{ id: "existing-run-1", session_id: SESSION_ID }],
+      }).admin as never,
+    );
 
     const response = await POST(request());
 
-    expect(response.status).toBe(400);
-    expect(await json(response)).toMatchObject({
-      error: {
-        code: "validation_error",
-        message: "현재 온톨로지 인덱스에 없는 회사입니다: MSFT",
-      },
-      request_id: "550e8400-e29b-41d4-a716-446655440001",
-    });
-    expect(getIndexedCompanies).toHaveBeenCalledTimes(1);
-    expect(getIndexedCompanies).toHaveBeenCalledWith(["AAPL", "MSFT"]);
+    expect(response.status).toBe(200);
+    expect(streamAgentRunEventsResponse).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: SESSION_ID,
+      runId: "existing-run-1",
+      requestId: REQUEST_ID,
+    }));
+    expect(checkChatRunRateLimit).not.toHaveBeenCalled();
     expect(reserveBudgetStep).not.toHaveBeenCalled();
-    expect(releaseExecutionBudget).not.toHaveBeenCalled();
-    expect(resolveSession).not.toHaveBeenCalled();
-    expect(fetchHistory).not.toHaveBeenCalled();
-    expect(enqueueAgentRun).not.toHaveBeenCalled();
+    expect(runtimeEnqueue).not.toHaveBeenCalled();
   });
 
-  it("does not spend the session rate-limit bucket before session ownership is verified", async () => {
-    vi.mocked(getReadyAgentWorker).mockResolvedValue({
-      ok: true,
-      worker: { worker_id: "mac-worker-jwc-1" } as never,
-      mcpHealth: readyMcpHealth,
-    });
+  it("checks user/IP rate limits before session ownership and does not leak work on denial", async () => {
     vi.mocked(resolveSession).mockResolvedValue({
       ok: false,
       response: Response.json(
-        {
-          error: {
-            code: "forbidden",
-            message: "세션에 접근할 수 없습니다.",
-          },
-          request_id: "550e8400-e29b-41d4-a716-446655440001",
-        },
+        { error: { code: "forbidden", message: "세션에 접근할 수 없습니다." } },
         { status: 403 },
       ),
     });
@@ -843,161 +470,47 @@ describe("POST /api/chat/run worker admission", () => {
 
     expect(response.status).toBe(403);
     expect(checkChatRunRateLimit).toHaveBeenCalledOnce();
-    expect(checkChatRunRateLimit).toHaveBeenCalledWith({
-      userId: "user-1",
-      requestId: "550e8400-e29b-41d4-a716-446655440001",
-      ip: "127.0.0.1",
-      scope: "user_ip",
-    });
     expect(reserveBudgetStep).not.toHaveBeenCalled();
-    expect(releaseExecutionBudget).not.toHaveBeenCalled();
     expect(fetchHistory).not.toHaveBeenCalled();
-    expect(enqueueAgentRun).not.toHaveBeenCalled();
+    expect(runtimeEnqueue).not.toHaveBeenCalled();
   });
 
-  it("reattaches duplicate requests to an existing run before rate limit or budget work", async () => {
-    const fake = createAdmin({
-      existingRuns: [
-        {
-          id: "existing-run-1",
-          session_id: "11111111-1111-4111-8111-111111111111",
-        },
-      ],
+  it("rejects unsupported URL/attachment work without sending it to the Rust lane", async () => {
+    body = { ...body, user_url: "https://example.com" } as TestBody & { user_url: string };
+    vi.mocked(validateRequest).mockResolvedValue({
+      ok: true,
+      data: { userId: "user-1", userEmail: "user@example.test", body: { ...body } as never },
     });
-    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin as never);
 
     const response = await POST(request());
 
-    expect(response.status).toBe(200);
-    expect(response.headers.get("X-Chat-Session-Id")).toBe(
-      "11111111-1111-4111-8111-111111111111",
-    );
-    expect(checkChatRunRateLimit).not.toHaveBeenCalled();
-    expect(getActiveOntologyCatalogRelease).not.toHaveBeenCalled();
+    expect(response.status).toBe(400);
+    expect((await responseJson(response)).error).toMatchObject({ code: "validation_error" });
+    expect(runtimeEnqueue).not.toHaveBeenCalled();
+  });
+
+  it("validates a new company session's tickers before creating the session", async () => {
+    body = {
+      ...body,
+      session_id: undefined,
+      scope_type: "company",
+      default_tickers: ["AAPL", "MSFT"],
+    };
+    vi.mocked(validateRequest).mockResolvedValue({
+      ok: true,
+      data: { userId: "user-1", userEmail: "user@example.test", body: { ...body } as never },
+    });
+    vi.mocked(getIndexedCompanies).mockResolvedValue([
+      { ticker: "AAPL", name: "Apple Inc." },
+    ] as Awaited<ReturnType<typeof getIndexedCompanies>>);
+
+    const response = await POST(request());
+    const payload = await responseJson(response);
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toMatchObject({ code: "validation_error" });
+    expect(getIndexedCompanies).toHaveBeenCalledWith(["AAPL", "MSFT"]);
     expect(reserveBudgetStep).not.toHaveBeenCalled();
-    expect(resolveSession).not.toHaveBeenCalled();
-    expect(fetchHistory).not.toHaveBeenCalled();
-    expect(enqueueAgentRun).not.toHaveBeenCalled();
-    expect(streamAgentRunEventsResponse).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: "user-1",
-        sessionId: "11111111-1111-4111-8111-111111111111",
-        runId: "existing-run-1",
-        requestId: "550e8400-e29b-41d4-a716-446655440001",
-      }),
-    );
-  });
-
-  it("reattaches duplicate requests that appear after the user message is saved", async () => {
-    const fake = createAdmin({
-      existingRuns: [
-        null,
-        {
-          id: "existing-run-after-message",
-          session_id: "11111111-1111-4111-8111-111111111111",
-        },
-      ],
-    });
-    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin as never);
-
-    const response = await POST(request());
-
-    expect(response.status).toBe(200);
-    expect(resolveSession).toHaveBeenCalledOnce();
-    expect(fetchHistory).toHaveBeenCalledOnce();
-    expect(recordAnalyticsEventFromRequest).not.toHaveBeenCalled();
-    expect(enqueueAgentRun).not.toHaveBeenCalled();
-    expect(releaseExecutionBudget).not.toHaveBeenCalled();
-    expect(fake.deleted).toEqual([]);
-    expect(streamAgentRunEventsResponse).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: "user-1",
-        sessionId: "11111111-1111-4111-8111-111111111111",
-        runId: "existing-run-after-message",
-        requestId: "550e8400-e29b-41d4-a716-446655440001",
-      }),
-    );
-  });
-
-  it("reattaches duplicate requests reported by enqueue without releasing budget or deleting the user message", async () => {
-    const fake = createAdmin({ existingRuns: [null, null] });
-    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin as never);
-    vi.mocked(enqueueAgentRun).mockResolvedValue({
-      ok: false,
-      reason: "duplicate_request",
-      runId: "enqueue-duplicate-run",
-    });
-
-    const response = await POST(request());
-
-    expect(response.status).toBe(200);
-    expect(releaseExecutionBudget).not.toHaveBeenCalled();
-    expect(fake.deleted).toEqual([]);
-    expect(streamAgentRunEventsResponse).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: "user-1",
-        sessionId: "11111111-1111-4111-8111-111111111111",
-        runId: "enqueue-duplicate-run",
-        requestId: "550e8400-e29b-41d4-a716-446655440001",
-      }),
-    );
-  });
-
-  it("releases budget and deletes the created user message when enqueue fails", async () => {
-    const fake = createAdmin({ existingRuns: [null, null] });
-    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin as never);
-    vi.mocked(enqueueAgentRun).mockResolvedValue({
-      ok: false,
-      reason: "internal_error",
-    });
-
-    const response = await POST(request());
-
-    expect(response.status).toBe(500);
-    expect(await json(response)).toMatchObject({
-      error: {
-        code: "internal_error",
-        message: "분석 작업을 대기열에 넣지 못했습니다.",
-      },
-      request_id: "550e8400-e29b-41d4-a716-446655440001",
-    });
-    expect(releaseExecutionBudget).toHaveBeenCalledWith(
-      "user-1",
-      "550e8400-e29b-41d4-a716-446655440001",
-      null,
-      "internal_error",
-    );
-    expect(fake.deleted).toEqual([
-      { table: "messages", key: "id", value: "user-message-1" },
-    ]);
-  });
-
-  it("returns a conflict and cleans up when another run is already active", async () => {
-    const fake = createAdmin({ existingRuns: [null, null] });
-    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin as never);
-    vi.mocked(enqueueAgentRun).mockResolvedValue({
-      ok: false,
-      reason: "active_run_exists",
-    });
-
-    const response = await POST(request());
-
-    expect(response.status).toBe(409);
-    expect(await json(response)).toMatchObject({
-      error: {
-        code: "active_run_exists",
-        message: "이미 응답을 생성 중입니다.",
-      },
-      request_id: "550e8400-e29b-41d4-a716-446655440001",
-    });
-    expect(releaseExecutionBudget).toHaveBeenCalledWith(
-      "user-1",
-      "550e8400-e29b-41d4-a716-446655440001",
-      null,
-      "active_run_exists",
-    );
-    expect(fake.deleted).toEqual([
-      { table: "messages", key: "id", value: "user-message-1" },
-    ]);
+    expect(runtimeEnqueue).not.toHaveBeenCalled();
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   finalizeRunResponseContext,
   isCurrentRunResponseContext,
+  shouldSyncSessionAfterDone,
 } from "./useChat";
 
 describe("useChat run response context", () => {
@@ -25,6 +26,12 @@ describe("useChat run response context", () => {
         activeSessionId: "session-a",
       }),
     ).toBe(false);
+  });
+
+  it("reloads the durable answer when a terminal event has no inline content", () => {
+    expect(shouldSyncSessionAfterDone(undefined)).toBe(true);
+    expect(shouldSyncSessionAfterDone("")).toBe(true);
+    expect(shouldSyncSessionAfterDone("persisted answer")).toBe(false);
   });
 
   it("does not let stale cleanup clear the new session transport", () => {

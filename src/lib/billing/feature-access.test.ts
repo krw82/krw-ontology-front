@@ -37,7 +37,15 @@ describe("temporary plan feature split", () => {
         "recent_chats",
         "institutional_holdings",
         "stock_discovery",
-        "research_notebook",
+        "wide_research",
+      ],
+      lite: [
+        "company_search",
+        "guru_advisor",
+        "recent_chats",
+        "institutional_holdings",
+        "stock_discovery",
+        "wide_research",
       ],
       standard: [
         "company_search",
@@ -46,7 +54,6 @@ describe("temporary plan feature split", () => {
         "institutional_holdings",
         "stock_discovery",
         "wide_research",
-        "research_notebook",
       ],
       pro: menuFeatures,
       beta: menuFeatures,
@@ -63,7 +70,7 @@ describe("temporary plan feature split", () => {
   });
 
   it("reopens all menu features when the temporary mode is off", () => {
-    for (const planKey of ["free", "standard", "pro"] as EntitlementPlanKey[]) {
+    for (const planKey of ["free", "lite", "standard", "pro"] as EntitlementPlanKey[]) {
       for (const featureKey of menuFeatures) {
         expect(isPlanFeatureEnabled(planKey, featureKey, "off")).toBe(true);
       }

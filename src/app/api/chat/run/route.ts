@@ -23,6 +23,7 @@ import {
   RustAgentRuntimeError,
   type RustAgentEnqueueResult,
 } from "@/lib/agent-v1/runtime";
+import { getReadyRustAgentDaemon } from "@/lib/agent/daemon-heartbeat";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
 import {
   attachAnalysisCreditRunShadow,
@@ -49,6 +50,7 @@ import {
   assessChatPromptSafety,
   blockedChatSafetyMessage,
 } from "@/lib/security/chat-safety";
+import { getResearchAdmissionMode } from "@/lib/agent-v1/readiness";
 import type { ChatRunRequest, ErrorCode, RunKind } from "@/types/api-contracts";
 
 function errorResponse(
@@ -190,15 +192,26 @@ export async function POST(request: NextRequest) {
   if (!sessionRateLimitResult.ok) return sessionRateLimitResult.response;
 
   const effectiveAnalysisMode = normalizeAnalysisMode(body.analysis_mode);
-  const effectiveRunKind = normalizeRunKind(
+  const requestedRunKind = normalizeRunKind(
     body.run_kind ?? defaultRunKindForAnalysisMode(effectiveAnalysisMode),
   );
+  // A global chat with no ticker is a research question over the covered
+  // universe. Keep idea_generation as the explicit candidate-screening lane,
+  // while ordinary tickerless questions use the wide-research workflow.
+  const effectiveRunKind: RunKind =
+    requestedRunKind === "company_research" &&
+    session.scopeType === "global" &&
+    session.defaultTickers.length === 0
+      ? "wide_research"
+      : requestedRunKind;
   const guruLensKey =
     effectiveRunKind === "guru_advisor"
       ? normalizeGuruLensKey(body.guru_lens)
       : null;
   const routingMode: "auto" | "preserve" =
-    effectiveRunKind === "company_research" ? "auto" : "preserve";
+    effectiveRunKind === "company_research" || effectiveRunKind === "wide_research"
+      ? "auto"
+      : "preserve";
 
   if (!featureChecked) {
     const featureResponse = await enforceChatFeatureAccess({
@@ -235,7 +248,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (
-    !["company_research", "scenario_sensitivity", "guru_advisor", "idea_generation"].includes(
+    !["company_research", "wide_research", "scenario_sensitivity", "guru_advisor", "idea_generation"].includes(
       effectiveRunKind,
     )
   ) {
@@ -247,7 +260,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (effectiveRunKind !== "idea_generation" && session.defaultTickers.length === 0) {
+  if (!['idea_generation', 'wide_research'].includes(effectiveRunKind) && session.defaultTickers.length === 0) {
     return errorResponse(
       400,
       "validation_error",
@@ -298,6 +311,61 @@ export async function POST(request: NextRequest) {
         sessionId: session.id,
         requestId: request_id,
         content: blockedChatSafetyMessage(responseLocale),
+      }),
+      session.id,
+    );
+  }
+
+  // Provider cutovers use a bounded drain/closed window. Save the question
+  // and a terminal assistant message without reserving credits or creating a
+  // Rust run, so the browser never remains pending while the daemon restarts.
+  if (getResearchAdmissionMode() !== "open") {
+    const historyResult = await fetchHistory(
+      session.id,
+      content,
+      request_id,
+      userMessageMetadata,
+      { loadHistory: false },
+    );
+    if (!historyResult.ok) return historyResult.response;
+    return withSessionHeader(
+      await createImmediateAssistantResponse({
+        sessionId: session.id,
+        requestId: request_id,
+        content: "리서치 엔진을 안전하게 전환 중입니다. 질문은 저장했으며 잠시 후 다시 시도해 주세요.",
+      }),
+      session.id,
+    );
+  }
+
+  // The Rust process lives on the Mac, not on the GCP web host. Before
+  // reserving a credit or enqueueing durable work, require its own fresh,
+  // release-bound database heartbeat. This prevents a sleeping/offline Mac
+  // from leaving a customer with a run that can never start. The retired
+  // Claude/plugin worker is not consulted; in development the guard is a
+  // deliberate no-op unless explicitly enabled.
+  let rustDaemonReady = false;
+  try {
+    rustDaemonReady = (await getReadyRustAgentDaemon()).ok;
+  } catch {
+    // The readiness lookup is intentionally fail-closed. A transient shared
+    // DB failure must not create a durable run that no local daemon can claim.
+    rustDaemonReady = false;
+  }
+  if (!rustDaemonReady) {
+    const historyResult = await fetchHistory(
+      session.id,
+      content,
+      request_id,
+      userMessageMetadata,
+      { loadHistory: false },
+    );
+    if (!historyResult.ok) return historyResult.response;
+    return withSessionHeader(
+      await createImmediateAssistantResponse({
+        sessionId: session.id,
+        requestId: request_id,
+        content: "리서치 엔진을 안전하게 준비 중입니다. 질문은 저장했으며 잠시 후 같은 채팅방에서 다시 시도해 주세요.",
       }),
       session.id,
     );
@@ -404,7 +472,7 @@ export async function POST(request: NextRequest) {
   // only streams persisted run events; the Rust daemon owns research work.
   const runId = randomUUID();
   const rustRunKind = toRustRunKind(effectiveRunKind, effectiveGuruLensKey);
-  const rustContext = effectiveRunKind === "idea_generation"
+  const rustContext = effectiveRunKind === "idea_generation" || effectiveRunKind === "wide_research"
     ? { kind: "covered_universe" as const, universe: "covered" as const }
     : { kind: "company_ticker_set" as const, tickers: session.defaultTickers };
   let enqueueResult: RustAgentEnqueueResult;
@@ -417,7 +485,10 @@ export async function POST(request: NextRequest) {
       sessionId: session.id,
       userMessageId: historyResult.result.userMessageId,
       runKind: rustRunKind,
-      locale: responseLocale,
+      // The web app intentionally uses compact UI locales (`ko` / `en`),
+      // while the immutable Rust release manifest routes by BCP-47 locales.
+      // Keep the UI contract untouched and adapt only at this boundary.
+      locale: toRustResponseLocale(responseLocale),
       question: content,
       context: rustContext,
     });
@@ -432,13 +503,21 @@ export async function POST(request: NextRequest) {
       }), session.id);
     }
     const reason = error instanceof RustAgentRuntimeError ? error.code : "agent_v1_enqueue_failed";
+    // Keep a bounded, non-sensitive diagnostic visible in the dev server log.
+    // Some Next log serializers drop object fields, which otherwise hides the
+    // actual failure class while keeping request/session/question data out.
+    const errorName = error instanceof Error ? error.name : typeof error;
+    const errorCode = readAgentRuntimeErrorCode(error);
+    console.warn(
+      `[chat/run] agent_v1 enqueue failed: ${reason}; class=${errorName}; cause_code=${errorCode ?? "none"}`,
+    );
     await releaseExecutionBudget(userId, request_id, null, reason);
     await releaseAnalysisCreditsShadow(userId, request_id, null, reason);
     return withSessionHeader(
       await createImmediateAssistantResponse({
         sessionId: session.id,
         requestId: request_id,
-        content: "리서치 엔진이 잠시 준비되지 않았습니다. 질문은 저장했으며, 새 채팅방에서 다시 시도해 주세요.",
+        content: "리서치 엔진이 잠시 준비되지 않았습니다. 질문은 저장했으며, 잠시 후 같은 채팅방에서 다시 시도해 주세요.",
       }),
       session.id,
     );
@@ -454,10 +533,28 @@ export async function POST(request: NextRequest) {
   }), session.id);
 }
 
+function readAgentRuntimeErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== "object") return null;
+  const direct = Reflect.get(error, "code");
+  if (typeof direct === "string" && /^[A-Za-z0-9_:-]{1,128}$/.test(direct)) {
+    return direct;
+  }
+  const cause = Reflect.get(error, "cause");
+  if (!cause || typeof cause !== "object") return null;
+  const nested = Reflect.get(cause, "code");
+  return typeof nested === "string" && /^[A-Za-z0-9_:-]{1,128}$/.test(nested)
+    ? nested
+    : null;
+}
+
 function toRustRunKind(runKind: RunKind, guruLens: string | null): string {
   if (runKind !== "guru_advisor") return runKind;
   const lens = guruLens && guruLens !== "auto" ? guruLens : "buffett";
   return `guru_${lens}`;
+}
+
+function toRustResponseLocale(locale: Locale): "ko-KR" | "en-US" {
+  return locale === "en" ? "en-US" : "ko-KR";
 }
 
 function withSessionHeader(response: Response, sessionId: string): Response {

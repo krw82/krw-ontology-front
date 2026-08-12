@@ -680,9 +680,12 @@ body {
   transform: scale(0.985);
 }
 
-.pulse-refresh-turn,
-.motion-progress-turn {
+.pulse-refresh-turn {
   animation: motion-refresh-turn 460ms var(--ease-out-expo) both;
+}
+
+.motion-progress-turn {
+  animation: motion-progress-spin 900ms linear infinite;
 }
 
 .notebook-refresh-settled {

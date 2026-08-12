@@ -3,12 +3,18 @@ import { filingEventTagLabel } from "@/lib/filing-notifications/classification";
 
 export const FILING_FORM_TYPES = ["8-K", "8-K/A", "6-K", "6-K/A", "4", "4/A"] as const;
 
-export type FilingNotificationKind = "filing_received" | "analysis_ready" | "filing_digest";
+export type FilingNotificationKind =
+  | "filing_received"
+  | "analysis_ready"
+  | "filing_digest"
+  | "market_issue_received"
+  | "market_issue_digest";
 
 export interface FilingPushPayload {
   schemaVersion: 1;
   notificationId: string;
-  filingEventId: string;
+  filingEventId?: string;
+  marketIssueId?: string;
   kind: FilingNotificationKind;
   title: string;
   body: string;

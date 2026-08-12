@@ -97,12 +97,18 @@ function upgradeCopy(
     };
   }
 
+  const nextPlanLabel = planKey === "lite" ? "Standard" : "Lite";
+  const nextPlanMessage =
+    planKey === "lite"
+      ? "Standard로 업그레이드하면 더 넉넉한 주간 분석량을 사용할 수 있습니다."
+      : "Lite로 업그레이드하면 더 넉넉한 주간 분석량을 사용할 수 있습니다.";
+
   if (percentUsed >= 100) {
     return {
       enabled: true,
       title: `${usageLabel} 체험 사용량을 모두 사용했습니다.`,
-      message: "Standard로 업그레이드하면 더 넉넉한 주간 분석량을 사용할 수 있습니다.",
-      label: "Standard 보기",
+      message: nextPlanMessage,
+      label: `${nextPlanLabel} 보기`,
     };
   }
 
@@ -110,7 +116,7 @@ function upgradeCopy(
     return {
       enabled: true,
       title: `${usageLabel} 체험 사용량이 거의 찼습니다.`,
-      message: "Standard로 업그레이드하면 더 넉넉한 주간 분석량을 사용할 수 있습니다.",
+      message: nextPlanMessage,
       label: "플랜 확인",
     };
   }

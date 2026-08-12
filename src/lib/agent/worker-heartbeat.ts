@@ -20,7 +20,6 @@ const WORKER_HEARTBEAT_TTL_SECONDS = readIntEnv(
   120,
   { min: 5 },
 );
-
 export type AgentWorkerStatus = AgentWorkerHeartbeatRow["status"];
 
 export type WorkerAdmissionResult =
@@ -151,24 +150,19 @@ export async function writeCurrentWorkerHeartbeat(
   workerId: string,
   status: AgentWorkerStatus,
 ): Promise<void> {
+  let mcpHealth: McpHealthResult;
   try {
-    const mcpHealth = await checkMcpReady();
-    await heartbeatAgentWorker({
-      workerId,
-      status: isReadyMcpHealth(mcpHealth) ? status : "unhealthy",
-      mcpHealth,
-      error: isReadyMcpHealth(mcpHealth)
-        ? null
-        : readinessErrorMessage(mcpHealth),
-    });
+    mcpHealth = await checkMcpReady();
   } catch (error) {
-    await heartbeatAgentWorker({
-      workerId,
-      status: "unhealthy",
-      mcpHealth: fallbackMcpHealth(error),
-      error: error instanceof Error ? error.message : String(error),
-    });
+    mcpHealth = fallbackMcpHealth(error);
   }
+  const mcpReady = isReadyMcpHealth(mcpHealth);
+  await heartbeatAgentWorker({
+    workerId,
+    status: mcpReady ? status : "unhealthy",
+    mcpHealth,
+    error: !mcpReady ? readinessErrorMessage(mcpHealth) : null,
+  });
 }
 
 export async function markAgentWorkerStopped(workerId: string): Promise<void> {

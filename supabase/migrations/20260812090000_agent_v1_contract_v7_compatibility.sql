@@ -1,7 +1,8 @@
 -- Forward compatibility for the current krw-agent host contract.
 -- The original product projection migration predates immutable claim v7 and
--- only accepted DeepSeek. New code calls the v7 wrapper below; historical
--- functions remain untouched so the migration is safe on an already-live DB.
+-- only admitted one provider model. New code calls the provider-neutral v7
+-- wrapper below; historical functions remain untouched so the migration is
+-- safe on an already-live DB.
 
 do $$
 begin
@@ -92,7 +93,7 @@ begin
   end if;
   if v_product->>'run_kind' not in (
     'company_research', 'company_research_en', 'earnings_deep_dive',
-    'scenario_sensitivity', 'idea_generation', 'guru_ackman', 'guru_buffett',
+    'wide_research', 'scenario_sensitivity', 'idea_generation', 'guru_ackman', 'guru_buffett',
     'guru_flatt', 'guru_marks', 'guru_terry_smith'
   ) then
     raise exception 'unsupported v7 run_kind';

@@ -1,9 +1,13 @@
 import { timingSafeEqual } from "crypto";
 import { APP_VERSION } from "@/lib/app-version";
-import { getReadyAgentWorker } from "@/lib/agent/worker-heartbeat";
+import {
+  getReadyAgentWorker,
+} from "@/lib/agent/worker-heartbeat";
+import { getReadyRustAgentDaemon } from "@/lib/agent/daemon-heartbeat";
 import { hasTrustedClientIpConfiguration } from "@/lib/http/client-ip";
 import { getActiveOntologyCatalogRelease } from "@/lib/ontology/catalog";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { checkAgentV1Readiness, type AgentV1Readiness } from "@/lib/agent-v1/readiness";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -190,6 +194,101 @@ async function checkWorkerMcp(expectedReleaseId?: string): Promise<CheckResult> 
   }
 }
 
+async function checkRustAgentDaemon(): Promise<CheckResult> {
+  try {
+    const ready = await getReadyRustAgentDaemon();
+    if (!ready.ok) {
+      return { ok: false, error: ready.message };
+    }
+    return {
+      ok: true,
+      required: ready.required,
+      daemon_id: ready.daemon?.daemon_id ?? null,
+      provider: ready.daemon?.provider ?? null,
+      descriptor_artifact_hash: ready.daemon?.descriptor_artifact_hash ?? null,
+      release_set_hash: ready.daemon?.release_set_hash ?? null,
+      runtime_version: ready.daemon?.runtime_version ?? null,
+      last_seen_at: ready.daemon?.last_seen_at ?? null,
+      heartbeat_expires_at: ready.daemon?.heartbeat_expires_at ?? null,
+    };
+  } catch {
+    // This endpoint is operator-only, but it must still not expose a local
+    // filesystem path or database/provider error from a failed heartbeat read.
+    return { ok: false, error: "Local Rust research daemon is unavailable" };
+  }
+}
+
+/**
+ * Agent V1 settles provider cost from the exact model recorded on the run.
+ * Do not let a production queue open when that model has no verified pricing
+ * snapshot: the answer can still be projected after the policy is repaired,
+ * but silently recording a different provider's price (or zero) is unsafe.
+ */
+async function checkAgentV1ProviderPricing(
+  readiness: AgentV1Readiness,
+): Promise<CheckResult> {
+  const runtimeEnvironment = process.env.KRW_RUNTIME_ENVIRONMENT?.trim().toLowerCase();
+  const required = runtimeEnvironment === "prod"
+    || runtimeEnvironment === "staging"
+    || process.env.NODE_ENV === "production";
+  if (!required) return { ok: true, required: false };
+  if (!readiness.provider || !readiness.model) {
+    return {
+      ok: false,
+      required: true,
+      error: "Agent V1 provider/model is not resolved",
+    };
+  }
+
+  try {
+    const { data, error } = await getSupabaseAdmin()
+      .from("provider_pricing_policies")
+      .select("version, effective_from, effective_to, source_url, verified_at")
+      .eq("provider", readiness.provider)
+      .eq("provider_model", readiness.model)
+      .order("effective_from", { ascending: false })
+      .limit(16);
+    if (error) {
+      return { ok: false, required: true, error: error.message };
+    }
+    const now = Date.now();
+    const current = (data ?? []).find((row) => {
+      const starts = Date.parse(row.effective_from);
+      const ends = row.effective_to ? Date.parse(row.effective_to) : Number.POSITIVE_INFINITY;
+      const verifiedAt = row.verified_at ? Date.parse(row.verified_at) : Number.NaN;
+      const sourceUrl = typeof row.source_url === "string" ? row.source_url : "";
+      return Number.isFinite(starts)
+        && starts <= now
+        && ends > now
+        && Number.isFinite(verifiedAt)
+        && verifiedAt <= now
+        && /^https:\/\//i.test(sourceUrl);
+    });
+    if (!current) {
+      return {
+        ok: false,
+        required: true,
+        provider: readiness.provider,
+        model: readiness.model,
+        error: "No current verified provider pricing policy for the selected model",
+      };
+    }
+    return {
+      ok: true,
+      required: true,
+      provider: readiness.provider,
+      model: readiness.model,
+      pricing_version: current.version,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      required: true,
+      error: error instanceof Error ? error.message : "Provider pricing readiness failed",
+    };
+  }
+}
+
 export async function GET(request: Request) {
   if (!isAuthorized(request)) {
     return Response.json(
@@ -198,20 +297,39 @@ export async function GET(request: Request) {
     );
   }
 
-  const [supabase, catalog, filingWorker] = await Promise.all([
+  const [supabase, catalog, filingWorker, agentV1] = await Promise.all([
     checkSupabase(),
     checkCatalog(),
     checkFilingWorker(),
+    checkAgentV1Readiness(),
   ]);
+  const agentV1Pricing = await checkAgentV1ProviderPricing(agentV1);
   const trustedClientIp = checkTrustedClientIpConfiguration();
-  const mcp =
-    catalog.ok && typeof catalog.release_id === "string"
+  const agentV1Required =
+    process.env.KRW_AGENT_BACKEND_MODE === "rust" ||
+    process.env.KRW_RUNTIME_ENVIRONMENT === "prod";
+  const mcp = agentV1Required
+    ? {
+        ok: true,
+        required: false,
+        owner: "local_rust_agentd",
+      }
+    : catalog.ok && typeof catalog.release_id === "string"
       ? await checkWorkerMcp(catalog.release_id)
       : {
           ok: false,
           error: "Cannot check worker MCP without an active catalog release",
         };
-  const ok = supabase.ok && catalog.ok && mcp.ok && trustedClientIp.ok && filingWorker.ok;
+  const agentV1Daemon = agentV1Required
+    ? await checkRustAgentDaemon()
+    : { ok: true, required: false };
+  const ok =
+    supabase.ok &&
+    catalog.ok &&
+    mcp.ok &&
+    trustedClientIp.ok &&
+    filingWorker.ok &&
+    (!agentV1Required || (agentV1.ok && agentV1Pricing.ok && agentV1Daemon.ok));
 
   return Response.json(
     {
@@ -224,6 +342,9 @@ export async function GET(request: Request) {
         catalog,
         mcp,
         filing_worker: filingWorker,
+        agent_v1: agentV1,
+        agent_v1_pricing: agentV1Pricing,
+        agent_v1_daemon: agentV1Daemon,
         trusted_client_ip: trustedClientIp,
       },
     },

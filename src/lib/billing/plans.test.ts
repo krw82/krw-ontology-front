@@ -13,7 +13,15 @@ describe("billing plans", () => {
     expect(getBillingPlan("free")).toMatchObject({
       budgetPeriod: "weekly",
       monthlyPriceKrw: 0,
-      weeklyAnalysisCreditsRaw: 400000,
+      weeklyAnalysisCreditsRaw: 250000,
+      dailyBudgetUsd: null,
+      perRunReserveUsd: 0,
+      unlimited: false,
+    });
+    expect(getBillingPlan("lite")).toMatchObject({
+      budgetPeriod: "weekly",
+      monthlyPriceKrw: 2900,
+      weeklyAnalysisCreditsRaw: 750000,
       dailyBudgetUsd: null,
       perRunReserveUsd: 0,
       unlimited: false,
@@ -45,6 +53,7 @@ describe("billing plans", () => {
   it("exposes only public upgrade plans in display order", () => {
     expect(listPublicBillingPlans().map((plan) => plan.key)).toEqual([
       "free",
+      "lite",
       "standard",
       "pro",
     ]);
@@ -52,7 +61,7 @@ describe("billing plans", () => {
 
   it("derives user-facing usage labels", () => {
     const free = getBillingPlan("free");
-    expect(getBillingPlanAnalysisCredits(free)).toBe(400);
+    expect(getBillingPlanAnalysisCredits(free)).toBe(250);
     expect(getBillingPlanBaseRunCredits(free)).toBe(0);
     expect(getBillingPlanLimitLabel(free)).toBe("사용량/주");
   });

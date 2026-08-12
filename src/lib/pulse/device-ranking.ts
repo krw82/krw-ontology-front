@@ -26,9 +26,13 @@ const RECENT_NEWS_SELECTION_GENERATIONS = 2;
 const TARGET_REGULAR_REFRESH_REPLACEMENT_COUNT = 3;
 const TARGET_REBASE_REFRESH_REPLACEMENT_COUNT = 5;
 const REGULAR_ANCHOR_REBASE_INTERVAL = 4;
-const MIN_VISIBLE_NEWS = 3;
-const MAX_VISIBLE_NEWS = 4;
+const MIN_VISIBLE_NEWS = 4;
+const MAX_VISIBLE_NEWS = 5;
 const ABUNDANT_NEWS_CANDIDATE_COUNT = 8;
+// The source may retain a wider five-day news reservoir, but Pulse renders a
+// current-events first screen. Never spend one of its news slots on an issue
+// older than two days when non-news work can fill the remaining space.
+const NEWS_FIRST_SCREEN_FRESHNESS_MS = 48 * 60 * 60 * 1_000;
 
 export const PULSE_DEVICE_PROFILE_VERSION = 7;
 
@@ -333,7 +337,7 @@ export function selectDevicePulseSlate(
   const newsCandidates = eligible
     .filter((item) => item.kind === "news")
     .sort((left, right) => compareItems(left, right, profile));
-  const selectedNews = selectNewsItems(newsCandidates, feed.visible_limit, profile);
+  const selectedNews = selectNewsItems(newsCandidates, feed.visible_limit, profile, now);
   const selectedNewsIds = new Set(selectedNews.map((item) => item.id));
   const remainingNews = newsCandidates.filter((item) => !selectedNewsIds.has(item.id));
   const ordered = eligible
@@ -748,10 +752,12 @@ function selectNewsItems(
   candidates: PulseItem[],
   visibleLimit: number,
   profile: PulseDeviceProfile,
+  now: Date,
 ): PulseItem[] {
-  const targetCount = targetNewsCount(candidates.length, visibleLimit);
+  const timelyCandidates = candidates.filter((item) => isTimelyFirstScreenNews(item, now));
+  const targetCount = targetNewsCount(timelyCandidates.length, visibleLimit);
   if (targetCount === 0) return [];
-  const fresh = candidates.filter((item) => !wasNewsSelectedRecently(item, profile));
+  const fresh = timelyCandidates.filter((item) => !wasNewsSelectedRecently(item, profile));
   const selected: PulseItem[] = [];
   const add = (items: PulseItem[], count: number, namespace: string) => {
     const selectedIds = new Set(selected.map((item) => item.id));
@@ -770,7 +776,7 @@ function selectNewsItems(
   add(fresh.filter(isPersonalNews), 1, "news-personal");
   add(fresh, targetCount - selected.length, "news-fresh");
   if (selected.length < targetCount) {
-    const fallback = candidates
+    const fallback = timelyCandidates
       .filter((item) => !selected.some((chosen) => chosen.id === item.id))
       .sort((left, right) => compareByOldestSelection(left, right, profile));
     add(fallback, targetCount - selected.length, "news-cooldown-fallback");
@@ -787,13 +793,23 @@ function targetNewsCount(candidateCount: number, visibleLimit: number): number {
   return Math.min(desired, candidateCount, screenCapacity);
 }
 
+function isTimelyFirstScreenNews(item: PulseItem, now: Date): boolean {
+  const occurredAt = Date.parse(item.occurred_at);
+  if (!Number.isFinite(occurredAt)) return false;
+  const age = now.getTime() - occurredAt;
+  return age >= 0 && age <= NEWS_FIRST_SCREEN_FRESHNESS_MS;
+}
+
 function stablePickWeightedNews(
   candidates: PulseItem[],
   count: number,
   profile: PulseDeviceProfile,
   namespace: string,
 ): PulseItem[] {
-  const available = [...candidates].sort((left, right) => left.id.localeCompare(right.id));
+  // `candidates` already carries the server's utility order, including
+  // freshness. Do not replace it with ID order here: that allowed a 4-day-old
+  // issue to win a first-screen slot over today's higher-ranked news.
+  const available = [...candidates];
   const selected: PulseItem[] = [];
   for (let slot = 0; slot < count && available.length > 0; slot += 1) {
     const picked = stableWeightedChoice(

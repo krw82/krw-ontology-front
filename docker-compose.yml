@@ -84,6 +84,23 @@ services:
       - AGENT_RUN_EVENT_LISTEN_CHANNEL=${AGENT_RUN_EVENT_LISTEN_CHANNEL:-agent_run_event}
       - AGENT_RUN_EVENT_LISTEN_RECONNECT_INTERVAL_MS=${AGENT_RUN_EVENT_LISTEN_RECONNECT_INTERVAL_MS:-5000}
       - AGENT_EVENT_RECONCILE_INTERVAL_MS=${AGENT_EVENT_RECONCILE_INTERVAL_MS:-15000}
+      # The web process accepts research jobs only through the Rust agent
+      # boundary. The release descriptor is mounted read-only so switching
+      # GLM/DeepSeek changes data, not the application image.
+      - KRW_AGENT_BACKEND_MODE=${KRW_AGENT_BACKEND_MODE:-rust}
+      - KRW_AGENT_PROVIDER=${KRW_AGENT_PROVIDER:-deepseek}
+      - KRW_AGENT_ADMISSION_MODE=${KRW_AGENT_ADMISSION_MODE:-closed}
+      - KRW_RUNTIME_ENVIRONMENT=${KRW_RUNTIME_ENVIRONMENT:-prod}
+      - KRW_AGENT_TENANT_ID=${KRW_AGENT_TENANT_ID:-}
+      - KRW_AGENT_RELEASE_DESCRIPTOR_PATH=${KRW_AGENT_RELEASE_DESCRIPTOR_PATH:-/run/krw-agent/public-release.json}
+      - KRW_AGENT_RELEASE_ARTIFACT_HASH=${KRW_AGENT_RELEASE_ARTIFACT_HASH:-}
+      - KRW_AGENT_RELEASE_SET_HASH=${KRW_AGENT_RELEASE_SET_HASH:-}
+      # New Rust runs require the daemon's own release-bound heartbeat from
+      # the shared database. This is off for ordinary local development.
+      - KRW_AGENT_DAEMON_HEARTBEAT_REQUIRED=${KRW_AGENT_DAEMON_HEARTBEAT_REQUIRED:-0}
+      - AGENT_V1_DATABASE_URL=${AGENT_V1_DATABASE_URL:-}
+      - AGENT_V1_DATABASE_CA_PEM=${AGENT_V1_DATABASE_CA_PEM:-}
+      - AGENT_V1_DATABASE_CA_FILE=${AGENT_V1_DATABASE_CA_FILE:-}
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       - FILING_DETECTION_ENABLED=${FILING_DETECTION_ENABLED:-1}
       - CLAUDE_AGENT_CWD=/app/agent-workspace
@@ -120,6 +137,10 @@ services:
       - DOCUMENT_QUEUE_REDIS_URL=${DOCUMENT_QUEUE_REDIS_URL:-redis://redis:6379/0}
     volumes:
       - ${CLAUDE_PROD_CONFIG_DIR:-/srv/claude-prod}:/home/nextjs/.claude-prod
+      # The Rust daemon runs on the local Mac, alongside the existing Claude
+      # plugin worker. GCP receives only this public descriptor file; it never
+      # receives a Rust binary, AgentImage, provider key, or DB credential.
+      - ${KRW_AGENT_PUBLIC_DESCRIPTOR_HOST_PATH:-/opt/krw-agent/public-release.json}:/run/krw-agent/public-release.json:ro
       - document_inbox:/srv/krw-document-inbox
     networks:
       - app-network
@@ -149,6 +170,9 @@ services:
       - ALL
     pids_limit: 128
     environment:
+      - AGENT_V1_DATABASE_URL=${AGENT_V1_DATABASE_URL:-}
+      - AGENT_V1_DATABASE_CA_PEM=${AGENT_V1_DATABASE_CA_PEM:-}
+      - AGENT_V1_DATABASE_CA_FILE=${AGENT_V1_DATABASE_CA_FILE:-}
       - AGENT_V1_OUTBOX_DATABASE_URL=${AGENT_V1_OUTBOX_DATABASE_URL:-}
       - SUPABASE_DB_URL=${SUPABASE_DB_URL:-}
       - SUPABASE_URL=${SUPABASE_URL}
@@ -173,12 +197,12 @@ services:
           "CMD",
           "node",
           "-e",
-          "require('fs').accessSync('.worker/agent-v1-outbox-worker.mjs')",
+          "const fs=require('fs'); try { const value=JSON.parse(fs.readFileSync('/tmp/agent-v1-outbox-health.json','utf8')); const age=Date.now()-Date.parse(value.last_success_at||''); if (value.schema_version!==1 || value.status!=='ready' || !Number.isFinite(age) || age>60000) process.exit(1); } catch { process.exit(1); }",
         ]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 30s
 
   llm-gateway:
     image: krw-ontology-front-web:local

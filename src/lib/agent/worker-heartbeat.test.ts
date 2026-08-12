@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("node:child_process", () => ({
@@ -184,6 +184,11 @@ describe("agent worker heartbeat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("CLAUDE_CODE_EXECUTABLE", "~/.local/bin/claude-krw");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
   it("writes worker heartbeat metadata from local MCP health", async () => {

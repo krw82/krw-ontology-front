@@ -788,6 +788,11 @@ function ChatContent({
               {headerActionTicker ? (
                 <ChatWatchlistHeaderActions
                   ticker={headerActionTicker}
+                  notebookEnabled={
+                    entitlement?.features.find(
+                      (feature) => feature.key === "research_notebook",
+                    )?.enabled ?? false
+                  }
                   showNotebookOnboarding={
                     ALWAYS_SHOW_NOTEBOOK_ONBOARDING_IN_DEV ||
                     hasCompletedAssistantAnswer

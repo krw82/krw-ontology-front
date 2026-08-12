@@ -216,8 +216,7 @@ export function HomePrimaryCtas({
   locale?: Locale;
 }) {
   const companiesHref = localizedPath(locale, "/companies");
-  const label =
-    locale === "ko" ? "공시 근거로 확인하기" : "Check against filings";
+  const label = locale === "ko" ? "리서치 시작" : "Check against filings";
   const useCases =
     locale === "ko"
       ? [

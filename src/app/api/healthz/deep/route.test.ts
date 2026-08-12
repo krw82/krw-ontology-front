@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { getReadyAgentWorker } from "@/lib/agent/worker-heartbeat";
+import { getReadyRustAgentDaemon } from "@/lib/agent/daemon-heartbeat";
 import { APP_VERSION } from "@/lib/app-version";
 import { getActiveOntologyCatalogRelease } from "@/lib/ontology/catalog";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -7,6 +8,10 @@ import { GET } from "./route";
 
 vi.mock("@/lib/agent/worker-heartbeat", () => ({
   getReadyAgentWorker: vi.fn(),
+}));
+
+vi.mock("@/lib/agent/daemon-heartbeat", () => ({
+  getReadyRustAgentDaemon: vi.fn(),
 }));
 
 vi.mock("@/lib/ontology/catalog", () => ({
@@ -159,6 +164,11 @@ function mockMcpOk() {
         manifest_valid: true,
       },
     },
+  });
+  vi.mocked(getReadyRustAgentDaemon).mockResolvedValue({
+    ok: true,
+    required: false,
+    daemon: null,
   });
 }
 

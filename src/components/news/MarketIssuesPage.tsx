@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
 import {
   formatIssueRelativeTime,
   normalizeMarketIssueList,
@@ -11,23 +11,9 @@ import {
   type MarketIssuesStatus,
 } from "@/components/news/news-model";
 
-const SCOPE_COPY: Record<MarketIssueScope, { label: string; description: string }> = {
-  mine: {
-    label: "내 기업",
-    description: "관심종목으로 지정한 기업과 연결된 변화만 모았습니다.",
-  },
-  market: {
-    label: "시장 전체",
-    description: "시장 변화 중 원문을 다시 확인할 수 있는 이슈를 차분히 모았습니다.",
-  },
-};
-
-function getInitialScope(): MarketIssueScope {
-  if (typeof window === "undefined") return "market";
-  return new URLSearchParams(window.location.search).get("scope") === "mine"
-    ? "mine"
-    : "market";
-}
+const MARKET_SCOPE: MarketIssueScope = "market";
+const PULL_REFRESH_TRIGGER = 64;
+const PULL_DISTANCE_MAX = 96;
 
 function mergeIssues(current: readonly MarketIssueCard[], next: readonly MarketIssueCard[]): MarketIssueCard[] {
   const byId = new Map(current.map((issue) => [issue.id, issue]));
@@ -36,15 +22,18 @@ function mergeIssues(current: readonly MarketIssueCard[], next: readonly MarketI
 }
 
 export default function MarketIssuesPage() {
-  const [scope, setScope] = useState<MarketIssueScope>(getInitialScope);
   const [issues, setIssues] = useState<MarketIssueCard[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<MarketIssuesStatus>({ label: null, updatedAt: null });
+  const [pullDistance, setPullDistance] = useState(0);
+  const [pullRefreshing, setPullRefreshing] = useState(false);
   const requestRef = useRef(0);
   const controllerRef = useRef<AbortController | null>(null);
+  const pullStartYRef = useRef<number | null>(null);
+  const pullDistanceRef = useRef(0);
 
   const loadIssues = useCallback(async (targetScope: MarketIssueScope, cursor?: string) => {
     const requestId = requestRef.current + 1;
@@ -100,12 +89,19 @@ export default function MarketIssuesPage() {
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => {
-      if (!cancelled) void loadIssues(scope);
+      if (!cancelled) void loadIssues(MARKET_SCOPE);
     });
     return () => {
       cancelled = true;
     };
-  }, [loadIssues, scope]);
+  }, [loadIssues]);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("scope")) return;
+    url.searchParams.delete("scope");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,22 +115,78 @@ export default function MarketIssuesPage() {
 
   useEffect(() => () => controllerRef.current?.abort(), []);
 
-  const changeScope = (nextScope: MarketIssueScope) => {
-    if (nextScope === scope) return;
-    setScope(nextScope);
-    const url = new URL(window.location.href);
-    if (nextScope === "mine") url.searchParams.delete("scope");
-    else url.searchParams.set("scope", nextScope);
-    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-  };
-
   const retry = () => {
-    void loadIssues(scope);
+    void loadIssues(MARKET_SCOPE);
     void loadStatus();
   };
 
+  const refreshFromPull = useCallback(async () => {
+    if (loading || loadingMore || pullRefreshing) return;
+    setPullRefreshing(true);
+    try {
+      await Promise.all([loadIssues(MARKET_SCOPE), loadStatus()]);
+    } finally {
+      setPullRefreshing(false);
+    }
+  }, [loadIssues, loadStatus, loading, loadingMore, pullRefreshing]);
+
+  const handleTouchStart = useCallback((event: TouchEvent<HTMLElement>) => {
+    if (loading || loadingMore || pullRefreshing || window.scrollY > 0) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest("button,a,input,textarea,select")) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+    pullStartYRef.current = touch.clientY;
+    pullDistanceRef.current = 0;
+  }, [loading, loadingMore, pullRefreshing]);
+
+  const handleTouchMove = useCallback((event: TouchEvent<HTMLElement>) => {
+    const startY = pullStartYRef.current;
+    if (startY === null) return;
+    if (window.scrollY > 0) {
+      pullStartYRef.current = null;
+      pullDistanceRef.current = 0;
+      setPullDistance(0);
+      return;
+    }
+    const touch = event.touches[0];
+    if (!touch) return;
+    const delta = touch.clientY - startY;
+    if (delta <= 0) {
+      pullDistanceRef.current = 0;
+      setPullDistance(0);
+      return;
+    }
+    const distance = Math.min(PULL_DISTANCE_MAX, delta * 0.45);
+    pullDistanceRef.current = distance;
+    setPullDistance(distance);
+  }, []);
+
+  const resetPullGesture = useCallback(() => {
+    pullStartYRef.current = null;
+    pullDistanceRef.current = 0;
+    setPullDistance(0);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    const shouldRefresh = pullDistanceRef.current >= PULL_REFRESH_TRIGGER;
+    resetPullGesture();
+    if (shouldRefresh) void refreshFromPull();
+  }, [refreshFromPull, resetPullGesture]);
+
+  const handleTouchCancel = useCallback(() => {
+    resetPullGesture();
+  }, [resetPullGesture]);
+
   return (
-    <main id="main-content" className="mx-auto w-full max-w-5xl px-base pb-3xl sm:px-xl">
+    <main
+      id="main-content"
+      className="mx-auto w-full max-w-5xl px-base pb-3xl sm:px-xl"
+      onTouchCancel={handleTouchCancel}
+      onTouchEnd={handleTouchEnd}
+      onTouchMove={handleTouchMove}
+      onTouchStart={handleTouchStart}
+    >
       <header className="relative overflow-hidden border-b border-hairline bg-white -mx-base sm:-mx-xl">
         <div className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-primary-fixed/55 blur-3xl" aria-hidden="true" />
         <div className="relative px-base py-base sm:px-xl sm:py-lg">
@@ -144,47 +196,44 @@ export default function MarketIssuesPage() {
       </header>
 
       <section className="mt-xl">
+        <div
+          aria-hidden={pullDistance === 0 && !pullRefreshing}
+          aria-live="polite"
+          className="pointer-events-none flex items-center justify-center gap-xs overflow-hidden text-[12px] font-semibold text-muted transition-[height,opacity] duration-150"
+          role="status"
+          style={{
+            height: pullRefreshing ? 40 : pullDistance,
+            opacity: pullRefreshing || pullDistance > 0 ? 1 : 0,
+          }}
+        >
+          <span className={`material-symbols-outlined text-[16px] ${pullRefreshing ? "animate-spin" : ""}`} aria-hidden="true">
+            {pullRefreshing ? "progress_activity" : pullDistance >= PULL_REFRESH_TRIGGER ? "refresh" : "south"}
+          </span>
+          {pullRefreshing
+            ? "최신 내용 확인 중"
+            : pullDistance >= PULL_REFRESH_TRIGGER
+              ? "놓으면 새로고침"
+              : "당겨서 새로고침"}
+        </div>
         <div className="sticky top-0 z-10 -mx-base border-y border-hairline bg-canvas/95 px-base py-sm backdrop-blur sm:relative sm:top-auto sm:mx-0 sm:border-x-0 sm:px-0">
-          <div className="flex items-center justify-between gap-base">
-            <div className="inline-flex rounded-[14px] border border-hairline bg-white p-1" role="tablist" aria-label="시장 이슈 범위">
-              {(Object.keys(SCOPE_COPY) as MarketIssueScope[]).map((itemScope) => {
-                const active = scope === itemScope;
-                return (
-                  <button
-                    key={itemScope}
-                    id={`market-issues-${itemScope}-tab`}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    aria-controls="market-issues-panel"
-                    onClick={() => changeScope(itemScope)}
-                    className={`min-h-10 rounded-[10px] px-base text-[13px] font-extrabold transition ${
-                      active
-                        ? "bg-ink text-white shadow-sm"
-                        : "text-muted hover:bg-surface-soft hover:text-ink"
-                    }`}
-                  >
-                    {SCOPE_COPY[itemScope].label}
-                  </button>
-                );
-              })}
-            </div>
+          <div className="flex items-center justify-end gap-base">
             <button
               type="button"
               onClick={retry}
-              disabled={loading || loadingMore}
+              aria-busy={loading || loadingMore || pullRefreshing}
+              disabled={loading || loadingMore || pullRefreshing}
               className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-hairline bg-white px-sm text-[12px] font-bold text-body transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <span className={`material-symbols-outlined text-[16px] ${loading ? "animate-spin" : ""}`} aria-hidden="true">refresh</span>
+              <span className={`material-symbols-outlined text-[16px] ${loading || pullRefreshing ? "animate-spin" : ""}`} aria-hidden="true">refresh</span>
               새로고침
             </button>
           </div>
         </div>
 
-        <div id="market-issues-panel" role="tabpanel" aria-labelledby={`market-issues-${scope}-tab`} className="mt-lg">
+        <div id="market-issues-panel" className="mt-lg">
           {loading ? <IssueListSkeleton /> : null}
           {!loading && error && issues.length === 0 ? <IssueLoadError onRetry={retry} /> : null}
-          {!loading && !error && issues.length === 0 ? <MarketIssuesEmpty scope={scope} onMarketScope={() => changeScope("market")} /> : null}
+          {!loading && !error && issues.length === 0 ? <MarketIssuesEmpty /> : null}
           {!loading && issues.length > 0 ? (
             <>
               {error ? (
@@ -200,7 +249,7 @@ export default function MarketIssuesPage() {
                 <div className="mt-xl flex justify-center">
                   <button
                     type="button"
-                    onClick={() => void loadIssues(scope, nextCursor)}
+                    onClick={() => void loadIssues(MARKET_SCOPE, nextCursor)}
                     disabled={loadingMore}
                     className="inline-flex min-h-11 items-center gap-2 rounded-full border border-hairline bg-white px-lg text-[13px] font-bold text-ink transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -235,7 +284,9 @@ function MarketIssueCard({ issue }: { issue: MarketIssueCard }) {
           {issue.title}
         </h3>
         <div className="mt-sm border-l-2 border-[#bcd2fa] pl-sm">
-          <p className="text-[11px] font-extrabold tracking-[0.01em] text-primary">AI가 정리한 한국어 맥락</p>
+          <p className="text-[11px] font-extrabold tracking-[0.01em] text-primary">
+            {issue.localNewsStage === "ai_verified" ? "AI가 검증해 정리한 한국어 맥락" : "한국어 맥락"}
+          </p>
           <p className="mt-1 line-clamp-3 text-[14px] leading-6 text-body">{issue.summary}</p>
         </div>
       </Link>
@@ -298,24 +349,16 @@ function IssueLoadError({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-function MarketIssuesEmpty({ scope, onMarketScope }: { scope: MarketIssueScope; onMarketScope: () => void }) {
-  const mine = scope === "mine";
+function MarketIssuesEmpty() {
   return (
     <div className="rounded-[22px] border border-dashed border-[#cbd7ea] bg-[#fbfcff] px-lg py-2xl text-center">
       <span className="material-symbols-outlined text-[32px] text-primary" aria-hidden="true">travel_explore</span>
       <h3 className="mt-sm text-[18px] font-extrabold tracking-[-0.03em] text-ink">
-        {mine ? "내 기업과 연결된 이슈가 아직 없습니다." : "지금 표시할 시장 이슈가 없습니다."}
+        지금 표시할 시장 이슈가 없습니다.
       </h3>
       <p className="mx-auto mt-2 max-w-[28rem] text-[13px] leading-6 text-body">
-        {mine
-          ? "회사 리서치를 시작하거나 관심 기업을 확인하면, 연결된 시장 변화를 이곳에서 다시 볼 수 있습니다."
-          : "새 이슈가 확인되면 원문과 함께 이 화면에 정리됩니다."}
+        새 이슈가 확인되면 이 화면에 정리됩니다.
       </p>
-      {mine ? (
-        <button type="button" onClick={onMarketScope} className="mt-base min-h-10 rounded-full border border-hairline bg-white px-base text-[13px] font-bold text-primary transition hover:border-primary hover:text-ink">
-          시장 전체 보기
-        </button>
-      ) : null}
     </div>
   );
 }

@@ -212,7 +212,7 @@ export async function POST(request: NextRequest) {
       {
         error: {
           code: "forbidden" as const,
-          message: "와이드 리서치는 Standard 플랜부터 사용할 수 있습니다.",
+          message: "와이드 리서치는 현재 플랜에서 사용할 수 없습니다.",
         },
       },
       { status: 403 },

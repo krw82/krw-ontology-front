@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { recordAnalyticsEventFromRequest } from "@/lib/analytics/server";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
+import { requireMenuFeatureAccess } from "@/lib/billing/feature-access-server";
 import { tryRecordCoverageActivation } from "@/lib/coverage/activation";
 import {
   invalidOriginResponse,
@@ -43,6 +44,13 @@ export async function POST(
     return handleAuthError(error);
   }
   if (!user) return handleAuthError(new Error("No user"));
+
+  const featureAccess = await requireMenuFeatureAccess(
+    user.id,
+    user.email,
+    "research_notebook",
+  );
+  if (featureAccess) return featureAccess;
 
   const tickerResult = await requireIndexedTicker((await params).ticker);
   if (!tickerResult.ok) return tickerResult.response;

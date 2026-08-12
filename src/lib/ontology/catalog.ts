@@ -10,6 +10,29 @@ import type {
   OntologyCompanyRow,
 } from "@/types/database";
 
+type OntologyCatalogReleaseMetadata = Pick<
+  OntologyCatalogReleaseRow,
+  | "env"
+  | "release_id"
+  | "active"
+  | "format"
+  | "generated_at"
+  | "release_created_at"
+  | "index_generated_at"
+  | "company_count"
+  | "document_count"
+  | "index_document_count"
+  | "object_count"
+  | "created_at"
+  | "updated_at"
+> &
+  Partial<
+    Pick<
+      OntologyCatalogReleaseRow,
+      "manifest_json" | "summary_json" | "source_json" | "catalog_json"
+    >
+  >;
+
 export interface IndexedCompany {
   ticker: string;
   name: string;
@@ -604,6 +627,29 @@ async function readCompanyBrowseCards(
 
 export async function getActiveOntologyCatalogRelease(
   env: OntologyEnv = getOntologyEnv(),
+): Promise<OntologyCatalogReleaseMetadata | null> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("ontology_catalog_releases")
+    .select(
+      "env, release_id, active, format, generated_at, release_created_at, index_generated_at, company_count, document_count, index_document_count, object_count, created_at, updated_at",
+    )
+    .eq("env", env)
+    .eq("active", true)
+    .maybeSingle<OntologyCatalogReleaseMetadata>();
+
+  if (error) {
+    throw new Error(`Failed to read active ontology catalog release: ${error.message}`);
+  }
+  return data ?? null;
+}
+
+/**
+ * Full release payload for the rare path that explicitly needs the catalog
+ * JSON. Callers that only need release metadata should use the lightweight
+ * getActiveOntologyCatalogRelease() query above.
+ */
+export async function getActiveOntologyCatalogReleasePayload(
+  env: OntologyEnv = getOntologyEnv(),
 ): Promise<OntologyCatalogReleaseRow | null> {
   const { data, error } = await getSupabaseAdmin()
     .from("ontology_catalog_releases")
@@ -615,7 +661,7 @@ export async function getActiveOntologyCatalogRelease(
     .maybeSingle<OntologyCatalogReleaseRow>();
 
   if (error) {
-    throw new Error(`Failed to read active ontology catalog release: ${error.message}`);
+    throw new Error(`Failed to read active ontology catalog release payload: ${error.message}`);
   }
   return data ?? null;
 }

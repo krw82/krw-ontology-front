@@ -187,12 +187,12 @@ const chatTourSteps: TourStep[] = [
       '[data-onboarding-target="chat-notebook-actions"], [data-onboarding-target="research-notebook-nav"], [data-onboarding-target="workspace-menu-trigger"]',
     icon: "article",
     title: {
-      ko: "중요한 리서치는 노트북에 남기세요",
-      en: "Save important research to the notebook",
+      ko: "관심 기업을 저장하세요",
+      en: "Save companies to your interests",
     },
     body: {
-      ko: "관심 기업으로 저장하면 리서치 노트북에서 종목별 질문과 메모를 이어서 관리할 수 있습니다.",
-      en: "Mark companies as watched or held, then continue notes and questions in the research notebook.",
+      ko: "관심 기업은 최대 3개까지 저장할 수 있습니다. Pro에서는 리서치 노트북으로 질문과 메모를 이어서 관리합니다.",
+      en: "Save up to three companies. Pro adds a research notebook for carrying forward questions and notes.",
     },
   },
 ];

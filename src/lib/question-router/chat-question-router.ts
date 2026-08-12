@@ -475,7 +475,8 @@ function preserveExplicitRoute(
     input.currentRunKind === "news_discovery" ||
     input.currentRunKind === "market_move_research" ||
     input.currentRunKind === "scenario_sensitivity" ||
-    input.currentRunKind === "guru_advisor"
+    input.currentRunKind === "guru_advisor" ||
+    input.currentRunKind === "wide_research"
   ) {
     return {
       analysisMode: input.currentAnalysisMode,
@@ -554,7 +555,7 @@ async function routeWithClaude(
     }
     const correctedRunKind =
       runKind === "idea_generation" && isSectorOrCohortResearchQuestion(input.content)
-        ? "company_research"
+        ? "wide_research"
         : runKind;
     return {
       analysisMode: analysisModeForRunKind(correctedRunKind),
@@ -622,12 +623,13 @@ function buildClaudeRouterPrompt(input: ChatQuestionRouteInput): string {
     "2. news_discovery: if the question asks for latest/recent/current news, market-news context, issue/news topic, or what happened recently, and it is not primarily a price-move question.",
     "3. scenario_sensitivity: if the question asks only for forward scenarios, upside/base/downside, sensitivity, future paths, outlook conditions, or what would strengthen/weaken/break a judgment for an already selected company/context.",
     "4. idea_generation: if the question asks to find, screen, discover, or list candidate stocks/companies from conditions, themes, financial filters, or exclusions.",
-    "5. company_research: default filing-grounded company research, buy/sell/hold questions without a current price/news move, business model, financials, risk, capital allocation, filings.",
+    "5. wide_research: sector, industry, macro, cohort, or cross-company impact questions without one selected ticker; explain transmission paths rather than screening candidates.",
+    "6. company_research: default filing-grounded research for one selected company, buy/sell/hold questions without a current price/news move, business model, financials, risk, capital allocation, filings.",
     "",
     "Important KRW Ontology policy:",
     "- Do not route sector, industry, or company-cohort interpretation questions to idea_generation unless the user explicitly asks to find, recommend, screen, rank, pick, or shortlist candidates.",
-    "- Questions like '소비재 기업들을 살펴보고 소비자 관련 매크로 현황이 어떤지 알고싶어' are company_research/wide research, not idea_generation.",
-    "- idea_generation is for candidate discovery. company_research is for interpreting a known sector/cohort, macro channel, demand, margin, pricing, risk, or business trend across relevant covered companies.",
+    "- Questions like '소비재 기업들을 살펴보고 소비자 관련 매크로 현황이 어떤지 알고싶어' are wide_research, not idea_generation.",
+    "- idea_generation is for candidate discovery. wide_research is for interpreting a sector/cohort, macro channel, demand, margin, pricing, risk, or business trend across relevant covered companies; company_research is for one selected company.",
     "- Simple share-price move questions should route to market_move_research, unlike generic public-equity routers that exclude share-price questions.",
     "- Mixed price-move + outlook questions still route to market_move_research first. The market-move workflow can offer scenario follow-ups.",
     "- Mixed latest-news + outlook questions route to news_discovery first unless the user explicitly asks for scenarios only.",
@@ -646,7 +648,7 @@ function buildClaudeRouterPrompt(input: ChatQuestionRouteInput): string {
     "- '애플의 아이폰, 서비스, 맥, 아이패드, 웨어러블 수익 구조를 공시 기준으로 정리하고 최근 성장 동인을 매출총이익률 중심으로 설명해줘.' => {\"run_kind\":\"company_research\"}",
     "- '향후 전망만 시나리오로 나눠줘' => {\"run_kind\":\"scenario_sensitivity\"}",
     "- '이 판단이 바뀌는 조건 알려줘' => {\"run_kind\":\"scenario_sensitivity\"}",
-    "- '소비재 기업들을 살펴보고 소비자들 관련 매크로 현황 어떤지 알고싶어' => {\"run_kind\":\"company_research\"}",
+    "- '소비재 기업들을 살펴보고 소비자들 관련 매크로 현황 어떤지 알고싶어' => {\"run_kind\":\"wide_research\"}",
     "- '소비 둔화에도 버틸 소비재 기업 후보 뽑아줘' => {\"run_kind\":\"idea_generation\"}",
     "- 'AI 데이터센터 수혜지만 부채 부담 낮은 기업 찾아줘' => {\"run_kind\":\"idea_generation\"}",
     "- '지금 사도 돼?' => {\"run_kind\":\"company_research\"}",
@@ -676,6 +678,7 @@ function analysisModeForRunKind(runKind: RunKind): AnalysisMode {
 
 function readRunKind(value: unknown): RunKind | null {
   return value === "company_research" ||
+    value === "wide_research" ||
     value === "news_discovery" ||
     value === "market_move_research" ||
     value === "idea_generation" ||

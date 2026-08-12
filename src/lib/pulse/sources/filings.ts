@@ -49,6 +49,8 @@ type FilingBriefPreview = {
 };
 
 export const MAX_PULSE_FILING_CANDIDATES = 300;
+export const GENERAL_DIGEST_8K_WINDOW_MS = 12 * 60 * 60 * 1_000;
+export const PREFERRED_DIGEST_8K_WINDOW_MS = 2 * 24 * 60 * 60 * 1_000;
 
 export interface PulseGlobalCandidateVersion {
   globalRevision: bigint | number | string;
@@ -65,6 +67,7 @@ export async function getFilingCandidates(
   now: Date,
   preferredTickers: string[] = [],
   version?: PulseGlobalCandidateVersion,
+  digest8KInterestTickers: readonly string[] = preferredTickers,
 ): Promise<PulseCandidate[]> {
   const env = filingCatalogEnv();
   const snapshotAt = now.toISOString();
@@ -97,9 +100,56 @@ export async function getFilingCandidates(
       p_discovery_limit: 0,
     });
 
-  return deduplicateCandidateRows([...baseRows, ...preferredRows])
+  // A routine digest 8-K is useful market context briefly, but it should not
+  // occupy the general Pulse reservoir for days. A covered or recently
+  // researched company gets a longer, still-bounded follow-up window.
+  const freshBaseRows = baseRows.filter((row) =>
+    isWithinDigest8KWindow(row, now, GENERAL_DIGEST_8K_WINDOW_MS));
+  const freshPreferredRows = preferredRows.filter((row) =>
+    isWithinDigest8KWindow(
+      row,
+      now,
+      isDigest8KInterestTicker(row, digest8KInterestTickers)
+        ? PREFERRED_DIGEST_8K_WINDOW_MS
+        : GENERAL_DIGEST_8K_WINDOW_MS,
+    ));
+
+  return deduplicateCandidateRows([...freshBaseRows, ...freshPreferredRows])
     .slice(0, MAX_PULSE_FILING_CANDIDATES)
     .flatMap(toCandidateFromGlobalRow);
+}
+
+function isWithinDigest8KWindow(
+  row: GlobalFilingCandidateRow,
+  now: Date,
+  windowMs: number,
+): boolean {
+  const [candidate] = toCandidateFromGlobalRow(row);
+  if (!candidate) return true;
+  const formType = String(candidate.metadata.form_type ?? "");
+  const alertPriority = String(candidate.metadata.alert_priority ?? "");
+  if ((formType !== "8-K" && formType !== "8-K/A") || alertPriority !== "digest") return true;
+
+  const occurredAt = Date.parse(candidate.occurred_at);
+  return Number.isNaN(occurredAt) || now.getTime() - occurredAt <= windowMs;
+}
+
+function isDigest8KInterestTicker(
+  row: GlobalFilingCandidateRow,
+  interestTickers: readonly string[],
+): boolean {
+  if (interestTickers.length === 0) return false;
+  const [candidate] = toCandidateFromGlobalRow(row);
+  if (!candidate) return false;
+  const coveredTickers = String(candidate.metadata.covered_tickers_csv ?? "")
+    .split(",")
+    .map((ticker) => ticker.trim().toUpperCase())
+    .filter(Boolean);
+  const candidateTickers = [candidate.ticker, ...coveredTickers]
+    .filter((ticker): ticker is string => Boolean(ticker))
+    .map((ticker) => ticker.toUpperCase());
+  const interestTickerSet = new Set(interestTickers.map((ticker) => ticker.trim().toUpperCase()));
+  return candidateTickers.some((ticker) => interestTickerSet.has(ticker));
 }
 
 async function loadCandidateRows(

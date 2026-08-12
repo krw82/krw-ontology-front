@@ -3,10 +3,14 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import CompanyLogo from "@/components/CompanyLogo";
 import CompanyInsiderTransactions from "@/components/CompanyInsiderTransactions";
+import CompanyRecentMarketNews from "@/components/CompanyRecentMarketNews";
 import CompanyRecentImportantFilings from "@/components/CompanyRecentImportantFilings";
 import CompanyWatchlistActions from "@/components/CompanyWatchlistActions";
+import CompanyFilingSubscriptionControl from "@/components/filings/CompanyFilingSubscriptionControl";
 import CompanyEditorialSeriesSection, { type CompanyEditorialSeries } from "@/components/editorial/CompanyEditorialSeriesSection";
 import InstitutionalTickerActivity from "@/components/InstitutionalTickerActivity";
+import CompanyValuationSnapshot from "@/components/CompanyValuationSnapshot";
+import CompanyFinancialHealthSnapshot from "@/components/CompanyFinancialHealthSnapshot";
 import JsonLdScript from "@/components/JsonLdScript";
 import MarketingCtaLink from "@/components/MarketingCtaLink";
 import CompanyGuruLensPicker from "@/components/guru/CompanyGuruLensPicker";
@@ -38,6 +42,8 @@ import { isFirstValueEntry } from "@/lib/onboarding/first-value";
 import { ONBOARDING_START_ENTRY } from "@/lib/onboarding/start-flow";
 import { getRecentCompanyInsiderTransactions } from "@/lib/filing-notifications/company-insider-transactions";
 import { getRecentCompanyImportantFilings } from "@/lib/filing-notifications/company-important-filings";
+import { getRecentCompanyMarketNews } from "@/lib/market-issues/company-news";
+import { getLatestValuationSnapshot } from "@/lib/valuation/repository";
 import type { UserCompanyMarkRow } from "@/types/database";
 
 export const runtime = "nodejs";
@@ -143,8 +149,10 @@ export default async function CompanyLandingPage({
     institutionalActivity,
     latestImportantFiling,
     insiderTransactions,
+    recentMarketNews,
     recentImportantFilings,
     editorialSeries,
+    valuationSnapshot,
   ] =
     await Promise.all([
       getInstitutionalTickerActivity(company.ticker).catch(() => []),
@@ -152,8 +160,10 @@ export default async function CompanyLandingPage({
         ? getLatestAccessibleImportantFiling(user.id, company.ticker)
         : Promise.resolve(null),
       getRecentCompanyInsiderTransactions(company.ticker).catch(() => []),
+      getRecentCompanyMarketNews(company.ticker).catch(() => []),
       getRecentCompanyImportantFilings(company.ticker).catch(() => []),
       getPublishedCompanyEditorialSeries(company.ticker).catch(() => []),
+      getLatestValuationSnapshot(company.ticker).catch(() => null),
     ]);
 
   const companyStories: CompanyEditorialSeries[] = editorialSeries.map((series) => ({
@@ -308,6 +318,8 @@ export default async function CompanyLandingPage({
   };
   const watchlistPath = `/watchlist/${displayCompany.ticker}`;
   const watchlistLoginHref = `/login?next=${encodeURIComponent(watchlistPath)}`;
+  const companyPath = localizedPath(locale, `/companies/${displayCompany.ticker}`);
+  const filingNotificationLoginHref = `/login?next=${encodeURIComponent(companyPath)}`;
 
   return (
     <div className="bg-canvas text-ink">
@@ -400,6 +412,14 @@ export default async function CompanyLandingPage({
                 />
               </div>
             </div>
+            <div className="mt-4 max-w-3xl">
+              <CompanyFilingSubscriptionControl
+                ticker={displayCompany.ticker}
+                locale={locale}
+                loginHref={filingNotificationLoginHref}
+                isAuthenticated={Boolean(user)}
+              />
+            </div>
           </header>
 
           {companyStories.length > 0 ? <CompanyEditorialSeriesSection series={companyStories} /> : <section className="border-b border-hairline py-7">
@@ -437,9 +457,25 @@ export default async function CompanyLandingPage({
             </div>
           </section>}
 
+          <CompanyValuationSnapshot
+            locale={locale}
+            valuation={valuationSnapshot}
+          />
+
+          <CompanyFinancialHealthSnapshot
+            locale={locale}
+            valuation={valuationSnapshot}
+          />
+
           <InstitutionalTickerActivity
             locale={locale}
             items={institutionalActivity}
+          />
+
+          <CompanyRecentMarketNews
+            locale={locale}
+            ticker={displayCompany.ticker}
+            items={recentMarketNews}
           />
 
           <CompanyRecentImportantFilings

@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  formatIssueDate,
   formatIssueRelativeTime,
   normalizeMarketIssueDetail,
   type MarketIssueCard,
@@ -100,15 +98,13 @@ function IssueDetailContent({
   draftError: string | null;
   onOpenResearchDraft: (researchPathId: string | null) => void;
 }) {
-  const sourceCount = Math.max(issue.sourceCount, issue.sources.length);
-
   return (
     <article className="mt-base">
       <header className="border-b border-hairline pb-xl sm:pb-2xl">
         <div className="flex flex-wrap items-center gap-sm">
           <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted">
-            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">source</span>
-            원문 {sourceCount}개
+            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">fact_check</span>
+            검토용 이슈
           </span>
           <time className="sr-only" dateTime={issue.updatedAt ?? issue.publishedAt ?? undefined}>
             {formatIssueRelativeTime(issue.updatedAt ?? issue.publishedAt)}
@@ -118,17 +114,21 @@ function IssueDetailContent({
           {issue.title}
         </h1>
         <p className="mt-base max-w-2xl text-[14px] leading-6 text-muted">
-          시장의 변화와 기업의 연결고리를 검토하기 위한 리서치 화면입니다. 아래 원문과 공시를 함께 확인해주세요.
+          시장의 변화와 기업의 연결고리를 검토하기 위한 리서치 화면입니다. 회사 공시와 실적 발표를 함께 확인해주세요.
         </p>
       </header>
 
       <section className="mt-xl rounded-[22px] border border-[#d8e4fa] bg-[#f6f9ff] p-base sm:p-lg" aria-labelledby="korean-context-title">
         <div className="flex items-center gap-xs text-[12px] font-extrabold text-primary">
           <span className="material-symbols-outlined text-[18px]" aria-hidden="true">auto_awesome</span>
-          <h2 id="korean-context-title">AI가 정리한 한국어 맥락</h2>
+          <h2 id="korean-context-title">{issue.localNewsStage === "ai_verified" ? "AI가 검증해 정리한 한국어 맥락" : "한국어 맥락"}</h2>
         </div>
         <p className="mt-sm text-[16px] leading-7 text-body">{issue.summary}</p>
-        <p className="mt-sm text-[12px] leading-5 text-muted">이 문단은 원문을 대신하지 않습니다. 아래 원문 출처와 회사 공시를 함께 확인해주세요.</p>
+        <p className="mt-sm text-[12px] leading-5 text-muted">
+          {issue.localNewsStage === "ai_verified"
+            ? "AI가 원문과 대조해 정리한 맥락입니다. 투자 판단 전에는 회사 공시와 실적 발표를 확인해주세요."
+            : "투자 판단 전에는 회사 공시와 실적 발표를 확인해주세요."}
+        </p>
       </section>
 
       {issue.whyShown.length > 0 ? (
@@ -191,29 +191,10 @@ function IssueDetailContent({
       </section>
 
       {issue.confirmed.length > 0 ? (
-        <section className="mt-xl" aria-label="원문에 나온 내용">
-          <EvidenceList title="원문에 나온 내용" tone="confirmed" items={issue.confirmed} emptyCopy="원문에서 별도로 정리된 항목이 아직 없습니다." />
+        <section className="mt-xl" aria-label="확인된 내용">
+          <EvidenceList title="확인된 내용" tone="confirmed" items={issue.confirmed} emptyCopy="별도로 정리된 확인 내용이 아직 없습니다." />
         </section>
       ) : null}
-
-      <section className="mt-xl" aria-labelledby="sources-title">
-        <div className="flex items-baseline justify-between gap-base">
-          <div>
-            <p className="text-[11px] font-extrabold tracking-[0.08em] text-primary">SOURCE ORIGINALS</p>
-            <h2 id="sources-title" className="mt-1 text-[20px] font-extrabold tracking-[-0.035em] text-ink">원문 출처</h2>
-          </div>
-          <span className="text-[12px] font-medium text-muted">한국어 요약과 분리해 표시합니다.</span>
-        </div>
-        {issue.sources.length > 0 ? (
-          <div className="mt-base grid gap-sm">
-            {issue.sources.map((source, index) => <SourceOriginal key={source.id} source={source} index={index} />)}
-          </div>
-        ) : (
-          <div className="mt-base rounded-[18px] border border-dashed border-hairline bg-white p-base text-[13px] leading-6 text-muted">
-            연결된 원문 출처가 아직 표시되지 않았습니다. 이 이슈는 공시·실적콜에서 한 번 더 검증해주세요.
-          </div>
-        )}
-      </section>
 
     </article>
   );
@@ -231,35 +212,6 @@ function EvidenceList({ title, icon, tone, items, emptyCopy }: { title: string; 
         </ul>
       ) : <p className="mt-sm text-[13px] leading-6 text-muted">{emptyCopy}</p>}
     </div>
-  );
-}
-
-function SourceOriginal({ source, index }: { source: MarketIssueCard["sources"][number]; index: number }) {
-  const identity = [source.publisher, source.author].filter(Boolean).join(" · ") || `출처 ${index + 1}`;
-  const sourceType = source.sourceType ?? "원문";
-  return (
-    <article className="rounded-[18px] border border-hairline bg-white p-base sm:p-lg">
-      <div className="flex flex-wrap items-center justify-between gap-sm">
-        <p className="text-[12px] font-extrabold text-ink">{identity}</p>
-        <div className="flex items-center gap-sm">
-          <span className="rounded-full bg-surface-soft px-sm py-1 text-[10px] font-bold text-muted">{sourceType}</span>
-          {source.publishedAt ? <time className="text-[11px] text-muted" dateTime={source.publishedAt}>{formatIssueDate(source.publishedAt)}</time> : null}
-        </div>
-      </div>
-      {source.originalTitle ? <h3 className="mt-sm text-[15px] font-bold leading-6 text-ink">{source.originalTitle}</h3> : null}
-      {source.originalText ? (
-        <blockquote className="mt-sm border-l-2 border-[#c5d7fb] pl-sm text-[13px] leading-6 text-body">
-          <p className="mb-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-muted">Original</p>
-          {source.originalText}
-        </blockquote>
-      ) : null}
-      {source.href ? (
-        <a href={source.href} target="_blank" rel="noreferrer" className="mt-sm inline-flex min-h-10 items-center gap-1 text-[12px] font-extrabold text-primary transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-          원문 열기
-          <span className="material-symbols-outlined text-[15px]" aria-hidden="true">open_in_new</span>
-        </a>
-      ) : null}
-    </article>
   );
 }
 

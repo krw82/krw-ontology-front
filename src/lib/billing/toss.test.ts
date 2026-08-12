@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildTossBasicAuthorization,
+  cancelTossPayment,
   chargeTossBillingKey,
   generateTossOrderId,
   getTossPaymentsKeyMode,
@@ -194,6 +195,50 @@ describe("Toss Payments billing client", () => {
       code: "UNAUTHORIZED_KEY",
       status: 401,
       message: "잘못된 시크릿 키입니다.",
+    });
+  });
+
+  it("cancels a payment with a durable idempotency key and optional partial amount", async () => {
+    vi.stubEnv("TOSS_PAYMENTS_CLIENT_KEY", "test_ck_123");
+    vi.stubEnv("TOSS_PAYMENTS_SECRET_KEY", "test_sk_123");
+    vi.stubEnv("TOSS_PAYMENTS_API_BASE_URL", "https://toss.example");
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          paymentKey: "pay/cancel",
+          status: "CANCELED",
+          orderId: "order_123",
+          orderName: "KRW Ontology Standard 월 구독",
+          totalAmount: 7900,
+          balanceAmount: 0,
+          currency: "KRW",
+        }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await cancelTossPayment({
+      paymentKey: "pay/cancel",
+      cancelReason: "7일 이내 미사용 자동 환불",
+      cancelAmountKrw: 7900,
+      idempotencyKey: "00000000-0000-4000-8000-000000000000",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://toss.example/v1/payments/pay%2Fcancel/cancel",
+      expect.objectContaining({ method: "POST", cache: "no-store" }),
+    );
+    const [, init] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(init.headers).toMatchObject({
+      "Idempotency-Key": "00000000-0000-4000-8000-000000000000",
+    });
+    expect(JSON.parse(String(init.body))).toEqual({
+      cancelReason: "7일 이내 미사용 자동 환불",
+      cancelAmount: 7900,
     });
   });
 

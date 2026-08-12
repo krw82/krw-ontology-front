@@ -136,4 +136,89 @@ describe("Pulse filing source", () => {
       { globalRevision: 99, timeBucket: 99 },
     )).resolves.toEqual([]);
   });
+
+  it("keeps a digest 8-K for 12 hours generally and two days for a preferred ticker", async () => {
+    const now = new Date("2026-07-16T12:00:00.000Z");
+    const rpc = vi.fn(async (name: string, params: { p_preferred_tickers?: string[] }) => {
+      if (name !== "get_pulse_global_filing_candidates_v1") throw new Error("unexpected rpc");
+      const occurredAt = params.p_preferred_tickers?.length
+        ? "2026-07-15T00:30:00.000Z"
+        : "2026-07-15T23:30:00.000Z";
+      return {
+        data: [{
+          filing_event_id: params.p_preferred_tickers?.length ? "preferred-digest" : "general-digest",
+          payload: {
+            ...filingPayload(params.p_preferred_tickers?.length ? "preferred-digest" : "general-digest"),
+            alert_priority: "digest",
+            occurred_at: occurredAt,
+          },
+          candidate_bucket: params.p_preferred_tickers?.length ? "preferred" : "discovery",
+        }],
+        error: null,
+      };
+    });
+    const supabase = { rpc } as unknown as SupabaseClient<Database>;
+
+    const candidates = await getFilingCandidates(
+      supabase,
+      now,
+      ["AAPL"],
+      { globalRevision: 101, timeBucket: 101 },
+    );
+
+    expect(candidates.map((candidate) => candidate.item_key)).toEqual(["filing:preferred-digest"]);
+  });
+
+  it("removes a preferred digest 8-K after two days", async () => {
+    const rpc = vi.fn(async (name: string) => {
+      if (name !== "get_pulse_global_filing_candidates_v1") throw new Error("unexpected rpc");
+      return {
+        data: [{
+          filing_event_id: "expired-preferred-digest",
+          payload: {
+            ...filingPayload("expired-preferred-digest"),
+            alert_priority: "digest",
+            occurred_at: "2026-07-14T11:59:59.000Z",
+          },
+          candidate_bucket: "preferred",
+        }],
+        error: null,
+      };
+    });
+    const supabase = { rpc } as unknown as SupabaseClient<Database>;
+
+    await expect(getFilingCandidates(
+      supabase,
+      new Date("2026-07-16T12:00:00.000Z"),
+      ["AAPL"],
+      { globalRevision: 102, timeBucket: 102 },
+    )).resolves.toEqual([]);
+  });
+
+  it("does not extend a digest 8-K merely because the ticker has recent research", async () => {
+    const rpc = vi.fn(async (name: string) => {
+      if (name !== "get_pulse_global_filing_candidates_v1") throw new Error("unexpected rpc");
+      return {
+        data: [{
+          filing_event_id: "research-only-digest",
+          payload: {
+            ...filingPayload("research-only-digest"),
+            alert_priority: "digest",
+            occurred_at: "2026-07-15T00:30:00.000Z",
+          },
+          candidate_bucket: "preferred",
+        }],
+        error: null,
+      };
+    });
+    const supabase = { rpc } as unknown as SupabaseClient<Database>;
+
+    await expect(getFilingCandidates(
+      supabase,
+      new Date("2026-07-16T12:00:00.000Z"),
+      ["AAPL"],
+      { globalRevision: 103, timeBucket: 103 },
+      [],
+    )).resolves.toEqual([]);
+  });
 });

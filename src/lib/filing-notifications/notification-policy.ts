@@ -1,6 +1,7 @@
-import type { FilingNotificationPreferencesRow } from "@/types/database";
+import type { FilingNotificationPreferencesRow, SecForm4EventSummaryRow } from "@/types/database";
 
 export type FilingAlertPriority = "urgent" | "normal" | "digest";
+export const DEFAULT_FORM4_IMMEDIATE_MIN_VALUE_USD = 1_000_000;
 
 export function isFilingInboxEligible(params: {
   formType: string;
@@ -30,9 +31,11 @@ export function isFilingInboxEligible(params: {
  * trail without turning routine corrections into noise.
  */
 export function shouldQueueImmediateFilingPush(params: {
+  formType?: string;
   isAmendment: boolean;
   priority: FilingAlertPriority;
   preference: FilingNotificationPreferencesRow | undefined;
+  form4Summary?: Pick<SecForm4EventSummaryRow, "reported_purchase_value" | "reported_sale_value"> | null;
   deliveryMode?: FilingNotificationPreferencesRow["delivery_mode"];
 }): boolean {
   const preference = params.preference;
@@ -40,7 +43,15 @@ export function shouldQueueImmediateFilingPush(params: {
   const deliveryMode = params.deliveryMode ?? preference?.delivery_mode ?? "important_immediate";
   if (deliveryMode === "daily_digest") return false;
   if (deliveryMode === "all_immediate") return true;
-  return params.priority !== "digest";
+  if (params.priority === "digest") return false;
+  if (!params.formType?.startsWith("4")) return true;
+  return form4ReportedValue(params.form4Summary) >= (preference?.form4_immediate_min_value_usd ?? DEFAULT_FORM4_IMMEDIATE_MIN_VALUE_USD);
+}
+
+function form4ReportedValue(
+  summary: Pick<SecForm4EventSummaryRow, "reported_purchase_value" | "reported_sale_value"> | null | undefined,
+): number {
+  return Math.max(summary?.reported_purchase_value ?? 0, summary?.reported_sale_value ?? 0);
 }
 
 /** Urgent regulatory events bypass the short per-ticker batching window. */

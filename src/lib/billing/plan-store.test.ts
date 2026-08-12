@@ -109,7 +109,7 @@ describe("billing plan store", () => {
 
     const plan = await getBillingPlanFromStore("free");
 
-    expect(plan.weeklyAnalysisCreditsRaw).toBe(400000);
+    expect(plan.weeklyAnalysisCreditsRaw).toBe(250000);
     expect(plan.monthlyPriceKrw).toBe(0);
   });
 });

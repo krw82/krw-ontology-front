@@ -22,7 +22,7 @@ const relatedLinks = {
     {
       href: "/pricing",
       label: "가격",
-      description: "Free, Standard, Pro 플랜을 확인합니다.",
+      description: "Free, Lite, Standard, Pro 플랜을 확인합니다.",
     },
   ],
   en: [
@@ -44,7 +44,7 @@ const relatedLinks = {
     {
       href: "/pricing",
       label: "Pricing",
-      description: "Review Free, Standard, and Pro plans.",
+      description: "Review Free, Lite, Standard, and Pro plans.",
     },
   ],
 } as const;
