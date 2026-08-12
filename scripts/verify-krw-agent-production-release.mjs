@@ -200,12 +200,14 @@ function descriptorModel(descriptor, provider) {
 function verifyCanonicalCapabilityRuntime(bundleRoot, provider) {
   const runtimeRoot = join(bundleRoot, "capability-runtime");
   const identityPath = join(runtimeRoot, "identity.json");
-  const pythonPath = join(runtimeRoot, ".venv", "bin", "python");
+  const archivePath = join(runtimeRoot, "capability-runtime.venv.tar.gz");
   const launcher = join(bundleRoot, "packaging", "launchd", "krw-capabilityd-start-local");
+  const installer = join(bundleRoot, "packaging", "launchd", "install-local-mac-capabilityd-release.sh");
   for (const [path, label] of [
     [identityPath, `${provider} capability identity`],
-    [pythonPath, `${provider} capability Python runtime`],
+    [archivePath, `${provider} sealed capability runtime`],
     [launcher, `${provider} capability launcher`],
+    [installer, `${provider} capability installer`],
   ]) {
     const stat = lstatSync(path, { throwIfNoEntry: false });
     if (!stat || stat.isSymbolicLink() || !stat.isFile()) fail(`${label} is missing or unsafe`);
