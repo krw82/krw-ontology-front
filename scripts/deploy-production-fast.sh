@@ -64,6 +64,7 @@ REQUIRE_LIVE_TOSS=0
 BILLING_V2_CUTOVER=0
 RELEASE_ID=
 ENV_FILE=.env.mac-worker.production
+ENV_FILE_EXPLICIT=0
 TMP_DIR=
 DATA_LOCK_DIR=
 DATA_LOCK_OWNED=0
@@ -167,6 +168,7 @@ while [ "$#" -gt 0 ]; do
       shift
       [ "$#" -gt 0 ] || fail "--env-file requires a value."
       ENV_FILE=$1
+      ENV_FILE_EXPLICIT=1
       ;;
     --dry-run) DRY_RUN=1 ;;
     --help|-h)
@@ -208,6 +210,38 @@ esac
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 TARGET_FILE="$FRONT_DIR/ops/production-target.json"
+
+resolve_agent_runtime_env() {
+  # The normal front env owns public/product settings, while Agent V1 has a
+  # second, operator-owned sourceable envelope for its local TLS MCP endpoints
+  # and private database CA.  Keep the relationship as an explicit pointer in
+  # the normal env instead of baking a user-specific krw-agent path into this
+  # deployer. An explicit --env-file always wins for recovery and automation.
+  [ "$WITH_AGENT_RELEASE" = "1" ] || return 0
+  [ "$ENV_FILE_EXPLICIT" = "0" ] || return 0
+
+  configured_runtime_env=${KRW_AGENT_RUNTIME_ENV_FILE:-}
+  if [ -z "$configured_runtime_env" ] && [ -f "$FRONT_DIR/.env.mac-worker.production" ]; then
+    configured_runtime_env=$(awk -F= '
+      $0 !~ /^[[:space:]]*#/ && $1 == "KRW_AGENT_RUNTIME_ENV_FILE" {
+        sub(/^[^=]*=/, "")
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+        gsub(/^"|"$/, "")
+        gsub(/^'\''|'\''$/, "")
+        print
+      }
+    ' "$FRONT_DIR/.env.mac-worker.production" | tail -n 1)
+  fi
+  case "$configured_runtime_env" in
+    /*) ;;
+    *) fail "Rust Agent V1 deploy requires KRW_AGENT_RUNTIME_ENV_FILE or an explicit --env-file with the local agent runtime envelope." ;;
+  esac
+  [ -f "$configured_runtime_env" ] && [ ! -L "$configured_runtime_env" ] \
+    || fail "KRW_AGENT_RUNTIME_ENV_FILE must point to a regular local runtime env file."
+  ENV_FILE=$configured_runtime_env
+}
+
+resolve_agent_runtime_env
 case "$ENV_FILE" in
   /*) ENV_PATH=$ENV_FILE ;;
   *) ENV_PATH="$FRONT_DIR/$ENV_FILE" ;;

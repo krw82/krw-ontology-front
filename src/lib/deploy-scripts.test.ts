@@ -233,6 +233,8 @@ describe("production deploy scripts", () => {
     expect(deployFast).toContain("run_remote_validate_agent_candidate_abi");
     expect(deployFast).toContain("AGENT_V1_DATABASE_CA_FILE /run/krw-agent/agent-v1-ca.pem");
     expect(deployFast).toContain("agent_tenant_id=krw-ontology-prod");
+    expect(deployFast).toContain("resolve_agent_runtime_env");
+    expect(deployFast).toContain("KRW_AGENT_RUNTIME_ENV_FILE");
     expect(compose).toContain("supabase-root-2021-ca.crt:/run/krw-agent/agent-v1-ca.pem:ro");
     expect(deployFast).toContain("--with-agent-release requires --apply-migrations for the direct Rust daemon heartbeat ABI.");
     expect(deployFast).not.toContain("local Mac worker heartbeat restart");
