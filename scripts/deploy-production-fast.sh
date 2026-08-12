@@ -766,6 +766,15 @@ previous=$(value_of "$active_env" KRW_AGENT_ADMISSION_MODE)
 case "$previous" in open|closed|drain|canary) ;; *) previous=closed ;; esac
 printf '%s\n' "$previous" > "$REMOTE_STAGE/research-admission.previous"
 chmod 600 "$REMOTE_STAGE/research-admission.previous"
+if [ "$previous" = "canary" ]; then
+  principals=$(value_of "$active_env" KRW_AGENT_CANARY_PRINCIPAL_IDS)
+  [ -n "$principals" ] || {
+    echo "Canary admission has no allowed principal ids to preserve." >&2
+    exit 1
+  }
+  printf '%s\n' "$principals" > "$REMOTE_STAGE/research-admission.previous-canary-principals"
+  chmod 600 "$REMOTE_STAGE/research-admission.previous-canary-principals"
+fi
 changed=0
 restore_previous() {
   status=$?
@@ -834,8 +843,69 @@ compose_active() {
   FRONT_DIR="$active_root" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$active_root" --env-file "$active_env" -f "$active_root/docker-compose.yml" "$@"
 }
 upsert_env_value "$active_env" KRW_AGENT_ADMISSION_MODE "$previous"
+if [ "$previous" = "canary" ]; then
+  canary_principals_file="$REMOTE_STAGE/research-admission.previous-canary-principals"
+  [ -f "$canary_principals_file" ] || {
+    echo "Refusing to restore canary admission without its principal allowlist." >&2
+    exit 1
+  }
+  canary_principals=$(cat "$canary_principals_file")
+  [ -n "$canary_principals" ] || {
+    echo "Refusing to restore an empty canary principal allowlist." >&2
+    exit 1
+  }
+  upsert_env_value "$active_env" KRW_AGENT_CANARY_PRINCIPAL_IDS "$canary_principals"
+else
+  upsert_env_value "$active_env" KRW_AGENT_CANARY_PRINCIPAL_IDS ""
+fi
 compose_active up -d --no-deps --force-recreate --wait web agent-v1-outbox
 echo "Previous research admission restored: $previous"
+REMOTE_SCRIPT
+}
+
+# A frontend-only deployment must never turn a closed/canary/drain research
+# engine into an open one. Capture the active gate before the candidate is
+# switched (the candidate itself always starts closed), then restore that
+# exact state only after deep health passes. A Rust release change deliberately
+# does not use this path: it remains closed until new provider evidence exists.
+run_remote_capture_research_admission() {
+  cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE'"
+set -eu
+
+active_env="$REMOTE_FRONT_DIR/.env"
+if [ -L "$REMOTE_FRONT_DIR/.simple-deploy/current" ] \
+  && [ -f "$REMOTE_FRONT_DIR/.simple-deploy/current/runtime.env" ]; then
+  active_env="$REMOTE_FRONT_DIR/.simple-deploy/current/runtime.env"
+fi
+value_of() {
+  awk -F= -v key="$2" '
+    $0 !~ /^[[:space:]]*#/ && $1 == key {
+      sub(/^[^=]*=/, "")
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+      gsub(/^"|"$/, "")
+      gsub(/^'\''|'\''$/, "")
+      print
+    }
+  ' "$1" | tail -n 1
+}
+if [ "$(value_of "$active_env" KRW_AGENT_BACKEND_MODE)" != "rust" ]; then
+  echo "Active web release does not use Rust Agent V1; no research admission needs preserving."
+  exit 0
+fi
+previous=$(value_of "$active_env" KRW_AGENT_ADMISSION_MODE)
+case "$previous" in open|closed|drain|canary) ;; *) previous=closed ;; esac
+printf '%s\n' "$previous" > "$REMOTE_STAGE/research-admission.previous"
+chmod 600 "$REMOTE_STAGE/research-admission.previous"
+if [ "$previous" = "canary" ]; then
+  principals=$(value_of "$active_env" KRW_AGENT_CANARY_PRINCIPAL_IDS)
+  [ -n "$principals" ] || {
+    echo "Canary admission has no allowed principal ids to preserve." >&2
+    exit 1
+  }
+  printf '%s\n' "$principals" > "$REMOTE_STAGE/research-admission.previous-canary-principals"
+  chmod 600 "$REMOTE_STAGE/research-admission.previous-canary-principals"
+fi
+echo "Captured research admission for frontend-only deployment: $previous"
 REMOTE_SCRIPT
 }
 
@@ -2029,6 +2099,10 @@ if [ "$WITH_AGENT_RELEASE" = "1" ] && [ "$SKIP_WEB" = "0" ]; then
   run_remote_validate_agent_candidate_abi
 fi
 
+if [ "$WITH_AGENT_RELEASE" = "0" ] && [ "$SKIP_WEB" = "0" ]; then
+  run_remote_capture_research_admission
+fi
+
 if [ "$WITH_DATA" = "1" ]; then
   run_data_publish
 fi
@@ -2062,7 +2136,7 @@ if [ "$SKIP_WEB" = "0" ]; then
   run_remote_deep_verify
   prune_remote_post_activation_artifacts
   if [ "$WITH_AGENT_RELEASE" = "0" ]; then
-    run_remote_open_research_admission
+    run_remote_restore_research_admission
   elif [ "$AGENT_FINAL_EVIDENCE_VERIFIED" = "1" ]; then
     run_remote_open_research_admission
   else

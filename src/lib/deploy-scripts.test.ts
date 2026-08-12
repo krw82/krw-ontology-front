@@ -1102,6 +1102,9 @@ cleanup
     );
     expect(fastDeploy).toContain("Production commit contains generated build artifacts");
     expect(fastDeploy).toContain("Pruned inactive deployment stages and stale web candidate tags.");
+    expect(fastDeploy).toContain("run_remote_capture_research_admission");
+    expect(fastDeploy).toContain("run_remote_restore_research_admission");
+    expect(fastDeploy).toContain("A frontend-only deployment must never turn a closed/canary/drain research");
     expect(fastDeploy).not.toContain("--exclude=coverage");
     expect(fastDeploy).not.toContain("ONTOLOGY_ARCHIVE");
     expect(fastDeploy).not.toContain("KRW_ONTOLOGY_SOURCE_DIR");
