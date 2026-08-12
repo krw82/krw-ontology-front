@@ -5,7 +5,11 @@ vi.mock("@krw-agent/host", () => ({
 }));
 
 import { loadPinnedReleaseArtifact } from "@krw-agent/host";
-import { checkAgentV1Readiness, getResearchAdmissionMode } from "./readiness";
+import {
+  checkAgentV1Readiness,
+  getResearchAdmissionMode,
+  isResearchAdmissionAllowed,
+} from "./readiness";
 
 describe("research admission", () => {
   it("defaults production to closed and local development to open", () => {
@@ -15,8 +19,23 @@ describe("research admission", () => {
 
   it("accepts only the explicit bounded states", () => {
     expect(getResearchAdmissionMode({ KRW_AGENT_ADMISSION_MODE: "drain" })).toBe("drain");
+    expect(getResearchAdmissionMode({ KRW_AGENT_ADMISSION_MODE: "canary" })).toBe("canary");
     expect(getResearchAdmissionMode({ KRW_AGENT_ADMISSION_MODE: "closed" })).toBe("closed");
     expect(getResearchAdmissionMode({ KRW_AGENT_ADMISSION_MODE: "unexpected" })).toBe("open");
+  });
+
+  it("admits only configured UUID principals in canary mode", () => {
+    const principal = "11111111-1111-4111-8111-111111111111";
+    const env = {
+      KRW_AGENT_ADMISSION_MODE: "canary",
+      KRW_AGENT_CANARY_PRINCIPAL_IDS: principal,
+    };
+    expect(isResearchAdmissionAllowed(principal, env)).toBe(true);
+    expect(isResearchAdmissionAllowed("22222222-2222-4222-8222-222222222222", env)).toBe(false);
+    expect(isResearchAdmissionAllowed(principal, {
+      ...env,
+      KRW_AGENT_CANARY_PRINCIPAL_IDS: "not-a-uuid",
+    })).toBe(false);
   });
 
   it("recovers a missing provider pin from the sealed descriptor in development", async () => {

@@ -925,9 +925,10 @@ if (isKrwFeedMcpEnabled()) {
   console.info("[dev:krw-feed-mcp] disabled");
 }
 
-const webDevArgs = truthyEnv(process.env.KRW_DEV_WEBPACK)
-  ? ["run", "dev:web", "--", "--webpack"]
-  : ["run", "dev:web"];
+// Keep the long-lived development server on Webpack. Turbopack's persistent
+// development cache is unbounded in this setup and can grow by tens of GB
+// across isolated test/review runs. Production builds are unaffected.
+const webDevArgs = ["run", "dev:web"];
 nextDev = spawnLabeled("web", "npm", webDevArgs, (code) => {
   void shutdown("web-exit").finally(() => process.exit(code ?? 1));
 });

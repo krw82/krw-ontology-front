@@ -763,7 +763,7 @@ if [ "$(value_of "$active_env" KRW_AGENT_BACKEND_MODE)" != "rust" ]; then
   exit 0
 fi
 previous=$(value_of "$active_env" KRW_AGENT_ADMISSION_MODE)
-case "$previous" in open|closed|drain) ;; *) previous=open ;; esac
+case "$previous" in open|closed|drain|canary) ;; *) previous=closed ;; esac
 printf '%s\n' "$previous" > "$REMOTE_STAGE/research-admission.previous"
 chmod 600 "$REMOTE_STAGE/research-admission.previous"
 changed=0
@@ -792,7 +792,7 @@ run_remote_restore_research_admission() {
 set -eu
 [ -f "$REMOTE_STAGE/research-admission.previous" ] || exit 0
 previous=$(cat "$REMOTE_STAGE/research-admission.previous")
-case "$previous" in open|closed|drain) ;; *) exit 1 ;; esac
+case "$previous" in open|closed|drain|canary) ;; *) exit 1 ;; esac
 active_root=$REMOTE_FRONT_DIR
 active_env=$REMOTE_FRONT_DIR/.env
 if [ -L "$REMOTE_FRONT_DIR/.simple-deploy/current" ] \

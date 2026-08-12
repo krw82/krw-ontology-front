@@ -1,6 +1,6 @@
 import { loadPinnedReleaseArtifact } from "@krw-agent/host";
 
-export type ResearchAdmissionMode = "open" | "drain" | "closed";
+export type ResearchAdmissionMode = "open" | "drain" | "closed" | "canary";
 
 const PROVIDER_MODELS = {
   glm: "glm-5.2",
@@ -23,10 +23,49 @@ export function getResearchAdmissionMode(
   env: Record<string, string | undefined> = process.env,
 ): ResearchAdmissionMode {
   const value = env.KRW_AGENT_ADMISSION_MODE?.trim().toLowerCase();
-  if (value === "open" || value === "drain" || value === "closed") return value;
+  if (value === "open" || value === "drain" || value === "closed" || value === "canary") {
+    return value;
+  }
   return env.KRW_RUNTIME_ENVIRONMENT === "prod" || env.NODE_ENV === "production"
     ? "closed"
     : "open";
+}
+
+/**
+ * `canary` is a permanent, fail-closed operating mode used to produce
+ * release-bound evidence through the ordinary chat API before public
+ * admission opens. The allowlist is deployment configuration, never a
+ * user-controlled claim or a baked-in account identifier.
+ */
+export function isResearchAdmissionAllowed(
+  userId: string,
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  const mode = getResearchAdmissionMode(env);
+  if (mode === "open") return true;
+  if (mode !== "canary") return false;
+  if (!UUID_PATTERN.test(userId)) return false;
+  return configuredCanaryPrincipalIds(env).has(userId.toLowerCase());
+}
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_CANARY_PRINCIPALS = 8;
+
+function configuredCanaryPrincipalIds(
+  env: Record<string, string | undefined>,
+): ReadonlySet<string> {
+  const configured = env.KRW_AGENT_CANARY_PRINCIPAL_IDS?.trim();
+  if (!configured) return new Set();
+  const values = configured.split(",").map((value) => value.trim());
+  if (
+    values.length === 0 ||
+    values.length > MAX_CANARY_PRINCIPALS ||
+    values.some((value) => !UUID_PATTERN.test(value))
+  ) {
+    return new Set();
+  }
+  return new Set(values.map((value) => value.toLowerCase()));
 }
 
 export async function checkAgentV1Readiness(

@@ -90,6 +90,9 @@ services:
       - KRW_AGENT_BACKEND_MODE=${KRW_AGENT_BACKEND_MODE:-rust}
       - KRW_AGENT_PROVIDER=${KRW_AGENT_PROVIDER:-deepseek}
       - KRW_AGENT_ADMISSION_MODE=${KRW_AGENT_ADMISSION_MODE:-closed}
+      # `canary` mode admits only these explicit operator test principals;
+      # normal users remain closed until the signed evidence gate opens.
+      - KRW_AGENT_CANARY_PRINCIPAL_IDS=${KRW_AGENT_CANARY_PRINCIPAL_IDS:-}
       - KRW_RUNTIME_ENVIRONMENT=${KRW_RUNTIME_ENVIRONMENT:-prod}
       - KRW_AGENT_TENANT_ID=${KRW_AGENT_TENANT_ID:-}
       - KRW_AGENT_RELEASE_DESCRIPTOR_PATH=${KRW_AGENT_RELEASE_DESCRIPTOR_PATH:-/run/krw-agent/public-release.json}

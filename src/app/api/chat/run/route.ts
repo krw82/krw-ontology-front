@@ -50,7 +50,7 @@ import {
   assessChatPromptSafety,
   blockedChatSafetyMessage,
 } from "@/lib/security/chat-safety";
-import { getResearchAdmissionMode } from "@/lib/agent-v1/readiness";
+import { isResearchAdmissionAllowed } from "@/lib/agent-v1/readiness";
 import type { ChatRunRequest, ErrorCode, RunKind } from "@/types/api-contracts";
 
 function errorResponse(
@@ -319,7 +319,7 @@ export async function POST(request: NextRequest) {
   // Provider cutovers use a bounded drain/closed window. Save the question
   // and a terminal assistant message without reserving credits or creating a
   // Rust run, so the browser never remains pending while the daemon restarts.
-  if (getResearchAdmissionMode() !== "open") {
+  if (!isResearchAdmissionAllowed(userId)) {
     const historyResult = await fetchHistory(
       session.id,
       content,

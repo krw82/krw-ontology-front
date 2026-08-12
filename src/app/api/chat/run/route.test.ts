@@ -32,6 +32,7 @@ vi.mock("@/lib/agent-v1/runtime", () => ({
 }));
 vi.mock("@/lib/agent-v1/readiness", () => ({
   getResearchAdmissionMode: vi.fn(),
+  isResearchAdmissionAllowed: vi.fn(),
 }));
 vi.mock("@/lib/agent/daemon-heartbeat", () => ({
   getReadyRustAgentDaemon: vi.fn(),
@@ -83,7 +84,10 @@ import {
   getRustAgentRuntime,
   RustAgentRuntimeError,
 } from "@/lib/agent-v1/runtime";
-import { getResearchAdmissionMode } from "@/lib/agent-v1/readiness";
+import {
+  getResearchAdmissionMode,
+  isResearchAdmissionAllowed,
+} from "@/lib/agent-v1/readiness";
 import { getReadyRustAgentDaemon } from "@/lib/agent/daemon-heartbeat";
 import { streamAgentRunEventsResponse } from "@/lib/agent/run-events";
 import {
@@ -253,6 +257,7 @@ describe("POST /api/chat/run Rust Agent V1 contract", () => {
       result: { userMessageId: USER_MESSAGE_ID, history: [] },
     });
     vi.mocked(getResearchAdmissionMode).mockReturnValue("open");
+    vi.mocked(isResearchAdmissionAllowed).mockReturnValue(true);
     vi.mocked(getReadyRustAgentDaemon).mockResolvedValue({
       ok: true,
       required: false,
@@ -373,6 +378,7 @@ describe("POST /api/chat/run Rust Agent V1 contract", () => {
 
   it("saves the question and returns a terminal message while admission is closed", async () => {
     vi.mocked(getResearchAdmissionMode).mockReturnValue("drain");
+    vi.mocked(isResearchAdmissionAllowed).mockReturnValue(false);
 
     const response = await POST(request());
     const payload = await responseJson(response);
@@ -389,6 +395,17 @@ describe("POST /api/chat/run Rust Agent V1 contract", () => {
     );
     expect(runtimeEnqueue).not.toHaveBeenCalled();
     expect(reserveBudgetStep).not.toHaveBeenCalled();
+  });
+
+  it("allows the configured canary principal without opening public admission", async () => {
+    vi.mocked(getResearchAdmissionMode).mockReturnValue("canary");
+    vi.mocked(isResearchAdmissionAllowed).mockReturnValue(true);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(isResearchAdmissionAllowed).toHaveBeenCalledWith("user-1");
+    expect(runtimeEnqueue).toHaveBeenCalledOnce();
   });
 
   it("saves the question without reserving a credit when the local Rust daemon is unavailable", async () => {

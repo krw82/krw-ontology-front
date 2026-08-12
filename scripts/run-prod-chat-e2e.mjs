@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import { createServerClient } from "@supabase/ssr";
@@ -124,6 +124,30 @@ const SUITES = {
   ].slice(0, 30),
 };
 
+// This is deliberately small: it proves the production chat path can retain
+// a follow-up in one room while a fresh room stays independent. Full quality
+// matrices continue to use the ordinary suites or a supplied question file.
+const CANARY_CASES = [
+  {
+    id: "CANARY_AAPL_BASELINE",
+    cat: "canary",
+    ticker: "AAPL",
+    q: "Apple의 최근 매출 흐름과 핵심 리스크를 공시 근거 중심으로 간단히 정리해줘.",
+  },
+  {
+    id: "CANARY_AAPL_FOLLOWUP",
+    cat: "canary",
+    ticker: "AAPL",
+    q: "방금 답변을 바탕으로, 가장 중요한 확인 포인트와 그 포인트가 틀릴 때의 영향을 이어서 설명해줘.",
+  },
+  {
+    id: "CANARY_AAPL_ISOLATED",
+    cat: "canary",
+    ticker: "AAPL",
+    q: "Apple의 현금흐름을 볼 때 우선 확인할 공시 항목을 정리해줘.",
+  },
+];
+
 function usage() {
   console.log(`Usage: node scripts/run-prod-chat-e2e.mjs [options]
 
@@ -139,7 +163,7 @@ Options:
   --email EMAIL               Defaults to PROD_E2E_EMAIL
   --password PASSWORD         Defaults to PROD_E2E_PASSWORD
   --env-file PATH             Load PROD_E2E_* values from a local env file
-  --suite 3q|5q|30q|220q      Defaults to 3q
+  --suite 3q|5q|30q|220q|canary  Defaults to 3q
   --question-file PATH        JSON array of { id, q, ticker?, cat? }
   --suite-220q-source PATH    JSONL source for --suite 220q. Defaults to ${DEFAULT_220Q_SOURCE}
   --research-mode MODE        Defaults to deep
@@ -148,6 +172,7 @@ Options:
   --max-cases N               Limit selected cases
   --timeout-ms N              Per-case timeout. Defaults to ${DEFAULT_TIMEOUT_MS}
   --output PATH               Defaults to /tmp/krw-prod-chat-e2e-<timestamp>.json
+  --include-raw-answers       Keep bounded full answers in this private report
   --dry-run                   Print plan only; does not authenticate or call prod
   --help, -h                  Show this help
 
@@ -175,6 +200,7 @@ function parseArgs(argv) {
     output: process.env.PROD_E2E_OUTPUT || "",
     envFile: "",
     dryRun: false,
+    includeRawAnswers: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -185,6 +211,10 @@ function parseArgs(argv) {
     }
     if (flag === "--dry-run") {
       args.dryRun = true;
+      continue;
+    }
+    if (flag === "--include-raw-answers") {
+      args.includeRawAnswers = true;
       continue;
     }
 
@@ -296,7 +326,9 @@ async function selectCases(args) {
     }
     cases = parsed.map((item, index) => normalizeCase(item, index));
   } else {
-    if (args.suite === "220q") {
+    if (args.suite === "canary") {
+      cases = CANARY_CASES;
+    } else if (args.suite === "220q") {
       cases = await load220qCases(args.suite220qSource);
     } else {
       cases = SUITES[args.suite];
@@ -480,8 +512,16 @@ function buildRestHeaders(args, auth) {
   };
 }
 
-function buildRequestBody(testCase, args, requestId) {
+function buildRequestBody(testCase, args, requestId, sessionId = null) {
   const content = `[PROD_E2E:${RUN_TAG}:${testCase.id}] ${testCase.q}`;
+  if (sessionId) {
+    return {
+      content,
+      request_id: requestId,
+      research_mode: args.researchMode,
+      session_id: sessionId,
+    };
+  }
   return {
     content,
     request_id: requestId,
@@ -496,7 +536,7 @@ function makeRequestId() {
   return randomUUID();
 }
 
-async function runCase(testCase, args, auth) {
+async function runCase(testCase, args, auth, { sessionId = null } = {}) {
   const started = Date.now();
   const requestId = makeRequestId(testCase);
   const state = {
@@ -519,7 +559,7 @@ async function runCase(testCase, args, auth) {
     const postResponse = await fetch(new URL("/api/chat/run", args.baseUrl), {
       method: "POST",
       headers: buildHeaders(auth),
-      body: JSON.stringify(buildRequestBody(testCase, args, requestId)),
+      body: JSON.stringify(buildRequestBody(testCase, args, requestId, sessionId)),
       signal: controller.signal,
     });
 
@@ -680,7 +720,7 @@ async function collectDbState(args, auth, ids) {
   const runs = await rest(
     args,
     headers,
-    `agent_runs?request_id=eq.${requestFilter}&select=id,status,error_code,error_message,queued_at,claimed_at,started_at,finished_at,latency_ms,input_tokens,output_tokens,assistant_message_id,session_id&order=queued_at.asc`,
+    `agent_runs?request_id=eq.${requestFilter}&select=id,status,model,error_code,error_message,queued_at,claimed_at,started_at,finished_at,latency_ms,input_tokens,output_tokens,assistant_message_id,session_id&order=queued_at.asc`,
   );
   const run = runs.at(-1) ?? null;
   const runId = run?.id ?? ids.runId;
@@ -726,7 +766,11 @@ async function collectDbState(args, auth, ids) {
           id: assistant.id,
           status: assistant.status,
           chars: String(assistant.content ?? "").length,
+          sha256: sha256(String(assistant.content ?? "")),
           preview: String(assistant.content ?? "").replace(/\s+/g, " ").slice(0, 1200),
+          ...(args.includeRawAnswers
+            ? { content: String(assistant.content ?? "").slice(0, 64 * 1024) }
+            : {}),
         }
       : null,
     tool_calls: toolCalls.map((tool) => ({
@@ -739,6 +783,10 @@ async function collectDbState(args, auth, ids) {
     events,
     open_tool_calls: toolCalls.filter((tool) => !tool.finished_at).length,
   };
+}
+
+function sha256(value) {
+  return `sha256:${createHash("sha256").update(value, "utf8").digest("hex")}`;
 }
 
 async function rest(args, headers, pathName) {
@@ -937,6 +985,69 @@ async function runCases(cases, args, auth, jsonlPath) {
   return results.filter(Boolean);
 }
 
+async function runCanaryCases(cases, args, auth, jsonlPath) {
+  const [firstCase, followUpCase, isolatedCase] = cases;
+  const first = await runCase(firstCase, args, auth);
+  await appendFile(jsonlPath, `${JSON.stringify(first)}\n`, "utf8");
+  const followUp = first.session_id
+    ? await runCase(followUpCase, args, auth, { sessionId: first.session_id })
+    : {
+        ...followUpCase,
+        grade: "FAIL",
+        status: "failed",
+        notes: ["base canary did not return a session id"],
+        elapsed_ms: 0,
+        elapsed_sec: 0,
+        session_id: null,
+        run_id: null,
+        terminal_event: null,
+        error: "base canary did not return a session id",
+        event_count: 0,
+        events: [],
+        db: null,
+      };
+  await appendFile(jsonlPath, `${JSON.stringify(followUp)}\n`, "utf8");
+  const isolated = await runCase(isolatedCase, args, auth);
+  await appendFile(jsonlPath, `${JSON.stringify(isolated)}\n`, "utf8");
+  return [first, followUp, isolated];
+}
+
+function summarizeCanary(results) {
+  const [first, followUp, isolated] = results;
+  const durableFinal = (result) =>
+    result?.grade !== "FAIL" &&
+    result?.db?.run?.status === "completed" &&
+    result?.db?.assistant?.status === "completed";
+  const durable_final_projection = results.every(durableFinal);
+  const non_empty_answer = results.every((result) =>
+    Number.isInteger(result?.db?.assistant?.chars) && result.db.assistant.chars > 0,
+  );
+  const same_session_followup =
+    Boolean(first?.session_id) &&
+    first.session_id === followUp?.session_id &&
+    Boolean(first?.run_id) &&
+    first.run_id !== followUp?.run_id;
+  const cross_session_isolation =
+    Boolean(isolated?.session_id) &&
+    isolated.session_id !== first?.session_id &&
+    isolated.session_id !== followUp?.session_id;
+  return {
+    status: durable_final_projection && non_empty_answer && same_session_followup && cross_session_isolation
+      ? "pass"
+      : "fail",
+    durable_final_projection,
+    non_empty_answer,
+    same_session_followup,
+    cross_session_isolation,
+    session_ids: {
+      primary: first?.session_id ?? null,
+      follow_up: followUp?.session_id ?? null,
+      isolated: isolated?.session_id ?? null,
+    },
+    run_ids: results.map((result) => result?.run_id ?? null),
+  };
+}
+
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -979,12 +1090,15 @@ async function main() {
   const jsonlPath = jsonlPathFor(args.output);
   await mkdir(path.dirname(jsonlPath), { recursive: true });
   await rm(jsonlPath, { force: true });
-  const results = await runCases(cases, args, auth, jsonlPath);
+  const results = args.suite === "canary"
+    ? await runCanaryCases(cases, args, auth, jsonlPath)
+    : await runCases(cases, args, auth, jsonlPath);
 
   const report = {
     kind: "prod_chat_e2e",
     summary: summarize(results, args),
     results,
+    ...(args.suite === "canary" ? { canary: summarizeCanary(results) } : {}),
   };
   const written = await writeReport(report, args.output);
   console.log(JSON.stringify({ written: { ...written, jsonlPath }, summary: report.summary }, null, 2));

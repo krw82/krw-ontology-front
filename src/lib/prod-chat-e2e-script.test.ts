@@ -51,4 +51,25 @@ describe("production chat E2E script", () => {
       stderr: expect.stringContaining("Unknown suite"),
     });
   }, 20_000);
+
+  it("selects the three-run session canary without calling production", async () => {
+    const { stdout } = await execFileAsync(
+      "node",
+      [
+        "scripts/run-prod-chat-e2e.mjs",
+        "--dry-run",
+        "--suite",
+        "canary",
+      ],
+      { cwd: process.cwd() },
+    );
+
+    const parsed = JSON.parse(stdout);
+    expect(parsed.plan.cases).toHaveLength(3);
+    expect(parsed.plan.cases.map((item: { id: string }) => item.id)).toEqual([
+      "CANARY_AAPL_BASELINE",
+      "CANARY_AAPL_FOLLOWUP",
+      "CANARY_AAPL_ISOLATED",
+    ]);
+  });
 });
