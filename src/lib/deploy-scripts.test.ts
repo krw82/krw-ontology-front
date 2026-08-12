@@ -1107,6 +1107,9 @@ cleanup
     expect(fastDeploy).toContain("A frontend-only deployment must never turn a closed/canary/drain research");
     expect(fastDeploy).toContain("Inherited the verified Rust Agent V1 descriptor for a frontend-only candidate.");
     expect(fastDeploy).toContain("which omitted every immutable Agent V1 pin");
+    expect(fastDeploy).toContain("admission evidence always names the running frontend");
+    expect(read("scripts/set-krw-agent-production-canary.sh")).toContain("--mode canary");
+    expect(read("scripts/set-krw-agent-production-canary.sh")).toContain("KRW_AGENT_CANARY_PRINCIPAL_IDS");
     expect(fastDeploy).not.toContain("--exclude=coverage");
     expect(fastDeploy).not.toContain("ONTOLOGY_ARCHIVE");
     expect(fastDeploy).not.toContain("KRW_ONTOLOGY_SOURCE_DIR");

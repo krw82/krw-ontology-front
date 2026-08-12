@@ -3,15 +3,17 @@ set -eu
 
 # Open a previously closed Rust research release only after its local Mac
 # daemon, GCP descriptor, and final evidence all prove they describe the same
-# provider release. The complete Rust bundle and every credential remain on
-# this Mac; GCP owns only the public descriptor and queue-facing web services.
+# provider release. `--release-id` identifies the local Mac agent install;
+# the active frontend deployment has its own independent deployment id. The
+# complete Rust bundle and every credential remain on this Mac; GCP owns only
+# the public descriptor and queue-facing web services.
 
 usage() {
   cat <<'EOF'
 Usage:
   scripts/open-krw-agent-production-admission.sh \
     --release-root /absolute/sealed-dual-release \
-    --release-id ID --provider glm|deepseek \
+    --release-id MAC_AGENT_ID --provider glm|deepseek \
     --evidence-index /absolute/production-evidence-index.json
 
 Optional environment:
@@ -192,7 +194,7 @@ upsert_env_value() {
   mv "$temporary" "$env_file"
 }
 compose_active() {
-  FRONT_DIR="$ACTIVE_ROOT" NEXT_PUBLIC_APP_VERSION="$RELEASE_ID" docker compose \
+  FRONT_DIR="$ACTIVE_ROOT" docker compose \
     --project-name "$COMPOSE_PROJECT" --project-directory "$ACTIVE_ROOT" \
     --env-file "$ACTIVE_ENV" -f "$ACTIVE_ROOT/docker-compose.yml" "$@"
 }
@@ -215,7 +217,6 @@ test "$(value_of KRW_AGENT_PROVIDER)" = "$PROVIDER"
 test "$(value_of KRW_AGENT_RELEASE_ARTIFACT_HASH)" = "$DESCRIPTOR_HASH"
 test "$(value_of KRW_AGENT_RELEASE_SET_HASH)" = "$RELEASE_SET_HASH"
 test "$(value_of KRW_AGENT_FRONT_COMMIT)" = "$FRONT_COMMIT"
-test "$(value_of NEXT_PUBLIC_APP_VERSION)" = "$RELEASE_ID"
 test "$(value_of KRW_AGENT_ADMISSION_MODE)" = closed
 descriptor_path="$ACTIVE_ROOT/agent-release/public-release.json"
 test -f "$descriptor_path"

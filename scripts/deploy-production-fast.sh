@@ -1116,7 +1116,6 @@ if [ "$WITH_AGENT_RELEASE" = "0" ] \
       KRW_AGENT_RELEASE_DESCRIPTOR_PATH \
       KRW_AGENT_RELEASE_ARTIFACT_HASH \
       KRW_AGENT_RELEASE_SET_HASH \
-      KRW_AGENT_FRONT_COMMIT \
       KRW_AGENT_DAEMON_HEARTBEAT_REQUIRED \
       KRW_RUNTIME_ENVIRONMENT \
       KRW_AGENT_TENANT_ID \
@@ -1131,6 +1130,10 @@ if [ "$WITH_AGENT_RELEASE" = "0" ] \
       upsert_env_value "$REMOTE_STAGE/runtime.env" "$key" "$inherited_value"
     done
     upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_PUBLIC_DESCRIPTOR_HOST_PATH "$REMOTE_STAGE/agent-release/public-release.json"
+    # This web candidate has a new source commit but continues to host the
+    # existing sealed Rust descriptor. Preserve those two provenance axes
+    # independently so admission evidence always names the running frontend.
+    upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_FRONT_COMMIT "$FRONT_GIT_COMMIT"
     upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_ADMISSION_MODE closed
     upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_CANARY_PRINCIPAL_IDS ""
     echo "Inherited the verified Rust Agent V1 descriptor for a frontend-only candidate."
