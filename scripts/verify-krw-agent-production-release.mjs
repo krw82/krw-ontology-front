@@ -197,6 +197,54 @@ function descriptorModel(descriptor, provider) {
   return expected;
 }
 
+function verifyCanonicalCapabilityRuntime(bundleRoot, provider) {
+  const runtimeRoot = join(bundleRoot, "capability-runtime");
+  const identityPath = join(runtimeRoot, "identity.json");
+  const pythonPath = join(runtimeRoot, ".venv", "bin", "python");
+  const launcher = join(bundleRoot, "packaging", "launchd", "krw-capabilityd-start-local");
+  for (const [path, label] of [
+    [identityPath, `${provider} capability identity`],
+    [pythonPath, `${provider} capability Python runtime`],
+    [launcher, `${provider} capability launcher`],
+  ]) {
+    const stat = lstatSync(path, { throwIfNoEntry: false });
+    if (!stat || stat.isSymbolicLink() || !stat.isFile()) fail(`${label} is missing or unsafe`);
+  }
+  const identity = jsonFile(identityPath, `${provider} capability identity`);
+  if (
+    identity.ok !== true ||
+    identity.protocol_version !== "2025-06-18" ||
+    !Number.isInteger(identity.tool_count) || identity.tool_count < 1 ||
+    !requiredString(identity.build_id, `${provider} capability build`) ||
+    !requiredHash(identity.tool_schema_sha256, `${provider} capability schema`) ||
+    !requiredHash(identity.release_manifest_sha256, `${provider} capability release`)
+  ) {
+    fail(`${provider} canonical capability identity is invalid`);
+  }
+  const binding = readFileSync(join(bundleRoot, "deployments", "deployment-binding.yaml"), "utf8");
+  const ontologyBlocks = binding.split(/(?=^  - binding_key: )/m)
+    .filter((block) => /^    endpoint_ref: krw-ontology-local$/m.test(block));
+  if (ontologyBlocks.length === 0) fail(`${provider} deployment binding has no ontology endpoint`);
+  for (const block of ontologyBlocks) {
+    for (const [field, value] of [
+      ["server_build", identity.build_id],
+      ["server_schema_bundle_hash", identity.tool_schema_sha256],
+      ["data_release_hash", identity.release_manifest_sha256],
+    ]) {
+      if (!new RegExp(`^    ${field}: ${value.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}$`, "m").test(block)) {
+        fail(`${provider} deployment binding does not pin its canonical capability identity`);
+      }
+    }
+  }
+  return {
+    build_id: identity.build_id,
+    tool_schema_sha256: identity.tool_schema_sha256,
+    release_manifest_sha256: identity.release_manifest_sha256,
+    protocol_version: identity.protocol_version,
+    tool_count: identity.tool_count,
+  };
+}
+
 function inspectBundle(releaseRoot, provider) {
   const bundleRoot = realDirectory(join(releaseRoot, provider), `${provider} bundle`);
   if (relative(releaseRoot, bundleRoot).startsWith("..")) {
@@ -228,6 +276,7 @@ function inspectBundle(releaseRoot, provider) {
   }
   const manifestHash = requiredHash(manifest.manifest_hash, `${provider} manifest hash`);
   if (verifier.manifest_hash !== manifestHash) fail(`${provider} verifier manifest mismatch`);
+  const capability_runtime = verifyCanonicalCapabilityRuntime(bundleRoot, provider);
   return {
     root: bundleRoot,
     provider_id: provider,
@@ -237,6 +286,7 @@ function inspectBundle(releaseRoot, provider) {
     release_set_hash: releaseSetHash,
     git_commit: requiredGitObject(manifest.git_commit, `${provider} Git commit`),
     git_tree: requiredGitObject(manifest.git_tree, `${provider} Git tree`),
+    capability_runtime,
   };
 }
 
@@ -263,6 +313,15 @@ function verifyDualIndex(root, bundles) {
   }
   equal(bundles.glm.git_commit, bundles.deepseek.git_commit, "provider source commit");
   equal(bundles.glm.git_tree, bundles.deepseek.git_tree, "provider source tree");
+  for (const field of [
+    "build_id",
+    "tool_schema_sha256",
+    "release_manifest_sha256",
+    "protocol_version",
+    "tool_count",
+  ]) {
+    equal(bundles.glm.capability_runtime[field], bundles.deepseek.capability_runtime[field], `provider capability runtime ${field}`);
+  }
 }
 
 function verifyEvidence(path, bundles, frontCommit) {

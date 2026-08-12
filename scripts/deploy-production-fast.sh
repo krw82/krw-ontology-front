@@ -79,6 +79,8 @@ AGENT_DESCRIPTOR_SOURCE=
 AGENT_DESCRIPTOR_COPY=
 AGENT_LOCAL_INSTALLER=
 AGENT_INSTALLED_INSTALLER=
+AGENT_CAPABILITY_INSTALLER=
+AGENT_INSTALLED_CAPABILITY_INSTALLER=
 AGENT_PROVIDER_BUNDLE=
 AGENT_LOCAL_INSTALL_ROOT=${KRW_AGENT_LOCAL_INSTALL_ROOT:-"$HOME/.local/share/krw-agent"}
 AGENT_OPERATOR_ROOT=${KRW_AGENT_OPERATOR_ROOT:-"$HOME/krw-agnet-prod"}
@@ -86,6 +88,7 @@ AGENT_METRICS_PORT=${KRW_AGENT_METRICS_PORT:-15520}
 AGENT_FINAL_EVIDENCE_VERIFIED=0
 AGENT_CUTOVER_ROLLBACK_ARMED=0
 AGENT_LOCAL_RELEASE_ACTIVATED=0
+AGENT_CAPABILITY_RUNTIME_ACTIVATED=0
 AGENT_ADMISSION_CLOSED=0
 FRONT_CANDIDATE_ACTIVATED=0
 MAC_RUNTIME_ACTIVATED=0
@@ -104,6 +107,9 @@ cleanup() {
     fi
     if [ "$AGENT_LOCAL_RELEASE_ACTIVATED" = "1" ]; then
       rollback_local_agent_release || echo "Local krw-agent release rollback failed." >&2
+    fi
+    if [ "$AGENT_CAPABILITY_RUNTIME_ACTIVATED" = "1" ]; then
+      rollback_local_agent_capability_runtime || echo "Local canonical capability runtime rollback failed." >&2
     fi
     if [ "$MAC_RUNTIME_ACTIVATED" = "1" ]; then
       restore_previous_mac_runtime || echo "Previous Mac worker runtime restoration failed." >&2
@@ -395,10 +401,14 @@ if [ "$WITH_AGENT_RELEASE" = "1" ]; then
   AGENT_PROVIDER_BUNDLE="$AGENT_RELEASE_ROOT/$AGENT_PROVIDER"
   AGENT_LOCAL_INSTALLER="$AGENT_RELEASE_ROOT/$AGENT_PROVIDER/packaging/launchd/install-local-mac-agentd-release.sh"
   AGENT_INSTALLED_INSTALLER="$AGENT_LOCAL_INSTALL_ROOT/releases/$RELEASE_ID/$AGENT_PROVIDER/packaging/launchd/install-local-mac-agentd-release.sh"
+  AGENT_CAPABILITY_INSTALLER="$AGENT_RELEASE_ROOT/$AGENT_PROVIDER/packaging/launchd/install-local-mac-capabilityd-release.sh"
+  AGENT_INSTALLED_CAPABILITY_INSTALLER="$AGENT_LOCAL_INSTALL_ROOT/releases/$RELEASE_ID/$AGENT_PROVIDER/packaging/launchd/install-local-mac-capabilityd-release.sh"
   require_file "$AGENT_DESCRIPTOR_SOURCE"
   require_file "$AGENT_PROVIDER_BUNDLE/apply_migrations.sh"
   require_file "$AGENT_LOCAL_INSTALLER"
   [ -x "$AGENT_LOCAL_INSTALLER" ] || fail "Sealed local krw-agent installer is not executable."
+  require_file "$AGENT_CAPABILITY_INSTALLER"
+  [ -x "$AGENT_CAPABILITY_INSTALLER" ] || fail "Sealed canonical capability runtime installer is not executable."
   require_file "$ENV_PATH"
   printf '%s\n' "Verified sealed GLM+DeepSeek release for local Mac activation; selected provider: $AGENT_PROVIDER"
 fi
@@ -729,10 +739,28 @@ activate_local_agent_release() {
       --env-file "$ENV_PATH"
 }
 
+activate_local_agent_capability_runtime() {
+  [ -x "$AGENT_INSTALLED_CAPABILITY_INSTALLER" ] || fail "Staged canonical capability runtime installer is unavailable."
+  KRW_AGENT_LOCAL_INSTALL_ROOT="$AGENT_LOCAL_INSTALL_ROOT" \
+    "$AGENT_INSTALLED_CAPABILITY_INSTALLER" --mode activate \
+      --release-id "$RELEASE_ID" \
+      --provider "$AGENT_PROVIDER" \
+      --operator-root "$AGENT_OPERATOR_ROOT"
+}
+
 rollback_local_agent_release() {
   [ -x "$AGENT_INSTALLED_INSTALLER" ] || return 0
   KRW_AGENT_LOCAL_INSTALL_ROOT="$AGENT_LOCAL_INSTALL_ROOT" \
     "$AGENT_INSTALLED_INSTALLER" --mode rollback --release-id "$RELEASE_ID"
+}
+
+rollback_local_agent_capability_runtime() {
+  [ -x "$AGENT_INSTALLED_CAPABILITY_INSTALLER" ] || return 0
+  KRW_AGENT_LOCAL_INSTALL_ROOT="$AGENT_LOCAL_INSTALL_ROOT" \
+    "$AGENT_INSTALLED_CAPABILITY_INSTALLER" --mode rollback \
+      --release-id "$RELEASE_ID" \
+      --provider "$AGENT_PROVIDER" \
+      --operator-root "$AGENT_OPERATOR_ROOT"
 }
 
 run_remote_close_research_admission() {
@@ -2198,6 +2226,8 @@ if [ "$WITH_AGENT_RELEASE" = "1" ]; then
   # prior Mac release before public admission can be reopened.
   AGENT_LOCAL_RELEASE_ACTIVATED=1
   activate_local_agent_release
+  AGENT_CAPABILITY_RUNTIME_ACTIVATED=1
+  activate_local_agent_capability_runtime
   activate_local_agent_mcp_gateways
   # `krw-agentd` has already written its own release-bound database heartbeat
   # before its loopback metrics endpoint becomes ready. No Claude/plugin
