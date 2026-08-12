@@ -6,6 +6,61 @@
 -- product receipt.  Replays are therefore safe and cannot create a second
 -- assistant message or charge a reservation twice.
 
+-- The deployed v1 ABI stores committed answers in the private
+-- agent_store.answer_bundles table and exposes read_committed_outcome().
+-- Keep the product projection behind one SECURITY DEFINER read boundary so
+-- the public outbox worker never receives table privileges.
+create or replace function agent_v1.read_final_projection(p_request jsonb)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, agent_store
+as $$
+declare
+  v_run agent_store.runs%rowtype;
+  v_bundle agent_store.answer_bundles%rowtype;
+  v_markdown text;
+begin
+  perform agent_store.assert_request(
+    p_request,
+    array['abi_version', 'run_id', 'tenant_id', 'principal_id', 'session_id'],
+    array['abi_version', 'run_id', 'tenant_id', 'principal_id', 'session_id']
+  );
+  select * into v_run from agent_store.runs where run_id = p_request->>'run_id';
+  if not found then
+    raise exception using errcode = 'K1001', message = 'unknown_run';
+  end if;
+  if v_run.tenant_id is distinct from p_request->>'tenant_id'
+     or v_run.principal_id is distinct from p_request->>'principal_id'
+     or v_run.session_id is distinct from p_request->>'session_id' then
+    raise exception using errcode = 'K1017', message = 'ownership_mismatch';
+  end if;
+  if v_run.state <> 'final' then
+    raise exception using errcode = 'K1003', message = 'run_not_final';
+  end if;
+  select * into v_bundle from agent_store.answer_bundles where run_id = v_run.run_id;
+  if not found then
+    raise exception using errcode = 'K1001', message = 'final_projection_missing';
+  end if;
+  v_markdown := coalesce(
+    v_bundle.answer_bundle->>'rendered_content',
+    v_bundle.answer_bundle->>'rendered_markdown'
+  );
+  if v_markdown is null or v_markdown = '' then
+    raise exception using errcode = 'K1000', message = 'final_markdown_missing';
+  end if;
+  return jsonb_build_object(
+    'run_id', v_run.run_id,
+    'answer_bundle_hash', v_bundle.answer_bundle_hash,
+    'markdown', v_markdown,
+    'usage', v_bundle.usage
+  );
+end;
+$$;
+
+revoke all on function agent_v1.read_final_projection(jsonb) from public;
+
 do $$
 begin
   if to_regprocedure('agent_v1.read_final_projection(jsonb)') is null then

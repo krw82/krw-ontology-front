@@ -4,6 +4,10 @@
 
 begin;
 
+-- The original ABI table predates the v7 runtime's truthful output hash.
+alter table agent_store.answer_bundles
+  add column if not exists final_output_hash text;
+
 CREATE OR REPLACE FUNCTION agent_v1.commit_final(p_request jsonb) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
