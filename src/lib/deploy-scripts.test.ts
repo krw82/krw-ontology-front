@@ -1105,6 +1105,8 @@ cleanup
     expect(fastDeploy).toContain("run_remote_capture_research_admission");
     expect(fastDeploy).toContain("run_remote_restore_research_admission");
     expect(fastDeploy).toContain("A frontend-only deployment must never turn a closed/canary/drain research");
+    expect(fastDeploy).toContain("Inherited the verified Rust Agent V1 descriptor for a frontend-only candidate.");
+    expect(fastDeploy).toContain("which omitted every immutable Agent V1 pin");
     expect(fastDeploy).not.toContain("--exclude=coverage");
     expect(fastDeploy).not.toContain("ONTOLOGY_ARCHIVE");
     expect(fastDeploy).not.toContain("KRW_ONTOLOGY_SOURCE_DIR");

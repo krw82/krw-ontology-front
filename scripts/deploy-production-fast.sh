@@ -1012,6 +1012,11 @@ fi
 
 value_of() {
   key="$1"
+  value_from_file "$REMOTE_STAGE/runtime.env" "$key"
+}
+value_from_file() {
+  env_file="$1"
+  key="$2"
   awk -F= -v key="$key" '
     $0 !~ /^[[:space:]]*#/ && $1 == key {
       sub(/^[^=]*=/, "")
@@ -1020,7 +1025,7 @@ value_of() {
       gsub(/^'\''|'\''$/, "")
       print
     }
-  ' "$REMOTE_STAGE/runtime.env" | tail -n 1
+  ' "$env_file" | tail -n 1
 }
 require_live_toss_key() {
   key="$1"
@@ -1081,6 +1086,56 @@ else
   echo "Market-issue filtered-stream worker is disabled for this deployment."
 fi
 printf '\nFRONT_DIR=%s\nNEXT_PUBLIC_APP_VERSION=%s\n' "$REMOTE_STAGE" "$RELEASE_ID" >> "$REMOTE_STAGE/runtime.env"
+# A frontend-only release must retain the already verified Rust descriptor and
+# its database bindings. Previously the candidate was rebuilt from `.env`
+# alone, which omitted every immutable Agent V1 pin; this made a harmless web
+# deploy incapable of activating against the existing Mac daemon. Copy only
+# the trusted, release-bound values from the active stage, never admission or
+# canary identities, and start the candidate closed until deep health passes.
+if [ "$WITH_AGENT_RELEASE" = "0" ] \
+  && [ -L "$REMOTE_FRONT_DIR/.simple-deploy/current" ] \
+  && [ -f "$REMOTE_FRONT_DIR/.simple-deploy/current/runtime.env" ]; then
+  active_root=$(cd "$REMOTE_FRONT_DIR/.simple-deploy/current" && pwd -P)
+  active_env="$active_root/runtime.env"
+  if [ "$(value_from_file "$active_env" KRW_AGENT_BACKEND_MODE)" = "rust" ]; then
+    active_descriptor="$active_root/agent-release/public-release.json"
+    test -f "$active_descriptor"
+    expected_descriptor_hash=$(value_from_file "$active_env" KRW_AGENT_RELEASE_ARTIFACT_HASH)
+    case "$expected_descriptor_hash" in sha256:[0-9a-f][0-9a-f]*) ;; *)
+      echo "Active Rust release has no valid descriptor hash." >&2
+      exit 1
+      ;;
+    esac
+    observed_descriptor_hash="sha256:$(sha256sum "$active_descriptor" | awk '{print $1}')"
+    test "$observed_descriptor_hash" = "$expected_descriptor_hash"
+    install -d -m 0755 "$REMOTE_STAGE/agent-release"
+    install -m 0644 "$active_descriptor" "$REMOTE_STAGE/agent-release/public-release.json"
+    for key in \
+      KRW_AGENT_BACKEND_MODE \
+      KRW_AGENT_PROVIDER \
+      KRW_AGENT_RELEASE_DESCRIPTOR_PATH \
+      KRW_AGENT_RELEASE_ARTIFACT_HASH \
+      KRW_AGENT_RELEASE_SET_HASH \
+      KRW_AGENT_FRONT_COMMIT \
+      KRW_AGENT_DAEMON_HEARTBEAT_REQUIRED \
+      KRW_RUNTIME_ENVIRONMENT \
+      KRW_AGENT_TENANT_ID \
+      AGENT_V1_DATABASE_URL \
+      AGENT_V1_OUTBOX_DATABASE_URL \
+      AGENT_V1_DATABASE_CA_FILE; do
+      inherited_value=$(value_from_file "$active_env" "$key")
+      [ -n "$inherited_value" ] || {
+        echo "Active Rust release is missing required binding: $key" >&2
+        exit 1
+      }
+      upsert_env_value "$REMOTE_STAGE/runtime.env" "$key" "$inherited_value"
+    done
+    upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_PUBLIC_DESCRIPTOR_HOST_PATH "$REMOTE_STAGE/agent-release/public-release.json"
+    upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_ADMISSION_MODE closed
+    upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_CANARY_PRINCIPAL_IDS ""
+    echo "Inherited the verified Rust Agent V1 descriptor for a frontend-only candidate."
+  fi
+fi
 # A Rust-engine deploy pins the staged web image to the exact sealed provider
 # descriptor before it is built. The daemon and every credential remain on the
 # local Mac; this VM receives exactly one public JSON descriptor plus hashes.
