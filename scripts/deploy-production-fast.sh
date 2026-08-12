@@ -478,6 +478,12 @@ prepare_dry_run_runtime_plugin() {
 }
 
 if [ "$DRY_RUN" = "1" ]; then
+  if [ "$WITH_AGENT_RELEASE" = "1" ]; then
+    "$SCRIPT_DIR/apply-agent-v1-production-migrations.sh" \
+      --agent-release "$AGENT_PROVIDER_BUNDLE" \
+      --skip-front-migrations \
+      --dry-run
+  fi
   if [ "$WITH_AGENT_RELEASE" = "0" ] && [ "$SKIP_MAC" = "0" ]; then
     prepare_dry_run_runtime_plugin
     (cd "$FRONT_DIR" && npm run build:worker)
