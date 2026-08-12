@@ -19,7 +19,11 @@ try {
     { KRW_AGENT_HOST_PACKAGE_OUTPUT: join(temporaryRoot, "package") },
   );
   const provenance = parseLastJsonLine(output.stdout);
-  validateProvenance(provenance, agentRepo);
+  // package-host-ts writes the archive into the isolated temporary output
+  // directory supplied above.  Validate that exact staging location rather
+  // than incorrectly requiring the archive to live inside the Rust source
+  // repository.
+  validateProvenance(provenance, temporaryRoot);
   const archiveBytes = await readFile(provenance.archive_path);
   const archiveHash = `sha256:${createHash("sha256").update(archiveBytes).digest("hex")}`;
   if (archiveHash !== provenance.sha256) throw new Error("host_package_output_hash_mismatch");
@@ -46,6 +50,16 @@ try {
 
   await run("npm", ["install", "--package-lock-only", "--ignore-scripts", "--offline"], root);
   await run("npm", ["install", "--ignore-scripts", "--offline"], root);
+  // npm can retain the old integrity for a local file dependency.  Pin the
+  // lockfile to the exact bytes that were just staged so Docker's `npm ci`
+  // verifies the same archive as this provenance record.
+  const lockPath = join(root, "package-lock.json");
+  const lock = JSON.parse(await readFile(lockPath, "utf8"));
+  const lockEntry = lock.packages?.["node_modules/@krw-agent/host"];
+  if (!lockEntry) throw new Error("host_package_lock_entry_missing");
+  lockEntry.resolved = `file:vendor/krw-agent-host/${provenance.archive}`;
+  lockEntry.integrity = `sha512-${createHash("sha512").update(archiveBytes).digest("base64")}`;
+  await writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
   await run(process.execPath, [join(root, "scripts", "verify-krw-agent-host-package.mjs")], root);
   console.log(JSON.stringify({
     status: "synced",
@@ -80,12 +94,14 @@ function parseLastJsonLine(output) {
   }
 }
 
-function validateProvenance(value, agentRepo) {
+function validateProvenance(value, temporaryRoot) {
+  const outputRoot = resolve(temporaryRoot);
   if (
     !value
     || value.package !== "@krw-agent/host"
     || typeof value.version !== "string"
-    || !value.archive_path.startsWith(`${resolve(agentRepo)}/`)
+    || typeof value.archive_path !== "string"
+    || !value.archive_path.startsWith(`${outputRoot}/`)
     || !/^krw-agent-host-[0-9A-Za-z._-]+\.tgz$/.test(value.archive)
     || !/^sha256:[0-9a-f]{64}$/.test(value.sha256)
     || !/^[0-9a-f]{40}$|^[0-9a-f]{64}$/.test(value.agent_git_commit)
