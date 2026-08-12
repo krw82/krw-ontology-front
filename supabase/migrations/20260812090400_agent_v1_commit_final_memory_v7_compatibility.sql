@@ -8,6 +8,120 @@ begin;
 alter table agent_store.answer_bundles
   add column if not exists final_output_hash text;
 
+-- Session memory is part of the v7 product contract.  Older production
+-- databases have the base agent ABI but not these append-only tables yet, so
+-- materialize the exact runtime-owned structures before replacing commit_final.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'agent_store.runs'::regclass
+       and conname = 'runs_session_memory_owner_v1_unique'
+  ) then
+    alter table agent_store.runs
+      add constraint runs_session_memory_owner_v1_unique
+      unique (run_id, tenant_id, principal_id, session_id);
+  end if;
+end;
+$$;
+
+create table if not exists agent_store.session_memory_frontiers (
+  tenant_id text not null check (char_length(tenant_id) between 1 and 128),
+  principal_id text not null check (char_length(principal_id) between 1 and 128),
+  session_id text not null check (char_length(session_id) between 1 and 128),
+  revision bigint not null check (revision >= 0),
+  frontier_hash text not null check (frontier_hash ~ '^sha256:[0-9a-f]{64}$'),
+  source_lineage_hash text not null check (source_lineage_hash ~ '^sha256:[0-9a-f]{64}$'),
+  last_source_run_id text,
+  created_at timestamptz not null default clock_timestamp(),
+  updated_at timestamptz not null default clock_timestamp(),
+  primary key (tenant_id, principal_id, session_id),
+  foreign key (last_source_run_id, tenant_id, principal_id, session_id)
+    references agent_store.runs (run_id, tenant_id, principal_id, session_id)
+    on delete restrict,
+  check ((revision = 0) = (last_source_run_id is null))
+);
+
+create table if not exists agent_store.session_memory_deltas (
+  tenant_id text not null,
+  principal_id text not null,
+  session_id text not null,
+  revision bigint not null check (revision >= 1),
+  source_run_id text not null,
+  parent_frontier_hash text not null check (parent_frontier_hash ~ '^sha256:[0-9a-f]{64}$'),
+  delta_hash text not null check (delta_hash ~ '^sha256:[0-9a-f]{64}$'),
+  next_frontier_hash text not null check (next_frontier_hash ~ '^sha256:[0-9a-f]{64}$'),
+  source_lineage_hash text not null check (source_lineage_hash ~ '^sha256:[0-9a-f]{64}$'),
+  delta jsonb not null check (pg_column_size(delta) between 2 and 1048576),
+  committed_at timestamptz not null default clock_timestamp(),
+  primary key (tenant_id, principal_id, session_id, revision),
+  unique (source_run_id),
+  unique (tenant_id, principal_id, session_id, next_frontier_hash),
+  foreign key (tenant_id, principal_id, session_id)
+    references agent_store.session_memory_frontiers
+      (tenant_id, principal_id, session_id) on delete restrict,
+  foreign key (source_run_id, tenant_id, principal_id, session_id)
+    references agent_store.runs (run_id, tenant_id, principal_id, session_id)
+    on delete restrict,
+  check (jsonb_typeof(delta) = 'object'),
+  check (delta->>'schema_version' = '3'),
+  check (delta->>'authority' = 'context_only'),
+  check (delta->>'parent_frontier_hash' is not distinct from parent_frontier_hash),
+  check (delta->>'revision' is not distinct from revision::text),
+  check (delta->'source'->>'run_id' is not distinct from source_run_id),
+  check (delta->'source'->>'revision' is not distinct from revision::text),
+  check (delta->'recent_turn'->>'source_run_id' is not distinct from source_run_id)
+);
+
+create index if not exists session_memory_deltas_owner_page_idx
+  on agent_store.session_memory_deltas (tenant_id, principal_id, session_id, revision)
+  include (parent_frontier_hash, delta_hash, next_frontier_hash,
+           source_lineage_hash, source_run_id);
+
+create or replace function agent_store.session_memory_frontier_hash(
+  p_parent_hash text, p_revision bigint, p_delta_hash text
+) returns text language plpgsql immutable strict set search_path = pg_catalog as $$
+begin
+  if p_parent_hash !~ '^sha256:[0-9a-f]{64}$'
+     or p_delta_hash !~ '^sha256:[0-9a-f]{64}$' or p_revision < 1 then
+    raise exception using errcode='K1000', message='invalid_memory_frontier_input';
+  end if;
+  return 'sha256:' || encode(sha256(
+    convert_to('krw.session-memory/frontier-v2','UTF8') || decode('00','hex') ||
+    convert_to(p_parent_hash,'UTF8') || decode('00','hex') ||
+    convert_to(p_revision::text,'UTF8') || decode('00','hex') ||
+    convert_to(p_delta_hash,'UTF8')), 'hex');
+end;
+$$;
+
+create or replace function agent_store.session_memory_source_lineage_hash(
+  p_parent_hash text, p_revision bigint, p_source_run_hash text
+) returns text language plpgsql immutable strict set search_path = pg_catalog as $$
+begin
+  if p_parent_hash !~ '^sha256:[0-9a-f]{64}$'
+     or p_source_run_hash !~ '^sha256:[0-9a-f]{64}$' or p_revision < 1 then
+    raise exception using errcode='K1000', message='invalid_memory_source_lineage_input';
+  end if;
+  return 'sha256:' || encode(sha256(
+    convert_to('krw.session-memory/source-lineage-v2','UTF8') || decode('00','hex') ||
+    convert_to(p_parent_hash,'UTF8') || decode('00','hex') ||
+    convert_to(p_revision::text,'UTF8') || decode('00','hex') ||
+    convert_to(p_source_run_hash,'UTF8')), 'hex');
+end;
+$$;
+
+create or replace function agent_store.reject_session_memory_delta_mutation()
+returns trigger language plpgsql set search_path = pg_catalog as $$
+begin
+  raise exception using errcode='K1025', message='session_memory_delta_is_append_only';
+end;
+$$;
+
+drop trigger if exists session_memory_deltas_append_only on agent_store.session_memory_deltas;
+create trigger session_memory_deltas_append_only
+  before update or delete on agent_store.session_memory_deltas
+  for each row execute function agent_store.reject_session_memory_delta_mutation();
+
 CREATE OR REPLACE FUNCTION agent_v1.commit_final(p_request jsonb) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
