@@ -82,6 +82,8 @@ AGENT_INSTALLED_INSTALLER=
 AGENT_CAPABILITY_INSTALLER=
 AGENT_INSTALLED_CAPABILITY_INSTALLER=
 AGENT_PROVIDER_BUNDLE=
+AGENT_RUNTIME_ENV_FILE=
+AGENT_RUNTIME_ENV_PATH=
 AGENT_LOCAL_INSTALL_ROOT=${KRW_AGENT_LOCAL_INSTALL_ROOT:-"$HOME/.local/share/krw-agent"}
 AGENT_OPERATOR_ROOT=${KRW_AGENT_OPERATOR_ROOT:-"$HOME/krw-agnet-prod"}
 AGENT_METRICS_PORT=${KRW_AGENT_METRICS_PORT:-15520}
@@ -246,7 +248,7 @@ resolve_agent_runtime_env() {
   esac
   [ -f "$configured_runtime_env" ] && [ ! -L "$configured_runtime_env" ] \
     || fail "KRW_AGENT_RUNTIME_ENV_FILE must point to a regular local runtime env file."
-  ENV_FILE=$configured_runtime_env
+  AGENT_RUNTIME_ENV_FILE=$configured_runtime_env
 }
 
 resolve_agent_runtime_env
@@ -278,6 +280,16 @@ case "$ENV_FILE" in
   /*) ENV_PATH=$ENV_FILE ;;
   *) ENV_PATH="$FRONT_DIR/$ENV_FILE" ;;
 esac
+if [ "$WITH_AGENT_RELEASE" = "1" ]; then
+  # The web deploy keeps its normal product/Supabase environment. Only the
+  # local daemon receives the separate operator envelope that contains its
+  # private TLS MCP endpoints and database CA.
+  if [ -n "$AGENT_RUNTIME_ENV_FILE" ]; then
+    AGENT_RUNTIME_ENV_PATH=$AGENT_RUNTIME_ENV_FILE
+  else
+    AGENT_RUNTIME_ENV_PATH=$ENV_PATH
+  fi
+fi
 require_command() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
 }
@@ -823,7 +835,7 @@ verify_sealed_local_agent_database_abi() {
     'KRW_AGENT_WORKER_ID=sealed-release-database-check' > "$agent_overlay"
   chmod 600 "$agent_overlay"
   if ! "$AGENT_PROVIDER_BUNDLE/packaging/launchd/krw-agentd-start-local" \
-    --env-file "$ENV_PATH" \
+    --env-file "$AGENT_RUNTIME_ENV_PATH" \
     --overlay-file "$agent_overlay" \
     --database-check; then
     cleanup_agent_check
@@ -840,7 +852,7 @@ activate_local_agent_release() {
       --release-id "$RELEASE_ID" \
       --provider "$AGENT_PROVIDER" \
       --metrics-port "$AGENT_METRICS_PORT" \
-      --env-file "$ENV_PATH"
+      --env-file "$AGENT_RUNTIME_ENV_PATH"
 }
 
 activate_local_agent_capability_runtime() {
