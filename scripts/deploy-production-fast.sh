@@ -396,10 +396,13 @@ run_agent_release_migrations() {
     # shellcheck disable=SC1090
     . "$ENV_PATH"
     set +a
-    agent_database_url=${KRW_AGENT_DATABASE_URL:-${AGENT_V1_DATABASE_URL:-}}
+    # Existing Mac workers use the LISTEN URL as their shared Rust store
+    # connection. It is the same production database and is valid for the
+    # sealed migration runner; do not require a duplicate AGENT_V1_* secret.
+    agent_database_url=${KRW_AGENT_DATABASE_URL:-${AGENT_V1_DATABASE_URL:-${AGENT_V1_OUTBOX_DATABASE_URL:-${AGENT_QUEUE_LISTEN_DATABASE_URL:-}}}}
     case "$agent_database_url" in
       postgres://*|postgresql://*) ;;
-      *) fail "Rust Agent V1 migration requires the local Supabase PostgreSQL runtime URL." ;;
+      *) fail "Rust Agent V1 migration requires a production Supabase PostgreSQL runtime URL." ;;
     esac
     AGENT_V1_PSQL_URL="$agent_database_url" \
       "$SCRIPT_DIR/apply-agent-v1-production-migrations.sh" \
