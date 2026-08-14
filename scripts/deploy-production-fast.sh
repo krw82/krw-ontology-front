@@ -753,6 +753,26 @@ REMOTE_SCRIPT
 }
 
 stage_local_agent_release() {
+  installed_release_root="$AGENT_LOCAL_INSTALL_ROOT/releases/$RELEASE_ID"
+  installed_state_root="$AGENT_LOCAL_INSTALL_ROOT/deploy-state/$RELEASE_ID"
+  if [ -e "$installed_release_root" ]; then
+    # A failed deployment may have completed the immutable stage step before
+    # reaching activation. Reuse only an identical, independently verifiable
+    # bundle; never overwrite an existing release directory.
+    [ -d "$installed_release_root" ] && [ ! -L "$installed_release_root" ] \
+      || fail "Existing local release path is unsafe: $installed_release_root"
+    [ ! -e "$installed_state_root" ] \
+      || fail "Release $RELEASE_ID already has activation state; create a new release id for another deployment."
+    cmp -s "$AGENT_RELEASE_ROOT/dual-release-index.json" "$installed_release_root/dual-release-index.json" \
+      || fail "Existing local release $RELEASE_ID does not match the sealed candidate."
+    for provider in glm deepseek; do
+      python3 "$installed_release_root/$provider/packaging/verify_standalone_release.py" \
+        --root "$installed_release_root/$provider" >/dev/null \
+        || fail "Existing local release $RELEASE_ID failed offline verification for $provider."
+    done
+    printf '%s\n' "Reusing verified staged local krw-agent release: $RELEASE_ID ($AGENT_PROVIDER)"
+    return 0
+  fi
   KRW_AGENT_LOCAL_INSTALL_ROOT="$AGENT_LOCAL_INSTALL_ROOT" \
     "$AGENT_LOCAL_INSTALLER" --mode stage \
       --release-root "$AGENT_RELEASE_ROOT" \
