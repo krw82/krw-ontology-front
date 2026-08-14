@@ -318,6 +318,23 @@ run_migration_dry_run() {
   migration_dry_run_output=$(mktemp "$TMP_BASE/krw-fast-migration.XXXXXX")
   if run_front_migration --dry-run >"$migration_dry_run_output" 2>&1; then
     cat "$migration_dry_run_output"
+    # Supabase CLI reports out-of-order migrations as a successful dry-run
+    # with an instruction to rerun using --include-all. Detect that advisory
+    # even when the command exits zero; otherwise the real apply phase silently
+    # omits the lifecycle migrations and the Rust compatibility gate fails.
+    if grep -q -- "--include-all" "$migration_dry_run_output"; then
+      echo "Retrying migration plan with --include-all for out-of-order local migrations."
+      if run_front_migration --include-all --dry-run >"$migration_dry_run_output" 2>&1; then
+        cat "$migration_dry_run_output"
+        rm -f "$migration_dry_run_output"
+        MIGRATION_INCLUDE_ALL=1
+        return 0
+      else
+        cat "$migration_dry_run_output" >&2
+        rm -f "$migration_dry_run_output"
+        return 1
+      fi
+    fi
     rm -f "$migration_dry_run_output"
     return 0
   fi
