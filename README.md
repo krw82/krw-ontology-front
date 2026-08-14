@@ -129,6 +129,43 @@ fail-closed입니다. `--release-id`는 이미 current인 ID만 허용합니다.
 symlink를 수동 변경하지 말고, candidate release·plugin·worker를 함께 seal하는
 전용 cutover가 구현되기 전에는 기존 current를 유지합니다.
 
+## Production 13F Refresh
+
+13F 최신 보고서를 production DB에 반영할 때는 GCP VM의 호스트에서 `npm run 13f`를
+직접 실행하지 않는다. VM 호스트에는 Node만 있고 npm이 없으며, production image에는
+원본 `scripts/` 디렉터리가 포함되지 않는다. 대신 active release의 `scripts/`와 `src/`를
+읽기 전용으로 production image에 연결하고, active release의 `runtime.env`를 사용한다.
+
+최신 보고 기간 1개씩을 15개 등록 매니저에 반영하는 명령은 다음과 같다.
+
+```bash
+gcloud compute ssh krw-onto-v3 \
+  --project=project-98c109e3-2546-4786-bac \
+  --zone=asia-northeast3-a \
+  --command='docker run --rm \
+    --network container:krw-ontology-front-web-1 \
+    --env-file /home/username/krw-ontology-front/.simple-deploy/current/runtime.env \
+    -v /home/username/krw-ontology-front/.simple-deploy/current/scripts:/app/scripts:ro \
+    -v /home/username/krw-ontology-front/.simple-deploy/current/src:/app/src:ro \
+    -w /app \
+    krw-ontology-front-web:local \
+    node scripts/refresh-sec-13f.mjs --limit 1'
+```
+
+`--limit 1`은 매니저 1개가 아니라 각 매니저의 최신 보고 기간 1개를 의미한다. 성공하면
+`[saved:pg]` 로그와 `SEC 13F refresh complete. Saved ... filing(s).`가 출력된다.
+
+DB에 쓰지 않고 SEC 조회와 파싱만 확인하려면 마지막 인자를 다음처럼 바꾼다.
+
+```text
+node scripts/refresh-sec-13f.mjs --limit 1 --dry-run
+```
+
+이 명령은 `/home/username/krw-ontology-front/.simple-deploy/current/runtime.env`
+을 사용하므로 `.env.production`을 source하지 않는다. `npm run 13f`는 로컬 또는 npm이
+설치된 개발 환경의 alias이며, production VM에서 `gcloud npm run 13f`처럼 실행하는
+명령은 아니다. `...`를 명령에 그대로 넣어도 안 된다.
+
 ## Operations
 
 운영 절차와 장애 대응은 [docs/OPERATIONS.md](docs/OPERATIONS.md)를 기준으로 합니다.

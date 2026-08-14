@@ -386,9 +386,7 @@ function ChangeStoryRow({
 }) {
   const displayName = holdingDisplayName(holding);
   const primaryLabel = holding.ticker ?? displayName;
-  const secondaryLabel = holding.ticker
-    ? displayName
-    : "CUSIP " + holding.cusip;
+  const secondaryLabel = holding.ticker ? displayName : null;
   const rowClassName = [
     "motion-13f-row group flex min-h-[88px] items-center gap-3 px-0 py-4 transition-colors sm:min-h-[148px] sm:flex-col sm:items-start sm:justify-between sm:px-5 sm:py-5",
     holding.chatHref
@@ -413,12 +411,14 @@ function ChangeStoryRow({
           />
         ) : null}
         <div className="min-w-0">
-          <p className="truncate font-mono text-[22px] font-black leading-6 tracking-[-0.06em] text-ink">
+          <p className="break-words font-mono text-[22px] font-black leading-6 tracking-[-0.06em] text-ink">
             {primaryLabel}
           </p>
-          <p className="mt-1 truncate text-[13px] font-bold leading-5 text-body">
-            {secondaryLabel}
-          </p>
+          {secondaryLabel ? (
+            <p className="mt-1 break-words text-[13px] font-bold leading-5 text-body">
+              {secondaryLabel}
+            </p>
+          ) : null}
         </div>
       </div>
       <div className="ml-auto text-right sm:ml-0 sm:text-left">
@@ -534,9 +534,11 @@ function CoreHoldingRow({
           <span className="block truncate text-[15px] font-black leading-5 text-ink transition-colors group-hover:text-primary">
             {displayName}
           </span>
-          <span className="mt-1 block font-mono text-[11px] font-bold leading-4 text-muted">
-            {holding.ticker ?? holding.cusip}
-          </span>
+          {holding.ticker ? (
+            <span className="mt-1 block font-mono text-[11px] font-bold leading-4 text-muted">
+              {holding.ticker}
+            </span>
+          ) : null}
         </span>
       </span>
       <span className="text-right font-mono text-[12px] font-black leading-5 text-ink">
