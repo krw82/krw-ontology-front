@@ -20,6 +20,8 @@ export type AgentV1ProductOutboxKind =
   | "answer.presentation"
   | "answer.billing"
   | "answer.notification"
+  | "run.started"
+  | "run.progress"
   | "run.cancelled"
   | "run.failed"
   | "run.deferred";
@@ -157,9 +159,13 @@ const ACK_STATEMENT = Object.freeze({
   name: "krw_front_agent_v1_ack_outbox",
   text: "SELECT agent_v1.ack_outbox($1::jsonb) AS result",
 });
-const APPLY_STATEMENT = Object.freeze({
+const APPLY_TERMINAL_STATEMENT = Object.freeze({
   name: "krw_front_agent_v1_apply_product_outbox",
   text: "SELECT public.apply_agent_v1_product_outbox($1::jsonb) AS result",
+});
+const APPLY_LIFECYCLE_STATEMENT = Object.freeze({
+  name: "krw_front_agent_v1_apply_product_outbox_v2",
+  text: "SELECT public.apply_agent_v1_product_outbox_v2($1::jsonb) AS result",
 });
 const PRODUCT_MAPPING_STATEMENT = Object.freeze({
   name: "krw_front_agent_v1_product_mapping_exists",
@@ -202,8 +208,14 @@ export class PostgresAgentV1OutboxPort implements AgentV1OutboxPort {
       return "ignored";
     }
     const eventObject = event as unknown as JsonObject;
+    const statement = isLifecycleOutboxKind(event.event_kind)
+      ? APPLY_LIFECYCLE_STATEMENT
+      : APPLY_TERMINAL_STATEMENT;
+    const operation = isLifecycleOutboxKind(event.event_kind)
+      ? "apply_lifecycle_outbox"
+      : "apply_product_outbox";
     const response = exactObject(
-      await executeFixed(this.client, "apply_product_outbox", APPLY_STATEMENT, {
+      await executeFixed(this.client, operation, statement, {
         schema_version: 1,
         event_hash: canonicalHash(eventObject),
         event: eventObject,
@@ -358,7 +370,15 @@ const OUTBOX_KINDS = new Set<AgentV1ProductOutboxKind>([
   "answer.presentation",
   "answer.billing",
   "answer.notification",
+  "run.started",
+  "run.progress",
   "run.cancelled",
   "run.failed",
   "run.deferred",
 ]);
+
+function isLifecycleOutboxKind(
+  value: AgentV1ProductOutboxKind,
+): value is "run.started" | "run.progress" {
+  return value === "run.started" || value === "run.progress";
+}

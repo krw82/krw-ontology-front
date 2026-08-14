@@ -73,4 +73,34 @@ describe("Agent V1 research run-kind migrations", () => {
     expect(source).toContain("when others then");
     expect(source).not.toContain("provider_message");
   });
+
+  it("admits durable lifecycle events without changing terminal projection", () => {
+    const source = readFileSync(
+      join(migrationRoot, "20260814145432_agent_v1_lifecycle_projection.sql"),
+      "utf8",
+    );
+    expect(source).toContain("apply_agent_v1_product_outbox_v2");
+    expect(source).toContain("'run.started'");
+    expect(source).toContain("'run.progress'");
+    expect(source).toContain("'researching'");
+    expect(source).toContain("'composing'");
+    expect(source).toContain("lifecycle_run_version");
+    expect(source).toContain("lifecycle_stage");
+    expect(source).toContain("status = case");
+    expect(source).toContain("status not in ('completed', 'failed', 'cancelled', 'expired')");
+    expect(source).toContain("return public.apply_agent_v1_product_outbox(p_request)");
+  });
+
+  it("keeps refined failure classification bounded and non-blocking", () => {
+    const source = readFileSync(
+      join(migrationRoot, "20260814145704_agent_v1_failure_classification.sql"),
+      "utf8",
+    );
+    expect(source).toContain("reclassify_agent_v1_failure_notice");
+    expect(source).toContain("engine_output_thinking_budget_exhausted");
+    expect(source).toContain("engine_input_session_memory_delta_invalid");
+    expect(source).toContain("failure_class");
+    expect(source).toContain("when others then");
+    expect(source).not.toContain("provider_message");
+  });
 });

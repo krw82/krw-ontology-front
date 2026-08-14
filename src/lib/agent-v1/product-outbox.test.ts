@@ -63,6 +63,19 @@ describe("dispatchProductOutboxOnce", () => {
     expect(report.released).toBe(0);
     expect(port.failedAcks).toHaveLength(0);
   });
+
+  it("treats lifecycle events as product-owned and ACKs them after projection", async () => {
+    const port = new FakePort([event(1, "run.started")]);
+    const report = await dispatchProductOutboxOnce(port, {
+      workerId: "worker-1",
+      claimLimit: 1,
+      leaseMs: 30_000,
+      concurrency: 1,
+    });
+
+    expect(report).toMatchObject({ claimed: 1, applied: 1, delivered: 1 });
+    expect(port.operations).toEqual(["apply:1", "ack-success:1"]);
+  });
 });
 
 class FakePort implements AgentV1OutboxPort {
@@ -109,11 +122,14 @@ class FakePort implements AgentV1OutboxPort {
   }
 }
 
-function event(outboxId: number): AgentV1OutboxReceipt {
+function event(
+  outboxId: number,
+  eventKind: AgentV1OutboxReceipt["event_kind"] = "answer.committed",
+): AgentV1OutboxReceipt {
   return {
     outbox_id: outboxId,
     run_id: RUN_ID,
-    event_kind: "answer.committed",
+    event_kind: eventKind,
     dedupe_key: `${RUN_ID}:answer.committed:${outboxId}`,
     payload: {
       run_id: RUN_ID,

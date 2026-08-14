@@ -61,6 +61,7 @@ try {
           to_regprocedure('public.enqueue_agent_v1_product_run_v7(jsonb)') is not null as product_enqueue,
           to_regprocedure('public.cancel_agent_v1_product_run(jsonb)') is not null as product_cancel,
           to_regprocedure('public.apply_agent_v1_product_outbox(jsonb)') is not null as product_outbox,
+          to_regprocedure('public.apply_agent_v1_product_outbox_v2(jsonb)') is not null as product_outbox_v2,
           coalesce(
             position(
               'wide_research' in pg_get_functiondef(
@@ -82,6 +83,17 @@ try {
           to_regclass('public.agent_v1_product_run_mappings') is not null as mappings_table,
           to_regclass('public.agent_v1_product_outbox_receipts') is not null as receipts_table,
           to_regclass('public.agent_v1_daemon_heartbeats') is not null as daemon_heartbeats_table,
+          exists (
+            select 1 from information_schema.columns
+             where table_schema = 'public'
+               and table_name = 'agent_v1_product_run_mappings'
+               and column_name = 'lifecycle_stage'
+          ) as lifecycle_mapping_column,
+          exists (
+            select 1 from pg_trigger
+             where tgname = 'trg_agent_store_lifecycle_started'
+               and tgrelid = 'agent_store.runs'::regclass
+          ) as lifecycle_started_trigger,
           to_regclass('agent_store.session_memory_frontiers') is not null as session_memory_frontiers,
           to_regclass('agent_store.session_memory_deltas') is not null as session_memory_deltas,
           exists (
@@ -137,6 +149,7 @@ try {
       "product_enqueue",
       "product_cancel",
       "product_outbox",
+      "product_outbox_v2",
       "wide_research_enqueue",
       "research_run_kind_constraint",
       "commit_final",
@@ -144,6 +157,8 @@ try {
       "mappings_table",
       "receipts_table",
       "daemon_heartbeats_table",
+      "lifecycle_mapping_column",
+      "lifecycle_started_trigger",
       "session_memory_frontiers",
       "session_memory_deltas",
       "final_output_hash_column",

@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
 import { trackClientEventSilently } from "@/lib/analytics/client";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { type PulseDeviceSignal } from "@/lib/pulse/device-ranking";
 import { pulseCompanyHref, pulseCompanyName } from "@/lib/pulse/company-display";
 import CompanyLogo from "@/components/CompanyLogo";
@@ -38,6 +40,8 @@ export default function PulseCard({
 }: PulseCardProps) {
   const ref = useRef<HTMLElement>(null);
   const impressionSent = useRef(false);
+  const reducedMotion = useReducedMotion();
+  const [researchSubmitted, setResearchSubmitted] = useState(false);
   const isDevelopmentShowcase = item.metadata.development_showcase === true;
   const hasSourceGroundedBrief = item.kind === "filing" && item.metadata.filing_brief_ready === true;
 
@@ -129,11 +133,27 @@ export default function PulseCard({
   };
 
   return (
-    <article
+    <motion.article
       ref={ref}
-      className={`group relative border-b border-hairline py-lg sm:py-xl ${detailAction ? "cursor-pointer" : ""}`}
+      className={`group relative overflow-hidden border-b border-hairline py-lg sm:py-xl ${detailAction ? "cursor-pointer" : ""}`}
       data-pulse-kind={item.kind}
       data-pulse-state={item.state}
+      aria-hidden={researchSubmitted || undefined}
+      initial={false}
+      animate={researchSubmitted ? "exiting" : "visible"}
+      variants={{
+        visible: { opacity: 1, height: "auto", y: 0 },
+        exiting: {
+          opacity: 0,
+          height: 0,
+          paddingBottom: 0,
+          paddingTop: 0,
+          borderBottomWidth: 0,
+          borderColor: "transparent",
+          y: -8,
+        },
+      }}
+      transition={{ duration: reducedMotion ? 0 : 0.26, ease: "easeOut" }}
     >
       {detailAction ? (
         <Link
@@ -207,9 +227,10 @@ export default function PulseCard({
               {researchAction ? (
                 <button
                   type="button"
-                  disabled={researchPending}
+                  disabled={researchPending || researchSubmitted}
                   className="pointer-events-auto relative -left-8 mx-auto inline-flex min-h-12 w-[calc(100%-1.5rem)] max-w-[320px] items-center justify-center gap-2 rounded-[12px] border border-[#2d4160] bg-[#101827] px-base text-[13px] font-bold tracking-[0.01em] text-[#dce8ff] shadow-[0_8px_20px_rgba(16,24,40,0.16)] transition-colors hover:border-[#7da5ff] hover:bg-[#18243a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-60"
                   onClick={() => {
+                    setResearchSubmitted(true);
                     recordResearchOpen();
                     onResearch(item);
                   }}
@@ -242,7 +263,7 @@ export default function PulseCard({
         </div>
       </div>
       {isFourPanelLearning ? <LearningStoryCarousel item={item} /> : null}
-    </article>
+    </motion.article>
   );
 }
 
