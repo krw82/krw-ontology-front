@@ -1272,10 +1272,9 @@ if [ "$WITH_AGENT_RELEASE" = "1" ]; then
   upsert_env_value "$REMOTE_STAGE/runtime.env" AGENT_V1_OUTBOX_DATABASE_URL "$agent_database_url"
   upsert_env_value "$REMOTE_STAGE/runtime.env" AGENT_V1_DATABASE_CA_FILE /run/krw-agent/agent-v1-ca.pem
 fi
-# A Rust Agent V1 candidate is always admitted in a closed state first.  The
-# admission gate is opened only after activation and deep readiness succeed;
-# this prevents a web restart from creating runs against a half-started
-# provider or an unverified descriptor.
+# A Rust Agent V1 candidate starts closed while its matching Mac release and
+# web candidate are activated. It is opened immediately after deep readiness
+# proves both sides agree on the selected sealed descriptor.
 if [ "$(value_of KRW_AGENT_BACKEND_MODE)" = "rust" ]; then
   upsert_env_value "$REMOTE_STAGE/runtime.env" KRW_AGENT_ADMISSION_MODE closed
 fi
@@ -2274,10 +2273,12 @@ if [ "$SKIP_WEB" = "0" ]; then
   prune_remote_post_activation_artifacts
   if [ "$WITH_AGENT_RELEASE" = "0" ]; then
     run_remote_restore_research_admission
-  elif [ "$AGENT_FINAL_EVIDENCE_VERIFIED" = "1" ]; then
-    run_remote_open_research_admission
   else
-    echo "Rust release is healthy on this Mac and the GCP web candidate is live, but research admission remains closed until the private DeepSeek canary evidence is verified."
+    # A fresh release must be usable as soon as its transactional activation
+    # completes. The remote opener still verifies the daemon heartbeat,
+    # provider, descriptor, and release-set hashes and rolls back to closed
+    # if that check fails.
+    run_remote_open_research_admission
   fi
 fi
 
