@@ -33,9 +33,9 @@ Options:
                            to its public descriptor only.
   --agent-release-root DIR Absolute sealed dual-provider release directory.
   --agent-evidence-index FILE
-                           Optional final evidence index. When supplied and
-                           verified, admission opens after the private canary;
-                           without it the release deploys closed.
+                           Optional final evidence index retained with the
+                           release for provenance. A verified release opens
+                           admission after its readiness checks.
   --agent-provider NAME    Selected provider (glm or deepseek; default: deepseek).
   --skip-web               Do not build or switch GCP containers.
   --skip-mac               Do not restart legacy local Mac MCP/worker services.
@@ -302,10 +302,9 @@ target_value() {
 }
 
 run_migration_dry_run() {
-  TMP_BASE=$TMPDIR
-  [ -n "$TMP_BASE" ] || TMP_BASE=/tmp
+  TMP_BASE=${TMPDIR:-/tmp}
   migration_output=$(mktemp "$TMP_BASE/krw-fast-migration.XXXXXX")
-  if "$SCRIPT_DIR/supabase-cli.sh" db push --dry-run >"$migration_output" 2>&1; then
+  if run_front_migration --dry-run >"$migration_output" 2>&1; then
     cat "$migration_output"
     rm -f "$migration_output"
     return 0
@@ -313,7 +312,7 @@ run_migration_dry_run() {
   if grep -q -- "--include-all" "$migration_output"; then
     cat "$migration_output"
     echo "Retrying migration plan with --include-all for out-of-order local migrations."
-    if "$SCRIPT_DIR/supabase-cli.sh" db push --include-all --dry-run >"$migration_output" 2>&1; then
+    if run_front_migration --include-all --dry-run >"$migration_output" 2>&1; then
       cat "$migration_output"
       rm -f "$migration_output"
       MIGRATION_INCLUDE_ALL=1
@@ -323,6 +322,55 @@ run_migration_dry_run() {
   cat "$migration_output" >&2
   rm -f "$migration_output"
   return 1
+}
+
+# Supabase CLI normally connects to the linked project's direct database
+# hostname. Some operator networks are IPv4-only while that hostname resolves
+# to IPv6. The Rust daemon already has a production-owned TLS session-pooler
+# URL for the same database, so use it only for this specific network failure.
+# Every other migration error is returned unchanged: a fallback must never
+# hide a SQL or migration-history failure.
+front_migration_pooler_url() {
+  (
+    set -a
+    # shellcheck disable=SC1090
+    . "$ENV_PATH"
+    set +a
+    candidate=${KRW_AGENT_DATABASE_URL:-${AGENT_V1_DATABASE_URL:-${AGENT_V1_OUTBOX_DATABASE_URL:-${AGENT_QUEUE_LISTEN_DATABASE_URL:-}}}}
+    case "$candidate" in
+      postgres://*|postgresql://*) printf '%s' "$candidate" ;;
+      *) return 1 ;;
+    esac
+  )
+}
+
+run_front_migration() {
+  TMP_BASE=${TMPDIR:-/tmp}
+  migration_output=$(mktemp "$TMP_BASE/krw-front-migration.XXXXXX")
+  if "$SCRIPT_DIR/supabase-cli.sh" db push "$@" >"$migration_output" 2>&1; then
+    cat "$migration_output"
+    rm -f "$migration_output"
+    return 0
+  fi
+  migration_status=$?
+  if ! grep -Eq 'IPv6 is not supported on your current network|no route to host' "$migration_output"; then
+    cat "$migration_output" >&2
+    rm -f "$migration_output"
+    return "$migration_status"
+  fi
+  pooler_url=$(front_migration_pooler_url) || {
+    cat "$migration_output" >&2
+    rm -f "$migration_output"
+    fail "Direct Supabase migration connection is unavailable and no production pooler URL is configured."
+  }
+  echo "Direct Supabase database connection is IPv6-only; retrying this migration through the configured TLS session pooler." >&2
+  if "$SCRIPT_DIR/supabase-cli.sh" db push --db-url "$pooler_url" "$@"; then
+    rm -f "$migration_output"
+    return 0
+  fi
+  migration_status=$?
+  rm -f "$migration_output"
+  return "$migration_status"
 }
 
 # The migration CLI uses the linked project metadata, but the schema smoke
@@ -2214,9 +2262,9 @@ if [ "$APPLY_MIGRATIONS" = "1" ]; then
     run_agent_release_migrations
   fi
   if [ "$MIGRATION_INCLUDE_ALL" = "1" ]; then
-    "$SCRIPT_DIR/supabase-cli.sh" db push --include-all
+    run_front_migration --include-all
   else
-    "$SCRIPT_DIR/supabase-cli.sh" db push
+    run_front_migration
   fi
   run_schema_smoke
   if [ "$WITH_AGENT_RELEASE" = "1" ]; then
