@@ -385,7 +385,14 @@ run_schema_smoke() {
     set +a
     node "$SCRIPT_DIR/supabase-schema-smoke.mjs"
     if [ "$WITH_AGENT_RELEASE" = "1" ]; then
-      node "$SCRIPT_DIR/verify-agent-v1-compatibility.mjs"
+      agent_database_url=${KRW_AGENT_DATABASE_URL:-${AGENT_V1_DATABASE_URL:-${AGENT_V1_OUTBOX_DATABASE_URL:-${AGENT_QUEUE_LISTEN_DATABASE_URL:-}}}}
+      case "$agent_database_url" in
+        postgres://*|postgresql://*) ;;
+        *) fail "Rust Agent V1 schema smoke requires a production Supabase PostgreSQL runtime URL." ;;
+      esac
+      AGENT_V1_DATABASE_URL="$agent_database_url" \
+      AGENT_V1_DATABASE_CA_FILE="$FRONT_DIR/ops/certificates/supabase-root-2021-ca.crt" \
+        node "$SCRIPT_DIR/verify-agent-v1-compatibility.mjs"
     fi
   )
 }
@@ -404,6 +411,8 @@ run_agent_release_migrations() {
       postgres://*|postgresql://*) ;;
       *) fail "Rust Agent V1 migration requires a production Supabase PostgreSQL runtime URL." ;;
     esac
+    AGENT_V1_DATABASE_URL="$agent_database_url" \
+    AGENT_V1_DATABASE_CA_FILE="$FRONT_DIR/ops/certificates/supabase-root-2021-ca.crt" \
     AGENT_V1_PSQL_URL="$agent_database_url" \
       "$SCRIPT_DIR/apply-agent-v1-production-migrations.sh" \
         --agent-release "$AGENT_PROVIDER_BUNDLE" \

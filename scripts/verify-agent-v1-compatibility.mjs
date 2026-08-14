@@ -3,6 +3,12 @@ import { lstatSync, readFileSync } from "node:fs";
 
 const connectionString = firstNonEmpty(
   process.env.AGENT_V1_DATABASE_URL,
+  process.env.AGENT_V1_OUTBOX_DATABASE_URL,
+  // The Mac daemon's LISTEN connection is the same TLS session-pooler
+  // database used by the Rust store. Older production env files keep this
+  // canonical URL under the worker key rather than duplicating it as AGENT_V1.
+  process.env.AGENT_QUEUE_LISTEN_DATABASE_URL,
+  process.env.AGENT_RUN_CANCEL_LISTEN_DATABASE_URL,
   process.env.SUPABASE_DB_URL,
   process.env.DATABASE_URL,
   process.env.POSTGRES_URL,
