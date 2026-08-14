@@ -115,8 +115,13 @@ export default function PulseFeed({
   const pendingMutationIdsRef = useRef<Set<string>>(new Set());
   const pulseViewTrackedRef = useRef(false);
   const degradedSourcesTrackedRef = useRef<Set<string>>(new Set());
+  const researchActivityFocusConsumedRef = useRef(false);
   const pullStartYRef = useRef<number | null>(null);
   const pullDistanceRef = useRef(0);
+  const [researchActivityFocused, setResearchActivityFocused] = useState(false);
+  const [researchActivityFocusRequested, setResearchActivityFocusRequested] = useState(false);
+  const [researchPendingIds, setResearchPendingIds] = useState<Set<string>>(new Set());
+  const researchPendingIdsRef = useRef<Set<string>>(new Set());
 
   const setFeed = useCallback((nextState: SetStateAction<PulseFeedResponse>) => {
     const nextFeed =
@@ -202,6 +207,47 @@ export default function PulseFeed({
   const showDegradedNotice = !initialFeedLoading && !feedUnavailable && degraded.length > 0;
   const showInitialLoadFailure = !initialFeedLoading && feedUnavailable && errorMessage !== null;
   const showSyncIndicator = loading && !initialFeedLoading && !feedUnavailable;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hasHashFocusRequest = window.location.hash === "#research-activity";
+    if (
+      (hasHashFocusRequest && researchActivityFocusConsumedRef.current)
+      || (!hasHashFocusRequest && !researchActivityFocusRequested)
+      || (!hasActiveAnalysis && !hasCompletedAnalysis)
+    ) {
+      return;
+    }
+    const target = document.getElementById("research-activity");
+    if (!target) return;
+
+    if (hasHashFocusRequest) researchActivityFocusConsumedRef.current = true;
+    let focusResetTimer: number | null = null;
+    const focusTimer = window.setTimeout(() => {
+      target.scrollIntoView({
+        behavior: reducedMotion ? "auto" : "smooth",
+        block: "start",
+      });
+      setResearchActivityFocused(true);
+      if (!hasHashFocusRequest) setResearchActivityFocusRequested(false);
+      focusResetTimer = window.setTimeout(
+        () => setResearchActivityFocused(false),
+        reducedMotion ? 0 : 1_400,
+      );
+      if (hasHashFocusRequest) {
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${window.location.search}`,
+        );
+      }
+    }, 0);
+
+    return () => {
+      window.clearTimeout(focusTimer);
+      if (focusResetTimer !== null) window.clearTimeout(focusResetTimer);
+    };
+  }, [hasActiveAnalysis, hasCompletedAnalysis, reducedMotion, researchActivityFocusRequested]);
 
   useEffect(() => {
     // The server intentionally renders an unavailable shell and the first
@@ -373,6 +419,64 @@ export default function PulseFeed({
       }
     }
   }, [cancelStatusRequest, setFeed]);
+
+  const startResearch = useCallback(async (item: PulseItem) => {
+    if (!item.ticker || researchPendingIdsRef.current.has(item.id)) return;
+
+    researchPendingIdsRef.current.add(item.id);
+    setResearchPendingIds((current) => new Set(current).add(item.id));
+
+    try {
+      const response = await fetch("/api/chat/run", {
+        method: "POST",
+        headers: {
+          Accept: "text/event-stream",
+          "Content-Type": "application/json",
+          "X-KRW-Locale": "ko-KR",
+        },
+        body: JSON.stringify({
+          content: `${item.ticker} ${item.title}의 투자 관점과 근거를 확인해줘`,
+          request_id: createFeedSessionId(),
+          research_mode: "standard",
+          analysis_mode: "standard",
+          run_kind: "company_research",
+          scope_type: "company",
+          default_tickers: [item.ticker],
+          default_document_types: [],
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+          return;
+        }
+        throw new Error(`research request failed: ${response.status}`);
+      }
+
+      await response.body?.cancel();
+      setResearchActivityFocusRequested(true);
+      void fetchDelta();
+      window.setTimeout(() => void fetchDelta(), 600);
+      window.setTimeout(() => void fetchDelta(), 1_600);
+      window.setTimeout(() => {
+        researchPendingIdsRef.current.delete(item.id);
+        setResearchPendingIds((current) => {
+          const next = new Set(current);
+          next.delete(item.id);
+          return next;
+        });
+      }, 1_800);
+    } catch {
+      researchPendingIdsRef.current.delete(item.id);
+      setResearchPendingIds((current) => {
+        const next = new Set(current);
+        next.delete(item.id);
+        return next;
+      });
+      setErrorMessage("리서치를 시작하지 못했습니다. 잠시 후 다시 시도해주세요.");
+    }
+  }, [fetchDelta]);
 
   const refreshFeed = useCallback(async (
     origin: PulseRefreshOrigin,
@@ -740,6 +844,7 @@ export default function PulseFeed({
           <ResearchActivityRail
             activeItems={activeResearchItems}
             completedItems={completedAnalysisItems}
+            focused={researchActivityFocused}
             feedSessionId={feedSessionId}
             rankingVersion={feed.ranking_version}
             onMutation={mutate}
@@ -823,10 +928,12 @@ export default function PulseFeed({
                         item={entry.item}
                         position={entry.position}
                         pending={pendingIds.has(entry.item.id)}
+                        researchPending={researchPendingIds.has(entry.item.id)}
                         feedSessionId={feedSessionId}
                         rankingVersion={feed.ranking_version}
                         onMutation={mutate}
                         onDeviceSignal={recordDeviceSignal}
+                        onResearch={startResearch}
                       />
                     )}
                   </motion.div>
@@ -877,6 +984,7 @@ export default function PulseFeed({
 function ResearchActivityRail({
   activeItems,
   completedItems,
+  focused,
   feedSessionId,
   rankingVersion,
   onMutation,
@@ -885,6 +993,7 @@ function ResearchActivityRail({
 }: {
   activeItems: PulseItem[];
   completedItems: PulseItem[];
+  focused: boolean;
   feedSessionId: string;
   rankingVersion: PulseFeedResponse["ranking_version"];
   onMutation: (item: PulseItem, action: PulseMutationAction) => void;
@@ -897,7 +1006,21 @@ function ResearchActivityRail({
   ].filter((value): value is string => Boolean(value));
 
   return (
-    <section className="mb-base overflow-hidden rounded-[22px] bg-ink text-white" aria-labelledby="research-activity-title">
+    <motion.section
+      id="research-activity"
+      className="mb-base overflow-hidden rounded-[22px] bg-ink text-white"
+      animate={{
+        boxShadow: focused && !reducedMotion
+          ? [
+              "inset 0 0 0 0 rgba(173, 200, 255, 0)",
+              "inset 0 0 0 3px rgba(173, 200, 255, 0.55)",
+              "inset 0 0 0 0 rgba(173, 200, 255, 0)",
+            ]
+          : "inset 0 0 0 0 rgba(173, 200, 255, 0)",
+      }}
+      transition={{ duration: focused && !reducedMotion ? 1.2 : 0, ease: easeOutExpo }}
+      aria-labelledby="research-activity-title"
+    >
       <div className="flex min-h-9 items-center justify-between border-b border-white/15 px-lg py-sm">
         <h2 id="research-activity-title" className="text-[12px] font-extrabold tracking-[0.08em] text-[#adc8ff]">
           리서치 활동
@@ -980,7 +1103,7 @@ function ResearchActivityRail({
           ) : null}
         </AnimatePresence>
       </div>
-    </section>
+    </motion.section>
   );
 }
 
@@ -998,7 +1121,10 @@ function ActiveResearchRow({
   const companyName = pulseCompanyName(item);
   const companyHref = pulseCompanyHref(item.ticker);
   const primary = item.primary_action;
-  const isRunning = item.metadata.run_status === "running";
+  // Every item in this component comes from the active-analysis lane. The
+  // backend may still report pending/queued before the worker starts, but it
+  // is already in progress from the user's perspective.
+  const isRunning = item.phase === "active";
   const openResearch = () => {
     onDeviceSignal(item, "open");
     trackClientEventSilently("pulse_item_opened", {
@@ -1057,10 +1183,14 @@ function ActiveResearchRow({
             onClick={openResearch}
           >
             <span className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold leading-5 text-white">
-              {isRunning ? <span className="material-symbols-outlined progress-spin shrink-0 text-[14px] text-[#adc8ff]" aria-hidden="true">progress_activity</span> : null}
               <span className="truncate">{item.title}</span>
             </span>
-            <span className="material-symbols-outlined shrink-0 text-[18px] text-[#adc8ff] transition-transform group-hover:translate-x-0.5" aria-hidden="true">arrow_forward</span>
+            <span
+              className={`material-symbols-outlined shrink-0 text-[18px] text-[#adc8ff] ${isRunning ? "progress-spin" : "transition-transform group-hover:translate-x-0.5"}`}
+              aria-hidden="true"
+            >
+              {isRunning ? "progress_activity" : "arrow_forward"}
+            </span>
           </Link>
         </div>
       ) : (

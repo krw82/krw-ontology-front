@@ -245,7 +245,10 @@ export async function composePulseFeed({
     candidateItems.map((candidate) => [candidate.item_key, candidate.server_rank]),
   );
 
-  const visibleActiveAnalysis = [...developmentActiveAnalysis, ...activeAnalysis]
+  // A real user-started run must be visible before the development-only
+  // showcase rows. Otherwise the fixed NVDA/MSFT rows can fill the compact
+  // status lane and leave the newly started run as a duplicate candidate card.
+  const visibleActiveAnalysis = [...activeAnalysis, ...developmentActiveAnalysis]
     .slice(0, PULSE_ACTIVE_ANALYSIS_ITEM_LIMIT)
     .map((candidate, activeIndex) => ({
       ...candidate,
@@ -256,7 +259,7 @@ export async function composePulseFeed({
         ?? candidateItems.length + activeIndex,
     }));
 
-  const visibleCompletedAnalysis = [...developmentCompletedAnalysis, ...completedAnalysis]
+  const visibleCompletedAnalysis = [...completedAnalysis, ...developmentCompletedAnalysis]
     .slice(0, PULSE_COMPLETED_ANALYSIS_ITEM_LIMIT);
 
   const sinceTime = since && !Number.isNaN(Date.parse(since)) ? Date.parse(since) : null;

@@ -13,10 +13,12 @@ interface PulseCardProps {
   item: PulseItem;
   position: number;
   pending: boolean;
+  researchPending: boolean;
   feedSessionId: string;
   rankingVersion: PulseFeedResponse["ranking_version"];
   onMutation: (item: PulseItem, action: PulseMutationAction) => void;
   onDeviceSignal: (item: PulseItem, signal: PulseDeviceSignal) => void;
+  onResearch: (item: PulseItem) => void;
 }
 
 function pulseImpressionStorageKey(feedSessionId: string, itemId: string): string {
@@ -27,10 +29,12 @@ export default function PulseCard({
   item,
   position,
   pending,
+  researchPending,
   feedSessionId,
   rankingVersion,
   onMutation,
   onDeviceSignal,
+  onResearch,
 }: PulseCardProps) {
   const ref = useRef<HTMLElement>(null);
   const impressionSent = useRef(false);
@@ -84,7 +88,8 @@ export default function PulseCard({
   const analysisActive = item.kind === "analysis" && item.phase === "active";
   const isFourPanelLearning = item.kind === "learning" && item.metadata.learning_kind === "four_panel";
   const isCompanyStory = item.kind === "learning"
-    && typeof item.metadata.editorial_series_id === "string";
+    && (typeof item.metadata.editorial_series_id === "string"
+      || stringMetadata(item, "source_label") === "KRW.O 회사 이야기");
   const hasInteractiveMedia = item.kind === "learning"
     && (item.metadata.learning_kind === "image" || item.metadata.learning_kind === "carousel");
   const detailAction = primary.type === "link" && !analysisActive && item.kind !== "question"
@@ -194,20 +199,31 @@ export default function PulseCard({
             <p className="mt-xs line-clamp-2 text-[14px] leading-6 text-body">{visibleDetail}</p>
           ) : null}
 
-          {item.kind === "filing" ? <FilingSourceLine item={item} /> : null}
-
           {!isFourPanelLearning && !isCompanyStory ? (
             <div className="mt-sm flex min-h-11 flex-wrap items-center gap-x-base gap-y-0.5">
               {item.kind !== "filing" && !analysisActive && pulseActionContext(item, analysisStatus) ? (
                 <span className="text-[12px] font-medium text-muted">{pulseActionContext(item, analysisStatus)}</span>
               ) : null}
-              {visibleAction.type === "link" ? (
+              {researchAction ? (
+                <button
+                  type="button"
+                  disabled={researchPending}
+                  className="pointer-events-auto relative -left-8 mx-auto inline-flex min-h-12 w-[calc(100%-1.5rem)] max-w-[320px] items-center justify-center gap-2 rounded-[12px] border border-[#2d4160] bg-[#101827] px-base text-[13px] font-bold tracking-[0.01em] text-[#dce8ff] shadow-[0_8px_20px_rgba(16,24,40,0.16)] transition-colors hover:border-[#7da5ff] hover:bg-[#18243a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-60"
+                  onClick={() => {
+                    recordResearchOpen();
+                    onResearch(item);
+                  }}
+                >
+                  <span>{researchPending ? "Researching..." : "Research NOW"}</span>
+                  <ResearchNowIcon />
+                </button>
+              ) : visibleAction.type === "link" ? (
                 <Link
                   href={visibleAction.href}
                   className="pointer-events-auto inline-flex min-h-11 items-center gap-1 text-[13px] font-bold text-primary transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  onClick={researchAction ? recordResearchOpen : recordPrimaryOpen}
+                  onClick={recordPrimaryOpen}
                 >
-                  {researchAction ? "이 이슈로 리서치" : visibleAction.label}
+                  {visibleAction.label}
                   <span className="material-symbols-outlined text-[16px]" aria-hidden="true">arrow_forward</span>
                 </Link>
               ) : (
@@ -230,6 +246,23 @@ export default function PulseCard({
   );
 }
 
+function ResearchNowIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="size-5 shrink-0"
+      viewBox="0 0 24 24"
+      fill="none"
+      focusable="false"
+    >
+      <path
+        d="M12 1.5c1.35 6.2 4.3 9.15 10.5 10.5-6.2 1.35-9.15 4.3-10.5 10.5C10.65 16.3 7.7 13.35 1.5 12 7.7 10.65 10.65 7.7 12 1.5Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 /**
  * Keep the original primary link as the card's source/detail destination and
  * promote a research link to the single visible CTA. Mutation actions stay in
@@ -246,18 +279,10 @@ function pulseResearchAction(item: PulseItem): PulseLinkAction | null {
   if (existing) return existing;
   if (!item.ticker || item.kind === "checkup" || item.kind === "learning") return null;
 
-  const params = new URLSearchParams({
-    ticker: item.ticker,
-    query: `${item.ticker} ${item.title}의 투자 관점과 근거를 확인해줘`,
-  });
-  // news 아이템은 source_id에 마켓 이슈 UUID를 갖고 있음 — 채팅에서 출처 연결을 위해 전달
-  if (item.source_type === "news" && item.source_id) {
-    params.set("news_issue_id", item.source_id);
-  }
   return {
     type: "link",
     label: "이 이슈로 리서치",
-    href: `/chat/new?${params.toString()}`,
+    href: "/pulse#research-activity",
     analytics_name: "pulse_answer_prefilled",
   };
 }
@@ -402,18 +427,6 @@ function FilingChangeBrief({ item }: { item: PulseItem }) {
   );
 }
 
-function FilingSourceLine({ item }: { item: PulseItem }) {
-  const formType = stringMetadata(item, "form_type");
-  const factCount = numberMetadata(item, "filing_brief_fact_count");
-  return (
-    <p className="mt-sm flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] leading-5">
-      <span className="font-semibold text-body">{formType ? `SEC ${formType}` : "SEC 공시"}</span>
-      <span className="text-muted" aria-hidden="true">·</span>
-      <span className="font-medium text-muted">{factCount > 0 ? `원문 근거 ${factCount}개` : "제출 원문"}</span>
-    </p>
-  );
-}
-
 export function filingChanges(body: string): string[] {
   return body
     .split(/(?<=[.!?。])\s+/u)
@@ -454,7 +467,7 @@ function pulseActionContext(item: PulseItem, analysisStatus: string | null): str
     if (item.phase === "failed") return "다시 시도 가능";
     return "답변과 근거 준비됨";
   }
-  if (item.kind === "question") return "이 질문으로 이어서 보기";
+  if (item.kind === "question") return "";
   if (item.kind === "resurface") return "";
   if (item.kind === "checkup") return "오늘의 확인 항목";
   if (item.kind === "news") return "";

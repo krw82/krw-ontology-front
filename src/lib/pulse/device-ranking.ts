@@ -324,7 +324,15 @@ export function selectDevicePulseSlate(
   for (const item of feed.active_analysis_items) {
     if (!candidatesById.has(item.id)) candidatesById.set(item.id, item);
   }
-  const activeAnalysisIds = new Set(feed.active_analysis_items.map((item) => item.id));
+  const activeAnalysisIds = new Set([
+    ...feed.active_analysis_items.map((item) => item.id),
+    // A V5/V10 response can carry an active analysis in the candidate
+    // reservoir as a compatibility fallback. It still belongs only in the
+    // dedicated research activity rail.
+    ...feed.candidate_items
+      .filter((item) => item.kind === "analysis" && item.phase === "active")
+      .map((item) => item.id),
+  ]);
 
   const eligible = [...candidatesById.values()]
     // Active analyses render in the dedicated status rail, not again inside

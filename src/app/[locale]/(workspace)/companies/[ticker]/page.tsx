@@ -6,7 +6,6 @@ import CompanyInsiderTransactions from "@/components/CompanyInsiderTransactions"
 import CompanyRecentMarketNews from "@/components/CompanyRecentMarketNews";
 import CompanyRecentImportantFilings from "@/components/CompanyRecentImportantFilings";
 import CompanyWatchlistActions from "@/components/CompanyWatchlistActions";
-import CompanyFilingSubscriptionControl from "@/components/filings/CompanyFilingSubscriptionControl";
 import CompanyEditorialSeriesSection, { type CompanyEditorialSeries } from "@/components/editorial/CompanyEditorialSeriesSection";
 import InstitutionalTickerActivity from "@/components/InstitutionalTickerActivity";
 import CompanyValuationSnapshot from "@/components/CompanyValuationSnapshot";
@@ -318,8 +317,6 @@ export default async function CompanyLandingPage({
   };
   const watchlistPath = `/watchlist/${displayCompany.ticker}`;
   const watchlistLoginHref = `/login?next=${encodeURIComponent(watchlistPath)}`;
-  const companyPath = localizedPath(locale, `/companies/${displayCompany.ticker}`);
-  const filingNotificationLoginHref = `/login?next=${encodeURIComponent(companyPath)}`;
 
   return (
     <div className="bg-canvas text-ink">
@@ -411,14 +408,6 @@ export default async function CompanyLandingPage({
                   }
                 />
               </div>
-            </div>
-            <div className="mt-4 max-w-3xl">
-              <CompanyFilingSubscriptionControl
-                ticker={displayCompany.ticker}
-                locale={locale}
-                loginHref={filingNotificationLoginHref}
-                isAuthenticated={Boolean(user)}
-              />
             </div>
           </header>
 
