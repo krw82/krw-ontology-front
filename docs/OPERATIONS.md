@@ -197,17 +197,11 @@ FILING_NOTIFICATION_CREATION_ENABLED=0        # stop new inbox entries
 FILING_DETECTION_ENABLED=0                    # stop SEC polling
 ```
 
-## SDK Freeze
+## Research engine boundary
 
-Pinned versions:
-
-```text
-Node @anthropic-ai/claude-agent-sdk: 0.3.204
-Python claude-agent-sdk: 0.2.85
-Claude Code native binary: 2.1.204
-```
-
-Use `npm run verify:sdk-freeze` before deploying. Do not update the SDK as part of routine dependency maintenance.
+The web application uses the pinned Rust `krw-agent` release and Supabase queue.
+The frontend image must not contain Claude Agent SDK or a Claude Code binary.
+Run `npm run verify:sdk-freeze` before deployment; it verifies their absence.
 
 ## Supabase Hosted Settings
 

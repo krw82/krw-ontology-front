@@ -229,11 +229,12 @@ export interface AgentRunRow extends Record<string, unknown> {
     | "company_research"
     | "idea_generation"
     | "news_discovery"
+    | "news_discovery_wide"
     | "news_research"
     | "market_move_research"
     | "scenario_sensitivity"
     | "guru_advisor";
-  executor_type: "claude_agent" | "server_pipeline";
+  executor_type: "claude_agent" | "server_pipeline" | "rust_agent";
   selected_news_event_context: Json | null;
   source_artifact_id: string | null;
   source_event_id: string | null;

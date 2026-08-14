@@ -15,6 +15,69 @@ const MAX_POST_TEXT_CHARS = 1_200;
 const MAX_CONTEXT_POST_TEXT_CHARS = 25_000;
 const MAX_CONTEXT_SOURCE_TEXT_CHARS = 120_000;
 
+// Keep MCP payloads bounded at the database boundary.  These projections are
+// intentionally explicit so a newly-added media, enrichment, or operational
+// column cannot silently inflate every research prompt.
+const MARKET_ISSUE_COLUMNS = [
+  "id",
+  "env",
+  "event_key",
+  "state",
+  "title_ko",
+  "summary_ko",
+  "impact_path",
+  "confirmed_facts",
+  "unconfirmed_facts",
+  "status_labels",
+  "source_summary",
+  "source_count",
+  "market_score",
+  "risk_level",
+  "first_observed_at",
+  "published_at",
+  "last_published_at",
+  "updated_at",
+  "merged_into_issue_id",
+  "active_research_packet_id",
+].join(",");
+const MARKET_ISSUE_ENTITY_COLUMNS =
+  "issue_id,ticker,entity_name,relationship,relationship_reason,confidence";
+const MARKET_SOURCE_ITEM_COLUMNS = [
+  "id",
+  "env",
+  "source_id",
+  "external_item_id",
+  "canonical_url",
+  "original_text",
+  "normalized_text_hash",
+  "public_metrics",
+  "source_metadata",
+  "published_at",
+  "deleted_at",
+  "status",
+  "title",
+  "content_kind",
+  "extraction_method",
+  "extraction_confidence",
+  "signal_level",
+].join(",");
+const MARKET_SOURCE_COLUMNS =
+  "id,source_type,account_handle,display_name,source_class";
+const MARKET_MEDIA_COLUMNS = [
+  "id",
+  "source_item_id",
+  "ordinal",
+  "media_type",
+  "media_url",
+  "content_hash",
+  "extraction_status",
+  "extraction_model",
+  "extraction_confidence",
+  "extraction_payload",
+].join(",");
+const MARKET_RESEARCH_PACKET_COLUMNS =
+  "id,issue_id,version,status,source_context_hash,payload,created_at,updated_at";
+
 export class KrwFeedReaderError extends Error {
   constructor(
     readonly code:
@@ -63,7 +126,7 @@ export async function listFeedItems(input: {
 
   let query = db
     .from("market_issues")
-    .select("*")
+    .select(MARKET_ISSUE_COLUMNS)
     .eq("env", env)
     .eq("state", "published")
     .is("merged_into_issue_id", null)
@@ -237,24 +300,35 @@ async function loadResearchArtifacts(
   const db = getMarketIssueServiceClient();
   const [{ data: linkData, error: linkError }, { data: packetData, error: packetError }] = await Promise.all([
     db.from("market_issue_items").select("issue_id,source_item_id").in("issue_id", issueIds),
-    db.from("market_issue_research_packets").select("*").in("issue_id", issueIds),
+    db
+      .from("market_issue_research_packets")
+      .select(MARKET_RESEARCH_PACKET_COLUMNS)
+      .in("issue_id", issueIds),
   ]);
   if (linkError) throw queryError(linkError);
   if (packetError) throw queryError(packetError);
   const links = rows(linkData);
   const sourceItemIds = unique(links.map((link) => text(link.source_item_id)).filter(Boolean));
   const { data: itemData, error: itemError } = sourceItemIds.length > 0
-    ? await db.from("market_source_items").select("*").eq("env", marketIssueEnvironment()).in("id", sourceItemIds)
+    ? await db
+      .from("market_source_items")
+      .select(MARKET_SOURCE_ITEM_COLUMNS)
+      .eq("env", marketIssueEnvironment())
+      .in("id", sourceItemIds)
     : { data: [], error: null };
   if (itemError) throw queryError(itemError);
   const items = rows(itemData).filter((item) => text(item.status, "active") === "active" && !item.deleted_at);
   const sourceIds = unique(items.map((item) => text(item.source_id)).filter(Boolean));
   const [{ data: sourceData, error: sourceError }, { data: mediaData, error: mediaError }] = await Promise.all([
     sourceIds.length > 0
-      ? db.from("market_issue_sources").select("*").in("id", sourceIds)
+      ? db.from("market_issue_sources").select(MARKET_SOURCE_COLUMNS).in("id", sourceIds)
       : Promise.resolve({ data: [], error: null }),
     sourceItemIds.length > 0
-      ? db.from("market_source_media").select("*").in("source_item_id", sourceItemIds).order("ordinal")
+      ? db
+        .from("market_source_media")
+        .select(MARKET_MEDIA_COLUMNS)
+        .in("source_item_id", sourceItemIds)
+        .order("ordinal")
       : Promise.resolve({ data: [], error: null }),
   ]);
   if (sourceError) throw queryError(sourceError);
@@ -263,13 +337,13 @@ async function loadResearchArtifacts(
   const itemById = new Map(items.map((item) => [text(item.id), item]));
   const mediaByItem = groupRows(rows(mediaData), (media) => text(media.source_item_id));
   const packetsById = new Map(rows(packetData).map((packet) => [text(packet.id), packet]));
+  const linksByIssue = groupRows(links, (link) => text(link.issue_id));
   const sourceMaterials: FeedSourceMaterial[] = [];
   const researchPackets: FeedResearchPacket[] = [];
 
   for (const bundle of bundles) {
     const issueId = text(bundle.issue.id);
-    const linkedItems = links
-      .filter((link) => text(link.issue_id) === issueId)
+    const linkedItems = (linksByIssue.get(issueId) ?? [])
       .map((link) => itemById.get(text(link.source_item_id)))
       .filter((item): item is Row => Boolean(item))
       .sort((left, right) => Date.parse(text(right.published_at)) - Date.parse(text(left.published_at)))
@@ -364,7 +438,7 @@ async function loadPublishedIssueBundles(issueIds: string[], maxPosts: number) {
   const db = getMarketIssueServiceClient();
   const { data, error } = await db
     .from("market_issues")
-    .select("*")
+    .select(MARKET_ISSUE_COLUMNS)
     .eq("env", marketIssueEnvironment())
     .eq("state", "published")
     .is("merged_into_issue_id", null)
@@ -383,7 +457,10 @@ async function loadIssueBundles(issueRows: Row[], maxPosts: number): Promise<Arr
   const issueIds = issueRows.map((row) => text(row.id)).filter(Boolean);
   const [{ data: entityData, error: entityError }, { data: linkData, error: linkError }] =
     await Promise.all([
-      db.from("market_issue_entities").select("*").in("issue_id", issueIds),
+      db
+        .from("market_issue_entities")
+        .select(MARKET_ISSUE_ENTITY_COLUMNS)
+        .in("issue_id", issueIds),
       maxPosts > 0
         ? db.from("market_issue_items").select("issue_id,source_item_id").in("issue_id", issueIds)
         : Promise.resolve({ data: [], error: null }),
@@ -419,7 +496,7 @@ async function loadPostsByIssue(
   const db = getMarketIssueServiceClient();
   const { data: itemData, error: itemError } = await db
     .from("market_source_items")
-    .select("*")
+    .select(MARKET_SOURCE_ITEM_COLUMNS)
     .eq("env", marketIssueEnvironment())
     .eq("status", "active")
     .is("deleted_at", null)
@@ -428,7 +505,7 @@ async function loadPostsByIssue(
   const items = rows(itemData);
   const sourceIds = unique(items.map((item) => text(item.source_id)).filter(Boolean));
   const { data: sourceData, error: sourceError } = sourceIds.length > 0
-    ? await db.from("market_issue_sources").select("*").in("id", sourceIds)
+    ? await db.from("market_issue_sources").select(MARKET_SOURCE_COLUMNS).in("id", sourceIds)
     : { data: [], error: null };
   if (sourceError) throw queryError(sourceError);
   const sourceById = new Map(rows(sourceData).map((source) => [text(source.id), source]));

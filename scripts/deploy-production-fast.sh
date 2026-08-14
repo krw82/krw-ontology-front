@@ -774,6 +774,12 @@ REMOTE_SCRIPT
 }
 
 stage_local_agent_release() {
+  # The Rust daemon's launchd plist receives this exact persistent env path.
+  # Verify its authenticated Feed connection before staging or activating a
+  # release, so a stale/deleted temporary env cannot become a user-facing
+  # tool failure after a later daemon restart.
+  "$FRONT_DIR/scripts/verify-krw-feed-mcp-production.sh" --env-file "$AGENT_RUNTIME_ENV_PATH"
+
   installed_release_root="$AGENT_LOCAL_INSTALL_ROOT/releases/$RELEASE_ID"
   installed_state_root="$AGENT_LOCAL_INSTALL_ROOT/deploy-state/$RELEASE_ID"
   if [ -e "$installed_release_root" ]; then
@@ -1423,7 +1429,7 @@ if [ "$WITH_AGENT_RELEASE" = "1" ]; then
 const fs = require("fs");
 const { Pool } = require("pg");
 
-const providerModels = { glm: "glm-5.2", deepseek: "deepseek-v4-flash" };
+const providerModels = { glm: "glm-5.3", deepseek: "deepseek-v4-flash" };
 const url = process.env.AGENT_V1_DATABASE_URL;
 const tenant = process.env.KRW_AGENT_TENANT_ID;
 const provider = process.env.KRW_AGENT_PROVIDER;

@@ -162,7 +162,7 @@ export function readMarketIssueRuntimeConfig(): MarketIssueRuntimeConfig {
     zaiMaxTokens: boundedInt(process.env.MARKET_ISSUE_ZAI_MAX_TOKENS, 4096, 512, 8192),
     visionModel: normalizedText(process.env.MARKET_ISSUE_ZAI_VISION_MODEL) || "glm-4.6v",
     visionMaxTokens: boundedInt(process.env.MARKET_ISSUE_ZAI_VISION_MAX_TOKENS, 2048, 512, 8192),
-    composerModel: normalizedText(process.env.MARKET_ISSUE_ZAI_COMPOSER_MODEL) || "glm-5.2",
+    composerModel: normalizedText(process.env.MARKET_ISSUE_ZAI_COMPOSER_MODEL) || "glm-5.3",
     composerMaxTokens: boundedInt(process.env.MARKET_ISSUE_ZAI_COMPOSER_MAX_TOKENS, 4096, 512, 8192),
     sourceSeeds: !process.env.MARKET_ISSUE_X_SOURCES?.trim()
       ? [...DEFAULT_X_SOURCE_SEEDS]

@@ -77,17 +77,11 @@ npm run supabase:schema:smoke
 
 `npm run check`는 타입, lint, unit, build를 묶어 실행합니다.
 
-## SDK Freeze
+## Research engine boundary
 
-Claude Agent SDK는 의도적으로 고정합니다.
-
-```text
-Node @anthropic-ai/claude-agent-sdk: 0.3.204
-Python claude-agent-sdk: 0.2.85
-Claude Code native binary: 2.1.204
-```
-
-업데이트는 별도 브랜치에서 SDK 회귀 테스트와 운영 smoke를 통과한 뒤에만 진행합니다. 일반 배포 중 자동 업그레이드는 금지합니다.
+웹 채팅과 프론트 워커는 Rust `krw-agent` 릴리스와 Supabase 큐만 사용합니다.
+Claude Agent SDK 또는 Claude Code 실행 파일을 프론트 배포물에 포함하지 않습니다.
+배포 전 `npm run verify:sdk-freeze`는 이 제거 상태를 확인합니다.
 
 ## Production Deploy
 

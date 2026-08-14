@@ -132,9 +132,6 @@ if [ "${VM_DEPLOY_ATTESTATION:-}" != "$EXPECTED_VM_ATTESTATION" ]; then
   exit 1
 fi
 ALLOW_MISSING_TOSS_PAYMENTS=${ALLOW_MISSING_TOSS_PAYMENTS:-1}
-EXPECTED_CLAUDE_CODE_VERSION=${EXPECTED_CLAUDE_CODE_VERSION:-2.1.204}
-EXPECTED_NODE_CLAUDE_AGENT_SDK_VERSION=${EXPECTED_NODE_CLAUDE_AGENT_SDK_VERSION:-0.3.204}
-EXPECTED_PY_CLAUDE_AGENT_SDK_VERSION=${EXPECTED_PY_CLAUDE_AGENT_SDK_VERSION:-0.2.85}
 
 require_path() {
   if [ ! -e "$1" ]; then
@@ -151,7 +148,7 @@ require_command() {
 }
 
 # Prepared activation is intentionally a minimal, sealed cutover path. All
-# source, ontology, environment, build, SDK, and artifact checks ran during
+# source, ontology, environment, build, and artifact checks ran during
 # --build-only. Repeating them after the schema/runtime pause would lengthen the
 # outage and reintroduce mutable preflight dependencies.
 if [ "$DEPLOY_MODE" = "activate-only" ]; then
@@ -477,26 +474,18 @@ if [ "$DEPLOY_MODE" = "build-only" ]; then
     }
     console.log("OK prebuilt web/worker image artifacts");
   '
-  docker run --rm --entrypoint sh krw-ontology-front-web:local -lc '
-    set -eu
-    claude_version=$(/usr/local/bin/claude-prod --version 2>&1)
-    node_sdk_version=$(node -e '\''
-      const fs = require("fs");
-      const sdkPath = require.resolve("@anthropic-ai/claude-agent-sdk");
-      const marker = "/node_modules/@anthropic-ai/claude-agent-sdk/";
-      const index = sdkPath.indexOf(marker);
-      if (index < 0) throw new Error(`unexpected sdk path: ${sdkPath}`);
-      const packagePath = sdkPath.slice(0, index + marker.length) + "package.json";
-      process.stdout.write(JSON.parse(fs.readFileSync(packagePath, "utf8")).version);
-    '\'')
-    py_sdk_version=$(/opt/krw-ontology-venv/bin/python -c '\''import importlib.metadata as m; print(m.version("claude-agent-sdk"))'\'')
-    case "$claude_version" in
-      *"'"$EXPECTED_CLAUDE_CODE_VERSION"'"*) ;;
-      *) echo "Claude Code version mismatch in prepared image: $claude_version" >&2; exit 1 ;;
-    esac
-    test "$node_sdk_version" = "'"$EXPECTED_NODE_CLAUDE_AGENT_SDK_VERSION"'"
-    test "$py_sdk_version" = "'"$EXPECTED_PY_CLAUDE_AGENT_SDK_VERSION"'"
-    echo "OK prepared image runtime versions"
+  docker run --rm --entrypoint node krw-ontology-front-web:local -e '
+    const fs = require("fs");
+    if (fs.existsSync("/usr/local/bin/claude-prod")) {
+      throw new Error("Claude Code executable must not be present in the web image");
+    }
+    try {
+      require.resolve("@anthropic-ai/claude-agent-sdk");
+      throw new Error("Claude Agent SDK must not be present in the web image");
+    } catch (error) {
+      if (!String(error?.message || error).includes("Cannot find module")) throw error;
+    }
+    console.log("OK Rust research web image is SDK-free");
   '
   docker image inspect --format '{{.Id}}' krw-ontology-front-web:local
   echo "Docker image preparation complete; no production container was restarted."
@@ -521,60 +510,11 @@ docker compose \
   --project-name "$COMPOSE_PROJECT_NAME" \
   --env-file "$ENV_FILE" \
   -f "$BUILD_CONTEXT/docker-compose.yml" \
-  exec -T web /usr/local/bin/claude-prod --version
-
-docker compose \
-  --project-name "$COMPOSE_PROJECT_NAME" \
-  --env-file "$ENV_FILE" \
-  -f "$BUILD_CONTEXT/docker-compose.yml" \
-  exec -T web sh -lc '
-    set -eu
-    claude_version=$(/usr/local/bin/claude-prod --version 2>&1)
-    node_sdk_version=$(
-      node <<NODE
-const fs = require("fs");
-const path = require.resolve("@anthropic-ai/claude-agent-sdk");
-const marker = "/node_modules/@anthropic-ai/claude-agent-sdk/";
-const index = path.indexOf(marker);
-if (index < 0) throw new Error("unexpected sdk path: " + path);
-const packagePath = path.slice(0, index + marker.length) + "package.json";
-process.stdout.write(JSON.parse(fs.readFileSync(packagePath, "utf8")).version);
-NODE
-    )
-    py_sdk_version=$(/opt/krw-ontology-venv/bin/python -c "import importlib.metadata as m; print(m.version(\"claude-agent-sdk\"))")
-
-    case "$claude_version" in
-      *"'"$EXPECTED_CLAUDE_CODE_VERSION"'"*) ;;
-      *) echo "Claude Code version mismatch: expected '"$EXPECTED_CLAUDE_CODE_VERSION"', got $claude_version" >&2; exit 1 ;;
-    esac
-    test "$node_sdk_version" = "'"$EXPECTED_NODE_CLAUDE_AGENT_SDK_VERSION"'" || {
-      echo "Node Claude Agent SDK mismatch: expected '"$EXPECTED_NODE_CLAUDE_AGENT_SDK_VERSION"', got $node_sdk_version" >&2
-      exit 1
-    }
-    test "$py_sdk_version" = "'"$EXPECTED_PY_CLAUDE_AGENT_SDK_VERSION"'" || {
-      echo "Python Claude Agent SDK mismatch: expected '"$EXPECTED_PY_CLAUDE_AGENT_SDK_VERSION"', got $py_sdk_version" >&2
-      exit 1
-    }
-
-    echo "OK Claude Code: $claude_version"
-    echo "OK Node Claude Agent SDK: $node_sdk_version"
-    echo "OK Python Claude Agent SDK: $py_sdk_version"
-  '
-
-docker compose \
-  --project-name "$COMPOSE_PROJECT_NAME" \
-  --env-file "$ENV_FILE" \
-  -f "$BUILD_CONTEXT/docker-compose.yml" \
   exec -T web python3 - <<'PY'
 import os
-from pathlib import Path
 
-agent_cwd = Path(os.environ["CLAUDE_AGENT_CWD"])
-
-if not agent_cwd.is_absolute():
-    raise SystemExit(f"CLAUDE_AGENT_CWD must be absolute: {agent_cwd}")
-if not agent_cwd.exists() or not os.access(agent_cwd, os.W_OK | os.X_OK):
-    raise SystemExit(f"CLAUDE_AGENT_CWD is not writable: {agent_cwd}")
+if os.environ.get("KRW_AGENT_BACKEND_MODE", "rust") != "rust":
+    raise SystemExit("GCP web must use the Rust research engine")
 for key in (
     "KRW_ONTOLOGY_PLUGIN_PATH",
     "KRW_ONTOLOGY_MCP_URL",
@@ -588,7 +528,7 @@ for key in (
     if os.environ.get(key):
         raise SystemExit(f"GCP web must not be configured with local ontology/MCP state: {key}")
 
-print(f"OK Claude agent cwd: {agent_cwd}")
+print("OK Rust research backend")
 print("OK web ontology data boundary: Supabase catalog only")
 PY
 

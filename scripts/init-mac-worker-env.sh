@@ -74,7 +74,12 @@ fi
 require_key() {
   key=$1
   if ! awk -F= -v key="$key" '
-    $0 !~ /^[[:space:]]*#/ && $1 == key && length($0) > length(key) + 1 {
+    function normalized_key(raw) {
+      sub(/^[[:space:]]*export[[:space:]]+/, "", raw)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", raw)
+      return raw
+    }
+    $0 !~ /^[[:space:]]*#/ && normalized_key($1) == key && length($0) > length($1) + 1 {
       found = 1
     }
     END { exit(found ? 0 : 1) }
@@ -87,7 +92,12 @@ require_key() {
 copy_key() {
   key=$1
   awk -F= -v key="$key" '
-    $0 !~ /^[[:space:]]*#/ && $1 == key {
+    function normalized_key(raw) {
+      sub(/^[[:space:]]*export[[:space:]]+/, "", raw)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", raw)
+      return raw
+    }
+    $0 !~ /^[[:space:]]*#/ && normalized_key($1) == key {
       print
       found = 1
     }
@@ -98,7 +108,12 @@ copy_key() {
 read_key_or_empty() {
   key=$1
   awk -F= -v key="$key" '
-    $0 !~ /^[[:space:]]*#/ && $1 == key {
+    function normalized_key(raw) {
+      sub(/^[[:space:]]*export[[:space:]]+/, "", raw)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", raw)
+      return raw
+    }
+    $0 !~ /^[[:space:]]*#/ && normalized_key($1) == key {
       sub(/^[^=]*=/, "")
       print
       found = 1
@@ -127,34 +142,30 @@ if ! awk -F= '
   exit 1
 fi
 
-CLAUDE_KRW_PATH=~/.local/bin/claude-krw
-CLAUDE_SDK_PATH="$FRONT_DIR/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/claude"
-if [ -x "$CLAUDE_SDK_PATH" ]; then
-  CLAUDE_PATH=$CLAUDE_SDK_PATH
-elif [ -x "$CLAUDE_KRW_PATH" ]; then
-  CLAUDE_PATH=$CLAUDE_KRW_PATH
-else
-  CLAUDE_PATH=$(read_key_or_empty CLAUDE_CODE_EXECUTABLE)
-fi
-if [ -z "$CLAUDE_PATH" ]; then
-  CLAUDE_PATH=${CLAUDE_CODE_EXECUTABLE:-}
-fi
-if [ -z "$CLAUDE_PATH" ]; then
-  CLAUDE_PATH=$(command -v claude 2>/dev/null || true)
-fi
-if [ -z "$CLAUDE_PATH" ]; then
-  CLAUDE_PATH=~/.local/bin/claude
-fi
-CLAUDE_CONFIG=$(read_key_or_empty CLAUDE_CONFIG_DIR)
-if [ -z "$CLAUDE_CONFIG" ]; then
-  CLAUDE_CONFIG=~/.claude-krw
-fi
-
 FILINGS_MCP_ENABLED_VALUE=$(read_key_or_empty FILINGS_MCP_ENABLED)
 FILINGS_MCP_AUTH_TOKEN_VALUE=$(read_key_or_empty FILINGS_MCP_AUTH_TOKEN)
 FILINGS_MCP_PERSONAL_SIGNING_SECRET_VALUE=$(read_key_or_empty FILINGS_MCP_PERSONAL_SIGNING_SECRET)
 FILINGS_MCP_PORT_VALUE=$(read_key_or_empty FILINGS_MCP_PORT)
 KRW_FILINGS_MCP_URL_VALUE=$(read_key_or_empty KRW_FILINGS_MCP_URL)
+KRW_FEED_MCP_ENABLED_VALUE=$(read_key_or_empty KRW_FEED_MCP_ENABLED)
+KRW_FEED_MCP_CANONICAL_TOKEN_VALUE=$(read_key_or_empty KRW_FEED_MCP_TOKEN)
+KRW_FEED_MCP_LEGACY_TOKEN_VALUE=$(read_key_or_empty FEED_MCP_AUTH_TOKEN)
+if [ -n "$KRW_FEED_MCP_CANONICAL_TOKEN_VALUE" ] \
+  && [ -n "$KRW_FEED_MCP_LEGACY_TOKEN_VALUE" ] \
+  && [ "$KRW_FEED_MCP_CANONICAL_TOKEN_VALUE" != "$KRW_FEED_MCP_LEGACY_TOKEN_VALUE" ]; then
+  echo "Feed MCP token aliases conflict in $SOURCE_ENV" >&2
+  exit 1
+fi
+KRW_FEED_MCP_TOKEN_VALUE=$KRW_FEED_MCP_CANONICAL_TOKEN_VALUE
+if [ -z "$KRW_FEED_MCP_TOKEN_VALUE" ]; then
+  KRW_FEED_MCP_TOKEN_VALUE=$KRW_FEED_MCP_LEGACY_TOKEN_VALUE
+fi
+if [ -z "$KRW_FEED_MCP_ENABLED_VALUE" ] && [ -n "$KRW_FEED_MCP_TOKEN_VALUE" ]; then
+  KRW_FEED_MCP_ENABLED_VALUE=1
+fi
+KRW_FEED_MCP_HOST_VALUE=$(read_key_or_empty KRW_FEED_MCP_HOST)
+KRW_FEED_MCP_PORT_VALUE=$(read_key_or_empty KRW_FEED_MCP_PORT)
+KRW_FEED_MCP_URL_VALUE=$(read_key_or_empty KRW_FEED_MCP_URL)
 
 QUEUE_LISTEN_URL=$(read_key_or_empty AGENT_QUEUE_LISTEN_DATABASE_URL)
 CANCEL_LISTEN_URL=$(read_key_or_empty AGENT_RUN_CANCEL_LISTEN_DATABASE_URL)
@@ -244,10 +255,6 @@ trap cleanup EXIT INT TERM
   echo "KRW_MCP_EXPECTED_BUILD_FINGERPRINT_SHA256="
   echo "KRW_MCP_EXPECTED_RELEASE_MANIFEST_SHA256="
   echo "KRW_MCP_EXPECTED_SERVICE_FINGERPRINT_SHA256="
-  echo "CLAUDE_AGENT_CWD=~/krw-ontology-front/.agent-workspace"
-  echo "CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG"
-  echo "CLAUDE_CODE_EXECUTABLE=$CLAUDE_PATH"
-  echo "EXPECTED_CLAUDE_CODE_VERSION=2.1.204"
   echo "AGENT_SUPERVISOR_ID=mac-supervisor-jwc"
   echo "AGENT_SUPERVISOR_CONCURRENCY=8"
   echo "AGENT_WORKER_ID_PREFIX=mac-worker-jwc"
@@ -281,8 +288,6 @@ trap cleanup EXIT INT TERM
   echo "AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS=10000"
   echo "AGENT_SUPERVISOR_SHUTDOWN_GRACE_MS=120000"
   echo "AGENT_WORKER_IDLE_LOG_INTERVAL_MS=60000"
-  echo "CLAUDE_MODEL=sonnet"
-  echo "CLAUDE_AGENT_MAX_TURNS=40"
   echo "AGENT_MAX_TOOL_CALLS=32"
   echo "YAHOO_FINANCE_MAX_CALLS=4"
   echo "RESEARCH_ANSWER_ENVELOPE_ENABLED=0"
@@ -306,6 +311,11 @@ trap cleanup EXIT INT TERM
   echo "FILINGS_MCP_CACHE_TTL_MS=300000"
   echo "FILINGS_MCP_CACHE_MAX_ENTRIES=16"
   echo "FILINGS_MCP_NICE=-5"
+  echo "KRW_FEED_MCP_ENABLED=${KRW_FEED_MCP_ENABLED_VALUE:-0}"
+  echo "KRW_FEED_MCP_TOKEN=$KRW_FEED_MCP_TOKEN_VALUE"
+  echo "KRW_FEED_MCP_HOST=${KRW_FEED_MCP_HOST_VALUE:-127.0.0.1}"
+  echo "KRW_FEED_MCP_PORT=${KRW_FEED_MCP_PORT_VALUE:-8795}"
+  echo "KRW_FEED_MCP_URL=${KRW_FEED_MCP_URL_VALUE:-http://127.0.0.1:8795/mcp}"
   echo "AGENT_RUN_HARD_TIMEOUT_MINUTES=10"
   echo "LEASE_TIMEOUT_MINUTES=10"
   echo "LEASE_HEARTBEAT_INTERVAL_MS=30000"

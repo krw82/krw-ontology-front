@@ -238,17 +238,17 @@ export async function POST(request: NextRequest) {
     ...(marketIssueId ? { market_issue_id: marketIssueId } : {}),
   };
 
-  if (marketIssueId || userUrls.length > 0 || (body.attachment_ids?.length ?? 0) > 0) {
+  if (userUrls.length > 0 || (body.attachment_ids?.length ?? 0) > 0) {
     return errorResponse(
       400,
       "validation_error",
-      "현재 전환된 리서치 엔진은 회사·와이드 기본 질문만 지원합니다. 새 채팅방에서 첨부·URL·뉴스를 제외하고 다시 요청해주세요.",
+      "현재 전환된 리서치 엔진은 회사·와이드·뉴스 기본 질문만 지원합니다. 첨부·URL은 제외하고 다시 요청해주세요.",
       request_id,
     );
   }
 
   if (
-    !["company_research", "wide_research", "scenario_sensitivity", "guru_advisor", "idea_generation"].includes(
+    !["company_research", "wide_research", "news_discovery", "scenario_sensitivity", "guru_advisor", "idea_generation"].includes(
       effectiveRunKind,
     )
   ) {
@@ -260,7 +260,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!['idea_generation', 'wide_research'].includes(effectiveRunKind) && session.defaultTickers.length === 0) {
+  if (!['idea_generation', 'wide_research', 'news_discovery'].includes(effectiveRunKind) && !marketIssueId && session.defaultTickers.length === 0) {
     return errorResponse(
       400,
       "validation_error",
@@ -471,8 +471,12 @@ export async function POST(request: NextRequest) {
   // 9. Queue the Rust run through the pinned host contract. The HTTP response
   // only streams persisted run events; the Rust daemon owns research work.
   const runId = randomUUID();
-  const rustRunKind = toRustRunKind(effectiveRunKind, effectiveGuruLensKey);
-  const rustContext = effectiveRunKind === "idea_generation" || effectiveRunKind === "wide_research"
+  const rustRunKind = marketIssueId
+    ? "news_research"
+    : toRustRunKind(effectiveRunKind, effectiveGuruLensKey, session.scopeType);
+  const rustContext = marketIssueId
+    ? { kind: "selected_feed_items" as const, feed_item_ids: [marketIssueId] }
+    : effectiveRunKind === "idea_generation" || effectiveRunKind === "wide_research" || (effectiveRunKind === "news_discovery" && session.scopeType === "global")
     ? { kind: "covered_universe" as const, universe: "covered" as const }
     : { kind: "company_ticker_set" as const, tickers: session.defaultTickers };
   let enqueueResult: RustAgentEnqueueResult;
@@ -547,7 +551,14 @@ function readAgentRuntimeErrorCode(error: unknown): string | null {
     : null;
 }
 
-function toRustRunKind(runKind: RunKind, guruLens: string | null): string {
+function toRustRunKind(
+  runKind: RunKind,
+  guruLens: string | null,
+  scopeType: "global" | "company",
+): string {
+  if (runKind === "news_discovery" && scopeType === "global") {
+    return "news_discovery_wide";
+  }
   if (runKind !== "guru_advisor") return runKind;
   const lens = guruLens && guruLens !== "auto" ? guruLens : "buffett";
   return `guru_${lens}`;

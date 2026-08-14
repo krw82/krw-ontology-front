@@ -106,9 +106,6 @@ services:
       - AGENT_V1_DATABASE_CA_FILE=${AGENT_V1_DATABASE_CA_FILE:-}
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       - FILING_DETECTION_ENABLED=${FILING_DETECTION_ENABLED:-1}
-      - CLAUDE_AGENT_CWD=/app/agent-workspace
-      - CLAUDE_CODE_EXECUTABLE=/usr/local/bin/claude-prod
-      - CLAUDE_CONFIG_DIR=/home/nextjs/.claude-prod
       - WEB_COMMIT=${WEB_COMMIT:-}
       - KRW_ONTOLOGY_COMMIT=${KRW_ONTOLOGY_COMMIT:-}
       - ADMIN_EMAILS=${ADMIN_EMAILS:-}
@@ -124,10 +121,6 @@ services:
       # falls back to the former direct payment routes.
       - BILLING_WRITES_ENABLED=${BILLING_WRITES_ENABLED:-1}
       - GLOBAL_CONCURRENT_RUN_LIMIT=${GLOBAL_CONCURRENT_RUN_LIMIT:-8}
-      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-6}
-      - CLAUDE_AGENT_MAX_TURNS=${CLAUDE_AGENT_MAX_TURNS:-20}
-      - AGENT_MAX_TOOL_CALLS=${AGENT_MAX_TOOL_CALLS:-18}
-      - AGENT_MAX_TOOL_RESULT_CHARS=${AGENT_MAX_TOOL_RESULT_CHARS:-100000}
       - AGENT_RUN_HARD_TIMEOUT_MINUTES=${AGENT_RUN_HARD_TIMEOUT_MINUTES:-10}
       - LEASE_TIMEOUT_MINUTES=${LEASE_TIMEOUT_MINUTES:-10}
       - MCP_HEALTH_TIMEOUT_MS=${MCP_HEALTH_TIMEOUT_MS:-30000}
@@ -139,9 +132,8 @@ services:
       - REDIS_QUEUE_URL=${REDIS_QUEUE_URL:-}
       - DOCUMENT_QUEUE_REDIS_URL=${DOCUMENT_QUEUE_REDIS_URL:-redis://redis:6379/0}
     volumes:
-      - ${CLAUDE_PROD_CONFIG_DIR:-/srv/claude-prod}:/home/nextjs/.claude-prod
-      # The Rust daemon runs on the local Mac, alongside the existing Claude
-      # plugin worker. GCP receives only this public descriptor file; it never
+      # The Rust daemon runs on the local Mac. GCP receives only this public
+      # descriptor file; it never
       # receives a Rust binary, AgentImage, provider key, or DB credential.
       - ${KRW_AGENT_PUBLIC_DESCRIPTOR_HOST_PATH:-/opt/krw-agent/public-release.json}:/run/krw-agent/public-release.json:ro
       # Public Supabase pooler root used only by the trusted server-side
@@ -684,7 +676,7 @@ services:
       - MARKET_ISSUE_ZAI_TIMEOUT_MS=${MARKET_ISSUE_ZAI_TIMEOUT_MS:-120000}
       - MARKET_ISSUE_ZAI_VISION_MODEL=${MARKET_ISSUE_ZAI_VISION_MODEL:-glm-4.6v}
       - MARKET_ISSUE_ZAI_VISION_MAX_TOKENS=${MARKET_ISSUE_ZAI_VISION_MAX_TOKENS:-2048}
-      - MARKET_ISSUE_ZAI_COMPOSER_MODEL=${MARKET_ISSUE_ZAI_COMPOSER_MODEL:-glm-5.2}
+      - MARKET_ISSUE_ZAI_COMPOSER_MODEL=${MARKET_ISSUE_ZAI_COMPOSER_MODEL:-glm-5.3}
       - MARKET_ISSUE_ZAI_COMPOSER_MAX_TOKENS=${MARKET_ISSUE_ZAI_COMPOSER_MAX_TOKENS:-4096}
     networks:
       - app-network

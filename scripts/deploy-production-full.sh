@@ -22,6 +22,10 @@ script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 front_dir=$(CDPATH= cd -- "$script_dir/.." && pwd -P)
 agent_source_root=${KRW_AGENT_SOURCE_ROOT:-"$HOME/krw-agnet"}
 agent_operator_root=${KRW_AGENT_OPERATOR_ROOT:-"$HOME/krw-agnet-prod"}
+agent_runtime_env_source=${KRW_AGENT_RUNTIME_ENV_FILE:-"$agent_operator_root/runtime/krw-agent-deploy.env"}
+agent_runtime_env_candidate=
+agent_runtime_env_backup=
+agent_runtime_env_activated=0
 release_id=
 forward_args=()
 has_forward_args=0
@@ -43,6 +47,123 @@ EOF
 fail() {
   printf '%s\n' "$1" >&2
   exit 1
+}
+
+cleanup_runtime_env_update() {
+  local exit_status=$?
+  set +e
+
+  # A candidate becomes the persistent launchd env only after its exact Feed
+  # bearer request succeeds.  Any later build/deploy failure restores the
+  # original file before this process exits, so a standalone daemon restart
+  # can never point at the deleted temporary overlay used by the old path.
+  if [[ "$agent_runtime_env_activated" = "1" && "$exit_status" -ne 0 && -n "$agent_runtime_env_backup" && -f "$agent_runtime_env_backup" ]]; then
+    if mv -f -- "$agent_runtime_env_backup" "$agent_runtime_env_source"; then
+      printf '%s\n' "Restored the previous Rust runtime env after failed deployment." >&2
+    else
+      printf '%s\n' "CRITICAL: unable to restore the previous Rust runtime env." >&2
+    fi
+    agent_runtime_env_backup=
+    agent_runtime_env_activated=0
+  fi
+  if [[ -n "$agent_runtime_env_candidate" && -f "$agent_runtime_env_candidate" ]]; then
+    rm -f -- "$agent_runtime_env_candidate"
+    agent_runtime_env_candidate=
+  fi
+  if [[ "$exit_status" -eq 0 && -n "$agent_runtime_env_backup" && -f "$agent_runtime_env_backup" ]]; then
+    rm -f -- "$agent_runtime_env_backup"
+    agent_runtime_env_backup=
+  fi
+
+  trap - EXIT
+  exit "$exit_status"
+}
+
+trap cleanup_runtime_env_update EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+read_env_value() {
+  local env_file=$1
+  local wanted_key=$2
+  awk -F= -v wanted_key="$wanted_key" '
+    function normalized_key(raw) {
+      sub(/^[[:space:]]*export[[:space:]]+/, "", raw)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", raw)
+      return raw
+    }
+    $0 !~ /^[[:space:]]*#/ && normalized_key($1) == wanted_key {
+      value = $0
+      sub(/^[^=]*=/, "", value)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+      if (length(value) >= 2 && substr(value, 1, 1) == substr(value, length(value), 1) && (substr(value, 1, 1) == "\"" || substr(value, 1, 1) == "\047")) {
+        value = substr(value, 2, length(value) - 2)
+      }
+      print value
+      found = 1
+    }
+    END { exit(found ? 0 : 1) }
+  ' "$env_file" | tail -n 1
+}
+
+write_canonical_feed_token() {
+  local env_file=$1
+  local token=$2
+  local temporary
+  temporary=$(mktemp "${env_file}.rewrite.XXXXXX")
+  awk -F= '
+    function normalized_key(raw) {
+      sub(/^[[:space:]]*export[[:space:]]+/, "", raw)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", raw)
+      return raw
+    }
+    $0 ~ /^[[:space:]]*#/ ||
+      (normalized_key($1) != "KRW_FEED_MCP_TOKEN" && normalized_key($1) != "FEED_MCP_AUTH_TOKEN") {
+      print
+    }
+  ' "$env_file" > "$temporary"
+  printf "export KRW_FEED_MCP_TOKEN='%s'\n" \
+    "$(printf '%s' "$token" | sed "s/'/'\\\\''/g")" >> "$temporary"
+  chmod 600 "$temporary"
+  mv -f -- "$temporary" "$env_file"
+}
+
+prepare_agent_runtime_env_candidate() {
+  [[ -f "$agent_runtime_env_source" && ! -L "$agent_runtime_env_source" ]] \
+    || fail "Rust Agent V1 runtime env is missing or unsafe: $agent_runtime_env_source"
+
+  local canonical_feed_token legacy_feed_token feed_token
+  canonical_feed_token=$(read_env_value "$front_dir/.env" KRW_FEED_MCP_TOKEN 2>/dev/null || true)
+  legacy_feed_token=$(read_env_value "$front_dir/.env" FEED_MCP_AUTH_TOKEN 2>/dev/null || true)
+  if [[ -n "$canonical_feed_token" && -n "$legacy_feed_token" && "$canonical_feed_token" != "$legacy_feed_token" ]]; then
+    fail "Feed MCP token aliases conflict in $front_dir/.env"
+  fi
+  feed_token=$canonical_feed_token
+  if [[ -z "$feed_token" ]]; then
+    feed_token=$legacy_feed_token
+  fi
+  [[ -n "$feed_token" ]] || fail "Feed MCP token is required for a fresh Rust release"
+  [[ "$feed_token" != *$'\n'* && "$feed_token" != *$'\r'* ]] \
+    || fail "Feed MCP token contains a newline and cannot be propagated safely"
+
+  # Keep the candidate in the same directory so its later activation is an
+  # atomic rename.  The launchd plist will receive only the stable source
+  # path, never this candidate name.
+  agent_runtime_env_candidate=$(mktemp "${agent_runtime_env_source}.candidate.XXXXXX")
+  cp -p -- "$agent_runtime_env_source" "$agent_runtime_env_candidate"
+  write_canonical_feed_token "$agent_runtime_env_candidate" "$feed_token"
+
+  if ! "$front_dir/scripts/verify-krw-feed-mcp-production.sh" --env-file "$agent_runtime_env_candidate"; then
+    fail "Feed MCP bearer preflight failed; Rust release was not built or activated"
+  fi
+
+  agent_runtime_env_backup=$(mktemp "${agent_runtime_env_source}.previous.XXXXXX")
+  cp -p -- "$agent_runtime_env_source" "$agent_runtime_env_backup"
+  chmod 600 "$agent_runtime_env_backup"
+  mv -f -- "$agent_runtime_env_candidate" "$agent_runtime_env_source"
+  agent_runtime_env_candidate=
+  agent_runtime_env_activated=1
+  printf '%s\n' "Verified Feed MCP credential and updated the persistent Rust runtime env."
 }
 
 while [[ $# -gt 0 ]]; do
@@ -80,6 +201,7 @@ done
   || fail "Production web release requires a clean committed frontend tree"
 [[ -z "$(git -C "$agent_source_root" status --porcelain=v1 --untracked-files=normal)" ]] \
   || fail "Fresh Rust release requires a clean committed krw-agnet tree"
+prepare_agent_runtime_env_candidate
 
 case "$release_id" in
   "") release_id="$(date +%Y%m%d%H%M%S)-$$" ;;
@@ -91,12 +213,16 @@ agent_commit=$(git -C "$agent_source_root" rev-parse --short=12 HEAD) \
 release_root="$agent_operator_root/releases/${release_id}-${agent_commit}"
 [[ ! -e "$release_root" ]] || fail "Fresh Rust release path already exists: $release_root"
 
-"$agent_source_root/scripts/build_sealed_dual_provider_release.sh" \
-  --output-root "$release_root" \
+build_args=(
+  --output-root "$release_root"
   --operator-root "$agent_operator_root"
+  --runtime-env "$agent_runtime_env_source"
+)
+"$agent_source_root/scripts/build_sealed_dual_provider_release.sh" "${build_args[@]}"
 
 deploy_exact_release() {
-  exec env KRW_AGENT_OPERATOR_ROOT="$agent_operator_root" \
+  env KRW_AGENT_OPERATOR_ROOT="$agent_operator_root" \
+    KRW_AGENT_RUNTIME_ENV_FILE="$agent_runtime_env_source" \
     "$script_dir/deploy-production-fast.sh" \
       --apply-migrations \
       --with-agent-release \

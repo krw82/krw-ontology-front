@@ -3,7 +3,7 @@ import { loadPinnedReleaseArtifact } from "@krw-agent/host";
 export type ResearchAdmissionMode = "open" | "drain" | "closed" | "canary";
 
 const PROVIDER_MODELS = {
-  glm: "glm-5.2",
+  glm: "glm-5.3",
   deepseek: "deepseek-v4-flash",
 } as const;
 type Provider = keyof typeof PROVIDER_MODELS;

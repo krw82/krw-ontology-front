@@ -20,7 +20,7 @@ import {
 import { dirname, isAbsolute, resolve } from "node:path";
 
 const PROVIDERS = Object.freeze({
-  glm: "glm-5.2",
+  glm: "glm-5.3",
   deepseek: "deepseek-v4-flash",
 });
 const HASH = /^sha256:[0-9a-f]{64}$/;

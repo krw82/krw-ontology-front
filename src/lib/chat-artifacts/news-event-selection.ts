@@ -3,6 +3,7 @@ import type { Json } from "@/types/database";
 import type {
   AtomicNewsEventCard,
   ChatArtifact,
+  EventPremisePack,
   NewsEventSelectionArtifactPayload,
   SourcePreview,
 } from "@/types/api-contracts";
@@ -251,8 +252,49 @@ export function buildNewsEventSelectionUserMessage(
     lines.push("", "내용 요약:", display.summary);
   }
 
-  lines.push("", "이 뉴스를 공시 기준으로 분석해줘.");
+  lines.push(
+    "",
+    "이 뉴스가 사실이라고 가정하고, 회사에 미칠 영향과 확인해야 할 공시 근거를 분석해줘.",
+    "뉴스 자체의 진위를 따지는 것이 아니라 전제에서 출발해 영향·전파경로·확인 신호를 설명해줘.",
+  );
   return lines.join("\n");
+}
+
+/** Build the bounded event premise persisted with a chat-room selection. */
+export function buildEventPremisePack(
+  event: AtomicNewsEventCard,
+  mode: EventPremisePack["mode"] = "assume_event_true",
+): EventPremisePack {
+  const source = event.primary_source ?? findPrimarySource(
+    event.source_previews ?? [],
+    event,
+  );
+  return {
+    version: "event-premise/v1",
+    mode,
+    selected_event_id: event.id,
+    ticker: event.ticker,
+    company_name: event.company_name,
+    event_title: event.event_title_ko ?? event.event_title,
+    original_headline: event.original_headline,
+    summary: event.summary_ko ?? event.short_summary,
+    source_urls: uniqueStrings([
+      source?.url,
+      ...(event.official_source_urls ?? []),
+      ...(event.major_news_urls ?? []),
+      ...(event.reader_urls ?? []),
+    ]).slice(0, 4),
+    source_published_at: source?.published_at ?? event.source_date ?? event.event_date ?? null,
+    impact_axes: uniqueStrings([
+      ...(event.investment_axes ?? []),
+      ...(event.ontology_bridge_brief_en?.likely_financial_axes ?? []),
+      ...(event.ontology_bridge_brief_en?.likely_business_axes ?? []),
+    ]).slice(0, 8),
+    baseline_questions: uniqueStrings([
+      ...(event.ontology_baseline_questions ?? []),
+      ...(event.ontology_bridge_brief_en?.suggested_ontology_questions ?? []),
+    ]).slice(0, 8),
+  };
 }
 
 export function buildNewsEventDisplayText(
@@ -494,6 +536,14 @@ function isEnglishHeavy(value: string): boolean {
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function uniqueStrings(values: unknown[]): string[] {
+  return [...new Set(values
+    .filter((value): value is string =>
+      typeof value === "string" && value.trim().length > 0,
+    )
+    .map((value) => value.trim()))];
 }
 
 function parseJsonRecord(value: string | null): UnknownRecord | null {

@@ -1,104 +1,23 @@
 import "server-only";
+import type { VisualizationIntent } from "./contracts";
 
-import {
-  createSdkMcpServer,
-  tool,
-} from "@anthropic-ai/claude-agent-sdk";
-import { z } from "zod/v4";
-import type { AccumulatedRun } from "@/lib/agent/stream-handler";
-import type { VisualizationIntent, VisualizationToolResult } from "./contracts";
-import { compileVisualization } from "./compiler";
-import { VisualizationDatasetRegistry } from "./dataset-registry";
-
+/**
+ * Visualization composition is owned by krw-agent. The web app only keeps
+ * the stable public tool name for reading already-persisted artifacts; it no
+ * longer constructs an Anthropic SDK MCP server in-process.
+ */
 export const VISUALIZATION_MCP_SERVER_NAME = "krw_presentation";
 export const COMPOSE_VISUALIZATION_TOOL_NAME = "compose_visualization";
 export const COMPOSE_VISUALIZATION_SDK_TOOL_NAME =
   `mcp__${VISUALIZATION_MCP_SERVER_NAME}__${COMPOSE_VISUALIZATION_TOOL_NAME}`;
 
-const MAX_VISUALIZATIONS_PER_ANSWER = 3;
-
-const boundedString = (max: number) => z.string().max(max);
-
-/**
- * The model submits semantic intent only. The runtime reads the current run's
- * verified datasets and compiles values, units, evidence, and renderer spec.
- */
-export function createVisualizationMcpServer(acc: AccumulatedRun) {
-  let visualizationCount = 0;
-  const seenFingerprints = new Set<string>();
-
-  return createSdkMcpServer({
-    name: VISUALIZATION_MCP_SERVER_NAME,
-    version: "2.0.0",
-    alwaysLoad: true,
-    tools: [
-      tool(
-        COMPOSE_VISUALIZATION_TOOL_NAME,
-        [
-          "Create a verified inline visualization from data already retrieved during this KRW run.",
-          "Give only semantic intent in ordinary Korean or English: the analytical goal, metric names, whether to use the company total or a breakdown, optional group/scope filters, optional Korean display text, and an optional form only when its data conditions clearly apply. Use composition_snapshot+donut/pie for one-period mix, relationship+scatter for paired measures, matrix+heatmap for a compact category-by-period grid, and bridge+waterfall for one non-negative series of changes. All number values, source ids, units, calculations, final chart selection, and placement are runtime-owned.",
-          "Never provide raw chart values, an ECharts/Nivo/Vega spec, evidence ids, or a Markdown insert token.",
-          "The display title and series label hints are editorial only and must be short. Prefer each series_label_hints item as {source:'Americas', label:'미주'}. For a low-capability caller, bare Korean labels are also accepted only when include_scopes has the same number of items and the labels are in exactly the same order; the runtime then pairs them with those verified source scopes. The runtime validates hints against selected verified series. A skipped or duplicate result is normal; continue the answer without retrying the same visualization.",
-        ].join(" "),
-        {
-          // All fields are optional and normalized in the handler. This avoids
-          // wasting a low-capability model turn on a formatting-only retry.
-          goal: boundedString(300).optional(),
-          measures: z.union([boundedString(160), z.array(boundedString(160)).max(8)]).optional(),
-          time_scope: boundedString(120).optional(),
-          relationship: boundedString(32).optional(),
-          scope_mode: boundedString(32).optional(),
-          group_by: boundedString(120).optional(),
-          include_scopes: z.array(boundedString(160)).max(8).optional(),
-          exclude_scopes: z.array(boundedString(160)).max(8).optional(),
-          transform_hints: z.array(boundedString(32)).max(4).optional(),
-          event_overlay: z.array(boundedString(32)).max(4).optional(),
-          preferred_form: boundedString(32).optional(),
-          title_hint: boundedString(120).optional(),
-          metric_label_hint: boundedString(60).optional(),
-          group_label_hint: boundedString(60).optional(),
-          series_label_hints: z.array(z.unknown()).max(8).optional(),
-        },
-        async (args) => {
-          if (visualizationCount >= MAX_VISUALIZATIONS_PER_ANSWER) {
-            return success({
-              kind: "compose_visualization_result",
-              status: "skipped",
-              reason_code: "visualization_limit",
-              explanation: `한 답변에는 최대 ${MAX_VISUALIZATIONS_PER_ANSWER}개의 시각화만 표시합니다.`,
-              warnings: [],
-            });
-          }
-
-          // Build at call time, after preceding MCP results have reached acc.
-          const registry = VisualizationDatasetRegistry.fromAccumulatedRun(acc);
-          const result = compileVisualization({
-            intent: normalizeVisualizationToolIntent(args),
-            registry,
-            artifactIndex: visualizationCount + 1,
-          });
-          if (result.artifact && seenFingerprints.has(result.artifact.semantic_fingerprint)) {
-            return success({
-              kind: "compose_visualization_result",
-              status: "skipped",
-              reason_code: "duplicate_visualization",
-              explanation: "같은 검증 데이터와 분석 목적의 시각화가 이미 만들어졌습니다.",
-              warnings: [],
-            });
-          }
-          if (result.artifact) {
-            seenFingerprints.add(result.artifact.semantic_fingerprint);
-            visualizationCount += 1;
-          }
-          return success(result);
-        },
-        { alwaysLoad: true },
-      ),
-    ],
-  });
+export function createVisualizationMcpServer(): never {
+  throw new Error("visualization_composition_owned_by_krw_agent");
 }
 
-export function normalizeVisualizationToolIntent(args: Record<string, unknown>): VisualizationIntent {
+export function normalizeVisualizationToolIntent(
+  args: Record<string, unknown>,
+): VisualizationIntent {
   const measures = typeof args.measures === "string"
     ? [args.measures]
     : Array.isArray(args.measures)
@@ -140,29 +59,13 @@ function normalizeSeriesLabelHints(
 ): VisualizationIntent["series_label_hints"] {
   if (!Array.isArray(value)) return undefined;
   const objectHints = value.flatMap((item) => {
-    if (!isRecord(item) || typeof item.source !== "string" || typeof item.label !== "string") {
-      return [];
-    }
+    if (!isRecord(item) || typeof item.source !== "string" || typeof item.label !== "string") return [];
     return [{ source: item.source, label: item.label }];
   });
   if (objectHints.length > 0) return objectHints;
-
-  // Some small models emit just ["미주", "유럽"] despite the object-shaped
-  // contract. When and only when an equally sized verified source list is
-  // present, pair by position. This remains presentation-only and the compiler
-  // still verifies every source against the run-local registry.
   const bareLabels = value.filter((item): item is string => typeof item === "string");
-  if (
-    bareLabels.length !== value.length ||
-    !includeScopes ||
-    includeScopes.length !== bareLabels.length
-  ) {
-    return undefined;
-  }
-  return bareLabels.map((label, index) => ({
-    source: includeScopes[index]!,
-    label,
-  }));
+  if (bareLabels.length !== value.length || !includeScopes || includeScopes.length !== bareLabels.length) return undefined;
+  return bareLabels.map((label, index) => ({ source: includeScopes[index]!, label }));
 }
 
 function stringOrNull(value: unknown): string | null | undefined {
@@ -170,20 +73,7 @@ function stringOrNull(value: unknown): string | null | undefined {
 }
 
 function allowedRelationship(value: unknown): VisualizationIntent["relationship"] {
-  return isOneOf(value, [
-    "auto",
-    "trend",
-    "comparison",
-    "composition",
-    "composition_snapshot",
-    "relationship",
-    "decomposition",
-    "bridge",
-    "matrix",
-    "exact_values",
-  ])
-    ? value
-    : undefined;
+  return isOneOf(value, ["auto", "trend", "comparison", "composition", "composition_snapshot", "relationship", "decomposition", "bridge", "matrix", "exact_values"]) ? value : undefined;
 }
 
 function allowedScopeMode(value: unknown): VisualizationIntent["scope_mode"] {
@@ -191,9 +81,7 @@ function allowedScopeMode(value: unknown): VisualizationIntent["scope_mode"] {
 }
 
 function allowedTransform(value: string): NonNullable<VisualizationIntent["transform_hints"]>[number] | null {
-  return isOneOf(value, ["identity", "yoy_percent", "qoq_percent", "index_to_100", "share_of_total", "cumulative"])
-    ? value
-    : null;
+  return isOneOf(value, ["identity", "yoy_percent", "qoq_percent", "index_to_100", "share_of_total", "cumulative"]) ? value : null;
 }
 
 function allowedOverlay(value: string): NonNullable<VisualizationIntent["event_overlay"]>[number] | null {
@@ -201,39 +89,13 @@ function allowedOverlay(value: string): NonNullable<VisualizationIntent["event_o
 }
 
 function allowedViewType(value: unknown): VisualizationIntent["preferred_form"] {
-  return isOneOf(value, [
-    "auto",
-    "line",
-    "area",
-    "bar",
-    "stacked_bar",
-    "stacked_100",
-    "pie",
-    "donut",
-    "scatter",
-    "heatmap",
-    "waterfall",
-    "table",
-  ])
-    ? value
-    : undefined;
+  return isOneOf(value, ["auto", "line", "bar", "stacked_bar", "stacked_100", "area", "scatter", "heatmap", "waterfall", "donut", "pie", "table"]) ? value : undefined;
 }
 
-function isOneOf<const T extends string>(value: unknown, allowed: readonly T[]): value is T {
-  return typeof value === "string" && (allowed as readonly string[]).includes(value);
+function isOneOf<T extends string>(value: unknown, options: readonly T[]): value is T {
+  return typeof value === "string" && options.includes(value as T);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+  return typeof value === "object" && value !== null;
 }
-
-function success(result: VisualizationToolResult) {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify(result) }],
-    structuredContent: result as unknown as Record<string, unknown>,
-  };
-}
-
-export const __test__ = {
-  compileVisualization,
-};

@@ -391,6 +391,7 @@ function normalizeShareContext(value: unknown): PublicShareContext {
 function readShareRunKind(value: unknown): RunKind | null {
   return value === "idea_generation" ||
     value === "news_discovery" ||
+    value === "news_discovery_wide" ||
     value === "market_move_research" ||
     value === "scenario_sensitivity" ||
     value === "guru_advisor" ||

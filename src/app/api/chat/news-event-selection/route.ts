@@ -1,10 +1,14 @@
+import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@/i18n/config";
-import type { McpHealthResult } from "@/lib/agent/mcp-client";
-import { getReadyAgentWorker } from "@/lib/agent/worker-heartbeat";
-import { enqueueAgentRun, findRunByRequestId } from "@/lib/agent/job-queue";
-import { getClaudeAgentModel } from "@/lib/agent/model";
+import { findRunByRequestId } from "@/lib/agent/job-queue";
 import { streamAgentRunEventsResponse } from "@/lib/agent/run-events";
+import {
+  getRustAgentRuntime,
+  RustAgentRuntimeError,
+  type RustAgentEnqueueResult,
+} from "@/lib/agent-v1/runtime";
+import { getReadyRustAgentDaemon } from "@/lib/agent/daemon-heartbeat";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
 import { fetchHistory, reserveBudgetStep, resolveSession } from "@/lib/api/chat";
 import {
@@ -18,11 +22,13 @@ import {
   reserveAnalysisCreditsShadow,
 } from "@/lib/concurrency/analysis-credits";
 import { shouldBlockAnalysisCreditReservation } from "@/lib/billing/credit-policy";
-import { getActiveOntologyCatalogRelease } from "@/lib/ontology/catalog";
 import { normalizeResearchMode } from "@/lib/research-mode";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isPlainObject, isUuid } from "@/lib/api/validation";
-import { buildNewsEventSelectionUserMessage } from "@/lib/chat-artifacts/news-event-selection";
+import {
+  buildEventPremisePack,
+  buildNewsEventSelectionUserMessage,
+} from "@/lib/chat-artifacts/news-event-selection";
 import type {
   ChatMessageArtifactRow,
   ChatMessageArtifactSelectionRow,
@@ -32,13 +38,6 @@ import type {
   ErrorCode,
   NewsEventSelectionArtifactPayload,
 } from "@/types/api-contracts";
-
-let workerReadinessCache: {
-  releaseId: string;
-  result: McpHealthResult;
-  timestamp: number;
-} | null = null;
-const WORKER_READINESS_TTL = 5_000;
 
 function errorResponse(
   status: number,
@@ -130,18 +129,17 @@ export async function POST(request: NextRequest) {
   });
   if (!rateLimitResult.ok) return rateLimitResult.response;
 
-  let mcpHealth: McpHealthResult;
+  let rustDaemonReady = false;
   try {
-    const activeCatalog = await getActiveOntologyCatalogRelease();
-    if (!activeCatalog?.release_id) {
-      throw new Error("No active ontology web catalog release found");
-    }
-    mcpHealth = await getCachedReadyWorkerHealth(activeCatalog.release_id);
+    rustDaemonReady = (await getReadyRustAgentDaemon()).ok;
   } catch {
+    rustDaemonReady = false;
+  }
+  if (!rustDaemonReady) {
     return errorResponse(
       503,
       "worker_unavailable",
-      "분석 워커가 준비되지 않았습니다. 잠시 후 다시 시도해주세요.",
+      "리서치 엔진이 준비되지 않았습니다. 잠시 후 다시 시도해주세요.",
       requestId,
     );
   }
@@ -173,6 +171,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const selectedEvent = artifactResult.event;
+  const selectedFeedId = isUuid(selectedEvent.id) ? selectedEvent.id : null;
+
   const budgetResult = await reserveBudgetStep(
     user.id,
     requestId,
@@ -181,7 +182,7 @@ export async function POST(request: NextRequest) {
   );
   if (!budgetResult.ok) return budgetResult.response;
   const creditReservation = await reserveAnalysisCreditsShadow(user.id, requestId, {
-    runKind: "company_research",
+    runKind: selectedFeedId ? "news_discovery" : "company_research",
     researchMode,
   });
   if (
@@ -210,7 +211,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const selectedEvent = artifactResult.event;
   const visibleUserMessage = selectedEventUserMessage(selectedEvent);
   const historyResult = await fetchHistory(
     session.id,
@@ -228,48 +228,46 @@ export async function POST(request: NextRequest) {
     return historyResult.response;
   }
 
-  const model = getClaudeAgentModel();
-  const enqueueResult = await enqueueAgentRun({
-    session,
-    requestId,
-    history: historyResult.result,
-    model,
-    mcpHealth,
-    researchMode,
-    analysisMode: "company",
-    runKind: "company_research",
-    responseLocale,
-    selectedNewsEventContext: selectedEvent,
-    sourceArtifactId: artifactResult.artifact.id,
-    sourceEventId: selectedEvent.id,
-  });
-
-  if (!enqueueResult.ok) {
-    await releaseExecutionBudget(
-      user.id,
+  // The Rust feed image owns the selected-event boundary. A published feed
+  // issue ID is the only browser value forwarded to the worker; article text
+  // remains a Supabase-backed feed capability result, not a client command.
+  const runId = randomUUID();
+  let enqueueResult: RustAgentEnqueueResult;
+  try {
+    const runtime = await getRustAgentRuntime();
+    enqueueResult = await runtime.enqueue({
+      runId,
       requestId,
-      enqueueResult.runId ?? null,
-      enqueueResult.reason,
-    );
-    await releaseAnalysisCreditsShadow(
-      user.id,
-      requestId,
-      enqueueResult.runId ?? null,
-      enqueueResult.reason,
-    );
+      userId: user.id,
+      sessionId: session.id,
+      userMessageId: historyResult.result.userMessageId,
+      runKind: selectedFeedId
+        ? "news_research"
+        : session.defaultTickers.length > 0
+          ? "company_research"
+          : "news_discovery_wide",
+      locale: responseLocale === "en" ? "en-US" : "ko-KR",
+      question: selectedEventUserMessage(selectedEvent),
+      context: selectedFeedId
+        ? { kind: "selected_feed_items", feed_item_ids: [selectedFeedId] }
+        : session.defaultTickers.length > 0
+          ? { kind: "company_ticker_set", tickers: session.defaultTickers }
+          : { kind: "covered_universe", universe: "covered" },
+    });
+  } catch (error) {
+    const reason = error instanceof RustAgentRuntimeError
+      ? error.code
+      : "agent_v1_enqueue_failed";
+    await releaseExecutionBudget(user.id, requestId, null, reason);
+    await releaseAnalysisCreditsShadow(user.id, requestId, null, reason);
     await getSupabaseAdmin()
       .from("messages")
       .delete()
       .eq("id", historyResult.result.userMessageId);
-
     return errorResponse(
-      enqueueResult.reason === "active_run_exists" ? 409 : 500,
-      enqueueResult.reason === "active_run_exists"
-        ? "active_run_exists"
-        : "internal_error",
-      enqueueResult.reason === "active_run_exists"
-        ? "이미 응답을 생성 중입니다."
-        : "분석 작업을 대기열에 넣지 못했습니다.",
+      503,
+      "worker_unavailable",
+      "리서치 엔진이 잠시 준비되지 않았습니다. 잠시 후 다시 시도해주세요.",
       requestId,
     );
   }
@@ -293,27 +291,6 @@ export async function POST(request: NextRequest) {
   });
   response.headers.set("X-Chat-Session-Id", session.id);
   return response;
-}
-
-async function getCachedReadyWorkerHealth(
-  expectedReleaseId: string,
-): Promise<McpHealthResult> {
-  if (
-    workerReadinessCache &&
-    workerReadinessCache.releaseId === expectedReleaseId &&
-    Date.now() - workerReadinessCache.timestamp < WORKER_READINESS_TTL
-  ) {
-    return workerReadinessCache.result;
-  }
-
-  const result = await getReadyAgentWorker(new Date(), expectedReleaseId);
-  if (!result.ok) throw new Error(result.message);
-  workerReadinessCache = {
-    releaseId: expectedReleaseId,
-    result: result.mcpHealth,
-    timestamp: Date.now(),
-  };
-  return result.mcpHealth;
 }
 
 async function loadSelectableEvent(params: {
@@ -382,7 +359,10 @@ async function upsertSelection(params: {
     session_id: params.sessionId,
     event_id: params.event.id,
     user_id: params.userId,
-    selected_payload_json: params.event,
+    selected_payload_json: {
+      ...params.event,
+      premise: buildEventPremisePack(params.event),
+    },
     user_message_id: params.userMessageId,
     research_run_id: params.researchRunId,
     status: "queued",

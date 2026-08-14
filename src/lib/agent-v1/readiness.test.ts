@@ -41,7 +41,7 @@ describe("research admission", () => {
   it("recovers a missing provider pin from the sealed descriptor in development", async () => {
     vi.mocked(loadPinnedReleaseArtifact).mockResolvedValue({
       descriptor: {
-        entries: [{ execution: { resolved_model: "glm-5.2" } }],
+        entries: [{ execution: { resolved_model: "glm-5.3" } }],
       },
       release_set_hash: "sha256:release",
     } as never);
@@ -54,14 +54,14 @@ describe("research admission", () => {
       AGENT_V1_DATABASE_URL: "postgresql://local",
     });
     expect(result.provider).toBe("glm");
-    expect(result.model).toBe("glm-5.2");
+    expect(result.model).toBe("glm-5.3");
     expect(result.descriptor_valid).toBe(true);
   });
 
   it("does not infer a missing provider pin in production", async () => {
     vi.mocked(loadPinnedReleaseArtifact).mockResolvedValue({
       descriptor: {
-        entries: [{ execution: { resolved_model: "glm-5.2" } }],
+        entries: [{ execution: { resolved_model: "glm-5.3" } }],
       },
       release_set_hash: "sha256:release",
     } as never);
@@ -81,7 +81,7 @@ describe("research admission", () => {
   it("does not replace an explicitly invalid provider with descriptor inference", async () => {
     vi.mocked(loadPinnedReleaseArtifact).mockResolvedValue({
       descriptor: {
-        entries: [{ execution: { resolved_model: "glm-5.2" } }],
+        entries: [{ execution: { resolved_model: "glm-5.3" } }],
       },
       release_set_hash: "sha256:release",
     } as never);

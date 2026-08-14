@@ -234,7 +234,7 @@ async function hasUsableRuntimePin() {
     const descriptorValue = JSON.parse(descriptorBytes.toString("utf8"));
     if (descriptorValue?.release_set_hash !== releaseSetHash) return false;
     const expectedModel = configuredProvider === "glm"
-      ? "glm-5.2"
+      ? "glm-5.3"
       : "deepseek-v4-flash";
     const entries = Array.isArray(descriptorValue?.entries)
       ? descriptorValue.entries

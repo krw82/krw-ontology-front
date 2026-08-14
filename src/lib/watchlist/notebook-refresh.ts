@@ -1,18 +1,5 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
-import { mkdir } from "node:fs/promises";
-import path from "node:path";
-import {
-  query,
-  type Options,
-  type PermissionResult,
-  type SDKMessage,
-} from "@anthropic-ai/claude-agent-sdk";
-import { buildClaudeAgentEnv } from "@/lib/agent/env";
-import { getKrwOntologyPluginPath } from "@/lib/agent/mcp-client";
-import { getClaudeAgentModel } from "@/lib/agent/model";
-import { readIntEnv } from "@/lib/env";
 import { normalizeTicker } from "@/lib/ontology/ticker";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type {
@@ -26,13 +13,11 @@ const SESSION_SELECT =
 const MESSAGE_SELECT =
   "id, session_id, role, content, status, request_id, created_at, updated_at";
 
-const DEFAULT_AGENT_WORKSPACE_DIR = ".agent-workspace";
 const NOTEBOOK_MAX_LENGTH = 100_000;
 const EXISTING_NOTEBOOK_PROMPT_LIMIT = 45_000;
 const MESSAGE_PROMPT_LIMIT = 10_000;
 const DEFAULT_RECENT_CONVERSATION_LIMIT = 3;
 const RECENT_SESSION_CANDIDATE_MULTIPLIER = 4;
-const DEFAULT_NOTEBOOK_AGENT_MAX_TURNS = 3;
 const OPEN_QUESTION_MAX_COUNT = 5;
 const AUTO_QUESTION_VISIBLE_INTERVAL_HOURS = 10;
 const QUESTION_MAX_LENGTH = 1200;
@@ -41,22 +26,6 @@ const NOTEBOOK_TEMPLATE_SECTIONS = [
   "긍정 논리",
   "반대 논리",
   "생각이 바뀔 수 있는 신호",
-];
-const DISALLOWED_TOOLS = [
-  "Bash",
-  "Read",
-  "Write",
-  "Edit",
-  "MultiEdit",
-  "NotebookEdit",
-  "WebFetch",
-  "WebSearch",
-  "TodoWrite",
-  "Task",
-  "Glob",
-  "Grep",
-  "LS",
-  "Skill",
 ];
 
 export interface NotebookConversationInput {
@@ -347,80 +316,23 @@ function buildNotebookTemplate(): string {
 
 async function runNotebookAgent(
   prompt: string,
-  onUsage?: (usage: NotebookAgentUsage) => void,
+  _onUsage?: (usage: NotebookAgentUsage) => void,
 ): Promise<string> {
-  const cwd = await resolveNotebookAgentCwd();
-  const pluginPath = getKrwOntologyPluginPath();
-  const sdkOptions: Options = {
-    cwd,
-    model: getClaudeAgentModel(),
-    pathToClaudeCodeExecutable:
-      process.env.CLAUDE_CODE_EXECUTABLE || undefined,
-    systemPrompt: {
-      type: "preset",
-      preset: "claude_code",
-      append: [
-        "You transform app-provided text for one personal investor research notebook.",
-        "For merge-research-answer, preserve the notebook and merge only useful new observations and change signals.",
-        "Use only these notebook sections: 내가 보고 있는 이유, 긍정 논리, 반대 논리, 생각이 바뀔 수 있는 신호.",
-        "Do not include a title line, H1, basis period line, filing basis line, or last-updated metadata line in the notebook body.",
-        "Write section content as short topic-based bullets by default. A small Markdown table is okay when it makes comparison clearer. Do not write paragraph blocks.",
-        "Keep one idea per bullet and at most one number per bullet.",
-        "Do not create 현재 생각, 새로 확인한 점, 확인할 질문, 최근 업데이트, or 다음에 볼 것 sections in the notebook body.",
-        "For extract-open-questions, return only a JSON array of unresolved question strings.",
-        "Write like a careful individual investor, not a formal analyst memo. Use simple Korean and short sentences.",
-        "Prefer directional notes over dense numbers. Keep only the most important 2-4 numbers when necessary.",
-        "Do not list every percentage, growth rate, margin, or period from the conversations.",
-        "If FY/CY/quarter basis is mixed or unclear, do not assert it as fact.",
-        "Avoid wording like 스토리는 온전히 유지, 단기 노이즈, 사상 최고 수준, 결론적으로, 투자 포인트.",
-        "Allow only compact personal-note Markdown tables when they clarify a comparison or checklist. Never write source, valuation, segment financial, or dense numeric tables. Never write a company overview or tearsheet.",
-        "Never query files, databases, MCP tools, web, or external services.",
-        "Return only the requested payload, with no code fence or explanation.",
-      ].join("\n"),
-    },
-    plugins: [{ type: "local", path: pluginPath }],
-    tools: [],
-    allowedTools: [],
-    disallowedTools: DISALLOWED_TOOLS,
-    permissionMode: "dontAsk",
-    allowDangerouslySkipPermissions: false,
-    canUseTool: denyAllTools,
-    settingSources: [],
-    maxTurns: readIntEnv(
-      "NOTEBOOK_AGENT_MAX_TURNS",
-      DEFAULT_NOTEBOOK_AGENT_MAX_TURNS,
-      { min: 1 },
-    ),
-    includePartialMessages: false,
-    abortController: new AbortController(),
-    env: buildClaudeAgentEnv(),
-    sessionId: randomUUID(),
-  };
-
-  let output = "";
-  let resultError: string | null = null;
-  const sdkQuery = query({ prompt, options: sdkOptions });
-  for await (const message of sdkQuery) {
-    if (message.type === "result") {
-      const usage = usageFromSdkMessage(message);
-      if (hasUsage(usage)) onUsage?.(usage);
-      if (message.subtype === "success") {
-        if (!output.trim() && typeof message.result === "string") {
-          output = message.result;
-        }
-      } else {
-        resultError = Array.isArray(message.errors)
-          ? message.errors.join("\n")
-          : "Notebook agent execution failed.";
-      }
-      continue;
-    }
-
-    output += textFromSdkMessage(message);
+  // Notebook refresh is intentionally no longer a second agent runtime. The
+  // chat answer itself is produced by krw-agent; this bounded merge keeps the
+  // personal note useful without a hidden provider, MCP, or SDK call.
+  const payload = parseNotebookPayload(prompt);
+  if (payload?.update_mode === "extract-open-questions") {
+    const recent = Array.isArray(payload.recent_conversations)
+      ? payload.recent_conversations
+      : [];
+    const questions = recent
+      .map((item: unknown) => (isRecord(item) ? item.user_question : null))
+      .filter((value: unknown): value is string => typeof value === "string")
+      .filter((value) => value.includes("?") || value.includes("？"));
+    return JSON.stringify(dedupeQuestions(questions));
   }
-
-  if (resultError) throw new Error(resultError);
-  return output;
+  return mergeNotebookPayload(payload);
 }
 
 async function loadNotebookConversationFromSession(
@@ -468,37 +380,52 @@ async function loadNotebookConversationFromSession(
   };
 }
 
-async function resolveNotebookAgentCwd(): Promise<string> {
-  const configured = process.env.CLAUDE_AGENT_CWD?.trim();
-  const cwd = configured || path.join(process.cwd(), DEFAULT_AGENT_WORKSPACE_DIR);
-  if (!path.isAbsolute(cwd)) {
-    throw new Error(`CLAUDE_AGENT_CWD must be absolute when set: ${cwd}`);
+function parseNotebookPayload(prompt: string): Record<string, unknown> | null {
+  const marker = "Payload:";
+  const payloadText = prompt.slice(prompt.lastIndexOf(marker) + marker.length).trim();
+  if (!payloadText) return null;
+  try {
+    const parsed = JSON.parse(payloadText) as unknown;
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
   }
-  await mkdir(cwd, { recursive: true });
-  return cwd;
 }
 
-async function denyAllTools(): Promise<PermissionResult> {
-  return {
-    behavior: "deny",
-    message: "Notebook refresh must use only the provided payload.",
-  };
-}
-
-function textFromSdkMessage(message: SDKMessage): string {
-  const content = (message as { content?: unknown }).content;
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-
-  return content
-    .map((block) => {
-      if (!isRecord(block)) return "";
-      if (block.type === "text" && typeof block.text === "string") {
-        return block.text;
-      }
-      return "";
+function mergeNotebookPayload(payload: Record<string, unknown> | null): string {
+  if (!payload) return buildNotebookTemplate();
+  const ticker = typeof payload.ticker === "string" ? payload.ticker : "";
+  const existing = typeof payload.existing_notebook_md === "string"
+    ? payload.existing_notebook_md
+    : "";
+  const conversations = Array.isArray(payload.recent_conversations)
+    ? payload.recent_conversations.filter(isRecord)
+    : [];
+  const answerBullets = conversations
+    .flatMap((conversation) => {
+      const answer = typeof conversation.assistant_answer === "string"
+        ? conversation.assistant_answer
+        : "";
+      return answer
+        .replace(/```[\s\S]*?```/g, "")
+        .split(/\r?\n/)
+        .map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim())
+        .filter((line) => line.length >= 12 && line.length <= 240)
+        .filter((line) => !/^#/.test(line));
     })
-    .join("");
+    .filter((line, index, all) => all.indexOf(line) === index)
+    .slice(0, 8);
+  const base = normalizeNotebookMarkdown(existing || buildNotebookTemplate(), ticker);
+  if (answerBullets.length === 0) return base;
+  const additions = answerBullets.map((line) => `- ${line}`).join("\n");
+  const section = /리스크|위험|부담|감소|하락|우려|불확실/.test(additions)
+    ? "반대 논리"
+    : "긍정 논리";
+  const heading = `## ${section}`;
+  const merged = base.includes(heading)
+    ? base.replace(heading, `${heading}\n${additions}`)
+    : `${base}\n\n${heading}\n${additions}`;
+  return merged.slice(0, NOTEBOOK_MAX_LENGTH);
 }
 
 function normalizeNotebookMarkdown(markdown: string, ticker: string): string {
@@ -666,77 +593,4 @@ function normalizeQuestionKey(value: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
-}
-
-function usageFromSdkMessage(message: SDKMessage): NotebookAgentUsage {
-  if (message.type !== "result") {
-    return emptyNotebookAgentUsage();
-  }
-
-  const recordMessage = message as Record<string, unknown>;
-  const usage = isRecord(recordMessage.usage) ? recordMessage.usage : {};
-  const modelUsage = isRecord(recordMessage.modelUsage)
-    ? recordMessage.modelUsage
-    : {};
-  const inputTokens =
-    numberValue(usage.input_tokens) ??
-    numberValue(usage.inputTokens) ??
-    sumModelUsage(modelUsage, "inputTokens");
-  const outputTokens =
-    numberValue(usage.output_tokens) ??
-    numberValue(usage.outputTokens) ??
-    sumModelUsage(modelUsage, "outputTokens");
-  const cacheHitInputTokens =
-    numberValue(usage.prompt_cache_hit_tokens) ??
-    numberValue(usage.promptCacheHitTokens) ??
-    sumModelUsage(modelUsage, "cacheHitInputTokens");
-  const cacheMissInputTokens =
-    numberValue(usage.prompt_cache_miss_tokens) ??
-    numberValue(usage.promptCacheMissTokens) ??
-    sumModelUsage(modelUsage, "cacheMissInputTokens");
-
-  return {
-    inputTokens: inputTokens ?? 0,
-    outputTokens: outputTokens ?? 0,
-    cacheHitInputTokens: cacheHitInputTokens ?? 0,
-    cacheMissInputTokens: cacheMissInputTokens ?? 0,
-  };
-}
-
-function emptyNotebookAgentUsage(): NotebookAgentUsage {
-  return {
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheHitInputTokens: 0,
-    cacheMissInputTokens: 0,
-  };
-}
-
-function hasUsage(usage: NotebookAgentUsage): boolean {
-  return (
-    usage.inputTokens > 0 ||
-    usage.outputTokens > 0 ||
-    usage.cacheHitInputTokens > 0 ||
-    usage.cacheMissInputTokens > 0
-  );
-}
-
-function sumModelUsage(
-  modelUsage: Record<string, unknown>,
-  field:
-    | "inputTokens"
-    | "outputTokens"
-    | "cacheHitInputTokens"
-    | "cacheMissInputTokens",
-): number {
-  return Object.values(modelUsage).reduce<number>((sum, value) => {
-    if (!isRecord(value)) return sum;
-    return sum + (numberValue(value[field]) ?? 0);
-  }, 0);
-}
-
-function numberValue(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value)
-    ? Math.max(0, Math.floor(value))
-    : null;
 }

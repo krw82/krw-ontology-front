@@ -60,7 +60,9 @@ export function getKrwOntologySkillForRunKind(
   if (runKind === "idea_generation") {
     return KRW_ONTOLOGY_IDEA_GENERATION_SKILL;
   }
-  if (runKind === "news_discovery") return KRW_ONTOLOGY_NEWS_DISCOVERY_SKILL;
+  if (runKind === "news_discovery" || runKind === "news_discovery_wide") {
+    return KRW_ONTOLOGY_NEWS_DISCOVERY_SKILL;
+  }
   if (runKind === "market_move_research") {
     return KRW_ONTOLOGY_MARKET_MOVE_RESEARCH_SKILL;
   }
@@ -104,7 +106,7 @@ export function buildResearchPassPrompt(
         ? newsFilingCorrelationRuntimePrompt(responseLocale)
       : runKind === "idea_generation"
       ? ideaGenerationRuntimePrompt()
-      : runKind === "news_discovery"
+      : runKind === "news_discovery" || runKind === "news_discovery_wide"
       ? newsDiscoveryRuntimePrompt(responseLocale)
       : runKind === "market_move_research"
           ? marketMoveResearchRuntimePrompt(responseLocale)

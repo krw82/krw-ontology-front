@@ -50,4 +50,27 @@ describe("Agent V1 research run-kind migrations", () => {
     expect(source).toContain("release_set_hash");
     expect(source).not.toContain("agent_worker_heartbeats");
   });
+
+  it("admits tickerless news runs in the product procedure and row constraint", () => {
+    const source = readFileSync(
+      join(migrationRoot, "20260814100000_news_discovery_wide.sql"),
+      "utf8",
+    );
+    expect(source).toContain("'news_discovery_wide'");
+    expect(source).toContain("'news_research'");
+    expect(source).toContain("enqueue_agent_v1_product_run_v7");
+  });
+
+  it("projects terminal research failures without marking them as answers", () => {
+    const source = readFileSync(
+      join(migrationRoot, "20260814130000_agent_v1_failure_projection.sql"),
+      "utf8",
+    );
+    expect(source).toContain("trg_project_agent_v1_failure_notice");
+    expect(source).toContain("'research_failure'");
+    expect(source).toContain("'research_completed', false");
+    expect(source).toContain("status = 'failed'::public.message_status");
+    expect(source).toContain("when others then");
+    expect(source).not.toContain("provider_message");
+  });
 });

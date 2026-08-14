@@ -2,12 +2,15 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/agent/worker-heartbeat", () => ({
-  getReadyAgentWorker: vi.fn(),
-}));
 vi.mock("@/lib/agent/job-queue", () => ({
-  enqueueAgentRun: vi.fn(),
   findRunByRequestId: vi.fn(),
+}));
+vi.mock("@/lib/agent/daemon-heartbeat", () => ({
+  getReadyRustAgentDaemon: vi.fn(),
+}));
+vi.mock("@/lib/agent-v1/runtime", () => ({
+  RustAgentRuntimeError: class RustAgentRuntimeError extends Error {},
+  getRustAgentRuntime: vi.fn(),
 }));
 vi.mock("@/lib/agent/run-events", () => ({
   streamAgentRunEventsResponse: vi.fn(() => new Response("stream")),
@@ -39,28 +42,26 @@ vi.mock("@/lib/api/chat/rate-limit", () => ({
 vi.mock("@/lib/concurrency/execution-budget", () => ({
   releaseExecutionBudget: vi.fn(),
 }));
-vi.mock("@/lib/ontology/catalog", () => ({
-  getActiveOntologyCatalogRelease: vi.fn(),
-}));
 vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: vi.fn(),
 }));
 
-import { getReadyAgentWorker } from "@/lib/agent/worker-heartbeat";
-import { enqueueAgentRun, findRunByRequestId } from "@/lib/agent/job-queue";
+import { getReadyRustAgentDaemon } from "@/lib/agent/daemon-heartbeat";
+import { findRunByRequestId } from "@/lib/agent/job-queue";
+import { getRustAgentRuntime } from "@/lib/agent-v1/runtime";
 import { streamAgentRunEventsResponse } from "@/lib/agent/run-events";
 import { getAuthUser } from "@/lib/auth";
 import { fetchHistory, reserveBudgetStep, resolveSession } from "@/lib/api/chat";
 import { checkChatRunRateLimit } from "@/lib/api/chat/rate-limit";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
-import { getActiveOntologyCatalogRelease } from "@/lib/ontology/catalog";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { POST } from "./route";
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const ARTIFACT_ID = "22222222-2222-4222-8222-222222222222";
 const REQUEST_ID = "550e8400-e29b-41d4-a716-446655440001";
-const EVENT_ID = "alphabet-ai-capex";
+const EVENT_ID = "33333333-3333-4333-8333-333333333333";
+const rustEnqueue = vi.fn();
 
 const selectedEvent = {
   id: EVENT_ID,
@@ -205,50 +206,7 @@ describe("POST /api/chat/news-event-selection", () => {
     } as Awaited<ReturnType<typeof getAuthUser>>);
     vi.mocked(findRunByRequestId).mockResolvedValue(null);
     vi.mocked(checkChatRunRateLimit).mockResolvedValue({ ok: true });
-    vi.mocked(getActiveOntologyCatalogRelease).mockResolvedValue({
-      release_id: "release-1",
-    } as Awaited<ReturnType<typeof getActiveOntologyCatalogRelease>>);
-    vi.mocked(getReadyAgentWorker).mockResolvedValue({
-      ok: true,
-      worker: { worker_id: "mac-worker-jwc-1" } as never,
-      mcpHealth: {
-        connected: true,
-        staticOk: true,
-        commandOk: true,
-        liveOk: true,
-        sqliteOk: true,
-        contractOk: true,
-        toolParityOk: true,
-        fingerprintOk: true,
-        fingerprintErrors: [],
-        mcpContractVersion: "krw-ontology-mcp/v2",
-        buildId: "build-1",
-        backendGitSha: "backend-sha-1",
-        toolSchemaSha256: "a".repeat(64),
-        buildFingerprintSha256: "a".repeat(64),
-        releaseManifestSha256: "a".repeat(64),
-        serviceFingerprintSha256: "a".repeat(64),
-        env: "dev",
-        releaseId: "release-1",
-        manifestPath: "/tmp/manifest.json",
-        manifestValid: true,
-        agentIndexSchemaVersion: "agent_index_v1",
-        indexGeneratedAt: "2026-06-04T00:00:00.000Z",
-        companyCount: 10,
-        documentCount: 20,
-        objectCount: 30,
-        toolCount: 13,
-        tools: ["krw_ontology_query_context"],
-        root: "/tmp/ontology",
-        indexPath: "/tmp/ontology/index.sqlite",
-        pluginPath: "/tmp/plugin",
-        releaseMetadata: {
-          env: "dev",
-          release_id: "release-1",
-          manifest_valid: true,
-        },
-      },
-    } as Awaited<ReturnType<typeof getReadyAgentWorker>>);
+    vi.mocked(getReadyRustAgentDaemon).mockResolvedValue({ ok: true } as never);
     vi.mocked(resolveSession).mockResolvedValue({
       ok: true,
       session: {
@@ -281,15 +239,19 @@ describe("POST /api/chat/news-event-selection", () => {
         history: [],
       },
     });
-    vi.mocked(enqueueAgentRun).mockResolvedValue({
-      ok: true,
-      runId: "research-run-1",
-      assistantMessageId: "assistant-message-research",
-      queuedAt: "2026-06-04T00:00:00.000Z",
+    rustEnqueue.mockResolvedValue({
+        runId: "research-run-1",
+        assistantMessageId: "assistant-message-research",
+        queuedAt: "2026-06-04T00:00:00.000Z",
+        outcome: "enqueued",
+    });
+    vi.mocked(getRustAgentRuntime).mockResolvedValue({
+      enqueue: rustEnqueue,
+      cancel: vi.fn(),
     });
   });
 
-  it("queues a company_research run for the selected MCP event", async () => {
+  it("queues a Rust news_research run for the selected MCP event", async () => {
     const fake = createAdmin();
     vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin as never);
 
@@ -312,19 +274,11 @@ describe("POST /api/chat/news-event-selection", () => {
       expect.stringContaining("내용 요약:"),
       REQUEST_ID,
     );
-    expect(enqueueAgentRun).toHaveBeenCalledWith(
-      expect.objectContaining({
-        requestId: REQUEST_ID,
-        analysisMode: "company",
-        runKind: "company_research",
-        responseLocale: "ko",
-        selectedNewsEventContext: expect.objectContaining({
-          ...selectedEvent,
-        }),
-        sourceArtifactId: ARTIFACT_ID,
-        sourceEventId: EVENT_ID,
-      }),
-    );
+    expect(rustEnqueue).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: REQUEST_ID,
+      runKind: "news_research",
+      context: { kind: "selected_feed_items", feed_item_ids: [EVENT_ID] },
+    }));
     expect(fake.upserts).toEqual([
       expect.objectContaining({
         artifact_id: ARTIFACT_ID,
@@ -361,7 +315,7 @@ describe("POST /api/chat/news-event-selection", () => {
     });
     expect(reserveBudgetStep).not.toHaveBeenCalled();
     expect(fetchHistory).not.toHaveBeenCalled();
-    expect(enqueueAgentRun).not.toHaveBeenCalled();
+    expect(rustEnqueue).not.toHaveBeenCalled();
     expect(releaseExecutionBudget).not.toHaveBeenCalled();
   });
 });

@@ -337,6 +337,28 @@ describe("POST /api/chat/run Rust Agent V1 contract", () => {
     );
   });
 
+  it("routes a tickerless news question to the covered-universe feed image", async () => {
+    body = {
+      ...body,
+      content: "최근 시장 뉴스에서 영향이 큰 기업 이슈를 찾아줘",
+      analysis_mode: "news",
+      run_kind: "news_discovery",
+    };
+    vi.mocked(validateRequest).mockResolvedValue({
+      ok: true,
+      data: { userId: "user-1", userEmail: "user@example.test", body: { ...body } as never },
+    });
+    setSession({ scopeType: "global", defaultTickers: [] });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(runtimeEnqueue).toHaveBeenCalledWith(expect.objectContaining({
+      runKind: "news_discovery_wide",
+      context: { kind: "covered_universe", universe: "covered" },
+    }));
+  });
+
   it("keeps a follow-up in the same chat session while creating a new run", async () => {
     const firstRequestId = REQUEST_ID;
     const secondRequestId = "550e8400-e29b-41d4-a716-446655440002";

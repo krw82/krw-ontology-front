@@ -1,13 +1,21 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const EXPECTED_NODE_SDK = "0.3.204";
-const EXPECTED_PYTHON_SDK = "0.2.85";
 const repoRoot = process.cwd();
 
-describe("KRW-AI Agent SDK freeze", () => {
-  it("pins the frontend SDK exactly instead of using semver ranges", () => {
+function sourceFiles(root: string): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    const absolute = path.join(root, entry.name);
+    if (entry.isDirectory()) files.push(...sourceFiles(absolute));
+    else if (/\.(?:ts|tsx|js|mjs|cjs)$/.test(entry.name)) files.push(absolute);
+  }
+  return files;
+}
+
+describe("KRW-AI Agent SDK removal", () => {
+  it("does not ship or declare the retired frontend SDK", () => {
     const packageJson = JSON.parse(
       readFileSync(path.join(repoRoot, "package.json"), "utf8"),
     ) as {
@@ -26,38 +34,20 @@ describe("KRW-AI Agent SDK freeze", () => {
       >;
     };
 
-    expect(packageJson.dependencies?.["@anthropic-ai/claude-agent-sdk"]).toBe(
-      EXPECTED_NODE_SDK,
-    );
+    expect(packageJson.dependencies?.["@anthropic-ai/claude-agent-sdk"]).toBeUndefined();
+    expect(packageLock.packages?.[""]?.dependencies?.["@anthropic-ai/claude-agent-sdk"]).toBeUndefined();
+    expect(packageLock.packages?.["node_modules/@anthropic-ai/claude-agent-sdk"]).toBeUndefined();
     expect(
-      packageLock.packages?.[""]?.dependencies?.[
-        "@anthropic-ai/claude-agent-sdk"
-      ],
-    ).toBe(EXPECTED_NODE_SDK);
-    expect(
-      packageLock.packages?.["node_modules/@anthropic-ai/claude-agent-sdk"]
-        ?.version,
-    ).toBe(EXPECTED_NODE_SDK);
-
-    const nativePackageVersions = Object.entries(
-      packageLock.packages?.["node_modules/@anthropic-ai/claude-agent-sdk"]
-        ?.optionalDependencies ?? {},
-    )
-      .filter(([name]) => name.startsWith("@anthropic-ai/claude-agent-sdk-"))
-      .map(([, version]) => version);
-
-    expect(nativePackageVersions.length).toBeGreaterThan(0);
-    expect(new Set(nativePackageVersions)).toEqual(new Set([EXPECTED_NODE_SDK]));
+      Object.keys(packageLock.packages ?? {}).some((name) =>
+        name.includes("@anthropic-ai/claude-agent-sdk"),
+      ),
+    ).toBe(false);
   });
 
-  it("pins the ontology Python SDK used by production MCP builds", () => {
-    const ontologyPyproject = readFileSync(
-      path.join(repoRoot, "krw-ontology", "pyproject.toml"),
-      "utf8",
-    );
-
-    expect(ontologyPyproject).toContain(
-      `"claude-agent-sdk==${EXPECTED_PYTHON_SDK}"`,
-    );
+  it("does not import the retired SDK from active frontend source", () => {
+    const sdkImport = /(?:from\s+|import\s*\(|require\s*\()(['"])@anthropic-ai\/claude-agent-sdk\1/;
+    for (const file of sourceFiles(path.join(repoRoot, "src"))) {
+      expect(readFileSync(file, "utf8"), file).not.toMatch(sdkImport);
+    }
   });
 });

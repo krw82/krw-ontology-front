@@ -15,12 +15,7 @@ FROM base AS prod-deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY vendor ./vendor
-# GCP runs Debian (glibc), so the optional musl Claude binary can never be
-# selected. Remove it in this stage, before it reaches the final image. The
-# glibc Linux binary remains available for the legacy, non-research web paths
-# that still import the Node SDK.
-RUN npm ci --omit=dev \
-    && rm -rf node_modules/@anthropic-ai/claude-agent-sdk-linux-x64-musl
+RUN npm ci --omit=dev
 
 # Build stage
 FROM base AS builder
@@ -83,14 +78,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/.worker/billing-worker.mjs ./.wor
 COPY --from=builder --chown=nextjs:nodejs /app/.worker/agent-v1-outbox-worker.mjs ./.worker/agent-v1-outbox-worker.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/.services ./.services
 COPY --from=prod-deps --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/docker/claude-prod /usr/local/bin/claude-prod
-
-RUN chmod 755 /usr/local/bin/claude-prod
-
 RUN <<'EOF'
 set -eu
-mkdir -p .next/cache /app/agent-workspace /home/nextjs/.claude-prod /srv/krw-document-inbox
-chown -R nextjs:nodejs .next /app/agent-workspace /home/nextjs/.claude-prod /srv/krw-document-inbox
+mkdir -p .next/cache /app/agent-workspace /srv/krw-document-inbox
+chown -R nextjs:nodejs .next /app/agent-workspace /srv/krw-document-inbox
 EOF
 
 USER nextjs

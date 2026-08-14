@@ -199,6 +199,7 @@ describe("production deploy scripts", () => {
   it("routes normal production aliases through the fast web and Mac path", () => {
     const deployProd = read("scripts/deploy-production.sh");
     const deployFast = read("scripts/deploy-production-fast.sh");
+    const deployFull = read("scripts/deploy-production-full.sh");
     const deployAll = read("scripts/deploy-all-production.sh");
     const deployQueue = read("scripts/deploy-production-simple.sh");
     const deployWeb = read("scripts/deploy-web-production.sh");
@@ -206,6 +207,7 @@ describe("production deploy scripts", () => {
     const packageJson = read("package.json");
     const restartCompose = read("scripts/restart-production-compose.sh");
     const verifyMcp = read("scripts/verify-mcp-server-production.sh");
+    const verifyFeed = read("scripts/verify-krw-feed-mcp-production.sh");
     const verifyMcpRuntime = read("scripts/verify-mcp-runtime.mjs");
     const fingerprintMcpRuntime = read("scripts/mcp-runtime-fingerprint.sh");
 
@@ -222,7 +224,8 @@ describe("production deploy scripts", () => {
     expect(deployFast).toContain("docker compose");
     expect(deployFast).toContain("run_schema_smoke()");
     expect(deployFast).toContain("run_schema_smoke");
-    expect(deployFast).toContain("db push --dry-run");
+    expect(deployFast).toContain("run_migration_dry_run");
+    expect(deployFast).toContain("supabase-cli.sh");
     expect(deployFast).toContain("run_remote_deep_verify");
     expect(deployFast).toContain("Removing retired GCP ontology sidecars.");
     expect(deployFast).toContain("stage_local_agent_release");
@@ -250,6 +253,21 @@ describe("production deploy scripts", () => {
     expect(deployFast).not.toContain("KRW_ONTOLOGY_SOURCE_DIR=\"$REMOTE_STAGE/ontology\"");
     expect(deployFast).not.toContain("pause-production-cutover.sh");
     expect(deployFast).not.toContain("deploy-all-production.sh");
+    expect(deployFull).toContain("build_sealed_dual_provider_release.sh");
+    expect(deployFull).toContain("prepare_agent_runtime_env_candidate");
+    expect(deployFull).toContain("write_canonical_feed_token");
+    expect(deployFull).toContain("verify-krw-feed-mcp-production.sh");
+    expect(deployFull).toContain("agent_runtime_env_candidate");
+    expect(deployFull).toContain("Restored the previous Rust runtime env");
+    expect(deployFull).toContain("KRW_FEED_MCP_TOKEN");
+    expect(deployFull).toContain("--runtime-env");
+    expect(deployFull).toContain("KRW_AGENT_RUNTIME_ENV_FILE");
+    expect(deployFull).not.toContain("agent_runtime_env_overlay_dir");
+    expect(deployFast).toContain(
+      'verify-krw-feed-mcp-production.sh" --env-file "$AGENT_RUNTIME_ENV_PATH"',
+    );
+    expect(verifyFeed).toContain("NODE_EXTRA_CA_CERTS");
+    expect(verifyFeed).toContain('Object.hasOwn(payload, "database_ready")');
 
     expect(deployAll).toContain("deploy-web-production.sh");
     expect(deployAll).toContain("deploy-plugin-worker-production.sh");
@@ -357,27 +375,11 @@ describe("production deploy scripts", () => {
       ),
     ).not.toContain("ontology-mcp:");
     expect(restartCompose).toContain("Direct production Compose restarts are disabled");
-    expect(read("scripts/deploy-plugin-worker-production.sh")).toContain(
-      'runtime/plugins/prod/$ACTIVE_RELEASE_ID-canonical/krw-ontology',
+    const retiredPluginDeploy = read("scripts/deploy-plugin-worker-production.sh");
+    expect(retiredPluginDeploy).toContain(
+      "Claude/plugin worker deployment path has been retired.",
     );
-    expect(read("scripts/deploy-plugin-worker-production.sh")).toContain(
-      'KRW_ONTOLOGY_MCP_HEALTH_URL "http://127.0.0.1:$CANDIDATE_MCP_PORT/health"',
-    );
-    expect(read("scripts/deploy-plugin-worker-production.sh")).toContain(
-      'KRW_ONTOLOGY_MCP_READY_URL "http://127.0.0.1:$CANDIDATE_MCP_PORT/readyz"',
-    );
-    expect(read("scripts/deploy-plugin-worker-production.sh")).toContain(
-      'KRW_ONTOLOGY_SOURCE_DIR="$RUNTIME_ONTOLOGY_SOURCE"',
-    );
-    expect(read("scripts/deploy-plugin-worker-production.sh")).toContain(
-      'KRW_ONTOLOGY_RELEASE_ROOT="$ACTIVE_RELEASE_ROOT"',
-    );
-    expect(read("scripts/deploy-plugin-worker-production.sh")).toContain(
-      'KRW_FILINGS_MCP_DEFER_PERSONAL_DATA_SMOKE 1',
-    );
-    expect(read("scripts/deploy-plugin-worker-production.sh")).toContain(
-      "--exclude '/.venv*/'",
-    );
+    expect(retiredPluginDeploy).not.toContain("@anthropic-ai/claude-agent-sdk");
     expect(read("scripts/deploy-vm-compose.sh")).toContain(
       "--exclude '/.venv*/'",
     );
@@ -395,7 +397,7 @@ describe("production deploy scripts", () => {
       '"prod:deploy:mac-runtime": "/bin/sh scripts/deploy-production-fast.sh --skip-web"',
     );
     expect(packageJson).toContain('"prod:deploy:code": "scripts/deploy-production-fast.sh --apply-migrations"');
-    expect(packageJson).toContain('"prod:deploy:full": "scripts/deploy-production-fast.sh --apply-migrations --with-agent-release"');
+    expect(packageJson).toContain('"prod:deploy:full": "scripts/deploy-production-full.sh"');
     expect(packageJson).toContain('"prod:deploy:dry": "scripts/deploy-production-fast.sh --dry-run --apply-migrations"');
     expect(packageJson).toContain('"prod:deploy:safe": "scripts/deploy-production-fast.sh --apply-migrations --with-agent-release"');
     expect(packageJson).toContain('"prod:release:publish": "scripts/deploy-production-fast.sh --with-data --skip-web --skip-mac"');
@@ -579,7 +581,7 @@ describe("production deploy scripts", () => {
     expect(dockerfileWeb).toContain("/app/.worker/document-worker.mjs");
     expect(dockerfileWeb).toContain("markitdown[pdf]");
     expect(dockerfileWeb).not.toContain("claude-agent-sdk==0.2.85");
-    expect(dockerfileWeb).toContain("claude-agent-sdk-linux-x64-musl");
+    expect(dockerfileWeb).not.toContain("claude-agent-sdk-linux-x64-musl");
     expect(compose).toContain("  document-worker:");
     expect(compose).toContain("  document-outbox-dispatcher:");
     expect(compose).toContain("  filings-mcp:");
@@ -875,8 +877,8 @@ cleanup
     );
 
     const initEnv = read("scripts/init-mac-worker-env.sh");
-    expect(initEnv).toContain("~/.local/bin/claude-krw");
-    expect(initEnv).toContain("EXPECTED_CLAUDE_CODE_VERSION=2.1.204");
+    expect(initEnv).not.toContain("claude-krw");
+    expect(initEnv).not.toContain("EXPECTED_CLAUDE_CODE_VERSION");
     expect(initEnv).toContain("KRW_ONTOLOGY_QUEUE_ROOT=~/krw-ontology-data-running");
     expect(initEnv).toContain("$HOME/krw-ontology");
     expect(initEnv).toContain("ref/plugins/prod/krw-ontology");
@@ -887,6 +889,11 @@ cleanup
     expect(initEnv).toContain("KRW_ONTOLOGY_MCP_URL=http://127.0.0.1:8765/mcp");
     expect(initEnv).toContain("KRW_ONTOLOGY_MCP_HEALTH_URL=http://127.0.0.1:8765/health");
     expect(initEnv).toContain("KRW_ONTOLOGY_MCP_READY_URL=http://127.0.0.1:8765/readyz");
+    expect(initEnv).toContain("KRW_FEED_MCP_CANONICAL_TOKEN_VALUE=$(read_key_or_empty KRW_FEED_MCP_TOKEN)");
+    expect(initEnv).toContain("KRW_FEED_MCP_LEGACY_TOKEN_VALUE=$(read_key_or_empty FEED_MCP_AUTH_TOKEN)");
+    expect(initEnv).toContain("Feed MCP token aliases conflict");
+    expect(initEnv).toContain("KRW_FEED_MCP_TOKEN=$KRW_FEED_MCP_TOKEN_VALUE");
+    expect(initEnv).toContain("KRW_FEED_MCP_URL=${KRW_FEED_MCP_URL_VALUE:-http://127.0.0.1:8795/mcp}");
     expect(initEnv).toContain("AGENT_SUPERVISOR_ID=mac-supervisor-jwc");
     expect(initEnv).toContain("AGENT_SUPERVISOR_CONCURRENCY=8");
     expect(initEnv).toContain("MAC_WORKER_COUNT=8");
@@ -995,50 +1002,15 @@ cleanup
     expect(deployWorker).toContain("does not deploy or restart the GCP web container");
     expect(deployWorker).toContain("MCP HTTP server must already be healthy");
 
-    expect(deployPluginWorker).toContain("KRW_ONTOLOGY_PLUGIN_PATH is not the canonical active-release plugin path");
-    expect(deployPluginWorker).toContain("KRW_ONTOLOGY_CURRENT_RELEASE_ROOT");
-    expect(deployPluginWorker).toContain("Prepared runtime current release link mismatch.");
-    expect(deployPluginWorker).toContain("materialize-ontology-plugin.mjs");
-    expect(deployPluginWorker).toContain("materialize-guru-advisor-plugin.mjs");
     expect(deployPluginWorker).toContain(
-      'append_env_value "$RUNTIME_ENV_PATH" KRW_RUNTIME_NODE_EXECUTABLE "$NODE_PATH"',
+      "Claude/plugin worker deployment path has been retired.",
     );
+    expect(deployPluginWorker).toContain("npm run prod:deploy:full");
+    expect(deployPluginWorker).not.toContain("@anthropic-ai/claude-agent-sdk");
     expect(read("scripts/deploy-web-production.sh")).toContain(
       'ps -o state= -p "$gcp_probe_pid"',
     );
-    expect(deployPluginWorker).toContain("KRW_GURU_ADVISOR_PLUGIN_PATH is not the canonical source plugin path");
-    expect(deployPluginWorker).toContain("export-stock-news-coverage.mjs");
-    expect(deployPluginWorker).toContain("stock-news/coverage_companies.json");
-    expect(deployPluginWorker).toContain("install-mcp-server-launchd.sh");
-    expect(deployPluginWorker).toContain("install-stock-news-mcp-launchd.sh");
-    expect(deployPluginWorker).toContain("deploy-worker-production.sh");
-    expect(deployPluginWorker).not.toContain(
-      "News discovery will still work, but fallback cards may stay in English",
-    );
-    expect(deployPluginWorker).toContain("versioned, immutable Mac runtime");
-    expect(deployPluginWorker).toContain("candidate runtime dependency and isolated MCP health checks");
-    expect(deployPluginWorker).toContain(
-      'npm ci --include=dev --no-audit --no-fund && npm run build:worker',
-    );
-    expect(deployPluginWorker).toContain('npm ci --omit=dev');
-    expect(deployPluginWorker).toContain("KRW_RUNTIME_IDENTITY_SHA256");
-    expect(deployPluginWorker).toContain(
-      "Retrying isolated ontology environment sync after a transient SIGTERM",
-    );
-    expect(deployPluginWorker).toContain('[ "$runtime_sync_status" -ne 143 ]');
-    const runtimeEnvCopy = deployPluginWorker.indexOf(
-      'cp "$ENV_PATH" "$RUNTIME_ENV_PATH"',
-    );
-    const runtimeEnvWritable = deployPluginWorker.indexOf(
-      'chmod 600 "$RUNTIME_ENV_PATH"',
-      runtimeEnvCopy,
-    );
-    const deepSeekMaterialization = deployPluginWorker.indexOf(
-      'node - "$CLAUDE_CONFIG_DIR/deepseek.env" "$RUNTIME_ENV_PATH"',
-    );
-    expect(runtimeEnvCopy).toBeGreaterThan(-1);
-    expect(runtimeEnvWritable).toBeGreaterThan(runtimeEnvCopy);
-    expect(deepSeekMaterialization).toBeGreaterThan(runtimeEnvWritable);
+    expect(deployPluginWorker).not.toContain("claude-prod");
     expect(read("scripts/export-stock-news-coverage.mjs")).toContain("ontology_companies");
     expect(read("scripts/start-stock-news-mcp-production.sh")).toContain("STOCK_NEWS_COVERAGE_PATH");
     expect(read("scripts/start-stock-news-mcp-dev.sh")).toContain("STOCK_NEWS_COVERAGE_PATH");
@@ -1081,7 +1053,11 @@ cleanup
     expect(devScript).toContain("KRW_ONTOLOGY_GLOBAL_SPINE_PATH");
     expect(devScript).toContain("KRW_ONTOLOGY_SHARD_MANIFEST_PATH");
     expect(devScript).toContain("KRW_DEV_WORKER_NICE");
-    expect(devScript).toContain('["-n", String(devWorkerNice), process.execPath, workerOutfile]');
+    expect(devScript).toContain(
+      '["-n", String(devWorkerNice), process.execPath, documentWorkerOutfile]',
+    );
+    expect(devScript).toContain("agentV1OutboxOutfile");
+    expect(devScript).toContain("local krw-agent daemon");
     expect(devScript).toContain('stdio: ["pipe", "inherit", "inherit"]');
 
     expect(mcpClient).toContain(

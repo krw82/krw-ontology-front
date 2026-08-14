@@ -27,7 +27,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  serverExternalPackages: ["@anthropic-ai/claude-agent-sdk"],
   async headers() {
     return [
       {

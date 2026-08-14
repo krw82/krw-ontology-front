@@ -9,8 +9,6 @@ import process from "node:process";
 import { context } from "esbuild";
 import nextEnv from "@next/env";
 
-const workerEntry = "src/worker/agent-worker.ts";
-const workerOutfile = ".worker/agent-worker.mjs";
 const documentWorkerEntry = "src/worker/document-worker.ts";
 const documentWorkerOutfile = ".worker/document-worker.mjs";
 const agentV1OutboxEntry = "src/worker/agent-v1-outbox-worker.ts";
@@ -207,7 +205,6 @@ function healthUrlFromMcpUrl(mcpUrl) {
 
 configureDevOntologyEnv();
 
-let worker = null;
 let documentWorker = null;
 let agentV1OutboxWorker = null;
 let nextDev = null;
@@ -215,8 +212,6 @@ let devMcp = null;
 let stockNewsMcp = null;
 let feedMcp = null;
 let shuttingDown = false;
-let workerStartQueued = false;
-let workerRestarting = false;
 let documentWorkerStartQueued = false;
 let documentWorkerRestarting = false;
 let agentV1OutboxStartQueued = false;
@@ -262,9 +257,9 @@ function isKrwFeedMcpEnabled() {
 // consumed by the Rust daemon and its product outbox projector below.
 const rustAgentBackend =
   process.env.KRW_AGENT_BACKEND_MODE?.trim().toLowerCase() === "rust";
-const shouldRunAgentWorker =
-  !truthyEnv(process.env.KRW_DEV_SKIP_AGENT_WORKER) &&
-  (!rustAgentBackend || truthyEnv(process.env.KRW_DEV_RUN_LEGACY_AGENT_WORKER));
+// The retired plugin agent worker is intentionally never built or started.
+// Research work belongs to the local krw-agent daemon; this wrapper may still
+// run stateless document/outbox workers for development.
 const shouldRunDocumentWorker = !truthyEnv(process.env.KRW_DEV_SKIP_DOCUMENT_WORKER);
 const shouldRunAgentV1Outbox =
   rustAgentBackend && !truthyEnv(process.env.KRW_DEV_SKIP_AGENT_V1_OUTBOX);
@@ -416,32 +411,6 @@ async function stopChild(child) {
     // The process is already gone.
   } finally {
     clearTimeout(timeout);
-  }
-}
-
-async function restartWorker() {
-  if (!shouldRunAgentWorker) return;
-  if (shuttingDown) return;
-  if (workerStartQueued) return;
-  workerStartQueued = true;
-
-  try {
-    workerRestarting = true;
-    await stopChild(worker);
-    workerRestarting = false;
-    if (shuttingDown) return;
-    worker = spawnLabeled(
-      "worker",
-      "nice",
-      ["-n", String(devWorkerNice), process.execPath, workerOutfile],
-      (code) => {
-        if (workerRestarting) return;
-        void shutdown("worker-exit").finally(() => process.exit(code ?? 1));
-      },
-    );
-  } finally {
-    workerRestarting = false;
-    workerStartQueued = false;
   }
 }
 
@@ -792,23 +761,6 @@ function stopManagedDevMcpListener() {
   }
 }
 
-const workerRestartPlugin = {
-  name: "worker-restart",
-  setup(build) {
-    build.onResolve({ filter: /^server-only$/ }, () => ({
-      path: serverOnlyShim,
-    }));
-
-    build.onEnd((result) => {
-      if (result.errors.length > 0) {
-        console.error("[dev:worker] build failed; keeping previous worker");
-        return;
-      }
-      void restartWorker();
-    });
-  },
-};
-
 const documentWorkerRestartPlugin = {
   name: "document-worker-restart",
   setup(build) {
@@ -847,17 +799,6 @@ const agentV1OutboxRestartPlugin = {
   },
 };
 
-const workerContext = shouldRunAgentWorker ? await context({
-  entryPoints: [workerEntry],
-  bundle: true,
-  platform: "node",
-  target: "node20",
-  format: "esm",
-  packages: "external",
-  outfile: workerOutfile,
-  plugins: [workerRestartPlugin],
-}) : null;
-
 const documentWorkerContext = shouldRunDocumentWorker ? await context({
   entryPoints: [documentWorkerEntry],
   bundle: true,
@@ -895,10 +836,8 @@ async function shutdown(signal) {
   }
 
   await Promise.allSettled([
-    workerContext?.dispose(),
     documentWorkerContext?.dispose(),
     agentV1OutboxContext?.dispose(),
-    stopChild(worker),
     stopChild(documentWorker),
     stopChild(agentV1OutboxWorker),
     stopChild(devMcp),
@@ -933,13 +872,9 @@ const webDevArgs = ["run", "dev:web"];
 nextDev = spawnLabeled("web", "npm", webDevArgs, (code) => {
   void shutdown("web-exit").finally(() => process.exit(code ?? 1));
 });
-if (workerContext) {
-  await workerContext.watch();
-} else {
-  console.info(
-    `[dev:worker] disabled${rustAgentBackend ? " in Rust backend mode" : " by KRW_DEV_SKIP_AGENT_WORKER"}`,
-  );
-}
+console.info(
+  `[dev:worker] retired; research runs are owned by the local krw-agent daemon${rustAgentBackend ? " (Rust backend mode)" : ""}`,
+);
 if (documentWorkerContext) {
   await documentWorkerContext.watch();
 } else {

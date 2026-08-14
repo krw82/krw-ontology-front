@@ -65,6 +65,7 @@ export type RunKind =
   | "wide_research"
   | "idea_generation"
   | "news_discovery"
+  | "news_discovery_wide"
   | "market_move_research"
   | "scenario_sensitivity"
   | "guru_advisor";
@@ -1182,6 +1183,28 @@ export interface AtomicNewsEventCard {
   };
   ranking?: Record<string, unknown>;
   [key: string]: unknown;
+}
+
+/**
+ * Small, durable event anchor carried between the news card, the chat room,
+ * and a Rust `news_research` run.  It deliberately contains the premise and
+ * source references, not an unbounded article body.  The default mode asks
+ * for impact analysis under the premise that the event is true; fact-checking
+ * is an explicit alternate mode.
+ */
+export interface EventPremisePack {
+  version: "event-premise/v1";
+  mode: "assume_event_true" | "fact_check";
+  selected_event_id: string;
+  ticker?: string;
+  company_name?: string;
+  event_title: string;
+  original_headline?: string;
+  summary?: string;
+  source_urls: string[];
+  source_published_at?: string | null;
+  impact_axes: string[];
+  baseline_questions: string[];
 }
 
 export interface NewsEventSelectionArtifactPayload {
