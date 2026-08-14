@@ -162,6 +162,12 @@ esac
 
 if [[ "$skip_front_migrations" == false ]]; then
   "$front_root/scripts/supabase-cli.sh" db push
+  node "$front_root/scripts/verify-agent-v1-compatibility.mjs"
+  printf 'agent-v1 production migration gate passed\n'
+else
+  # The fast deploy path applies product-owned migrations immediately after
+  # this sealed Rust migration step.  Do not run the compatibility query
+  # against the pre-product-migration schema; the caller runs the same gate
+  # after both migration sets have been applied.
+  printf 'agent-v1 Rust migrations applied; deferring compatibility gate until front migrations complete\n'
 fi
-node "$front_root/scripts/verify-agent-v1-compatibility.mjs"
-printf 'agent-v1 production migration gate passed\n'
