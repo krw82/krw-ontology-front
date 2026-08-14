@@ -24,6 +24,7 @@ agent_source_root=${KRW_AGENT_SOURCE_ROOT:-"$HOME/krw-agnet"}
 agent_operator_root=${KRW_AGENT_OPERATOR_ROOT:-"$HOME/krw-agnet-prod"}
 release_id=
 forward_args=()
+has_forward_args=0
 
 usage() {
   cat <<'EOF'
@@ -63,6 +64,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       forward_args+=("$1")
+      has_forward_args=1
       shift
       ;;
   esac
@@ -93,10 +95,19 @@ release_root="$agent_operator_root/releases/${release_id}-${agent_commit}"
   --output-root "$release_root" \
   --operator-root "$agent_operator_root"
 
-exec env KRW_AGENT_OPERATOR_ROOT="$agent_operator_root" \
-  "$script_dir/deploy-production-fast.sh" \
-    --apply-migrations \
-    --with-agent-release \
-    --release-id "$release_id" \
-    --agent-release-root "$release_root" \
-    "${forward_args[@]}"
+deploy_exact_release() {
+  exec env KRW_AGENT_OPERATOR_ROOT="$agent_operator_root" \
+    "$script_dir/deploy-production-fast.sh" \
+      --apply-migrations \
+      --with-agent-release \
+      --release-id "$release_id" \
+      --agent-release-root "$release_root" \
+      "$@"
+}
+
+# Bash with `set -u` treats an empty array expansion as an unset variable on
+# some macOS Bash versions. Keep the common no-argument deploy path explicit.
+if [[ "$has_forward_args" = "1" ]]; then
+  deploy_exact_release "${forward_args[@]}"
+fi
+deploy_exact_release
