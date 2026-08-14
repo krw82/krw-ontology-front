@@ -303,24 +303,24 @@ target_value() {
 
 run_migration_dry_run() {
   TMP_BASE=${TMPDIR:-/tmp}
-  migration_output=$(mktemp "$TMP_BASE/krw-fast-migration.XXXXXX")
-  if run_front_migration --dry-run >"$migration_output" 2>&1; then
-    cat "$migration_output"
-    rm -f "$migration_output"
+  migration_dry_run_output=$(mktemp "$TMP_BASE/krw-fast-migration.XXXXXX")
+  if run_front_migration --dry-run >"$migration_dry_run_output" 2>&1; then
+    cat "$migration_dry_run_output"
+    rm -f "$migration_dry_run_output"
     return 0
   fi
-  if grep -q -- "--include-all" "$migration_output"; then
-    cat "$migration_output"
+  if grep -q -- "--include-all" "$migration_dry_run_output"; then
+    cat "$migration_dry_run_output"
     echo "Retrying migration plan with --include-all for out-of-order local migrations."
-    if run_front_migration --include-all --dry-run >"$migration_output" 2>&1; then
-      cat "$migration_output"
-      rm -f "$migration_output"
+    if run_front_migration --include-all --dry-run >"$migration_dry_run_output" 2>&1; then
+      cat "$migration_dry_run_output"
+      rm -f "$migration_dry_run_output"
       MIGRATION_INCLUDE_ALL=1
       return 0
     fi
   fi
-  cat "$migration_output" >&2
-  rm -f "$migration_output"
+  cat "$migration_dry_run_output" >&2
+  rm -f "$migration_dry_run_output"
   return 1
 }
 
@@ -346,30 +346,30 @@ front_migration_pooler_url() {
 
 run_front_migration() {
   TMP_BASE=${TMPDIR:-/tmp}
-  migration_output=$(mktemp "$TMP_BASE/krw-front-migration.XXXXXX")
-  if "$SCRIPT_DIR/supabase-cli.sh" db push "$@" >"$migration_output" 2>&1; then
-    cat "$migration_output"
-    rm -f "$migration_output"
+  front_migration_output=$(mktemp "$TMP_BASE/krw-front-migration.XXXXXX")
+  if "$SCRIPT_DIR/supabase-cli.sh" db push "$@" >"$front_migration_output" 2>&1; then
+    cat "$front_migration_output"
+    rm -f "$front_migration_output"
     return 0
   fi
   migration_status=$?
-  if ! grep -Eq 'IPv6 is not supported on your current network|no route to host' "$migration_output"; then
-    cat "$migration_output" >&2
-    rm -f "$migration_output"
+  if ! grep -Eq 'IPv6 is not supported on your current network|no route to host' "$front_migration_output"; then
+    cat "$front_migration_output" >&2
+    rm -f "$front_migration_output"
     return "$migration_status"
   fi
   pooler_url=$(front_migration_pooler_url) || {
-    cat "$migration_output" >&2
-    rm -f "$migration_output"
+    cat "$front_migration_output" >&2
+    rm -f "$front_migration_output"
     fail "Direct Supabase migration connection is unavailable and no production pooler URL is configured."
   }
   echo "Direct Supabase database connection is IPv6-only; retrying this migration through the configured TLS session pooler." >&2
   if "$SCRIPT_DIR/supabase-cli.sh" db push --db-url "$pooler_url" "$@"; then
-    rm -f "$migration_output"
+    rm -f "$front_migration_output"
     return 0
   fi
   migration_status=$?
-  rm -f "$migration_output"
+  rm -f "$front_migration_output"
   return "$migration_status"
 }
 
