@@ -170,6 +170,7 @@ ensure_local_feed_gateway_ready() {
     if curl -fsS --connect-timeout 1 --max-time 3 "${curl_args[@]}" \
       -H "Authorization: Bearer $feed_token" \
       -H 'Accept: application/json' \
+      -H 'Origin: https://krw-agent.local' \
       "$ready_url" -o "$probe_body" 2>/dev/null \
       && python3 - "$probe_body" <<'PY'
 import json

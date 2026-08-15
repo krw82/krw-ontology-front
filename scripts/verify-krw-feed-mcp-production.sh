@@ -44,7 +44,10 @@ node - <<'NODE'
 const mcpUrl = new URL(process.env.KRW_FEED_MCP_URL);
 mcpUrl.pathname = "/readyz";
 const response = await fetch(mcpUrl, {
-  headers: { authorization: `Bearer ${process.env.KRW_FEED_MCP_TOKEN}` },
+  headers: {
+    authorization: `Bearer ${process.env.KRW_FEED_MCP_TOKEN}`,
+    origin: "https://krw-agent.local",
+  },
 });
 const payload = await response.json();
 // `database_ready` exists on some Feed versions but is not part of the

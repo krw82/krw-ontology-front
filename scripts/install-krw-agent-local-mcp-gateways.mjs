@@ -24,6 +24,10 @@ import path from "node:path";
 
 const CONTRACT_ID = "krw-agent/mcp-tool-session-stateless/v1";
 const GATEWAY_LABEL = "com.krw.agent.local-mcp-gateways";
+// This is the only caller identity emitted by the sealed Rust MCP client.
+// Keep it identical across every local gateway: the TLS boundary is shared
+// even though the upstream services differ.
+const CLIENT_ORIGIN = "https://krw-agent.local";
 const CONFIGS = [
   { name: "ontology", reuse: "attested-stateless-v1" },
   { name: "feed", reuse: "run-scoped" },
@@ -91,6 +95,13 @@ function assertGatewayConfig(config, expectedReuse, label) {
   if (!config.tls || typeof config.tls.keyFile !== "string" || typeof config.tls.certFile !== "string") {
     fail(`${label} config has no valid TLS material`);
   }
+  if (
+    !Array.isArray(config.allowedOrigins) ||
+    config.allowedOrigins.length !== 1 ||
+    config.allowedOrigins[0] !== CLIENT_ORIGIN
+  ) {
+    fail(`${label} config has no exact Rust MCP Origin allowlist`);
+  }
 }
 
 async function atomicWrite(destination, content, mode) {
@@ -123,11 +134,14 @@ function httpsRequest({ ca, port, pathname, method = "GET", body = null }) {
         ca,
         rejectUnauthorized: true,
         timeout: 5000,
-        headers: body === null ? {} : {
-          accept: "application/json, text/event-stream",
-          "content-type": "application/json",
-          "mcp-protocol-version": "2025-06-18",
-          "content-length": Buffer.byteLength(body),
+        headers: {
+          origin: CLIENT_ORIGIN,
+          ...(body === null ? {} : {
+            accept: "application/json, text/event-stream",
+            "content-type": "application/json",
+            "mcp-protocol-version": "2025-06-18",
+            "content-length": Buffer.byteLength(body),
+          }),
         },
       },
       (response) => {
@@ -205,6 +219,10 @@ async function materialize(options) {
     await regularFile(configPath, `${entry.name} gateway config`);
     const config = JSON.parse(await readFile(configPath, "utf8"));
     config.toolSessionReuse = entry.reuse;
+    // The operator files contain endpoint identity and TLS material; this
+    // release-bound client identity is deliberately materialized here so an
+    // upgraded fail-closed proxy cannot be started with an empty allowlist.
+    config.allowedOrigins = [CLIENT_ORIGIN];
     assertGatewayConfig(config, entry.reuse, entry.name);
     configs.push({ ...entry, configPath, config });
   }
