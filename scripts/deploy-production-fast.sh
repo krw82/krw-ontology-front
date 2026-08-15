@@ -82,6 +82,7 @@ AGENT_INSTALLED_INSTALLER=
 AGENT_CAPABILITY_INSTALLER=
 AGENT_INSTALLED_CAPABILITY_INSTALLER=
 AGENT_PROVIDER_BUNDLE=
+AGENT_GATEWAY_PROXY=
 AGENT_RUNTIME_ENV_FILE=
 AGENT_RUNTIME_ENV_PATH=
 AGENT_LOCAL_INSTALL_ROOT=${KRW_AGENT_LOCAL_INSTALL_ROOT:-"$HOME/.local/share/krw-agent"}
@@ -113,6 +114,11 @@ cleanup() {
     if [ "$AGENT_LOCAL_RELEASE_ACTIVATED" = "1" ]; then
       rollback_local_agent_release || echo "Local krw-agent release rollback failed." >&2
     fi
+    # A rollback restores the prior gateway JSON. Older operator JSON may
+    # predate the fail-closed upstream-readiness rule, while the gateway
+    # runtime asset remains current. Repair before the supervisor is left to
+    # restart against that mixed boundary.
+    reconcile_active_local_mcp_gateway_contract repair || echo "Local MCP gateway contract reconciliation failed after rollback." >&2
     if [ "$MAC_RUNTIME_ACTIVATED" = "1" ]; then
       restore_previous_mac_runtime || echo "Previous Mac worker runtime restoration failed." >&2
     fi
@@ -220,6 +226,30 @@ esac
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 TARGET_FILE="$FRONT_DIR/ops/production-target.json"
+
+reconcile_active_local_mcp_gateway_contract() {
+  mode=$1
+  proxy=${2:-}
+  reconciler="$SCRIPT_DIR/reconcile-local-mcp-gateway-contract.mjs"
+  require_file "$reconciler"
+  case "$mode" in
+    check)
+      if [ -n "$proxy" ]; then
+        node "$reconciler" --mode check --operator-root "$AGENT_OPERATOR_ROOT" --proxy "$proxy"
+      else
+        node "$reconciler" --mode check --operator-root "$AGENT_OPERATOR_ROOT"
+      fi
+      ;;
+    repair)
+      if [ -n "$proxy" ]; then
+        node "$reconciler" --mode repair --restart --operator-root "$AGENT_OPERATOR_ROOT" --proxy "$proxy"
+      else
+        node "$reconciler" --mode repair --restart --operator-root "$AGENT_OPERATOR_ROOT"
+      fi
+      ;;
+    *) fail "Unknown local MCP gateway reconciliation mode: $mode" ;;
+  esac
+}
 
 resolve_agent_runtime_env() {
   # The normal front env owns public/product settings, while Agent V1 has a
@@ -501,6 +531,7 @@ if [ "$WITH_AGENT_RELEASE" = "1" ]; then
   require_command shasum
   require_file "$SCRIPT_DIR/verify-krw-agent-production-release.mjs"
   require_file "$SCRIPT_DIR/install-krw-agent-local-mcp-gateways.mjs"
+  require_file "$SCRIPT_DIR/reconcile-local-mcp-gateway-contract.mjs"
   require_file "$FRONT_DIR/ops/certificates/supabase-root-2021-ca.crt"
   [ -n "$AGENT_RELEASE_ROOT" ] || fail "Set KRW_AGENT_RELEASE_ROOT or pass --agent-release-root for a sealed dual-provider release."
   case "$AGENT_LOCAL_INSTALL_ROOT" in
@@ -521,18 +552,25 @@ if [ "$WITH_AGENT_RELEASE" = "1" ]; then
   AGENT_FINAL_EVIDENCE_VERIFIED=$(node -e 'const value=JSON.parse(process.argv[1]); process.stdout.write(value.final_evidence_verified ? "1" : "0");' "$AGENT_RELEASE_REPORT")
   AGENT_DESCRIPTOR_SOURCE="$AGENT_RELEASE_ROOT/$AGENT_PROVIDER/public-release.json"
   AGENT_PROVIDER_BUNDLE="$AGENT_RELEASE_ROOT/$AGENT_PROVIDER"
+  AGENT_GATEWAY_PROXY="$AGENT_PROVIDER_BUNDLE/packaging/local-mcp-gateways/mcp_tls_proxy.mjs"
   AGENT_LOCAL_INSTALLER="$AGENT_RELEASE_ROOT/$AGENT_PROVIDER/packaging/launchd/install-local-mac-agentd-release.sh"
   AGENT_INSTALLED_INSTALLER="$AGENT_LOCAL_INSTALL_ROOT/releases/$RELEASE_ID/$AGENT_PROVIDER/packaging/launchd/install-local-mac-agentd-release.sh"
   AGENT_CAPABILITY_INSTALLER="$AGENT_RELEASE_ROOT/$AGENT_PROVIDER/packaging/launchd/install-local-mac-capabilityd-release.sh"
   AGENT_INSTALLED_CAPABILITY_INSTALLER="$AGENT_LOCAL_INSTALL_ROOT/releases/$RELEASE_ID/$AGENT_PROVIDER/packaging/launchd/install-local-mac-capabilityd-release.sh"
   require_file "$AGENT_DESCRIPTOR_SOURCE"
   require_file "$AGENT_PROVIDER_BUNDLE/apply_migrations.sh"
+  require_file "$AGENT_GATEWAY_PROXY"
   require_file "$AGENT_LOCAL_INSTALLER"
   [ -x "$AGENT_LOCAL_INSTALLER" ] || fail "Sealed local krw-agent installer is not executable."
   require_file "$AGENT_CAPABILITY_INSTALLER"
   [ -x "$AGENT_CAPABILITY_INSTALLER" ] || fail "Sealed canonical capability runtime installer is not executable."
   require_file "$ENV_PATH"
   printf '%s\n' "Verified sealed GLM+DeepSeek release for local Mac activation; selected provider: $AGENT_PROVIDER"
+  if [ "$DRY_RUN" = "1" ]; then
+    reconcile_active_local_mcp_gateway_contract check "$AGENT_GATEWAY_PROXY"
+  else
+    reconcile_active_local_mcp_gateway_contract repair "$AGENT_GATEWAY_PROXY"
+  fi
 fi
 
 if [ "$WITH_AGENT_RELEASE" = "0" ] && [ "$SKIP_MAC" = "0" ]; then

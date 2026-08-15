@@ -67,6 +67,48 @@ describe("production deploy scripts", () => {
     );
   });
 
+  it("repairs an old local MCP gateway contract before deployment and after rollback", () => {
+    const deployFull = read("scripts/deploy-production-full.sh");
+    const deployFast = read("scripts/deploy-production-fast.sh");
+    const fullRepair = deployFull.indexOf(
+      "reconcile_current_local_mcp_gateway_contract",
+    );
+    const fullRuntimePreparation = deployFull.indexOf(
+      "prepare_agent_runtime_env_candidate",
+    );
+    const fastRepair = deployFast.indexOf(
+      "reconcile_active_local_mcp_gateway_contract",
+    );
+    const stagedRelease = deployFast.indexOf("stage_local_agent_release");
+    const cleanup = deployFast.slice(
+      deployFast.indexOf("cleanup() {"),
+      deployFast.indexOf("\n}\ntrap cleanup EXIT"),
+    );
+
+    expect(fullRepair).toBeGreaterThan(-1);
+    expect(fullRepair).toBeLessThan(fullRuntimePreparation);
+    expect(fastRepair).toBeGreaterThan(-1);
+    expect(fastRepair).toBeLessThan(stagedRelease);
+    expect(deployFast).toContain("reconcile-local-mcp-gateway-contract.mjs");
+    expect(deployFast).toContain(
+      '"$AGENT_PROVIDER_BUNDLE/packaging/local-mcp-gateways/mcp_tls_proxy.mjs"',
+    );
+    expect(cleanup.indexOf("reconcile_active_local_mcp_gateway_contract")).toBeGreaterThan(
+      cleanup.indexOf("rollback_local_agent_release"),
+    );
+  });
+
+  it("uses an MCP initialize proof for the Guru gateway instead of a guessed health URL", () => {
+    const installer = read("scripts/install-krw-agent-local-mcp-gateways.mjs");
+    const reconciler = read("scripts/reconcile-local-mcp-gateway-contract.mjs");
+
+    expect(installer).toContain('entry.name === "guru"');
+    expect(installer).toContain('"mcp_initialize"');
+    expect(installer).toContain('config.upstreamMcpPath');
+    expect(reconciler).toContain('{ name: "guru", readinessMode: "mcp_initialize", mcpPath: "/mcp" }');
+    expect(reconciler).not.toContain('name: "guru", readinessMode: "http_json", readinessPath: "/healthz"');
+  });
+
   it("requires an exact krw-agent host archive provenance before a production build", () => {
     const packageJson = JSON.parse(read("package.json"));
     expect(packageJson.scripts.build).toContain("verify:agent-host-package");

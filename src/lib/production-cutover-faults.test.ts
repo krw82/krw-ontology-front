@@ -56,6 +56,15 @@ const schemaSmokeRpcContractVerifier = join(
   "scripts",
   "verify-supabase-schema-smoke-rpc-contract.mjs",
 );
+const localMcpGatewayContractReconciler = join(
+  repoRoot,
+  "scripts",
+  "reconcile-local-mcp-gateway-contract.mjs",
+);
+const localMcpGatewayProxy = resolve(
+  repoRoot,
+  "../krw-agnet/packaging/local-mcp-gateways/mcp_tls_proxy.mjs",
+);
 
 function sha256(path: string) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
@@ -2518,5 +2527,124 @@ describe("production cutover fault injection", () => {
     expect(`${result.stdout}\n${result.stderr}`).toContain(
       "OK schema smoke RPC contract",
     );
+  });
+
+  it("repairs legacy MCP readiness flags atomically before a gateway restart", () => {
+    const root = mkdtempSync(join(tmpdir(), "krw-mcp-gateway-reconcile-"));
+    const configRoot = join(root, "config", "runtime");
+    mkdirSync(configRoot, { recursive: true });
+    const ports: Record<string, number> = {
+      ontology: 21432,
+      feed: 21433,
+      filings: 21434,
+      guru: 21435,
+    };
+    const gatewayConfig = (name: string, checkUpstreamReady = true) => ({
+      service: `krw-${name}-mcp`,
+      toolSessionReuse: "run-scoped",
+      allowedOrigins: ["https://krw-agent.local"],
+      checkUpstreamReady,
+      normalizeReadiness: true,
+      protocolVersion: "2025-06-18",
+      buildId: `${name}-build`,
+      toolSchemaSha256: "sha256:schema",
+      releaseManifestSha256: "sha256:release",
+      listen: { host: "127.0.0.1", port: ports[name] },
+      upstream: { host: "127.0.0.1", port: ports[name] + 1000 },
+      tls: { keyFile: "/tmp/key.pem", certFile: "/tmp/cert.pem" },
+    });
+    const writeConfig = (name: string, value: unknown) => {
+      writeFileSync(
+        join(configRoot, `${name}-tls.json`),
+        `${JSON.stringify(value, null, 2)}\n`,
+        { mode: 0o600 },
+      );
+    };
+
+    try {
+      for (const name of Object.keys(ports)) {
+        // This matches the production failure: the old Guru config passed a
+        // generic HTTP-ready check but still guessed a nonexistent health URL.
+        writeConfig(name, gatewayConfig(name));
+      }
+
+      const checked = spawnSync(
+        process.execPath,
+        [
+          localMcpGatewayContractReconciler,
+          "--mode",
+          "check",
+          "--operator-root",
+          root,
+          "--proxy",
+          localMcpGatewayProxy,
+        ],
+        { cwd: repoRoot, encoding: "utf8" },
+      );
+      expect(checked.status).not.toBe(0);
+      expect(`${checked.stdout}\n${checked.stderr}`).toContain(
+        "endpoint-specific readiness normalization: ontology, feed, filings, guru",
+      );
+
+      const repaired = spawnSync(
+        process.execPath,
+        [
+          localMcpGatewayContractReconciler,
+          "--mode",
+          "repair",
+          "--operator-root",
+          root,
+          "--proxy",
+          localMcpGatewayProxy,
+        ],
+        { cwd: repoRoot, encoding: "utf8" },
+      );
+      expect(repaired.status, repaired.stderr).toBe(0);
+      const guru = JSON.parse(
+        readFileSync(join(configRoot, "guru-tls.json"), "utf8"),
+      );
+      expect(guru.checkUpstreamReady).toBe(true);
+      expect(guru.normalizeReadiness).toBe(true);
+      expect(guru.upstreamReadinessMode).toBe("mcp_initialize");
+      expect(guru.upstreamMcpPath).toBe("/mcp");
+
+      const valid = spawnSync(
+        process.execPath,
+        [
+          localMcpGatewayContractReconciler,
+          "--mode",
+          "check",
+          "--operator-root",
+          root,
+          "--proxy",
+          localMcpGatewayProxy,
+        ],
+        { cwd: repoRoot, encoding: "utf8" },
+      );
+      expect(valid.status, valid.stderr).toBe(0);
+
+      writeConfig("guru", gatewayConfig("guru", false));
+      writeConfig("feed", {});
+      const refused = spawnSync(
+        process.execPath,
+        [
+          localMcpGatewayContractReconciler,
+          "--mode",
+          "repair",
+          "--operator-root",
+          root,
+          "--proxy",
+          localMcpGatewayProxy,
+        ],
+        { cwd: repoRoot, encoding: "utf8" },
+      );
+      expect(refused.status).not.toBe(0);
+      const unmodifiedGuru = JSON.parse(
+        readFileSync(join(configRoot, "guru-tls.json"), "utf8"),
+      );
+      expect(unmodifiedGuru.checkUpstreamReady).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

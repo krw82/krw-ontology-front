@@ -51,6 +51,16 @@ fail() {
   exit 1
 }
 
+reconcile_current_local_mcp_gateway_contract() {
+  local reconciler="$script_dir/reconcile-local-mcp-gateway-contract.mjs"
+  [[ -f "$reconciler" && ! -L "$reconciler" ]] \
+    || fail "Local MCP gateway reconciler is missing or unsafe: $reconciler"
+  node "$reconciler" \
+    --mode repair \
+    --restart \
+    --operator-root "$agent_operator_root"
+}
+
 cleanup_runtime_env_update() {
   local exit_status=$?
   set +e
@@ -387,6 +397,10 @@ done
   || fail "Fresh Rust release requires a clean committed krw-agnet tree"
 node "$script_dir/verify-supabase-schema-smoke-rpc-contract.mjs" \
   || fail "Schema-smoke RPC contract does not match the generated database types"
+# Operator gateway JSON predates the sealed release and can survive an older
+# rollback. Reconcile it before the Feed readiness probe and before compiling
+# or uploading anything, so a stale gateway cannot waste a full deployment.
+reconcile_current_local_mcp_gateway_contract
 prepare_agent_runtime_env_candidate
 
 case "$release_id" in

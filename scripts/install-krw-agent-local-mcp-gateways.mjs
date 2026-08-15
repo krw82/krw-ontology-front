@@ -86,6 +86,9 @@ function assertGatewayConfig(config, expectedReuse, label, origin) {
   if (config.checkUpstreamReady !== true || config.normalizeReadiness !== true) {
     fail(`${label} gateway must probe and normalize live upstream readiness`);
   }
+  if (!["http_json", "mcp_initialize"].includes(config.upstreamReadinessMode)) {
+    fail(`${label} gateway has no supported upstream readiness mode`);
+  }
   for (const field of ["service", "protocolVersion", "buildId", "toolSchemaSha256", "releaseManifestSha256"]) {
     if (typeof config[field] !== "string" || !config[field]) fail(`${label} config has no ${field}`);
   }
@@ -230,12 +233,22 @@ async function materialize(options) {
     const config = JSON.parse(await readFile(configPath, "utf8"));
     config.toolSessionReuse = reuse;
     // A synthetic gateway-ready response must never outlive its upstream.
-    // Guru exposes /healthz while Feed/Filings expose /readyz; normalize the
-    // path here so a stale operator JSON cannot announce a dead worker.
+    // Each upstream gets the narrowest truthful readiness proof, so a stale
+    // operator JSON cannot announce a dead worker.
     config.checkUpstreamReady = true;
     config.normalizeReadiness = true;
-    config.upstreamReadinessPath = config.upstreamReadinessPath
-      ?? (entry.name === "guru" ? "/healthz" : "/readyz");
+    // Guru is a pure Streamable HTTP MCP worker and deliberately has no
+    // ad-hoc /healthz endpoint. Its stateless initialize response is the
+    // truthful health proof; every other local worker exposes JSON readiness.
+    config.upstreamReadinessMode = entry.name === "guru"
+      ? "mcp_initialize"
+      : "http_json";
+    if (config.upstreamReadinessMode === "mcp_initialize") {
+      config.upstreamMcpPath = config.upstreamMcpPath ?? "/mcp";
+      delete config.upstreamReadinessPath;
+    } else {
+      config.upstreamReadinessPath = config.upstreamReadinessPath ?? "/readyz";
+    }
     // The operator files contain endpoint identity and TLS material; this
     // release-bound client identity is deliberately materialized here so an
     // upgraded fail-closed proxy cannot be started with an empty allowlist.
