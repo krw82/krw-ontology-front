@@ -1,16 +1,13 @@
 import "server-only";
 
-import type { AccumulatedRun } from "@/lib/agent/stream-handler";
 import type { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type {
   ChatMessagePresentation,
   ChatMessageVisualization,
   KrwVisualizationArtifact,
   PresentationBlock,
-  VisualizationToolResult,
 } from "./contracts";
 import { isKrwVisualizationArtifact } from "./contracts";
-import { COMPOSE_VISUALIZATION_TOOL_NAME } from "./create-visualization-tool";
 import { buildPresentationBlocks } from "./presentation";
 import type {
   ChatMessagePresentationRow,
@@ -51,55 +48,6 @@ export function toPublicChatPresentation(
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
-}
-
-/**
- * Persists exactly the compiler-owned artifacts returned by compose_visualization.
- * The final answer text is deliberately not inspected for markers or chart JSON.
- */
-export async function persistCreatedVisualizations(params: {
-  admin: SupabaseAdmin;
-  acc: AccumulatedRun;
-  sessionId: string;
-  messageId: string;
-  runId: string;
-}): Promise<ChatMessageVisualization[]> {
-  const artifacts = extractCreatedVisualizationArtifacts(params.acc);
-  if (artifacts.length === 0) return [];
-
-  const rows = artifacts.map((artifact) => ({
-    session_id: params.sessionId,
-    message_id: params.messageId,
-    run_id: params.runId,
-    artifact_ref: artifact.artifact_ref,
-    payload_json: jsonForDb(artifact) ?? {},
-  }));
-  const { data, error } = await params.admin
-    .from("chat_message_visualizations")
-    .upsert(rows, { onConflict: "message_id,artifact_ref" })
-    .select("id, session_id, message_id, run_id, artifact_ref, payload_json, created_at")
-    .returns<ChatMessageVisualizationRow[]>();
-
-  if (error || !data) {
-    console.warn("[agent-worker] failed to persist visualizations", {
-      runId: params.runId,
-      error: error?.message,
-    });
-    return [];
-  }
-
-  return data.flatMap((row) => {
-    try {
-      return [toPublicChatVisualization(row)];
-    } catch (error) {
-      console.warn("[agent-worker] invalid persisted visualization payload", {
-        runId: params.runId,
-        rowId: row.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return [];
-    }
-  });
 }
 
 /**
@@ -146,57 +94,6 @@ export async function persistMessagePresentation(params: {
   return toPublicChatPresentation(data);
 }
 
-export function extractCreatedVisualizationArtifacts(
-  acc: Pick<AccumulatedRun, "toolCalls">,
-): KrwVisualizationArtifact[] {
-  const artifacts: KrwVisualizationArtifact[] = [];
-  const seenRefs = new Set<string>();
-  const seenFingerprints = new Set<string>();
-
-  for (const toolCall of acc.toolCalls) {
-    if (toolCall.toolName !== COMPOSE_VISUALIZATION_TOOL_NAME) continue;
-    for (const payload of [toolCall.resultJson, parseJson(toolCall.resultText)]) {
-      const result = parseVisualizationToolResult(payload);
-      if (!result?.artifact || result.status === "skipped") continue;
-      if (
-        seenRefs.has(result.artifact.artifact_ref) ||
-        seenFingerprints.has(result.artifact.semantic_fingerprint)
-      ) continue;
-      seenRefs.add(result.artifact.artifact_ref);
-      seenFingerprints.add(result.artifact.semantic_fingerprint);
-      artifacts.push(result.artifact);
-    }
-  }
-  return artifacts;
-}
-
-function parseVisualizationToolResult(value: unknown): VisualizationToolResult | null {
-  if (!isRecord(value) || value.kind !== "compose_visualization_result") return null;
-  if (
-    value.status !== "created" &&
-    value.status !== "partial" &&
-    value.status !== "skipped"
-  ) {
-    return null;
-  }
-  const artifact = isKrwVisualizationArtifact(value.artifact)
-    ? value.artifact
-    : undefined;
-  if (value.status !== "skipped" && !artifact) return null;
-  if (artifact && value.artifact_ref !== artifact.artifact_ref) return null;
-  return {
-    kind: "compose_visualization_result",
-    status: value.status,
-    artifact_ref: artifact?.artifact_ref,
-    artifact,
-    reason_code: stringValue(value.reason_code),
-    explanation: stringValue(value.explanation),
-    warnings: Array.isArray(value.warnings)
-      ? value.warnings.filter((warning): warning is string => typeof warning === "string")
-      : [],
-  };
-}
-
 function parsePresentationBlocks(value: unknown): PresentationBlock[] {
   if (!Array.isArray(value)) return [];
   const ids = new Set<string>();
@@ -227,19 +124,6 @@ function parsePresentationBlocks(value: unknown): PresentationBlock[] {
 
 function jsonForDb(value: unknown): Json | null {
   return JSON.parse(JSON.stringify(value)) as Json;
-}
-
-function parseJson(value: string | null | undefined): unknown {
-  if (!value) return null;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-}
-
-function stringValue(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
 }
 
 function isRecord(value: unknown): value is UnknownRecord {

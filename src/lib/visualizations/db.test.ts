@@ -1,177 +1,69 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AccumulatedRun } from "@/lib/agent/stream-handler";
 
 vi.mock("server-only", () => ({}));
 
-import {
-  extractCreatedVisualizationArtifacts,
-  persistCreatedVisualizations,
-  persistMessagePresentation,
-} from "./db";
+import { persistMessagePresentation, toPublicChatVisualization } from "./db";
+import type { ChatMessageVisualizationRow } from "@/types/database";
 
-function accumulated(resultJson: unknown): AccumulatedRun {
-  return {
-    fullText: "매출은 증가했습니다.",
-    structuredOutput: null,
-    researchSynthesisOutput: null,
-    researchSynthesisText: null,
-    displayPlanOutput: null,
-    toolCalls: [{
-      id: "visualization-tool-1",
-      toolName: "compose_visualization",
-      argumentsJson: JSON.stringify({ goal: "매출 추이" }),
-      resultSummary: null,
-      resultJson,
-      resultText: null,
-      startedAt: "2026-01-01T00:00:00.000Z",
-      finishedAt: "2026-01-01T00:00:01.000Z",
-      errorMessage: null,
+const artifact = {
+  artifact_format: "krw-visualization",
+  schema_version: 3,
+  artifact_ref: "viz_1_revenue",
+  semantic_fingerprint: "fingerprint-revenue",
+  intent: { goal: "매출 추이" },
+  title: "매출 추이",
+  views: [{
+    view_id: "view-1",
+    chart_type: "line",
+    title: "매출 추이",
+    series: [{
+      series_key: "AAPL:revenue",
+      label: "Revenue",
+      scope: { kind: "company_total", key: "AAPL", label: "Apple" },
+      points: [{ period: "FY2025", value: 416.2, evidence_ref: "metric_observation:1" }],
     }],
-    citations: [],
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheHitInputTokens: 0,
-    cacheMissInputTokens: 0,
+    dataset: { kind: "series" },
+  }],
+  provenance: {
+    source_tool_call_ids: [],
+    evidence_refs: ["metric_observation:1"],
+    source_kinds: ["ontology"],
+  },
+  quality: { series_count: 1, point_count: 1, warnings: [] },
+};
+
+function visualizationRow(): ChatMessageVisualizationRow {
+  return {
+    id: "visualization-row-1",
+    session_id: "session-1",
+    message_id: "message-1",
+    run_id: "run-1",
+    artifact_ref: "viz_1_revenue",
+    payload_json: artifact,
+    created_at: "2026-01-01T00:00:02.000Z",
   };
 }
 
-describe("visualization persistence extraction", () => {
-  it("persists compiler artifacts without requiring a Markdown insert token", () => {
-    const artifact = {
-      artifact_format: "krw-visualization",
-      schema_version: 3,
+describe("visualization read-model projection", () => {
+  it("projects a persisted row into the public chat visualization", () => {
+    expect(toPublicChatVisualization(visualizationRow())).toEqual({
+      id: "visualization-row-1",
+      session_id: "session-1",
+      message_id: "message-1",
+      run_id: "run-1",
       artifact_ref: "viz_1_revenue",
-      semantic_fingerprint: "fingerprint-revenue",
-      intent: { goal: "매출 추이" },
-      title: "매출 추이",
-      views: [{
-        view_id: "view_1",
-        chart_type: "bar",
-        title: "매출 추이",
-        series: [{
-          series_key: "revenue",
-          label: "Revenue",
-          scope: { kind: "company_total", key: "company_total", label: "Company total" },
-          points: [{ period: "CY2025", value: 100, evidence_ref: "metric_observation:1" }],
-        }],
-        dataset: { kind: "series" },
-      }],
-      provenance: {
-        source_tool_call_ids: ["ontology-tool-1"],
-        evidence_refs: ["metric_observation:1"],
-        source_kinds: ["ontology"],
-      },
-      quality: { series_count: 1, point_count: 1, warnings: [] },
-    };
-
-    const artifacts = extractCreatedVisualizationArtifacts(accumulated({
-      kind: "compose_visualization_result",
-      status: "created",
-      artifact_ref: "viz_1_revenue",
-      artifact,
-      warnings: [],
-    }));
-
-    expect(artifacts).toEqual([artifact]);
-  });
-
-  it("keeps one artifact when separate tool calls resolve to the same semantic data", () => {
-    const firstArtifact = {
-      artifact_format: "krw-visualization" as const,
-      schema_version: 3 as const,
-      artifact_ref: "viz_a1b2c3d4e5f60708",
-      semantic_fingerprint: "same-selected-data",
-      intent: { goal: "매출 추이" },
-      title: "애플 매출 추이",
-      views: [{
-        view_id: "view_1",
-        chart_type: "line" as const,
-        title: "애플 매출 추이",
-        series: [{
-          series_key: "AAPL|revenue|company_total",
-          label: "회사 전체",
-          scope: { kind: "company_total", key: "company_total" },
-          points: [{ period: "CY2025", value: 100, evidence_ref: "metric_observation:1" }],
-        }],
-        dataset: { kind: "series" },
-      }],
-      provenance: {
-        source_tool_call_ids: ["ontology-tool-1"],
-        evidence_refs: ["metric_observation:1"],
-        source_kinds: ["ontology" as const],
-      },
-      quality: { series_count: 1, point_count: 1, warnings: [] },
-    };
-    const secondArtifact = {
-      ...firstArtifact,
-      artifact_ref: "viz_0011223344556677",
-      title: "매출 변화",
-    };
-    const run = accumulated({
-      kind: "compose_visualization_result",
-      status: "created",
-      artifact_ref: firstArtifact.artifact_ref,
-      artifact: firstArtifact,
-      warnings: [],
+      payload_json: artifact,
+      created_at: "2026-01-01T00:00:02.000Z",
     });
-    run.toolCalls.push({
-      ...run.toolCalls[0]!,
-      id: "visualization-tool-2",
-      resultJson: {
-        kind: "compose_visualization_result",
-        status: "created",
-        artifact_ref: secondArtifact.artifact_ref,
-        artifact: secondArtifact,
-        warnings: [],
-      },
-    });
-
-    expect(extractCreatedVisualizationArtifacts(run)).toEqual([firstArtifact]);
   });
 
-  it("does not persist skipped or malformed tool output", () => {
-    expect(extractCreatedVisualizationArtifacts(accumulated({
-      kind: "compose_visualization_result",
-      status: "skipped",
-      reason_code: "no_dataset",
-      warnings: [],
-    }))).toEqual([]);
-    expect(extractCreatedVisualizationArtifacts(accumulated({
-      kind: "compose_visualization_result",
-      status: "created",
-      artifact_ref: "not-a-valid-artifact",
-      artifact: { raw_filing_body: "do not persist" },
-      warnings: [],
-    }))).toEqual([]);
+  it("rejects a malformed persisted payload instead of rendering it", () => {
+    const row = visualizationRow();
+    (row as { payload_json: unknown }).payload_json = { raw_filing_body: "invalid" };
+    expect(() => toPublicChatVisualization(row)).toThrow(/Invalid visualization payload/);
   });
 
-  it("persists compiler artifacts and deterministic presentation blocks separately", async () => {
-    const artifact = {
-      artifact_format: "krw-visualization" as const,
-      schema_version: 3 as const,
-      artifact_ref: "viz_1_revenue",
-      semantic_fingerprint: "fingerprint-revenue",
-      intent: { goal: "매출 추이" },
-      title: "매출 추이",
-      views: [{
-        view_id: "view_1",
-        chart_type: "line" as const,
-        title: "매출 추이",
-        series: [{
-          series_key: "revenue",
-          label: "Revenue",
-          scope: { kind: "company_total", key: "company_total", label: "Company total" },
-          points: [{ period: "CY2025", value: 100, evidence_ref: "metric_observation:1" }],
-        }],
-        dataset: { kind: "series" },
-      }],
-      provenance: {
-        source_tool_call_ids: ["ontology-tool-1"],
-        evidence_refs: ["metric_observation:1"],
-        source_kinds: ["ontology" as const],
-      },
-      quality: { series_count: 1, point_count: 1, warnings: [] },
-    };
+  it("persists deterministic presentation blocks separately from the answer text", async () => {
     const calls: Array<{ table: string; payload: unknown; conflict?: string }> = [];
     const admin = {
       from(table: string) {
@@ -181,20 +73,7 @@ describe("visualization persistence extraction", () => {
             return {
               select() {
                 return {
-                  returns: async () => ({
-                    data: table === "chat_message_visualizations"
-                      ? [{
-                          id: "visualization-row-1",
-                          session_id: "session-1",
-                          message_id: "message-1",
-                          run_id: "run-1",
-                          artifact_ref: "viz_1_revenue",
-                          payload_json: artifact,
-                          created_at: "2026-01-01T00:00:02.000Z",
-                        }]
-                      : null,
-                    error: null,
-                  }),
+                  returns: async () => ({ data: null, error: null }),
                   maybeSingle: async () => ({
                     data: table === "chat_message_presentations"
                       ? {
@@ -219,33 +98,16 @@ describe("visualization persistence extraction", () => {
       },
     } as never;
 
-    const visualizations = await persistCreatedVisualizations({
-      admin,
-      acc: accumulated({
-        kind: "compose_visualization_result",
-        status: "created",
-        artifact_ref: "viz_1_revenue",
-        artifact,
-        warnings: [],
-      }),
-      sessionId: "session-1",
-      messageId: "message-1",
-      runId: "run-1",
-    });
     const presentation = await persistMessagePresentation({
       admin,
       sessionId: "session-1",
       messageId: "message-1",
       runId: "run-1",
       content: "매출은 증가했습니다.",
-      visualizations,
+      visualizations: [toPublicChatVisualization(visualizationRow())],
     });
 
     expect(calls).toEqual([
-      expect.objectContaining({
-        table: "chat_message_visualizations",
-        conflict: "message_id,artifact_ref",
-      }),
       expect.objectContaining({
         table: "chat_message_presentations",
         conflict: "message_id",

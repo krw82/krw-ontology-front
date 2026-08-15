@@ -14,7 +14,6 @@ export type {
   VisualizationIntent,
   VisualizationMatrixDataset,
   VisualizationSeries,
-  VisualizationToolResult,
   VisualizationView,
   VisualizationXYDataset,
 } from "@/lib/visualizations/contracts";
@@ -68,7 +67,8 @@ export type RunKind =
   | "news_discovery_wide"
   | "market_move_research"
   | "scenario_sensitivity"
-  | "guru_advisor";
+  | "guru_advisor"
+  | "source_filing_followup";
 
 export type AgentRunExecutorType = "claude_agent" | "server_pipeline" | "rust_agent";
 
@@ -194,7 +194,6 @@ export type YahooFinanceMCPToolName =
   "get_yahoo_finance_news" | "get_stock_info";
 
 /** Local presentation MCP tool name. */
-export type VisualizationMCPToolName = "compose_visualization";
 
 /** On-demand SEC filing MCP tools. Document bodies are never persisted. */
 export type KrwFilingsMCPToolName =
@@ -233,7 +232,6 @@ export type MCPToolName =
   | StockNewsMCPToolName
   | KrwFeedMCPToolName
   | YahooFinanceMCPToolName
-  | VisualizationMCPToolName
   | KrwFilingsMCPToolName
   | GuruMCPToolName;
 

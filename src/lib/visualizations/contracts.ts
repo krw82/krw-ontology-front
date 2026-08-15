@@ -248,18 +248,6 @@ export interface KrwVisualizationArtifact {
   quality: VisualizationQuality;
 }
 
-export type VisualizationResultStatus = "created" | "partial" | "skipped";
-
-export interface VisualizationToolResult {
-  kind: "compose_visualization_result";
-  status: VisualizationResultStatus;
-  artifact_ref?: string;
-  artifact?: KrwVisualizationArtifact;
-  reason_code?: string;
-  explanation?: string;
-  warnings: string[];
-}
-
 export interface ChatMessageVisualization {
   readonly id: string;
   session_id: string;

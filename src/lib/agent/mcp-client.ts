@@ -16,7 +16,6 @@ import type {
   KrwFilingsMCPToolName,
   KRWOntologyMCPToolName,
   StockNewsMCPToolName,
-  VisualizationMCPToolName,
 } from "@/types/api-contracts";
 import type { Json } from "@/types/database";
 import {
@@ -33,7 +32,6 @@ const STOCK_NEWS_MCP_SERVER_NAME = "stock-news";
 const STOCK_NEWS_DIRECT_TOOL_PREFIX = `mcp__${STOCK_NEWS_MCP_SERVER_NAME}__`;
 const GURU_ADVISOR_PLUGIN_TOOL_PREFIX =
   "mcp__plugin_krw-guru-advisor_krw-guru-advisor__";
-const VISUALIZATION_MCP_TOOL_PREFIX = "mcp__krw_presentation__";
 const YAHOO_FINANCE_MCP_TOOL_PREFIX =
   `mcp__${YAHOO_FINANCE_MCP_SERVER_NAME}__`;
 export const KRW_FILINGS_MCP_SERVER_NAME = "krw-filings";
@@ -76,10 +74,6 @@ export const KRW_FEED_MCP_TOOLS = [
   "list_feed_items",
   "get_feed_context",
 ] as const satisfies readonly KrwFeedMCPToolName[];
-
-export const VISUALIZATION_MCP_TOOLS = [
-  "compose_visualization",
-] as const satisfies readonly VisualizationMCPToolName[];
 
 export const KRW_FILINGS_MCP_TOOLS = [
   "get_filing",
@@ -141,10 +135,6 @@ export const GURU_ADVISOR_SDK_ALLOWED_TOOLS = GURU_MCP_TOOLS.map(
   (toolName) => `${GURU_ADVISOR_PLUGIN_TOOL_PREFIX}${toolName}`,
 );
 
-export const VISUALIZATION_SDK_ALLOWED_TOOLS = VISUALIZATION_MCP_TOOLS.map(
-  (toolName) => `${VISUALIZATION_MCP_TOOL_PREFIX}${toolName}`,
-);
-
 export const KRW_FILINGS_SDK_ALLOWED_TOOLS = KRW_FILINGS_MCP_TOOLS.map(
   (toolName) => `${KRW_FILINGS_DIRECT_TOOL_PREFIX}${toolName}`,
 );
@@ -159,7 +149,6 @@ const STOCK_NEWS_MCP_TOOL_SET = new Set<string>(STOCK_NEWS_MCP_TOOLS);
 const KRW_FEED_MCP_TOOL_SET = new Set<string>(KRW_FEED_MCP_TOOLS);
 const GURU_MCP_TOOL_SET = new Set<string>(GURU_MCP_TOOLS);
 const YAHOO_FINANCE_MCP_TOOL_SET = new Set<string>(YAHOO_FINANCE_MCP_TOOLS);
-const VISUALIZATION_MCP_TOOL_SET = new Set<string>(VISUALIZATION_MCP_TOOLS);
 const KRW_FILINGS_MCP_TOOL_SET = new Set<string>(KRW_FILINGS_MCP_TOOLS);
 const KRW_PERSONAL_FILINGS_MCP_TOOL_SET = new Set<string>(
   KRW_PERSONAL_FILINGS_MCP_TOOLS,
@@ -199,13 +188,6 @@ export function isYahooFinanceSdkTool(toolName: string): boolean {
   const bareName = toolName.slice(YAHOO_FINANCE_MCP_TOOL_PREFIX.length);
 
   return Boolean(bareName && YAHOO_FINANCE_MCP_TOOL_SET.has(bareName));
-}
-
-export function isVisualizationSdkTool(toolName: string): boolean {
-  if (!toolName.startsWith(VISUALIZATION_MCP_TOOL_PREFIX)) return false;
-  const bareName = toolName.slice(VISUALIZATION_MCP_TOOL_PREFIX.length);
-
-  return Boolean(bareName && VISUALIZATION_MCP_TOOL_SET.has(bareName));
 }
 
 export function isKrwFilingsSdkTool(toolName: string): boolean {

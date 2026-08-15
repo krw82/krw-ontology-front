@@ -322,13 +322,6 @@ function activityForTool(toolName: MCPToolName): ResearchActivityUpdate {
     };
   }
 
-  if (toolName === "compose_visualization") {
-    return {
-      stage: "composing",
-      label: "근거 기반 시각화 정리 중",
-    };
-  }
-
   if (
     toolName === "krw_ontology_catalog" ||
     toolName === "krw_ontology_company_context" ||
