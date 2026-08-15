@@ -305,15 +305,23 @@ describe("production deploy scripts", () => {
     expect(deployFull).toContain("build_sealed_dual_provider_release.sh");
     expect(deployFull).toContain("prepare_agent_runtime_env_candidate");
     expect(deployFull).toContain("write_canonical_feed_token");
-    expect(deployFull).toContain("verify-krw-feed-mcp-production.sh");
+    expect(deployFull).toContain("resolve_active_feed_gateway_origin");
+    expect(deployFull).toContain(
+      'ensure_local_feed_gateway_ready "$feed_token" "$active_feed_origin"',
+    );
     expect(deployFull).toContain("agent_runtime_env_candidate");
     expect(deployFull).toContain("Restored the previous Rust runtime env");
     expect(deployFull).toContain("KRW_FEED_MCP_TOKEN");
     expect(deployFull).toContain("--runtime-env");
     expect(deployFull).toContain("KRW_AGENT_RUNTIME_ENV_FILE");
     expect(deployFull).not.toContain("agent_runtime_env_overlay_dir");
-    expect(deployFast).toContain(
-      'verify-krw-feed-mcp-production.sh" --env-file "$AGENT_RUNTIME_ENV_PATH"',
+    const stageBlock = deployFast.slice(
+      deployFast.indexOf("stage_local_agent_release()"),
+      deployFast.indexOf("\n}\n\nprepare_local_agent_mcp_gateways", deployFast.indexOf("stage_local_agent_release()")),
+    );
+    expect(stageBlock).not.toContain("verify-krw-feed-mcp-production.sh");
+    expect(deployFull).not.toContain(
+      'verify-krw-feed-mcp-production.sh" --env-file "$agent_runtime_env_candidate"',
     );
     expect(verifyFeed).toContain("NODE_EXTRA_CA_CERTS");
     expect(verifyFeed).toContain('Object.hasOwn(payload, "database_ready")');

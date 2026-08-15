@@ -792,10 +792,11 @@ REMOTE_SCRIPT
 
 stage_local_agent_release() {
   # The Rust daemon's launchd plist receives this exact persistent env path.
-  # Verify its authenticated Feed connection before staging or activating a
-  # release, so a stale/deleted temporary env cannot become a user-facing
-  # tool failure after a later daemon restart.
-  "$FRONT_DIR/scripts/verify-krw-feed-mcp-production.sh" --env-file "$AGENT_RUNTIME_ENV_PATH"
+  # Do not probe the sealed Feed Origin at this point.  The active gateway may
+  # still be running the previous release contract, so that probe would reject
+  # a valid new Origin and prevent the gateway materialization step below from
+  # ever running.  The selected bundle's authenticated MCP preflight is the
+  # authoritative check after all gateways have been switched.
 
   installed_release_root="$AGENT_LOCAL_INSTALL_ROOT/releases/$RELEASE_ID"
   installed_state_root="$AGENT_LOCAL_INSTALL_ROOT/deploy-state/$RELEASE_ID"

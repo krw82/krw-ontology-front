@@ -208,6 +208,33 @@ resolve_canonical_mcp_origin() {
   node "$front_dir/scripts/krw-agent-mcp-contract.mjs" --registry "$registry"
 }
 
+resolve_active_feed_gateway_origin() {
+  # A fresh release's sealed Origin can differ from the currently running
+  # gateway during a cutover.  The early liveness probe must therefore use the
+  # Origin that the *current* gateway actually allows.  The sealed Origin is
+  # checked again after the gateway contract has been materialized; using it
+  # here would create a bootstrap deadlock (old gateway rejects new Origin,
+  # so the installer is never reached).
+  local config="$agent_operator_root/config/runtime/feed-tls.json"
+  [[ -f "$config" && ! -L "$config" ]] \
+    || fail "active Feed gateway config is missing or unsafe: $config"
+  node - "$config" <<'NODE'
+const fs = require("node:fs");
+const configPath = process.argv[2];
+const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+const origins = config?.allowedOrigins;
+if (
+  !Array.isArray(origins) ||
+  origins.length !== 1 ||
+  typeof origins[0] !== "string" ||
+  !/^https:\/\/[A-Za-z0-9.-]+(?::\d{1,5})?$/.test(origins[0])
+) {
+  throw new Error("active Feed gateway has no exact HTTPS Origin allowlist");
+}
+process.stdout.write(origins[0]);
+NODE
+}
+
 ensure_local_feed_gateway_ready() {
   local feed_token=$1
   local origin=$2
@@ -279,7 +306,7 @@ prepare_agent_runtime_env_candidate() {
   [[ -f "$agent_runtime_env_source" && ! -L "$agent_runtime_env_source" ]] \
     || fail "Rust Agent V1 runtime env is missing or unsafe: $agent_runtime_env_source"
 
-  local canonical_feed_token legacy_feed_token feed_token
+  local canonical_feed_token legacy_feed_token feed_token active_feed_origin
   canonical_feed_token=$(read_env_value "$front_dir/.env" KRW_FEED_MCP_TOKEN 2>/dev/null || true)
   legacy_feed_token=$(read_env_value "$front_dir/.env" FEED_MCP_AUTH_TOKEN 2>/dev/null || true)
   if [[ -n "$canonical_feed_token" && -n "$legacy_feed_token" && "$canonical_feed_token" != "$legacy_feed_token" ]]; then
@@ -302,7 +329,9 @@ prepare_agent_runtime_env_candidate() {
       || fail "GLM and DeepSeek MCP endpoint Origins differ"
   fi
 
-  ensure_local_feed_gateway_ready "$feed_token" "$agent_mcp_origin"
+  active_feed_origin=$(resolve_active_feed_gateway_origin)
+  printf '%s\n' "Checking the existing Feed MCP gateway before applying the new sealed Origin ($active_feed_origin)..."
+  ensure_local_feed_gateway_ready "$feed_token" "$active_feed_origin"
 
   # Keep the candidate in the same directory so its later activation is an
   # atomic rename.  The launchd plist will receive only the stable source
@@ -311,10 +340,6 @@ prepare_agent_runtime_env_candidate() {
   cp -p -- "$agent_runtime_env_source" "$agent_runtime_env_candidate"
   write_canonical_feed_token "$agent_runtime_env_candidate" "$feed_token"
   canonicalize_runtime_mcp_environment "$agent_runtime_env_candidate" "$agent_mcp_origin"
-
-  if ! "$front_dir/scripts/verify-krw-feed-mcp-production.sh" --env-file "$agent_runtime_env_candidate"; then
-    fail "Feed MCP bearer preflight failed; Rust release was not built or activated"
-  fi
 
   agent_runtime_env_backup=$(mktemp "${agent_runtime_env_source}.previous.XXXXXX")
   cp -p -- "$agent_runtime_env_source" "$agent_runtime_env_backup"
