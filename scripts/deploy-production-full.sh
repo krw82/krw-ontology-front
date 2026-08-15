@@ -128,6 +128,71 @@ write_canonical_feed_token() {
   mv -f -- "$temporary" "$env_file"
 }
 
+ensure_local_feed_gateway_ready() {
+  local feed_token=$1
+  local feed_url ready_url ca_file probe_dir probe_body deadline
+  feed_url=$(read_env_value "$agent_runtime_env_source" KRW_FEED_MCP_URL 2>/dev/null || true)
+  [[ -n "$feed_url" ]] || fail "Rust runtime env has no KRW_FEED_MCP_URL"
+  case "$feed_url" in
+    */mcp) ready_url="${feed_url%/mcp}/readyz" ;;
+    *) fail "KRW_FEED_MCP_URL must end with /mcp" ;;
+  esac
+
+  ca_file=$(read_env_value "$agent_runtime_env_source" KRW_AGENT_MCP_CA_FILE 2>/dev/null || true)
+  case "$feed_url" in
+    https://*)
+      [[ -n "$ca_file" && -f "$ca_file" && ! -L "$ca_file" ]] \
+        || fail "HTTPS Feed gateway requires a regular KRW_AGENT_MCP_CA_FILE"
+      ;;
+    http://*) ;;
+    *) fail "KRW_FEED_MCP_URL must use http or https" ;;
+  esac
+
+  command -v launchctl >/dev/null 2>&1 \
+    || fail "launchctl is required to prepare the local Feed MCP gateway"
+  # The gateway supervisor is intentionally long-lived, but a previous crash
+  # can leave its loopback ports unavailable while launchd is still restarting
+  # it. Kick it once before the credential probe and wait for the authenticated
+  # readiness contract instead of treating that short startup window as a
+  # permanent deployment failure.
+  launchctl kickstart -k "gui/$(id -u)/com.krw.agent.local-mcp-gateways" >/dev/null 2>&1 || true
+
+  probe_dir=$(mktemp -d "${TMPDIR:-/tmp}/krw-feed-gateway.XXXXXX")
+  chmod 700 "$probe_dir"
+  probe_body="$probe_dir/ready.json"
+  deadline=$((SECONDS + 45))
+  while (( SECONDS < deadline )); do
+    if [[ "$feed_url" == https://* ]]; then
+      curl_args=(--cacert "$ca_file")
+    else
+      curl_args=()
+    fi
+    if curl -fsS --connect-timeout 1 --max-time 3 "${curl_args[@]}" \
+      -H "Authorization: Bearer $feed_token" \
+      -H 'Accept: application/json' \
+      "$ready_url" -o "$probe_body" 2>/dev/null \
+      && python3 - "$probe_body" <<'PY'
+import json
+import pathlib
+import sys
+
+payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+if payload.get("ok") is not True or payload.get("service") not in (None, "krw-feed-mcp"):
+    raise SystemExit(1)
+if "database_ready" in payload and payload["database_ready"] is not True:
+    raise SystemExit(1)
+PY
+    then
+      rm -rf -- "$probe_dir"
+      printf '%s\n' "Local Feed MCP gateway is ready for the sealed release."
+      return 0
+    fi
+    sleep 1
+  done
+  rm -rf -- "$probe_dir"
+  fail "Local Feed MCP gateway did not become ready at $ready_url"
+}
+
 prepare_agent_runtime_env_candidate() {
   [[ -f "$agent_runtime_env_source" && ! -L "$agent_runtime_env_source" ]] \
     || fail "Rust Agent V1 runtime env is missing or unsafe: $agent_runtime_env_source"
@@ -145,6 +210,8 @@ prepare_agent_runtime_env_candidate() {
   [[ -n "$feed_token" ]] || fail "Feed MCP token is required for a fresh Rust release"
   [[ "$feed_token" != *$'\n'* && "$feed_token" != *$'\r'* ]] \
     || fail "Feed MCP token contains a newline and cannot be propagated safely"
+
+  ensure_local_feed_gateway_ready "$feed_token"
 
   # Keep the candidate in the same directory so its later activation is an
   # atomic rename.  The launchd plist will receive only the stable source
