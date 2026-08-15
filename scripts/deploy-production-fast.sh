@@ -407,23 +407,32 @@ run_front_migration() {
 # process so a normal production runtime deploy can validate the migrated
 # schema before any new web or worker process is activated.
 run_schema_smoke() {
-  (
-    set -a
-    # shellcheck disable=SC1090
-    . "$ENV_PATH"
-    set +a
-    node "$SCRIPT_DIR/supabase-schema-smoke.mjs"
-    if [ "$WITH_AGENT_RELEASE" = "1" ]; then
-      agent_database_url=${KRW_AGENT_DATABASE_URL:-${AGENT_V1_DATABASE_URL:-${AGENT_V1_OUTBOX_DATABASE_URL:-${AGENT_QUEUE_LISTEN_DATABASE_URL:-}}}}
-      case "$agent_database_url" in
-        postgres://*|postgresql://*) ;;
-        *) fail "Rust Agent V1 schema smoke requires a production Supabase PostgreSQL runtime URL." ;;
-      esac
-      AGENT_V1_DATABASE_URL="$agent_database_url" \
-      AGENT_V1_DATABASE_CA_FILE="$FRONT_DIR/ops/certificates/supabase-root-2021-ca.crt" \
-        node "$SCRIPT_DIR/verify-agent-v1-compatibility.mjs"
+  for attempt in 1 2 3 4 5; do
+    if (
+      set -a
+      # shellcheck disable=SC1090
+      . "$ENV_PATH"
+      set +a
+      node "$SCRIPT_DIR/supabase-schema-smoke.mjs" || exit $?
+      if [ "$WITH_AGENT_RELEASE" = "1" ]; then
+        agent_database_url=${KRW_AGENT_DATABASE_URL:-${AGENT_V1_DATABASE_URL:-${AGENT_V1_OUTBOX_DATABASE_URL:-${AGENT_QUEUE_LISTEN_DATABASE_URL:-}}}}
+        case "$agent_database_url" in
+          postgres://*|postgresql://*) ;;
+          *) fail "Rust Agent V1 schema smoke requires a production Supabase PostgreSQL runtime URL." ;;
+        esac
+        AGENT_V1_DATABASE_URL="$agent_database_url" \
+        AGENT_V1_DATABASE_CA_FILE="$FRONT_DIR/ops/certificates/supabase-root-2021-ca.crt" \
+          node "$SCRIPT_DIR/verify-agent-v1-compatibility.mjs" || exit $?
+      fi
+    ); then
+      return 0
     fi
-  )
+    if [ "$attempt" -eq 5 ]; then
+      return 1
+    fi
+    echo "Supabase schema smoke attempt $attempt failed; waiting for PostgREST schema-cache convergence..." >&2
+    sleep 3
+  done
 }
 
 run_agent_release_migrations() {

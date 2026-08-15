@@ -2417,4 +2417,30 @@ describe("production cutover fault injection", () => {
     expect(source).toContain('String(sweepError.code ?? "") === "PGRST202"');
     expect(source).toContain("await assertCoverageLimitRpcSignatures()");
   });
+
+  it("retries schema smoke after transient propagation and keeps denied RPC probes non-mutating", () => {
+    const source = readFileSync(
+      join(repoRoot, "scripts", "supabase-schema-smoke.mjs"),
+      "utf8",
+    );
+    const deployFast = readFileSync(
+      join(repoRoot, "scripts", "deploy-production-fast.sh"),
+      "utf8",
+    );
+    const blockedErrorGate = source.slice(
+      source.indexOf("function isExpectedBlockedRpcError"),
+      source.indexOf("async function assertRpcBlocked"),
+    );
+
+    expect(source).toContain("const blockedCoverageProbeArgs");
+    expect(source).toContain("const blockedJudgmentProbeArgs");
+    expect(source).toContain("p_user_id: null");
+    expect(source).toContain("p_filing_event_id: null");
+    expect(blockedErrorGate).not.toContain('code === "PGRST202"');
+    expect(blockedErrorGate).not.toContain('message.includes("schema cache")');
+    expect(deployFast).toContain("for attempt in 1 2 3 4 5; do");
+    expect(deployFast).toContain(
+      "Supabase schema smoke attempt $attempt failed; waiting for PostgREST schema-cache convergence...",
+    );
+  });
 });

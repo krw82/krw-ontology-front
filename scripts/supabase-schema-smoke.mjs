@@ -190,13 +190,10 @@ function isExpectedBlockedRpcError(error) {
   const code = String(error?.code ?? "");
   const message = String(error?.message ?? "").toLowerCase();
 
-  return (
-    code === "42501" ||
-    code === "PGRST202" ||
-    message.includes("permission denied") ||
-    message.includes("could not find the function") ||
-    message.includes("schema cache")
-  );
+  // A permission smoke must prove an authorization denial. A missing function
+  // or a stale PostgREST schema cache is an availability defect, not proof
+  // that the privileged RPC remains protected.
+  return code === "42501" || message.includes("permission denied");
 }
 
 async function assertRpcBlocked(client, roleLabel, name, args) {
@@ -873,41 +870,45 @@ async function runCoverageAndJudgmentWriteSmoke() {
       "OK schema: user_filing_source_opens blocks anon/authenticated writes",
     );
 
+    // Keep denied-RPC probes non-mutating even if an execute grant regresses.
+    // Both RPCs reject these required identifiers before taking locks or
+    // writing state; an unexpected 22023 is therefore safe and still fails
+    // this smoke as an authorization regression.
+    const blockedCoverageProbeArgs = {
+      ...coverageArgs,
+      p_user_id: null,
+      p_idempotency_key: `schema-smoke-denied-coverage-${suffix}`,
+    };
+    const blockedJudgmentProbeArgs = {
+      ...judgmentArgs,
+      p_user_id: null,
+      p_filing_event_id: null,
+      p_idempotency_key: `schema-smoke-denied-judgment-${suffix}`,
+    };
+
     await assertRpcBlocked(
       anonSupabase,
       "anon",
       "set_user_company_coverage_level",
-      {
-        ...coverageArgs,
-        p_idempotency_key: `${coverageArgs.p_idempotency_key}-anon`,
-      },
+      blockedCoverageProbeArgs,
     );
     await assertRpcBlocked(
       authenticatedSupabase,
       "authenticated",
       "set_user_company_coverage_level",
-      {
-        ...coverageArgs,
-        p_idempotency_key: `${coverageArgs.p_idempotency_key}-auth`,
-      },
+      blockedCoverageProbeArgs,
     );
     await assertRpcBlocked(
       anonSupabase,
       "anon",
       "save_user_filing_judgment_revision",
-      {
-        ...judgmentArgs,
-        p_idempotency_key: `${judgmentArgs.p_idempotency_key}-anon`,
-      },
+      blockedJudgmentProbeArgs,
     );
     await assertRpcBlocked(
       authenticatedSupabase,
       "authenticated",
       "save_user_filing_judgment_revision",
-      {
-        ...judgmentArgs,
-        p_idempotency_key: `${judgmentArgs.p_idempotency_key}-auth`,
-      },
+      blockedJudgmentProbeArgs,
     );
   } finally {
     if (userId) {
