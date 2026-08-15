@@ -107,11 +107,11 @@ cleanup() {
     if [ "$FRONT_CANDIDATE_ACTIVATED" = "1" ]; then
       run_remote_rollback_front_candidate || echo "Front candidate rollback failed after agent cutover." >&2
     fi
-    if [ "$AGENT_LOCAL_RELEASE_ACTIVATED" = "1" ]; then
-      rollback_local_agent_release || echo "Local krw-agent release rollback failed." >&2
-    fi
     if [ "$AGENT_CAPABILITY_RUNTIME_ACTIVATED" = "1" ]; then
       rollback_local_agent_capability_runtime || echo "Local canonical capability runtime rollback failed." >&2
+    fi
+    if [ "$AGENT_LOCAL_RELEASE_ACTIVATED" = "1" ]; then
+      rollback_local_agent_release || echo "Local krw-agent release rollback failed." >&2
     fi
     if [ "$MAC_RUNTIME_ACTIVATED" = "1" ]; then
       restore_previous_mac_runtime || echo "Previous Mac worker runtime restoration failed." >&2
@@ -868,14 +868,59 @@ verify_sealed_local_agent_database_abi() {
   echo 'Sealed local Rust daemon database ABI verified through the launchd entrypoint.'
 }
 
+verify_sealed_local_agent_mcp_abi() {
+  # The MCP gateway and canonical capability runtime must already be active
+  # before this check. Keeping it separate from the database check avoids
+  # probing the previous release's gateway with the new release Origin.
+  TMP_BASE=${TMPDIR:-/tmp}
+  agent_check_dir=$(mktemp -d "$TMP_BASE/krw-agent-mcp-check.XXXXXX")
+  agent_overlay="$agent_check_dir/overlay.env"
+  cleanup_agent_check() {
+    rm -rf -- "$agent_check_dir"
+  }
+  ln -s "$AGENT_PROVIDER_BUNDLE" "$agent_check_dir/current"
+  umask 077
+  printf '%s\n' \
+    "KRW_AGENT_CURRENT_DIR=$agent_check_dir/current" \
+    "KRW_AGENT_PROVIDER=$AGENT_PROVIDER" \
+    "KRW_AGENT_ARTIFACT_ROOT=$agent_check_dir/artifacts" \
+    'KRW_AGENT_WORKER_ID=sealed-release-mcp-check' > "$agent_overlay"
+  chmod 600 "$agent_overlay"
+  if ! "$AGENT_PROVIDER_BUNDLE/packaging/launchd/krw-agentd-start-local" \
+    --env-file "$AGENT_RUNTIME_ENV_PATH" \
+    --overlay-file "$agent_overlay" \
+    --mcp-check; then
+    cleanup_agent_check
+    return 1
+  fi
+  cleanup_agent_check
+  echo 'Sealed local Rust daemon MCP ABI verified through the active gateway.'
+}
+
 activate_local_agent_release() {
   [ -x "$AGENT_INSTALLED_INSTALLER" ] || fail "Staged local krw-agent installer is unavailable."
+  local start_mode=()
+  if [ "${1:-}" = "--defer-start" ]; then
+    start_mode=(--defer-start)
+  elif [ -n "${1:-}" ]; then
+    fail "Unknown local agent activation option: $1"
+  fi
   KRW_AGENT_LOCAL_INSTALL_ROOT="$AGENT_LOCAL_INSTALL_ROOT" \
     "$AGENT_INSTALLED_INSTALLER" --mode activate \
       --release-id "$RELEASE_ID" \
       --provider "$AGENT_PROVIDER" \
       --metrics-port "$AGENT_METRICS_PORT" \
-      --env-file "$AGENT_RUNTIME_ENV_PATH"
+      --env-file "$AGENT_RUNTIME_ENV_PATH" \
+      "${start_mode[@]}"
+}
+
+start_local_agent_release() {
+  [ -x "$AGENT_INSTALLED_INSTALLER" ] || fail "Staged local krw-agent installer is unavailable."
+  KRW_AGENT_LOCAL_INSTALL_ROOT="$AGENT_LOCAL_INSTALL_ROOT" \
+    "$AGENT_INSTALLED_INSTALLER" --mode start \
+      --release-id "$RELEASE_ID" \
+      --provider "$AGENT_PROVIDER" \
+      --metrics-port "$AGENT_METRICS_PORT"
 }
 
 activate_local_agent_capability_runtime() {
@@ -1560,6 +1605,12 @@ async function main() {
         to_regprocedure('agent_v1.claim_outbox(jsonb)') is not null as claim_outbox,
         to_regprocedure('agent_v1.ack_outbox(jsonb)') is not null as ack_outbox,
         to_regprocedure('agent_v1.heartbeat_daemon(jsonb)') is not null as heartbeat_daemon,
+        exists (
+          select 1 from information_schema.columns
+           where table_schema = 'public'
+             and table_name = 'agent_v1_daemon_heartbeats'
+             and column_name = 'mcp_ready'
+        ) as daemon_mcp_readiness_column,
         to_regprocedure('public.apply_agent_v1_product_outbox(jsonb)') is not null as apply_product_outbox,
         to_regclass('public.agent_v1_product_outbox_receipts') is not null as product_outbox_receipts
     `);
@@ -2355,18 +2406,22 @@ if [ "$WITH_AGENT_RELEASE" = "1" ]; then
   run_remote_close_research_admission
   AGENT_ADMISSION_CLOSED=1
   AGENT_CUTOVER_ROLLBACK_ARMED=1
-  # Materialize the gateway contract from the staged, sealed bundle before
-  # changing the daemon. A missing local MCP boundary therefore aborts before
-  # either the Mac daemon or the web candidate can accept product work.
-  prepare_local_agent_mcp_gateways
-  # Arm rollback before switching the local launchd job: a terminal or SSH
-  # loss after a successful switch is treated as ambiguous and restores the
-  # prior Mac release before public admission can be reopened.
+  # Switch the immutable current symlink and write the daemon plist without
+  # starting launchd. The capability installer intentionally follows this new
+  # symlink, while the daemon remains stopped until every MCP dependency is
+  # ready.
   AGENT_LOCAL_RELEASE_ACTIVATED=1
-  activate_local_agent_release
+  activate_local_agent_release --defer-start
   AGENT_CAPABILITY_RUNTIME_ACTIVATED=1
   activate_local_agent_capability_runtime
+  # Materialize the complete gateway contract only after the capability
+  # installer has captured rollback copies of every endpoint config. A failed
+  # cutover can therefore restore the old runtime and all four gateways as one
+  # coherent release.
+  prepare_local_agent_mcp_gateways
   activate_local_agent_mcp_gateways
+  verify_sealed_local_agent_mcp_abi
+  start_local_agent_release
   # `krw-agentd` has already written its own release-bound database heartbeat
   # before its loopback metrics endpoint becomes ready. No Claude/plugin
   # worker is restarted or consulted on the Rust deployment path.

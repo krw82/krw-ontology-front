@@ -18,6 +18,55 @@ function read(path: string) {
 }
 
 describe("production deploy scripts", () => {
+  it("derives the MCP Origin from the sealed endpoint registry", () => {
+    const installer = read("scripts/install-krw-agent-local-mcp-gateways.mjs");
+    expect(installer).toContain("resolveMcpOrigin");
+    expect(installer).not.toContain('const CLIENT_ORIGIN = "https://krw-agent.local"');
+    expect(read("scripts/deploy-production-full.sh")).toContain(
+      "krw-agent-mcp-contract.mjs",
+    );
+    expect(read("scripts/deploy-production-fast.sh")).toContain("--mcp-check");
+    expect(read("scripts/verify-krw-feed-mcp-production.sh")).toContain(
+      "KRW_AGENT_MCP_ORIGIN",
+    );
+    expect(read("scripts/verify-mcp-runtime.mjs")).toContain(
+      "KRW_AGENT_MCP_ORIGIN is required for HTTPS MCP verification",
+    );
+    expect(read("scripts/verify-filings-mcp-production.sh")).toContain(
+      "KRW_AGENT_MCP_ORIGIN is required for HTTPS filings verification",
+    );
+    expect(read("scripts/verify-agent-v1-compatibility.mjs")).toContain(
+      "daemon_mcp_readiness_column",
+    );
+  });
+
+  it("switches the release before dependencies but starts the Rust daemon last", () => {
+    const deployFast = read("scripts/deploy-production-fast.sh");
+    const deferredRelease = deployFast.lastIndexOf("activate_local_agent_release --defer-start");
+    const capability = deployFast.lastIndexOf("activate_local_agent_capability_runtime");
+    const prepare = deployFast.lastIndexOf("prepare_local_agent_mcp_gateways");
+    const gateways = deployFast.lastIndexOf("activate_local_agent_mcp_gateways");
+    const mcpCheck = deployFast.lastIndexOf("verify_sealed_local_agent_mcp_abi");
+    const daemon = deployFast.lastIndexOf("start_local_agent_release");
+
+    expect(deferredRelease).toBeGreaterThan(-1);
+    expect(capability).toBeGreaterThan(deferredRelease);
+    expect(prepare).toBeGreaterThan(capability);
+    expect(gateways).toBeGreaterThan(capability);
+    expect(mcpCheck).toBeGreaterThan(gateways);
+    expect(daemon).toBeGreaterThan(gateways);
+    expect(daemon).toBeGreaterThan(mcpCheck);
+    expect(deployFast).toContain("--defer-start");
+    expect(deployFast).toContain("--mode start");
+    const cleanup = deployFast.slice(
+      deployFast.indexOf("cleanup() {"),
+      deployFast.indexOf("\n}\ntrap cleanup EXIT"),
+    );
+    expect(cleanup.indexOf("rollback_local_agent_capability_runtime")).toBeLessThan(
+      cleanup.indexOf("rollback_local_agent_release"),
+    );
+  });
+
   it("requires an exact krw-agent host archive provenance before a production build", () => {
     const packageJson = JSON.parse(read("package.json"));
     expect(packageJson.scripts.build).toContain("verify:agent-host-package");

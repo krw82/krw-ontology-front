@@ -86,7 +86,28 @@ readyUrl.pathname = "/readyz";
 readyUrl.search = "";
 readyUrl.hash = "";
 const timeout = Number(process.env.MCP_HEALTH_TIMEOUT_MS || 30000);
-const headers = { Authorization: `Bearer ${token}`, accept: "application/json" };
+const origin = process.env.KRW_AGENT_MCP_ORIGIN?.trim() || "";
+if (readyUrl.protocol === "https:" && !origin) {
+  throw new Error("KRW_AGENT_MCP_ORIGIN is required for HTTPS filings verification");
+}
+if (origin) {
+  const parsedOrigin = new URL(origin);
+  if (
+    parsedOrigin.protocol !== "https:" ||
+    parsedOrigin.pathname !== "/" ||
+    parsedOrigin.search ||
+    parsedOrigin.hash ||
+    parsedOrigin.username ||
+    parsedOrigin.password
+  ) {
+    throw new Error("KRW_AGENT_MCP_ORIGIN must be a bare HTTPS origin");
+  }
+}
+const headers = {
+  Authorization: `Bearer ${token}`,
+  accept: "application/json",
+  ...(origin ? { origin } : {}),
+};
 const response = await fetch(readyUrl, { headers, signal: AbortSignal.timeout(timeout) });
 const payload = await response.json().catch(() => null);
 if (!response.ok || payload?.ok !== true) throw new Error("On-demand filings MCP readiness is not ok");

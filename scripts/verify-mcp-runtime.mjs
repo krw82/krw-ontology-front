@@ -72,6 +72,7 @@ function requireExpectedValue(payload, envName, field) {
 
 const mcpUrl =
   process.env.KRW_ONTOLOGY_MCP_URL || "http://127.0.0.1:8765/mcp";
+const mcpRequestHeaders = requestHeadersForMcpUrl(mcpUrl);
 const readyUrl =
   process.env.KRW_ONTOLOGY_MCP_READY_URL || readyUrlFromMcpUrl(mcpUrl);
 const expectedEnv = process.env.KRW_ONTOLOGY_EXPECTED_ENV;
@@ -85,7 +86,7 @@ const timeout = setTimeout(
 
 try {
   const response = await fetch(readyUrl, {
-    headers: { accept: "application/json" },
+    headers: { accept: "application/json", ...mcpRequestHeaders },
     signal: controller.signal,
   });
   const payload = await response.json();
@@ -188,7 +189,7 @@ try {
     requireExpectedValue(payload, envName, field);
   }
 
-  await verifyMcpEndpoint(mcpUrl);
+  await verifyMcpEndpoint(mcpUrl, mcpRequestHeaders);
   verifyPluginContract(payload);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
@@ -197,12 +198,33 @@ try {
   clearTimeout(timeout);
 }
 
-async function verifyMcpEndpoint(url) {
+function requestHeadersForMcpUrl(url) {
+  const parsed = new URL(url);
+  if (parsed.protocol !== "https:") return {};
+  const origin = process.env.KRW_AGENT_MCP_ORIGIN?.trim();
+  if (!origin) throw new Error("KRW_AGENT_MCP_ORIGIN is required for HTTPS MCP verification");
+  const parsedOrigin = new URL(origin);
+  if (
+    parsedOrigin.protocol !== "https:" ||
+    parsedOrigin.pathname !== "/" ||
+    parsedOrigin.search ||
+    parsedOrigin.hash ||
+    parsedOrigin.username ||
+    parsedOrigin.password
+  ) {
+    throw new Error("KRW_AGENT_MCP_ORIGIN must be a bare HTTPS origin");
+  }
+  return { origin };
+}
+
+async function verifyMcpEndpoint(url, headers) {
   const client = new Client({
     name: "krw-ontology-runtime-preflight",
     version: "0.1.0",
   });
-  const transport = new StreamableHTTPClientTransport(new URL(url));
+  const transport = new StreamableHTTPClientTransport(new URL(url), {
+    requestInit: { headers },
+  });
   const timeoutMs = Number(process.env.MCP_HEALTH_TIMEOUT_MS || 30_000);
   try {
     await client.connect(transport, { timeout: timeoutMs });

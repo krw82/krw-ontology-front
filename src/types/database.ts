@@ -314,6 +314,7 @@ export interface AgentV1DaemonHeartbeatRow extends Record<string, unknown> {
   descriptor_artifact_hash: string;
   release_set_hash: string;
   runtime_version: string;
+  mcp_ready: boolean;
   last_seen_at: string;
   heartbeat_expires_at: string;
   created_at: string;

@@ -14,7 +14,11 @@ import {
 const descriptorArtifactHash = `sha256:${"a".repeat(64)}`;
 const releaseSetHash = `sha256:${"b".repeat(64)}`;
 
-function mockDaemonRow(now = new Date()) {
+function mockDaemonRow(
+  now = new Date(),
+  lastSeenAt = now,
+  expiresAt = new Date(now.getTime() + 90_000),
+) {
   const filters: Array<[string, string, unknown]> = [];
   const query = {
     eq(key: string, value: unknown) {
@@ -38,8 +42,9 @@ function mockDaemonRow(now = new Date()) {
         descriptor_artifact_hash: descriptorArtifactHash,
         release_set_hash: releaseSetHash,
         runtime_version: "0.1.0",
-        last_seen_at: now.toISOString(),
-        heartbeat_expires_at: new Date(now.getTime() + 90_000).toISOString(),
+        mcp_ready: true,
+        last_seen_at: lastSeenAt.toISOString(),
+        heartbeat_expires_at: expiresAt.toISOString(),
         created_at: now.toISOString(),
         updated_at: now.toISOString(),
       },
@@ -94,6 +99,27 @@ describe("Rust daemon heartbeat admission", () => {
       ["eq", "provider", "deepseek"],
       ["eq", "descriptor_artifact_hash", descriptorArtifactHash],
       ["eq", "release_set_hash", releaseSetHash],
+      ["eq", "mcp_ready", true],
     ]));
+  });
+
+  it("does not admit an old mcp-ready receipt before the database TTL expires", async () => {
+    const now = new Date("2026-08-12T00:00:00.000Z");
+    const fake = mockDaemonRow(
+      now,
+      new Date(now.getTime() - 60_000),
+      new Date(now.getTime() + 30_000),
+    );
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin as never);
+    vi.stubEnv("KRW_AGENT_DAEMON_HEARTBEAT_REQUIRED", "1");
+    vi.stubEnv("KRW_AGENT_PROVIDER", "deepseek");
+    vi.stubEnv("KRW_AGENT_RELEASE_ARTIFACT_HASH", descriptorArtifactHash);
+    vi.stubEnv("KRW_AGENT_RELEASE_SET_HASH", releaseSetHash);
+
+    await expect(getReadyRustAgentDaemon(now)).resolves.toEqual({
+      ok: false,
+      reason: "daemon_unavailable",
+      message: "Local Rust research daemon is unavailable",
+    });
   });
 });

@@ -18,6 +18,7 @@ fi
 
 export KRW_FEED_MCP_URL=${KRW_FEED_MCP_URL:-http://127.0.0.1:8795/mcp}
 export KRW_FEED_MCP_TOKEN=${KRW_FEED_MCP_TOKEN:-${FEED_MCP_AUTH_TOKEN:-}}
+export KRW_AGENT_MCP_ORIGIN=${KRW_AGENT_MCP_ORIGIN:-}
 
 if [ -z "$KRW_FEED_MCP_TOKEN" ]; then
   echo "KRW_FEED_MCP_TOKEN or FEED_MCP_AUTH_TOKEN is required" >&2
@@ -30,6 +31,10 @@ fi
 # a verifier-only TLS setting; it never disables certificate validation.
 case "$KRW_FEED_MCP_URL" in
   https://*)
+    if [ -z "$KRW_AGENT_MCP_ORIGIN" ]; then
+      echo "KRW_AGENT_MCP_ORIGIN is required for HTTPS Feed verification" >&2
+      exit 1
+    fi
     if [ -n "${KRW_AGENT_MCP_CA_FILE:-}" ]; then
       if [ ! -f "$KRW_AGENT_MCP_CA_FILE" ] || [ -L "$KRW_AGENT_MCP_CA_FILE" ]; then
         echo "KRW_AGENT_MCP_CA_FILE must be a regular file for HTTPS Feed verification" >&2
@@ -42,11 +47,24 @@ esac
 
 node - <<'NODE'
 const mcpUrl = new URL(process.env.KRW_FEED_MCP_URL);
+const origin = process.env.KRW_AGENT_MCP_ORIGIN;
+if (!origin) throw new Error("KRW_AGENT_MCP_ORIGIN is required");
+const parsedOrigin = new URL(origin);
+if (
+  parsedOrigin.protocol !== "https:" ||
+  parsedOrigin.pathname !== "/" ||
+  parsedOrigin.search ||
+  parsedOrigin.hash ||
+  parsedOrigin.username ||
+  parsedOrigin.password
+) {
+  throw new Error("KRW_AGENT_MCP_ORIGIN must be a bare HTTPS origin");
+}
 mcpUrl.pathname = "/readyz";
 const response = await fetch(mcpUrl, {
   headers: {
     authorization: `Bearer ${process.env.KRW_FEED_MCP_TOKEN}`,
-    origin: "https://krw-agent.local",
+    origin,
   },
 });
 const payload = await response.json();

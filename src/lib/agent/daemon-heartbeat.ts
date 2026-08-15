@@ -11,6 +11,12 @@ type ExpectedDaemonIdentity = {
   readonly releaseSetHash: string;
 };
 
+// The database receipt expires after 90 seconds, but admission should not
+// wait for the full TTL when the daemon stopped writing.  One missed 30s
+// heartbeat is tolerated; an older receipt is treated as stale even if its
+// expiry column has not elapsed yet.
+const MAX_HEARTBEAT_AGE_MS = 45_000;
+
 export type RustAgentDaemonAdmissionResult =
   | {
       ok: true;
@@ -43,11 +49,12 @@ export async function getReadyRustAgentDaemon(
     const { data, error } = await getSupabaseAdmin()
       .from("agent_v1_daemon_heartbeats")
       .select(
-        "daemon_id, provider, descriptor_artifact_hash, release_set_hash, runtime_version, last_seen_at, heartbeat_expires_at, created_at, updated_at",
+        "daemon_id, provider, descriptor_artifact_hash, release_set_hash, runtime_version, mcp_ready, last_seen_at, heartbeat_expires_at, created_at, updated_at",
       )
       .eq("provider", identity.provider)
       .eq("descriptor_artifact_hash", identity.descriptorArtifactHash)
       .eq("release_set_hash", identity.releaseSetHash)
+      .eq("mcp_ready", true)
       .gt("heartbeat_expires_at", now.toISOString())
       .order("last_seen_at", { ascending: false })
       .limit(1)
@@ -98,6 +105,7 @@ function isCurrentHeartbeat(row: AgentV1DaemonHeartbeatRow, now: Date): boolean 
   return Number.isFinite(lastSeenAt)
     && Number.isFinite(expiresAt)
     && lastSeenAt <= now.getTime() + 5_000
+    && lastSeenAt >= now.getTime() - MAX_HEARTBEAT_AGE_MS
     && expiresAt > now.getTime();
 }
 

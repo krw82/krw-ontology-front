@@ -27,6 +27,8 @@ agent_runtime_env_candidate=
 agent_runtime_env_backup=
 agent_runtime_env_activated=0
 release_id=
+agent_mcp_origin=
+agent_endpoint_registry=
 forward_args=()
 has_forward_args=0
 
@@ -128,8 +130,87 @@ write_canonical_feed_token() {
   mv -f -- "$temporary" "$env_file"
 }
 
+write_canonical_mcp_origin() {
+  local env_file=$1
+  local origin=$2
+  write_canonical_env_value "$env_file" KRW_AGENT_MCP_ORIGIN "$origin"
+}
+
+write_canonical_env_value() {
+  local env_file=$1
+  local key=$2
+  local value=$3
+  local temporary
+  temporary=$(mktemp "${env_file}.rewrite.XXXXXX")
+  awk -F= -v wanted_key="$key" '
+    function normalized_key(raw) {
+      sub(/^[[:space:]]*export[[:space:]]+/, "", raw)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", raw)
+      return raw
+    }
+    $0 ~ /^[[:space:]]*#/ || normalized_key($1) != wanted_key { print }
+  ' "$env_file" > "$temporary"
+  printf "export %s='%s'\n" "$key" \
+    "$(printf '%s' "$value" | sed "s/'/'\\\\''/g")" >> "$temporary"
+  chmod 600 "$temporary"
+  mv -f -- "$temporary" "$env_file"
+}
+
+remove_env_keys() {
+  local env_file=$1
+  shift
+  local temporary
+  temporary=$(mktemp "${env_file}.rewrite.XXXXXX")
+  awk -F= -v keys="$*" '
+    function normalized_key(raw) {
+      sub(/^[[:space:]]*export[[:space:]]+/, "", raw)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", raw)
+      return raw
+    }
+    $0 ~ /^[[:space:]]*#/ { print; next }
+    {
+      split(keys, wanted, " ")
+      for (i in wanted) if (normalized_key($1) == wanted[i]) next
+      print
+    }
+  ' "$env_file" > "$temporary"
+  chmod 600 "$temporary"
+  mv -f -- "$temporary" "$env_file"
+}
+
+canonicalize_runtime_mcp_environment() {
+  local env_file=$1
+  local origin=$2
+  local key value
+  local required_keys=(
+    KRW_ONTOLOGY_MCP_URL KRW_ONTOLOGY_READY_URL
+    KRW_FEED_MCP_URL KRW_FEED_MCP_READY_URL
+    KRW_FILINGS_MCP_URL KRW_FILINGS_MCP_READY_URL
+    KRW_GURU_MCP_URL KRW_GURU_MCP_READY_URL
+  )
+  for key in "${required_keys[@]}"; do
+    value=$(read_env_value "$env_file" "$key" 2>/dev/null || true)
+    [[ -n "$value" ]] || fail "Rust runtime env has no $key"
+    [[ "$value" = https://* ]] || fail "$key must use HTTPS in the production Rust runtime envelope"
+    write_canonical_env_value "$env_file" "$key" "$value"
+  done
+  write_canonical_mcp_origin "$env_file" "$origin"
+  # These names belonged to the retired HTTP worker and are not read by the
+  # sealed Rust launcher. Keeping them creates two apparent endpoint contracts
+  # for operators and tools that source this file outside the wrapper.
+  remove_env_keys "$env_file" KRW_ONTOLOGY_MCP_HEALTH_URL KRW_ONTOLOGY_MCP_READY_URL KRW_AGENT_ENDPOINTS_PATH
+}
+
+resolve_canonical_mcp_origin() {
+  local registry=$1
+  [[ -f "$registry" && ! -L "$registry" ]] \
+    || fail "sealed MCP endpoint registry is missing or unsafe: $registry"
+  node "$front_dir/scripts/krw-agent-mcp-contract.mjs" --registry "$registry"
+}
+
 ensure_local_feed_gateway_ready() {
   local feed_token=$1
+  local origin=$2
   local feed_url ready_url ca_file probe_dir probe_body deadline
   feed_url=$(read_env_value "$agent_runtime_env_source" KRW_FEED_MCP_URL 2>/dev/null || true)
   [[ -n "$feed_url" ]] || fail "Rust runtime env has no KRW_FEED_MCP_URL"
@@ -170,7 +251,7 @@ ensure_local_feed_gateway_ready() {
     if curl -fsS --connect-timeout 1 --max-time 3 "${curl_args[@]}" \
       -H "Authorization: Bearer $feed_token" \
       -H 'Accept: application/json' \
-      -H 'Origin: https://krw-agent.local' \
+      -H "Origin: $origin" \
       "$ready_url" -o "$probe_body" 2>/dev/null \
       && python3 - "$probe_body" <<'PY'
 import json
@@ -212,7 +293,16 @@ prepare_agent_runtime_env_candidate() {
   [[ "$feed_token" != *$'\n'* && "$feed_token" != *$'\r'* ]] \
     || fail "Feed MCP token contains a newline and cannot be propagated safely"
 
-  ensure_local_feed_gateway_ready "$feed_token"
+  agent_endpoint_registry="$agent_operator_root/config/deepseek/endpoint-registry.yaml"
+  agent_mcp_origin=$(resolve_canonical_mcp_origin "$agent_endpoint_registry")
+  if [[ -f "$agent_operator_root/config/glm/endpoint-registry.yaml" && ! -L "$agent_operator_root/config/glm/endpoint-registry.yaml" ]]; then
+    local glm_origin
+    glm_origin=$(resolve_canonical_mcp_origin "$agent_operator_root/config/glm/endpoint-registry.yaml")
+    [[ "$glm_origin" = "$agent_mcp_origin" ]] \
+      || fail "GLM and DeepSeek MCP endpoint Origins differ"
+  fi
+
+  ensure_local_feed_gateway_ready "$feed_token" "$agent_mcp_origin"
 
   # Keep the candidate in the same directory so its later activation is an
   # atomic rename.  The launchd plist will receive only the stable source
@@ -220,6 +310,7 @@ prepare_agent_runtime_env_candidate() {
   agent_runtime_env_candidate=$(mktemp "${agent_runtime_env_source}.candidate.XXXXXX")
   cp -p -- "$agent_runtime_env_source" "$agent_runtime_env_candidate"
   write_canonical_feed_token "$agent_runtime_env_candidate" "$feed_token"
+  canonicalize_runtime_mcp_environment "$agent_runtime_env_candidate" "$agent_mcp_origin"
 
   if ! "$front_dir/scripts/verify-krw-feed-mcp-production.sh" --env-file "$agent_runtime_env_candidate"; then
     fail "Feed MCP bearer preflight failed; Rust release was not built or activated"

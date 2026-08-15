@@ -86,6 +86,12 @@ try {
           exists (
             select 1 from information_schema.columns
              where table_schema = 'public'
+               and table_name = 'agent_v1_daemon_heartbeats'
+               and column_name = 'mcp_ready'
+          ) as daemon_mcp_readiness_column,
+          exists (
+            select 1 from information_schema.columns
+             where table_schema = 'public'
                and table_name = 'agent_v1_product_run_mappings'
                and column_name = 'lifecycle_stage'
           ) as lifecycle_mapping_column,
@@ -157,6 +163,7 @@ try {
       "mappings_table",
       "receipts_table",
       "daemon_heartbeats_table",
+      "daemon_mcp_readiness_column",
       "lifecycle_mapping_column",
       "lifecycle_started_trigger",
       "session_memory_frontiers",

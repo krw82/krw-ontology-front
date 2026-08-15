@@ -208,6 +208,7 @@ async function checkRustAgentDaemon(): Promise<CheckResult> {
       descriptor_artifact_hash: ready.daemon?.descriptor_artifact_hash ?? null,
       release_set_hash: ready.daemon?.release_set_hash ?? null,
       runtime_version: ready.daemon?.runtime_version ?? null,
+      mcp_ready: ready.daemon?.mcp_ready ?? null,
       last_seen_at: ready.daemon?.last_seen_at ?? null,
       heartbeat_expires_at: ready.daemon?.heartbeat_expires_at ?? null,
     };
@@ -308,11 +309,15 @@ export async function GET(request: Request) {
   const agentV1Required =
     process.env.KRW_AGENT_BACKEND_MODE === "rust" ||
     process.env.KRW_RUNTIME_ENVIRONMENT === "prod";
+  const agentV1Daemon = agentV1Required
+    ? await checkRustAgentDaemon()
+    : { ok: true, required: false };
   const mcp = agentV1Required
-    ? {
-        ok: true,
-        required: false,
+      ? {
+        ok: agentV1Daemon.ok,
+        required: agentV1Daemon.required,
         owner: "local_rust_agentd",
+        error: agentV1Daemon.error,
       }
     : catalog.ok && typeof catalog.release_id === "string"
       ? await checkWorkerMcp(catalog.release_id)
@@ -320,9 +325,6 @@ export async function GET(request: Request) {
           ok: false,
           error: "Cannot check worker MCP without an active catalog release",
         };
-  const agentV1Daemon = agentV1Required
-    ? await checkRustAgentDaemon()
-    : { ok: true, required: false };
   const ok =
     supabase.ok &&
     catalog.ok &&

@@ -21,18 +21,18 @@ import {
 } from "node:fs/promises";
 import https from "node:https";
 import path from "node:path";
+import {
+  resolveMcpOrigin,
+  resolveMcpSessionReuse,
+} from "./krw-agent-mcp-contract.mjs";
 
 const CONTRACT_ID = "krw-agent/mcp-tool-session-stateless/v1";
 const GATEWAY_LABEL = "com.krw.agent.local-mcp-gateways";
-// This is the only caller identity emitted by the sealed Rust MCP client.
-// Keep it identical across every local gateway: the TLS boundary is shared
-// even though the upstream services differ.
-const CLIENT_ORIGIN = "https://krw-agent.local";
 const CONFIGS = [
-  { name: "ontology", reuse: "attested-stateless-v1" },
-  { name: "feed", reuse: "run-scoped" },
-  { name: "filings", reuse: "run-scoped" },
-  { name: "guru", reuse: "attested-stateless-v1" },
+  { name: "ontology", endpointRef: "krw-ontology-local" },
+  { name: "feed", endpointRef: "krw-feed-local" },
+  { name: "filings", endpointRef: "krw-filings-local" },
+  { name: "guru", endpointRef: "krw-guru-local" },
 ];
 
 function usage() {
@@ -80,9 +80,12 @@ function attestation(config) {
   };
 }
 
-function assertGatewayConfig(config, expectedReuse, label) {
+function assertGatewayConfig(config, expectedReuse, label, origin) {
   if (!config || typeof config !== "object" || Array.isArray(config)) fail(`${label} config is invalid`);
   if (config.toolSessionReuse !== expectedReuse) fail(`${label} session contract was not materialized`);
+  if (config.checkUpstreamReady !== true || config.normalizeReadiness !== true) {
+    fail(`${label} gateway must probe and normalize live upstream readiness`);
+  }
   for (const field of ["service", "protocolVersion", "buildId", "toolSchemaSha256", "releaseManifestSha256"]) {
     if (typeof config[field] !== "string" || !config[field]) fail(`${label} config has no ${field}`);
   }
@@ -98,7 +101,7 @@ function assertGatewayConfig(config, expectedReuse, label) {
   if (
     !Array.isArray(config.allowedOrigins) ||
     config.allowedOrigins.length !== 1 ||
-    config.allowedOrigins[0] !== CLIENT_ORIGIN
+    config.allowedOrigins[0] !== origin
   ) {
     fail(`${label} config has no exact Rust MCP Origin allowlist`);
   }
@@ -123,7 +126,7 @@ async function atomicWrite(destination, content, mode) {
   }
 }
 
-function httpsRequest({ ca, port, pathname, method = "GET", body = null }) {
+function httpsRequest({ ca, origin, port, pathname, method = "GET", body = null }) {
   return new Promise((resolve, reject) => {
     const request = https.request(
       {
@@ -135,7 +138,7 @@ function httpsRequest({ ca, port, pathname, method = "GET", body = null }) {
         rejectUnauthorized: true,
         timeout: 5000,
         headers: {
-          origin: CLIENT_ORIGIN,
+          origin,
           ...(body === null ? {} : {
             accept: "application/json, text/event-stream",
             "content-type": "application/json",
@@ -208,23 +211,37 @@ async function materialize(options) {
   const runtimeProxy = path.join(runtime, "mcp_tls_proxy.mjs");
   const configRoot = path.join(options.operatorRoot, "config", "runtime");
   const tls = path.join(options.operatorRoot, "tls", "ca.pem");
+  const endpointRegistry = path.join(options.agentBundle, "deployments", "endpoint-registry.yaml");
+  const deploymentBinding = path.join(options.agentBundle, "deployments", "deployment-binding.yaml");
   await regularFile(source, "sealed MCP gateway asset");
   await directory(runtime, "operator runtime directory");
   await directory(configRoot, "gateway config directory");
   await regularFile(tls, "gateway CA certificate");
+  await regularFile(endpointRegistry, "sealed endpoint registry");
+  await regularFile(deploymentBinding, "sealed deployment binding");
+  const origin = resolveMcpOrigin(await readFile(endpointRegistry, "utf8"));
+  const sessionReuse = resolveMcpSessionReuse(await readFile(deploymentBinding, "utf8"));
 
   const configs = [];
   for (const entry of CONFIGS) {
+    const reuse = sessionReuse[entry.endpointRef];
     const configPath = path.join(configRoot, `${entry.name}-tls.json`);
     await regularFile(configPath, `${entry.name} gateway config`);
     const config = JSON.parse(await readFile(configPath, "utf8"));
-    config.toolSessionReuse = entry.reuse;
+    config.toolSessionReuse = reuse;
+    // A synthetic gateway-ready response must never outlive its upstream.
+    // Guru exposes /healthz while Feed/Filings expose /readyz; normalize the
+    // path here so a stale operator JSON cannot announce a dead worker.
+    config.checkUpstreamReady = true;
+    config.normalizeReadiness = true;
+    config.upstreamReadinessPath = config.upstreamReadinessPath
+      ?? (entry.name === "guru" ? "/healthz" : "/readyz");
     // The operator files contain endpoint identity and TLS material; this
     // release-bound client identity is deliberately materialized here so an
     // upgraded fail-closed proxy cannot be started with an empty allowlist.
-    config.allowedOrigins = [CLIENT_ORIGIN];
-    assertGatewayConfig(config, entry.reuse, entry.name);
-    configs.push({ ...entry, configPath, config });
+    config.allowedOrigins = [origin];
+    assertGatewayConfig(config, reuse, entry.name, origin);
+    configs.push({ ...entry, reuse, configPath, config });
   }
 
   if (options.mode !== "verify") {
@@ -236,6 +253,7 @@ async function materialize(options) {
     const receipt = {
       schema_version: "krw-agent-local-mcp-gateway-contract/v1",
       source_sha256: `sha256:${sha256(sourceBytes)}`,
+      origin,
       endpoints: configs.map(({ name, reuse, config }) => ({
         name,
         service: config.service,
@@ -252,13 +270,14 @@ async function materialize(options) {
       fail("materialized gateway asset does not match the sealed agent bundle");
     }
   }
-  return { configs, ca: await readFile(tls, "utf8"), runtime };
+  return { configs, ca: await readFile(tls, "utf8"), origin, runtime };
 }
 
 async function verifyLive(materialized) {
   for (const entry of materialized.configs) {
     const ready = await httpsRequest({
       ca: materialized.ca,
+      origin: materialized.origin,
       port: entry.config.listen.port,
       pathname: "/readyz",
     });
@@ -288,6 +307,7 @@ async function verifyLive(materialized) {
     });
     const initialized = await httpsRequest({
       ca: materialized.ca,
+      origin: materialized.origin,
       port: entry.config.listen.port,
       pathname: "/mcp",
       method: "POST",
