@@ -1195,11 +1195,6 @@ await expectAnonTableBlocked(
 );
 
 await expectAnonRpcBlocked("claim_agent_run", {
-  p_worker_id: "",
-  p_lease_seconds: 300,
-  p_global_limit: 1,
-});
-await expectAnonRpcBlocked("claim_agent_run", {
   p_worker_id: "schema-smoke",
   p_worker_env: "invalid",
   p_ontology_env: "prod",
@@ -1305,8 +1300,26 @@ await expectAnonRpcBlocked("claim_due_toss_subscriptions", {
   p_lease_seconds: 60,
 });
 await expectAnonRpcBlocked("finalize_toss_billing_payment", {
+  // Every deployed input name must be present so PostgREST resolves the
+  // current function signature. A null user id makes this safe even if an
+  // execute grant regresses: the function rejects it before locks or writes.
+  p_operation: "initial",
+  p_user_id: null,
+  p_subscription_id: null,
   p_payment_id: zeroUuid,
+  p_checkout_session_id: null,
+  p_plan_version_id: null,
+  p_period_start: null,
+  p_period_end: null,
+  p_credit_anchor_at: null,
+  p_customer_key: null,
+  p_billing_key: null,
+  p_billing_key_issued_at: null,
+  p_card_snapshot: {},
   p_paid_at: new Date().toISOString(),
+  p_renewal_lease_owner: null,
+  p_defer_plan_change_until: null,
+  p_now: new Date().toISOString(),
 });
 
 console.log("Supabase schema smoke test passed.");

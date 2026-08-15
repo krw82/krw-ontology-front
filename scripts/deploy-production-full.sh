@@ -385,6 +385,8 @@ done
   || fail "Production web release requires a clean committed frontend tree"
 [[ -z "$(git -C "$agent_source_root" status --porcelain=v1 --untracked-files=normal)" ]] \
   || fail "Fresh Rust release requires a clean committed krw-agnet tree"
+node "$script_dir/verify-supabase-schema-smoke-rpc-contract.mjs" \
+  || fail "Schema-smoke RPC contract does not match the generated database types"
 prepare_agent_runtime_env_candidate
 
 case "$release_id" in

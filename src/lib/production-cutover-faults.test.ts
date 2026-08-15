@@ -51,6 +51,11 @@ const atomicTransition = join(
   "scripts",
   "atomic-transition-sealed-file.mjs",
 );
+const schemaSmokeRpcContractVerifier = join(
+  repoRoot,
+  "scripts",
+  "verify-supabase-schema-smoke-rpc-contract.mjs",
+);
 
 function sha256(path: string) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
@@ -2441,6 +2446,77 @@ describe("production cutover fault injection", () => {
     expect(deployFast).toContain("for attempt in 1 2 3 4 5; do");
     expect(deployFast).toContain(
       "Supabase schema smoke attempt $attempt failed; waiting for PostgREST schema-cache convergence...",
+    );
+  });
+
+  it("rejects a schema-smoke RPC probe that omits a required deployed argument", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "krw-schema-smoke-contract-"));
+    const smokePath = join(fixtureRoot, "smoke.mjs");
+    const typesPath = join(fixtureRoot, "database.ts");
+    try {
+      writeFileSync(
+        smokePath,
+        [
+          "async function expectAnonRpcBlocked(_name, _args) {}",
+          'await expectAnonRpcBlocked("finalize_toss_billing_payment", {',
+          '  p_operation: "initial",',
+          "});",
+          "",
+        ].join("\n"),
+      );
+      writeFileSync(
+        typesPath,
+        [
+          "export type Database = {",
+          "  public: {",
+          "    Functions: {",
+          "      finalize_toss_billing_payment: {",
+          "        Args: {",
+          "          p_operation: string;",
+          "          p_user_id: string;",
+          "        };",
+          "        Returns: null;",
+          "      };",
+          "    };",
+          "  };",
+          "};",
+          "",
+        ].join("\n"),
+      );
+
+      const result = spawnSync(
+        process.execPath,
+        [
+          schemaSmokeRpcContractVerifier,
+          "--smoke",
+          smokePath,
+          "--types",
+          typesPath,
+        ],
+        { cwd: repoRoot, encoding: "utf8" },
+      );
+
+      expect(result.status).not.toBe(0);
+      expect(`${result.stdout}\n${result.stderr}`).toContain(
+        "finalize_toss_billing_payment",
+      );
+      expect(`${result.stdout}\n${result.stderr}`).toContain(
+        "missing required input(s): p_user_id",
+      );
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the checked-in schema smoke aligned with generated database RPC inputs", () => {
+    const result = spawnSync(process.execPath, [schemaSmokeRpcContractVerifier], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(`${result.stdout}\n${result.stderr}`).toContain(
+      "OK schema smoke RPC contract",
     );
   });
 });

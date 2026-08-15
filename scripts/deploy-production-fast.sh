@@ -551,6 +551,7 @@ if [ "$WITH_AGENT_RELEASE" = "0" ] && [ "$SKIP_MAC" = "0" ]; then
 fi
 if [ "$APPLY_MIGRATIONS" = "1" ]; then
   require_file "$SCRIPT_DIR/supabase-schema-smoke.mjs"
+  require_file "$SCRIPT_DIR/verify-supabase-schema-smoke-rpc-contract.mjs"
   if [ "$WITH_AGENT_RELEASE" = "1" ]; then
     require_file "$SCRIPT_DIR/verify-agent-v1-compatibility.mjs"
   fi
@@ -561,6 +562,7 @@ echo "Target VM: $GCP_PROJECT/$GCP_ZONE/$GCP_INSTANCE"
 echo "Web: $SKIP_WEB  Mac runtime: $SKIP_MAC  Migrations: $APPLY_MIGRATIONS  Catalog: $WITH_DATA  Agent release: $WITH_AGENT_RELEASE"
 
 if [ "$APPLY_MIGRATIONS" = "1" ]; then
+  node "$SCRIPT_DIR/verify-supabase-schema-smoke-rpc-contract.mjs"
   run_migration_dry_run
 fi
 
