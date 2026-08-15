@@ -7,66 +7,6 @@
 -- (unique (message_id, artifact_ref)) and chart rows can never diverge from
 -- the answer they belong to.
 
-create or replace function agent_v1.read_final_projection(p_request jsonb)
-returns jsonb
-language plpgsql
-stable
-security definer
-set search_path = pg_catalog, agent_store
-as $$
-declare
-  v_run agent_store.runs%rowtype;
-  v_bundle agent_store.answer_bundles%rowtype;
-  v_markdown text;
-  v_visualizations jsonb;
-begin
-  perform agent_store.assert_request(
-    p_request,
-    array['abi_version', 'run_id', 'tenant_id', 'principal_id', 'session_id'],
-    array['abi_version', 'run_id', 'tenant_id', 'principal_id', 'session_id']
-  );
-  select * into v_run from agent_store.runs where run_id = p_request->>'run_id';
-  if not found then
-    raise exception using errcode = 'K1001', message = 'unknown_run';
-  end if;
-  if v_run.tenant_id is distinct from p_request->>'tenant_id'
-     or v_run.principal_id is distinct from p_request->>'principal_id'
-     or v_run.session_id is distinct from p_request->>'session_id' then
-    raise exception using errcode = 'K1017', message = 'ownership_mismatch';
-  end if;
-  if v_run.state <> 'final' then
-    raise exception using errcode = 'K1003', message = 'run_not_final';
-  end if;
-  select * into v_bundle from agent_store.answer_bundles where run_id = v_run.run_id;
-  if not found then
-    raise exception using errcode = 'K1001', message = 'final_projection_missing';
-  end if;
-  v_markdown := coalesce(
-    v_bundle.answer_bundle->>'rendered_content',
-    v_bundle.answer_bundle->>'rendered_markdown'
-  );
-  if v_markdown is null or v_markdown = '' then
-    raise exception using errcode = 'K1000', message = 'final_markdown_missing';
-  end if;
-  v_visualizations := coalesce(v_bundle.answer_bundle->'visualizations', '[]'::jsonb);
-  if jsonb_typeof(v_visualizations) <> 'array'
-     or jsonb_array_length(v_visualizations) > 16
-     or exists (select 1 from jsonb_array_elements(v_visualizations) element
-                where jsonb_typeof(element) <> 'object') then
-    raise exception using errcode = 'K1000', message = 'final_visualizations_invalid';
-  end if;
-  return jsonb_build_object(
-    'run_id', v_run.run_id,
-    'answer_bundle_hash', v_bundle.answer_bundle_hash,
-    'markdown', v_markdown,
-    'visualizations', v_visualizations,
-    'usage', v_bundle.usage
-  );
-end;
-$$;
-
-revoke all on function agent_v1.read_final_projection(jsonb) from public;
-
 create or replace function public.apply_agent_v1_product_outbox(p_request jsonb)
 returns jsonb
 language plpgsql
@@ -103,6 +43,9 @@ declare
   v_price record;
   v_artifact jsonb;
   v_artifact_ref text;
+  v_visualization_inserted integer := 0;
+  v_visualization_omitted integer := 0;
+  v_visualization_rows integer := 0;
 begin
   perform public.agent_v1_product_assert_exact_object(
     p_request,
@@ -301,19 +244,37 @@ begin
     for v_artifact in select value from jsonb_array_elements(
         coalesce(v_projection->'visualizations', '[]'::jsonb)
     ) loop
-      v_artifact_ref := v_artifact->>'artifact_ref';
-      if v_artifact_ref is null or length(v_artifact_ref) < 1 or length(v_artifact_ref) > 128 then
-        raise exception 'visualization artifact_ref missing or oversized';
-      end if;
-      insert into public.chat_message_visualizations (
-        session_id, message_id, run_id, artifact_ref, payload_json
-      ) values (
-        v_mapping.session_id,
-        v_run.assistant_message_id,
-        v_run_id,
-        v_artifact_ref,
-        v_artifact
-      ) on conflict (message_id, artifact_ref) do nothing;
+      begin
+        v_artifact_ref := v_artifact->>'artifact_ref';
+        if v_artifact_ref is null
+           or length(v_artifact_ref) < 1
+           or length(v_artifact_ref) > 128
+           or v_artifact->>'artifact_format' <> 'krw-visualization'
+           or v_artifact->>'schema_version' <> '4'
+           or jsonb_typeof(v_artifact->'views') <> 'array'
+           or jsonb_array_length(v_artifact->'views') < 1
+           or jsonb_array_length(v_artifact->'views') > 4
+           or jsonb_typeof(v_artifact->'provenance') <> 'object'
+           or v_artifact ?| array['html', 'markup', 'svg', 'jsx', 'renderer_code'] then
+          v_visualization_omitted := v_visualization_omitted + 1;
+        else
+          insert into public.chat_message_visualizations (
+            session_id, message_id, run_id, artifact_ref, payload_json
+          ) values (
+            v_mapping.session_id,
+            v_run.assistant_message_id,
+            v_run_id,
+            v_artifact_ref,
+            v_artifact
+          ) on conflict (message_id, artifact_ref) do nothing;
+          get diagnostics v_visualization_rows = row_count;
+          v_visualization_inserted := v_visualization_inserted + v_visualization_rows;
+        end if;
+      exception when others then
+        -- Visualization projection is optional. The committed Markdown and
+        -- billing/terminal state must survive an invalid chart row.
+        v_visualization_omitted := v_visualization_omitted + 1;
+      end;
     end loop;
     insert into public.agent_run_events (run_id, event_type, payload)
     values (v_run_id, 'done', jsonb_build_object(
@@ -323,9 +284,8 @@ begin
       'rendered_message_hash', v_payload->>'rendered_message_hash',
       'evidence_ledger_hash', v_projection->>'evidence_ledger_hash',
       'memory_revision', v_projection->>'memory_revision',
-      'visualization_count', jsonb_array_length(
-        coalesce(v_projection->'visualizations', '[]'::jsonb)
-      ),
+      'visualization_count', v_visualization_inserted,
+      'visualization_omitted_count', v_visualization_omitted,
       'source', 'agent_v1_product_outbox'
     ));
     v_authoritative_state := 'final';

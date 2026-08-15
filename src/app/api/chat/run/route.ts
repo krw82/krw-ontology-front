@@ -471,11 +471,20 @@ export async function POST(request: NextRequest) {
   // 9. Queue the Rust run through the pinned host contract. The HTTP response
   // only streams persisted run events; the Rust daemon owns research work.
   const runId = randomUUID();
+  // A filing-backed chat session carries a trusted event id in the session
+  // row. Preserve that source binding even when the follow-up request does
+  // not repeat the URL query parameter. A market issue remains the stronger
+  // explicit feed anchor when both are present.
+  const sourceFilingEventId = session.sourceFilingEventId ?? null;
   const rustRunKind = marketIssueId
     ? "news_research"
+    : sourceFilingEventId
+    ? "source_filing_followup"
     : toRustRunKind(effectiveRunKind, effectiveGuruLensKey, session.scopeType);
   const rustContext = marketIssueId
     ? { kind: "selected_feed_items" as const, feed_item_ids: [marketIssueId] }
+    : sourceFilingEventId
+    ? { kind: "source_filing" as const, filing_event_id: sourceFilingEventId }
     : effectiveRunKind === "idea_generation" || effectiveRunKind === "wide_research" || (effectiveRunKind === "news_discovery" && session.scopeType === "global")
     ? { kind: "covered_universe" as const, universe: "covered" as const }
     : { kind: "company_ticker_set" as const, tickers: session.defaultTickers };

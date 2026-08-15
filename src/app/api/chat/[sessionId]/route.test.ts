@@ -45,6 +45,8 @@ function createSupabase(overrides: {
   sessionError?: { message: string } | null;
   messagesError?: { message: string } | null;
   runsError?: { message: string } | null;
+  visualizationsError?: { message: string } | null;
+  presentationsError?: { message: string } | null;
 } = {}) {
   const queriedTables: string[] = [];
   const session = overrides.session ?? {
@@ -182,14 +184,14 @@ function createSupabase(overrides: {
               }
               if (table === "chat_message_visualizations") {
                 return Promise.resolve({
-                  data: visualizations,
-                  error: null,
+                  data: overrides.visualizationsError ? null : visualizations,
+                  error: overrides.visualizationsError ?? null,
                 });
               }
               if (table === "chat_message_presentations") {
                 return Promise.resolve({
-                  data: presentations,
-                  error: null,
+                  data: overrides.presentationsError ? null : presentations,
+                  error: overrides.presentationsError ?? null,
                 });
               }
               throw new Error(`Unexpected table: ${table}`);
@@ -335,7 +337,7 @@ describe("GET /api/chat/[sessionId]", () => {
         artifact_ref: "chart_legacy",
         payload_json: {
           artifact_format: "krw-visualization",
-          schema_version: 1,
+          schema_version: 4,
         },
         created_at: "2026-05-31T00:01:00.000Z",
       }],
@@ -346,6 +348,21 @@ describe("GET /api/chat/[sessionId]", () => {
     const body = await json(response);
 
     expect(response.status).toBe(200);
+    expect(body.visualizations).toEqual([]);
+  });
+
+  it("keeps the chat readable when optional presentation projections fail", async () => {
+    const supabase = createSupabase({
+      visualizationsError: { message: "visualization table unavailable" },
+      presentationsError: { message: "presentation table unavailable" },
+    });
+    vi.mocked(createClient).mockResolvedValue(supabase.client);
+
+    const response = await GET(request(), params());
+    const body = await json(response);
+
+    expect(response.status).toBe(200);
+    expect(body.messages).toMatchObject([{ id: "message-1" }]);
     expect(body.visualizations).toEqual([]);
   });
 

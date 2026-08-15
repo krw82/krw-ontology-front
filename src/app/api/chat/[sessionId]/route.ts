@@ -188,12 +188,20 @@ export async function GET(
     return internalError("채팅 artifact를 불러오지 못했습니다.");
   }
 
+  // Visualizations and presentation blocks are optional projections. A
+  // missing table, transient read error, or one malformed row must never turn
+  // an otherwise readable research answer into a 500 response.
   if (chatVisualizationsError) {
-    return internalError("채팅 시각화를 불러오지 못했습니다.");
+    console.warn("[chat] optional visualization projection unavailable", {
+      sessionId,
+      error: chatVisualizationsError.message,
+    });
   }
-
   if (chatPresentationsError) {
-    return internalError("채팅 표시 구성을 불러오지 못했습니다.");
+    console.warn("[chat] optional presentation projection unavailable", {
+      sessionId,
+      error: chatPresentationsError.message,
+    });
   }
 
   const artifactIds = (chatArtifacts ?? []).map((artifact) => artifact.id);
@@ -215,13 +223,15 @@ export async function GET(
   // The v2 reader deliberately does not convert or render older/invalid
   // payloads. Ignore them so one retired row cannot make an entire chat
   // session unreadable.
-  const visualizations = (chatVisualizations ?? []).flatMap((row) => {
-    try {
-      return [toPublicChatVisualization(row)];
-    } catch {
-      return [];
-    }
-  });
+  const visualizations = chatVisualizationsError
+    ? []
+    : (chatVisualizations ?? []).flatMap((row) => {
+        try {
+          return [toPublicChatVisualization(row)];
+        } catch {
+          return [];
+        }
+      });
 
   return Response.json({
     session,
@@ -229,7 +239,9 @@ export async function GET(
     runs: (runs ?? []).map(toPublicRunSummary),
     chat_artifacts: (chatArtifacts ?? []).map(toPublicChatArtifact),
     visualizations,
-    presentations: (chatPresentations ?? []).map(toPublicChatPresentation),
+    presentations: chatPresentationsError
+      ? []
+      : (chatPresentations ?? []).map(toPublicChatPresentation),
     artifact_selections: artifactSelections ?? [],
     message_pagination: {
       limit: messageLimit,

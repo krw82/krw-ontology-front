@@ -215,6 +215,7 @@ release_root="$agent_operator_root/releases/${release_id}-${agent_commit}"
 
 build_args=(
   --output-root "$release_root"
+  --front-root "$front_dir"
   --operator-root "$agent_operator_root"
   --runtime-env "$agent_runtime_env_source"
 )
@@ -235,5 +236,6 @@ deploy_exact_release() {
 # some macOS Bash versions. Keep the common no-argument deploy path explicit.
 if [[ "$has_forward_args" = "1" ]]; then
   deploy_exact_release "${forward_args[@]}"
+else
+  deploy_exact_release
 fi
-deploy_exact_release

@@ -2048,10 +2048,12 @@ describe("production cutover fault injection", () => {
     expect(deployAll).toContain(
       '--path "$CUTOVER_SNAPSHOT/scripts/deploy-web-production.sh"',
     );
-    expect(deployMac).toContain("activate-prepared-mac-runtime.sh");
     expect(deployMac).toContain(
-      '"$RUNTIME_ROOT/scripts/activate-prepared-mac-runtime.sh"',
+      "The Claude/plugin worker deployment path has been retired.",
     );
+    expect(deployMac).toContain("npm run prod:deploy:full");
+    expect(deployMac).toContain("exit 2");
+    expect(deployMac).not.toContain("activate-prepared-mac-runtime.sh");
   });
 
   it("executes candidate recovery fail-close ordering and durable phase transitions", () => {
@@ -2177,32 +2179,19 @@ describe("production cutover fault injection", () => {
     }
   });
 
-  it("derives every Mac runtime control byte from one verified frontend snapshot", () => {
+  it("keeps the retired plugin-worker entrypoint side-effect free", () => {
     const deployMac = readFileSync(
       join(repoRoot, "scripts", "deploy-plugin-worker-production.sh"),
       "utf8",
     );
-    const snapshotVerified = deployMac.indexOf(
-      "COPIED_FRONT_SOURCE_SHA256=$(node",
-    );
-    const controlCopy = deployMac.indexOf(
-      'cp "$BUILD_DIR/scripts/$script_name" "$RUNTIME_ROOT/scripts/$script_name"',
-    );
-
-    expect(snapshotVerified).toBeGreaterThan(-1);
     expect(deployMac).toContain(
-      '"$BUILD_DIR/scripts/compute-production-source-sha256.mjs" "$BUILD_DIR"',
+      "The Claude/plugin worker deployment path has been retired.",
     );
-    expect(controlCopy).toBeGreaterThan(snapshotVerified);
-    expect(deployMac).toContain(
-      'cp "$BUILD_DIR/ops/production-target.json" "$RUNTIME_ROOT/ops/production-target.json"',
-    );
-    expect(deployMac).toContain(
-      'cp "$BUILD_DIR/ops/launchd/$template_name" "$RUNTIME_ROOT/ops/launchd/$template_name"',
-    );
-    expect(deployMac).not.toContain(
-      'cp "$SCRIPT_DIR/$script_name" "$RUNTIME_ROOT/scripts/$script_name"',
-    );
+    expect(deployMac).toContain("set -eu");
+    expect(deployMac).toContain("exit 2");
+    expect(deployMac).not.toContain("launchctl");
+    expect(deployMac).not.toContain("rsync");
+    expect(deployMac).not.toContain("activate-prepared-mac-runtime.sh");
   });
 
   it("rejects direct GCP, Mac, and data mutations before a mutator runs", () => {
@@ -2238,7 +2227,7 @@ describe("production cutover fault injection", () => {
           ["--env-file", envFile, "--prepare-only"],
           env,
         ),
-        "Mac production lane is internal",
+        "The Claude/plugin worker deployment path has been retired.",
       );
       expectRejected(
         runScript(
@@ -2369,7 +2358,11 @@ describe("production cutover fault injection", () => {
           ? /^scripts\/deploy-with-queue-pause\.sh(?:\s|$)/
           : name === "prod:deploy:bootstrap"
             ? /^scripts\/deploy-production-simple\.sh(?:\s|$)/
-            : /^scripts\/deploy-production-fast\.sh(?:\s|$)/;
+            : name === "prod:deploy:full" ||
+                name === "deploy:prod:full" ||
+                name === "deploy:all"
+              ? /^scripts\/deploy-production-full\.sh(?:\s|$)/
+              : /^scripts\/deploy-production-fast\.sh(?:\s|$)/;
       expect(
         normalizedCommand,
         `${name} bypasses the canonical deploy path`,

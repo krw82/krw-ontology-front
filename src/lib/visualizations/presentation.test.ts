@@ -5,7 +5,7 @@ import { buildPresentationBlocks } from "./presentation";
 function visualization(): KrwVisualizationArtifact {
   return {
     artifact_format: "krw-visualization",
-    schema_version: 3,
+    schema_version: 4,
     artifact_ref: "viz_1_revenue",
     semantic_fingerprint: "fingerprint-revenue",
     intent: { goal: "매출 추이 확인", measures: ["revenue"] },

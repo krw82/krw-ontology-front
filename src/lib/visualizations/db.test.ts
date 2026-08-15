@@ -7,7 +7,7 @@ import type { ChatMessageVisualizationRow } from "@/types/database";
 
 const artifact = {
   artifact_format: "krw-visualization",
-  schema_version: 3,
+  schema_version: 4,
   artifact_ref: "viz_1_revenue",
   semantic_fingerprint: "fingerprint-revenue",
   intent: { goal: "매출 추이" },
@@ -60,6 +60,33 @@ describe("visualization read-model projection", () => {
   it("rejects a malformed persisted payload instead of rendering it", () => {
     const row = visualizationRow();
     (row as { payload_json: unknown }).payload_json = { raw_filing_body: "invalid" };
+    expect(() => toPublicChatVisualization(row)).toThrow(/Invalid visualization payload/);
+  });
+
+  it("rejects markup-shaped optional payloads", () => {
+    const row = visualizationRow();
+    (row as { payload_json: unknown }).payload_json = {
+      ...artifact,
+      html: "<svg>do not render this</svg>",
+    };
+    expect(() => toPublicChatVisualization(row)).toThrow(/Invalid visualization payload/);
+  });
+
+  it("rejects unbounded renderer-facing strings", () => {
+    const row = visualizationRow();
+    (row as { payload_json: unknown }).payload_json = {
+      ...artifact,
+      views: [{
+        ...artifact.views[0],
+        series: [{
+          ...artifact.views[0].series[0],
+          points: [{
+            ...artifact.views[0].series[0].points[0],
+            formatted_value: "x".repeat(257),
+          }],
+        }],
+      }],
+    };
     expect(() => toPublicChatVisualization(row)).toThrow(/Invalid visualization payload/);
   });
 

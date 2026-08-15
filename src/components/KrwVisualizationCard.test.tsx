@@ -37,7 +37,7 @@ function visualization(): ChatMessageVisualization {
     created_at: "2026-07-25T00:00:00.000Z",
     payload_json: {
       artifact_format: "krw-visualization",
-      schema_version: 3,
+      schema_version: 4,
       artifact_ref: "viz_a1b2c3d4e5f60708",
       semantic_fingerprint: "a1b2c3d4e5f60708",
       intent: {

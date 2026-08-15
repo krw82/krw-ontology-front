@@ -222,21 +222,12 @@ describe("buildSystemPrompt", () => {
     );
   });
 
-  it("omits visualization instructions unless generation is explicitly enabled", () => {
-    const disabledPrompt = buildSystemPrompt();
-    expect(disabledPrompt).not.toContain("Structured visualization policy");
-    expect(disabledPrompt).not.toContain("compose_visualization");
-
-    const enabledPrompt = buildSystemPrompt(undefined, [], {
-      visualizationGenerationEnabled: true,
-    });
-    expect(enabledPrompt).toContain("Structured visualization policy");
-    expect(enabledPrompt).toContain("compose_visualization");
-    expect(enabledPrompt).toContain("Markdown placement tokens");
-    expect(enabledPrompt).toContain("composition_snapshot");
-    expect(enabledPrompt).toContain("series_label_hints");
-    expect(enabledPrompt).toContain("include_scopes");
-    expect(enabledPrompt).toContain("exact items and order");
+  it("never advertises a model-owned visualization call", () => {
+    const prompt = buildSystemPrompt();
+    expect(prompt).toContain("generated automatically from verified structured");
+    expect(prompt).not.toContain("compose_visualization");
+    expect(prompt).not.toContain("Structured visualization policy");
+    expect(prompt).toContain("Do not call a visualization tool");
   });
 
   it("adds an English-only final answer policy when requested", () => {

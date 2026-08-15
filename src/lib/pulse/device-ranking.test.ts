@@ -405,9 +405,11 @@ describe("Pulse V8 hybrid device refresh ranking", () => {
 
   it("keeps urgent work ahead of local affinity", () => {
     const urgent = item("urgent", "continue", 5, {
-      kind: "analysis",
-      source_type: "analysis",
-      phase: "active",
+      // Active research runs have their own rail and are intentionally
+      // removed from the ordinary slate. Use an urgent filing here so this
+      // test exercises the ordinary-feed priority contract.
+      kind: "filing",
+      source_type: "filing",
       ticker: "URG",
       priority: "urgent",
     });

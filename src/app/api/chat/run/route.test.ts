@@ -194,6 +194,7 @@ function createAdmin({
 function setSession(session: {
   scopeType: "global" | "company";
   defaultTickers: string[];
+  sourceFilingEventId?: string | null;
 }) {
   vi.mocked(resolveSession).mockResolvedValue({
     ok: true,
@@ -203,6 +204,9 @@ function setSession(session: {
       scopeType: session.scopeType,
       defaultTickers: session.defaultTickers,
       defaultDocumentTypes: [],
+      ...(session.sourceFilingEventId !== undefined
+        ? { sourceFilingEventId: session.sourceFilingEventId }
+        : {}),
     },
   });
 }
@@ -356,6 +360,23 @@ describe("POST /api/chat/run Rust Agent V1 contract", () => {
     expect(runtimeEnqueue).toHaveBeenCalledWith(expect.objectContaining({
       runKind: "news_discovery_wide",
       context: { kind: "covered_universe", universe: "covered" },
+    }));
+  });
+
+  it("preserves a filing-backed chat session as a source-filing run", async () => {
+    const filingEventId = "33333333-3333-4333-8333-333333333333";
+    setSession({
+      scopeType: "company",
+      defaultTickers: ["MAR"],
+      sourceFilingEventId: filingEventId,
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(runtimeEnqueue).toHaveBeenCalledWith(expect.objectContaining({
+      runKind: "source_filing_followup",
+      context: { kind: "source_filing", filing_event_id: filingEventId },
     }));
   });
 

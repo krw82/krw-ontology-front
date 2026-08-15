@@ -3,8 +3,21 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const migrationRoot = join(process.cwd(), "supabase", "migrations");
+const visualizationMigration = join(
+  migrationRoot,
+  "20260815130000_agent_v1_final_visualizations.sql",
+);
 
 describe("Agent V1 research run-kind migrations", () => {
+  it("leaves the Agent-owned final projection authoritative", () => {
+    const source = readFileSync(visualizationMigration, "utf8");
+    expect(source).not.toMatch(
+      /create\s+or\s+replace\s+function\s+agent_v1\.read_final_projection/i,
+    );
+    expect(source).toContain("agent_v1.read_final_projection");
+    expect(source).toContain("visualization_omitted_count");
+  });
+
   it("keeps the v7 enqueue allowlist aligned with front routing", () => {
     const source = readFileSync(
       join(migrationRoot, "20260812090000_agent_v1_contract_v7_compatibility.sql"),

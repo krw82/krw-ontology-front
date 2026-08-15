@@ -7,7 +7,7 @@
 export const KRW_VISUALIZATION_ARTIFACT_FORMAT = "krw-visualization" as const;
 // This is a single breaking cutover. Readers intentionally accept only this
 // artifact shape; old chart-token and v1 artifact paths are not retained.
-export const KRW_VISUALIZATION_SCHEMA_VERSION = 3 as const;
+export const KRW_VISUALIZATION_SCHEMA_VERSION = 4 as const;
 
 export const VISUALIZATION_VIEW_TYPES = [
   "line",
@@ -26,6 +26,14 @@ export const VISUALIZATION_VIEW_TYPES = [
 const VISUALIZATION_VIEW_TYPE_SET = new Set<VisualizationViewType>(
   VISUALIZATION_VIEW_TYPES,
 );
+
+const MAX_ARTIFACT_VIEWS = 4;
+const MAX_SERIES_PER_VIEW = 8;
+const MAX_POINTS_PER_SERIES = 12;
+const MAX_EVIDENCE_REFS = 128;
+const MAX_LABEL_LENGTH = 512;
+const MAX_FORMATTED_VALUE_LENGTH = 256;
+const MAX_EVENT_COUNT = 16;
 
 export type VisualizationRelationship =
   | "auto"
@@ -60,6 +68,8 @@ export interface VisualizationScope {
   key: string;
   /** Source-owned display text used only as a safe fallback. */
   label?: string | null;
+  dimension?: string | null;
+  composition_eligible?: boolean;
 }
 
 export interface VisualizationSeriesLabelHint {
@@ -93,6 +103,12 @@ export interface VisualizationIntent {
 
 export interface VisualizationPoint {
   period: string;
+  period_basis?: "FY" | "CY" | string | null;
+  period_sort_key?: number | null;
+  fiscal_year?: number | null;
+  fiscal_quarter?: number | null;
+  period_start?: string | null;
+  period_end?: string | null;
   value: number;
   formatted_value?: string | null;
   evidence_ref: string;
@@ -283,15 +299,20 @@ export function isKrwVisualizationArtifact(
   value: unknown,
 ): value is KrwVisualizationArtifact {
   if (!isRecord(value)) return false;
+  if ("html" in value || "markup" in value || "svg" in value || "jsx" in value) {
+    return false;
+  }
   return (
     value.artifact_format === KRW_VISUALIZATION_ARTIFACT_FORMAT &&
     value.schema_version === KRW_VISUALIZATION_SCHEMA_VERSION &&
-    typeof value.artifact_ref === "string" &&
-    typeof value.semantic_fingerprint === "string" &&
-    isRecord(value.intent) &&
-    typeof value.intent.goal === "string" &&
-    typeof value.title === "string" &&
-    Array.isArray(value.views) && value.views.every(isVisualizationView) &&
+    isBoundedString(value.artifact_ref, 128) &&
+    isBoundedString(value.semantic_fingerprint, 128) &&
+    isVisualizationIntent(value.intent) &&
+    isBoundedString(value.title, MAX_LABEL_LENGTH) &&
+    Array.isArray(value.views) &&
+    value.views.length > 0 &&
+    value.views.length <= MAX_ARTIFACT_VIEWS &&
+    value.views.every(isVisualizationView) &&
     isVisualizationProvenance(value.provenance) &&
     isVisualizationQuality(value.quality)
   );
@@ -300,15 +321,61 @@ export function isKrwVisualizationArtifact(
 function isVisualizationView(value: unknown): boolean {
   if (!isRecord(value)) return false;
   return (
-    typeof value.view_id === "string" &&
-    typeof value.title === "string" &&
+    isBoundedString(value.view_id, 128) &&
+    isBoundedString(value.title, MAX_LABEL_LENGTH) &&
     typeof value.chart_type === "string" &&
     VISUALIZATION_VIEW_TYPE_SET.has(value.chart_type as VisualizationViewType) &&
     Array.isArray(value.series) &&
+    value.series.length > 0 &&
+    value.series.length <= MAX_SERIES_PER_VIEW &&
     value.series.every(isVisualizationSeries) &&
     isVisualizationDataset(value.dataset, value.chart_type as VisualizationViewType) &&
+    (value.subtitle === undefined || value.subtitle === null || isBoundedString(value.subtitle, MAX_LABEL_LENGTH)) &&
+    (value.unit === undefined || value.unit === null || isBoundedString(value.unit, 128)) &&
     (value.events === undefined ||
-      (Array.isArray(value.events) && value.events.every(isVisualizationEvent)))
+      (Array.isArray(value.events) &&
+        value.events.length <= MAX_EVENT_COUNT &&
+        value.events.every(isVisualizationEvent)))
+  );
+}
+
+function isVisualizationIntent(value: unknown): value is VisualizationIntent & Record<string, unknown> {
+  if (!isRecord(value) || !isBoundedString(value.goal, MAX_LABEL_LENGTH)) return false;
+  const relationships = [
+    "auto",
+    "trend",
+    "comparison",
+    "composition",
+    "composition_snapshot",
+    "relationship",
+    "decomposition",
+    "bridge",
+    "matrix",
+    "exact_values",
+  ];
+  return (
+    (value.measures === undefined || isStringArray(value.measures, 16, 128)) &&
+    (value.time_scope === undefined || value.time_scope === null || isBoundedString(value.time_scope, 128)) &&
+    (value.relationship === undefined || relationships.includes(String(value.relationship))) &&
+    (value.scope_mode === undefined || ["auto", "total", "breakdown", "explicit"].includes(String(value.scope_mode))) &&
+    (value.group_by === undefined || value.group_by === null || isBoundedString(value.group_by, 128)) &&
+    (value.include_scopes === undefined || isStringArray(value.include_scopes, 32, 256)) &&
+    (value.exclude_scopes === undefined || isStringArray(value.exclude_scopes, 32, 256)) &&
+    (value.transform_hints === undefined || isStringArray(value.transform_hints, 8, 64)) &&
+    (value.event_overlay === undefined || isStringArray(value.event_overlay, 8, 32)) &&
+    (value.preferred_form === undefined || isBoundedString(value.preferred_form, 32)) &&
+    (value.title_hint === undefined || value.title_hint === null || isBoundedString(value.title_hint, MAX_LABEL_LENGTH)) &&
+    (value.metric_label_hint === undefined || value.metric_label_hint === null || isBoundedString(value.metric_label_hint, MAX_LABEL_LENGTH)) &&
+    (value.group_label_hint === undefined || value.group_label_hint === null || isBoundedString(value.group_label_hint, MAX_LABEL_LENGTH)) &&
+    (value.series_label_hints === undefined || (
+      Array.isArray(value.series_label_hints) &&
+      value.series_label_hints.length <= MAX_SERIES_PER_VIEW &&
+      value.series_label_hints.every((hint) =>
+        isRecord(hint) &&
+        isBoundedString(hint.source, 256) &&
+        isBoundedString(hint.label, MAX_LABEL_LENGTH),
+      )
+    ))
   );
 }
 
@@ -320,27 +387,33 @@ function isVisualizationDataset(value: unknown, chartType: VisualizationViewType
   if (value.kind === "composition") {
     return (
       (chartType === "pie" || chartType === "donut") &&
-      typeof value.period === "string" &&
+      isBoundedString(value.period, 128) &&
       Array.isArray(value.slices) &&
+      value.slices.length > 0 &&
+      value.slices.length <= MAX_SERIES_PER_VIEW &&
       value.slices.every(isCompositionSlice)
     );
   }
   if (value.kind === "xy") {
     return (
       chartType === "scatter" &&
-      typeof value.x_label === "string" &&
-      typeof value.y_label === "string" &&
-      (value.x_unit === undefined || value.x_unit === null || typeof value.x_unit === "string") &&
-      (value.y_unit === undefined || value.y_unit === null || typeof value.y_unit === "string") &&
+      isBoundedString(value.x_label, MAX_LABEL_LENGTH) &&
+      isBoundedString(value.y_label, MAX_LABEL_LENGTH) &&
+      (value.x_unit === undefined || value.x_unit === null || isBoundedString(value.x_unit, 128)) &&
+      (value.y_unit === undefined || value.y_unit === null || isBoundedString(value.y_unit, 128)) &&
       Array.isArray(value.points) &&
+      value.points.length > 0 &&
+      value.points.length <= MAX_SERIES_PER_VIEW * MAX_POINTS_PER_SERIES &&
       value.points.every(isXYPoint)
     );
   }
   if (value.kind === "matrix") {
     return (
       chartType === "heatmap" &&
-      isStringArray(value.columns) &&
+      isStringArray(value.columns, MAX_SERIES_PER_VIEW, MAX_LABEL_LENGTH) &&
       Array.isArray(value.rows) &&
+      value.rows.length > 0 &&
+      value.rows.length <= MAX_SERIES_PER_VIEW &&
       value.rows.every(isMatrixRow)
     );
   }
@@ -348,6 +421,8 @@ function isVisualizationDataset(value: unknown, chartType: VisualizationViewType
     return (
       chartType === "waterfall" &&
       Array.isArray(value.steps) &&
+      value.steps.length > 0 &&
+      value.steps.length <= MAX_SERIES_PER_VIEW * MAX_POINTS_PER_SERIES &&
       value.steps.every(isBridgeStep)
     );
   }
@@ -357,33 +432,35 @@ function isVisualizationDataset(value: unknown, chartType: VisualizationViewType
 function isCompositionSlice(value: unknown): boolean {
   return (
     isRecord(value) &&
-    typeof value.id === "string" &&
-    typeof value.label === "string" &&
+    isBoundedString(value.id, 128) &&
+    isBoundedString(value.label, MAX_LABEL_LENGTH) &&
     isFiniteNumber(value.value) &&
-    (value.formatted_value === undefined || value.formatted_value === null || typeof value.formatted_value === "string") &&
-    isStringArray(value.evidence_refs)
+    (value.formatted_value === undefined || value.formatted_value === null || isBoundedString(value.formatted_value, MAX_FORMATTED_VALUE_LENGTH)) &&
+    isStringArray(value.evidence_refs, MAX_EVIDENCE_REFS, 128)
   );
 }
 
 function isXYPoint(value: unknown): boolean {
   return (
     isRecord(value) &&
-    typeof value.id === "string" &&
-    typeof value.label === "string" &&
+    isBoundedString(value.id, 128) &&
+    isBoundedString(value.label, MAX_LABEL_LENGTH) &&
     isFiniteNumber(value.x) &&
     isFiniteNumber(value.y) &&
-    (value.x_formatted_value === undefined || value.x_formatted_value === null || typeof value.x_formatted_value === "string") &&
-    (value.y_formatted_value === undefined || value.y_formatted_value === null || typeof value.y_formatted_value === "string") &&
-    isStringArray(value.evidence_refs)
+    (value.x_formatted_value === undefined || value.x_formatted_value === null || isBoundedString(value.x_formatted_value, MAX_FORMATTED_VALUE_LENGTH)) &&
+    (value.y_formatted_value === undefined || value.y_formatted_value === null || isBoundedString(value.y_formatted_value, MAX_FORMATTED_VALUE_LENGTH)) &&
+    isStringArray(value.evidence_refs, MAX_EVIDENCE_REFS, 128)
   );
 }
 
 function isMatrixRow(value: unknown): boolean {
   return (
     isRecord(value) &&
-    typeof value.id === "string" &&
-    typeof value.label === "string" &&
+    isBoundedString(value.id, 128) &&
+    isBoundedString(value.label, MAX_LABEL_LENGTH) &&
     Array.isArray(value.cells) &&
+    value.cells.length > 0 &&
+    value.cells.length <= MAX_POINTS_PER_SERIES &&
     value.cells.every(isMatrixCell)
   );
 }
@@ -391,10 +468,10 @@ function isMatrixRow(value: unknown): boolean {
 function isMatrixCell(value: unknown): boolean {
   return (
     isRecord(value) &&
-    typeof value.column === "string" &&
+    isBoundedString(value.column, MAX_LABEL_LENGTH) &&
     isFiniteNumber(value.value) &&
-    (value.formatted_value === undefined || value.formatted_value === null || typeof value.formatted_value === "string") &&
-    isStringArray(value.evidence_refs)
+    (value.formatted_value === undefined || value.formatted_value === null || isBoundedString(value.formatted_value, MAX_FORMATTED_VALUE_LENGTH)) &&
+    isStringArray(value.evidence_refs, MAX_EVIDENCE_REFS, 128)
   );
 }
 
@@ -404,23 +481,33 @@ function isBridgeStep(value: unknown): boolean {
   const isEndpoint = kind === "start" || kind === "end";
   const isDelta = kind === "increase" || kind === "decrease";
   return (
-    typeof value.id === "string" &&
-    typeof value.label === "string" &&
+    isBoundedString(value.id, 128) &&
+    isBoundedString(value.label, MAX_LABEL_LENGTH) &&
     (isEndpoint || isDelta) &&
     (!isEndpoint || isFiniteNumber(value.value)) &&
     (!isDelta || isFiniteNumber(value.delta)) &&
-    (value.formatted_value === undefined || value.formatted_value === null || typeof value.formatted_value === "string") &&
-    isStringArray(value.evidence_refs)
+    (value.formatted_value === undefined || value.formatted_value === null || isBoundedString(value.formatted_value, MAX_FORMATTED_VALUE_LENGTH)) &&
+    isStringArray(value.evidence_refs, MAX_EVIDENCE_REFS, 128)
   );
 }
 
 function isVisualizationSeries(value: unknown): boolean {
   if (!isRecord(value)) return false;
   return (
-    typeof value.series_key === "string" &&
-    typeof value.label === "string" &&
+    isBoundedString(value.series_key, 256) &&
+    isBoundedString(value.label, MAX_LABEL_LENGTH) &&
+    (value.source_label === undefined || value.source_label === null || isBoundedString(value.source_label, MAX_LABEL_LENGTH)) &&
+    (value.ticker === undefined || value.ticker === null || isBoundedString(value.ticker, 64)) &&
+    (value.metric_name === undefined || value.metric_name === null || isBoundedString(value.metric_name, 128)) &&
+    (value.canonical_metric === undefined || value.canonical_metric === null || isBoundedString(value.canonical_metric, 128)) &&
+    (value.unit === undefined || value.unit === null || isBoundedString(value.unit, 128)) &&
+    (value.currency === undefined || value.currency === null || isBoundedString(value.currency, 16)) &&
+    (value.period_type === undefined || value.period_type === null || isBoundedString(value.period_type, 32)) &&
+    (value.duration === undefined || value.duration === null || isBoundedString(value.duration, 32)) &&
     isVisualizationScope(value.scope) &&
     Array.isArray(value.points) &&
+    value.points.length > 0 &&
+    value.points.length <= MAX_POINTS_PER_SERIES &&
     value.points.every(isVisualizationPoint)
   );
 }
@@ -428,39 +515,50 @@ function isVisualizationSeries(value: unknown): boolean {
 function isVisualizationScope(value: unknown): boolean {
   return (
     isRecord(value) &&
-    typeof value.kind === "string" &&
-    typeof value.key === "string" &&
-    (value.label === undefined || value.label === null || typeof value.label === "string")
+    isBoundedString(value.kind, 128) &&
+    isBoundedString(value.key, 256) &&
+    (value.label === undefined || value.label === null || isBoundedString(value.label, MAX_LABEL_LENGTH)) &&
+    (value.dimension === undefined || value.dimension === null || isBoundedString(value.dimension, 128)) &&
+    (value.composition_eligible === undefined || typeof value.composition_eligible === "boolean")
   );
 }
 
 function isVisualizationPoint(value: unknown): boolean {
   if (!isRecord(value)) return false;
   return (
-    typeof value.period === "string" &&
+    isBoundedString(value.period, 128) &&
+    (value.period_basis === undefined || value.period_basis === null || isBoundedString(value.period_basis, 32)) &&
+    (value.period_sort_key === undefined || value.period_sort_key === null || isFiniteNumber(value.period_sort_key)) &&
+    (value.fiscal_year === undefined || value.fiscal_year === null || Number.isInteger(value.fiscal_year)) &&
+    (value.fiscal_quarter === undefined || value.fiscal_quarter === null || Number.isInteger(value.fiscal_quarter)) &&
+    (value.period_start === undefined || value.period_start === null || isBoundedString(value.period_start, 64)) &&
+    (value.period_end === undefined || value.period_end === null || isBoundedString(value.period_end, 64)) &&
     isFiniteNumber(value.value) &&
-    typeof value.evidence_ref === "string" &&
+    isBoundedString(value.evidence_ref, 256) &&
+    (value.formatted_value === undefined || value.formatted_value === null || isBoundedString(value.formatted_value, MAX_FORMATTED_VALUE_LENGTH)) &&
     (value.derived_from_evidence_refs === undefined ||
-      isStringArray(value.derived_from_evidence_refs))
+      isStringArray(value.derived_from_evidence_refs, MAX_EVIDENCE_REFS, 256))
   );
 }
 
 function isVisualizationEvent(value: unknown): boolean {
   if (!isRecord(value)) return false;
   return (
-    typeof value.date === "string" &&
-    typeof value.label === "string" &&
+    isBoundedString(value.date, 64) &&
+    isBoundedString(value.label, MAX_LABEL_LENGTH) &&
     (value.source_kind === "filing" || value.source_kind === "news") &&
-    typeof value.evidence_ref === "string"
+    isBoundedString(value.evidence_ref, 256) &&
+    (value.href === undefined || value.href === null || isBoundedString(value.href, 2048))
   );
 }
 
 function isVisualizationProvenance(value: unknown): boolean {
   return (
     isRecord(value) &&
-    isStringArray(value.source_tool_call_ids) &&
-    isStringArray(value.evidence_refs) &&
+    isStringArray(value.source_tool_call_ids, MAX_EVIDENCE_REFS, 256) &&
+    isStringArray(value.evidence_refs, MAX_EVIDENCE_REFS, 256) &&
     Array.isArray(value.source_kinds) &&
+    value.source_kinds.length <= 8 &&
     value.source_kinds.every(
       (sourceKind) =>
         sourceKind === "ontology" ||
@@ -474,9 +572,11 @@ function isVisualizationProvenance(value: unknown): boolean {
 function isVisualizationQuality(value: unknown): boolean {
   return (
     isRecord(value) &&
-    typeof value.series_count === "number" &&
-    typeof value.point_count === "number" &&
-    isStringArray(value.warnings)
+    isNonNegativeInteger(value.series_count) &&
+    value.series_count <= MAX_ARTIFACT_VIEWS * MAX_SERIES_PER_VIEW &&
+    isNonNegativeInteger(value.point_count) &&
+    value.point_count <= MAX_ARTIFACT_VIEWS * MAX_SERIES_PER_VIEW * MAX_POINTS_PER_SERIES &&
+    isStringArray(value.warnings, 16, MAX_LABEL_LENGTH)
   );
 }
 
@@ -484,8 +584,24 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
+function isStringArray(
+  value: unknown,
+  maxItems = MAX_EVIDENCE_REFS,
+  maxLength = MAX_LABEL_LENGTH,
+): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= maxItems &&
+    value.every((item) => typeof item === "string" && item.length <= maxLength)
+  );
+}
+
+function isBoundedString(value: unknown, maxLength: number): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= maxLength;
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
