@@ -53,6 +53,21 @@ fail() {
   exit 1
 }
 
+augment_cargo_on_path() {
+  # Best-effort: make the agent checkout's pinned toolchain reachable for
+  # the controller's build/seal stages. Whether cargo is actually required
+  # is the controller's own fail-closed preflight decision, not this
+  # adapter's.
+  command -v cargo >/dev/null 2>&1 && return 0
+  if [[ -x "$HOME/.cargo/bin/cargo" ]]; then
+    export PATH="$HOME/.cargo/bin:$PATH"
+    return 0
+  fi
+  local pinned_cargo
+  pinned_cargo=$( { find "$HOME/.rustup/toolchains" -maxdepth 3 -name cargo -type f 2>/dev/null || true; } | sort | tail -n 1)
+  [[ -n "$pinned_cargo" ]] && export PATH="$(dirname -- "$pinned_cargo"):$PATH"
+  return 0
+}
 provider=
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -85,18 +100,19 @@ fi
   || fail "controller config not found (absolute path required): $deploy_config"
 
 if [[ ! -x "$deploy_bin" ]]; then
-  command -v cargo >/dev/null 2>&1 || [[ -x "$HOME/.cargo/bin/cargo" ]] || {
-    # The agent repository pins its toolchain; fall back to the pinned
-    # toolchain directory when cargo is not on PATH.
-    pinned_cargo=$(find "$HOME/.rustup/toolchains" -maxdepth 3 -name cargo -type f 2>/dev/null | sort | tail -n 1)
-    [[ -n "$pinned_cargo" ]] || fail "krw-agent-deploy binary missing and no cargo toolchain found: $deploy_bin"
-    export PATH="$(dirname -- "$pinned_cargo"):$PATH"
-  }
-  command -v cargo >/dev/null 2>&1 || export PATH="$HOME/.cargo/bin:$PATH"
+  augment_cargo_on_path
+  command -v cargo >/dev/null 2>&1 \
+    || fail "krw-agent-deploy binary missing and no cargo toolchain found (looked on PATH, ~/.cargo/bin, ~/.rustup/toolchains)"
   (cd "$agent_source_root" && cargo build --release -p krw-agent-deploy) \
     || fail "unable to build the krw-agent-deploy controller"
 fi
 
 [[ -x "$deploy_bin" ]] || fail "controller binary missing: $deploy_bin"
+
+# The controller's build/seal stages drive cargo-based release scripts; make
+# the agent checkout's toolchain reachable even when the binary was prebuilt.
+# (Whether cargo is required at all is the controller's fail-closed
+# preflight's decision.)
+augment_cargo_on_path
 
 exec "$deploy_bin" --config "$deploy_config" deploy
