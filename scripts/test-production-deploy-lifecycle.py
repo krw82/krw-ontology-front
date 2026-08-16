@@ -20,8 +20,8 @@ def write_executable(path: pathlib.Path, body: str) -> None:
 
 
 class ProductionDeployLifecycleTest(unittest.TestCase):
-    def test_full_build_failure_does_not_mutate_live_gateway(self) -> None:
-        """A failed release build must leave the running gateway untouched."""
+    def test_failed_controller_deploy_does_not_mutate_live_gateway(self) -> None:
+        """A failing controller deployment must leave the running gateway untouched."""
 
         with tempfile.TemporaryDirectory() as temporary:
             root = pathlib.Path(temporary)
@@ -30,123 +30,45 @@ class ProductionDeployLifecycleTest(unittest.TestCase):
             scripts.mkdir(parents=True)
             (front / "ops").mkdir()
             (front / ".deploy").mkdir()
-            (front / ".env").write_text(
-                "KRW_FEED_MCP_TOKEN=test-feed-token\n", encoding="utf-8"
-            )
-            (front / "ops" / "agent-v1-deployment-contract.json").write_text(
-                "{}\n", encoding="utf-8"
-            )
-            for name in (
-                "verify-supabase-schema-smoke-rpc-contract.mjs",
-                "krw-agent-mcp-contract.mjs",
-            ):
-                (scripts / name).write_text("// test fixture\n", encoding="utf-8")
-            (scripts / "deploy-production-full.sh").write_bytes(
+
+            full_script = scripts / "deploy-production-full.sh"
+            full_script.write_bytes(
                 (REPO_ROOT / "scripts" / "deploy-production-full.sh").read_bytes()
             )
-            (scripts / "deploy-production-full.sh").chmod(0o755)
-            early_preflight = root / "early-preflight"
-            write_executable(
-                scripts / "deploy-production-fast.sh",
-                f"""
-                #!/bin/sh
-                [ "$1" = "--preflight-only" ]
-                [ "$2" = "--apply-migrations" ]
-                [ "$3" = "--skip-mac" ]
-                : > {early_preflight}
-                """,
-            )
+            full_script.chmod(0o755)
 
-            agent = root / "agent"
-            (agent / "scripts").mkdir(parents=True)
-            build_observation = root / "build-observation"
+            # The adapter delegates the whole deployment to one explicit
+            # controller invocation and owns no build/migration/activation
+            # logic of its own. A controller that fails before touching the
+            # host must propagate its exit status without side effects.
+            controller_observation = root / "controller-observation"
+            controller = root / "krw-agent-deploy"
             write_executable(
-                agent / "scripts" / "build_sealed_dual_provider_release.sh",
+                controller,
                 f"""
                 #!/bin/sh
-                printf '%s\n' "$@" > {build_observation}
+                printf '%s\\n' "$@" > {controller_observation}
                 exit 42
                 """,
             )
-
-            operator = root / "operator"
-            (operator / "runtime").mkdir(parents=True)
-            (operator / "config" / "runtime").mkdir(parents=True)
-            (operator / "config" / "deepseek").mkdir(parents=True)
-            (operator / "config" / "glm").mkdir(parents=True)
-            ca_file = operator / "runtime" / "ca.pem"
-            ca_file.write_text("test-ca\n", encoding="utf-8")
-            runtime_env = operator / "runtime" / "krw-agent-deploy.env"
-            runtime_env.write_text(
-                "\n".join(
-                    [
-                        f"KRW_AGENT_MCP_CA_FILE={ca_file}",
-                        "KRW_ONTOLOGY_MCP_URL=https://127.0.0.1:21431/mcp",
-                        "KRW_ONTOLOGY_READY_URL=https://127.0.0.1:21431/readyz",
-                        "KRW_FEED_MCP_URL=https://127.0.0.1:21433/mcp",
-                        "KRW_FEED_MCP_READY_URL=https://127.0.0.1:21433/readyz",
-                        "KRW_FILINGS_MCP_URL=https://127.0.0.1:21432/mcp",
-                        "KRW_FILINGS_MCP_READY_URL=https://127.0.0.1:21432/readyz",
-                        "KRW_GURU_MCP_URL=https://127.0.0.1:21434/mcp",
-                        "KRW_GURU_MCP_READY_URL=https://127.0.0.1:21434/readyz",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            (operator / "config" / "runtime" / "feed-tls.json").write_text(
-                '{"allowedOrigins":["https://krwontology.com"]}\n',
-                encoding="utf-8",
-            )
-            for provider in ("deepseek", "glm"):
-                (operator / "config" / provider / "endpoint-registry.yaml").write_text(
-                    "fixture: true\n", encoding="utf-8"
-                )
+            deploy_config = root / "operator-config.json"
+            deploy_config.write_text('{"fixture": true}\n', encoding="utf-8")
 
             fake_bin = root / "bin"
             fake_bin.mkdir()
             gateway_mutation = root / "gateway-mutated"
+            write_executable(
+                fake_bin / "launchctl",
+                f"#!/bin/sh\n: > {gateway_mutation}\nexit 0\n",
+            )
             write_executable(
                 fake_bin / "git",
                 """
                 #!/bin/sh
                 case " $* " in
                   *" status "*) exit 0 ;;
-                  *" rev-parse --short=12 HEAD "*) echo abcdef123456; exit 0 ;;
                 esac
                 exit 1
-                """,
-            )
-            write_executable(
-                fake_bin / "node",
-                f"""
-                #!/bin/sh
-                case "$1" in
-                  *krw-agent-mcp-contract.mjs|-)
-                    echo https://krwontology.com
-                    exit 0
-                    ;;
-                  *verify-supabase-schema-smoke-rpc-contract.mjs)
-                    exit 0
-                    ;;
-                esac
-                exit 1
-                """,
-            )
-            write_executable(
-                fake_bin / "launchctl",
-                f"#!/bin/sh\n: > {gateway_mutation}\nexit 0\n",
-            )
-            write_executable(
-                fake_bin / "curl",
-                """
-                #!/bin/sh
-                output=
-                while [ "$#" -gt 0 ]; do
-                  if [ "$1" = "-o" ]; then shift; output=$1; fi
-                  shift
-                done
-                printf '%s\n' '{"ok":true,"service":"krw-feed-mcp","database_ready":true}' > "$output"
                 """,
             )
 
@@ -155,13 +77,13 @@ class ProductionDeployLifecycleTest(unittest.TestCase):
                 {
                     "PATH": f"{fake_bin}:/usr/bin:/bin:/usr/sbin:/sbin",
                     "SIMPLE_PRODUCTION_LOCK_HELD": "1",
-                    "KRW_AGENT_SOURCE_ROOT": str(agent),
-                    "KRW_AGENT_OPERATOR_ROOT": str(operator),
-                    "KRW_AGENT_RUNTIME_ENV_FILE": str(runtime_env),
+                    "KRW_AGENT_DEPLOY_BIN": str(controller),
+                    "KRW_AGENT_DEPLOY_CONFIG": str(deploy_config),
+                    "HOME": str(root / "home"),
                 }
             )
             result = subprocess.run(
-                [str(scripts / "deploy-production-full.sh")],
+                [str(full_script)],
                 cwd=front,
                 env=env,
                 text=True,
@@ -171,14 +93,15 @@ class ProductionDeployLifecycleTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 42, result.stderr)
-            self.assertTrue(
-                early_preflight.is_file(),
-                "full deployment built Rust before the shared GCP/Supabase preflight ran",
+            self.assertTrue(controller_observation.is_file(), result.stderr)
+            self.assertEqual(
+                controller_observation.read_text(encoding="utf-8").split(),
+                ["--config", str(deploy_config), "deploy"],
+                "the adapter must exec exactly one explicit controller invocation",
             )
-            self.assertTrue(build_observation.is_file(), result.stderr)
             self.assertFalse(
                 gateway_mutation.exists(),
-                "release preflight restarted or rewrote the live MCP gateway before the build completed",
+                "a failed controller deployment restarted or rewrote the live MCP gateway",
             )
 
     def test_failed_forward_cutover_cleans_only_temporary_state(self) -> None:

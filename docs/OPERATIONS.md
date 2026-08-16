@@ -78,8 +78,9 @@ It does not upload the v3 SQLite indexes to GCP.
 
 ## Web And Plugin Deploy
 
-The normal deploy driver is `scripts/deploy-production-fast.sh`. It retains the
-legacy sealed scripts only for bootstrap and interrupted-cutover recovery.
+The normal deploy driver is `scripts/deploy-production-fast.sh`. The legacy
+sealed bootstrap and interrupted-cutover recovery scripts were removed;
+production deploys are fix-forward only.
 
 For GCP web/API and application worker containers only:
 
@@ -119,34 +120,12 @@ identity and must not block an otherwise independent application release.
 If public GCP health fails during the switch, it retags and starts the previous
 GCP image automatically. Database migrations are not automatically reversed.
 
-If this Mac is still running the legacy mutable launchd paths and has no sealed
-immutable runtime pointer, the first cutover must instead be:
-
-```bash
-npm run prod:deploy:bootstrap
-```
-
-This is a one-time full cutover. It prepares and seals the new Mac runtime and
-the exact GCP rollback before stopping legacy launchd. The legacy Mac runtime is
-never restarted after that boundary: a pre-migration failure restores GCP only
-and leaves Mac fail-closed; a post-migration failure leaves both lanes
-fail-closed. Never delete the permanent bootstrap marker or repeat this command
-after a successful immutable activation.
-
-If the orchestrator is killed or the host reboots before the migration marker,
-recover under a new kernel lock by adopting the owner recorded in
-`.deploy/cutover-phase-<deployment_id>.env`:
-
-```bash
-npm run prod:deploy:recover -- \
-  --recover-cutover <deployment_id> \
-  --recovery-action resume \
-  --previous-lock-owner <recorded_lock_owner>
-```
-
-Use `resume-remote` instead of `resume` for the one-time unsealed bootstrap
-boundary. Recovery revalidates every local and remote seal before changing the
-durable owner and is refused after migration has started.
+The one-time legacy sealed Mac bootstrap and the interrupted-cutover recovery
+lane were removed with the old sealed cutover orchestrator. Interrupted
+cutovers are handled fix-forward: inspect the durable phase recorded under
+`.deploy/cutover-phase-<deployment_id>.env`, correct the failure, and re-run
+the deploy. `npm run prod:deploy:bootstrap` now refuses with guidance instead
+of running the removed sealed cutover.
 
 ## Health Checks
 
@@ -244,10 +223,10 @@ identity, and one real chat smoke test.
 Normal production mutation enters through `scripts/deploy-production-fast.sh`.
 It holds a macOS kernel `lockf` lock and does not pause the local ontology queue:
 normal code deploys do not change `prod/current`. The large
-`deploy-production-simple.sh` and `deploy-with-queue-pause.sh` paths are
-reserved for sealed bootstrap or interrupted-cutover recovery, not everyday
-deployment. Do not invoke low-level GCP, Mac runtime, data, Compose, or restart
-scripts as bypass lanes.
+`deploy-production-simple.sh` wrapper no longer deploys: it only cleans up an
+unactivated prepared candidate (`--recover-prepared-local-only`) and refuses
+with guidance otherwise. Do not invoke low-level GCP, Mac runtime, data,
+Compose, or restart scripts as bypass lanes.
 
 ## Schema Cache Gate
 

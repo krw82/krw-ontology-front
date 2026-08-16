@@ -174,49 +174,20 @@ SQLite release의 `prod/current` pointer를 다른 release로 promote하지는 �
 persistent service로 유지되고, document worker, outbox dispatcher, filing/billing worker는
 새 image로 재생성된다.
 
-### One-time immutable Mac bootstrap
+### Legacy sealed bootstrap / interrupted-cutover recovery (removed)
 
-현재 Mac production launchd가 아직 mutable repository 경로를 직접 실행하고
-immutable runtime `current` pointer가 없다면, 최초 1회만 다음 명령을 사용한다.
+과거의 one-time immutable Mac bootstrap(`npm run prod:deploy:bootstrap`)과
+interrupted-cutover recovery(`npm run prod:deploy:recover`) 경로는 legacy
+sealed cutover orchestrator와 함께 삭제됐다. production 배포는 fix-forward
+원칙으로만 처리한다.
 
-```bash
-npm run prod:deploy:bootstrap
-```
-
-이 명령은 `prod:deploy:full`의 code/schema cutover이면서, legacy Mac
-runtime을 immutable runtime으로 옮기는 단 한 번의 경계다. Catalog publication은
-여전히 별도 명령이다. 새 GCP rollback
-transaction과 새 Mac candidate를 먼저 봉인·검증한 뒤 legacy launchd를 멈춘다.
-legacy runtime의 실행 중 bytes를 정확히 재구성할 수 없으므로 이 경계를 지난
-후에는 legacy Mac을 절대 다시 시작하지 않는다.
-
-- migration 시작 전 실패: 봉인된 이전 GCP만 복원하고 Mac은 fail-closed
-- migration 시작 후 실패: GCP와 Mac 모두 fail-closed
-- 성공: `.immutable-bootstrap-complete` marker를 영구 기록
-
-marker를 삭제하거나 bootstrap 명령을 반복하지 않는다. 최초 성공 이후 모든
-배포는 `npm run prod:deploy:full` 또는 `npm run prod:deploy:code`를 사용한다.
-
-### Recover an interrupted cutover
-
-SIGKILL 또는 재부팅으로 orchestrator가 사라졌고 durable phase가 migration
-시작 전임을 확인한 경우에만 새 kernel lock 아래에서 sealed owner를 명시적으로
-adopt한다. 이전 owner는 `.deploy/cutover-phase-<deployment_id>.env`의
-`LOCK_OWNER`에서 읽는다.
-
-```bash
-npm run prod:deploy:recover -- \
-  --recover-cutover <deployment_id> \
-  --recovery-action resume \
-  --previous-lock-owner <recorded_lock_owner>
-```
-
-최초 immutable bootstrap 경계에서는 legacy Mac을 재시작할 수 없으므로
-`--recovery-action resume-remote`를 사용한다. recovery entrypoint는 normal
-deploy로 fall through하지 않으며, source/env/CLI, launchd snapshots, candidate
-Mac runtime, GCP release/rollback cross-seal과 image availability가 모두 맞아야
-owner를 교체한다. migration-started marker가 있으면 두 recovery action 모두
-거부된다.
+- 중단된 cutover가 남긴 `.deploy/cutover-phase-<deployment_id>.env` 기록을
+  확인하고 원인을 수정한 뒤 배포를 다시 실행한다.
+- `npm run prod:deploy:bootstrap`은 이제 안내 메시지와 함께 거부만 한다.
+- activation 전에 만들어진 미사용 candidate 정리만 필요하면
+  `scripts/deploy-production-simple.sh --recover-prepared-local-only`를 쓴다.
+- 일상 배포는 `npm run prod:deploy:full` 또는 `npm run prod:deploy:code`를
+  사용한다.
 
 ### Safe production deploy
 

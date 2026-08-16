@@ -2,8 +2,9 @@
 set -eu
 
 # Normal production deploys need one lock, one queue pause, and one restart.
-# The detailed receipt/recovery driver remains available for the exceptional
-# interrupted-cutover path; it is intentionally not part of every deploy.
+# The legacy sealed cutover orchestrator and its interrupted-cutover recovery
+# driver were removed (fix-forward only). This wrapper only retains the
+# pre-pause prepared-candidate cleanup and the queue safety checks.
 if [ "${PRODUCTION_OS_LOCK_HELD:-0}" != "1" ]; then
   EARLY_SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
   EARLY_FRONT_DIR=$(CDPATH= cd -- "$EARLY_SCRIPT_DIR/.." && pwd -P)
@@ -24,17 +25,19 @@ Usage: scripts/deploy-production-simple.sh [--dry-run] [--release-id ID] [--skip
 Emergency pre-pause cleanup only:
   scripts/deploy-production-simple.sh --recover-prepared-local-only
 
-Normal production deployment:
+Queue-safe wrapper around a production deploy:
   1. Stop the local ontology queue if it is running.
   2. Verify it cannot write prod/current.
-  3. Run the sealed production cutover (migration checks, deployment, health).
+  3. Run the production deployment.
   4. Restart the queue if this script stopped it.
+
+The legacy sealed cutover orchestrator (deploy-all-production.sh) was removed;
+production deploys are fix-forward only. Use 'npm run prod:deploy:full' (the
+agent-repository controller adapter) or, until the first controller-validated
+production deploy, the fast fallback 'npm run prod:deploy:code'.
 
 Slow local browser/PWA checks are deliberately separate:
   npm run prod:preflight
-
-For the rare case of an interrupted sealed cutover, use:
-  npm run prod:deploy:recover -- --recover-cutover ID --recovery-action ACTION --previous-lock-owner OWNER
 EOF
 }
 
@@ -295,6 +298,14 @@ NODE
   fi
 }
 
+refuse_removed_sealed_cutover() {
+  echo "The legacy sealed cutover orchestrator (deploy-all-production.sh) was removed." >&2
+  echo "Production deploys are fix-forward only. Use 'npm run prod:deploy:full'" >&2
+  echo "(agent-repo controller adapter) or the validated fast fallback" >&2
+  echo "'npm run prod:deploy:code' (scripts/deploy-production-fast.sh)." >&2
+  exit 1
+}
+
 cleanup() {
   exit_code=$?
   trap - EXIT INT TERM
@@ -324,7 +335,7 @@ require_command node
 mkdir -p "$FRONT_DIR/.deploy"
 if ! mkdir "$DEPLOY_LOCK_DIR" 2>/dev/null; then
   echo "Another deployment or an interrupted cutover is recorded at: $DEPLOY_LOCK_DIR" >&2
-  echo "Use npm run prod:deploy:recover only if deployment output asks for it." >&2
+  echo "Interrupted cutovers are fix-forward only; inspect the recorded state before redeploying." >&2
   exit 1
 fi
 LOCK_OWNED=1
@@ -349,12 +360,9 @@ queue_status_json >/dev/null 2>&1 || {
 }
 
 if [ "$DRY_RUN" = "1" ]; then
-  echo "Dry run: would stop the queue, run the sealed cutover, and restart the queue."
+  echo "Dry run: would stop the queue, run a production deploy, and restart the queue."
   queue_status || true
-  # shellcheck disable=SC2086
-  /bin/sh "$SCRIPT_DIR/deploy-all-production.sh" $DEPLOY_ARGS
-  DEPLOY_SUCCEEDED=1
-  exit 0
+  refuse_removed_sealed_cutover
 fi
 
 if queue_is_running; then
@@ -369,6 +377,4 @@ fi
 echo "Verifying queue is stopped and cannot publish prod/current..."
 assert_queue_stopped_and_safe
 
-# shellcheck disable=SC2086
-/bin/sh "$SCRIPT_DIR/deploy-all-production.sh" $DEPLOY_ARGS
-DEPLOY_SUCCEEDED=1
+refuse_removed_sealed_cutover

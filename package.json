@@ -120,7 +120,6 @@
     "prod:agent:admission:open": "scripts/open-krw-agent-production-admission.sh",
     "prod:deploy:full": "scripts/deploy-production-full.sh",
     "prod:deploy:bootstrap": "scripts/deploy-production-simple.sh --bootstrap-unsealed-mac-runtime --apply-migrations",
-    "prod:deploy:recover": "scripts/deploy-with-queue-pause.sh --recovery-only",
     "prod:deploy:safe": "scripts/deploy-production-fast.sh --apply-migrations --with-agent-release",
     "prod:release:publish": "scripts/deploy-production-fast.sh --with-data --skip-web --skip-mac",
     "deploy:prod": "scripts/deploy-production-fast.sh --apply-migrations",
