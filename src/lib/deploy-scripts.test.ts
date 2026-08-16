@@ -40,73 +40,22 @@ describe("production deploy scripts", () => {
     );
   });
 
-  it("switches the release before dependencies but starts the Rust daemon last", () => {
-    const deployFast = read("scripts/deploy-production-fast.sh");
-    const deferredRelease = deployFast.lastIndexOf("activate_local_agent_release --defer-start");
-    const capability = deployFast.lastIndexOf("activate_local_agent_capability_runtime");
-    const prepare = deployFast.lastIndexOf("prepare_local_agent_mcp_gateways");
-    const gateways = deployFast.lastIndexOf("activate_local_agent_mcp_gateways");
-    const mcpCheck = deployFast.lastIndexOf("verify_sealed_local_agent_mcp_abi");
-    const daemon = deployFast.lastIndexOf("start_local_agent_release");
-
-    expect(deferredRelease).toBeGreaterThan(-1);
-    expect(capability).toBeGreaterThan(deferredRelease);
-    expect(prepare).toBeGreaterThan(capability);
-    expect(gateways).toBeGreaterThan(capability);
-    expect(mcpCheck).toBeGreaterThan(gateways);
-    expect(daemon).toBeGreaterThan(gateways);
-    expect(daemon).toBeGreaterThan(mcpCheck);
-    expect(deployFast).toContain("--defer-start");
-    expect(deployFast).toContain("--mode start");
-    const cleanup = deployFast.slice(
-      deployFast.indexOf("cleanup() {"),
-      deployFast.indexOf("\n}\ntrap cleanup EXIT"),
-    );
-    expect(cleanup.indexOf("rollback_local_agent_capability_runtime")).toBeLessThan(
-      cleanup.indexOf("rollback_local_agent_release"),
-    );
-  });
-
-  it("repairs an old local MCP gateway contract before deployment and after rollback", () => {
-    const deployFull = read("scripts/deploy-production-full.sh");
-    const deployFast = read("scripts/deploy-production-fast.sh");
-    const fullRepair = deployFull.indexOf(
-      "reconcile_current_local_mcp_gateway_contract",
-    );
-    const fullRuntimePreparation = deployFull.indexOf(
-      "prepare_agent_runtime_env_candidate",
-    );
-    const fastRepair = deployFast.indexOf(
-      "reconcile_active_local_mcp_gateway_contract",
-    );
-    const stagedRelease = deployFast.indexOf("stage_local_agent_release");
-    const cleanup = deployFast.slice(
-      deployFast.indexOf("cleanup() {"),
-      deployFast.indexOf("\n}\ntrap cleanup EXIT"),
+  it("keeps production preflight read-only and cutover failure forward-only", () => {
+    const result = spawnSync(
+      "python3",
+      [join(process.cwd(), "scripts", "test-production-deploy-lifecycle.py")],
+      { cwd: process.cwd(), encoding: "utf8" },
     );
 
-    expect(fullRepair).toBeGreaterThan(-1);
-    expect(fullRepair).toBeLessThan(fullRuntimePreparation);
-    expect(fastRepair).toBeGreaterThan(-1);
-    expect(fastRepair).toBeLessThan(stagedRelease);
-    expect(deployFast).toContain("reconcile-local-mcp-gateway-contract.mjs");
-    expect(deployFast).toContain(
-      '"$AGENT_PROVIDER_BUNDLE/packaging/local-mcp-gateways/mcp_tls_proxy.mjs"',
-    );
-    expect(cleanup.indexOf("reconcile_active_local_mcp_gateway_contract")).toBeGreaterThan(
-      cleanup.indexOf("rollback_local_agent_release"),
-    );
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
   });
 
   it("uses an MCP initialize proof for the Guru gateway instead of a guessed health URL", () => {
     const installer = read("scripts/install-krw-agent-local-mcp-gateways.mjs");
-    const reconciler = read("scripts/reconcile-local-mcp-gateway-contract.mjs");
 
     expect(installer).toContain('entry.name === "guru"');
     expect(installer).toContain('"mcp_initialize"');
     expect(installer).toContain('config.upstreamMcpPath');
-    expect(reconciler).toContain('{ name: "guru", readinessMode: "mcp_initialize", mcpPath: "/mcp" }');
-    expect(reconciler).not.toContain('name: "guru", readinessMode: "http_json", readinessPath: "/healthz"');
   });
 
   it("requires an exact krw-agent host archive provenance before a production build", () => {
@@ -305,13 +254,10 @@ describe("production deploy scripts", () => {
     expect(deployProd).toContain("deploy-production-fast.sh");
     expect(deployProd).toContain("--apply-migrations");
     expect(deployFast).toContain("krw-ontology-front-web:candidate-");
-    expect(deployFast).toContain("Fast activation failed; restoring the previous VM image.");
     expect(deployFast).toContain("--billing-v2-cutover");
     expect(deployFast).toContain("Caddyfile.billing-readonly");
     expect(deployFast).toContain("run_remote_pause_billing_for_cutover");
-    expect(deployFast).toContain(
-      "preserving billing read-only mode instead of restoring legacy payment writes",
-    );
+    expect(deployFast).toContain("run_remote_disable_billing_v2_writes");
     expect(deployFast).toContain("docker compose");
     expect(deployFast).toContain("run_schema_smoke()");
     expect(deployFast).toContain("run_schema_smoke");
@@ -352,7 +298,6 @@ describe("production deploy scripts", () => {
       'ensure_local_feed_gateway_ready "$feed_token" "$active_feed_origin"',
     );
     expect(deployFull).toContain("agent_runtime_env_candidate");
-    expect(deployFull).toContain("Restored the previous Rust runtime env");
     expect(deployFull).toContain("KRW_FEED_MCP_TOKEN");
     expect(deployFull).toContain("--runtime-env");
     expect(deployFull).toContain("KRW_AGENT_RUNTIME_ENV_FILE");

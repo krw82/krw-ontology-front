@@ -1,9 +1,9 @@
 #!/bin/sh
 set -e
 
-# Normal production releases use this small, reversible path.  The former
-# sealed cutover scripts remain available only for incident recovery and
-# one-time bootstrap work.
+# Normal production releases are forward-only. Once migrations start, a
+# failure never reactivates an older web, Rust, or capability runtime against
+# the newer database schema.
 if [ "$SIMPLE_PRODUCTION_LOCK_HELD" != "1" ]; then
   EARLY_SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
   EARLY_FRONT_DIR=$(CDPATH= cd -- "$EARLY_SCRIPT_DIR/.." && pwd -P)
@@ -14,6 +14,9 @@ if [ "$SIMPLE_PRODUCTION_LOCK_HELD" != "1" ]; then
   }
   exec env SIMPLE_PRODUCTION_LOCK_HELD=1 PRODUCTION_OS_LOCK_HELD=1 lockf -t 0 -k "$EARLY_FRONT_DIR/.deploy/production-deploy.os-lock" /bin/sh "$0" "$@"
 fi
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 
 usage() {
   cat <<'EOF'
@@ -46,15 +49,19 @@ Options:
   --release-id ID          Safe deployment identifier.
   --env-file FILE          Mac production environment file.
   --dry-run                Verify targets and migration plan without mutation.
+  --preflight-only         Run the shared read-only GCP, remote-host, and
+                           Supabase migration preflight, then exit.
 
 Data publication is opt-in because it changes the active catalog independently:
   npm run prod:release:publish
 
-For exact sealed-runtime recovery or bootstrap, use the legacy recovery commands.
+Failures after the migration boundary keep research admission closed. Re-run a
+new forward release after correcting the reported dependency.
 EOF
 }
 
 DRY_RUN=0
+PREFLIGHT_ONLY=0
 APPLY_MIGRATIONS=0
 WITH_DATA=0
 WITH_AGENT_RELEASE=0
@@ -85,15 +92,13 @@ AGENT_PROVIDER_BUNDLE=
 AGENT_GATEWAY_PROXY=
 AGENT_RUNTIME_ENV_FILE=
 AGENT_RUNTIME_ENV_PATH=
+AGENT_RUNTIME_ENV_CHECK_PATH=
+AGENT_RUNTIME_ENV_CANDIDATE=${KRW_AGENT_RUNTIME_ENV_CANDIDATE:-}
 AGENT_LOCAL_INSTALL_ROOT=${KRW_AGENT_LOCAL_INSTALL_ROOT:-"$HOME/.local/share/krw-agent"}
 AGENT_OPERATOR_ROOT=${KRW_AGENT_OPERATOR_ROOT:-"$HOME/krw-agnet-prod"}
 AGENT_METRICS_PORT=${KRW_AGENT_METRICS_PORT:-15520}
 AGENT_FINAL_EVIDENCE_VERIFIED=0
-AGENT_CUTOVER_ROLLBACK_ARMED=0
-AGENT_LOCAL_RELEASE_ACTIVATED=0
-AGENT_CAPABILITY_RUNTIME_ACTIVATED=0
-AGENT_ADMISSION_CLOSED=0
-FRONT_CANDIDATE_ACTIVATED=0
+AGENT_FORWARD_CUTOVER_STARTED=0
 MAC_RUNTIME_ACTIVATED=0
 
 fail() {
@@ -104,35 +109,17 @@ fail() {
 cleanup() {
   exit_code=$?
   set +e
-  if [ "$exit_code" -ne 0 ] && [ "$AGENT_CUTOVER_ROLLBACK_ARMED" = "1" ]; then
-    if [ "$FRONT_CANDIDATE_ACTIVATED" = "1" ]; then
-      run_remote_rollback_front_candidate || echo "Front candidate rollback failed after agent cutover." >&2
-    fi
-    if [ "$AGENT_CAPABILITY_RUNTIME_ACTIVATED" = "1" ]; then
-      rollback_local_agent_capability_runtime || echo "Local canonical capability runtime rollback failed." >&2
-    fi
-    if [ "$AGENT_LOCAL_RELEASE_ACTIVATED" = "1" ]; then
-      rollback_local_agent_release || echo "Local krw-agent release rollback failed." >&2
-    fi
-    # A rollback restores the prior gateway JSON. Older operator JSON may
-    # predate the fail-closed upstream-readiness rule, while the gateway
-    # runtime asset remains current. Repair before the supervisor is left to
-    # restart against that mixed boundary.
-    reconcile_active_local_mcp_gateway_contract repair || echo "Local MCP gateway contract reconciliation failed after rollback." >&2
-    if [ "$MAC_RUNTIME_ACTIVATED" = "1" ]; then
-      restore_previous_mac_runtime || echo "Previous Mac worker runtime restoration failed." >&2
-    fi
-    if [ "$AGENT_ADMISSION_CLOSED" = "1" ]; then
-      run_remote_restore_research_admission || echo "Previous research admission could not be restored." >&2
-    fi
-  fi
-  if [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ]; then
-    rm -rf "$TMP_DIR"
+  set -- /bin/sh "$SCRIPT_DIR/cleanup-forward-deployment.sh"
+  if [ -n "$TMP_DIR" ]; then
+    set -- "$@" --temporary-dir "$TMP_DIR"
   fi
   if [ "$DATA_LOCK_OWNED" = "1" ] && [ -n "$DATA_LOCK_DIR" ]; then
-    rm -f "$DATA_LOCK_DIR/owner"
-    rmdir "$DATA_LOCK_DIR" 2>/dev/null || true
+    set -- "$@" --data-lock-dir "$DATA_LOCK_DIR"
   fi
+  if [ "$exit_code" -ne 0 ] && [ "$AGENT_FORWARD_CUTOVER_STARTED" = "1" ]; then
+    set -- "$@" --forward-cutover-started
+  fi
+  "$@" || echo "Deployment temporary-state cleanup failed." >&2
   exit "$exit_code"
 }
 trap cleanup EXIT
@@ -187,6 +174,11 @@ while [ "$#" -gt 0 ]; do
       ENV_FILE_EXPLICIT=1
       ;;
     --dry-run) DRY_RUN=1 ;;
+    --preflight-only)
+      PREFLIGHT_ONLY=1
+      DRY_RUN=1
+      SKIP_MAC=1
+      ;;
     --help|-h)
       usage
       exit 0
@@ -223,33 +215,11 @@ case "$RELEASE_ID" in
   *[!A-Za-z0-9._-]*) fail "Invalid release id: $RELEASE_ID" ;;
 esac
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
-FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 TARGET_FILE="$FRONT_DIR/ops/production-target.json"
-
-reconcile_active_local_mcp_gateway_contract() {
-  mode=$1
-  proxy=${2:-}
-  reconciler="$SCRIPT_DIR/reconcile-local-mcp-gateway-contract.mjs"
-  require_file "$reconciler"
-  case "$mode" in
-    check)
-      if [ -n "$proxy" ]; then
-        node "$reconciler" --mode check --operator-root "$AGENT_OPERATOR_ROOT" --proxy "$proxy"
-      else
-        node "$reconciler" --mode check --operator-root "$AGENT_OPERATOR_ROOT"
-      fi
-      ;;
-    repair)
-      if [ -n "$proxy" ]; then
-        node "$reconciler" --mode repair --restart --operator-root "$AGENT_OPERATOR_ROOT" --proxy "$proxy"
-      else
-        node "$reconciler" --mode repair --restart --operator-root "$AGENT_OPERATOR_ROOT"
-      fi
-      ;;
-    *) fail "Unknown local MCP gateway reconciliation mode: $mode" ;;
-  esac
-}
+case "$ENV_FILE" in
+  /*) ENV_PATH=$ENV_FILE ;;
+  *) ENV_PATH="$FRONT_DIR/$ENV_FILE" ;;
+esac
 
 resolve_agent_runtime_env() {
   # The normal front env owns public/product settings, while Agent V1 has a
@@ -258,9 +228,12 @@ resolve_agent_runtime_env() {
   # the normal env instead of baking a user-specific krw-agent path into this
   # deployer. An explicit --env-file always wins for recovery and automation.
   [ "$WITH_AGENT_RELEASE" = "1" ] || return 0
-  [ "$ENV_FILE_EXPLICIT" = "0" ] || return 0
 
-  configured_runtime_env=${KRW_AGENT_RUNTIME_ENV_FILE:-}
+  if [ "$ENV_FILE_EXPLICIT" = "1" ]; then
+    configured_runtime_env=$ENV_PATH
+  else
+    configured_runtime_env=${KRW_AGENT_RUNTIME_ENV_FILE:-}
+  fi
   if [ -z "$configured_runtime_env" ] && [ -f "$FRONT_DIR/.env.mac-worker.production" ]; then
     configured_runtime_env=$(awk -F= '
       $0 !~ /^[[:space:]]*#/ && $1 == "KRW_AGENT_RUNTIME_ENV_FILE" {
@@ -279,6 +252,15 @@ resolve_agent_runtime_env() {
   [ -f "$configured_runtime_env" ] && [ ! -L "$configured_runtime_env" ] \
     || fail "KRW_AGENT_RUNTIME_ENV_FILE must point to a regular local runtime env file."
   AGENT_RUNTIME_ENV_FILE=$configured_runtime_env
+
+  if [ -n "$AGENT_RUNTIME_ENV_CANDIDATE" ]; then
+    case "$AGENT_RUNTIME_ENV_CANDIDATE" in
+      /*) ;;
+      *) fail "KRW_AGENT_RUNTIME_ENV_CANDIDATE must be an absolute path." ;;
+    esac
+    [ -f "$AGENT_RUNTIME_ENV_CANDIDATE" ] && [ ! -L "$AGENT_RUNTIME_ENV_CANDIDATE" ] \
+      || fail "KRW_AGENT_RUNTIME_ENV_CANDIDATE must point to a regular staged env file."
+  fi
 }
 
 resolve_agent_runtime_env
@@ -290,7 +272,7 @@ resolve_agent_release_root() {
   # A normal deploy should not require a copied absolute release path. Pick
   # the newest operator-owned sealed candidate and let the offline verifier
   # reject incomplete/unsealed candidates. An explicit --agent-release-root
-  # remains available for rollback and incident recovery.
+  # remains available for an explicitly selected already-sealed release.
   releases_dir="$AGENT_OPERATOR_ROOT/releases"
   [ -d "$releases_dir" ] || fail "Agent operator releases directory is missing: $releases_dir"
   newest=""
@@ -306,10 +288,6 @@ resolve_agent_release_root() {
 }
 
 resolve_agent_release_root
-case "$ENV_FILE" in
-  /*) ENV_PATH=$ENV_FILE ;;
-  *) ENV_PATH="$FRONT_DIR/$ENV_FILE" ;;
-esac
 if [ "$WITH_AGENT_RELEASE" = "1" ]; then
   # The web deploy keeps its normal product/Supabase environment. Only the
   # local daemon receives the separate operator envelope that contains its
@@ -318,6 +296,11 @@ if [ "$WITH_AGENT_RELEASE" = "1" ]; then
     AGENT_RUNTIME_ENV_PATH=$AGENT_RUNTIME_ENV_FILE
   else
     AGENT_RUNTIME_ENV_PATH=$ENV_PATH
+  fi
+  if [ -n "$AGENT_RUNTIME_ENV_CANDIDATE" ]; then
+    AGENT_RUNTIME_ENV_CHECK_PATH=$AGENT_RUNTIME_ENV_CANDIDATE
+  else
+    AGENT_RUNTIME_ENV_CHECK_PATH=$AGENT_RUNTIME_ENV_PATH
   fi
 fi
 require_command() {
@@ -520,6 +503,13 @@ if [ "$SKIP_WEB" = "0" ]; then
   require_file "$FRONT_DIR/Dockerfile.web"
   actual_instance_id=$(gcloud compute instances describe "$GCP_INSTANCE" --project="$GCP_PROJECT" --zone="$GCP_ZONE" --format='value(id)')
   [ "$actual_instance_id" = "$GCP_INSTANCE_ID" ] || fail "GCP instance identity does not match ops/production-target.json."
+  if [ "$PREFLIGHT_ONLY" = "1" ]; then
+    gcloud compute ssh "$GCP_INSTANCE" \
+      --project="$GCP_PROJECT" \
+      --zone="$GCP_ZONE" \
+      --command="test -f '$REMOTE_FRONT_DIR/.env' && docker info >/dev/null" \
+      || fail "Production VM runtime prerequisites are unavailable."
+  fi
   FRONT_GIT_COMMIT=$(git -C "$FRONT_DIR" rev-parse HEAD) || fail "Unable to resolve the frontend Git commit."
   [ "$(git -C "$FRONT_DIR" rev-parse HEAD)" = "$FRONT_GIT_COMMIT" ] || fail "Frontend release commit changed during preflight."
   [ -z "$(git -C "$FRONT_DIR" status --porcelain=v1 --untracked-files=normal)" ] || fail "Production web release requires a clean committed frontend tree."
@@ -529,9 +519,10 @@ fi
 if [ "$WITH_AGENT_RELEASE" = "1" ]; then
   require_command python3
   require_command shasum
+  require_file "$SCRIPT_DIR/activate-forward-runtime-env.sh"
+  require_file "$SCRIPT_DIR/cleanup-forward-deployment.sh"
   require_file "$SCRIPT_DIR/verify-krw-agent-production-release.mjs"
   require_file "$SCRIPT_DIR/install-krw-agent-local-mcp-gateways.mjs"
-  require_file "$SCRIPT_DIR/reconcile-local-mcp-gateway-contract.mjs"
   require_file "$FRONT_DIR/ops/certificates/supabase-root-2021-ca.crt"
   [ -n "$AGENT_RELEASE_ROOT" ] || fail "Set KRW_AGENT_RELEASE_ROOT or pass --agent-release-root for a sealed dual-provider release."
   case "$AGENT_LOCAL_INSTALL_ROOT" in
@@ -566,11 +557,6 @@ if [ "$WITH_AGENT_RELEASE" = "1" ]; then
   [ -x "$AGENT_CAPABILITY_INSTALLER" ] || fail "Sealed canonical capability runtime installer is not executable."
   require_file "$ENV_PATH"
   printf '%s\n' "Verified sealed GLM+DeepSeek release for local Mac activation; selected provider: $AGENT_PROVIDER"
-  if [ "$DRY_RUN" = "1" ]; then
-    reconcile_active_local_mcp_gateway_contract check "$AGENT_GATEWAY_PROXY"
-  else
-    reconcile_active_local_mcp_gateway_contract repair "$AGENT_GATEWAY_PROXY"
-  fi
 fi
 
 if [ "$WITH_AGENT_RELEASE" = "0" ] && [ "$SKIP_MAC" = "0" ]; then
@@ -799,9 +785,9 @@ if [ -d "$release_base" ]; then
   done
 fi
 
-# Every active service is tagged `krw-ontology-front-web:local`. Keep at most
-# the rollback image for the immediately preceding cutover; release and
-# candidate tags are audit labels only and must not retain superseded images.
+# Every active service is tagged `krw-ontology-front-web:local`. Historical
+# candidate/release/rollback labels are not executable recovery state and must
+# not retain superseded images.
 docker images --format '{{.Repository}}|{{.Tag}}' \
   | while IFS='|' read -r repository tag; do
       [ "$repository" = "krw-ontology-front-web" ] || continue
@@ -811,8 +797,7 @@ docker images --format '{{.Repository}}|{{.Tag}}' \
     done
 
 # Caddy uses the stable `caddy:2` tag at runtime. Historical release labels
-# otherwise keep no additional image data, but they make image inventories and
-# rollback expectations misleading.
+# otherwise keep no additional image data and make image inventories unclear.
 docker images --format '{{.Repository}}|{{.Tag}}' \
   | while IFS='|' read -r repository tag; do
       [ "$repository" = "caddy" ] || continue
@@ -827,8 +812,8 @@ REMOTE_SCRIPT
 
 prune_remote_post_activation_artifacts() {
   # Do this only after the candidate has passed public deep health. Keep the
-  # active `local` tag and the immediately preceding rollback image, but drop
-  # the redundant candidate label and bound unused BuildKit cache. The cache
+  # active `local` tag, but drop the redundant candidate label and bound unused
+  # BuildKit cache. The cache
   # cap retains the fresh dependency/image layers used by the next deployment.
   cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "RELEASE_ID='$RELEASE_ID'"
 set -eu
@@ -908,7 +893,7 @@ verify_sealed_local_agent_database_abi() {
     'KRW_AGENT_WORKER_ID=sealed-release-database-check' > "$agent_overlay"
   chmod 600 "$agent_overlay"
   if ! "$AGENT_PROVIDER_BUNDLE/packaging/launchd/krw-agentd-start-local" \
-    --env-file "$AGENT_RUNTIME_ENV_PATH" \
+    --env-file "$AGENT_RUNTIME_ENV_CHECK_PATH" \
     --overlay-file "$agent_overlay" \
     --database-check; then
     cleanup_agent_check
@@ -937,7 +922,7 @@ verify_sealed_local_agent_mcp_abi() {
     'KRW_AGENT_WORKER_ID=sealed-release-mcp-check' > "$agent_overlay"
   chmod 600 "$agent_overlay"
   if ! "$AGENT_PROVIDER_BUNDLE/packaging/launchd/krw-agentd-start-local" \
-    --env-file "$AGENT_RUNTIME_ENV_PATH" \
+    --env-file "$AGENT_RUNTIME_ENV_CHECK_PATH" \
     --overlay-file "$agent_overlay" \
     --mcp-check; then
     cleanup_agent_check
@@ -982,19 +967,12 @@ activate_local_agent_capability_runtime() {
       --operator-root "$AGENT_OPERATOR_ROOT"
 }
 
-rollback_local_agent_release() {
-  [ -x "$AGENT_INSTALLED_INSTALLER" ] || return 0
-  KRW_AGENT_LOCAL_INSTALL_ROOT="$AGENT_LOCAL_INSTALL_ROOT" \
-    "$AGENT_INSTALLED_INSTALLER" --mode rollback --release-id "$RELEASE_ID"
-}
-
-rollback_local_agent_capability_runtime() {
-  [ -x "$AGENT_INSTALLED_CAPABILITY_INSTALLER" ] || return 0
-  KRW_AGENT_LOCAL_INSTALL_ROOT="$AGENT_LOCAL_INSTALL_ROOT" \
-    "$AGENT_INSTALLED_CAPABILITY_INSTALLER" --mode rollback \
-      --release-id "$RELEASE_ID" \
-      --provider "$AGENT_PROVIDER" \
-      --operator-root "$AGENT_OPERATOR_ROOT"
+activate_agent_runtime_env_candidate() {
+  [ -n "$AGENT_RUNTIME_ENV_CANDIDATE" ] || return 0
+  /bin/sh "$SCRIPT_DIR/activate-forward-runtime-env.sh" \
+    --candidate "$AGENT_RUNTIME_ENV_CANDIDATE" \
+    --destination "$AGENT_RUNTIME_ENV_FILE"
+  echo "Activated the forward Rust runtime environment."
 }
 
 run_remote_close_research_admission() {
@@ -1044,36 +1022,9 @@ if [ "$(value_of "$active_env" KRW_AGENT_BACKEND_MODE)" != "rust" ]; then
   echo "Active web release does not use Rust Agent V1; no research admission change is needed."
   exit 0
 fi
-previous=$(value_of "$active_env" KRW_AGENT_ADMISSION_MODE)
-case "$previous" in open|closed|drain|canary) ;; *) previous=closed ;; esac
-printf '%s\n' "$previous" > "$REMOTE_STAGE/research-admission.previous"
-chmod 600 "$REMOTE_STAGE/research-admission.previous"
-if [ "$previous" = "canary" ]; then
-  principals=$(value_of "$active_env" KRW_AGENT_CANARY_PRINCIPAL_IDS)
-  [ -n "$principals" ] || {
-    echo "Canary admission has no allowed principal ids to preserve." >&2
-    exit 1
-  }
-  printf '%s\n' "$principals" > "$REMOTE_STAGE/research-admission.previous-canary-principals"
-  chmod 600 "$REMOTE_STAGE/research-admission.previous-canary-principals"
-fi
-changed=0
-restore_previous() {
-  status=$?
-  if [ "$changed" = "1" ]; then
-    set +e
-    upsert_env_value "$active_env" KRW_AGENT_ADMISSION_MODE "$previous"
-    compose_active up -d --no-deps --force-recreate --wait web agent-v1-outbox
-  fi
-  exit "$status"
-}
-trap restore_previous EXIT INT TERM
 upsert_env_value "$active_env" KRW_AGENT_ADMISSION_MODE closed
-changed=1
 compose_active up -d --no-deps --force-recreate --wait web agent-v1-outbox
 compose_active exec -T web node -e 'fetch("http://127.0.0.1:3000/api/healthz").then(async response=>{const value=await response.json().catch(()=>null); if(!response.ok||value?.status!=="ok") process.exit(1);}).catch(()=>process.exit(1));'
-changed=0
-trap - EXIT INT TERM
 echo "Research admission closed before Rust agent release switch."
 REMOTE_SCRIPT
 }
@@ -1188,43 +1139,6 @@ if [ "$previous" = "canary" ]; then
   chmod 600 "$REMOTE_STAGE/research-admission.previous-canary-principals"
 fi
 echo "Captured research admission for frontend-only deployment: $previous"
-REMOTE_SCRIPT
-}
-
-run_remote_rollback_front_candidate() {
-  cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT'"
-set -eu
-test -f "$REMOTE_STAGE/rollback.env"
-. "$REMOTE_STAGE/rollback.env"
-test -n "$OLD_IMAGE"
-services="web reverse-proxy agent-v1-outbox llm-gateway filings-mcp document-worker document-outbox-dispatcher filing-notification-worker filing-brief-worker billing-worker"
-compose_stage() {
-  FRONT_DIR="$REMOTE_STAGE" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_STAGE" --env-file "$REMOTE_STAGE/runtime.env" -f "$REMOTE_STAGE/docker-compose.yml" "$@"
-}
-compose_old() {
-  if [ -n "$OLD_CONFIG_ROOT" ] && [ -f "$OLD_CONFIG_ROOT/runtime.env" ] && [ -f "$OLD_CONFIG_ROOT/docker-compose.yml" ]; then
-    FRONT_DIR="$OLD_CONFIG_ROOT" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$OLD_CONFIG_ROOT" --env-file "$OLD_CONFIG_ROOT/runtime.env" -f "$OLD_CONFIG_ROOT/docker-compose.yml" "$@"
-  else
-    FRONT_DIR="$REMOTE_FRONT_DIR" NEXT_PUBLIC_APP_VERSION="$OLD_APP_VERSION" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_FRONT_DIR" --env-file "$REMOTE_FRONT_DIR/.env" -f "$REMOTE_FRONT_DIR/docker-compose.yml" "$@"
-  fi
-}
-for worker in market-issue-worker market-web-source-worker market-issue-stream-worker market-issue-enrichment-worker; do
-  compose_stage rm -sf "$worker" || true
-done
-docker tag "$OLD_IMAGE" krw-ontology-front-web:local
-compose_old up -d --force-recreate --wait $services
-for worker in market-issue-worker market-web-source-worker market-issue-stream-worker market-issue-enrichment-worker; do
-  if compose_old config --services | grep -qx "$worker"; then
-    compose_old up -d --force-recreate --wait "$worker"
-  fi
-done
-if [ -n "$OLD_CONFIG_ROOT" ]; then
-  rm -f "$REMOTE_FRONT_DIR/.simple-deploy/current"
-  ln -s "$OLD_CONFIG_ROOT" "$REMOTE_FRONT_DIR/.simple-deploy/current"
-else
-  rm -f "$REMOTE_FRONT_DIR/.simple-deploy/current"
-fi
-echo "Rolled back front candidate after Rust agent release failure."
 REMOTE_SCRIPT
 }
 
@@ -1497,13 +1411,12 @@ fi
     OLD_IMAGE=$(docker image inspect --format '{{.Id}}' krw-ontology-front-web:local 2>/dev/null || true)
   fi
   test -n "$OLD_IMAGE"
-  ROLLBACK_TAG="krw-ontology-front-web:rollback-$RELEASE_ID"
   if docker image inspect "$OLD_IMAGE" >/dev/null 2>&1; then
-    docker tag "$OLD_IMAGE" "$ROLLBACK_TAG"
+    :
   else
-    # This VM can have a running bootstrap container whose image metadata was
-    # removed by an earlier local-tag rebuild. Rebuild the active source as a
-    # rollback image before the staged candidate replaces the local image tag.
+    # A bootstrap container can refer to image metadata removed by an earlier
+    # build. Rebuild the still-active source only so the stable local tag can
+    # remain unchanged while the candidate image is prepared.
     test -n "$OLD_WEB"
     FRONT_DIR="$REMOTE_FRONT_DIR" docker compose \
       --project-name "$COMPOSE_PROJECT" \
@@ -1511,21 +1424,8 @@ fi
       --env-file "$REMOTE_FRONT_DIR/.env" \
       -f "$REMOTE_FRONT_DIR/docker-compose.yml" \
       build web
-    docker tag krw-ontology-front-web:local "$ROLLBACK_TAG"
-    OLD_IMAGE=$(docker image inspect --format '{{.Id}}' "$ROLLBACK_TAG")
+    OLD_IMAGE=$(docker image inspect --format '{{.Id}}' krw-ontology-front-web:local)
   fi
-  echo "Preserved rollback image: $ROLLBACK_TAG"
-  OLD_APP_VERSION=unknown
-  if [ -n "$OLD_WEB" ]; then
-    OLD_APP_VERSION=$(docker inspect "$OLD_WEB" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^NEXT_PUBLIC_APP_VERSION=//p' | head -1)
-  fi
-OLD_CONFIG_ROOT=
-if [ -L "$REMOTE_FRONT_DIR/.simple-deploy/current" ] && [ -f "$REMOTE_FRONT_DIR/.simple-deploy/current/runtime.env" ]; then
-  OLD_CONFIG_ROOT=$(cd "$REMOTE_FRONT_DIR/.simple-deploy/current" && pwd -P)
-fi
-if [ -z "$OLD_APP_VERSION" ]; then
-  OLD_APP_VERSION=unknown
-fi
 compose_stage() {
   FRONT_DIR="$REMOTE_STAGE" NEXT_PUBLIC_APP_VERSION="$RELEASE_ID" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_STAGE" --env-file "$REMOTE_STAGE/runtime.env" -f "$REMOTE_STAGE/docker-compose.yml" "$@"
 }
@@ -1606,8 +1506,8 @@ main().catch((error) => {
 NODE
 fi
 docker tag "$OLD_IMAGE" krw-ontology-front-web:local
-printf 'OLD_IMAGE=%s\nCANDIDATE_IMAGE=%s\nOLD_CONFIG_ROOT=%s\nOLD_APP_VERSION=%s\n' "$OLD_IMAGE" "$CANDIDATE_IMAGE" "$OLD_CONFIG_ROOT" "$OLD_APP_VERSION" > "$REMOTE_STAGE/rollback.env"
-chmod 600 "$REMOTE_STAGE/rollback.env"
+printf 'CANDIDATE_IMAGE=%s\n' "$CANDIDATE_IMAGE" > "$REMOTE_STAGE/forward-activation.env"
+chmod 600 "$REMOTE_STAGE/forward-activation.env"
 rm -f "$REMOTE_FRONT_ARCHIVE"
 echo "Prepared fast VM candidate: $RELEASE_ID"
 REMOTE_SCRIPT
@@ -1736,26 +1636,10 @@ REMOTE_SCRIPT
 run_remote_activate() {
   cat <<'REMOTE_SCRIPT' | run_remote_buffered_script "RELEASE_ID='$RELEASE_ID' REMOTE_FRONT_DIR='$REMOTE_FRONT_DIR' REMOTE_STAGE='$REMOTE_STAGE' COMPOSE_PROJECT='$COMPOSE_PROJECT' SITE_ORIGIN_ONE='$SITE_ORIGIN_ONE' SITE_ORIGIN_TWO='$SITE_ORIGIN_TWO' BILLING_V2_CUTOVER='$BILLING_V2_CUTOVER'"
 set -e
-. "$REMOTE_STAGE/rollback.env"
+. "$REMOTE_STAGE/forward-activation.env"
 SERVICES="web reverse-proxy agent-v1-outbox llm-gateway filings-mcp document-worker document-outbox-dispatcher filing-notification-worker filing-brief-worker billing-worker"
-ROLLBACK_ARMED=1
-MARKET_ISSUE_STARTED=0
-MARKET_WEB_SOURCE_STARTED=0
-MARKET_ISSUE_STREAM_STARTED=0
-MARKET_ISSUE_ENRICHMENT_STARTED=0
-OLD_MARKET_ISSUE_WORKER=0
-OLD_MARKET_WEB_SOURCE_WORKER=0
-OLD_MARKET_ISSUE_STREAM_WORKER=0
-OLD_MARKET_ISSUE_ENRICHMENT_WORKER=0
 compose_stage() {
   FRONT_DIR="$REMOTE_STAGE" NEXT_PUBLIC_APP_VERSION="$RELEASE_ID" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_STAGE" --env-file "$REMOTE_STAGE/runtime.env" -f "$REMOTE_STAGE/docker-compose.yml" "$@"
-}
-compose_old() {
-  if [ -n "$OLD_CONFIG_ROOT" ] && [ -f "$OLD_CONFIG_ROOT/runtime.env" ] && [ -f "$OLD_CONFIG_ROOT/docker-compose.yml" ]; then
-    FRONT_DIR="$OLD_CONFIG_ROOT" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$OLD_CONFIG_ROOT" --env-file "$OLD_CONFIG_ROOT/runtime.env" -f "$OLD_CONFIG_ROOT/docker-compose.yml" "$@"
-  else
-    FRONT_DIR="$REMOTE_FRONT_DIR" NEXT_PUBLIC_APP_VERSION="$OLD_APP_VERSION" docker compose --project-name "$COMPOSE_PROJECT" --project-directory "$REMOTE_FRONT_DIR" --env-file "$REMOTE_FRONT_DIR/.env" -f "$REMOTE_FRONT_DIR/docker-compose.yml" "$@"
-  fi
 }
 runtime_value() {
   key="$1"
@@ -1783,18 +1667,6 @@ market_issue_stream_enabled() {
     *) return 1 ;;
   esac
 }
-if compose_old config --services | grep -qx "market-issue-worker"; then
-  OLD_MARKET_ISSUE_WORKER=1
-fi
-if compose_old config --services | grep -qx "market-web-source-worker"; then
-  OLD_MARKET_WEB_SOURCE_WORKER=1
-fi
-if compose_old config --services | grep -qx "market-issue-stream-worker"; then
-  OLD_MARKET_ISSUE_STREAM_WORKER=1
-fi
-if compose_old config --services | grep -qx "market-issue-enrichment-worker"; then
-  OLD_MARKET_ISSUE_ENRICHMENT_WORKER=1
-fi
 matches_version() {
   payload=$(printf '%s' "$1" | tr -d '[:space:]')
   expected=$2
@@ -1807,83 +1679,6 @@ matches_version() {
     *) return 1 ;;
   esac
 }
-reload_billing_readonly_proxy() {
-  readonly_caddy="$REMOTE_STAGE/Caddyfile.billing-readonly"
-  test -f "$readonly_caddy" || return 1
-  proxy_id=$(docker ps -q \
-    --filter "label=com.docker.compose.project=$COMPOSE_PROJECT" \
-    --filter "label=com.docker.compose.service=reverse-proxy" | head -1)
-  if [ -z "$proxy_id" ]; then
-    docker tag "$OLD_IMAGE" krw-ontology-front-web:local || return 1
-    compose_old up -d --no-deps --force-recreate reverse-proxy || return 1
-    attempt=1
-    while [ "$attempt" -le 15 ]; do
-      proxy_id=$(docker ps -q \
-        --filter "label=com.docker.compose.project=$COMPOSE_PROJECT" \
-        --filter "label=com.docker.compose.service=reverse-proxy" | head -1)
-      if [ -n "$proxy_id" ] \
-        && docker exec "$proxy_id" caddy version >/dev/null 2>&1; then
-        break
-      fi
-      sleep 1
-      attempt=$((attempt + 1))
-    done
-  fi
-  [ -n "$proxy_id" ] || return 1
-  docker cp "$readonly_caddy" "$proxy_id:/tmp/Caddyfile.billing-readonly" \
-    && docker exec "$proxy_id" caddy adapt \
-      --config /tmp/Caddyfile.billing-readonly \
-      --adapter caddyfile >/dev/null \
-    && docker exec "$proxy_id" caddy reload \
-      --config /tmp/Caddyfile.billing-readonly \
-      --adapter caddyfile >/dev/null
-}
-rollback() {
-  exit_code=$?
-  set +e
-  if [ "$ROLLBACK_ARMED" = "1" ]; then
-    if [ "$BILLING_V2_CUTOVER" = "1" ]; then
-      echo "Billing V2 activation failed; preserving billing read-only mode instead of restoring legacy payment writes." >&2
-      if reload_billing_readonly_proxy; then
-        docker tag "$OLD_IMAGE" krw-ontology-front-web:local
-        compose_old up -d --no-deps --force-recreate --wait web
-        compose_old stop billing-worker
-      else
-        echo "Unable to restore the Caddy billing read-only gate; leaving the application stopped rather than re-enabling legacy payment writes." >&2
-      fi
-    else
-      echo "Fast activation failed; restoring the previous VM image." >&2
-      if [ "$MARKET_ISSUE_STARTED" = "1" ]; then
-        compose_stage rm -sf market-issue-worker || true
-      fi
-      if [ "$MARKET_WEB_SOURCE_STARTED" = "1" ]; then
-        compose_stage rm -sf market-web-source-worker || true
-      fi
-      if [ "$MARKET_ISSUE_STREAM_STARTED" = "1" ]; then
-        compose_stage rm -sf market-issue-stream-worker || true
-      fi
-      if [ "$MARKET_ISSUE_ENRICHMENT_STARTED" = "1" ]; then
-        compose_stage rm -sf market-issue-enrichment-worker || true
-      fi
-      docker tag "$OLD_IMAGE" krw-ontology-front-web:local
-      compose_old up -d --force-recreate --wait $SERVICES
-      if [ "$OLD_MARKET_ISSUE_WORKER" = "1" ]; then
-        compose_old up -d --force-recreate --wait market-issue-worker
-      fi
-      if [ "$OLD_MARKET_WEB_SOURCE_WORKER" = "1" ]; then
-        compose_old up -d --force-recreate --wait market-web-source-worker
-      fi
-      if [ "$OLD_MARKET_ISSUE_STREAM_WORKER" = "1" ]; then
-        compose_old up -d --force-recreate --wait market-issue-stream-worker
-      fi
-      if [ "$OLD_MARKET_ISSUE_ENRICHMENT_WORKER" = "1" ]; then
-        compose_old up -d --force-recreate --wait market-issue-enrichment-worker
-      fi
-    fi
-  fi
-  exit "$exit_code"
-}
-trap rollback EXIT
 legacy_sidecar_ids=$( {
   docker ps -aq --filter "label=com.docker.compose.project=$COMPOSE_PROJECT" --filter "label=com.docker.compose.service=agent-worker"
   docker ps -aq --filter "label=com.docker.compose.project=$COMPOSE_PROJECT" --filter "label=com.docker.compose.service=ontology-mcp"
@@ -1919,14 +1714,12 @@ for origin in "$SITE_ORIGIN_ONE" "$SITE_ORIGIN_TWO"; do
   done
   [ "$public_ready" = "1" ]
 done
-MARKET_WEB_SOURCE_STARTED=1
 compose_stage up -d --force-recreate --wait market-web-source-worker
 compose_stage exec -T market-web-source-worker node -e '
   const sources = JSON.parse(process.env.MARKET_ISSUE_WEB_SOURCES || "[]");
   console.log(JSON.stringify({ worker: "market-web-source-worker", configuredSources: Array.isArray(sources) ? sources.length : 0 }));
 '
 if market_issue_x_ingestion_enabled; then
-  MARKET_ISSUE_STARTED=1
   compose_stage up -d --force-recreate --wait market-issue-worker
   echo "Started X market-issue worker (token verified in pre-activation step)."
 else
@@ -1934,18 +1727,15 @@ else
   echo "Skipped X market-issue worker because MARKET_ISSUE_X_INGESTION_ENABLED is disabled."
 fi
 if market_issue_stream_enabled; then
-  MARKET_ISSUE_STREAM_STARTED=1
   compose_stage up -d --force-recreate --wait market-issue-stream-worker
   echo "Started X market-issue stream worker (token verified in pre-activation step)."
 else
   compose_stage stop market-issue-stream-worker || true
   echo "Skipped X market-issue stream worker because MARKET_ISSUE_STREAM_ENABLED is disabled."
 fi
-MARKET_ISSUE_ENRICHMENT_STARTED=1
 compose_stage up -d --force-recreate --wait market-issue-enrichment-worker
 rm -f "$REMOTE_FRONT_DIR/.simple-deploy/current"
 ln -s "$REMOTE_STAGE" "$REMOTE_FRONT_DIR/.simple-deploy/current"
-ROLLBACK_ARMED=0
 echo "Activated fast VM candidate: $RELEASE_ID"
 REMOTE_SCRIPT
 }
@@ -2425,6 +2215,14 @@ if [ "$SKIP_WEB" = "0" ]; then
   fi
 fi
 
+# The schema boundary is forward-only. Close research before the first
+# migration write so every later failure leaves the queue stopped instead of
+# serving an older runtime against a newer heartbeat/outbox ABI.
+if [ "$WITH_AGENT_RELEASE" = "1" ]; then
+  AGENT_FORWARD_CUTOVER_STARTED=1
+  run_remote_close_research_admission
+fi
+
 if [ "$APPLY_MIGRATIONS" = "1" ]; then
   if [ "$WITH_AGENT_RELEASE" = "1" ]; then
     run_agent_release_migrations
@@ -2453,21 +2251,18 @@ if [ "$WITH_DATA" = "1" ]; then
 fi
 
 if [ "$WITH_AGENT_RELEASE" = "1" ]; then
-  run_remote_close_research_admission
-  AGENT_ADMISSION_CLOSED=1
-  AGENT_CUTOVER_ROLLBACK_ARMED=1
+  # Every database and candidate ABI check has completed. Install the staged
+  # runtime envelope while the remote queue remains closed.
+  activate_agent_runtime_env_candidate
   # Switch the immutable current symlink and write the daemon plist without
   # starting launchd. The capability installer intentionally follows this new
   # symlink, while the daemon remains stopped until every MCP dependency is
   # ready.
-  AGENT_LOCAL_RELEASE_ACTIVATED=1
   activate_local_agent_release --defer-start
-  AGENT_CAPABILITY_RUNTIME_ACTIVATED=1
   activate_local_agent_capability_runtime
-  # Materialize the complete gateway contract only after the capability
-  # installer has captured rollback copies of every endpoint config. A failed
-  # cutover can therefore restore the old runtime and all four gateways as one
-  # coherent release.
+  # Materialize the complete gateway contract after the matching capability
+  # runtime is active. A failure stays on this forward release with admission
+  # closed; it never reintroduces an older schema contract.
   prepare_local_agent_mcp_gateways
   activate_local_agent_mcp_gateways
   verify_sealed_local_agent_mcp_abi
@@ -2478,9 +2273,6 @@ if [ "$WITH_AGENT_RELEASE" = "1" ]; then
 fi
 
 if [ "$SKIP_WEB" = "0" ]; then
-  if [ "$WITH_AGENT_RELEASE" = "1" ]; then
-    FRONT_CANDIDATE_ACTIVATED=1
-  fi
   run_remote_activate
 fi
 
@@ -2496,20 +2288,16 @@ if [ "$SKIP_WEB" = "0" ]; then
   else
     # A fresh release must be usable as soon as its transactional activation
     # completes. The remote opener still verifies the daemon heartbeat,
-    # provider, descriptor, and release-set hashes and rolls back to closed
-    # if that check fails.
+    # provider, descriptor, and release-set hashes and returns to closed if
+    # that check fails.
     run_remote_open_research_admission
   fi
 fi
 
-# The matching agent daemon, web/outbox candidate, and admission gate are all
-# now healthy. Later billing-only checks do not roll back this completed
-# research-engine cutover.
+# The matching agent daemon, web/outbox candidate, and admission gate are now
+# healthy. Clear the failure marker only after admission is open.
 if [ "$WITH_AGENT_RELEASE" = "1" ]; then
-  AGENT_CUTOVER_ROLLBACK_ARMED=0
-  AGENT_LOCAL_RELEASE_ACTIVATED=0
-  AGENT_ADMISSION_CLOSED=0
-  FRONT_CANDIDATE_ACTIVATED=0
+  AGENT_FORWARD_CUTOVER_STARTED=0
 fi
 
 if [ "$BILLING_V2_CUTOVER" = "1" ]; then

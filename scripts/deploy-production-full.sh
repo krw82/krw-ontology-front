@@ -24,8 +24,6 @@ agent_source_root=${KRW_AGENT_SOURCE_ROOT:-"$HOME/krw-agnet"}
 agent_operator_root=${KRW_AGENT_OPERATOR_ROOT:-"$HOME/krw-agnet-prod"}
 agent_runtime_env_source=${KRW_AGENT_RUNTIME_ENV_FILE:-"$agent_operator_root/runtime/krw-agent-deploy.env"}
 agent_runtime_env_candidate=
-agent_runtime_env_backup=
-agent_runtime_env_activated=0
 release_id=
 agent_mcp_origin=
 agent_endpoint_registry=
@@ -40,9 +38,8 @@ Builds a new sealed GLM+DeepSeek Rust release from KRW_AGENT_SOURCE_ROOT
 (default: ~/krw-agnet), then deploys that exact release. The selected runtime
 provider remains DeepSeek unless --agent-provider glm is supplied.
 
-Use npm run prod:deploy:safe -- --agent-release-root DIR for a prebuilt
-rollback/recovery release. Automatic fresh-release deployment does not accept
---agent-release-root or --dry-run.
+Automatic fresh-release deployment does not accept --agent-release-root or
+--dry-run; it always builds and deploys one new forward release.
 EOF
 }
 
@@ -51,40 +48,16 @@ fail() {
   exit 1
 }
 
-reconcile_current_local_mcp_gateway_contract() {
-  local reconciler="$script_dir/reconcile-local-mcp-gateway-contract.mjs"
-  [[ -f "$reconciler" && ! -L "$reconciler" ]] \
-    || fail "Local MCP gateway reconciler is missing or unsafe: $reconciler"
-  node "$reconciler" \
-    --mode repair \
-    --restart \
-    --operator-root "$agent_operator_root"
-}
-
 cleanup_runtime_env_update() {
   local exit_status=$?
   set +e
 
-  # A candidate becomes the persistent launchd env only after its exact Feed
-  # bearer request succeeds.  Any later build/deploy failure restores the
-  # original file before this process exits, so a standalone daemon restart
-  # can never point at the deleted temporary overlay used by the old path.
-  if [[ "$agent_runtime_env_activated" = "1" && "$exit_status" -ne 0 && -n "$agent_runtime_env_backup" && -f "$agent_runtime_env_backup" ]]; then
-    if mv -f -- "$agent_runtime_env_backup" "$agent_runtime_env_source"; then
-      printf '%s\n' "Restored the previous Rust runtime env after failed deployment." >&2
-    else
-      printf '%s\n' "CRITICAL: unable to restore the previous Rust runtime env." >&2
-    fi
-    agent_runtime_env_backup=
-    agent_runtime_env_activated=0
-  fi
+  # The candidate is private staging input. It is never installed by this
+  # build wrapper; the forward cutover activates it only after admission has
+  # closed and all migration/ABI checks have passed.
   if [[ -n "$agent_runtime_env_candidate" && -f "$agent_runtime_env_candidate" ]]; then
     rm -f -- "$agent_runtime_env_candidate"
     agent_runtime_env_candidate=
-  fi
-  if [[ "$exit_status" -eq 0 && -n "$agent_runtime_env_backup" && -f "$agent_runtime_env_backup" ]]; then
-    rm -f -- "$agent_runtime_env_backup"
-    agent_runtime_env_backup=
   fi
 
   trap - EXIT
@@ -266,15 +239,6 @@ ensure_local_feed_gateway_ready() {
     *) fail "KRW_FEED_MCP_URL must use http or https" ;;
   esac
 
-  command -v launchctl >/dev/null 2>&1 \
-    || fail "launchctl is required to prepare the local Feed MCP gateway"
-  # The gateway supervisor is intentionally long-lived, but a previous crash
-  # can leave its loopback ports unavailable while launchd is still restarting
-  # it. Kick it once before the credential probe and wait for the authenticated
-  # readiness contract instead of treating that short startup window as a
-  # permanent deployment failure.
-  launchctl kickstart -k "gui/$(id -u)/com.krw.agent.local-mcp-gateways" >/dev/null 2>&1 || true
-
   probe_dir=$(mktemp -d "${TMPDIR:-/tmp}/krw-feed-gateway.XXXXXX")
   chmod 700 "$probe_dir"
   probe_body="$probe_dir/ready.json"
@@ -316,16 +280,8 @@ prepare_agent_runtime_env_candidate() {
   [[ -f "$agent_runtime_env_source" && ! -L "$agent_runtime_env_source" ]] \
     || fail "Rust Agent V1 runtime env is missing or unsafe: $agent_runtime_env_source"
 
-  local canonical_feed_token legacy_feed_token feed_token active_feed_origin
-  canonical_feed_token=$(read_env_value "$front_dir/.env" KRW_FEED_MCP_TOKEN 2>/dev/null || true)
-  legacy_feed_token=$(read_env_value "$front_dir/.env" FEED_MCP_AUTH_TOKEN 2>/dev/null || true)
-  if [[ -n "$canonical_feed_token" && -n "$legacy_feed_token" && "$canonical_feed_token" != "$legacy_feed_token" ]]; then
-    fail "Feed MCP token aliases conflict in $front_dir/.env"
-  fi
-  feed_token=$canonical_feed_token
-  if [[ -z "$feed_token" ]]; then
-    feed_token=$legacy_feed_token
-  fi
+  local feed_token active_feed_origin
+  feed_token=$(read_env_value "$front_dir/.env" KRW_FEED_MCP_TOKEN 2>/dev/null || true)
   [[ -n "$feed_token" ]] || fail "Feed MCP token is required for a fresh Rust release"
   [[ "$feed_token" != *$'\n'* && "$feed_token" != *$'\r'* ]] \
     || fail "Feed MCP token contains a newline and cannot be propagated safely"
@@ -351,13 +307,7 @@ prepare_agent_runtime_env_candidate() {
   write_canonical_feed_token "$agent_runtime_env_candidate" "$feed_token"
   canonicalize_runtime_mcp_environment "$agent_runtime_env_candidate" "$agent_mcp_origin"
 
-  agent_runtime_env_backup=$(mktemp "${agent_runtime_env_source}.previous.XXXXXX")
-  cp -p -- "$agent_runtime_env_source" "$agent_runtime_env_backup"
-  chmod 600 "$agent_runtime_env_backup"
-  mv -f -- "$agent_runtime_env_candidate" "$agent_runtime_env_source"
-  agent_runtime_env_candidate=
-  agent_runtime_env_activated=1
-  printf '%s\n' "Verified Feed MCP credential and updated the persistent Rust runtime env."
+  printf '%s\n' "Verified Feed MCP credential and prepared a private Rust runtime env candidate."
 }
 
 while [[ $# -gt 0 ]]; do
@@ -397,10 +347,10 @@ done
   || fail "Fresh Rust release requires a clean committed krw-agnet tree"
 node "$script_dir/verify-supabase-schema-smoke-rpc-contract.mjs" \
   || fail "Schema-smoke RPC contract does not match the generated database types"
-# Operator gateway JSON predates the sealed release and can survive an older
-# rollback. Reconcile it before the Feed readiness probe and before compiling
-# or uploading anything, so a stale gateway cannot waste a full deployment.
-reconcile_current_local_mcp_gateway_contract
+"$script_dir/deploy-production-fast.sh" \
+  --preflight-only \
+  --apply-migrations \
+  --skip-mac
 prepare_agent_runtime_env_candidate
 
 case "$release_id" in
@@ -415,15 +365,16 @@ release_root="$agent_operator_root/releases/${release_id}-${agent_commit}"
 
 build_args=(
   --output-root "$release_root"
-  --front-root "$front_dir"
+  --front-contract "$front_dir/ops/agent-v1-deployment-contract.json"
   --operator-root "$agent_operator_root"
-  --runtime-env "$agent_runtime_env_source"
+  --runtime-env "$agent_runtime_env_candidate"
 )
 "$agent_source_root/scripts/build_sealed_dual_provider_release.sh" "${build_args[@]}"
 
 deploy_exact_release() {
   env KRW_AGENT_OPERATOR_ROOT="$agent_operator_root" \
     KRW_AGENT_RUNTIME_ENV_FILE="$agent_runtime_env_source" \
+    KRW_AGENT_RUNTIME_ENV_CANDIDATE="$agent_runtime_env_candidate" \
     "$script_dir/deploy-production-fast.sh" \
       --apply-migrations \
       --with-agent-release \
