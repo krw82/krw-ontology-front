@@ -59,7 +59,7 @@ uv run krw-ontology quality check
 uv run krw-ontology release materialize-prod <release_id>
 
 cd ~/krw-ontology-front
-npm run prod:release:publish
+npm run publish:web-catalog
 ```
 
 The expected production index paths are:
@@ -70,7 +70,7 @@ The expected production index paths are:
 ~/krw-ontology-data/releases/prod/current/indexes/companies/<TICKER>.sqlite
 ```
 
-`prod:release:publish` verifies the already-active `prod/current`, exports a
+`publish:web-catalog` verifies the already-active `prod/current`, exports a
 compact `web_catalog.json`, and publishes that catalog to Supabase. It does not
 promote another release or restart prod MCP/Mac workers.
 
@@ -78,54 +78,35 @@ It does not upload the v3 SQLite indexes to GCP.
 
 ## Web And Plugin Deploy
 
-The normal deploy driver is `scripts/deploy-production-fast.sh`. The legacy
-sealed bootstrap and interrupted-cutover recovery scripts were removed;
+The normal deploy driver is the agent-repo 12-stage forward-only controller,
+entered through `npm run prod:deploy:full -- --agent-provider deepseek`
+(adapter: `scripts/deploy-production-full.sh`). The legacy fast script
+(`scripts/deploy-production-fast.sh`), its partial-switch variants, and the
+sealed bootstrap / interrupted-cutover recovery scripts were removed;
 production deploys are fix-forward only.
-
-For GCP web/API and application worker containers only:
-
-```bash
-npm run prod:deploy:web
-```
-
-```bash
-npm run prod:deploy:runtime
-```
-
-This is the billing-safe runtime release: it applies pending migrations, switches
-the GCP web/API and billing worker containers, and restarts the Mac runtime. It
-also refuses to deploy when the GCP runtime environment does not contain a
-matching live Toss key pair.
-
-For a Mac MCP/worker-only restart that intentionally leaves the GCP payment
-runtime untouched, use `npm run prod:deploy:mac-runtime`.
-
-For routine code deploys with pending migrations but without catalog publication:
-
-```bash
-npm run prod:deploy:code
-```
 
 For DB migration, web, and the sealed Rust agent runtime together:
 
 ```bash
-npm run prod:deploy:full
+npm run prod:deploy:full -- --agent-provider deepseek
 ```
 
-The full path builds the new GCP image before it applies a migration, switches
-the application containers, activates the Mac Rust daemon, and checks private
-deep health plus both public origins. Catalog publication remains the separate
-`prod:release:publish` operation because it validates ontology source/data
-identity and must not block an otherwise independent application release.
-If public GCP health fails during the switch, it retags and starts the previous
-GCP image automatically. Database migrations are not automatically reversed.
+The full path builds and seals the exact source commit, applies forward-only
+migrations under a closed admission gate, switches the application containers
+on GCP, activates the Mac Rust daemon, reopens research admission, and checks
+private deep health plus both public origins, leaving a terminal receipt.
+Catalog publication remains the separate `publish:web-catalog` operation
+because it validates ontology source/data identity and must not block an
+otherwise independent application release. If any stage fails, the deploy
+stops with the admission gate closed and is re-run fix-forward; container
+rollbacks and database migration rollbacks do not exist.
 
 The one-time legacy sealed Mac bootstrap and the interrupted-cutover recovery
 lane were removed with the old sealed cutover orchestrator. Interrupted
-cutovers are handled fix-forward: inspect the durable phase recorded under
-`.deploy/cutover-phase-<deployment_id>.env`, correct the failure, and re-run
-the deploy. `npm run prod:deploy:bootstrap` now refuses with guidance instead
-of running the removed sealed cutover.
+deploys are handled fix-forward: inspect the stage receipts under
+`~/krw-agnet-prod/deploy-receipts/`, correct the failure, and re-run
+`npm run prod:deploy:full`. `npm run prod:deploy:bootstrap` now refuses with
+guidance instead of running the removed sealed cutover.
 
 ## Health Checks
 
@@ -212,7 +193,7 @@ After `supabase db push`, schema rollback is deliberately manual: use a
 forward-compatible follow-up migration or the legacy recovery process if the
 incident requires a sealed runtime investigation. Do not manually repoint
 `prod/current`. For current-release catalog publication only, rerun
-`npm run prod:release:publish`.
+`npm run publish:web-catalog`.
 
 Before declaring recovery, verify `npm run prod:status`, both public
 `/api/healthz` origins, private deep health, exact worker deployment/runtime
@@ -220,7 +201,8 @@ identity, and one real chat smoke test.
 
 ## Deployment Lock And Recovery
 
-Normal production mutation enters through `scripts/deploy-production-fast.sh`.
+Normal production mutation enters through `scripts/deploy-production-full.sh`
+(the agent-repo controller adapter).
 It holds a macOS kernel `lockf` lock and does not pause the local ontology queue:
 normal code deploys do not change `prod/current`. The large
 `deploy-production-simple.sh` wrapper no longer deploys: it only cleans up an

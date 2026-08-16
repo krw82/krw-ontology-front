@@ -301,8 +301,7 @@ NODE
 refuse_removed_sealed_cutover() {
   echo "The legacy sealed cutover orchestrator (deploy-all-production.sh) was removed." >&2
   echo "Production deploys are fix-forward only. Use 'npm run prod:deploy:full'" >&2
-  echo "(agent-repo controller adapter) or the validated fast fallback" >&2
-  echo "'npm run prod:deploy:code' (scripts/deploy-production-fast.sh)." >&2
+  echo "(agent-repo controller adapter)." >&2
   exit 1
 }
 

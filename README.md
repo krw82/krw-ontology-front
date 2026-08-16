@@ -89,34 +89,28 @@ Claude Agent SDK 또는 Claude Code 실행 파일을 프론트 배포물에 포�
 있습니다. 새 자동화와 수동 작업은 `dev:*`, `prod:*`, `legacy:*` 이름을
 우선 사용합니다.
 
-평소 코드 배포:
+production 배포 (코드, migration, Mac runtime 전체를 12-stage controller로):
 
 ```bash
-npm run prod:deploy:code
+npm run prod:deploy:full -- --agent-provider deepseek
 ```
 
-`prod:deploy:web`은 GCP web/API와 stateless support worker만, `prod:deploy:runtime`은
-Mac MCP/agent runtime만 갱신합니다. runtime 배포는 새 버전 경로에 Ontology plugin을
-동일 소스에서 materialize한 뒤 MCP fingerprint와 worker heartbeat를 검증하고, 둘 중
-하나라도 실패하면 active runtime 전환을 중단합니다. 둘을 함께 반영할 때는
-`prod:deploy:code`를 사용합니다. GCP ontology MCP/agent sidecar는 운영하지 않습니다.
+legacy fast script(`deploy-production-fast.sh`)와 부분 전환 변형
+(`prod:deploy:web` / `prod:deploy:runtime` / `prod:deploy:code` 등)은
+삭제됐습니다. 배포는 항상 전체를 검증하며, 실패 시 admission 게이트가
+닫힌 채 receipt를 남기고 fix-forward로만 재실행합니다. GCP ontology
+MCP/agent sidecar는 운영하지 않습니다.
 
 현재 prod/current의 web catalog만 재게시:
 
 ```bash
-npm run prod:release:publish
-```
-
-전체 배포:
-
-```bash
-npm run prod:deploy:full
+npm run publish:web-catalog
 ```
 
 `prod:deploy:full`은 DB schema, web, 그리고 sealed Rust agent release를 함께
 전환하지만 ontology catalog를 재발행하지는 않는다. catalog publication은 ontology
 source/data release 자체를 검증하는 별도 작업이므로, 실제 catalog 변경이 있을 때만
-`npm run prod:release:publish`를 명시적으로 실행한다.
+`npm run publish:web-catalog`를 명시적으로 실행한다.
 
 서로 다른 ontology release를 `prod/current`로 승격하는 자동 경로는 현재
 fail-closed입니다. `--release-id`는 이미 current인 ID만 허용합니다. 운영자가
