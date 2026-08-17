@@ -728,7 +728,7 @@ async function pollFmpNewsSource(db: Db, config: MarketWebSourceRuntimeConfig, s
           extractionConfidence: 0.95,
         },
       );
-      await processCorrelateMessage(db, config, { source_item_id: text(sourceItem.id) });
+      await correlateSourceItem(db, config, tickerSource, sourceItem);
       ingested += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown fmp news ingestion failure";
@@ -905,6 +905,19 @@ async function processCorrelateMessage(db: Db, config: MarketWebSourceRuntimeCon
   if (!sourceItem || text(sourceItem.env) !== config.environment) return;
   const source = await loadSource(db, config.environment, text(sourceItem.source_id));
   if (!source) throw new Error("market_web_correlate_source_missing");
+  await correlateSourceItem(db, config, source, sourceItem);
+}
+
+// Shared correlate core. processCorrelateMessage resolves the source through
+// loadSource (active-only, queue-owned path); the FMP dispatcher passes the
+// per-ticker attribution source row directly because those rows stay
+// active=false so the poll scheduler never enqueues them.
+async function correlateSourceItem(
+  db: Db,
+  config: MarketWebSourceRuntimeConfig,
+  source: Row,
+  sourceItem: Row,
+): Promise<void> {
   if (!assessMarketIssueFreshness(source, sourceItem).eligible) return;
 
   if (await enqueueMarketEventBatch({
@@ -914,7 +927,7 @@ async function processCorrelateMessage(db: Db, config: MarketWebSourceRuntimeCon
     environment: config.environment,
   })) return;
 
-  const existingIssue = await findCorrelatedIssue(db, config.environment, sourceItemId, sourceItem);
+  const existingIssue = await findCorrelatedIssue(db, config.environment, text(sourceItem.id), sourceItem);
   const issue = existingIssue || await createWebIssue(db, config, source, sourceItem);
   await attachSourceItemToIssue(db, issue, sourceItem, existingIssue ? "corroborating" : "primary");
   await enqueueMarketIssueEnrichment({ db, issueId: text(issue.id), environment: config.environment });
