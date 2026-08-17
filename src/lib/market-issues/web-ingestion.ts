@@ -7,6 +7,7 @@ import WebSocket from "ws";
 import { enqueueMarketEventBatch, enqueueMarketIssueEnrichment } from "./enrichment";
 import { assessMarketIssueFreshness } from "./freshness";
 import { classifyAsNewsEvent, type NewsClassifierConfig } from "./news-classifier";
+import { fetchFmpJson, fmpApiKey } from "../valuation/fmp-client";
 
 type Row = Record<string, unknown>;
 type Db = SupabaseClient;
@@ -56,12 +57,16 @@ export type MarketWebSourceRuntimeConfig = {
   zaiApiKey: string;
   zaiModel: string;
   zaiTimeoutMs: number;
+  fmpNewsEnabled: boolean;
+  fmpNewsMaxAgeHours: number;
+  fmpNewsSymbolBatchSize: number;
 };
 
 export type MarketWebIngestionResult = {
   environment: MarketIssueEnvironment;
   seededSources: number;
   refreshedCompanyCoverage: number | null;
+  fmpSeededSources: number | null;
   poll: QueueResult;
   detail: QueueResult;
   correlate: QueueResult;
@@ -170,6 +175,9 @@ export function getMarketWebSourceRuntimeConfig(
     zaiApiKey: environment.MARKET_ISSUE_ZAI_API_KEY || environment.ZAI_API_KEY || "",
     zaiModel: environment.MARKET_ISSUE_ZAI_MODEL || "glm-5.1",
     zaiTimeoutMs: boundedNumber(environment.MARKET_ISSUE_ZAI_TIMEOUT_MS, 120000, 10000, 300000),
+    fmpNewsEnabled: environment.MARKET_FMP_NEWS_ENABLED === "true" || environment.MARKET_FMP_NEWS_ENABLED === "1",
+    fmpNewsMaxAgeHours: boundedNumber(environment.MARKET_FMP_NEWS_MAX_AGE_HOURS, 72, 1, 720),
+    fmpNewsSymbolBatchSize: boundedNumber(environment.MARKET_FMP_NEWS_SYMBOL_BATCH_SIZE, 40, 1, 100),
   };
 }
 
@@ -196,12 +204,13 @@ export async function runMarketWebSourceIngestionCycle(input: {
   const maxQueueJobs = input.maxQueueJobs || config.maxQueueJobs;
   const seededSources = await syncMarketIssueWebSources(db, config);
   const refreshedCompanyCoverage = await refreshMarketCompanySourceCoverage(db, config.environment);
+  const fmpSeededSources = await syncFmpNewsSources(db, config);
 
   const poll = await consumeQueue(db, config, "poll", maxQueueJobs, processPollMessage);
   const detail = await consumeQueue(db, config, "detail", maxQueueJobs, processDetailMessage);
   const correlate = await consumeQueue(db, config, "correlate", maxQueueJobs, processCorrelateMessage);
 
-  return { environment: config.environment, seededSources, refreshedCompanyCoverage, poll, detail, correlate };
+  return { environment: config.environment, seededSources, refreshedCompanyCoverage, fmpSeededSources, poll, detail, correlate };
 }
 
 async function refreshMarketCompanySourceCoverage(
@@ -306,6 +315,11 @@ async function processPollMessage(db: Db, config: MarketWebSourceRuntimeConfig, 
 
   if (text(source.adapter_type) === "sec_catalog") {
     await pollSecCatalogSource(db, config, source);
+    return;
+  }
+
+  if (text(source.adapter_type) === FMP_NEWS_ADAPTER_TYPE) {
+    await pollFmpNewsSource(db, config, source);
     return;
   }
 
@@ -457,6 +471,299 @@ async function pollSecCatalogSource(
   await db.from("market_issue_sources")
     .update({ last_collected_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() })
     .eq("id", source.id);
+}
+
+// ---- FMP market news adapter ----
+//
+// One active "dispatcher" source polls /stable/news/stock in ticker batches
+// (one API call per batch) and routes each article to a per-ticker attribution
+// source row seeded from market_company_source_registry. Ticker rows stay
+// active=false so the poll scheduler never enqueues them directly; items are
+// persisted against them by the dispatcher for display name + ticker
+// source_tags (deterministic entity attachment).
+
+const FMP_NEWS_ADAPTER_TYPE = "fmp_news";
+const FMP_NEWS_SOURCE_KEY = "fmp-market-news";
+const FMP_NEWS_POLL_INTERVAL_SECONDS = 900;
+const FMP_NEWS_SYNC_INTERVAL_MS = 10 * 60 * 1000;
+const FMP_NEWS_MAP_TTL_MS = 5 * 60 * 1000;
+const FMP_NEWS_BODY_MAX_CHARS = 20_000;
+const FMP_NEWS_ENDPOINT = "/news/stock";
+
+export type FmpNewsArticle = {
+  ticker: string;
+  title: string;
+  body: string;
+  url: string;
+  site: string | null;
+  image: string | null;
+  publishedAt: string;
+};
+
+export function parseFmpNewsArticles(value: unknown): FmpNewsArticle[] {
+  if (!Array.isArray(value)) return [];
+  const articles: FmpNewsArticle[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const record = item as Record<string, unknown>;
+    const ticker = text(record.symbol || record.ticker).trim().toUpperCase();
+    const url = text(record.url || record.link).trim();
+    const body = text(record.text || record.content || record.body).trim();
+    const title = text(record.title || record.headline).trim();
+    const publishedAt = parseFmpNewsDate(text(record.publishedDate || record.published_date || record.date));
+    if (!ticker || !url || !body || !publishedAt) continue;
+    articles.push({
+      ticker: ticker.slice(0, 16),
+      title: title.slice(0, 500),
+      body,
+      url,
+      site: nullableText(record.site) || nullableText(record.publisher),
+      image: nullableText(record.image),
+      publishedAt,
+    });
+  }
+  return articles;
+}
+
+// FMP space-separated datetimes ("2026-08-17 10:00:00") carry no timezone
+// designator; treat them as UTC so freshness windows stay deterministic
+// regardless of the worker host timezone.
+function parseFmpNewsDate(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(trimmed);
+  const normalized = trimmed.includes("T") ? trimmed : trimmed.replace(" ", "T");
+  const parsed = new Date(hasTimezone ? normalized : `${normalized}Z`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+export function filterFmpArticlesForIngest(
+  articles: FmpNewsArticle[],
+  input: { now: Date; maxAgeHours: number; maxItems: number; knownTickers: ReadonlySet<string> },
+): {
+  accepted: FmpNewsArticle[];
+  skippedStale: number;
+  skippedUnknownTicker: number;
+  skippedInvalidUrl: number;
+  seenUrls: Set<string>;
+} {
+  const cutoffMs = input.now.getTime() - input.maxAgeHours * 60 * 60 * 1000;
+  const accepted: FmpNewsArticle[] = [];
+  const seenUrls = new Set<string>();
+  let skippedStale = 0;
+  let skippedUnknownTicker = 0;
+  let skippedInvalidUrl = 0;
+  for (const article of articles) {
+    if (accepted.length >= input.maxItems) break;
+    let canonical: URL;
+    try {
+      canonical = new URL(article.url);
+      if (canonical.protocol !== "https:" && canonical.protocol !== "http:") throw new Error("invalid_protocol");
+    } catch {
+      skippedInvalidUrl += 1;
+      continue;
+    }
+    const dedupeKey = `${article.ticker}:${normalizeCanonicalUrl(canonical.href).toLowerCase()}`;
+    if (seenUrls.has(dedupeKey)) continue;
+    seenUrls.add(dedupeKey);
+    if (Date.parse(article.publishedAt) < cutoffMs) {
+      skippedStale += 1;
+      continue;
+    }
+    if (!input.knownTickers.has(article.ticker)) {
+      skippedUnknownTicker += 1;
+      continue;
+    }
+    accepted.push(article);
+  }
+  return { accepted, skippedStale, skippedUnknownTicker, skippedInvalidUrl, seenUrls };
+}
+
+const fmpNewsSyncAt = new Map<string, number>();
+const fmpNewsTickerMapCache = new Map<string, { at: number; map: Map<string, Row> }>();
+
+export async function syncFmpNewsSources(db: Db, config: MarketWebSourceRuntimeConfig): Promise<number | null> {
+  const now = Date.now();
+  const previous = fmpNewsSyncAt.get(config.environment) || 0;
+  if (now - previous < FMP_NEWS_SYNC_INTERVAL_MS) return null;
+  fmpNewsSyncAt.set(config.environment, now);
+
+  const { data: registryRows, error: registryError } = await db
+    .from("market_company_source_registry")
+    .select("ticker,company_name")
+    .eq("env", config.environment)
+    .eq("active", true)
+    .limit(2000);
+  if (registryError) throw registryError;
+
+  const dispatcherActive = config.fmpNewsEnabled && fmpApiKey().length > 0;
+  const dispatcher = {
+    env: config.environment,
+    source_type: "web",
+    source_key: FMP_NEWS_SOURCE_KEY,
+    adapter_type: FMP_NEWS_ADAPTER_TYPE,
+    channel_type: "newsroom",
+    display_name: "FMP 시장 뉴스",
+    source_class: "registered_media",
+    discovery_url: "https://financialmodelingprep.com/stable/news/stock",
+    canonical_host: "financialmodelingprep.com",
+    poll_interval_seconds: FMP_NEWS_POLL_INTERVAL_SECONDS,
+    priority: 40,
+    max_items_per_poll: 50,
+    source_tags: ["company_news", "aggregator"],
+    adapter_config: { mode: "dispatcher" },
+    active: dispatcherActive,
+    updated_at: new Date().toISOString(),
+  };
+  const tickerRows = asRows(registryRows).map((row) => {
+    const ticker = text(row.ticker).trim().toUpperCase();
+    return {
+      env: config.environment,
+      source_type: "web",
+      source_key: `fmp-news-${ticker}`,
+      adapter_type: FMP_NEWS_ADAPTER_TYPE,
+      channel_type: "newsroom",
+      display_name: `${text(row.company_name, ticker)} 시장 뉴스 (FMP)`,
+      source_class: "registered_media",
+      discovery_url: "https://financialmodelingprep.com/stable/news/stock",
+      canonical_host: "financialmodelingprep.com",
+      poll_interval_seconds: 86_400,
+      priority: 30,
+      max_items_per_poll: 10,
+      source_tags: ["company_news", ticker],
+      adapter_config: { mode: "attribution", ticker },
+      active: false,
+      updated_at: new Date().toISOString(),
+    };
+  });
+
+  const { error: upsertError } = await db
+    .from("market_issue_sources")
+    .upsert([dispatcher, ...tickerRows], { onConflict: "env,source_type,source_key" });
+  if (upsertError) throw upsertError;
+  fmpNewsTickerMapCache.delete(config.environment);
+  return tickerRows.length;
+}
+
+async function loadFmpTickerSources(db: Db, config: MarketWebSourceRuntimeConfig): Promise<Map<string, Row>> {
+  const cached = fmpNewsTickerMapCache.get(config.environment);
+  if (cached && Date.now() - cached.at < FMP_NEWS_MAP_TTL_MS) return cached.map;
+  const { data, error } = await db
+    .from("market_issue_sources")
+    .select("id,display_name,source_tags,adapter_config,source_key")
+    .eq("env", config.environment)
+    .eq("source_type", "web")
+    .eq("adapter_type", FMP_NEWS_ADAPTER_TYPE)
+    .limit(2000);
+  if (error) throw error;
+  const map = new Map<string, Row>();
+  for (const raw of asRows(data)) {
+    const adapterConfig = asRow(raw.adapter_config) || {};
+    if (text(adapterConfig.mode) !== "attribution") continue;
+    const ticker = text(adapterConfig.ticker).trim().toUpperCase();
+    if (ticker) map.set(ticker, raw);
+  }
+  fmpNewsTickerMapCache.set(config.environment, { at: Date.now(), map });
+  return map;
+}
+
+async function pollFmpNewsSource(db: Db, config: MarketWebSourceRuntimeConfig, source: Row): Promise<void> {
+  const adapterConfig = asRow(source.adapter_config) || {};
+  if (text(adapterConfig.mode) !== "dispatcher") return;
+  if (!config.fmpNewsEnabled) return;
+
+  const startedAt = new Date().toISOString();
+  const tickerSources = await loadFmpTickerSources(db, config);
+  let articles: FmpNewsArticle[] = [];
+  let apiCallCount = 0;
+  try {
+    const tickers = Array.from(tickerSources.keys());
+    const batchSize = Math.max(1, Math.min(config.fmpNewsSymbolBatchSize, 100));
+    for (let offset = 0; offset < tickers.length; offset += batchSize) {
+      const batch = tickers.slice(offset, offset + batchSize);
+      apiCallCount += 1;
+      const pageArticles = await fetchFmpJson<unknown>(FMP_NEWS_ENDPOINT, {
+        symbols: batch.join(","),
+        page: "0",
+      });
+      articles = articles.concat(parseFmpNewsArticles(pageArticles));
+    }
+  } catch (error) {
+    await recordFetchFailure(db, text(source.id), "discovery", text(source.discovery_url), config.workerId, error);
+    throw error;
+  }
+  articles.sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
+
+  const maxItems = Math.max(1, Number(source.max_items_per_poll) || 50);
+  const filtered = filterFmpArticlesForIngest(articles, {
+    now: new Date(),
+    maxAgeHours: config.fmpNewsMaxAgeHours,
+    maxItems,
+    knownTickers: new Set(tickerSources.keys()),
+  });
+
+  const failures: string[] = [];
+  let ingested = 0;
+  for (const article of filtered.accepted) {
+    const tickerSource = tickerSources.get(article.ticker);
+    if (!tickerSource) continue;
+    try {
+      const sourceItem = await persistWebSourceItem(
+        db,
+        config,
+        tickerSource,
+        {
+          candidate_url: article.url,
+          published_at: article.publishedAt,
+          discovered_at: new Date().toISOString(),
+        },
+        {
+          canonicalUrl: normalizeCanonicalUrl(article.url),
+          title: article.title || null,
+          body: article.body.slice(0, FMP_NEWS_BODY_MAX_CHARS),
+          imageUrls: article.image ? [article.image] : [],
+          publishedAt: article.publishedAt,
+          publishedAtIsInferred: false,
+          extractionMethod: "fmp_news_api",
+          extractionConfidence: 0.95,
+        },
+      );
+      await processCorrelateMessage(db, config, { source_item_id: text(sourceItem.id) });
+      ingested += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unknown fmp news ingestion failure";
+      failures.push(`${article.ticker}: ${message}`.slice(0, 300));
+    }
+  }
+
+  await insertFetchRun(db, {
+    sourceId: text(source.id),
+    phase: "discovery",
+    workerId: config.workerId,
+    requestUrl: text(source.discovery_url),
+    status: failures.length > 0 && ingested === 0 ? "failed" : "succeeded",
+    httpStatus: 200,
+    extractionMethod: FMP_NEWS_ADAPTER_TYPE,
+    errorMessage: failures.length > 0 ? failures.join(" | ").slice(0, 900) : undefined,
+    metadata: {
+      fetched_article_count: articles.length,
+      api_call_count: apiCallCount,
+      ingested_item_count: ingested,
+      skipped_stale: filtered.skippedStale,
+      skipped_unknown_ticker: filtered.skippedUnknownTicker,
+      skipped_invalid_url: filtered.skippedInvalidUrl,
+      failure_count: failures.length,
+    },
+    startedAt,
+    finishedAt: new Date().toISOString(),
+  });
+  await db.from("market_issue_sources")
+    .update({
+      last_collected_at: new Date().toISOString(),
+      last_error: failures.length > 0 ? failures.join(" | ").slice(0, 500) : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", text(source.id));
 }
 
 async function processDetailMessage(db: Db, config: MarketWebSourceRuntimeConfig, payload: Row): Promise<void> {
@@ -624,7 +931,11 @@ async function persistWebSourceItem(
   const canonicalUrlHash = hashText(article.canonicalUrl.toLowerCase().trim());
   const candidateRaw = asRow(candidate.raw_candidate) || {};
   const filingEventId = text(source.adapter_type) === "sec_catalog" ? nullableText(candidateRaw.id) : null;
-  const externalItemId = filingEventId ? `sec:${filingEventId}` : `web:${canonicalUrlHash}`;
+  const externalItemId = filingEventId
+    ? `sec:${filingEventId}`
+    : text(source.adapter_type) === FMP_NEWS_ADAPTER_TYPE
+      ? `fmp:${canonicalUrlHash}`
+      : `web:${canonicalUrlHash}`;
   const publishedAt = article.publishedAt || nullableText(candidate.published_at) || new Date().toISOString();
   const row = {
     env: config.environment,
