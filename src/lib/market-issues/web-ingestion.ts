@@ -650,7 +650,7 @@ async function loadFmpTickerSources(db: Db, config: MarketWebSourceRuntimeConfig
   if (cached && Date.now() - cached.at < FMP_NEWS_MAP_TTL_MS) return cached.map;
   const { data, error } = await db
     .from("market_issue_sources")
-    .select("id,display_name,source_tags,adapter_config,source_key")
+    .select("id,display_name,source_tags,source_class,adapter_type,adapter_config,source_key")
     .eq("env", config.environment)
     .eq("source_type", "web")
     .eq("adapter_type", FMP_NEWS_ADAPTER_TYPE)
