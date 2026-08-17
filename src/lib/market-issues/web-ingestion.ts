@@ -1065,6 +1065,13 @@ async function createWebIssue(
   const settings = asRow(settingsData);
   const isLowSignal = text(sourceItem.signal_level) === "low";
   const preservePublished = text(existing?.state) === "published";
+  // A repeated near-duplicate article re-enters this upsert with the same
+  // event_key; keep the composed brief (research packet) on review-state
+  // issues instead of resetting the display back to "원문 분석 중". The new
+  // material still triggers a fresh enrichment job via its context hash.
+  const preserveComposed = preservePublished
+    || text(existing?.summary_status) === "ready"
+    || Boolean(existing?.active_research_packet_id);
   const sourceCount = Math.max(1, Number(existing?.source_count || 0) + 1);
   const sourceClass = text(source.source_class, "company_official");
   const isOfficial = ["company_official", "regulator", "exchange"].includes(sourceClass);
@@ -1077,15 +1084,15 @@ async function createWebIssue(
     env: config.environment,
     event_key: eventKey,
     state: preservePublished ? "published" : "review",
-    summary_status: preservePublished ? text(existing?.summary_status, "ready") : "pending",
-    title_ko: preservePublished
+    summary_status: preserveComposed ? text(existing?.summary_status, "ready") : "pending",
+    title_ko: preserveComposed
       ? text(existing?.title_ko, `${text(source.display_name, "공식 출처")} 원문 업데이트`)
       : `${text(source.display_name, "공식 출처")} 원문 분석 중`,
-    summary_ko: preservePublished ? text(existing?.summary_ko) : "",
-    impact_path: preservePublished ? stringArray(existing?.impact_path) : [],
-    confirmed_facts: preservePublished ? stringArray(existing?.confirmed_facts) : [],
-    unconfirmed_facts: preservePublished ? stringArray(existing?.unconfirmed_facts) : [],
-    research_paths: preservePublished ? existing?.research_paths || [] : [],
+    summary_ko: preserveComposed ? text(existing?.summary_ko) : "",
+    impact_path: preserveComposed ? stringArray(existing?.impact_path) : [],
+    confirmed_facts: preserveComposed ? stringArray(existing?.confirmed_facts) : [],
+    unconfirmed_facts: preserveComposed ? stringArray(existing?.unconfirmed_facts) : [],
+    research_paths: preserveComposed ? existing?.research_paths || [] : [],
     status_labels: [...labels].slice(0, 3),
     source_summary: {
       total: sourceCount,
