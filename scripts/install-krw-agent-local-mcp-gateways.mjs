@@ -32,7 +32,6 @@ const CONFIGS = [
   { name: "ontology", endpointRef: "krw-ontology-local" },
   { name: "feed", endpointRef: "krw-feed-local" },
   { name: "filings", endpointRef: "krw-filings-local" },
-  { name: "guru", endpointRef: "krw-guru-local" },
 ];
 
 function usage() {
@@ -237,18 +236,11 @@ async function materialize(options) {
     // operator JSON cannot announce a dead worker.
     config.checkUpstreamReady = true;
     config.normalizeReadiness = true;
-    // Guru is a pure Streamable HTTP MCP worker and deliberately has no
-    // ad-hoc /healthz endpoint. Its stateless initialize response is the
-    // truthful health proof; every other local worker exposes JSON readiness.
-    config.upstreamReadinessMode = entry.name === "guru"
-      ? "mcp_initialize"
-      : "http_json";
-    if (config.upstreamReadinessMode === "mcp_initialize") {
-      config.upstreamMcpPath = config.upstreamMcpPath ?? "/mcp";
-      delete config.upstreamReadinessPath;
-    } else {
-      config.upstreamReadinessPath = config.upstreamReadinessPath ?? "/readyz";
-    }
+    // Each upstream gets the narrowest truthful readiness proof, so a stale
+    // operator JSON cannot announce a dead worker. All local workers expose
+    // JSON readiness routes.
+    config.upstreamReadinessMode = "http_json";
+    config.upstreamReadinessPath = config.upstreamReadinessPath ?? "/readyz";
     // The operator files contain endpoint identity and TLS material; this
     // release-bound client identity is deliberately materialized here so an
     // upgraded fail-closed proxy cannot be started with an empty allowlist.
