@@ -237,9 +237,9 @@ export default function MarketIssuesPage() {
           {!loading && issues.length > 0 ? (
             <>
               {error ? (
-                <div className="mb-base flex items-center justify-between gap-base rounded-[14px] border border-[#f0d7b0] bg-[#fffaf0] px-base py-sm text-[12px] leading-5 text-[#805719]" role="status">
+                <div className="mb-base flex items-center justify-between gap-base rounded-[8px] border border-hairline bg-canvas px-base py-sm text-[12px] leading-5 text-body" role="status">
                   <span>{error}</span>
-                  <button type="button" onClick={retry} className="shrink-0 font-extrabold underline underline-offset-4">다시 시도</button>
+                  <button type="button" onClick={retry} className="shrink-0 font-extrabold text-primary underline underline-offset-4">다시 시도</button>
                 </div>
               ) : null}
               <div className="grid gap-base lg:grid-cols-2">
@@ -272,7 +272,7 @@ function MarketIssueCard({ issue }: { issue: MarketIssueCard }) {
   const visibleCompanies = issue.companies.slice(0, 4);
 
   return (
-    <article className="group flex min-h-full flex-col rounded-[22px] border border-hairline bg-white p-base shadow-[0_5px_22px_rgba(30,50,85,0.035)] transition duration-200 hover:-translate-y-0.5 hover:border-[#bdcff0] hover:shadow-[0_14px_34px_rgba(34,70,136,0.09)] sm:p-lg">
+    <article className="group flex min-h-full flex-col rounded-[8px] border border-hairline bg-white p-base transition duration-200 hover:border-primary sm:p-lg">
       <div className="flex justify-end">
         <time className="sr-only" dateTime={issue.publishedAt ?? undefined}>
           {formatIssueRelativeTime(issue.publishedAt)}
@@ -283,7 +283,7 @@ function MarketIssueCard({ issue }: { issue: MarketIssueCard }) {
         <h3 className="text-[19px] font-extrabold leading-[1.42] tracking-[-0.035em] text-ink transition group-hover:text-primary sm:text-[21px]">
           {issue.title}
         </h3>
-        <div className="mt-sm border-l-2 border-[#bcd2fa] pl-sm">
+        <div className="mt-sm border-l-2 border-primary pl-sm">
           <p className="text-[11px] font-extrabold tracking-[0.01em] text-primary">
             {issue.localNewsStage === "ai_verified" ? "AI가 검증해 정리한 한국어 맥락" : "한국어 맥락"}
           </p>
@@ -324,7 +324,7 @@ function IssueListSkeleton() {
   return (
     <div className="grid gap-base lg:grid-cols-2" aria-label="시장 이슈를 불러오는 중" role="status">
       {Array.from({ length: 6 }, (_, index) => (
-        <div key={index} className="h-[278px] animate-pulse rounded-[22px] border border-hairline bg-white p-base">
+        <div key={index} className="h-[278px] animate-pulse rounded-[8px] border border-hairline bg-white p-base">
           <div className="h-7 w-20 rounded-full bg-surface-soft" />
           <div className="mt-base h-7 w-4/5 rounded bg-surface-soft" />
           <div className="mt-sm h-5 w-full rounded bg-surface-soft" />
@@ -338,11 +338,11 @@ function IssueListSkeleton() {
 
 function IssueLoadError({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="rounded-[22px] border border-[#efd7b3] bg-[#fffaf2] px-lg py-xl text-center">
-      <span className="material-symbols-outlined text-[28px] text-[#ae7521]" aria-hidden="true">cloud_off</span>
+    <div className="rounded-[8px] border border-hairline bg-canvas px-lg py-xl text-center">
+      <span className="material-symbols-outlined text-[28px] text-muted" aria-hidden="true">cloud_off</span>
       <h3 className="mt-sm text-[17px] font-extrabold text-ink">시장 이슈를 불러오지 못했습니다.</h3>
       <p className="mt-1 text-[13px] leading-6 text-body">연결 상태를 확인한 뒤 다시 시도해주세요.</p>
-      <button type="button" onClick={onRetry} className="mt-base min-h-10 rounded-full bg-ink px-base text-[13px] font-bold text-white transition hover:bg-primary">
+      <button type="button" onClick={onRetry} className="mt-base min-h-10 rounded-full border border-hairline bg-white px-base text-[13px] font-bold text-ink transition hover:border-primary hover:text-primary">
         다시 시도
       </button>
     </div>
@@ -351,7 +351,7 @@ function IssueLoadError({ onRetry }: { onRetry: () => void }) {
 
 function MarketIssuesEmpty() {
   return (
-    <div className="rounded-[22px] border border-dashed border-[#cbd7ea] bg-[#fbfcff] px-lg py-2xl text-center">
+    <div className="rounded-[8px] border border-dashed border-hairline bg-canvas px-lg py-2xl text-center">
       <span className="material-symbols-outlined text-[32px] text-primary" aria-hidden="true">travel_explore</span>
       <h3 className="mt-sm text-[18px] font-extrabold tracking-[-0.03em] text-ink">
         지금 표시할 시장 이슈가 없습니다.
