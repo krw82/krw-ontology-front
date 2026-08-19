@@ -31,5 +31,3 @@ export interface AccumulatedRun {
   cacheHitInputTokens: number;
   cacheMissInputTokens: number;
 }
-
-export type AccumulatedToolCall = AccumulatedRun["toolCalls"][number];

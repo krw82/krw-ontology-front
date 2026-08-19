@@ -13,7 +13,6 @@ import type {
 import type { StreamingEventType } from "@/types/api-contracts";
 import {
   appendAgentRunEvent,
-  createAgentRunEventWriter,
   streamAgentRunEventsResponse,
   type AgentRunEventRow,
 } from "./run-events";
@@ -280,33 +279,6 @@ describe("agent run events", () => {
         },
       },
     ]);
-  });
-
-  it("drops token SSE blocks while preserving durable state events", async () => {
-    const fake = createEventAdmin();
-    const writer = createAgentRunEventWriter(fake.admin, "run-1");
-    const encoder = new TextEncoder();
-
-    await writer.write(
-      encoder.encode(
-        [
-          'event: token\ndata: {"content":"A"}',
-          'event: activity_update\ndata: {"stage":"retrieving","label":"검색 중"}',
-          'event: done\ndata: {"run_id":"run-1","message_id":"message-1"}',
-          "",
-        ].join("\n\n"),
-      ),
-    );
-    await writer.flush();
-
-    expect(fake.events.map((event) => event.event_type)).toEqual([
-      "activity_update",
-      "done",
-    ]);
-    expect(fake.events[0]?.payload).toEqual({
-      stage: "retrieving",
-      label: "검색 중",
-    });
   });
 
   it("replays durable events with SSE ids and stops at terminal events", async () => {

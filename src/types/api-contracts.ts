@@ -1739,14 +1739,11 @@ export interface WebContainerEnv {
   BILLING_MUTATIONS_PER_USER_PER_MINUTE?: string;
   ANALYSIS_CREDIT_ENFORCEMENT_MODE?: "shadow" | "soft_warning" | "enforced";
   KRW_ONTOLOGY_PLUGIN_PATH: string;
-  KRW_CHAT_ROUTER_MODE?: "claude" | "1" | "true";
   WEB_COMMIT: string;
   KRW_ONTOLOGY_COMMIT: string;
   GLOBAL_CONCURRENT_RUN_LIMIT: string; // "5"
   CLAUDE_MODEL: string; // "sonnet"
   CLAUDE_AGENT_MAX_TURNS: string; // "40"
-  AGENT_MAX_TOOL_CALLS: string; // "18"
-  AGENT_MAX_TOOL_RESULT_CHARS: string; // "100000"
   RESEARCH_ANSWER_ENVELOPE_ENABLED?: "0" | "1" | "true" | "false";
 }
 

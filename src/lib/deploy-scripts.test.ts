@@ -830,11 +830,8 @@ cleanup
     expect(read("scripts/start-stock-news-mcp-production.sh")).toContain("STOCK_NEWS_COVERAGE_PATH");
     expect(read("scripts/start-stock-news-mcp-dev.sh")).toContain("STOCK_NEWS_COVERAGE_PATH");
 
-    expect(statusWorkers).toContain("AGENT_SUPERVISOR_CONCURRENCY");
-    expect(statusWorkers).toContain("AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS");
     expect(statusWorkers).toContain("MAC_WORKER_NICE");
 
-    expect(packageJson).toContain("worker:mac:preflight");
     expect(packageJson).not.toContain("worker:prod:stop-gcp");
     expect(packageJson).not.toContain("worker:prod:start-gcp");
     expect(packageJson).toContain("mcp:prod:launchd:install");

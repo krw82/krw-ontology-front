@@ -35,7 +35,7 @@ runtime
   local plugin files
   local skills
   Mac-local prod/dev MCP HTTP server (GCP sidecar 없음)
-  Mac agent worker bundle/processes
+  Mac rust agent daemon (launchd com.krw.agentd)
 
 release
   immutable ontology release directory
@@ -185,8 +185,9 @@ Docker/launchd mutation, migration apply는 하지 않는다.
 npm run prod:status
 ```
 
-현재 활성 Mac runtime의 `runtime.env`를 찾아 MCP fingerprint, filings MCP,
-Mac supervisor heartbeat와 GCP Compose 상태를 확인한다.
+현재 활성 Mac runtime의 `runtime.env`를 찾아 MCP fingerprint, filings MCP와
+GCP Compose 상태를 확인한다. agent 실행은 러스트 데몬(launchd
+`com.krw.agentd`) 토폴로지로 운영된다.
 
 ## Ontology Release Build Flow
 
@@ -295,14 +296,12 @@ npm run mcp:dev:launchd:uninstall
 
 Mac-local dev MCP 서비스 명령어다. 기본 포트는 `8766`이다.
 
-```bash
-npm run worker:mac:preflight
-npm run worker:prod:status
-npm run worker:mac:launchd:install
-npm run worker:mac:launchd:uninstall
-```
+### Mac agent worker (RETIRED)
 
-prod Mac worker preflight/status/launchd 명령어다.
+`worker:mac:preflight` / `worker:mac:start` / `worker:mac:launchd:install`은
+2026-08-19 레거시 엔진 은퇴와 함께 제거되었다. 남은 명령: 언인스톨은
+`npm run worker:mac:launchd:uninstall`, env 초기화는 `npm run worker:mac:init-env`,
+운영 상태는 `npm run prod:status`.
 
 ## Supabase
 

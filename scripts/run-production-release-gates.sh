@@ -99,9 +99,9 @@ run_isolated_browser_gate_with_single_retry() {
   done
 }
 
-# `npm run check` also builds worker bundles. The production launchd supervisor
-# executes `$FRONT_DIR/.worker` with --no-build, so running the gate in-place
-# could expose new code if the live worker restarts before the schema cutover.
+# `npm run check` also builds worker bundles. Production workers run in the
+# GCP compose stack from remotely built images, never from `$FRONT_DIR/.worker`,
+# so running the gate in-place cannot expose new code before the schema cutover.
 # A private source mirror keeps every generated artifact away from production.
 EXPECTED_SOURCE_SHA256=$(node \
   "$SCRIPT_DIR/compute-production-source-sha256.mjs" "$FRONT_DIR")

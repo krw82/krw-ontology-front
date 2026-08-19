@@ -9,9 +9,6 @@ services:
       - NEXT_PUBLIC_SUPABASE_URL=http://host.docker.internal:54321
       - SUPABASE_URL=http://host.docker.internal:54321
       - GLOBAL_CONCURRENT_RUN_LIMIT=4
-      - LEASE_HEARTBEAT_INTERVAL_MS=30000
-      - AGENT_MAX_TOOL_CALLS=24
-      - AGENT_MAX_TOOL_RESULT_CHARS=80000
   document-worker:
     cpus: "0.3"
     mem_limit: 900m
