@@ -71,7 +71,7 @@ function CompanyCatalogSkeleton() {
       {Array.from({ length: 6 }, (_, index) => (
         <div
           key={index}
-          className="grid min-h-[112px] grid-cols-[88px_minmax(0,1fr)] gap-4 border-b border-hairline-soft px-4 py-4 last:border-b-0 xl:grid-cols-[148px_minmax(160px,1.1fr)_minmax(200px,1.4fr)_84px_64px_64px_64px]"
+          className="grid min-h-[112px] grid-cols-[88px_minmax(0,1fr)] gap-4 border-b border-hairline-soft px-4 py-4 last:border-b-0 xl:grid-cols-[148px_minmax(160px,1.1fr)_minmax(200px,1.4fr)_84px_64px_64px_64px_64px]"
         >
           <div className="motion-loading-block h-5 w-14 rounded bg-surface-soft" />
           <div className="space-y-2">
@@ -84,6 +84,9 @@ function CompanyCatalogSkeleton() {
           </div>
           <div className="hidden xl:block">
             <div className="motion-loading-block ml-auto h-4 w-14 rounded bg-surface-soft" />
+          </div>
+          <div className="hidden xl:block">
+            <div className="motion-loading-block ml-auto h-4 w-10 rounded bg-surface-soft" />
           </div>
           <div className="hidden xl:block">
             <div className="motion-loading-block ml-auto h-4 w-10 rounded bg-surface-soft" />
@@ -182,6 +185,7 @@ export default function CompaniesBrowser({
         sortPerLow: "PER 낮은순",
         sortPbrLow: "PBR 낮은순",
         sortRoeHigh: "ROE 높은순",
+        sortRoicHigh: "ROIC 높은순",
         valuationCoverageLabel: "밸류에이션",
         sortAria: "회사 목록 정렬",
         footer:
@@ -208,6 +212,7 @@ export default function CompaniesBrowser({
         sortPerLow: "Low P/E",
         sortPbrLow: "Low P/B",
         sortRoeHigh: "High ROE",
+        sortRoicHigh: "High ROIC",
         valuationCoverageLabel: "Valuation",
         sortAria: "Sort company list",
         footer:
@@ -387,12 +392,14 @@ export default function CompaniesBrowser({
     { key: "pe_ttm", label: copy.sortPerLow },
     { key: "pb", label: copy.sortPbrLow },
     { key: "roe_ttm", label: copy.sortRoeHigh },
+    { key: "roic_ttm", label: copy.sortRoicHigh },
   ];
   const metricHeaders: { key: MetricValuationSortKey; label: string }[] = [
     { key: "market_cap", label: "mkt cap" },
     { key: "pe_ttm", label: "per" },
     { key: "pb", label: "pbr" },
     { key: "roe_ttm", label: "roe" },
+    { key: "roic_ttm", label: "roic" },
   ];
   const valuationSortDisabled = isSearchActive || !valuationByTicker;
 
@@ -548,7 +555,7 @@ export default function CompaniesBrowser({
                 ease: easeOutExpo,
               }}
             >
-              <div className="hidden grid-cols-[148px_minmax(160px,1.1fr)_minmax(200px,1.4fr)_84px_64px_64px_64px] border-b border-hairline bg-surface px-4 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted xl:grid">
+              <div className="hidden grid-cols-[148px_minmax(160px,1.1fr)_minmax(200px,1.4fr)_84px_64px_64px_64px_64px] border-b border-hairline bg-surface px-4 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted xl:grid">
                 <span>ticker</span>
                 <span>company</span>
                 <span>activity</span>

@@ -216,7 +216,7 @@ export default function CompanyListItem({
   }
 
   return (
-    <article className="grid grid-cols-[56px_minmax(0,1fr)] gap-x-3 gap-y-1 px-4 py-4 transition-[transform,color,background-color] duration-150 ease-out group-hover:bg-surface xl:grid-cols-[148px_minmax(160px,1.1fr)_minmax(200px,1.4fr)_84px_64px_64px_64px] xl:items-start xl:gap-3 xl:py-3.5 group-active:bg-surface-soft">
+    <article className="grid grid-cols-[56px_minmax(0,1fr)] gap-x-3 gap-y-1 px-4 py-4 transition-[transform,color,background-color] duration-150 ease-out group-hover:bg-surface xl:grid-cols-[148px_minmax(160px,1.1fr)_minmax(200px,1.4fr)_84px_64px_64px_64px_64px] xl:items-start xl:gap-3 xl:py-3.5 group-active:bg-surface-soft">
       <div className="row-span-4 flex min-w-0 items-start xl:row-auto xl:block">
         <div className="flex min-w-0 items-start gap-3">
           <CompanyLogo
@@ -330,6 +330,11 @@ function ValuationCells({
       <p className={cellClass}>
         <span className={valueClass(valuation?.roe_ttm == null)}>
           {formatValuationPercent(valuation?.roe_ttm ?? null)}
+        </span>
+      </p>
+      <p className={cellClass}>
+        <span className={valueClass(valuation?.roic_ttm == null)}>
+          {formatValuationPercent(valuation?.roic_ttm ?? null)}
         </span>
       </p>
     </>

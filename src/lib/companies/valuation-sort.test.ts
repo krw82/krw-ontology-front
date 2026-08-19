@@ -21,6 +21,7 @@ function metrics(
       pe_ttm: null,
       pb: null,
       roe_ttm: null,
+      roic_ttm: null,
       fundamental_period_end: null,
       computed_at: null,
       ...values,
@@ -125,12 +126,30 @@ describe("formatters", () => {
 });
 
 describe("DEFAULT_VALUATION_SORT_DIRECTION", () => {
-  it("prefers cheap multiples, big caps, and high ROE", () => {
+  it("prefers cheap multiples, big caps, and high returns", () => {
     expect(DEFAULT_VALUATION_SORT_DIRECTION).toEqual({
       market_cap: "desc",
       pe_ttm: "asc",
       pb: "asc",
       roe_ttm: "desc",
+      roic_ttm: "desc",
     });
+  });
+
+  it("sorts ROIC descending with nulls last", () => {
+    const sorted = sortCompaniesByValuation(
+      [
+        metrics("NOISY", { roic_ttm: null }),
+        metrics("ALPHA", { roic_ttm: 0.83 }),
+        metrics("BETA", { roic_ttm: 0.16 }),
+      ],
+      "roic_ttm",
+      "desc",
+    );
+    expect(sorted.map((item) => item.ticker)).toEqual([
+      "ALPHA",
+      "BETA",
+      "NOISY",
+    ]);
   });
 });

@@ -4,6 +4,7 @@ export interface CompanyValuationMetrics {
   pe_ttm: number | null;
   pb: number | null;
   roe_ttm: number | null;
+  roic_ttm: number | null;
   fundamental_period_end: string | null;
   computed_at: string | null;
 }
@@ -13,7 +14,8 @@ export type ValuationSortKey =
   | "market_cap"
   | "pe_ttm"
   | "pb"
-  | "roe_ttm";
+  | "roe_ttm"
+  | "roic_ttm";
 
 export type ValuationSortDirection = "asc" | "desc";
 
@@ -31,6 +33,7 @@ export const DEFAULT_VALUATION_SORT_DIRECTION: Record<
   pe_ttm: "asc",
   pb: "asc",
   roe_ttm: "desc",
+  roic_ttm: "desc",
 };
 
 /**

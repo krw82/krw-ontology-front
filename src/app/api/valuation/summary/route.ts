@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 const WINDOW_DAYS = 30;
 const MAX_ROWS = 2000;
 const COLUMNS =
-  "ticker, market_cap, pe_ttm, pb, roe_ttm, fundamental_period_end, computed_at";
+  "ticker, market_cap, pe_ttm, pb, roe_ttm, roic_ttm, fundamental_period_end, computed_at";
 
 interface SnapshotRow {
   ticker: string | null;
@@ -21,6 +21,7 @@ interface SnapshotRow {
   pe_ttm: number | null;
   pb: number | null;
   roe_ttm: number | null;
+  roic_ttm: number | null;
   fundamental_period_end: string | null;
   computed_at: string | null;
 }
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
       pe_ttm: row.pe_ttm,
       pb: row.pb,
       roe_ttm: row.roe_ttm,
+      roic_ttm: row.roic_ttm,
       fundamental_period_end: row.fundamental_period_end,
       computed_at: row.computed_at,
     }));
