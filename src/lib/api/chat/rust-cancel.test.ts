@@ -21,6 +21,7 @@ import { getRustAgentRuntime } from "@/lib/agent-v1/runtime";
 import { markAgentRunTerminal } from "@/lib/agent/run-lifecycle";
 import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
+import type { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { cancelRustAgentRun } from "./rust-cancel";
 
 const RUN = {
@@ -48,9 +49,7 @@ function createAdmin() {
           },
         };
       },
-    } as unknown as ReturnType<
-      typeof import("@/lib/supabase/admin").getSupabaseAdmin
-    >,
+    } as unknown as ReturnType<typeof getSupabaseAdmin>,
   };
 }
 

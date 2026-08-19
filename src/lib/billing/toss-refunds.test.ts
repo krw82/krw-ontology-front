@@ -23,7 +23,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 import { areBillingWritesEnabled } from "@/lib/billing/billing-writes";
-import { TossBillingFlowError } from "@/lib/billing/toss-billing-error";
+import type { TossBillingFlowError } from "@/lib/billing/toss-billing-error";
 import {
   cancelTossPayment,
   getTossPaymentByPaymentKey,

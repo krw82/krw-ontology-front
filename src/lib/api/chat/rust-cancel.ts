@@ -2,7 +2,7 @@ import { getRustAgentRuntime } from "@/lib/agent-v1/runtime";
 import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import { markAgentRunTerminal } from "@/lib/agent/run-lifecycle";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
-import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import type { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { CANCELLED_ASSISTANT_MESSAGE } from "@/lib/chat/message-status";
 
 export interface RustAgentCancelTarget {
