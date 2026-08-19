@@ -155,14 +155,6 @@ export default function CompaniesBrowser({
       return valuation ? { ...company, valuation } : company;
     });
   }, [companies, valuationByTicker]);
-  const valuationCoveredCount = useMemo(
-    () =>
-      valuationByTicker
-        ? companies.filter((company) => valuationByTicker.has(company.ticker))
-            .length
-        : 0,
-    [companies, valuationByTicker],
-  );
   const copy = locale === "ko"
       ? {
         eyebrow: "회사 찾기",
@@ -186,7 +178,6 @@ export default function CompaniesBrowser({
         sortPbrLow: "PBR 낮은순",
         sortRoeHigh: "ROE 높은순",
         sortRoicHigh: "ROIC 높은순",
-        valuationCoverageLabel: "밸류에이션",
         sortAria: "회사 목록 정렬",
         footer:
           "© 2026 KRW.O. 공시 근거 기반 기업 리서치.",
@@ -213,7 +204,6 @@ export default function CompaniesBrowser({
         sortPbrLow: "Low P/B",
         sortRoeHigh: "High ROE",
         sortRoicHigh: "High ROIC",
-        valuationCoverageLabel: "Valuation",
         sortAria: "Sort company list",
         footer:
           "© 2026 KRW.O. Filing-grounded company research.",
@@ -542,10 +532,6 @@ export default function CompaniesBrowser({
                   {chip.label}
                 </button>
               ))}
-              <p className="ml-auto min-w-0 font-mono text-[11px] font-bold leading-4 text-muted-soft">
-                {copy.valuationCoverageLabel}{" "}
-                {valuationCoveredCount.toLocaleString()}/{companies.length.toLocaleString()} · TTM
-              </p>
             </div>
             <motion.div
               layout={animateCompanyRows}
