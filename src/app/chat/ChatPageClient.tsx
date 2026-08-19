@@ -11,6 +11,7 @@ import {
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { trackClientEventSilently } from "@/lib/analytics/client";
 import TopNav from "@/components/TopNav";
 import ChatMessage from "@/components/ChatMessage";
 import CompanyLogo from "@/components/CompanyLogo";
@@ -25,6 +26,7 @@ import RunStatusDock from "@/components/RunStatusDock";
 import CreditLimitErrorCard from "@/components/chat/CreditLimitErrorCard";
 import RecoverableChatErrorCard from "@/components/chat/RecoverableChatErrorCard";
 import ChatSessionShareButton from "@/components/ChatSessionShareButton";
+import ChatAnswerFollowCta from "@/components/chat/ChatAnswerFollowCta";
 import ChatWatchlistHeaderActions from "@/components/chat/ChatWatchlistHeaderActions";
 import DiscoverGuideFlow from "@/components/chat/DiscoverGuideFlow";
 import GuruCompanyPicker from "@/components/chat/GuruCompanyPicker";
@@ -391,6 +393,13 @@ function ChatContent({
       latestMessageId &&
       latestMessageId !== tracker.baselineMessageId
     ) {
+      trackClientEventSilently("answer_completed", {
+        surface: isGuruWorkspace
+          ? "guru"
+          : isDiscoverRoute
+            ? "discover"
+            : "chat",
+      });
       signalPwaInstallEngagement(
         "analysis_completed",
         isGuruWorkspace ? "guru" : isDiscoverRoute ? "discover" : "chat",
@@ -977,6 +986,13 @@ function ChatContent({
                             : null
                         }
                       />
+                      {msg.role === "assistant" &&
+                      isLatestAssistantMessage &&
+                      msg.status === "completed" &&
+                      !isActiveRun &&
+                      headerActionTicker ? (
+                        <ChatAnswerFollowCta ticker={headerActionTicker} />
+                      ) : null}
                     </div>
                   );
                 })}

@@ -82,6 +82,8 @@ export const ANALYTICS_EVENT_NAMES = [
   "amendment_comparison_opened",
   "company_filing_timeline_viewed",
   "pulse_viewed",
+  "pulse_push_priming_viewed",
+  "pulse_resume_viewed",
   "pulse_item_impression",
   "pulse_item_opened",
   "pulse_item_actioned",
