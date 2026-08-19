@@ -1,7 +1,9 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { MAX_PROMPT_HISTORY_MESSAGES } from "@/lib/agent/system-prompt";
 import type { ErrorCode } from "@/types/api-contracts";
 import type { Json } from "@/types/database";
+
+/** 히스토리 프롬프트 구성 상한 — 러스트 엔진 커트오버 이전 레거시 프롬프트 빌더의 값 유지 */
+const MAX_PROMPT_HISTORY_MESSAGES = 12;
 
 export interface HistoryResult {
   userMessageId: string;
