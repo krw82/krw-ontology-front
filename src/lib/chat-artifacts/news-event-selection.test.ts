@@ -1,11 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { createAccumulator } from "@/lib/agent/stream-handler";
+import type { AccumulatedRun } from "@/lib/agent/accumulated-run";
 import type { AtomicNewsEventCard } from "@/types/api-contracts";
 import {
   buildNewsEventDisplayText,
   buildNewsEventSelectionArtifact,
   buildNewsEventSelectionUserMessage,
 } from "./news-event-selection";
+
+function createAccumulator(): AccumulatedRun {
+  return {
+    fullText: "",
+    structuredOutput: null,
+    researchSynthesisOutput: null,
+    researchSynthesisText: null,
+    displayPlanOutput: null,
+    toolCalls: [],
+    citations: [],
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheHitInputTokens: 0,
+    cacheMissInputTokens: 0,
+  };
+}
 
 describe("buildNewsEventSelectionArtifact", () => {
   it("builds a news event selection artifact from the latest Stock News event result", () => {

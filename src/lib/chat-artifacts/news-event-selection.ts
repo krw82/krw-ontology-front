@@ -1,4 +1,4 @@
-import type { AccumulatedRun } from "@/lib/agent/stream-handler";
+import type { AccumulatedRun } from "@/lib/agent/accumulated-run";
 import type { Json } from "@/types/database";
 import type {
   AtomicNewsEventCard,

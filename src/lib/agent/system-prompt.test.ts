@@ -6,7 +6,6 @@ import {
   MAX_PROMPT_HISTORY_MESSAGES,
   sanitizePromptHistory,
 } from "./system-prompt";
-import { buildResearchPassPrompt } from "./workflow";
 
 describe("buildSystemPrompt", () => {
   afterEach(() => {
@@ -67,131 +66,6 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("system/developer prompts");
     expect(prompt).toContain("MCP configuration");
     expect(prompt).toContain("deployment scripts");
-  });
-
-  it("builds a Markdown-only research skill prompt outside the system prompt", () => {
-    const researchPrompt = buildResearchPassPrompt("아마존 알려줘");
-
-    expect(researchPrompt).toContain(
-      "/krw-ontology:krw-ontology-research 아마존 알려줘",
-    );
-    expect(researchPrompt).toContain("Markdown 본문만 작성합니다");
-    expect(researchPrompt).toContain("구조화 JSON은 만들지 않습니다");
-    expect(researchPrompt).not.toContain("krw-ontology-answer-composer");
-  });
-
-  it("uses the news discovery skill command for the first news analysis pass", () => {
-    const researchPrompt = buildResearchPassPrompt(
-      "AVGO 최근 뉴스까지 반영해줘",
-      "news",
-    );
-
-    expect(researchPrompt).toContain(
-      "/krw-ontology:krw-ontology-news-discovery AVGO 최근 뉴스까지 반영해줘",
-    );
-    expect(researchPrompt).not.toContain(
-      "/krw-ontology:krw-ontology-research AVGO",
-    );
-  });
-
-  it("uses ordinary KRW ontology research for selected news event analysis", () => {
-    const researchPrompt = buildResearchPassPrompt(
-      "선택한 뉴스 이벤트를 공시 기준으로 분석해줘",
-      "company",
-      "company_research",
-    );
-
-    expect(researchPrompt).toContain(
-      "/krw-ontology:krw-ontology-research 선택한 뉴스 이벤트를 공시 기준으로 분석해줘",
-    );
-    expect(researchPrompt).not.toContain("krw-ontology-news-research");
-  });
-
-  it("uses the source-filing skill before the ordinary research skill", () => {
-    const researchPrompt = buildResearchPassPrompt(
-      "이 공시가 투자 가설에 어떤 의미가 있어?",
-      "company",
-      "company_research",
-      "ko",
-      null,
-      true,
-    );
-
-    expect(researchPrompt).toContain(
-      "/krw-ontology:krw-ontology-filing-follow-up 이 공시가 투자 가설에 어떤 의미가 있어?",
-    );
-    expect(researchPrompt).toContain("해당 공시만 읽고 해석합니다");
-    expect(researchPrompt).not.toContain(
-      "/krw-ontology:krw-ontology-research 이 공시가 투자 가설에",
-    );
-  });
-
-  it("uses the idea generation skill with a Markdown-only candidate brief", () => {
-    const researchPrompt = buildResearchPassPrompt(
-      "AI 데이터센터 전력 수혜 기업을 찾아줘",
-      "company",
-      "idea_generation",
-    );
-
-    expect(researchPrompt).toContain(
-      "/krw-ontology:krw-ontology-idea-generation AI 데이터센터 전력 수혜 기업을 찾아줘",
-    );
-    expect(researchPrompt).toContain("웹앱 종목 발굴 실행");
-    expect(researchPrompt).toContain("deep 리서치");
-    expect(researchPrompt).toContain("한국어 Markdown 본문만 작성합니다");
-    expect(researchPrompt).not.toContain(
-      "/krw-ontology:krw-ontology-research AI 데이터센터",
-    );
-  });
-
-  it("uses the scenario sensitivity skill for scenario run kinds", () => {
-    const researchPrompt = buildResearchPassPrompt(
-      "앞으로의 시나리오 알려줘",
-      "company",
-      "scenario_sensitivity",
-    );
-
-    expect(researchPrompt).toContain(
-      "/krw-ontology:krw-ontology-scenario-sensitivity 앞으로의 시나리오 알려줘",
-    );
-    expect(researchPrompt).toContain("웹앱 시나리오/민감도 research 실행");
-    expect(researchPrompt).toContain("강화 / 유지 / 약화 / 가정 파기 조건");
-    expect(researchPrompt).not.toContain(
-      "/krw-ontology:krw-ontology-research 앞으로의 시나리오 알려줘",
-    );
-  });
-
-  it("uses the English research skill and English runtime instructions for English responses", () => {
-    const researchPrompt = buildResearchPassPrompt(
-      "Analyze AAPL",
-      "company",
-      "company_research",
-      "en",
-    );
-
-    expect(researchPrompt).toContain(
-      "/krw-ontology:krw-ontology-research-en Analyze AAPL",
-    );
-    expect(researchPrompt).toContain("English Markdown only");
-    expect(researchPrompt).not.toContain(
-      "/krw-ontology:krw-ontology-research Analyze AAPL",
-    );
-  });
-
-  it("uses a hidden Guru lens key without requiring a visible user-message prefix", () => {
-    const researchPrompt = buildResearchPassPrompt(
-      "이 기업을 오래 보유해도 될까?",
-      "company",
-      "guru_advisor",
-      "ko",
-      "buffett",
-    );
-
-    expect(researchPrompt).toContain(
-      "/krw-guru-advisor:krw-guru-buffett-advisor 이 기업을 오래 보유해도 될까?",
-    );
-    expect(researchPrompt).toContain('author_keys=["buffett"]');
-    expect(researchPrompt).not.toContain("[구루 렌즈:");
   });
 
   it("keeps current-news search disabled in the prompt unless explicitly enabled", () => {

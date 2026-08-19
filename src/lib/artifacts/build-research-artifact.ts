@@ -7,7 +7,7 @@ import type {
   ResearchSynthesis,
   StreamingCitation,
 } from "@/types/api-contracts";
-import type { AccumulatedRun } from "@/lib/agent/stream-handler";
+import type { AccumulatedRun } from "@/lib/agent/accumulated-run";
 import { generateArtifactHtml } from "./html-export";
 import { RESEARCH_ARTIFACT_VERSION } from "./schema";
 
