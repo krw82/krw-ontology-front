@@ -1608,27 +1608,6 @@ export interface HealthzResponse {
   timestamp: string;
 }
 
-/** GET /internal/mcp-health response */
-export interface McpHealthResponse {
-  mcp_connected: boolean;
-  ontology_env: "dev" | "staging" | "prod" | null;
-  ontology_release_id: string | null;
-  manifest_path: string | null;
-  manifest_valid: boolean;
-  agent_index_schema_version: string | null;
-  index_generated_at: string | null;
-  company_count: number | null;
-  document_count: number | null;
-  object_count: number | null;
-  index_path: string | null;
-  krw_ontology_commit: string;
-  worker_id?: string;
-  worker_status?: "idle" | "running" | "stopped" | "unhealthy";
-  worker_last_seen_at?: string;
-  catalog_release_id?: string;
-  error?: string;
-}
-
 // ============================================================
 // MCP Service Types (for internal use)
 // ============================================================
