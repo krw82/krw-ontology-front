@@ -1608,27 +1608,6 @@ export interface HealthzResponse {
   timestamp: string;
 }
 
-/** GET /internal/mcp-health response */
-export interface McpHealthResponse {
-  mcp_connected: boolean;
-  ontology_env: "dev" | "staging" | "prod" | null;
-  ontology_release_id: string | null;
-  manifest_path: string | null;
-  manifest_valid: boolean;
-  agent_index_schema_version: string | null;
-  index_generated_at: string | null;
-  company_count: number | null;
-  document_count: number | null;
-  object_count: number | null;
-  index_path: string | null;
-  krw_ontology_commit: string;
-  worker_id?: string;
-  worker_status?: "idle" | "running" | "stopped" | "unhealthy";
-  worker_last_seen_at?: string;
-  catalog_release_id?: string;
-  error?: string;
-}
-
 // ============================================================
 // MCP Service Types (for internal use)
 // ============================================================
@@ -1760,16 +1739,12 @@ export interface WebContainerEnv {
   BILLING_MUTATIONS_PER_USER_PER_MINUTE?: string;
   ANALYSIS_CREDIT_ENFORCEMENT_MODE?: "shadow" | "soft_warning" | "enforced";
   KRW_ONTOLOGY_PLUGIN_PATH: string;
-  KRW_CHAT_ROUTER_MODE?: "claude" | "1" | "true";
   WEB_COMMIT: string;
   KRW_ONTOLOGY_COMMIT: string;
   GLOBAL_CONCURRENT_RUN_LIMIT: string; // "5"
   CLAUDE_MODEL: string; // "sonnet"
   CLAUDE_AGENT_MAX_TURNS: string; // "40"
-  AGENT_MAX_TOOL_CALLS: string; // "18"
-  AGENT_MAX_TOOL_RESULT_CHARS: string; // "100000"
   RESEARCH_ANSWER_ENVELOPE_ENABLED?: "0" | "1" | "true" | "false";
-  LEASE_TIMEOUT_MINUTES: string; // "10"
 }
 
 /** Environment variables required by optional standalone MCP container */

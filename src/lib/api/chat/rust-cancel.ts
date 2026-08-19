@@ -14,20 +14,22 @@ export interface RustAgentCancelTarget {
 
 export type RustAgentCancelOutcome =
   | { kind: "cancelled" }
-  | { kind: "already_terminal" };
+  | { kind: "already_terminal" }
+  | { kind: "kernel_unavailable" };
 
 /**
  * Cancel a rust_agent run through the kernel queue — the only cancel channel
- * the Rust daemon honors — and finalize the product rows. Returns null when
- * the Rust runtime is unavailable; callers fall back to the legacy cancel
- * stamp, which is the pre-cutover behavior (no regression).
+ * the Rust daemon honors — and finalize the product rows. Returns
+ * `{ kind: "kernel_unavailable" }` when the Rust runtime cannot be reached;
+ * callers must surface that as a cancel-channel failure (503) instead of
+ * falling back to the legacy cancel stamp, which the daemon never reads.
  */
 export async function cancelRustAgentRun(params: {
   admin: ReturnType<typeof getSupabaseAdmin>;
   run: RustAgentCancelTarget;
   userId: string;
   sessionId: string;
-}): Promise<RustAgentCancelOutcome | null> {
+}): Promise<RustAgentCancelOutcome> {
   const { admin, run } = params;
   try {
     const runtime = await getRustAgentRuntime();
@@ -41,11 +43,11 @@ export async function cancelRustAgentRun(params: {
       return { kind: "already_terminal" };
     }
   } catch (error) {
-    console.warn("[chat-cancel] rust kernel cancel unavailable; using legacy cancel stamp", {
+    console.warn("[chat-cancel] rust kernel cancel unavailable; cancel channel failed", {
       runId: run.id,
       code: error instanceof Error ? error.message : "unknown",
     });
-    return null;
+    return { kind: "kernel_unavailable" };
   }
 
   await markAgentRunTerminal(admin, run.id, {

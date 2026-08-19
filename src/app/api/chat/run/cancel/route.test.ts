@@ -2,9 +2,6 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/agent/abort-manager", () => ({
-  abortRun: vi.fn(() => true),
-}));
 vi.mock("@/lib/agent/job-queue", () => ({
   requestAgentRunCancel: vi.fn(),
 }));
@@ -38,7 +35,6 @@ vi.mock("@/lib/api/chat/rust-cancel", () => ({
   cancelRustAgentRun: vi.fn(),
 }));
 
-import { abortRun } from "@/lib/agent/abort-manager";
 import { requestAgentRunCancel } from "@/lib/agent/job-queue";
 import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
@@ -167,7 +163,7 @@ describe("POST /api/chat/run/cancel", () => {
       assistantMessageId: "assistant-message-1",
       requestId: "request-1",
     });
-    vi.mocked(cancelRustAgentRun).mockResolvedValue(null);
+    vi.mocked(cancelRustAgentRun).mockResolvedValue({ kind: "already_terminal" });
   });
 
   it("stores queued assistant placeholders as cancelled, not failed", async () => {
@@ -199,7 +195,6 @@ describe("POST /api/chat/run/cancel", () => {
         }),
       ]),
     );
-    expect(abortRun).toHaveBeenCalledWith(RUN_ID);
     expect(releaseExecutionBudget).toHaveBeenCalledWith(
       "user-1",
       "request-1",
@@ -302,14 +297,24 @@ describe("POST /api/chat/run/cancel", () => {
       expect(requestAgentRunCancel).not.toHaveBeenCalled();
     });
 
-    it("fall back to the legacy stamp when the helper returns null", async () => {
+    it("return 503 for rust runs when the kernel cancel channel is unavailable", async () => {
       const fake = rustFake("cancelled");
       vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
-      vi.mocked(cancelRustAgentRun).mockResolvedValue(null);
+      vi.mocked(cancelRustAgentRun).mockResolvedValue({ kind: "kernel_unavailable" });
 
-      await POST(request());
+      const response = await POST(request());
+      const body = await response.json();
 
-      expect(requestAgentRunCancel).toHaveBeenCalledWith(RUN_ID);
+      expect(response.status).toBe(503);
+      expect(body).toEqual({
+        success: false,
+        error: {
+          code: "cancel_channel_unavailable",
+          message:
+            "리서치 엔진 취소 채널에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.",
+        },
+      });
+      expect(requestAgentRunCancel).not.toHaveBeenCalled();
     });
 
     it("never call the helper for claude_agent runs", async () => {

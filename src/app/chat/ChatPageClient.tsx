@@ -54,6 +54,7 @@ import {
 import { DEFAULT_LOCALE, isLocale } from "@/i18n/config";
 import { findQuestionTopic } from "@/lib/marketing/site";
 import { deriveChatPresentationContext } from "@/lib/chat/presentation-context";
+import { CHAT_ATTACHMENT_CONTEXT_SUPPORTED } from "@/lib/chat/attachment-support";
 import { createClientId } from "@/lib/client-id";
 import {
   buildComposerDraftKey,
@@ -1317,15 +1318,21 @@ function ChatContent({
               researchMode={effectiveResearchMode}
               onResearchModeChange={setResearchMode}
               urlModeAvailable={
-                !isGuruAdvisor && (isIdeaGeneration || contextTickers.length > 0)
+                CHAT_ATTACHMENT_CONTEXT_SUPPORTED &&
+                !isGuruAdvisor &&
+                (isIdeaGeneration || contextTickers.length > 0)
               }
-              fileModeAvailable={!isGuruAdvisor}
+              fileModeAvailable={CHAT_ATTACHMENT_CONTEXT_SUPPORTED && !isGuruAdvisor}
               urlOnlyFallbackMessage={
                 isIdeaGeneration
                   ? "이 URL을 바탕으로 관련 종목을 발굴해줘."
                   : undefined
               }
-              attachmentCoachmarkEnabled={!isIdeaGeneration && !isGuruAdvisor}
+              attachmentCoachmarkEnabled={
+                CHAT_ATTACHMENT_CONTEXT_SUPPORTED &&
+                !isIdeaGeneration &&
+                !isGuruAdvisor
+              }
               onUserUrlsChange={
                 isIdeaGeneration ? discoverGuide.onUserUrlsChange : undefined
               }

@@ -79,59 +79,6 @@ export async function appendAgentRunEvent(
   return data?.id ?? null;
 }
 
-export function createAgentRunEventWriter(
-  admin: SupabaseAdmin,
-  runId: string,
-) {
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  async function flushBlock(block: string) {
-    let eventType: StreamingEventType | null = null;
-    const dataLines: string[] = [];
-
-    for (const line of block.split("\n")) {
-      if (line.startsWith("event: ")) {
-        eventType = line.slice("event: ".length).trim() as StreamingEventType;
-      } else if (line.startsWith("data: ")) {
-        dataLines.push(line.slice("data: ".length));
-      } else if (line.startsWith("data:")) {
-        dataLines.push(line.slice("data:".length));
-      }
-    }
-
-    if (!eventType || dataLines.length === 0) return;
-    if (isIgnoredDurableEvent(eventType)) return;
-
-    let payload: unknown;
-    try {
-      payload = JSON.parse(dataLines.join("\n"));
-    } catch {
-      return;
-    }
-
-    await appendAgentRunEvent(admin, runId, eventType, payload);
-  }
-
-  return {
-    async write(chunk: Uint8Array) {
-      buffer += decoder.decode(chunk, { stream: true });
-
-      let boundary: number;
-      while ((boundary = buffer.indexOf("\n\n")) !== -1) {
-        const block = buffer.slice(0, boundary);
-        buffer = buffer.slice(boundary + 2);
-        await flushBlock(block);
-      }
-    },
-    async flush() {
-      const remaining = buffer.trim();
-      buffer = "";
-      if (remaining) await flushBlock(remaining);
-    },
-  };
-}
-
 export function streamAgentRunEventsResponse(
   params: StreamAgentRunEventsParams,
 ): Response {

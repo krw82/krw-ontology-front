@@ -128,7 +128,7 @@ describe("cancelRustAgentRun", () => {
     expect(appendAgentRunEvent).not.toHaveBeenCalled();
   });
 
-  it("returns null so callers fall back to the legacy stamp when the runtime is unavailable", async () => {
+  it("returns kernel_unavailable when the runtime cannot be reached", async () => {
     const fake = createAdmin();
     vi.mocked(getRustAgentRuntime).mockRejectedValue(new Error("agent_v1_release_pin_missing"));
 
@@ -139,7 +139,7 @@ describe("cancelRustAgentRun", () => {
       sessionId: "session-1",
     });
 
-    expect(outcome).toBeNull();
+    expect(outcome).toEqual({ kind: "kernel_unavailable" });
     expect(markAgentRunTerminal).not.toHaveBeenCalled();
   });
 

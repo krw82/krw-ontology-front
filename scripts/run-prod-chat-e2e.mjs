@@ -152,8 +152,8 @@ function usage() {
   console.log(`Usage: node scripts/run-prod-chat-e2e.mjs [options]
 
 Run production chat Agent E2E from the local machine using a dedicated test
-account. The script calls the production web API, lets the production
-agent-worker execute the run, then collects run/message/tool-call rows through
+account. The script calls the production web API, lets the production rust
+agent daemon execute the run, then collects run/message/tool-call rows through
 Supabase REST.
 
 Options:

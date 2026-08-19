@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node scripts/dev-with-research-engine.mjs",
     "dev:web-only": "node scripts/dev-with-worker.mjs",
-    "dev:content": "KRW_DEV_SKIP_AGENT_WORKER=1 KRW_DEV_SKIP_DOCUMENT_WORKER=1 node scripts/dev-with-worker.mjs",
+    "dev:content": "KRW_DEV_SKIP_DOCUMENT_WORKER=1 node scripts/dev-with-worker.mjs",
     "dev:web": "next dev --webpack",
     "dev:pwa": "NEXT_DIST_DIR=.next-pwa NEXT_PUBLIC_ENABLE_PWA_IN_DEV=1 next dev --webpack",
     "dev:document-worker": "npm run build:worker && node .worker/document-worker.mjs",
@@ -74,9 +74,6 @@
     "start:billing-worker": "node .worker/billing-worker.mjs",
     "start:llm-gateway": "node .services/llm-gateway.mjs",
     "worker:mac:init-env": "scripts/init-mac-worker-env.sh",
-    "worker:mac:preflight": "scripts/mac-worker-preflight.sh",
-    "worker:mac:start": "scripts/start-mac-worker-production.sh",
-    "worker:mac:launchd:install": "scripts/install-mac-worker-launchd.sh",
     "worker:mac:launchd:uninstall": "scripts/uninstall-mac-worker-launchd.sh",
     "worker:prod:status": "scripts/status-production-workers.sh",
     "mcp:prod:start": "scripts/start-mcp-server-production.sh",

@@ -626,10 +626,6 @@ cleanup
       webStart,
       llmGatewayStart,
     );
-    expect(compose).toContain(
-      "AGENT_RUN_HARD_TIMEOUT_MINUTES=${AGENT_RUN_HARD_TIMEOUT_MINUTES:-10}",
-    );
-    expect(compose).toContain("LEASE_TIMEOUT_MINUTES=${LEASE_TIMEOUT_MINUTES:-10}");
     expect(webSection).toContain(
       "AGENT_RUN_EVENT_LISTEN_DATABASE_URL=${AGENT_RUN_EVENT_LISTEN_DATABASE_URL:-}",
     );
@@ -699,7 +695,6 @@ cleanup
     const verifyMacRuntime = read("scripts/verify-mac-runtime-target.sh");
     const startFilingsMcp = read("scripts/start-filings-mcp-production.sh");
     const startStockNewsMcp = read("scripts/start-stock-news-mcp-production.sh");
-    const verifyHeartbeats = read("scripts/verify-mac-worker-heartbeats.mjs");
     const statusWorkers = read("scripts/status-production-workers.sh");
     const packageJson = read("package.json");
 
@@ -835,15 +830,8 @@ cleanup
     expect(read("scripts/start-stock-news-mcp-production.sh")).toContain("STOCK_NEWS_COVERAGE_PATH");
     expect(read("scripts/start-stock-news-mcp-dev.sh")).toContain("STOCK_NEWS_COVERAGE_PATH");
 
-    expect(verifyHeartbeats).toContain("agent_worker_heartbeats");
-    expect(verifyHeartbeats).toContain("EXPECTED_CLAUDE_CODE_VERSION");
-    expect(verifyHeartbeats).toContain("--release-id");
-    expect(verifyHeartbeats).toContain("OK Mac supervisor heartbeat");
-    expect(statusWorkers).toContain("AGENT_SUPERVISOR_CONCURRENCY");
-    expect(statusWorkers).toContain("AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS");
     expect(statusWorkers).toContain("MAC_WORKER_NICE");
 
-    expect(packageJson).toContain("worker:mac:preflight");
     expect(packageJson).not.toContain("worker:prod:stop-gcp");
     expect(packageJson).not.toContain("worker:prod:start-gcp");
     expect(packageJson).toContain("mcp:prod:launchd:install");

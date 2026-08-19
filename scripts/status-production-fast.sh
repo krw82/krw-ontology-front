@@ -50,7 +50,6 @@ test -f "$ENV_PATH" || {
 echo "Production runtime environment: $ENV_PATH"
 "$SCRIPT_DIR/verify-mcp-server-production.sh" --env-file "$ENV_PATH"
 "$SCRIPT_DIR/verify-filings-mcp-production.sh" --env-file "$ENV_PATH"
-node "$SCRIPT_DIR/verify-mac-worker-heartbeats.mjs" --env-file "$ENV_PATH" --timeout-ms 30000
 
 if [ "$SKIP_GCP" = "1" ]; then
   "$SCRIPT_DIR/status-production-workers.sh" --env-file "$ENV_PATH" --skip-gcp
