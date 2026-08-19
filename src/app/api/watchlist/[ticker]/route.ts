@@ -20,6 +20,7 @@ import {
   stringArrayInput,
   stringInput,
 } from "@/lib/watchlist/api";
+import { recordRetentionMilestone } from "@/lib/retention/milestones";
 import { getWatchlistCompanyDetail } from "@/lib/watchlist/workspace";
 
 export const runtime = "nodejs";
@@ -120,6 +121,11 @@ export async function PATCH(
       tags: tags ?? existing?.tags,
     });
     await recordCoverageMutationAnalytics(request, user.id, result, "watchlist");
+    if (coverageLevel.data === "interest" && !existing?.coverage_level) {
+      await recordRetentionMilestone(user.id, "first_company_followed", {
+        ticker: tickerResult.ticker,
+      });
+    }
     return Response.json({
       mark: result.mark,
       idempotent_replay: result.idempotentReplay,

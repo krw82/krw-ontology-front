@@ -138,6 +138,8 @@ const postInitialAnalyticsEventNameSet = new Set<string>([
   "session_share_viewed",
   "session_share_answer_read",
   "session_share_cta_clicked",
+  "pulse_push_priming_viewed",
+  "pulse_resume_viewed",
 ]);
 
 describe("analytics events migration", () => {
@@ -240,7 +242,9 @@ describe("analytics events migration", () => {
         eventName !== "session_share_created"
         && eventName !== "session_share_viewed"
         && eventName !== "session_share_answer_read"
-        && eventName !== "session_share_cta_clicked",
+        && eventName !== "session_share_cta_clicked"
+        && eventName !== "pulse_push_priming_viewed"
+        && eventName !== "pulse_resume_viewed",
     )) {
       expect(pulseRefreshMigration).toContain(`'${eventName}'`);
     }
@@ -267,7 +271,9 @@ describe("analytics events migration", () => {
       (eventName) =>
         eventName !== "session_share_viewed"
         && eventName !== "session_share_answer_read"
-        && eventName !== "session_share_cta_clicked",
+        && eventName !== "session_share_cta_clicked"
+        && eventName !== "pulse_push_priming_viewed"
+        && eventName !== "pulse_resume_viewed",
     )) {
       expect(sessionShareMigration).toContain(`'${eventName}'`);
     }
@@ -292,8 +298,32 @@ describe("analytics events migration", () => {
       sessionShareViewAnalyticsMigrationPath,
       "utf8",
     );
-    for (const eventName of ANALYTICS_EVENT_NAMES) {
+    for (const eventName of ANALYTICS_EVENT_NAMES.filter(
+      (eventName) =>
+        eventName !== "pulse_push_priming_viewed"
+        && eventName !== "pulse_resume_viewed",
+    )) {
       expect(sessionShareViewMigration).toContain(`'${eventName}'`);
+    }
+  });
+
+  it("adds the pulse priming/resume analytics events to already-created databases", () => {
+    const pulseRetentionMigration = readFileSync(
+      join(
+        process.cwd(),
+        "supabase/migrations/20260819091000_add_pulse_priming_resume_analytics.sql",
+      ),
+      "utf8",
+    );
+
+    expect(pulseRetentionMigration).toContain(
+      "drop constraint if exists analytics_events_event_name_check",
+    );
+    expect(pulseRetentionMigration).toContain(
+      "add constraint analytics_events_event_name_check",
+    );
+    for (const eventName of ANALYTICS_EVENT_NAMES) {
+      expect(pulseRetentionMigration).toContain(`'${eventName}'`);
     }
   });
 
@@ -351,7 +381,9 @@ describe("analytics events migration", () => {
         && eventName !== "session_share_created"
         && eventName !== "session_share_viewed"
         && eventName !== "session_share_answer_read"
-        && eventName !== "session_share_cta_clicked",
+        && eventName !== "session_share_cta_clicked"
+        && eventName !== "pulse_push_priming_viewed"
+        && eventName !== "pulse_resume_viewed",
     )) {
       expect(repairMigration).toContain(`'${eventName}'`);
     }

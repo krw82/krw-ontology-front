@@ -3,6 +3,7 @@ import { getAuthUser, handleAuthError } from "@/lib/auth";
 import { ensureSecCompanyIdentifier, normalizeFilingTicker } from "@/lib/filing-notifications/company-identifiers";
 import { invalidOriginResponse, isExpectedMutationOrigin } from "@/lib/filing-notifications/request";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { recordRetentionMilestone } from "@/lib/retention/milestones";
 import type { UserFilingSubscriptionRow } from "@/types/database";
 
 export const runtime = "nodejs";
@@ -76,6 +77,7 @@ export async function PUT(
       ),
     ]);
     if (pollError || preferenceError) throw new Error(pollError?.message ?? preferenceError?.message ?? "poll_state_unavailable");
+    await recordRetentionMilestone(auth.user.id, "first_filing_subscription", { ticker });
     return Response.json({ subscription, sync_status: "pending" });
   } catch {
     return Response.json({ error: { code: "service_unavailable", message: "공시 구독을 저장하지 못했습니다. 잠시 후 다시 시도해주세요." } }, { status: 503 });

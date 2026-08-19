@@ -613,9 +613,15 @@ export interface UserFilingSourceOpenRow extends Record<string, unknown> {
   last_opened_at: string;
 }
 
+export type UserRetentionMilestoneName =
+  | "coverage_activated"
+  | "first_company_followed"
+  | "first_filing_subscription"
+  | "push_enabled";
+
 export interface UserRetentionMilestoneRow extends Record<string, unknown> {
   user_id: string;
-  milestone: "coverage_activated";
+  milestone: UserRetentionMilestoneName;
   achieved_at: string;
   metadata: Json;
 }

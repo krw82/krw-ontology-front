@@ -10,6 +10,7 @@ import {
   isExpectedMutationOrigin,
 } from "@/lib/filing-notifications/request";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { recordRetentionMilestone } from "@/lib/retention/milestones";
 import type { PushSubscriptionRow } from "@/types/database";
 
 export const runtime = "nodejs";
@@ -148,6 +149,7 @@ export async function POST(request: NextRequest) {
       .from("filing_notification_preferences")
       .upsert({ user_id: auth.user.id }, { onConflict: "user_id", ignoreDuplicates: true }),
     trimOldSubscriptions(auth.user.id),
+    recordRetentionMilestone(auth.user.id, "push_enabled"),
   ]);
 
   return Response.json({ subscribed: true });
