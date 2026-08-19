@@ -566,3 +566,5 @@ printf 'chore(ops): delete the orphaned prepared-runtime activation script\n\nIt
 git add -A scripts src/lib/deploy-scripts.test.ts
 git commit -F /tmp/krw-commit-msg.txt
 ```
+ - Task 9 실행: 2026-08-19, launchd=none loaded, 삭제: .worker/agent-worker.mjs + 로그 31개(mac-agent-worker* 10, launchd-agent-worker* 20, dev-with-worker.pid 1)
+ - Task 10 실행: 2026-08-19, **판정: SSE-only — DB 미영속 확정**. 최근 3일 completed rust_agent run 10개 전부 tool_calls=0, citations=0 (agent_run_events에는 activity_update/done만 존재, tool_call 계열 이벤트도 없음). `tool_calls` 마지막 기록 2026-08-11 16:22 UTC = 구 claude_agent 실행기 마지막(732 run, 7,463행), `citations`는 0행(단 한 번도 기록 없음). 누구도 쓰지 않음: 프론트 repo insert 0건, outbox projection v1/v2 모두 messages+agent_run_events+정산만 기록, krw-agnet repo에 tool_calls/citations INSERT SQL 0건. 후속 항목(이관): krw-agnet 엔진 — outbox projection(`apply_agent_v1_product_outbox*` 확장 또는 daemon persist)에 tool_calls/citations 반영. 상세: `.superpowers/sdd/2026-08-19-post-cutover-fixes-plan/task-10-report.md`
