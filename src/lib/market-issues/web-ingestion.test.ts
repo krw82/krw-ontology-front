@@ -23,6 +23,9 @@ const config: MarketWebSourceRuntimeConfig = {
   zaiApiKey: "",
   zaiModel: "glm-5.1",
   zaiTimeoutMs: 5_000,
+  fmpNewsEnabled: false,
+  fmpNewsMaxAgeHours: 72,
+  fmpNewsSymbolBatchSize: 40,
 };
 
 const source = {

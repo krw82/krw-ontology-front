@@ -71,3 +71,6 @@ next-env.d.ts
 /.tmp/
 /.zcode/
 /krw-home-ko-fixed.png
+
+# local security-scanner state
+.mimosa/

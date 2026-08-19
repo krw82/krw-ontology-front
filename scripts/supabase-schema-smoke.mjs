@@ -60,28 +60,37 @@ if (!Number.isFinite(requestTimeoutMs) || requestTimeoutMs < 1_000) {
 }
 
 async function schemaSmokeFetch(input, init = {}) {
-  const timeoutSignal = AbortSignal.timeout(requestTimeoutMs);
-  const signal = init.signal
-    ? AbortSignal.any([init.signal, timeoutSignal])
-    : timeoutSignal;
-  try {
-    return await fetch(input, { ...init, signal });
-  } catch (error) {
-    if (timeoutSignal.aborted) {
-      let endpoint = "Supabase endpoint";
-      try {
-        endpoint = new URL(
-          typeof input === "string" ? input : input.url,
-        ).pathname;
-      } catch {
-        // Keep the non-sensitive fallback label.
+  // A single Supabase REST stall (observed as a 15s abort on one anon RPC
+  // probe while every neighboring probe answered instantly) must not fail a
+  // 12-stage deploy whose admission gate is already closed. Retry once on a
+  // timeout only; unexpected responses still surface on the first attempt.
+  for (let attempt = 1; ; attempt += 1) {
+    const timeoutSignal = AbortSignal.timeout(requestTimeoutMs);
+    const signal = init.signal
+      ? AbortSignal.any([init.signal, timeoutSignal])
+      : timeoutSignal;
+    try {
+      return await fetch(input, { ...init, signal });
+    } catch (error) {
+      if (!timeoutSignal.aborted || attempt > 1) {
+        if (timeoutSignal.aborted) {
+          let endpoint = "Supabase endpoint";
+          try {
+            endpoint = new URL(
+              typeof input === "string" ? input : input.url,
+            ).pathname;
+          } catch {
+            // Keep the non-sensitive fallback label.
+          }
+          throw new Error(
+            `Supabase schema smoke request timed out after ${requestTimeoutMs}ms: ${init.method ?? "GET"} ${endpoint}`,
+            { cause: error },
+          );
+        }
+        throw error;
       }
-      throw new Error(
-        `Supabase schema smoke request timed out after ${requestTimeoutMs}ms: ${init.method ?? "GET"} ${endpoint}`,
-        { cause: error },
-      );
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
     }
-    throw error;
   }
 }
 

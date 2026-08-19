@@ -34,10 +34,10 @@ export function isFmpEnabled(): boolean {
   return fmpApiKey().length > 0;
 }
 
-async function fetchFmpJson<T>(path: string, params: Record<string, string>): Promise<T> {
+export async function fetchFmpJson<T>(path: string, params: Record<string, string>): Promise<T> {
   const apiKey = fmpApiKey();
   if (!apiKey) {
-    throw new FmpRequestError("FMP_API_KEY is required for valuation refresh", {
+    throw new FmpRequestError("FMP_API_KEY is required for FMP requests", {
       code: "missing_api_key",
     });
   }

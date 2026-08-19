@@ -13,8 +13,6 @@ endpoints:
     origin: https://127.0.0.1
   - endpoint_ref: krw-filings-local
     origin: https://127.0.0.1
-  - endpoint_ref: krw-guru-local
-    origin: https://127.0.0.1
 `;
 
 describe("sealed MCP deployment contract", () => {
@@ -34,14 +32,20 @@ describe("sealed MCP deployment contract", () => {
     );
   });
 
+  it("ignores an unrequired legacy endpoint entry", () => {
+    expect(resolveMcpOrigin(`${registry}  - endpoint_ref: krw-guru-local\n    origin: https://127.0.0.1\n`)).toBe(
+      "https://127.0.0.1",
+    );
+  });
+
   it("uses the sealed binding session contract instead of gateway defaults", () => {
     const binding = `
   - binding_key: ontology
     endpoint_ref: krw-ontology-local
     tool_session_reuse: attested-stateless-v1
   - binding_key: guru
-    endpoint_ref: krw-guru-local
-    tool_session_reuse: run-scoped
+    endpoint_ref: krw-ontology-local
+    tool_session_reuse: attested-stateless-v1
   - binding_key: feed
     endpoint_ref: krw-feed-local
     tool_session_reuse: run-scoped
@@ -53,7 +57,6 @@ describe("sealed MCP deployment contract", () => {
       "krw-ontology-local": "attested-stateless-v1",
       "krw-feed-local": "run-scoped",
       "krw-filings-local": "run-scoped",
-      "krw-guru-local": "run-scoped",
     });
   });
 });

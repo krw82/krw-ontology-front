@@ -7,7 +7,6 @@ const REQUIRED_ENDPOINT_REFS = new Set([
   "krw-ontology-local",
   "krw-feed-local",
   "krw-filings-local",
-  "krw-guru-local",
 ]);
 const ALLOWED_SESSION_REUSE = new Set(["run-scoped", "attested-stateless-v1"]);
 
