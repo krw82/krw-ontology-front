@@ -37,6 +37,9 @@ vi.mock("@/lib/agent/run-events", () => ({
 vi.mock("@/lib/concurrency/execution-budget", () => ({
   releaseExecutionBudget: vi.fn(),
 }));
+vi.mock("@/lib/api/chat/rust-cancel", () => ({
+  cancelRustAgentRun: vi.fn(),
+}));
 
 import { getAuthUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -44,6 +47,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { requestAgentRunCancel } from "@/lib/agent/job-queue";
 import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
+import { cancelRustAgentRun } from "@/lib/api/chat/rust-cancel";
 import { CANCELLED_ASSISTANT_MESSAGE } from "@/lib/chat/message-status";
 import { POST } from "./route";
 
@@ -87,7 +91,13 @@ function createSessionClient() {
   } as unknown as Awaited<ReturnType<typeof createClient>>;
 }
 
-function createAdmin() {
+function createAdmin(activeRun: Record<string, unknown> = {
+  id: RUN_ID,
+  status: "queued",
+  request_id: "request-1",
+  executor_type: "claude_agent",
+  assistant_message_id: "assistant-message-1",
+}) {
   const updates: Array<{
     table: string;
     payload: Record<string, unknown>;
@@ -126,14 +136,14 @@ function createAdmin() {
                 return query;
               },
               returns() {
-                if (table === "agent_runs") {
-                  return Promise.resolve({
-                    data: [{ id: RUN_ID, status: "queued" }],
-                    error: null,
-                  });
-                }
-                return Promise.resolve({ data: [], error: null });
-              },
+                  if (table === "agent_runs") {
+                    return Promise.resolve({
+                      data: [activeRun],
+                      error: null,
+                    });
+                  }
+                  return Promise.resolve({ data: [], error: null });
+                },
             };
             return query;
           },
@@ -173,6 +183,7 @@ describe("POST /api/chat/[sessionId]/cancel", () => {
       assistantMessageId: "assistant-message-1",
       requestId: "request-1",
     });
+    vi.mocked(cancelRustAgentRun).mockResolvedValue(null);
   });
 
   it("stores queued assistant placeholders as cancelled, not failed", async () => {
@@ -219,5 +230,51 @@ describe("POST /api/chat/[sessionId]/cancel", () => {
         message_id: "assistant-message-1",
       },
     );
+  });
+
+  it("cancels rust_agent runs through the shared helper", async () => {
+    const fake = createAdmin({
+      id: RUN_ID,
+      status: "running",
+      session_id: SESSION_ID,
+      request_id: "request-1",
+      executor_type: "rust_agent",
+      assistant_message_id: "assistant-message-1",
+    });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+    vi.mocked(cancelRustAgentRun).mockResolvedValue({ kind: "cancelled" });
+
+    const response = await POST(request(), params());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(cancelRustAgentRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        run: expect.objectContaining({
+          id: RUN_ID,
+          executor_type: "rust_agent",
+        }),
+        userId: "user-1",
+        sessionId: SESSION_ID,
+      }),
+    );
+    expect(requestAgentRunCancel).not.toHaveBeenCalled();
+    expect(body).toEqual({ success: true, run_id: RUN_ID });
+  });
+
+  it("keeps the legacy stamp path for non-rust runs", async () => {
+    const fake = createAdmin({
+      id: RUN_ID,
+      status: "queued",
+      request_id: "request-1",
+      executor_type: "claude_agent",
+      assistant_message_id: "assistant-message-1",
+    });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+
+    await POST(request(), params());
+
+    expect(cancelRustAgentRun).not.toHaveBeenCalled();
+    expect(requestAgentRunCancel).toHaveBeenCalledWith(RUN_ID);
   });
 });

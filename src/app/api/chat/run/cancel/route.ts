@@ -7,12 +7,13 @@ import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
 import { getAuthUser, handleAuthError, forbiddenError } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isPlainObject, isUuid } from "@/lib/api/validation";
+import { cancelRustAgentRun } from "@/lib/api/chat/rust-cancel";
 import { CANCELLED_ASSISTANT_MESSAGE } from "@/lib/chat/message-status";
 import type { AgentRunRow, ChatSessionRow } from "@/types/database";
 
 type CancelRunRow = Pick<
   AgentRunRow,
-  "id" | "session_id" | "status" | "request_id"
+  "id" | "session_id" | "status" | "request_id" | "executor_type" | "assistant_message_id"
 > &
   Record<string, unknown>;
 type CancelSessionRow = Pick<ChatSessionRow, "id" | "user_id"> &
@@ -44,7 +45,7 @@ async function findRun(
   if (runId) {
     const { data: run } = await admin
       .from("agent_runs")
-      .select("id, session_id, status, request_id")
+      .select("id, session_id, status, request_id, executor_type, assistant_message_id")
       .eq("id", runId)
       .single<CancelRunRow>();
     return run ?? null;
@@ -54,7 +55,7 @@ async function findRun(
 
   const { data: runs } = await admin
     .from("agent_runs")
-    .select("id, session_id, status, request_id")
+    .select("id, session_id, status, request_id, executor_type, assistant_message_id")
     .eq("request_id", requestId)
     .order("started_at", { ascending: false })
     .limit(1)
@@ -132,6 +133,33 @@ export async function POST(request: NextRequest) {
       status: run.status,
       aborted: false,
     });
+  }
+
+  if (run.executor_type === "rust_agent") {
+    const outcome = await cancelRustAgentRun({
+      admin,
+      run,
+      userId: user.id,
+      sessionId: run.session_id,
+    });
+    if (outcome) {
+      abortRun(run.id);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      if (outcome.kind === "cancelled") {
+        return Response.json({
+          success: true,
+          run_id: run.id,
+          request_id: run.request_id,
+          aborted: true,
+        });
+      }
+      return Response.json({
+        success: true,
+        run_id: run.id,
+        status: run.status,
+        aborted: false,
+      });
+    }
   }
 
   const cancelResult = await requestAgentRunCancel(run.id);

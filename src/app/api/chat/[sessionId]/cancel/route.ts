@@ -8,6 +8,7 @@ import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import { markAgentRunTerminal } from "@/lib/agent/run-lifecycle";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
 import { isUuid } from "@/lib/api/validation";
+import { cancelRustAgentRun } from "@/lib/api/chat/rust-cancel";
 import { CANCELLED_ASSISTANT_MESSAGE } from "@/lib/chat/message-status";
 import type { ChatSessionRow, AgentRunRow } from "@/types/database";
 
@@ -56,7 +57,7 @@ export async function POST(
   // Find active run
   const { data: activeRuns } = await getSupabaseAdmin()
     .from("agent_runs")
-    .select("id, status")
+    .select("id, status, executor_type, assistant_message_id, request_id")
     .eq("session_id", sessionId)
     .in("status", ["pending", "queued", "running"])
     .returns<AgentRunRow[]>();
@@ -71,6 +72,21 @@ export async function POST(
   const run = activeRuns[0];
 
   const admin = getSupabaseAdmin();
+
+  if (run.executor_type === "rust_agent") {
+    const outcome = await cancelRustAgentRun({
+      admin,
+      run,
+      userId: user.id,
+      sessionId,
+    });
+    if (outcome) {
+      abortRun(run.id);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return Response.json({ success: true, run_id: run.id });
+    }
+  }
+
   const cancelResult = await requestAgentRunCancel(run.id);
   abortRun(run.id);
 

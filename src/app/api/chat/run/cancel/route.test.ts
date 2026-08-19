@@ -34,6 +34,9 @@ vi.mock("@/lib/auth", () => ({
 vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: vi.fn(),
 }));
+vi.mock("@/lib/api/chat/rust-cancel", () => ({
+  cancelRustAgentRun: vi.fn(),
+}));
 
 import { abortRun } from "@/lib/agent/abort-manager";
 import { requestAgentRunCancel } from "@/lib/agent/job-queue";
@@ -41,6 +44,7 @@ import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
 import { getAuthUser } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { cancelRustAgentRun } from "@/lib/api/chat/rust-cancel";
 import { CANCELLED_ASSISTANT_MESSAGE } from "@/lib/chat/message-status";
 import { POST } from "./route";
 
@@ -108,6 +112,8 @@ function createAdmin() {
                       session_id: "session-1",
                       status: "queued",
                       request_id: "request-1",
+                      executor_type: "claude_agent",
+                      assistant_message_id: "assistant-message-1",
                     },
                     error: null,
                   });
@@ -161,6 +167,7 @@ describe("POST /api/chat/run/cancel", () => {
       assistantMessageId: "assistant-message-1",
       requestId: "request-1",
     });
+    vi.mocked(cancelRustAgentRun).mockResolvedValue(null);
   });
 
   it("stores queued assistant placeholders as cancelled, not failed", async () => {
@@ -208,5 +215,111 @@ describe("POST /api/chat/run/cancel", () => {
         message_id: "assistant-message-1",
       },
     );
+  });
+
+  describe("rust agent runs", () => {
+    function rustFake(outcome: "cancelled" | "already_terminal") {
+      const fake = createAdmin();
+      // Replace only the agent_runs single() fixture with a rust run row;
+      // delegate every other table (chat_sessions, messages, rpc) to the
+      // original createAdmin() behavior so legacy-fallback paths still work.
+      const originalFrom = fake.admin.from.bind(fake.admin);
+      fake.admin.from = ((table: string) => {
+        if (table !== "agent_runs") {
+          return originalFrom(table);
+        }
+        const query = {
+          eq() {
+            return query;
+          },
+          is() {
+            return query;
+          },
+          order() {
+            return query;
+          },
+          limit() {
+            return query;
+          },
+          single() {
+            return Promise.resolve({
+              data: {
+                id: RUN_ID,
+                session_id: "session-1",
+                status: "running",
+                request_id: "request-1",
+                executor_type: "rust_agent",
+                assistant_message_id: "assistant-message-1",
+              },
+              error: null,
+            });
+          },
+        };
+        return { select: () => query };
+      }) as unknown as typeof fake.admin.from;
+      vi.mocked(cancelRustAgentRun).mockResolvedValue({ kind: outcome });
+      return fake;
+    }
+
+    it("cancel through the shared helper and report aborted", async () => {
+      const fake = rustFake("cancelled");
+      vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+
+      const response = await POST(request());
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(cancelRustAgentRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          run: expect.objectContaining({ id: RUN_ID, executor_type: "rust_agent" }),
+          userId: "user-1",
+          sessionId: "session-1",
+        }),
+      );
+      expect(requestAgentRunCancel).not.toHaveBeenCalled();
+      expect(body).toEqual({
+        success: true,
+        run_id: RUN_ID,
+        request_id: "request-1",
+        aborted: true,
+      });
+    });
+
+    it("report not-aborted when the kernel already reached a terminal outcome", async () => {
+      const fake = rustFake("already_terminal");
+      vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+
+      const response = await POST(request());
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({
+        success: true,
+        run_id: RUN_ID,
+        status: "running",
+        aborted: false,
+      });
+      expect(requestAgentRunCancel).not.toHaveBeenCalled();
+    });
+
+    it("fall back to the legacy stamp when the helper returns null", async () => {
+      const fake = rustFake("cancelled");
+      vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+      vi.mocked(cancelRustAgentRun).mockResolvedValue(null);
+
+      await POST(request());
+
+      expect(requestAgentRunCancel).toHaveBeenCalledWith(RUN_ID);
+    });
+
+    it("never call the helper for claude_agent runs", async () => {
+      const fake = createAdmin();
+      vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+
+      await POST(request());
+
+      expect(cancelRustAgentRun).not.toHaveBeenCalled();
+      expect(requestAgentRunCancel).toHaveBeenCalledWith(RUN_ID);
+    });
   });
 });
