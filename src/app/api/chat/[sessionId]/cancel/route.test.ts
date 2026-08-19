@@ -25,9 +25,6 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: vi.fn(),
 }));
-vi.mock("@/lib/agent/abort-manager", () => ({
-  abortRun: vi.fn(() => true),
-}));
 vi.mock("@/lib/agent/job-queue", () => ({
   requestAgentRunCancel: vi.fn(),
 }));
@@ -44,7 +41,6 @@ vi.mock("@/lib/api/chat/rust-cancel", () => ({
 import { getAuthUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { abortRun } from "@/lib/agent/abort-manager";
 import { requestAgentRunCancel } from "@/lib/agent/job-queue";
 import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
@@ -288,7 +284,6 @@ describe("POST /api/chat/[sessionId]/cancel", () => {
       },
     });
     expect(requestAgentRunCancel).not.toHaveBeenCalled();
-    expect(abortRun).not.toHaveBeenCalled();
   });
 
   it("keeps the legacy stamp path for non-rust runs", async () => {

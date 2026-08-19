@@ -1,5 +1,4 @@
 import type { NextRequest } from "next/server";
-import { abortRun } from "@/lib/agent/abort-manager";
 import { requestAgentRunCancel } from "@/lib/agent/job-queue";
 import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import { markAgentRunTerminal } from "@/lib/agent/run-lifecycle";
@@ -142,41 +141,37 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       sessionId: run.session_id,
     });
-    if (outcome) {
-      if (outcome.kind === "kernel_unavailable") {
-        return Response.json(
-          {
-            success: false,
-            error: {
-              code: "cancel_channel_unavailable",
-              message:
-                "리서치 엔진 취소 채널에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.",
-            },
+    if (outcome.kind === "kernel_unavailable") {
+      return Response.json(
+        {
+          success: false,
+          error: {
+            code: "cancel_channel_unavailable",
+            message:
+              "리서치 엔진 취소 채널에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.",
           },
-          { status: 503 },
-        );
-      }
-      abortRun(run.id);
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      if (outcome.kind === "cancelled") {
-        return Response.json({
-          success: true,
-          run_id: run.id,
-          request_id: run.request_id,
-          aborted: true,
-        });
-      }
+        },
+        { status: 503 },
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    if (outcome.kind === "cancelled") {
       return Response.json({
         success: true,
         run_id: run.id,
-        status: run.status,
-        aborted: false,
+        request_id: run.request_id,
+        aborted: true,
       });
     }
+    return Response.json({
+      success: true,
+      run_id: run.id,
+      status: run.status,
+      aborted: false,
+    });
   }
 
   const cancelResult = await requestAgentRunCancel(run.id);
-  const aborted = abortRun(run.id);
 
   if (cancelResult.status === "queued" || cancelResult.status === "pending") {
     await markAgentRunTerminal(admin, run.id, {
@@ -218,6 +213,6 @@ export async function POST(request: NextRequest) {
     success: true,
     run_id: run.id,
     request_id: run.request_id,
-    aborted,
+    aborted: false,
   });
 }

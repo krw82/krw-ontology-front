@@ -2,9 +2,6 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/agent/abort-manager", () => ({
-  abortRun: vi.fn(() => true),
-}));
 vi.mock("@/lib/agent/job-queue", () => ({
   requestAgentRunCancel: vi.fn(),
 }));
@@ -38,7 +35,6 @@ vi.mock("@/lib/api/chat/rust-cancel", () => ({
   cancelRustAgentRun: vi.fn(),
 }));
 
-import { abortRun } from "@/lib/agent/abort-manager";
 import { requestAgentRunCancel } from "@/lib/agent/job-queue";
 import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
@@ -199,7 +195,6 @@ describe("POST /api/chat/run/cancel", () => {
         }),
       ]),
     );
-    expect(abortRun).toHaveBeenCalledWith(RUN_ID);
     expect(releaseExecutionBudget).toHaveBeenCalledWith(
       "user-1",
       "request-1",
@@ -320,7 +315,6 @@ describe("POST /api/chat/run/cancel", () => {
         },
       });
       expect(requestAgentRunCancel).not.toHaveBeenCalled();
-      expect(abortRun).not.toHaveBeenCalled();
     });
 
     it("never call the helper for claude_agent runs", async () => {
