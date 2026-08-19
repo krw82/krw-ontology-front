@@ -1,3 +1,9 @@
+# Mac worker (legacy agent supervisor) — RETIRED 2026-08-19
+
+리서치 실행은 Rust 엔진(`~/krw-agnet`, launchd `com.krw.agentd`)으로 완전히 이전되었습니다.
+레거시 agent-worker 설치/기동 스크립트는 retired stub입니다.
+제거: `scripts/uninstall-mac-worker-launchd.sh`. 아래 내용은 역사적 참고용입니다.
+
 # Mac Production Worker
 
 This setup keeps `krwontology.com` on GCP for web/API, but moves agent execution

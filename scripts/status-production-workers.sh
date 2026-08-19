@@ -53,19 +53,6 @@ REMOTE_FRONT_DIR=$(target_value remoteFrontDir)
 COMPOSE_PROJECT_NAME=$(target_value composeProject)
 REMOTE_ENV_FILE=${REMOTE_ENV_FILE:-.env}
 
-echo "Local Mac worker/supervisor processes:"
-ps eww -axo pid,etime,nice,command \
-  | awk '
-    /[.]worker\/agent-worker[.]mjs/ && !/awk/ {
-      worker_id = "unknown";
-      if (match($0, /AGENT_WORKER_ID=[^ ]+/)) {
-        worker_id = substr($0, RSTART + 16, RLENGTH - 16);
-      }
-      printf "  pid=%s etime=%s nice=%s worker_id=%s\n", $1, $2, $3, worker_id;
-    }
-  ' \
-  || true
-
 if [ -f "$ENV_FILE" ]; then
   set -a
   # shellcheck disable=SC1090

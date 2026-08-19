@@ -763,8 +763,7 @@ cleanup
 
   it("keeps Mac worker cutover scripts conservative", () => {
     const preflight = read("scripts/mac-worker-preflight.sh");
-    const fastDeploy = read("scripts/deploy-production-fast.sh");
-    const start = read("scripts/start-mac-worker-production.sh");
+    const startMacWorker = read("scripts/start-mac-worker-production.sh");
     const installLaunchd = read("scripts/install-mac-worker-launchd.sh");
     const uninstallLaunchd = read("scripts/uninstall-mac-worker-launchd.sh");
     const startMcp = read("scripts/start-mcp-server-production.sh");
@@ -782,56 +781,12 @@ cleanup
     const statusWorkers = read("scripts/status-production-workers.sh");
     const packageJson = read("package.json");
 
-    expect(preflight).toContain("GLOBAL_CONCURRENT_RUN_LIMIT");
-    expect(preflight).toContain("AGENT_SUPERVISOR_CONCURRENCY");
-    expect(preflight).toContain(
-      "GLOBAL_CONCURRENT_RUN_LIMIT must be at least AGENT_SUPERVISOR_CONCURRENCY",
-    );
-    expect(preflight).toContain("queue status");
-    expect(preflight).toContain("--json");
-    expect(preflight).toContain("Local ontology queue can mutate prod/current");
-    expect(preflight).toContain("OK local ontology queue status via CLI");
-    expect(preflight).toContain("A Mac agent supervisor with id");
-    expect(preflight).toContain("--skip-worker-duplicate-check");
-    expect(preflight).toContain("--skip-live-mcp-fingerprint");
-    expect(preflight).toContain(
-      "Skipping live MCP fingerprint verification before runtime swap.",
-    );
-    expect(fastDeploy).toContain("--skip-live-mcp-fingerprint");
-    expect(preflight).toContain("Checking Postgres LISTEN config");
-    expect(preflight).toContain("AGENT_QUEUE_LISTEN_DATABASE_URL");
-    expect(preflight).toContain("OK Postgres LISTEN smoke");
-    expect(preflight).toContain("await client.query(`LISTEN ${listenChannel}`)");
-    expect(preflight).toContain("Missing Claude auth after placeholder cleanup");
-    expect(preflight).toContain("ANTHROPIC_AUTH_TOKEN");
-    expect(preflight).toContain("EXPECTED_CLAUDE_CODE_VERSION");
-    expect(preflight).toContain("KRW_ONTOLOGY_ENV=prod");
-    expect(preflight).toContain("/releases/prod/current");
-    expect(preflight).toContain("krw-ontology release verify");
-    expect(preflight).toContain("manifest_valid");
-    expect(preflight).toContain("KRW_ONTOLOGY_MCP_URL");
-    expect(preflight).toContain("Plugin .mcp.json MCP URL mismatch");
-    expect(preflight).toContain("Checking Guru plugin MCP config");
-    expect(preflight).toContain("Guru plugin must not expose mcpServers.krw-ontology-company");
-    expect(preflight).toContain("MCP HTTP health is not ok");
-    expect(preflight).toContain("global_spine_present");
-    expect(preflight).toContain("health_payload");
-    expect(preflight).toContain("agent_runs");
-
-    expect(start).toContain("MAC_WORKER_LOCK_DIR");
-    expect(start).toContain(
-      "No matching worker process found for existing lock; removing stale lock",
-    );
-    expect(start).toContain("safe_worker_id");
-    expect(start).toContain("--worker-id");
-    expect(start).toContain("--log-file");
-    expect(start).toContain("AGENT_SUPERVISOR_ID");
-    expect(start).toContain("AGENT_SUPERVISOR_CONCURRENCY");
-    expect(start).toContain("DEEPSEEK_API_KEY");
-    expect(start).toContain("mac-worker-preflight.sh");
-    expect(start).toContain(".worker/agent-worker.mjs");
-    expect(start).toContain('exec "$KRW_RUNTIME_NODE_EXECUTABLE" .worker/agent-worker.mjs');
-    expect(start).toContain(">> \"$LOG_FILE\" 2>&1");
+    for (const retiredScript of [preflight, installLaunchd, deployWorker]) {
+      expect(retiredScript).toContain("has been retired.");
+      expect(retiredScript).toContain("scripts/uninstall-mac-worker-launchd.sh");
+    }
+    expect(startMacWorker).toContain("has been retired.");
+    expect(startMacWorker).not.toContain(".worker/agent-worker.mjs");
 
     expect(verifyMacRuntime).toContain("KRW_RUNTIME_NODE_EXECUTABLE");
     expect(verifyMacRuntime).toContain('"$RUNTIME_NODE_EXECUTABLE" - "$IDENTITY_FILE"');
@@ -877,29 +832,7 @@ cleanup
     expect(initEnv).toContain("KRW_SQLITE_READ_CACHE_MIB=512");
     expect(initEnv).toContain("KRW_SQLITE_READ_MMAP_MIB=2048");
 
-    expect(installLaunchd).toContain("mac-worker-preflight.sh");
-    expect(installLaunchd).toContain("--env-file");
-    expect(installLaunchd).toContain("__ENV_FILE__");
-    expect(installLaunchd).toContain("AGENT_SUPERVISOR_CONCURRENCY");
-    expect(installLaunchd).toContain("MAC_WORKER_NICE");
-    expect(installLaunchd).toContain("__NICE__");
-    expect(installLaunchd).toContain('LABEL="com.krwontology.agent-worker"');
-    expect(installLaunchd).toContain("launchd should not start one process per slot");
-    expect(installLaunchd).toContain("sending SIG$signal");
-    expect(installLaunchd).toContain(
-      "wait_for_worker_id_to_stop \"$AGENT_SUPERVISOR_ID\" KILL",
-    );
-    expect(installLaunchd).toContain("legacy_worker_id");
-    expect(read("ops/launchd/com.krwontology.agent-worker.plist.template")).toContain(
-      "--skip-preflight",
-    );
-    expect(read("ops/launchd/com.krwontology.agent-worker.plist.template")).toContain(
-      "<key>Nice</key>",
-    );
-    expect(installLaunchd).toContain("launchctl bootstrap");
-    expect(installLaunchd).toContain("launchctl kickstart");
     for (const installer of [
-      installLaunchd,
       installMcpLaunchd,
       installFilingsMcpLaunchd,
       installStockNewsMcpLaunchd,
@@ -907,6 +840,7 @@ cleanup
       expect(installer).toContain('LAUNCHD_DOMAIN="gui/$(id -u)"');
       expect(installer).not.toMatch(/^DOMAIN="gui\/\$\(id -u\)"$/m);
     }
+    // uninstall은 퇴역 실행에 계속 필요하므로 기능 유지를 단언
     expect(uninstallLaunchd).toContain("launchctl bootout");
     expect(uninstallLaunchd).toContain("com.krwontology.agent-worker*.plist");
 
@@ -966,11 +900,6 @@ cleanup
       '"url": "http://127.0.0.1:8766/mcp"',
     );
 
-    expect(deployWorker).toContain("install-mac-worker-launchd.sh");
-    expect(deployWorker).toContain("verify-mac-worker-heartbeats.mjs");
-    expect(deployWorker).toContain("does not deploy or restart the GCP web container");
-    expect(deployWorker).toContain("MCP HTTP server must already be healthy");
-
     expect(deployPluginWorker).toContain(
       "Claude/plugin worker deployment path has been retired.",
     );
@@ -988,7 +917,6 @@ cleanup
     expect(verifyHeartbeats).toContain("EXPECTED_CLAUDE_CODE_VERSION");
     expect(verifyHeartbeats).toContain("--release-id");
     expect(verifyHeartbeats).toContain("OK Mac supervisor heartbeat");
-    expect(statusWorkers).toContain("nice=");
     expect(statusWorkers).toContain("AGENT_SUPERVISOR_CONCURRENCY");
     expect(statusWorkers).toContain("AGENT_RUN_CANCEL_RECONCILE_INTERVAL_MS");
     expect(statusWorkers).toContain("MAC_WORKER_NICE");
@@ -997,7 +925,6 @@ cleanup
     expect(packageJson).not.toContain("worker:prod:stop-gcp");
     expect(packageJson).not.toContain("worker:prod:start-gcp");
     expect(packageJson).toContain("mcp:prod:launchd:install");
-    expect(packageJson).toContain("deploy:worker");
   });
 
   it("keeps local dev worker on the dev ontology release by default", () => {
