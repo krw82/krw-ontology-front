@@ -1,14 +1,9 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { getReadyAgentWorker } from "@/lib/agent/worker-heartbeat";
 import { getReadyRustAgentDaemon } from "@/lib/agent/daemon-heartbeat";
 import { APP_VERSION } from "@/lib/app-version";
 import { getActiveOntologyCatalogRelease } from "@/lib/ontology/catalog";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { GET } from "./route";
-
-vi.mock("@/lib/agent/worker-heartbeat", () => ({
-  getReadyAgentWorker: vi.fn(),
-}));
 
 vi.mock("@/lib/agent/daemon-heartbeat", () => ({
   getReadyRustAgentDaemon: vi.fn(),
@@ -78,7 +73,7 @@ function mockSupabaseOk() {
   } as unknown as ReturnType<typeof getSupabaseAdmin>);
 }
 
-function mockMcpOk() {
+function mockCatalogOk() {
   vi.mocked(getActiveOntologyCatalogRelease).mockResolvedValue({
     env: "dev",
     release_id: "rel-20260521",
@@ -98,73 +93,9 @@ function mockMcpOk() {
     created_at: "2026-05-21T00:00:00.000Z",
     updated_at: "2026-05-21T00:00:00.000Z",
   });
-  vi.mocked(getReadyAgentWorker).mockResolvedValue({
-    ok: true,
-    worker: {
-      worker_id: "mac-worker-1",
-      status: "idle",
-      last_seen_at: "2026-05-21T00:00:10.000Z",
-      heartbeat_expires_at: "2026-05-21T00:02:10.000Z",
-      claude_code_version: "2.1.204",
-      web_commit: "web-commit",
-      krw_ontology_commit: "ontology-commit",
-      worker_env: "dev",
-      ontology_env: "dev",
-      ontology_release_id: "rel-20260521",
-      index_generated_at: "2026-05-21T00:00:00.000Z",
-      company_count: 10,
-      document_count: 20,
-      object_count: 30,
-      tool_count: 13,
-      root: "/srv/private-ontology-root",
-      index_path: "/srv/private-ontology-root/indexes/global_spine.sqlite",
-      manifest_path: "/srv/private-ontology-root/manifest.json",
-      manifest_valid: true,
-      agent_index_schema_version: "agent_index_v1",
-      plugin_path: "/app/krw-ontology/plugins/krw-ontology",
-      error: null,
-      metadata: {},
-      created_at: "2026-05-21T00:00:00.000Z",
-      updated_at: "2026-05-21T00:00:10.000Z",
-    },
-    mcpHealth: {
-      connected: true,
-      staticOk: true,
-      commandOk: true,
-      liveOk: true,
-      sqliteOk: true,
-      contractOk: true,
-      toolParityOk: true,
-      fingerprintOk: true,
-      fingerprintErrors: [],
-      mcpContractVersion: "krw-ontology-mcp/v2",
-      buildId: "build-1",
-      backendGitSha: "backend-sha-1",
-      toolSchemaSha256: "a".repeat(64),
-      buildFingerprintSha256: "a".repeat(64),
-      releaseManifestSha256: "a".repeat(64),
-      serviceFingerprintSha256: "a".repeat(64),
-      env: "dev",
-      releaseId: "rel-20260521",
-      manifestPath: "/srv/private-ontology-root/manifest.json",
-      manifestValid: true,
-      agentIndexSchemaVersion: "agent_index_v1",
-      indexGeneratedAt: "2026-05-21T00:00:00.000Z",
-      companyCount: 10,
-      documentCount: 20,
-      objectCount: 30,
-      toolCount: 13,
-      tools: ["krw_ontology_query"],
-      root: "/srv/private-ontology-root",
-      indexPath: "/srv/private-ontology-root/indexes/global_spine.sqlite",
-      pluginPath: "/app/krw-ontology/plugins/krw-ontology",
-      releaseMetadata: {
-        env: "dev",
-        release_id: "rel-20260521",
-        manifest_valid: true,
-      },
-    },
-  });
+}
+
+function mockDaemonNotRequired() {
   vi.mocked(getReadyRustAgentDaemon).mockResolvedValue({
     ok: true,
     required: false,
@@ -177,7 +108,8 @@ describe("GET /api/healthz/deep", () => {
     process.env.INTERNAL_API_KEY = "test-internal-key";
     vi.clearAllMocks();
     mockSupabaseOk();
-    mockMcpOk();
+    mockCatalogOk();
+    mockDaemonNotRequired();
   });
 
   afterEach(() => {
@@ -193,7 +125,7 @@ describe("GET /api/healthz/deep", () => {
       error: { code: "forbidden", message: "Unauthorized" },
     });
     expect(getSupabaseAdmin).not.toHaveBeenCalled();
-    expect(getReadyAgentWorker).not.toHaveBeenCalled();
+    expect(getReadyRustAgentDaemon).not.toHaveBeenCalled();
     expect(getActiveOntologyCatalogRelease).not.toHaveBeenCalled();
   });
 
@@ -208,11 +140,11 @@ describe("GET /api/healthz/deep", () => {
 
     expect(response.status).toBe(403);
     expect(getSupabaseAdmin).not.toHaveBeenCalled();
-    expect(getReadyAgentWorker).not.toHaveBeenCalled();
+    expect(getReadyRustAgentDaemon).not.toHaveBeenCalled();
     expect(getActiveOntologyCatalogRelease).not.toHaveBeenCalled();
   });
 
-  it("returns deep diagnostics only with the internal key", async () => {
+  it("derives the mcp check from the rust daemon heartbeat even when it is not required", async () => {
     const response = await GET(
       new Request("http://localhost/api/healthz/deep", {
         headers: { "x-internal-key": "test-internal-key" },
@@ -224,21 +156,88 @@ describe("GET /api/healthz/deep", () => {
     expect(body.status).toBe("ok");
     expect(body.checks.catalog.release_id).toBe("rel-20260521");
     expect(body.checks.catalog.company_count).toBe(10);
-    expect(body.checks.mcp.root).toBe("/srv/private-ontology-root");
-    expect(body.checks.mcp.env).toBe("dev");
-    expect(body.checks.mcp.release_id).toBe("rel-20260521");
-    expect(body.checks.mcp.manifest_valid).toBe(true);
-    expect(body.checks.mcp.live_ok).toBe(true);
-    expect(body.checks.mcp.sqlite_ok).toBe(true);
-    expect(body.checks.mcp.tool_count).toBe(13);
-    expect(body.checks.mcp.worker_id).toBe("mac-worker-1");
+    expect(body.checks.mcp).toEqual({
+      ok: true,
+      required: false,
+      owner: "local_rust_agentd",
+    });
+    expect(body.checks.agent_v1_daemon).toEqual(
+      expect.objectContaining({ ok: true, required: false, daemon_id: null }),
+    );
     expect(body.checks.filing_worker.scheduler_leader.deployment_id).toBe(
       APP_VERSION,
     );
     expect(body.checks.trusted_client_ip.ok).toBe(true);
     expect(getSupabaseAdmin).toHaveBeenCalledTimes(2);
     expect(getActiveOntologyCatalogRelease).toHaveBeenCalledOnce();
-    expect(getReadyAgentWorker).toHaveBeenCalledOnce();
+    expect(getReadyRustAgentDaemon).toHaveBeenCalledOnce();
+  });
+
+  it("surfaces a ready required daemon as a healthy mcp check", async () => {
+    const now = new Date();
+    vi.mocked(getReadyRustAgentDaemon).mockResolvedValue({
+      ok: true,
+      required: true,
+      daemon: {
+        daemon_id: "rust-agentd-1",
+        provider: "glm",
+        descriptor_artifact_hash: `sha256:${"a".repeat(64)}`,
+        release_set_hash: `sha256:${"b".repeat(64)}`,
+        runtime_version: "krw-agentd 0.9.2",
+        mcp_ready: true,
+        last_seen_at: now.toISOString(),
+        heartbeat_expires_at: new Date(now.getTime() + 60_000).toISOString(),
+        created_at: "2026-05-21T00:00:00.000Z",
+        updated_at: now.toISOString(),
+      },
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/healthz/deep", {
+        headers: { "x-internal-key": "test-internal-key" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.status).toBe("ok");
+    expect(body.checks.mcp).toEqual({
+      ok: true,
+      required: true,
+      owner: "local_rust_agentd",
+    });
+    expect(body.checks.agent_v1_daemon).toEqual(
+      expect.objectContaining({
+        ok: true,
+        required: true,
+        daemon_id: "rust-agentd-1",
+        provider: "glm",
+        mcp_ready: true,
+      }),
+    );
+  });
+
+  it("reports a missing daemon heartbeat as an unhealthy mcp check", async () => {
+    vi.mocked(getReadyRustAgentDaemon).mockResolvedValue({
+      ok: false,
+      reason: "daemon_unavailable",
+      message: "Local Rust research daemon is unavailable",
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/healthz/deep", {
+        headers: { "x-internal-key": "test-internal-key" },
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(body.status).toBe("error");
+    expect(body.checks.mcp).toEqual({
+      ok: false,
+      owner: "local_rust_agentd",
+      error: "Local Rust research daemon is unavailable",
+    });
   });
 
   it("reports an invalid production trusted client IP configuration", async () => {
