@@ -170,7 +170,6 @@ export default function CompaniesBrowser({
           "현재 환경의 웹 카탈로그에서 인덱싱된 회사를 찾지 못했습니다.",
         availableCompanies: "전체 분석 가능 회사",
         searchResults: "검색 결과",
-        countSuffix: "개 표시",
         emptySearch: "검색 조건에 맞는 회사가 없습니다.",
         sortDefault: "기본순",
         sortMarketCap: "시총순",
@@ -196,7 +195,6 @@ export default function CompaniesBrowser({
           "No indexed companies were found in the current web catalog.",
         availableCompanies: "All available companies",
         searchResults: "Search results",
-        countSuffix: "shown",
         emptySearch: "No companies match this search.",
         sortDefault: "Default",
         sortMarketCap: "Market cap",
@@ -492,22 +490,6 @@ export default function CompaniesBrowser({
                 {isSearchActive
                   ? copy.searchResults
                   : copy.availableCompanies}
-              </p>
-              <p className="text-[12px] font-bold leading-4 text-muted" aria-live="polite">
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.span
-                    key={`${visibleCompanies.length}:${filteredCompanies.length}`}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{
-                      duration: reducedMotion ? 0 : 0.14,
-                      ease: easeOutExpo,
-                    }}
-                  >
-                    {`${filteredCompanies.length.toLocaleString()} ${copy.countSuffix}`}
-                  </motion.span>
-                </AnimatePresence>
               </p>
             </div>
             <div
