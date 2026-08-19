@@ -143,6 +143,19 @@ export async function POST(request: NextRequest) {
       sessionId: run.session_id,
     });
     if (outcome) {
+      if (outcome.kind === "kernel_unavailable") {
+        return Response.json(
+          {
+            success: false,
+            error: {
+              code: "cancel_channel_unavailable",
+              message:
+                "리서치 엔진 취소 채널에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.",
+            },
+          },
+          { status: 503 },
+        );
+      }
       abortRun(run.id);
       await new Promise((resolve) => setTimeout(resolve, 100));
       if (outcome.kind === "cancelled") {

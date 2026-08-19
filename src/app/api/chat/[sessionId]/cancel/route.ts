@@ -81,6 +81,19 @@ export async function POST(
       sessionId,
     });
     if (outcome) {
+      if (outcome.kind === "kernel_unavailable") {
+        return Response.json(
+          {
+            success: false,
+            error: {
+              code: "cancel_channel_unavailable",
+              message:
+                "리서치 엔진 취소 채널에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.",
+            },
+          },
+          { status: 503 },
+        );
+      }
       abortRun(run.id);
       await new Promise((resolve) => setTimeout(resolve, 100));
       return Response.json({ success: true, run_id: run.id });

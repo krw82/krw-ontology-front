@@ -44,6 +44,7 @@ vi.mock("@/lib/api/chat/rust-cancel", () => ({
 import { getAuthUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { abortRun } from "@/lib/agent/abort-manager";
 import { requestAgentRunCancel } from "@/lib/agent/job-queue";
 import { appendAgentRunEvent } from "@/lib/agent/run-events";
 import { releaseExecutionBudget } from "@/lib/concurrency/execution-budget";
@@ -183,7 +184,7 @@ describe("POST /api/chat/[sessionId]/cancel", () => {
       assistantMessageId: "assistant-message-1",
       requestId: "request-1",
     });
-    vi.mocked(cancelRustAgentRun).mockResolvedValue(null);
+    vi.mocked(cancelRustAgentRun).mockResolvedValue({ kind: "already_terminal" });
   });
 
   it("stores queued assistant placeholders as cancelled, not failed", async () => {
@@ -260,6 +261,34 @@ describe("POST /api/chat/[sessionId]/cancel", () => {
     );
     expect(requestAgentRunCancel).not.toHaveBeenCalled();
     expect(body).toEqual({ success: true, run_id: RUN_ID });
+  });
+
+  it("returns 503 for rust runs when the kernel cancel channel is unavailable", async () => {
+    const fake = createAdmin({
+      id: RUN_ID,
+      status: "running",
+      session_id: SESSION_ID,
+      request_id: "request-1",
+      executor_type: "rust_agent",
+      assistant_message_id: "assistant-message-1",
+    });
+    vi.mocked(getSupabaseAdmin).mockReturnValue(fake.admin);
+    vi.mocked(cancelRustAgentRun).mockResolvedValue({ kind: "kernel_unavailable" });
+
+    const response = await POST(request(), params());
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toEqual({
+      success: false,
+      error: {
+        code: "cancel_channel_unavailable",
+        message:
+          "리서치 엔진 취소 채널에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.",
+      },
+    });
+    expect(requestAgentRunCancel).not.toHaveBeenCalled();
+    expect(abortRun).not.toHaveBeenCalled();
   });
 
   it("keeps the legacy stamp path for non-rust runs", async () => {
