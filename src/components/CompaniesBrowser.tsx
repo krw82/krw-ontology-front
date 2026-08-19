@@ -14,6 +14,15 @@ import CompanyCard, {
 } from "@/components/CompanyCard";
 import { easeOutExpo } from "@/lib/animation";
 import { filterAndSortCompanies } from "@/lib/companies/filter";
+import {
+  DEFAULT_VALUATION_SORT_DIRECTION,
+  sortCompaniesByValuation,
+  type CompanyValuationMetrics,
+  type MetricValuationSortKey,
+  type ValuationSortDirection,
+  type ValuationSortKey,
+} from "@/lib/companies/valuation-sort";
+import { trackClientEventSilently } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
@@ -36,6 +45,17 @@ type CompanyBrowseCatalogResponse = {
   companies: CompanyCardData[];
 };
 
+type ValuationSummaryResponse = {
+  generated_at: string | null;
+  count: number;
+  valuations: CompanyValuationMetrics[];
+};
+
+interface ValuationSortChip {
+  key: ValuationSortKey;
+  label: string;
+}
+
 const SEARCH_COACHMARK_STORAGE_KEY = "krw:companies-search-coachmark-seen:v1";
 const IS_DEV_ENV = process.env.NODE_ENV === "development";
 const EMPTY_COMPANIES: CompanyCardData[] = [];
@@ -51,7 +71,7 @@ function CompanyCatalogSkeleton() {
       {Array.from({ length: 6 }, (_, index) => (
         <div
           key={index}
-          className="grid min-h-[112px] grid-cols-[88px_minmax(0,1fr)] gap-4 border-b border-hairline-soft px-4 py-4 last:border-b-0 xl:grid-cols-[148px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)]"
+          className="grid min-h-[112px] grid-cols-[88px_minmax(0,1fr)] gap-4 border-b border-hairline-soft px-4 py-4 last:border-b-0 xl:grid-cols-[148px_minmax(160px,1.1fr)_minmax(200px,1.4fr)_84px_64px_64px_64px]"
         >
           <div className="motion-loading-block h-5 w-14 rounded bg-surface-soft" />
           <div className="space-y-2">
@@ -62,9 +82,17 @@ function CompanyCatalogSkeleton() {
             <div className="motion-loading-block h-4 w-4/5 rounded bg-surface-soft" />
             <div className="motion-loading-block h-4 w-3/5 rounded bg-surface-soft" />
           </div>
-          <div className="hidden space-y-2 xl:block">
-            <div className="motion-loading-block h-4 w-3/4 rounded bg-surface-soft" />
-            <div className="motion-loading-block h-4 w-1/2 rounded bg-surface-soft" />
+          <div className="hidden xl:block">
+            <div className="motion-loading-block ml-auto h-4 w-14 rounded bg-surface-soft" />
+          </div>
+          <div className="hidden xl:block">
+            <div className="motion-loading-block ml-auto h-4 w-10 rounded bg-surface-soft" />
+          </div>
+          <div className="hidden xl:block">
+            <div className="motion-loading-block ml-auto h-4 w-10 rounded bg-surface-soft" />
+          </div>
+          <div className="hidden xl:block">
+            <div className="motion-loading-block ml-auto h-4 w-10 rounded bg-surface-soft" />
           </div>
         </div>
       ))}
@@ -97,6 +125,12 @@ export default function CompaniesBrowser({
   const [catalogLoading, setCatalogLoading] = useState(
     loadCatalog && initialCompanies.length === 0,
   );
+  const [valuationByTicker, setValuationByTicker] = useState<
+    Map<string, CompanyValuationMetrics> | null
+  >(null);
+  const [sortKey, setSortKey] = useState<ValuationSortKey>("default");
+  const [sortDirection, setSortDirection] =
+    useState<ValuationSortDirection>("desc");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const reducedMotion = useReducedMotion();
   const coarsePointer = useCoarsePointer();
@@ -110,6 +144,21 @@ export default function CompaniesBrowser({
   const companies = useMemo(
     () => freshCatalog?.companies ?? deviceCatalog?.companies ?? EMPTY_COMPANIES,
     [deviceCatalog, freshCatalog],
+  );
+  const companiesWithValuation = useMemo(() => {
+    if (!valuationByTicker || valuationByTicker.size === 0) return companies;
+    return companies.map((company) => {
+      const valuation = valuationByTicker.get(company.ticker);
+      return valuation ? { ...company, valuation } : company;
+    });
+  }, [companies, valuationByTicker]);
+  const valuationCoveredCount = useMemo(
+    () =>
+      valuationByTicker
+        ? companies.filter((company) => valuationByTicker.has(company.ticker))
+            .length
+        : 0,
+    [companies, valuationByTicker],
   );
   const copy = locale === "ko"
       ? {
@@ -128,6 +177,13 @@ export default function CompaniesBrowser({
         searchResults: "검색 결과",
         countSuffix: "개 표시",
         emptySearch: "검색 조건에 맞는 회사가 없습니다.",
+        sortDefault: "기본순",
+        sortMarketCap: "시총순",
+        sortPerLow: "PER 낮은순",
+        sortPbrLow: "PBR 낮은순",
+        sortRoeHigh: "ROE 높은순",
+        valuationCoverageLabel: "밸류에이션",
+        sortAria: "회사 목록 정렬",
         footer:
           "© 2026 KRW.O. 공시 근거 기반 기업 리서치.",
       }
@@ -147,15 +203,69 @@ export default function CompaniesBrowser({
         searchResults: "Search results",
         countSuffix: "shown",
         emptySearch: "No companies match this search.",
+        sortDefault: "Default",
+        sortMarketCap: "Market cap",
+        sortPerLow: "Low P/E",
+        sortPbrLow: "Low P/B",
+        sortRoeHigh: "High ROE",
+        valuationCoverageLabel: "Valuation",
+        sortAria: "Sort company list",
         footer:
           "© 2026 KRW.O. Filing-grounded company research.",
       };
 
   const filteredCompanies = useMemo(() => {
-    return filterAndSortCompanies(companies, deferredSearch);
-  }, [companies, deferredSearch]);
+    const filtered = filterAndSortCompanies(
+      companiesWithValuation,
+      deferredSearch,
+    );
+    // Valuation screening only applies while browsing; an active search keeps
+    // relevance ordering so typing "AAPL" always surfaces the exact match.
+    if (deferredSearch.trim() || sortKey === "default") return filtered;
+    return sortCompaniesByValuation(filtered, sortKey, sortDirection);
+  }, [companiesWithValuation, deferredSearch, sortDirection, sortKey]);
   const isSearchActive = normalizedSearch.length > 0;
   const visibleCompanies = filteredCompanies;
+
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/valuation/summary", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load valuation summary");
+        const data = (await response.json()) as ValuationSummaryResponse;
+        if (!active || !Array.isArray(data.valuations)) return;
+        setValuationByTicker(
+          new Map(data.valuations.map((item) => [item.ticker, item])),
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  function applyValuationSort(
+    nextKey: ValuationSortKey,
+    source: "chip" | "header",
+  ) {
+    let nextDirection = sortDirection;
+    if (nextKey === "default") {
+      setSortKey("default");
+    } else if (nextKey === sortKey) {
+      nextDirection = sortDirection === "asc" ? "desc" : "asc";
+      setSortDirection(nextDirection);
+    } else {
+      nextDirection = DEFAULT_VALUATION_SORT_DIRECTION[nextKey];
+      setSortKey(nextKey);
+      setSortDirection(nextDirection);
+    }
+    trackClientEventSilently("cta_clicked", {
+      cta_id: source === "chip" ? "companies_sort_chip" : "companies_sort_header",
+      surface: "companies_index",
+      sort_key: nextKey,
+      direction: nextKey === "default" ? null : nextDirection,
+    });
+  }
 
   useEffect(() => {
     if (freshCatalog?.release_id && freshCatalog.companies.length > 0) {
@@ -270,6 +380,21 @@ export default function CompaniesBrowser({
       window.history.replaceState(window.history.state, "", nextLocation);
     }
   }
+
+  const sortChips: ValuationSortChip[] = [
+    { key: "default", label: copy.sortDefault },
+    { key: "market_cap", label: copy.sortMarketCap },
+    { key: "pe_ttm", label: copy.sortPerLow },
+    { key: "pb", label: copy.sortPbrLow },
+    { key: "roe_ttm", label: copy.sortRoeHigh },
+  ];
+  const metricHeaders: { key: MetricValuationSortKey; label: string }[] = [
+    { key: "market_cap", label: "mkt cap" },
+    { key: "pe_ttm", label: "per" },
+    { key: "pb", label: "pbr" },
+    { key: "roe_ttm", label: "roe" },
+  ];
+  const valuationSortDisabled = isSearchActive || !valuationByTicker;
 
   return (
     <div className="relative mx-auto w-full max-w-[1440px]">
@@ -388,6 +513,33 @@ export default function CompaniesBrowser({
                 </AnimatePresence>
               </p>
             </div>
+            <div
+              className="mb-3 flex flex-wrap items-center gap-xs"
+              aria-label={copy.sortAria}
+              role="group"
+            >
+              {sortChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  aria-pressed={sortKey === chip.key}
+                  disabled={chip.key !== "default" && valuationSortDisabled}
+                  onClick={() => applyValuationSort(chip.key, "chip")}
+                  className={[
+                    "inline-flex h-9 items-center rounded-[8px] border px-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.08em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50",
+                    sortKey === chip.key
+                      ? "border-primary bg-primary-fixed text-on-primary-fixed"
+                      : "border-hairline bg-canvas text-muted hover:border-outline hover:text-ink",
+                  ].join(" ")}
+                >
+                  {chip.label}
+                </button>
+              ))}
+              <p className="ml-auto min-w-0 font-mono text-[11px] font-bold leading-4 text-muted-soft">
+                {copy.valuationCoverageLabel}{" "}
+                {valuationCoveredCount.toLocaleString()}/{companies.length.toLocaleString()} · TTM
+              </p>
+            </div>
             <motion.div
               layout={animateCompanyRows}
               className="overflow-hidden rounded-[8px] border border-hairline bg-canvas"
@@ -396,11 +548,37 @@ export default function CompaniesBrowser({
                 ease: easeOutExpo,
               }}
             >
-              <div className="hidden grid-cols-[148px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] border-b border-hairline bg-surface px-4 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted xl:grid">
+              <div className="hidden grid-cols-[148px_minmax(160px,1.1fr)_minmax(200px,1.4fr)_84px_64px_64px_64px] border-b border-hairline bg-surface px-4 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-muted xl:grid">
                 <span>ticker</span>
                 <span>company</span>
                 <span>activity</span>
-                <span>watch</span>
+                {metricHeaders.map((header) => {
+                  const isActive = sortKey === header.key;
+                  return (
+                    <button
+                      key={header.key}
+                      type="button"
+                      disabled={valuationSortDisabled}
+                      onClick={() => applyValuationSort(header.key, "header")}
+                      aria-label={`${header.label} ${
+                        isActive
+                          ? sortDirection === "asc"
+                            ? "↑"
+                            : "↓"
+                          : ""
+                      }`}
+                      className={[
+                        "flex min-h-11 min-w-0 items-center justify-end gap-0.5 text-right transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50",
+                        isActive ? "text-primary" : "hover:text-ink",
+                      ].join(" ")}
+                    >
+                      <span className="truncate">{header.label}</span>
+                      <span aria-hidden="true" className="shrink-0">
+                        {isActive ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
               <AnimatePresence initial={false}>
                 {visibleCompanies.map((company, index) => (
