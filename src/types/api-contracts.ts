@@ -1748,7 +1748,6 @@ export interface WebContainerEnv {
   AGENT_MAX_TOOL_CALLS: string; // "18"
   AGENT_MAX_TOOL_RESULT_CHARS: string; // "100000"
   RESEARCH_ANSWER_ENVELOPE_ENABLED?: "0" | "1" | "true" | "false";
-  LEASE_TIMEOUT_MINUTES: string; // "10"
 }
 
 /** Environment variables required by optional standalone MCP container */

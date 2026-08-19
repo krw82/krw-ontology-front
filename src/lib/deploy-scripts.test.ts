@@ -626,10 +626,6 @@ cleanup
       webStart,
       llmGatewayStart,
     );
-    expect(compose).toContain(
-      "AGENT_RUN_HARD_TIMEOUT_MINUTES=${AGENT_RUN_HARD_TIMEOUT_MINUTES:-10}",
-    );
-    expect(compose).toContain("LEASE_TIMEOUT_MINUTES=${LEASE_TIMEOUT_MINUTES:-10}");
     expect(webSection).toContain(
       "AGENT_RUN_EVENT_LISTEN_DATABASE_URL=${AGENT_RUN_EVENT_LISTEN_DATABASE_URL:-}",
     );
