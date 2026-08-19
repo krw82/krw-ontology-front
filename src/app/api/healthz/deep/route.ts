@@ -1,8 +1,5 @@
 import { timingSafeEqual } from "crypto";
 import { APP_VERSION } from "@/lib/app-version";
-import {
-  getReadyAgentWorker,
-} from "@/lib/agent/worker-heartbeat";
 import { getReadyRustAgentDaemon } from "@/lib/agent/daemon-heartbeat";
 import { hasTrustedClientIpConfiguration } from "@/lib/http/client-ip";
 import { getActiveOntologyCatalogRelease } from "@/lib/ontology/catalog";
@@ -150,50 +147,6 @@ async function checkFilingWorker(): Promise<CheckResult> {
   }
 }
 
-async function checkWorkerMcp(expectedReleaseId?: string): Promise<CheckResult> {
-  try {
-    const ready = await getReadyAgentWorker(new Date(), expectedReleaseId);
-    if (!ready.ok) {
-      return {
-        ok: false,
-        error: ready.message,
-      };
-    }
-
-    const health = ready.mcpHealth;
-    return {
-      ok: health.connected,
-      error: health.error,
-      static_ok: health.staticOk,
-      command_ok: health.commandOk,
-      live_ok: health.liveOk,
-      sqlite_ok: health.sqliteOk,
-      env: health.env,
-      root: health.root,
-      index_path: health.indexPath,
-      manifest_path: health.manifestPath,
-      manifest_valid: health.manifestValid,
-      release_id: health.releaseId,
-      agent_index_schema_version: health.agentIndexSchemaVersion,
-      index_generated_at: health.indexGeneratedAt,
-      company_count: health.companyCount,
-      document_count: health.documentCount,
-      object_count: health.objectCount,
-      tool_count: health.toolCount,
-      tools: health.tools,
-      worker_id: ready.worker.worker_id,
-      worker_status: ready.worker.status,
-      worker_last_seen_at: ready.worker.last_seen_at,
-      worker_heartbeat_expires_at: ready.worker.heartbeat_expires_at,
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : "Unknown worker MCP health error",
-    };
-  }
-}
-
 async function checkRustAgentDaemon(): Promise<CheckResult> {
   try {
     const ready = await getReadyRustAgentDaemon();
@@ -309,22 +262,13 @@ export async function GET(request: Request) {
   const agentV1Required =
     process.env.KRW_AGENT_BACKEND_MODE === "rust" ||
     process.env.KRW_RUNTIME_ENVIRONMENT === "prod";
-  const agentV1Daemon = agentV1Required
-    ? await checkRustAgentDaemon()
-    : { ok: true, required: false };
-  const mcp = agentV1Required
-      ? {
-        ok: agentV1Daemon.ok,
-        required: agentV1Daemon.required,
-        owner: "local_rust_agentd",
-        error: agentV1Daemon.error,
-      }
-    : catalog.ok && typeof catalog.release_id === "string"
-      ? await checkWorkerMcp(catalog.release_id)
-      : {
-          ok: false,
-          error: "Cannot check worker MCP without an active catalog release",
-        };
+  const agentV1Daemon = await checkRustAgentDaemon();
+  const mcp = {
+    ok: agentV1Daemon.ok,
+    required: agentV1Daemon.required,
+    owner: "local_rust_agentd",
+    error: agentV1Daemon.error,
+  };
   const ok =
     supabase.ok &&
     catalog.ok &&
