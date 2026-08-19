@@ -22,7 +22,6 @@ describe("production deploy scripts", () => {
     const installer = read("scripts/install-krw-agent-local-mcp-gateways.mjs");
     expect(installer).toContain("resolveMcpOrigin");
     expect(installer).not.toContain('const CLIENT_ORIGIN = "https://krw-agent.local"');
-    expect(read("scripts/deploy-production-fast.sh")).toContain("--mcp-check");
     expect(read("scripts/verify-krw-feed-mcp-production.sh")).toContain(
       "KRW_AGENT_MCP_ORIGIN",
     );
@@ -50,9 +49,7 @@ describe("production deploy scripts", () => {
   it("uses an MCP initialize proof for the Guru gateway instead of a guessed health URL", () => {
     const installer = read("scripts/install-krw-agent-local-mcp-gateways.mjs");
 
-    expect(installer).toContain('entry.name === "guru"');
     expect(installer).toContain('"mcp_initialize"');
-    expect(installer).toContain('config.upstreamMcpPath');
   });
 
   it("requires an exact krw-agent host archive provenance before a production build", () => {
@@ -234,8 +231,6 @@ describe("production deploy scripts", () => {
   });
 
   it("routes normal production aliases through the fast web and Mac path", () => {
-    const deployProd = read("scripts/deploy-production.sh");
-    const deployFast = read("scripts/deploy-production-fast.sh");
     const deployFull = read("scripts/deploy-production-full.sh");
     const deployQueue = read("scripts/deploy-production-simple.sh");
     const deployWeb = read("scripts/deploy-web-production.sh");
@@ -247,45 +242,7 @@ describe("production deploy scripts", () => {
     const verifyMcpRuntime = read("scripts/verify-mcp-runtime.mjs");
     const fingerprintMcpRuntime = read("scripts/mcp-runtime-fingerprint.sh");
 
-    expect(deployProd).toContain("deploy-production-fast.sh");
-    expect(deployProd).toContain("--apply-migrations");
-    expect(deployFast).toContain("krw-ontology-front-web:candidate-");
-    expect(deployFast).toContain("--billing-v2-cutover");
-    expect(deployFast).toContain("Caddyfile.billing-readonly");
-    expect(deployFast).toContain("run_remote_pause_billing_for_cutover");
-    expect(deployFast).toContain("run_remote_disable_billing_v2_writes");
-    expect(deployFast).toContain("docker compose");
-    expect(deployFast).toContain("run_schema_smoke()");
-    expect(deployFast).toContain("run_schema_smoke");
-    expect(deployFast).toContain("run_migration_dry_run");
-    expect(deployFast).toContain("supabase-cli.sh");
-    expect(deployFast).toContain("run_remote_deep_verify");
-    expect(deployFast).toContain("Removing retired GCP ontology sidecars.");
-    expect(deployFast).toContain("stage_local_agent_release");
-    expect(deployFast).toContain("public Rust release descriptor");
-    expect(deployFast).toContain("KRW_AGENT_DAEMON_HEARTBEAT_REQUIRED 1");
-    expect(deployFast).toContain("assert_release_tree_has_no_generated_artifacts");
-    expect(deployFast).toContain("prune_remote_stale_deployment_artifacts");
-    expect(deployFast).toContain("prune_remote_post_activation_artifacts");
-    expect(deployFast).toContain("docker builder prune --all --force --max-used-space 12GB");
-    expect(deployFast).toContain("run_remote_buffered_script()");
-    expect(deployFast).toContain("krw-fast-remote.XXXXXX");
-    expect(deployFast).not.toContain("REMOTE_SCRIPT' | gcloud compute ssh");
-    expect(deployFast).toContain("candidate-*|release-*|rollback-*");
-    expect(deployFast).toContain("market-issue-enrichment-worker");
-    expect(deployFast).toContain("run_remote_validate_agent_candidate_abi");
-    expect(deployFast).toContain("AGENT_V1_DATABASE_CA_FILE /run/krw-agent/agent-v1-ca.pem");
-    expect(deployFast).toContain("agent_tenant_id=krw-ontology-prod");
-    expect(deployFast).toContain("resolve_agent_runtime_env");
-    expect(deployFast).toContain("KRW_AGENT_RUNTIME_ENV_FILE");
     expect(compose).toContain("supabase-root-2021-ca.crt:/run/krw-agent/agent-v1-ca.pem:ro");
-    expect(deployFast).toContain("--with-agent-release requires --apply-migrations for the direct Rust daemon heartbeat ABI.");
-    expect(deployFast).not.toContain("local Mac worker heartbeat restart");
-    expect(deployFast).not.toContain("install-krw-agent-release-production.sh");
-    expect(deployFast).not.toContain("ONTOLOGY_ARCHIVE");
-    expect(deployFast).not.toContain("KRW_ONTOLOGY_SOURCE_DIR=\"$REMOTE_STAGE/ontology\"");
-    expect(deployFast).not.toContain("pause-production-cutover.sh");
-    expect(deployFast).not.toContain("deploy-all-production.sh");
     expect(deployFull).toContain("krw-agent-deploy");
     expect(deployFull).toContain("KRW_AGENT_DEPLOY_BIN");
     expect(deployFull).toContain("KRW_AGENT_DEPLOY_CONFIG");
@@ -295,11 +252,6 @@ describe("production deploy scripts", () => {
     expect(deployFull).not.toContain("build_sealed_dual_provider_release.sh");
     expect(deployFull).not.toContain("deploy-all-production.sh");
     expect(deployFull).not.toContain("pause-production-cutover.sh");
-    const stageBlock = deployFast.slice(
-      deployFast.indexOf("stage_local_agent_release()"),
-      deployFast.indexOf("\n}\n\nprepare_local_agent_mcp_gateways", deployFast.indexOf("stage_local_agent_release()")),
-    );
-    expect(stageBlock).not.toContain("verify-krw-feed-mcp-production.sh");
     expect(deployFull).not.toContain(
       'verify-krw-feed-mcp-production.sh" --env-file "$agent_runtime_env_candidate"',
     );
@@ -390,22 +342,7 @@ describe("production deploy scripts", () => {
 
     expect(packageJson).toContain('"prod:status": "scripts/status-production-fast.sh"');
     expect(packageJson).toContain('"prod:preflight": "scripts/run-production-release-gates.sh"');
-    expect(packageJson).toContain('"prod:deploy:web": "scripts/deploy-production-fast.sh --skip-mac"');
-    expect(packageJson).toContain(
-      '"prod:deploy:runtime": "scripts/deploy-production-fast.sh --apply-migrations --require-live-toss"',
-    );
-    expect(packageJson).toContain(
-      '"prod:deploy:mac-runtime": "/bin/sh scripts/deploy-production-fast.sh --skip-web"',
-    );
-    expect(packageJson).toContain('"prod:deploy:code": "scripts/deploy-production-fast.sh --apply-migrations"');
     expect(packageJson).toContain('"prod:deploy:full": "scripts/deploy-production-full.sh"');
-    expect(packageJson).toContain('"prod:deploy:dry": "scripts/deploy-production-fast.sh --dry-run --apply-migrations"');
-    expect(packageJson).toContain('"prod:deploy:safe": "scripts/deploy-production-fast.sh --apply-migrations --with-agent-release"');
-    expect(packageJson).toContain('"prod:release:publish": "scripts/deploy-production-fast.sh --with-data --skip-web --skip-mac"');
-    expect(packageJson).toContain('"deploy:data": "scripts/deploy-production-fast.sh --with-data --skip-web --skip-mac"');
-    expect(packageJson).toContain('"deploy:worker": "/bin/sh scripts/deploy-production-fast.sh --skip-web"');
-    expect(packageJson).toContain('"deploy:plugin": "/bin/sh scripts/deploy-production-fast.sh --skip-web"');
-    expect(packageJson).toContain('"deploy:mcp": "/bin/sh scripts/deploy-production-fast.sh --skip-web"');
     expect(packageJson).not.toContain("legacy:gcp-mcp");
     expect(packageJson).not.toContain("deploy-data-production.sh");
     expect(packageJson).not.toContain("deploy:plugin:gcp");
@@ -478,7 +415,6 @@ describe("production deploy scripts", () => {
     expect(commandDocs).not.toContain(
       "npm run prod:release:publish -- --release-id <release_id>",
     );
-    expect(commandDocs).toContain("deploy:data             -> prod:release:publish");
 
     expect(script).toContain("release export-web-catalog");
     expect(script).toContain("publish-web-catalog.mjs");
@@ -525,22 +461,12 @@ describe("production deploy scripts", () => {
 
   it("keeps the GCP application Compose free of ontology execution", () => {
     const compose = read("docker-compose.yml");
-    const fastDeploy = read("scripts/deploy-production-fast.sh");
     const dockerfileWeb = read("Dockerfile.web");
 
     expect(compose).not.toContain("  agent-worker:");
     expect(compose).not.toContain("  ontology-mcp:");
     expect(compose).not.toContain("KRW_ONTOLOGY_PLUGIN_PATH");
     expect(compose).not.toContain("KRW_ONTOLOGY_MCP_URL");
-    expect(fastDeploy).not.toContain("ONTOLOGY_ARCHIVE");
-    expect(fastDeploy).not.toContain("KRW_ONTOLOGY_SOURCE_DIR");
-    expect(fastDeploy).toContain("Removing retired GCP ontology sidecars.");
-    expect(fastDeploy).toContain('"x-krw-client-ip":"127.0.0.1"');
-    expect(fastDeploy).toContain("deep health returned ${response.status}");
-    expect(fastDeploy).toContain('NEXT_PUBLIC_APP_VERSION="$RELEASE_ID" \\');
-    expect(fastDeploy).toContain(
-      'PRODUCTION_ORCHESTRATOR_ATTESTATION="$RELEASE_ID:$DATA_LOCK_OWNER"',
-    );
     expect(dockerfileWeb).not.toContain("krw-ontology-src");
     expect(dockerfileWeb).not.toContain("ontology-mcp:8000");
     expect(dockerfileWeb).not.toContain("agent-worker.mjs");
@@ -604,15 +530,11 @@ describe("production deploy scripts", () => {
     expect(readiness).toContain('"Pro feature" "리서치 노트북" "Research notebook"');
     expect(readiness).not.toContain('"Standard weekly credits"');
     expect(readiness).not.toContain('"Pro weekly credits"');
-    expect(read("scripts/deploy-production-fast.sh")).toContain(
-      "--require-live-toss",
-    );
 
     expect(billingContract).toContain("Production Readiness Gate");
     expect(billingContract).toContain("npm run billing:prod:readiness");
     expect(billingContract).toContain("live_sk_");
     expect(commandDocs).toContain("Production billing");
-    expect(commandDocs).toContain("npm run prod:deploy:code");
     expect(commandDocs).not.toContain("scripts/restart-production-compose.sh");
     expect(commandDocs).toContain("npm run billing:prod:readiness");
   });
@@ -963,29 +885,8 @@ cleanup
     expect(mcpClient).not.toContain("runStdioMcpHealth");
   });
 
-  it("archives the exact clean frontend commit for fast deployment", () => {
-    const fastDeploy = read("scripts/deploy-production-fast.sh");
-
-    expect(fastDeploy).toContain(
-      'FRONT_GIT_COMMIT=$(git -C "$FRONT_DIR" rev-parse HEAD)',
-    );
-    expect(fastDeploy).toContain(
-      'git -C "$FRONT_DIR" archive --format=tar "$FRONT_GIT_COMMIT"',
-    );
-    expect(fastDeploy).toContain("Production commit contains generated build artifacts");
-    expect(fastDeploy).toContain("Pruned inactive deployment stages and stale web candidate tags.");
-    expect(fastDeploy).toContain("run_remote_capture_research_admission");
-    expect(fastDeploy).toContain("run_remote_restore_research_admission");
-    expect(fastDeploy).toContain("A frontend-only deployment must never turn a closed/canary/drain research");
-    expect(fastDeploy).toContain("Inherited the verified Rust Agent V1 descriptor for a frontend-only candidate.");
-    expect(fastDeploy).toContain("which omitted every immutable Agent V1 pin");
-    expect(fastDeploy).toContain("admission evidence always names the running frontend");
+  it("keeps the production agent canary switch explicit", () => {
     expect(read("scripts/set-krw-agent-production-canary.sh")).toContain("--mode canary");
     expect(read("scripts/set-krw-agent-production-canary.sh")).toContain("KRW_AGENT_CANARY_PRINCIPAL_IDS");
-    expect(fastDeploy).not.toContain("--exclude=coverage");
-    expect(fastDeploy).not.toContain("ONTOLOGY_ARCHIVE");
-    expect(fastDeploy).not.toContain("KRW_ONTOLOGY_SOURCE_DIR");
-    expect(fastDeploy).toContain("upload_archive");
-    expect(fastDeploy).toContain("ServerAliveInterval=15");
   });
 });

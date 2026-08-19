@@ -7,7 +7,7 @@ usage() {
   cat <<'EOF'
 Usage: scripts/status-production-workers.sh [--env-file FILE] [--skip-gcp]
 
-Print local Mac supervisor process status and remote GCP Docker Compose status.
+Print remote GCP Docker Compose status and the local Mac worker environment config.
 EOF
 }
 
