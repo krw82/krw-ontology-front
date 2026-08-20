@@ -354,6 +354,20 @@ export default function TopNav({
                       onComplete={() => setAccountMenuOpen(false)}
                     />
                     <Link
+                      href="/settings/companies"
+                      className="mt-xs flex w-full items-center justify-between rounded-[8px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-surface-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      role="menuitem"
+                      onClick={() => setAccountMenuOpen(false)}
+                    >
+                      <span>{currentLocale === "ko" ? "관심 기업" : "Followed companies"}</span>
+                      <span
+                        aria-hidden="true"
+                        className="material-symbols-outlined text-[18px]"
+                      >
+                        bookmark
+                      </span>
+                    </Link>
+                    <Link
                       href="/settings/notifications"
                       className="mt-xs flex w-full items-center justify-between rounded-[8px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-surface-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       role="menuitem"

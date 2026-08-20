@@ -117,6 +117,12 @@ export default function ChatAnswerFollowCta({ ticker }: { ticker: string }) {
         >
           플랜 보기
         </Link>
+        <Link
+          href="/settings/companies"
+          className="text-[12px] font-bold text-primary underline-offset-2 hover:underline"
+        >
+          관심 기업 관리
+        </Link>
       </div>
     );
   }

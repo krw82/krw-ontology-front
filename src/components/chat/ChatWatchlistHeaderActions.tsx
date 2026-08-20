@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { useCompanyFollow } from "@/lib/follow/use-company-follow";
@@ -129,6 +130,12 @@ export default function ChatWatchlistHeaderActions({
           <p className="min-w-0 text-[12px] font-extrabold leading-5 text-ink">
             관심 기업은 무료 플랜 3개까지예요 · 무제한은 유료 플랜
           </p>
+          <Link
+            href="/settings/companies"
+            className="ml-2 shrink-0 text-[12px] font-extrabold text-primary underline underline-offset-2"
+          >
+            관리
+          </Link>
         </div>
       ) : null}
       {shouldShowNotebookHint ? (

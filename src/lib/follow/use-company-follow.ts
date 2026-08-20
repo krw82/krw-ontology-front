@@ -107,19 +107,23 @@ export type CompanyFollowState = {
 /** 관심 = 알림. 토글 하나가 관심종목 + 공시 구독 + 뉴스 팔로우를 함께 처리한다. */
 export function useCompanyFollow(
   ticker: string,
-  options?: { surface?: string },
+  options?: { surface?: string; initialFollowing?: boolean },
 ): CompanyFollowState {
   const normalizedTicker = normalizeTicker(ticker);
   const surface = options?.surface ?? "company_follow";
-  const [loading, setLoading] = useState(Boolean(normalizedTicker));
-  const [following, setFollowing] = useState(false);
+  // 목록 화면처럼 서버가 이미 상태를 아는 경우 초기 조회를 건너뛴다.
+  const hasInitialFollowing = options?.initialFollowing !== undefined;
+  const [loading, setLoading] = useState(
+    Boolean(normalizedTicker) && !hasInitialFollowing,
+  );
+  const [following, setFollowing] = useState(Boolean(options?.initialFollowing));
   const [unavailable, setUnavailable] = useState(false);
   const [alerts, setAlerts] = useState<"on" | "no_sec_id" | null>(null);
   const [limitReached, setLimitReached] = useState(false);
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    if (!normalizedTicker) return;
+    if (!normalizedTicker || hasInitialFollowing) return;
     let stale = false;
     const tickerForRequest = normalizedTicker;
     void (async () => {
@@ -136,7 +140,7 @@ export function useCompanyFollow(
     return () => {
       stale = true;
     };
-  }, [normalizedTicker]);
+  }, [normalizedTicker, hasInitialFollowing]);
 
   // 같은 티커의 다른 버튼(챗 헤더 ↔ 답변 CTA)이 상태를 바꾸면 다시 조회한다.
   useEffect(() => {
