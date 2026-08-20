@@ -16,11 +16,11 @@ const ANSWER_FOLLOW_CTA_ENABLED =
 type CtaState = "idle" | "working" | "done" | "failed";
 
 const DONE_MESSAGE: Record<PushPlan, string> = {
-  already: "팔로우 완료 · 알림 켜짐",
-  prompt: "팔로우 완료 · 알림 켜짐",
-  install: "팔로우 완료 · 홈 화면에 추가하면 폰으로 알림이 와요",
-  denied: "팔로우 완료 · 브라우저 설정에서 알림을 허용할 수 있어요",
-  skipped: "팔로우 완료",
+  already: "관심 추가 완료 · 알림 켜짐",
+  prompt: "관심 추가 완료 · 알림 켜짐",
+  install: "관심 추가 완료 · 홈 화면에 추가하면 폰으로 알림이 와요",
+  denied: "관심 추가 완료 · 브라우저 설정에서 알림을 허용할 수 있어요",
+  skipped: "관심 추가 완료",
 };
 
 /**
@@ -157,12 +157,12 @@ export default function ChatAnswerFollowCta({ ticker }: { ticker: string }) {
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-[13px] font-extrabold leading-[1.4] text-ink">
-          {normalizedTicker} 새 소식 받기
+          {normalizedTicker} 관심 추가 · 새 소식 알림
         </p>
         <p className="text-[12px] leading-[1.4] text-muted">
           {state === "failed"
             ? "일시적인 문제로 저장하지 못했어요. 다시 시도해주세요."
-            : "공시·뉴스가 뜨면 이 기기로 알려드려요. 언제든 끌 수 있어요."}
+            : "관심으로 추가하면 공시·뉴스가 뜰 때 이 기기로 알려드려요. 언제든 끌 수 있어요."}
         </p>
       </div>
       <button
@@ -182,14 +182,14 @@ export default function ChatAnswerFollowCta({ ticker }: { ticker: string }) {
             ? "progress_activity"
             : state === "failed"
               ? "refresh"
-              : "notifications_active"}
+              : "bookmark_add"}
         </span>
         <span>
           {isWorking
-            ? "설정 중"
+            ? "추가 중"
             : state === "failed"
               ? "다시 시도"
-              : "받기"}
+              : "관심 추가"}
         </span>
       </button>
     </div>
