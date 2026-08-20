@@ -13,6 +13,10 @@ import {
   subscribeCurrentDevice,
 } from "@/lib/filing-notifications/push-subscription-client";
 import { normalizeTicker } from "@/lib/ontology/ticker";
+import {
+  emitFollowChange,
+  subscribeFollowChange,
+} from "./follow-change-events";
 
 export type PushPlan = "already" | "prompt" | "install" | "denied" | "skipped";
 
@@ -67,6 +71,24 @@ async function ensureDevicePush(surface: string): Promise<PushPlan> {
   return "skipped";
 }
 
+async function fetchFollowingState(
+  ticker: string,
+): Promise<{ following: boolean } | null> {
+  try {
+    const response = await fetch(
+      `/api/watchlist/${encodeURIComponent(ticker)}/coverage-level`,
+      { cache: "no-store" },
+    );
+    if (!response.ok) return null;
+    const payload = (await response.json()) as {
+      mark?: { coverage_level?: string | null } | null;
+    };
+    return { following: Boolean(payload.mark?.coverage_level) };
+  } catch {
+    return null;
+  }
+}
+
 export type CompanyFollowState = {
   loading: boolean;
   following: boolean;
@@ -101,30 +123,32 @@ export function useCompanyFollow(
     let stale = false;
     const tickerForRequest = normalizedTicker;
     void (async () => {
-      try {
-        const response = await fetch(
-          `/api/watchlist/${encodeURIComponent(tickerForRequest)}/coverage-level`,
-          { cache: "no-store" },
-        );
-        if (stale) return;
-        if (!response.ok) {
-          setUnavailable(true);
-          return;
-        }
-        const payload = (await response.json()) as {
-          mark?: { coverage_level?: string | null } | null;
-        };
-        if (stale) return;
-        setFollowing(Boolean(payload.mark?.coverage_level));
-      } catch {
-        // 네트워크 실패는 숨김까지는 아니므로 조용히 둔다.
-      } finally {
-        if (!stale) setLoading(false);
+      const result = await fetchFollowingState(tickerForRequest);
+      if (stale) return;
+      if (result) {
+        setFollowing(result.following);
+      } else {
+        setUnavailable(true);
       }
-    })();
+    })().finally(() => {
+      if (!stale) setLoading(false);
+    });
     return () => {
       stale = true;
     };
+  }, [normalizedTicker]);
+
+  // 같은 티커의 다른 버튼(챗 헤더 ↔ 답변 CTA)이 상태를 바꾸면 다시 조회한다.
+  useEffect(() => {
+    if (!normalizedTicker) return;
+    const tickerForRequest = normalizedTicker;
+    return subscribeFollowChange(tickerForRequest, () => {
+      void (async () => {
+        const result = await fetchFollowingState(tickerForRequest);
+        // 조회 실패는 숨김/해제로 오인하지 않도록 상태를 그대로 둔다.
+        if (result) setFollowing(result.following);
+      })();
+    });
   }, [normalizedTicker]);
 
   const follow = useCallback(async () => {
@@ -157,6 +181,7 @@ export function useCompanyFollow(
         });
       }
       const pushPlan = await ensureDevicePush(surface);
+      emitFollowChange(normalizedTicker);
       return {
         ok: true as const,
         pushPlan,
@@ -183,6 +208,7 @@ export function useCompanyFollow(
         surface,
         ticker: normalizedTicker,
       });
+      emitFollowChange(normalizedTicker);
       return { ok: true };
     } catch {
       setError(true);

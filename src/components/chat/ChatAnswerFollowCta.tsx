@@ -54,8 +54,17 @@ export default function ChatAnswerFollowCta({ ticker }: { ticker: string }) {
   // Anonymous or unauthorized visitors never see the CTA.
   const hidden = followState.unavailable || (followState.following && pushReady);
 
+  // 헤더 등 다른 버튼이 관심을 해제하면 완료 상태를 제안 상태로 되돌린다.
+  const viewState: CtaState =
+    state === "done" && !followState.following ? "idle" : state;
+
   const handleFollow = useCallback(async () => {
-    if (!normalizedTicker || state === "working" || state === "done") return;
+    if (
+      !normalizedTicker ||
+      state === "working" ||
+      (state === "done" && followState.following)
+    )
+      return;
 
     setState("working");
     trackClientEventSilently("cta_clicked", {
@@ -83,7 +92,7 @@ export default function ChatAnswerFollowCta({ ticker }: { ticker: string }) {
     return null;
   }
 
-  if (followState.limitReached && state !== "working" && state !== "done") {
+  if (followState.limitReached && viewState !== "working" && viewState !== "done") {
     return (
       <div
         data-answer-follow-cta="limit"
@@ -112,7 +121,7 @@ export default function ChatAnswerFollowCta({ ticker }: { ticker: string }) {
     );
   }
 
-  if (state === "done") {
+  if (viewState === "done") {
     return (
       <div
         data-answer-follow-cta="done"
@@ -146,7 +155,7 @@ export default function ChatAnswerFollowCta({ ticker }: { ticker: string }) {
   const isWorking = state === "working";
   return (
     <div
-      data-answer-follow-cta={state === "failed" ? "failed" : "active"}
+      data-answer-follow-cta={viewState === "failed" ? "failed" : "active"}
       className="mx-auto mt-xs flex w-full max-w-4xl flex-wrap items-center gap-x-sm gap-y-xs rounded-[10px] border border-hairline bg-surface-soft px-sm py-sm"
     >
       <span
@@ -160,7 +169,7 @@ export default function ChatAnswerFollowCta({ ticker }: { ticker: string }) {
           {normalizedTicker} 관심 추가 · 새 소식 알림
         </p>
         <p className="text-[12px] leading-[1.4] text-muted">
-          {state === "failed"
+          {viewState === "failed"
             ? "일시적인 문제로 저장하지 못했어요. 다시 시도해주세요."
             : "관심으로 추가하면 공시·뉴스가 뜰 때 이 기기로 알려드려요. 언제든 끌 수 있어요."}
         </p>
@@ -180,14 +189,14 @@ export default function ChatAnswerFollowCta({ ticker }: { ticker: string }) {
         >
           {isWorking
             ? "progress_activity"
-            : state === "failed"
+            : viewState === "failed"
               ? "refresh"
               : "bookmark_add"}
         </span>
         <span>
           {isWorking
             ? "추가 중"
-            : state === "failed"
+            : viewState === "failed"
               ? "다시 시도"
               : "관심 추가"}
         </span>
