@@ -94,3 +94,12 @@ DELETE: coverage null(기존 RPC 통과 — monitoring_rules 동작 불변) + �
 - 예외: 진입점 5곳으로 확대(스펙 4곳 + 온보딩 FirstValueFilingActions 발견), pricing 표가 전 플랜 "기업 3개"로 되어 있던 과거 카피 오류를 free 3/유료 무제한으로 바로잡음
 - 남은 것: prod 배포(마이그레이션 포함) → prod 백필 → 2차 delivery_mode "끔(관심만)" 옵션
 
+## PROD 반영 (2026-08-21)
+
+- main 병합(9ba78a4) + 푸시 → `npm run prod:deploy:full -- --agent-provider glm` → **release 20260820T150226Z-91559f42** sealed·activated·open (12단계, 0 스킵)
+- 라이브 검증: `PUT /api/companies/AAPL/follow` 익명 Origin 없음 403 / Origin 있음 401 — 라우트·가드 정상. pricing 카피 라이브 반영 확인
+- 배포 컨트롤러는 agent 저장소 마이그레이션만 적용(`applied_migrations: []`)하므로, 이 저장소 SQL은 pooler 런북대로 **직접 적용**: reconcile 함수 재정의 + schema_migrations 등록(20260820120000), prod 함수 본문에 구독 해제 포함 확인
+- **prod 백필 적용**: 구독→관심 1건, 관심→구독 13건(관심만 있던 유저가 알림 확보), CIK 미해결 스킵 2건. 재드라이런 0건으로 멱등 확인
+- 2차 후보만 남음: delivery_mode "끔(관심만)" 옵션
+
+
