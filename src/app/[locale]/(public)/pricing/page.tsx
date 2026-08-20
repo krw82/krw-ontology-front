@@ -77,11 +77,11 @@ const pricingCopy = {
         pro: "포함 · 크레딧 차감",
       },
       {
-        label: "관심 기업 저장",
+        label: "관심 기업 저장 · 새 소식 알림",
         free: "기업 3개",
-        lite: "기업 3개",
-        standard: "기업 3개",
-        pro: "기업 3개",
+        lite: "무제한",
+        standard: "무제한",
+        pro: "무제한",
       },
       {
         label: "리서치 노트북",
@@ -164,11 +164,11 @@ const pricingCopy = {
         pro: "Included · uses credits",
       },
       {
-        label: "Saved companies",
+        label: "Saved companies & alerts",
         free: "3 companies",
-        lite: "3 companies",
-        standard: "3 companies",
-        pro: "3 companies",
+        lite: "Unlimited",
+        standard: "Unlimited",
+        pro: "Unlimited",
       },
       {
         label: "Research notebook",
@@ -274,7 +274,7 @@ function getPlanDisplay(
     > = {
       free: {
         description:
-          "모든 리서치 모드와 공시 기반 분석을 시작하고 관심 기업 3개를 저장할 수 있습니다.",
+          "모든 리서치 모드와 공시 기반 분석을 시작하고, 관심 기업 3개의 새 소식 알림을 받을 수 있습니다.",
         featureSummary: "모든 리서치 모드",
       },
       lite: {
