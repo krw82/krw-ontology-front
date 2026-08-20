@@ -2,30 +2,24 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { signalPwaInstallEngagement } from "@/components/pwa/lifecycle";
 import { trackClientEventSilently } from "@/lib/analytics/client";
+import { getCurrentDevicePushSubscription } from "@/lib/filing-notifications/push-subscription-client";
 import {
-  isIOSBrowser,
-  isStandaloneDisplayMode,
-  isWebPushSupported,
-} from "@/lib/filing-notifications/client";
-import {
-  getCurrentDevicePushSubscription,
-  subscribeCurrentDevice,
-} from "@/lib/filing-notifications/push-subscription-client";
+  useCompanyFollow,
+  type PushPlan,
+} from "@/lib/follow/use-company-follow";
 import { normalizeTicker } from "@/lib/ontology/ticker";
 
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim() ?? "";
 const ANSWER_FOLLOW_CTA_ENABLED =
   process.env.NEXT_PUBLIC_ANSWER_FOLLOW_CTA !== "off";
 
-type CtaState = "checking" | "idle" | "working" | "done" | "failed";
-type PushOutcome = "granted" | "denied" | "install" | "skipped" | null;
+type CtaState = "idle" | "working" | "done" | "failed";
 
-const DONE_MESSAGE: Record<Exclude<PushOutcome, null>, string> = {
-  granted: "팔로우 완료 · 알림 켜짐",
-  denied: "팔로우 완료 · 브라우저 설정에서 알림을 허용할 수 있어요",
+const DONE_MESSAGE: Record<PushPlan, string> = {
+  already: "팔로우 완료 · 알림 켜짐",
+  prompt: "팔로우 완료 · 알림 켜짐",
   install: "팔로우 완료 · 홈 화면에 추가하면 폰으로 알림이 와요",
+  denied: "팔로우 완료 · 브라우저 설정에서 알림을 허용할 수 있어요",
   skipped: "팔로우 완료",
 };
 
@@ -36,48 +30,29 @@ const DONE_MESSAGE: Record<Exclude<PushOutcome, null>, string> = {
  */
 export default function ChatAnswerFollowCta({ ticker }: { ticker: string }) {
   const normalizedTicker = normalizeTicker(ticker);
-  const [state, setState] = useState<CtaState>("checking");
-  const [followed, setFollowed] = useState(false);
+  const followState = useCompanyFollow(ticker, {
+    surface: "chat_answer",
+  });
+  const [state, setState] = useState<CtaState>("idle");
   const [pushReady, setPushReady] = useState(false);
-  const [hidden, setHidden] = useState(false);
   const [digestLimited, setDigestLimited] = useState(false);
-  const [pushOutcome, setPushOutcome] = useState<PushOutcome>(null);
+  const [pushPlan, setPushPlan] = useState<PushPlan | null>(null);
 
   useEffect(() => {
     if (!normalizedTicker) return;
     let stale = false;
-    const tickerForRequest = normalizedTicker;
-
-    async function loadState() {
-      const [coverageResponse, subscription] = await Promise.all([
-        fetch(`/api/watchlist/${encodeURIComponent(tickerForRequest)}/coverage-level`, {
-          cache: "no-store",
-        }).catch(() => null),
-        getCurrentDevicePushSubscription(),
-      ]);
-      if (stale) return;
-
-      if (!coverageResponse || !coverageResponse.ok) {
-        // Anonymous or unauthorized visitors never see the CTA.
-        setHidden(true);
-        setState("idle");
-        return;
-      }
-      const payload = (await coverageResponse.json().catch(() => null)) as {
-        mark?: { coverage_level?: string | null } | null;
-      } | null;
-      const isFollowed = Boolean(payload?.mark?.coverage_level);
-      setFollowed(isFollowed);
-      setPushReady(Boolean(subscription));
-      setHidden(isFollowed && Boolean(subscription));
-      setState("idle");
-    }
-
-    void loadState();
+    void getCurrentDevicePushSubscription()
+      .then((subscription) => {
+        if (!stale) setPushReady(Boolean(subscription));
+      })
+      .catch(() => null);
     return () => {
       stale = true;
     };
   }, [normalizedTicker]);
+
+  // Anonymous or unauthorized visitors never see the CTA.
+  const hidden = followState.unavailable || (followState.following && pushReady);
 
   const handleFollow = useCallback(async () => {
     if (!normalizedTicker || state === "working" || state === "done") return;
@@ -89,106 +64,52 @@ export default function ChatAnswerFollowCta({ ticker }: { ticker: string }) {
       ticker: normalizedTicker,
     });
 
-    try {
-      if (!followed) {
-        const response = await fetch(
-          `/api/watchlist/${encodeURIComponent(normalizedTicker)}`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ coverage_level: "interest" }),
-          },
-        );
-        if (!response.ok) throw new Error("watchlist_follow_failed");
-        trackClientEventSilently("company_followed", {
-          surface: "chat_answer",
-          ticker: normalizedTicker,
-        });
-        setFollowed(true);
-      }
-
-      // Filing/news alert subscription. Some tickers have no SEC identifier
-      // (422) — that only narrows the alerts, the follow itself still counts.
-      const subscriptionResponse = await fetch(
-        `/api/filing-subscriptions/${encodeURIComponent(normalizedTicker)}`,
-        { method: "PUT" },
-      ).catch(() => null);
-      if (subscriptionResponse?.ok) {
-        trackClientEventSilently("filing_subscription_created", {
-          surface: "chat_answer",
-          ticker: normalizedTicker,
-        });
-      } else if (subscriptionResponse?.status === 422) {
-        setDigestLimited(true);
-      }
-
-      // Pulse news feed personalization (best effort).
-      await fetch(
-        `/api/news/companies/${encodeURIComponent(normalizedTicker)}/follow`,
-        { method: "PUT" },
-      ).catch(() => null);
-
-      if (pushReady) {
-        setPushOutcome("granted");
-        setState("done");
-        return;
-      }
-
-      const iosNeedsInstall = isIOSBrowser() && !isStandaloneDisplayMode();
-      if (iosNeedsInstall) {
-        signalPwaInstallEngagement("install_requested", "chat_answer_cta");
-        setPushOutcome("install");
-        setState("done");
-        return;
-      }
-      if (
-        !isWebPushSupported() ||
-        !VAPID_PUBLIC_KEY ||
-        (typeof Notification !== "undefined" &&
-          Notification.permission === "denied")
-      ) {
-        setPushOutcome(
-          typeof Notification !== "undefined" &&
-            Notification.permission === "denied"
-            ? "denied"
-            : "skipped",
-        );
-        setState("done");
-        return;
-      }
-
-      trackClientEventSilently("push_permission_prompted", {
-        surface: "chat_answer",
-      });
-      const permission = await subscribeCurrentDevice(VAPID_PUBLIC_KEY).catch(
-        () => null,
-      );
-      if (permission === "granted") {
-        trackClientEventSilently("push_subscribed", {
-          surface: "chat_answer",
-        });
-        setPushOutcome("granted");
-      } else if (permission === "denied") {
-        trackClientEventSilently("push_permission_denied", {
-          surface: "chat_answer",
-        });
-        setPushOutcome("denied");
-      } else {
-        setPushOutcome("skipped");
-      }
+    const result = await followState.follow();
+    if (result.ok) {
+      setDigestLimited(result.alerts === "no_sec_id");
+      setPushPlan(result.pushPlan);
       setState("done");
-    } catch {
-      setState("failed");
+      return;
     }
-  }, [followed, normalizedTicker, pushReady, state]);
+    setState(result.reason === "limit" ? "idle" : "failed");
+  }, [followState, normalizedTicker, state]);
 
   if (
     !ANSWER_FOLLOW_CTA_ENABLED ||
     !normalizedTicker ||
-    state === "checking" ||
+    followState.loading ||
     hidden
   ) {
     return null;
+  }
+
+  if (followState.limitReached && state !== "working" && state !== "done") {
+    return (
+      <div
+        data-answer-follow-cta="limit"
+        className="mx-auto mt-xs flex w-full max-w-4xl flex-wrap items-center gap-x-sm gap-y-xs rounded-[10px] border border-hairline bg-surface-soft px-sm py-sm"
+        aria-live="polite"
+      >
+        <span
+          aria-hidden="true"
+          className="material-symbols-outlined text-[18px] text-primary"
+        >
+          lock
+        </span>
+        <p className="min-w-0 flex-1 text-[13px] font-extrabold leading-[1.4] text-ink">
+          관심 기업이 가득 찼어요 · 무료 플랜은 3개까지
+          <span className="ml-xs text-[12px] font-medium text-muted">
+            무제한 관심·알림은 유료 플랜
+          </span>
+        </p>
+        <Link
+          href="/pricing"
+          className="text-[12px] font-bold text-primary underline-offset-2 hover:underline"
+        >
+          플랜 보기
+        </Link>
+      </div>
+    );
   }
 
   if (state === "done") {
@@ -205,7 +126,7 @@ export default function ChatAnswerFollowCta({ ticker }: { ticker: string }) {
           check_circle
         </span>
         <p className="min-w-0 flex-1 text-[13px] font-extrabold leading-[1.4] text-ink">
-          {DONE_MESSAGE[pushOutcome ?? "skipped"]}
+          {DONE_MESSAGE[pushPlan ?? "skipped"]}
           {digestLimited ? (
             <span className="ml-xs text-[12px] font-medium text-muted">
               · 이 종목은 공시 알림 대상이 아닐 수 있어요

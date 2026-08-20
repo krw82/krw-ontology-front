@@ -2,14 +2,9 @@
 
 import { useEffect, useState } from "react";
 
+import { useCompanyFollow } from "@/lib/follow/use-company-follow";
 import { normalizeTicker } from "@/lib/ontology/ticker";
-import type {
-  UserCompanyCoverageLevel,
-  UserCompanyNotebook,
-  UserCompanyMark,
-} from "@/types/api-contracts";
-
-type CoverageLevel = UserCompanyCoverageLevel;
+import type { UserCompanyNotebook } from "@/types/api-contracts";
 
 export interface ChatWatchlistHeaderActionsProps {
   ticker: string;
@@ -25,39 +20,15 @@ export default function ChatWatchlistHeaderActions({
   forceShowNotebookOnboarding,
 }: ChatWatchlistHeaderActionsProps) {
   const normalizedTicker = normalizeTicker(ticker);
-  const [mark, setMark] = useState<UserCompanyMark | null>(null);
+  const followState = useCompanyFollow(ticker, {
+    surface: "chat_header",
+  });
   const [notebookUsage, setNotebookUsage] = useState<{
     ticker: string;
     hasBeenUsed: boolean;
   } | null>(null);
-  const [pendingLevel, setPendingLevel] = useState<CoverageLevel | null>(null);
-
-  useEffect(() => {
-    if (!normalizedTicker) return;
-
-    let stale = false;
-    const tickerForRequest = normalizedTicker;
-    async function loadMark() {
-      try {
-        const response = await fetch(
-          `/api/watchlist/${encodeURIComponent(tickerForRequest)}/coverage-level`,
-          { cache: "no-store" },
-        );
-        if (!response.ok) return;
-        const payload = (await response.json()) as {
-          mark?: UserCompanyMark | null;
-        };
-        if (!stale) setMark(payload.mark ?? null);
-      } catch {
-        if (!stale) setMark(null);
-      }
-    }
-
-    void loadMark();
-    return () => {
-      stale = true;
-    };
-  }, [normalizedTicker]);
+  const [pending, setPending] = useState(false);
+  const [limitNotice, setLimitNotice] = useState(false);
 
   useEffect(() => {
     if (
@@ -104,29 +75,26 @@ export default function ChatWatchlistHeaderActions({
     };
   }, [forceShowNotebookOnboarding, normalizedTicker, notebookEnabled, showNotebookOnboarding]);
 
+  useEffect(() => {
+    if (!limitNotice) return;
+    const timeoutId = window.setTimeout(() => setLimitNotice(false), 4_000);
+    return () => window.clearTimeout(timeoutId);
+  }, [limitNotice]);
+
   if (!normalizedTicker) return null;
 
-  async function saveCoverageLevel(nextLevel: CoverageLevel) {
-    if (!normalizedTicker || pendingLevel) return;
-
-    const currentLevel = coverageLevelOf(mark);
-    const coverageLevel = currentLevel === nextLevel ? null : nextLevel;
-
-    setPendingLevel(nextLevel);
+  async function toggleFollow() {
+    if (pending) return;
+    setPending(true);
     try {
-      const response = await fetch(
-        `/api/watchlist/${encodeURIComponent(normalizedTicker)}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ coverage_level: coverageLevel }),
-        },
-      );
-      if (!response.ok) throw new Error("Failed to save watchlist mark");
-      const payload = (await response.json()) as { mark?: UserCompanyMark };
-      if (payload.mark) setMark(payload.mark);
+      const result = followState.following
+        ? await followState.unfollow()
+        : await followState.follow();
+      if (!result.ok && "reason" in result && result.reason === "limit") {
+        setLimitNotice(true);
+      }
     } finally {
-      setPendingLevel(null);
+      setPending(false);
     }
   }
 
@@ -136,10 +104,6 @@ export default function ChatWatchlistHeaderActions({
     notebookEnabled &&
     showNotebookOnboarding &&
     (forceShowNotebookOnboarding || notebookHasBeenUsed === false);
-  const currentCoverageLevel = coverageLevelOf(mark);
-  const hasSavedMark = Boolean(
-    currentCoverageLevel,
-  );
 
   return (
     <div
@@ -147,12 +111,26 @@ export default function ChatWatchlistHeaderActions({
       data-onboarding-target="chat-notebook-actions"
     >
       <ChatHeaderMarkButton
-        active={currentCoverageLevel === "interest"}
-        disabled={pendingLevel !== null}
-        icon={currentCoverageLevel === "interest" ? "check" : "bookmark"}
-        label={pendingLevel === "interest" ? "저장 중" : "관심"}
-        onClick={() => void saveCoverageLevel("interest")}
+        active={followState.following}
+        disabled={pending || followState.loading}
+        icon={followState.following ? "check" : "bookmark"}
+        label={pending ? "저장 중" : "관심"}
+        onClick={() => void toggleFollow()}
       />
+      {limitNotice ? (
+        <div
+          className="absolute right-0 top-[calc(100%+8px)] z-30 inline-flex max-w-[calc(100vw-32px)] items-center rounded-[8px] border border-primary/25 bg-canvas px-3 py-2 text-left shadow-[0_12px_28px_rgba(15,23,42,0.16)]"
+          role="status"
+        >
+          <span
+            aria-hidden="true"
+            className="absolute right-9 top-[-5px] h-2.5 w-2.5 rotate-45 border-l border-t border-primary/25 bg-canvas"
+          />
+          <p className="min-w-0 text-[12px] font-extrabold leading-5 text-ink">
+            관심 기업은 무료 플랜 3개까지예요 · 무제한은 유료 플랜
+          </p>
+        </div>
+      ) : null}
       {shouldShowNotebookHint ? (
         <div
           className="absolute right-0 top-[calc(100%+8px)] z-30 inline-flex max-w-[calc(100vw-32px)] items-center rounded-[8px] border border-primary/25 bg-canvas px-3 py-2 text-left shadow-[0_12px_28px_rgba(15,23,42,0.16)]"
@@ -163,7 +141,7 @@ export default function ChatWatchlistHeaderActions({
             className="absolute right-9 top-[-5px] h-2.5 w-2.5 rotate-45 border-l border-t border-primary/25 bg-canvas"
           />
           <p className="min-w-0 whitespace-nowrap text-[12px] font-extrabold leading-5 text-ink">
-            {hasSavedMark
+            {followState.following
               ? "이 리서치를 커버리지에 남기세요"
               : "저장하고 커버리지에서 이어가세요"}
           </p>
@@ -205,8 +183,4 @@ function ChatHeaderMarkButton({
       <span>{label}</span>
     </button>
   );
-}
-
-function coverageLevelOf(mark: UserCompanyMark | null): CoverageLevel | null {
-  return mark?.coverage_level ?? null;
 }

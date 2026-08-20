@@ -1,6 +1,10 @@
 import type { NextRequest } from "next/server";
 import { getAuthUser, handleAuthError } from "@/lib/auth";
-import { ensureSecCompanyIdentifier, normalizeFilingTicker } from "@/lib/filing-notifications/company-identifiers";
+import { normalizeFilingTicker } from "@/lib/filing-notifications/company-identifiers";
+import {
+  disableFilingSubscription,
+  enableFilingSubscription,
+} from "@/lib/filing-notifications/subscription-service";
 import { invalidOriginResponse, isExpectedMutationOrigin } from "@/lib/filing-notifications/request";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { recordRetentionMilestone } from "@/lib/retention/milestones";
@@ -45,38 +49,23 @@ export async function PUT(
     if (!existing?.enabled && (count ?? 0) >= MAX_FILING_SUBSCRIPTIONS_PER_USER) {
       return Response.json({ error: { code: "limit_reached", message: `공시 알림 기업은 최대 ${MAX_FILING_SUBSCRIPTIONS_PER_USER}개까지 등록할 수 있습니다.` } }, { status: 409 });
     }
-    const identifier = await ensureSecCompanyIdentifier(ticker);
-    if (!identifier?.cik) {
+    const subscriptionResult = await enableFilingSubscription({
+      userId: auth.user.id,
+      ticker,
+    });
+    if (subscriptionResult.status === "unsupported") {
       return Response.json({ error: { code: "unsupported_company", message: "SEC 공시 식별자를 찾지 못했습니다." } }, { status: 422 });
     }
-    const now = new Date().toISOString();
-    const { data: subscription, error } = await admin
+    if (subscriptionResult.status === "error") {
+      throw new Error("subscription_unavailable");
+    }
+    const { data: subscription, error: selectError } = await admin
       .from("user_filing_subscriptions")
-      .upsert(
-        {
-          user_id: auth.user.id,
-          ticker,
-          cik: identifier.cik,
-          enabled: true,
-          subscribed_at: now,
-          disabled_at: null,
-        },
-        { onConflict: "user_id,ticker" },
-      )
       .select("*")
-      .single<UserFilingSubscriptionRow>();
-    if (error || !subscription) throw new Error(error?.message ?? "subscription_unavailable");
-    const [{ error: pollError }, { error: preferenceError }] = await Promise.all([
-      admin.from("sec_filing_poll_state").upsert(
-        { cik: identifier.cik, enabled: true, next_poll_at: now },
-        { onConflict: "cik" },
-      ),
-      admin.from("filing_notification_preferences").upsert(
-        { user_id: auth.user.id },
-        { onConflict: "user_id", ignoreDuplicates: true },
-      ),
-    ]);
-    if (pollError || preferenceError) throw new Error(pollError?.message ?? preferenceError?.message ?? "poll_state_unavailable");
+      .eq("user_id", auth.user.id)
+      .eq("ticker", ticker)
+      .maybeSingle<UserFilingSubscriptionRow>();
+    if (selectError || !subscription) throw new Error(selectError?.message ?? "subscription_unavailable");
     await recordRetentionMilestone(auth.user.id, "first_filing_subscription", { ticker });
     return Response.json({ subscription, sync_status: "pending" });
   } catch {
@@ -104,13 +93,11 @@ export async function DELETE(
   if (findError) return Response.json({ error: { code: "service_unavailable", message: "공시 구독을 확인하지 못했습니다." } }, { status: 503 });
   if (!subscription || !subscription.enabled) return Response.json({ ok: true, already_disabled: true });
 
-  const now = new Date().toISOString();
-  const { error: updateError } = await admin
-    .from("user_filing_subscriptions")
-    .update({ enabled: false, disabled_at: now })
-    .eq("id", subscription.id)
-    .eq("user_id", auth.user.id);
-  if (updateError) return Response.json({ error: { code: "service_unavailable", message: "공시 구독을 해제하지 못했습니다." } }, { status: 503 });
+  const disabled = await disableFilingSubscription({
+    userId: auth.user.id,
+    ticker,
+  });
+  if (!disabled) return Response.json({ error: { code: "service_unavailable", message: "공시 구독을 해제하지 못했습니다." } }, { status: 503 });
 
   const { count, error: countError } = await admin
     .from("user_filing_subscriptions")
