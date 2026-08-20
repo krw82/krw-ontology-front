@@ -81,7 +81,7 @@ export default function WatchlistStoryTray() {
 
   return (
     <motion.section
-      aria-label="관심 기업"
+      aria-label="내 기업"
       className="mb-base border-b border-hairline pb-base"
       initial={reducedMotion ? false : { opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
@@ -89,7 +89,7 @@ export default function WatchlistStoryTray() {
     >
       <div className="mb-xs flex items-baseline justify-between px-xs">
         <p className="font-mono text-[10px] font-black uppercase tracking-[0.14em] text-primary">
-          관심 기업
+          내 기업
         </p>
         {totalNew > 0 ? (
           <p className="text-[11px] font-semibold text-muted">새 소식 {totalNew}</p>
@@ -175,7 +175,7 @@ export default function WatchlistStoryTray() {
           <li className="shrink-0 snap-start">
             <Link
               href="/watchlist"
-              aria-label={`관심 기업 ${overflowCount}개 더 보기`}
+              aria-label={`내 기업 ${overflowCount}개 더 보기`}
               className="flex w-16 flex-col items-center gap-1 rounded-[8px] px-xs py-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:w-[72px]"
               onClick={() =>
                 trackClientEventSilently("cta_clicked", {
