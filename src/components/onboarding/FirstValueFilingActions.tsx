@@ -24,11 +24,10 @@ export default function FirstValueFilingActions({
     if (followState === "saving" || followState === "saved") return;
     setFollowState("saving");
     try {
-      const response = await fetch(`/api/watchlist/${encodeURIComponent(ticker)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticker, coverage_level: "interest" }),
-      });
+      const response = await fetch(
+        `/api/companies/${encodeURIComponent(ticker)}/follow`,
+        { method: "PUT" },
+      );
       if (!response.ok) throw new Error("follow_failed");
       setFollowState("saved");
       signalPwaInstallEngagement("watch_added", "filing_first_value");
@@ -37,6 +36,10 @@ export default function FirstValueFilingActions({
         filing_event_id: filingEventId,
         surface: "filing_first_value",
         source_opened: true,
+      });
+      trackClientEventSilently("filing_subscription_created", {
+        ticker,
+        surface: "filing_first_value",
       });
     } catch {
       setFollowState("error");

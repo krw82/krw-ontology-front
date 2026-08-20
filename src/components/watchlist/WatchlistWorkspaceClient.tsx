@@ -231,25 +231,29 @@ export default function WatchlistWorkspaceClient({
     setError(null);
     startTransition(() => {
       void (async () => {
-        const response = await fetch(`/api/watchlist/${ticker}`, {
-          method: "PATCH",
+        const response = await fetch(`/api/companies/${ticker}/follow`, {
+          method: coverageLevel === null ? "DELETE" : "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ coverage_level: coverageLevel }),
         });
         const payload = await readPayload(response);
         if (!response.ok) {
-          setError(errorMessage(payload, "종목 상태를 저장하지 못했습니다."));
+          setError(
+            errorCodeOf(payload) === "coverage_limit_reached"
+              ? "관심 기업은 무료 플랜 3개까지예요. 무제한은 유료 플랜에서 만날 수 있어요."
+              : errorMessage(payload, "종목 상태를 저장하지 못했습니다."),
+          );
           return;
         }
 
-        const mark = payload?.mark as UserCompanyMark | undefined;
-        if (mark) {
-          setCompany((current) => ({
-            ...current,
-            mark,
-            latest_activity_at: new Date().toISOString(),
-          }));
-        }
+        const mark =
+          coverageLevel === null
+            ? ({ ...company.mark, coverage_level: null } as UserCompanyMark)
+            : (payload?.mark as UserCompanyMark | undefined) ?? company.mark;
+        setCompany((current) => ({
+          ...current,
+          mark,
+          latest_activity_at: new Date().toISOString(),
+        }));
       })();
     });
   };
@@ -694,6 +698,19 @@ function errorMessage(payload: ApiPayload, fallback: string): string {
     return error.message;
   }
   return fallback;
+}
+
+function errorCodeOf(payload: ApiPayload): string | null {
+  const error = payload?.error;
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    typeof error.code === "string"
+  ) {
+    return error.code;
+  }
+  return null;
 }
 
 function formatDateTime(value: string | null): string {
