@@ -603,6 +603,66 @@ body {
   animation: motion-progress-spin 900ms linear infinite;
 }
 
+/* 관심 기업 story tray (Pulse) */
+@keyframes motion-story-sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes motion-story-badge-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.pulse-story-sweep {
+  animation: motion-story-sweep 6s linear infinite;
+}
+
+/* 새 소식 디스크의 숨쉬기 후광 — 조용히 확장/수축하며 "살아 있음"을 전달 */
+@keyframes motion-story-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 82, 255, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(0, 82, 255, 0.12);
+  }
+}
+
+.pulse-story-breathe {
+  animation: motion-story-breathe 2.8s ease-in-out infinite;
+}
+
+.pulse-story-badge {
+  animation: motion-story-badge-pop 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.pulse-story-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-snap-type: x proximity;
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 20px), transparent 100%);
+}
+
+.pulse-story-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-story-sweep,
+  .pulse-story-breathe,
+  .pulse-story-badge {
+    animation: none;
+  }
+}
+
 @keyframes motion-notebook-result-settle {
   from {
     opacity: 0.72;

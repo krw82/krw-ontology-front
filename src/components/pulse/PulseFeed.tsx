@@ -8,7 +8,7 @@ import CompanyLogo from "@/components/CompanyLogo";
 import InsiderTradeStackCard from "@/components/pulse/InsiderTradeStackCard";
 import PulseCard from "@/components/pulse/PulseCard";
 import PulsePushPrimingBanner from "@/components/pulse/PulsePushPrimingBanner";
-import PulseResumeBanner from "@/components/pulse/PulseResumeBanner";
+import WatchlistStoryTray from "@/components/pulse/WatchlistStoryTray";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import { easeOutExpo } from "@/lib/animation";
@@ -857,7 +857,7 @@ export default function PulseFeed({
         {firstValueEntry ? (
           <FirstValuePulseContext intent={onboardingIntent} />
         ) : null}
-        <PulseResumeBanner />
+        <WatchlistStoryTray />
         <PulsePushPrimingBanner />
         <div
           aria-hidden={pullDistance === 0 && !pullRefreshing}
