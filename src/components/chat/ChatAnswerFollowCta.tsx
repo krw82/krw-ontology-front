@@ -30,7 +30,7 @@ const DONE_MESSAGE: Record<PushPlan, string> = {
  */
 export default function ChatAnswerFollowCta({ ticker }: { ticker: string }) {
   const normalizedTicker = normalizeTicker(ticker);
-  const followState = useCompanyFollow(normalizedTicker, {
+  const followState = useCompanyFollow(ticker, {
     surface: "chat_answer",
   });
   const [state, setState] = useState<CtaState>("idle");

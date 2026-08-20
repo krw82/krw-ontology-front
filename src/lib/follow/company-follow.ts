@@ -31,7 +31,7 @@ export type FollowCompanyResult =
  */
 export async function followCompanyServer(input: {
   userId: string;
-  userEmail: string;
+  userEmail?: string | null;
   ticker: string;
   source?: string;
 }): Promise<FollowCompanyResult> {
@@ -90,7 +90,7 @@ export async function followCompanyServer(input: {
 
 export async function unfollowCompanyServer(input: {
   userId: string;
-  userEmail: string;
+  userEmail?: string | null;
   ticker: string;
 }): Promise<{ ok: boolean }> {
   try {

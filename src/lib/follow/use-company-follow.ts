@@ -179,10 +179,6 @@ export function useCompanyFollow(
       if (!response.ok) throw new Error("unfollow_failed");
       setFollowing(false);
       setAlerts(null);
-      trackClientEventSilently("company_unfollowed", {
-        surface,
-        ticker: normalizedTicker,
-      });
       trackClientEventSilently("filing_subscription_removed", {
         surface,
         ticker: normalizedTicker,

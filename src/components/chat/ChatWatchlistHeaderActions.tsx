@@ -20,7 +20,7 @@ export default function ChatWatchlistHeaderActions({
   forceShowNotebookOnboarding,
 }: ChatWatchlistHeaderActionsProps) {
   const normalizedTicker = normalizeTicker(ticker);
-  const followState = useCompanyFollow(normalizedTicker, {
+  const followState = useCompanyFollow(ticker, {
     surface: "chat_header",
   });
   const [notebookUsage, setNotebookUsage] = useState<{
