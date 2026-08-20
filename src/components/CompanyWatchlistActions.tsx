@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { trackClientEventWithTimeout } from "@/lib/analytics/client";
+import { useCompanyFollow } from "@/lib/follow/use-company-follow";
 import { cn } from "@/lib/utils";
 import { signalPwaInstallEngagement } from "@/components/pwa/lifecycle";
 import type { Locale } from "@/i18n/config";
@@ -49,6 +50,8 @@ export default function CompanyWatchlistActions({
   );
   const [coverageSavedSettled, setCoverageSavedSettled] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [limitError, setLimitError] = useState(false);
+  const followState = useCompanyFollow(ticker, { surface: "company_hero" });
 
   useEffect(() => {
     if (!coverageSavedSettled) return;
@@ -74,19 +77,21 @@ export default function CompanyWatchlistActions({
     setPendingLevel(nextLevel ?? coverageLevel);
     setCoverageSavedSettled(false);
     setError(null);
+    setLimitError(false);
 
     try {
-      const response = await fetch(`/api/watchlist/${encodeURIComponent(ticker)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ticker,
-          coverage_level: nextLevel,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error((await readErrorMessage(response)) ?? labels.error);
+      const result =
+        nextLevel === "interest"
+          ? await followState.follow()
+          : await followState.unfollow();
+      if (!result.ok) {
+        if ("reason" in result && result.reason === "limit") {
+          setLimitError(true);
+          throw new Error(
+            "관심 기업은 무료 플랜 3개까지예요. 무제한 관심·알림은 유료 플랜에서 만날 수 있어요.",
+          );
+        }
+        throw new Error(labels.error);
       }
 
       void trackClientEventWithTimeout("cta_clicked", {
@@ -98,12 +103,7 @@ export default function CompanyWatchlistActions({
         destination: destinationHref,
         ...analyticsProperties,
       });
-      if (coverageLevel === null && nextLevel !== null) {
-        void trackClientEventWithTimeout("company_followed", {
-          ticker,
-          surface: "company_hero",
-        });
-      }
+      // company_followed / filing_subscription_created는 훅이 발화한다.
       if (nextLevel !== null) {
         signalPwaInstallEngagement("watch_added", "company_hero");
       }
@@ -143,6 +143,14 @@ export default function CompanyWatchlistActions({
       {error ? (
         <p className="mt-2 text-[13px] font-bold leading-5 text-error">
           {error}
+          {limitError ? (
+            <Link
+              href="/pricing"
+              className="ml-xs text-[13px] font-extrabold text-primary underline underline-offset-4"
+            >
+              플랜 보기
+            </Link>
+          ) : null}
         </p>
       ) : null}
     </div>
@@ -335,19 +343,6 @@ function actionClassName(emphasis: boolean, selected = false) {
 function coverageLevelLabel(level: CoverageLevel | null): string {
   if (level === "interest") return "관심";
   return "커버리지 해제";
-}
-
-async function readErrorMessage(response: Response): Promise<string | null> {
-  try {
-    const payload = (await response.json()) as {
-      error?: { message?: unknown };
-    };
-    return typeof payload.error?.message === "string"
-      ? payload.error.message
-      : null;
-  } catch {
-    return null;
-  }
 }
 
 function formatOnboardingDate(value: string, locale: Locale): string {

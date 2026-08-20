@@ -75,11 +75,10 @@ export type CompanyFollowState = {
   alerts: "on" | "no_sec_id" | null;
   limitReached: boolean;
   error: boolean;
-  follow: () => Promise<{
-    ok: boolean;
-    pushPlan: PushPlan | null;
-    alerts: "on" | "no_sec_id" | null;
-  }>;
+  follow: () => Promise<
+    | { ok: true; pushPlan: PushPlan | null; alerts: "on" | "no_sec_id" | null }
+    | { ok: false; reason: "limit" | "error" }
+  >;
   unfollow: () => Promise<{ ok: boolean }>;
 };
 
@@ -129,7 +128,7 @@ export function useCompanyFollow(
   }, [normalizedTicker]);
 
   const follow = useCallback(async () => {
-    if (!normalizedTicker) return { ok: false, pushPlan: null, alerts: null };
+    if (!normalizedTicker) return { ok: false as const, reason: "error" as const };
     setError(false);
     setLimitReached(false);
     try {
@@ -139,7 +138,7 @@ export function useCompanyFollow(
       );
       if (response.status === 409) {
         setLimitReached(true);
-        return { ok: false, pushPlan: null, alerts: null };
+        return { ok: false as const, reason: "limit" as const };
       }
       if (!response.ok) throw new Error("follow_failed");
       const payload = (await response.json()) as {
@@ -158,10 +157,14 @@ export function useCompanyFollow(
         });
       }
       const pushPlan = await ensureDevicePush(surface);
-      return { ok: true, pushPlan, alerts: payload.alerts ?? null };
+      return {
+        ok: true as const,
+        pushPlan,
+        alerts: payload.alerts ?? null,
+      };
     } catch {
       setError(true);
-      return { ok: false, pushPlan: null, alerts: null };
+      return { ok: false as const, reason: "error" as const };
     }
   }, [normalizedTicker, surface]);
 

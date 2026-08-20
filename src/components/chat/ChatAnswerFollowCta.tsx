@@ -71,7 +71,7 @@ export default function ChatAnswerFollowCta({ ticker }: { ticker: string }) {
       setState("done");
       return;
     }
-    setState(followState.limitReached ? "idle" : "failed");
+    setState(result.reason === "limit" ? "idle" : "failed");
   }, [followState, normalizedTicker, state]);
 
   if (
