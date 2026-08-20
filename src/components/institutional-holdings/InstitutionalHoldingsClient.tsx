@@ -237,9 +237,10 @@ function QuarterlyStory({
 }: {
   dashboard: InstitutionalHoldingsDashboard;
 }) {
+  const newPurchases = dashboard.rebalancing.newPurchases.slice(0, 3);
   const buys = dashboard.rebalancing.buys.slice(0, 3);
   const sells = dashboard.rebalancing.sells.slice(0, 3);
-  const hasChanges = buys.length > 0 || sells.length > 0;
+  const hasChanges = newPurchases.length > 0 || buys.length > 0 || sells.length > 0;
   const storyCopy = quarterlyStoryCopy({
     hasPreviousFiling: Boolean(dashboard.previousFiling),
     buys,
@@ -267,10 +268,18 @@ function QuarterlyStory({
           className="mt-7 flex flex-wrap gap-x-5 border-b border-hairline"
           aria-label="13F 변화 바로가기"
         >
+          {newPurchases.length > 0 ? (
+            <a
+              href="#new-positions"
+              className="inline-flex min-h-11 items-center border-b-2 border-primary text-[12px] font-black text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-fixed-dim/35"
+            >
+              새로 담은 곳
+            </a>
+          ) : null}
           {buys.length > 0 ? (
             <a
               href="#increased-holdings"
-              className="inline-flex min-h-11 items-center border-b-2 border-primary text-[12px] font-black text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-fixed-dim/35"
+              className="inline-flex min-h-11 items-center border-b-2 border-transparent text-[12px] font-black text-body transition-colors hover:border-hairline hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-fixed-dim/35"
             >
               더 크게 본 곳
             </a>
@@ -292,10 +301,21 @@ function QuarterlyStory({
         </nav>
       ) : null}
 
+      {newPurchases.length > 0 ? (
+        <ChangeStorySection
+          id="new-positions"
+          index="01 / NEW IN"
+          title="이번 분기 새로 편입한 종목"
+          description="직전 공시에 없다가 이번에 처음 보유한 종목입니다. 편입 금액이 큰 순서입니다."
+          holdings={newPurchases}
+          direction="up"
+        />
+      ) : null}
+
       {buys.length > 0 ? (
         <ChangeStorySection
           id="increased-holdings"
-          index="01 / MORE OF"
+          index="02 / MORE OF"
           title="보유 비중을 더 키운 종목"
           description="직전 공시와 비교한 보유 비중 변화가 큰 순서입니다."
           holdings={buys}
@@ -306,7 +326,7 @@ function QuarterlyStory({
       {sells.length > 0 ? (
         <ChangeStorySection
           id="decreased-holdings"
-          index="02 / LESS OF"
+          index="03 / LESS OF"
           title="보유 비중을 줄인 종목"
           description="비중 감소는 처분이나 부정적 전망과 같은 뜻이 아닙니다."
           holdings={sells}

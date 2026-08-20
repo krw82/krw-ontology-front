@@ -194,7 +194,7 @@ function buildStats(
 }
 
 function emptyRebalancing(): InstitutionalHoldingsDashboard["rebalancing"] {
-  return { buys: [], sells: [] };
+  return { newPurchases: [], buys: [], sells: [] };
 }
 
 function emptyShareTrend(): InstitutionalHoldingsDashboard["shareTrend"] {
@@ -205,8 +205,10 @@ function buildRebalancing(
   positionChanges: Sec13FPositionChangeRow[],
   totalValue: number,
 ): InstitutionalHoldingsDashboard["rebalancing"] {
+  // 'new' rows have no prior weight, so their weight_change equals the full
+  // position weight — they belong in newPurchases, not in buys/sells.
   const comparableChanges = positionChanges.filter(
-    (change) => change.weight_change !== null,
+    (change) => change.weight_change !== null && change.change_type !== "new",
   );
   const buys = comparableChanges
     .filter((change) => Number(change.weight_change) > 0)
@@ -216,8 +218,14 @@ function buildRebalancing(
     .filter((change) => Number(change.weight_change) < 0)
     .sort((left, right) => Number(left.weight_change) - Number(right.weight_change))
     .slice(0, REBALANCING_LIST_LIMIT);
+  const newPurchases = positionChanges
+    .filter((change) => change.change_type === "new")
+    .sort((left, right) =>
+      Number(right.current_value_usd ?? 0) - Number(left.current_value_usd ?? 0))
+    .slice(0, REBALANCING_LIST_LIMIT);
 
   return {
+    newPurchases: buildHoldingViews(newPurchases, totalValue),
     buys: buildHoldingViews(buys, totalValue),
     sells: buildHoldingViews(sells, totalValue),
   };

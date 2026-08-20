@@ -237,6 +237,7 @@ export interface InstitutionalHoldingsDashboard {
     top10Weight: number;
   };
   rebalancing: {
+    newPurchases: InstitutionalHoldingView[];
     buys: InstitutionalHoldingView[];
     sells: InstitutionalHoldingView[];
   };

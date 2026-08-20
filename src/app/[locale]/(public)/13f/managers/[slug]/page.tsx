@@ -49,6 +49,7 @@ const managerCopy = {
     change: "변화",
     companyLinkCta: "회사 보기",
     rebalancingHeading: "분기 리밸런싱 단서",
+    newPurchases: "신규 편입",
     buys: "비중 증가",
     sells: "비중 감소",
     limitsHeading: "13F 해석 유의사항",
@@ -92,6 +93,7 @@ const managerCopy = {
     change: "Change",
     companyLinkCta: "View company",
     rebalancingHeading: "Quarterly rebalancing signals",
+    newPurchases: "New positions",
     buys: "Weight increases",
     sells: "Weight decreases",
     limitsHeading: "How to interpret 13F data",
@@ -352,13 +354,21 @@ export default async function Manager13FPage({ params }: ManagerPageProps) {
           </section>
 
           {dashboard &&
-          (dashboard.rebalancing.buys.length > 0 ||
+          (dashboard.rebalancing.newPurchases.length > 0 ||
+            dashboard.rebalancing.buys.length > 0 ||
             dashboard.rebalancing.sells.length > 0) ? (
             <section className="border-b border-hairline py-8">
               <h2 className="text-[22px] font-black leading-7 text-ink">
                 {copy.rebalancingHeading}
               </h2>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {dashboard.rebalancing.newPurchases.length > 0 ? (
+                  <RebalanceList
+                    title={copy.newPurchases as string}
+                    holdings={dashboard.rebalancing.newPurchases}
+                    locale={locale}
+                  />
+                ) : null}
                 <RebalanceList
                   title={copy.buys as string}
                   holdings={dashboard.rebalancing.buys}
