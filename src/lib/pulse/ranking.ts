@@ -136,6 +136,21 @@ export function comparePulseSortKeys(
   return left.item_key.localeCompare(right.item_key);
 }
 
+/**
+ * The completed-analysis lane is a recency notification ("방금 완료"), not a
+ * utility ranking. freshnessScore is flat within six hours, so the ordinary
+ * sort keys let an affinity-heavy completion from hours ago bury the run that
+ * just finished. Completion time leads here; the utility order does not.
+ */
+export function compareCompletedAnalysisRecency(
+  left: Pick<PulseSortKey, "occurred_at" | "item_key">,
+  right: Pick<PulseSortKey, "occurred_at" | "item_key">,
+): number {
+  const occurredDiff = Date.parse(right.occurred_at) - Date.parse(left.occurred_at);
+  if (occurredDiff !== 0) return occurredDiff;
+  return left.item_key.localeCompare(right.item_key);
+}
+
 export function sortKeyOf(candidate: PulseRankedCandidate): PulseSortKey {
   const {
     lane,

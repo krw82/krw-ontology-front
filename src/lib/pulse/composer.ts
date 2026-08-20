@@ -35,6 +35,7 @@ import {
 import { getPulsePreferences } from "@/lib/pulse/preferences";
 import {
   buildPulseCandidatePool,
+  compareCompletedAnalysisRecency,
   rankPulseCandidates,
 } from "@/lib/pulse/ranking";
 import { getLearningCandidates, selectLearningCandidate } from "@/lib/pulse/sources/learning";
@@ -259,8 +260,13 @@ export async function composePulseFeed({
         ?? candidateItems.length + activeIndex,
     }));
 
-  const visibleCompletedAnalysis = [...completedAnalysis, ...developmentCompletedAnalysis]
-    .slice(0, PULSE_COMPLETED_ANALYSIS_ITEM_LIMIT);
+  // Recency leads the completed lane regardless of the utility order: a run
+  // that just finished must not lose its notification slot to an older,
+  // affinity-heavy completion of the same day.
+  const visibleCompletedAnalysis = [
+    ...[...completedAnalysis].sort(compareCompletedAnalysisRecency),
+    ...[...developmentCompletedAnalysis].sort(compareCompletedAnalysisRecency),
+  ].slice(0, PULSE_COMPLETED_ANALYSIS_ITEM_LIMIT);
 
   const sinceTime = since && !Number.isNaN(Date.parse(since)) ? Date.parse(since) : null;
 

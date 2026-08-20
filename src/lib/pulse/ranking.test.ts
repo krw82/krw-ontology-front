@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PulseCandidate } from "@/lib/pulse/contract";
 import {
   buildPulseCandidatePool,
+  compareCompletedAnalysisRecency,
   PULSE_CANDIDATE_POOL_MAX,
   rankPulseCandidates,
   toRankedCandidate,
@@ -184,4 +185,45 @@ describe("Pulse V5 flat server candidate pool", () => {
     expect(ranked[0]!.rank_score).toBeGreaterThan(ranked[1]!.rank_score);
   });
 
+});
+
+describe("compareCompletedAnalysisRecency", () => {
+  it("puts the just-finished run ahead of an affinity-heavy older completion", () => {
+    const justFinished = candidate("analysis:keys:completed", {
+      kind: "analysis",
+      source_type: "analysis",
+      phase: "completed",
+      ticker: "KEYS",
+      occurred_at: "2026-07-20T11:58:00.000Z",
+    });
+    const affinityHeavy = candidate("analysis:oxy:completed", {
+      kind: "analysis",
+      source_type: "analysis",
+      phase: "completed",
+      ticker: "OXY",
+      coverage_level: "interest",
+      research_affinity: 20,
+      occurred_at: "2026-07-20T07:00:00.000Z",
+    });
+
+    // The utility order still prefers the marked, affinity-heavy completion…
+    const ranked = rankPulseCandidates([justFinished, affinityHeavy], now);
+    expect(ranked[0]?.item_key).toBe("analysis:oxy:completed");
+
+    // …but the completed lane is a recency notification, not a utility ranking.
+    const lane = [...ranked].sort(compareCompletedAnalysisRecency);
+    expect(lane.map((item) => item.item_key)).toEqual([
+      "analysis:keys:completed",
+      "analysis:oxy:completed",
+    ]);
+  });
+
+  it("breaks completion-time ties by item key for a stable lane order", () => {
+    const left = { occurred_at: "2026-07-20T10:00:00.000Z", item_key: "analysis:b:completed" };
+    const right = { occurred_at: "2026-07-20T10:00:00.000Z", item_key: "analysis:a:completed" };
+
+    expect(compareCompletedAnalysisRecency(left, right)).toBe(1);
+    expect(compareCompletedAnalysisRecency(right, left)).toBe(-1);
+    expect(compareCompletedAnalysisRecency(left, left)).toBe(0);
+  });
 });
