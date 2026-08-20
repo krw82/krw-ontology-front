@@ -70,12 +70,17 @@ async function ensureDevicePush(surface: string): Promise<PushPlan> {
 export type CompanyFollowState = {
   loading: boolean;
   following: boolean;
+  /** coverage-level 조회 자체가 실패(비로그인 포함). 표면은 CTA를 숨긴다. */
+  unavailable: boolean;
   alerts: "on" | "no_sec_id" | null;
   limitReached: boolean;
   error: boolean;
-  follow: () => Promise<{ ok: boolean; pushPlan: PushPlan | null }>;
+  follow: () => Promise<{
+    ok: boolean;
+    pushPlan: PushPlan | null;
+    alerts: "on" | "no_sec_id" | null;
+  }>;
   unfollow: () => Promise<{ ok: boolean }>;
-  reload: () => Promise<void>;
 };
 
 /** 관심 = 알림. 토글 하나가 관심종목 + 공시 구독 + 뉴스 팔로우를 함께 처리한다. */
@@ -87,35 +92,44 @@ export function useCompanyFollow(
   const surface = options?.surface ?? "company_follow";
   const [loading, setLoading] = useState(Boolean(normalizedTicker));
   const [following, setFollowing] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const [alerts, setAlerts] = useState<"on" | "no_sec_id" | null>(null);
   const [limitReached, setLimitReached] = useState(false);
   const [error, setError] = useState(false);
 
-  const reload = useCallback(async () => {
+  useEffect(() => {
     if (!normalizedTicker) return;
-    try {
-      const response = await fetch(
-        `/api/watchlist/${encodeURIComponent(normalizedTicker)}/coverage-level`,
-        { cache: "no-store" },
-      );
-      if (!response.ok) return;
-      const payload = (await response.json()) as {
-        mark?: { coverage_level?: string | null } | null;
-      };
-      setFollowing(Boolean(payload.mark?.coverage_level));
-    } catch {
-      // 조회 실패는 조용히 둔다. 각 표면이 안내를 담당한다.
-    } finally {
-      setLoading(false);
-    }
+    let stale = false;
+    const tickerForRequest = normalizedTicker;
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/watchlist/${encodeURIComponent(tickerForRequest)}/coverage-level`,
+          { cache: "no-store" },
+        );
+        if (stale) return;
+        if (!response.ok) {
+          setUnavailable(true);
+          return;
+        }
+        const payload = (await response.json()) as {
+          mark?: { coverage_level?: string | null } | null;
+        };
+        if (stale) return;
+        setFollowing(Boolean(payload.mark?.coverage_level));
+      } catch {
+        // 네트워크 실패는 숨김까지는 아니므로 조용히 둔다.
+      } finally {
+        if (!stale) setLoading(false);
+      }
+    })();
+    return () => {
+      stale = true;
+    };
   }, [normalizedTicker]);
 
-  useEffect(() => {
-    void reload();
-  }, [reload]);
-
   const follow = useCallback(async () => {
-    if (!normalizedTicker) return { ok: false, pushPlan: null };
+    if (!normalizedTicker) return { ok: false, pushPlan: null, alerts: null };
     setError(false);
     setLimitReached(false);
     try {
@@ -125,7 +139,7 @@ export function useCompanyFollow(
       );
       if (response.status === 409) {
         setLimitReached(true);
-        return { ok: false, pushPlan: null };
+        return { ok: false, pushPlan: null, alerts: null };
       }
       if (!response.ok) throw new Error("follow_failed");
       const payload = (await response.json()) as {
@@ -144,10 +158,10 @@ export function useCompanyFollow(
         });
       }
       const pushPlan = await ensureDevicePush(surface);
-      return { ok: true, pushPlan };
+      return { ok: true, pushPlan, alerts: payload.alerts ?? null };
     } catch {
       setError(true);
-      return { ok: false, pushPlan: null };
+      return { ok: false, pushPlan: null, alerts: null };
     }
   }, [normalizedTicker, surface]);
 
@@ -180,11 +194,11 @@ export function useCompanyFollow(
   return {
     loading,
     following,
+    unavailable,
     alerts,
     limitReached,
     error,
     follow,
     unfollow,
-    reload,
   };
 }
