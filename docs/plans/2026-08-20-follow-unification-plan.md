@@ -84,3 +84,13 @@ DELETE: coverage null(기존 RPC 통과 — monitoring_rules 동작 불변) + �
 2. 나머지 진입점 교체 + 고아 삭제
 3. reconcile 마이그레이션 + pricing 카피
 4. 백필 스크립트 (prod 직접 실행)
+
+## 실행 결과 (2026-08-20, feat/follow-alert-unification)
+
+- 태스크 1~10 전부 구현·커밋 (f2cdf02 → 0b9b7ee, 게이트 수정 11a81a7)
+- 검증: `npm run typecheck` 0 에러, 린트는 main에도 있던 FilingInbox 사전결함 1개만, `npx vitest run` 319 파일 / 1397 테스트 전부 통과
+- reconcile 마이그레이션 로컬 DB 실증: 4개 관심+구독 → limit 3 강등 시 최저우선순위 종목의 관심·구독이 함께 해제되고 나머지 불변 (롤백 검증)
+- 백필 스크립트 dev 적용 검증: 관심만 있던 3건 구독 생성, 구독→관심 방향 대상 0건. **prod 미실행** — 배포 후 pooler 런북대로 dry-run → --apply
+- 예외: 진입점 5곳으로 확대(스펙 4곳 + 온보딩 FirstValueFilingActions 발견), pricing 표가 전 플랜 "기업 3개"로 되어 있던 과거 카피 오류를 free 3/유료 무제한으로 바로잡음
+- 남은 것: prod 배포(마이그레이션 포함) → prod 백필 → 2차 delivery_mode "끔(관심만)" 옵션
+
