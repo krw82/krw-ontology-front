@@ -12,6 +12,7 @@ import WatchlistStoryTray from "@/components/pulse/WatchlistStoryTray";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import { easeOutExpo } from "@/lib/animation";
+import { anonymousResearchLoginHref } from "@/lib/pulse/anonymous-research-login";
 import { pulseCompanyHref, pulseCompanyName } from "@/lib/pulse/company-display";
 import {
   advancePulseDeviceRefresh,
@@ -450,7 +451,9 @@ export default function PulseFeed({
 
       if (!response.ok) {
         if (response.status === 401) {
-          window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+          window.location.href
+            = anonymousResearchLoginHref(item)
+              ?? `/login?next=${encodeURIComponent(window.location.pathname)}`;
           return;
         }
         throw new Error(`research request failed: ${response.status}`);
