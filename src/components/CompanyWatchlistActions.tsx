@@ -151,6 +151,14 @@ export default function CompanyWatchlistActions({
               플랜 보기
             </Link>
           ) : null}
+          {limitError ? (
+            <Link
+              href="/settings/companies"
+              className="ml-xs text-[13px] font-extrabold text-primary underline underline-offset-4"
+            >
+              관심 기업 관리
+            </Link>
+          ) : null}
         </p>
       ) : null}
     </div>

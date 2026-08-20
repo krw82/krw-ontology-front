@@ -9,10 +9,61 @@ import {
 } from "@/lib/filing-notifications/subscription-service";
 import { setMarketIssueCompanyFollow } from "@/lib/market-issues/repository";
 import { getMarketIssueServiceClient } from "@/lib/market-issues/service";
+import { getIndexedCompanyBrowseCards } from "@/lib/ontology/catalog";
+import { normalizeTicker, normalizeTickers } from "@/lib/ontology/ticker";
 import { recordRetentionMilestone } from "@/lib/retention/milestones";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { UserCompanyMark } from "@/types/api-contracts";
 
 export type FollowAlertsStatus = "on" | "no_sec_id";
+
+export type FollowedCompanySummary = {
+  ticker: string;
+  name: string;
+  sector: string | null;
+  followed_at: string;
+};
+
+/**
+ * 관심 마킹 전체 조회(모든 플랜). 리서치 노트북용 listWatchlistOverview와
+ * 달리 노트·질문까지 묻지 않고, 카드 목록에 필요한 회사 메타데이터만
+ * 붙인다. 인덱스에 없는 티커는 이름을 티커로 대체한다.
+ */
+export async function listUserCompanyFollows(
+  userId: string,
+): Promise<FollowedCompanySummary[]> {
+  const { data: marks, error } = await getSupabaseAdmin()
+    .from("user_company_marks")
+    .select("ticker, coverage_level, updated_at")
+    .eq("user_id", userId)
+    .not("coverage_level", "is", null)
+    .order("updated_at", { ascending: false })
+    .returns<{ ticker: string; coverage_level: string; updated_at: string }[]>();
+
+  if (error) {
+    throw new Error(`Failed to load followed companies: ${error.message}`);
+  }
+
+  const tickers = normalizeTickers((marks ?? []).map((mark) => mark.ticker));
+  const companies = await getIndexedCompanyBrowseCards(tickers);
+  const cardByTicker = new Map(
+    companies.map((company) => [company.ticker, company]),
+  );
+
+  return (marks ?? []).flatMap((mark) => {
+    const ticker = normalizeTicker(mark.ticker);
+    if (!ticker) return [];
+    const card = cardByTicker.get(ticker);
+    return [
+      {
+        ticker,
+        name: card?.name ?? ticker,
+        sector: card?.sector ?? null,
+        followed_at: mark.updated_at,
+      },
+    ];
+  });
+}
 
 export type FollowCompanyResult =
   | {

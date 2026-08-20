@@ -7,6 +7,21 @@ export const dynamic = "force-dynamic";
 
 const SETTINGS_ENTRIES = [
   {
+    href: "/settings/companies",
+    icon: "bookmark",
+    eyebrow: "FOLLOWED COMPANIES",
+    title: "관심 기업",
+    description:
+      "관심 기업 목록과 새 소식 알림을 확인하고 관리합니다.",
+  },
+  {
+    href: "/settings/notifications",
+    icon: "notifications",
+    eyebrow: "NOTIFICATIONS",
+    title: "알림 설정",
+    description: "푸시 알림과 공시·뉴스 알림 종류를 설정합니다.",
+  },
+  {
     href: "/settings/billing",
     icon: "credit_card",
     eyebrow: "PLAN & BILLING",
@@ -34,7 +49,7 @@ export default async function SettingsPage() {
             설정
           </h1>
           <p className="mt-base text-[15px] font-medium leading-7 text-body sm:text-[17px]">
-            플랜과 결제를 관리하세요.
+            관심 기업·알림·플랜을 관리하세요.
           </p>
           <p className="mt-sm text-[13px] font-semibold text-muted">
             {user.email}
@@ -51,7 +66,7 @@ export default async function SettingsPage() {
                 id="settings-categories-heading"
                 className="mt-xs text-[22px] font-black tracking-[-0.035em] text-ink"
               >
-                플랜 및 결제
+                계정 관리
               </h2>
             </div>
           </div>
