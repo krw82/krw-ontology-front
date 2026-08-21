@@ -4,14 +4,6 @@ import { motion } from "motion/react";
 import { easeOutExpo, staggerContainerFast } from "@/lib/animation";
 
 const fastTransition = 0.24;
-const fastVariant = {
-  hidden: { opacity: 0, y: 10 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: fastTransition, ease: easeOutExpo },
-  },
-};
 
 const headingContainer = {
   hidden: {},
@@ -21,7 +13,7 @@ const headingContainer = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Hero heading with quick fade-up line sequence */
+/*  Hero heading — per-word mask reveal with accent underline draw     */
 /* ------------------------------------------------------------------ */
 
 interface HeroHeadingProps {
@@ -33,6 +25,57 @@ interface HeroHeadingProps {
   trailingLines?: string[];
 }
 
+const wordMask = {
+  hidden: { y: "112%" },
+  visible: {
+    y: "0%",
+    transition: { duration: 0.52, ease: easeOutExpo },
+  },
+};
+
+function MaskedLine({
+  text,
+  lineDelay,
+  accent = false,
+}: {
+  text: string;
+  lineDelay: number;
+  accent?: boolean;
+}) {
+  return (
+    <motion.span
+      className={accent ? "block text-primary" : "block"}
+      initial="hidden"
+      animate="visible"
+      variants={{
+        hidden: {},
+        visible: { transition: { staggerChildren: 0.045, delayChildren: lineDelay } },
+      }}
+    >
+      {text.split(" ").map((word, wordIdx) => (
+        <span
+          key={wordIdx}
+          className="inline-block overflow-hidden pb-[0.14em] -mb-[0.14em] align-bottom"
+        >
+          <motion.span className="inline-block" variants={wordMask}>
+            {word}
+            {wordIdx < text.split(" ").length - 1 ? "\u00A0" : ""}
+          </motion.span>
+        </span>
+      ))}
+      {accent && (
+        <motion.span
+          aria-hidden="true"
+          className="mt-[0.06em] block h-[0.085em] w-full origin-left rounded-full bg-gradient-to-r from-primary-fixed via-primary-container to-primary"
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ duration: 0.7, ease: easeOutExpo, delay: lineDelay + 0.34 }}
+        />
+      )}
+    </motion.span>
+  );
+}
+
 export function HeroHeading({ lines, accentLine, trailingLines = [] }: HeroHeadingProps) {
   return (
     <motion.h1
@@ -42,21 +85,11 @@ export function HeroHeading({ lines, accentLine, trailingLines = [] }: HeroHeadi
       variants={headingContainer}
     >
       {lines.map((line, lineIdx) => (
-        <motion.span
-          key={lineIdx}
-          variants={fastVariant}
-          className="block"
-        >
-          {line}
-        </motion.span>
+        <MaskedLine key={lineIdx} text={line} lineDelay={lineIdx * 0.16} />
       ))}
-      <motion.span className="block text-primary" variants={fastVariant}>
-        {accentLine}
-      </motion.span>
+      <MaskedLine text={accentLine} lineDelay={lines.length * 0.16} accent />
       {trailingLines.map((line, lineIdx) => (
-        <motion.span key={`trailing-${lineIdx}`} variants={fastVariant} className="block">
-          {line}
-        </motion.span>
+        <MaskedLine key={`trailing-${lineIdx}`} text={line} lineDelay={(lines.length + 1 + lineIdx) * 0.16} />
       ))}
     </motion.h1>
   );
@@ -72,7 +105,7 @@ export function HeroSubtext({ children }: { children: React.ReactNode }) {
       className="mt-6 max-w-2xl text-pretty text-[17px] leading-8 text-body sm:text-[20px]"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: fastTransition, ease: easeOutExpo, delay: 0.05 }}
+      transition={{ duration: fastTransition, ease: easeOutExpo, delay: 0.42 }}
     >
       {children}
     </motion.p>
@@ -80,17 +113,21 @@ export function HeroSubtext({ children }: { children: React.ReactNode }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Eyebrow label fade-in                                              */
+/*  Eyebrow label with live dot                                        */
 /* ------------------------------------------------------------------ */
 
 export function HeroEyebrow({ children }: { children: React.ReactNode }) {
   return (
     <motion.p
-      className="mb-6 font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-primary"
+      className="mb-6 flex items-center gap-2 font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-primary"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: fastTransition, ease: easeOutExpo }}
     >
+      <span
+        aria-hidden="true"
+        className="home-live-dot relative inline-flex h-2 w-2 shrink-0 rounded-full bg-primary-container"
+      />
       {children}
     </motion.p>
   );
@@ -211,9 +248,9 @@ export function InsightBlock({ children }: { children: React.ReactNode }) {
 export function QuestionFormEntrance({ children }: { children: React.ReactNode }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: fastTransition, ease: easeOutExpo, delay: 0.08 }}
+      initial={{ opacity: 0, y: 22, scale: 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.44, ease: easeOutExpo, delay: 0.55 }}
     >
       {children}
     </motion.div>

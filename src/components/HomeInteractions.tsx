@@ -229,7 +229,7 @@ export function HomePrimaryCtas({
             destination: pulseHref,
           });
         }}
-        className="inline-flex min-h-12 items-center justify-center rounded-[8px] bg-surface-dark px-5 py-3 text-[15px] font-extrabold leading-5 text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+        className="inline-flex min-h-12 items-center justify-center rounded-[8px] bg-surface-dark px-5 py-3 text-[15px] font-extrabold leading-5 text-on-dark transition-[background-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:bg-primary-active hover:shadow-[0_18px_36px_-12px_rgba(0,62,199,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas active:translate-y-0"
       >
         {label}
       </Link>
@@ -283,7 +283,7 @@ export function HomeQuestionForm({
 
   return (
     <div
-      className="mt-8 flex w-full max-w-3xl items-center gap-2 rounded-[14px] border bg-canvas p-2 shadow-[0_10px_28px_rgba(10,11,13,0.08)] sm:mt-10 sm:gap-3"
+      className="home-hero-glass mt-8 flex w-full max-w-3xl items-center gap-2 rounded-[14px] border border-white/70 bg-white/70 p-2 shadow-[0_24px_60px_-12px_rgba(0,62,199,0.20)] backdrop-blur-xl sm:mt-10 sm:gap-3"
       style={{
         borderColor: "var(--color-outline-variant)",
       }}

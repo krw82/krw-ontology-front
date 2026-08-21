@@ -26,6 +26,8 @@ import {
   SITE_NAME,
 } from "@/lib/marketing/site";
 import { getCspNonce } from "@/lib/security/csp-nonce";
+import { HeroBackdrop } from "@/components/landing/HeroBackdrop";
+import { TickerTape } from "@/components/landing/TickerTape";
 
 type HomePageProps = {
   params: Promise<{ locale: string }>;
@@ -206,12 +208,9 @@ export default async function Home({ params }: HomePageProps) {
 
       <main
         id="main-content"
-        className="relative min-h-[100dvh] px-4 pb-16 pt-28 sm:px-6 sm:pb-24 sm:pt-32 lg:px-8"
+        className="relative min-h-[100dvh] overflow-x-clip px-4 pb-16 pt-28 sm:px-6 sm:pb-24 sm:pt-32 lg:px-8"
       >
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 bg-[linear-gradient(90deg,rgba(10,11,13,0.04)_1px,transparent_1px),linear-gradient(180deg,rgba(10,11,13,0.04)_1px,transparent_1px)] bg-[size:72px_72px]"
-        />
+        <HeroBackdrop />
         <section className="relative z-10 mx-auto grid w-full max-w-7xl grid-cols-[minmax(0,1fr)] items-start gap-12 ">
           <div className="min-w-0 max-w-full">
             <HeroEyebrow>{copy.eyebrow}</HeroEyebrow>
@@ -259,6 +258,8 @@ export default async function Home({ params }: HomePageProps) {
             <WorkflowSteps steps={copy.workflowSteps} />
           </div>
         </section>
+
+        <TickerTape />
       </main>
 
     </div>

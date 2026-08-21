@@ -293,6 +293,82 @@ body {
   animation: drift 20s ease-in-out infinite alternate;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Landing hero — filing observatory backdrop                         */
+/* ------------------------------------------------------------------ */
+
+@keyframes home-aurora-sway-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(9%, 7%, 0) scale(1.14); }
+}
+
+@keyframes home-aurora-sway-b {
+  from { transform: translate3d(0, 0, 0) scale(1.08); }
+  to { transform: translate3d(-10%, 9%, 0) scale(1); }
+}
+
+@keyframes home-aurora-sway-c {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(7%, -6%, 0) scale(1.1); }
+}
+
+.home-aurora {
+  will-change: transform;
+}
+
+.home-aurora-a {
+  animation: home-aurora-sway-a 26s ease-in-out infinite alternate;
+}
+
+.home-aurora-b {
+  animation: home-aurora-sway-b 32s ease-in-out infinite alternate;
+}
+
+.home-aurora-c {
+  animation: home-aurora-sway-c 38s ease-in-out infinite alternate;
+}
+
+@keyframes home-ticker-run {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+.home-ticker-tape-track {
+  animation: home-ticker-run 46s linear infinite;
+}
+
+.home-ticker-tape:hover .home-ticker-tape-track {
+  animation-play-state: paused;
+}
+
+@keyframes home-live-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(0, 82, 255, 0.45); }
+  70% { box-shadow: 0 0 0 7px rgba(0, 82, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 82, 255, 0); }
+}
+
+.home-live-dot {
+  animation: home-live-pulse 2.4s ease-out infinite;
+}
+
+.home-hero-glass {
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.9),
+    rgba(255, 255, 255, 0.62)
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-aurora-a,
+  .home-aurora-b,
+  .home-aurora-c,
+  .home-ticker-tape-track,
+  .home-live-dot {
+    animation: none;
+  }
+}
+
 @keyframes question-chain-stage-in {
   from {
     opacity: 0;
