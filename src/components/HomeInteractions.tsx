@@ -7,7 +7,7 @@ import { easeOutExpo } from "@/lib/animation";
 import { trackClientEventSilently } from "@/lib/analytics/client";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
-import { localizedPath, queryLocalizedPath } from "@/i18n/routing";
+import { queryLocalizedPath } from "@/i18n/routing";
 import { createClient } from "@/lib/supabase/client";
 
 const traceTransitionMs = 0.12;
@@ -216,27 +216,6 @@ export function HomePrimaryCtas({
 }) {
   const pulseHref = queryLocalizedPath(locale, "/pulse");
   const label = locale === "ko" ? "리서치 시작" : "Check against filings";
-  const useCases =
-    locale === "ko"
-      ? [
-          {
-            label: "이 종목 지금 살만한가?",
-            href: localizedPath(locale, "/questions#sample-answer"),
-          },
-          { label: "오늘 뉴스가 호재인가 악재인가?", href: queryLocalizedPath(locale, "/news") },
-          { label: "어떤 회사를 먼저 봐야 하나?", href: queryLocalizedPath(locale, "/pulse") },
-        ]
-      : [
-          {
-            label: "Is this stock worth buying now?",
-            href: localizedPath(locale, "/questions#sample-answer"),
-          },
-          { label: "Is today's news good or bad?", href: queryLocalizedPath(locale, "/news") },
-          {
-            label: "Which companies should I check first?",
-            href: queryLocalizedPath(locale, "/pulse"),
-          },
-        ];
 
   return (
     <div className="mt-6">
@@ -254,31 +233,6 @@ export function HomePrimaryCtas({
       >
         {label}
       </Link>
-      <div className="mt-4 grid max-w-2xl gap-2 sm:grid-cols-3">
-        {useCases.map((item, index) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            onClick={() => {
-              trackClientEventSilently("cta_clicked", {
-                cta_id: `home_use_case_${index + 1}`,
-                cta_label: item.label,
-                surface: "home_use_case_prompt",
-                destination: item.href,
-              });
-            }}
-            className="group flex min-h-12 items-center justify-between gap-3 rounded-[8px] border border-hairline bg-canvas px-3 py-2 text-left text-[13px] font-extrabold leading-5 text-ink transition-colors hover:border-primary hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-          >
-            <span className="min-w-0">{item.label}</span>
-            <span
-              aria-hidden="true"
-              className="material-symbols-outlined shrink-0 text-[17px] text-muted transition-[color,transform] group-hover:translate-x-0.5 group-hover:text-primary"
-            >
-              arrow_forward
-            </span>
-          </Link>
-        ))}
-      </div>
     </div>
   );
 }

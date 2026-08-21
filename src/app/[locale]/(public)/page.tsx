@@ -17,13 +17,11 @@ import {
   TraceCardEntrance,
   QuestionFormEntrance,
 } from "@/components/HeroSection";
-import SampleResearchAnswerCard from "@/components/public/SampleResearchAnswerCard";
-import { SAMPLE_RESEARCH_ANSWERS } from "@/content/sample-research-answer.ko";
+import ResearchConsole from "@/components/public/ResearchConsole";
 import { isLocale, type Locale } from "@/i18n/config";
 import { localizedPageMetadata } from "@/i18n/metadata";
 import { localizedPath, queryLocalizedPath } from "@/i18n/routing";
 import { buildNewChatHref } from "@/lib/chat/history-state";
-import { sampleAnswerCtaHref } from "@/lib/content/sample-answer-display";
 import {
   absoluteUrl,
   buildSiteOgImagePath,
@@ -56,8 +54,6 @@ const homeCopy = {
       { href: "/13f", label: "13F 보유" },
       { href: "/pricing", label: "가격" },
     ],
-    previewEyebrow: "REAL ANSWER",
-    previewTitle: "실제 답변 예시",
     previewDataStrip: "공시 · 뉴스 · 13F 기관 보유 · 내부자 거래 — 355개 기업",
     workflowSteps: ["질문 고르기", "리서치 실행", "매일 이어서 보기"],
     offerDescription: "무료 플랜",
@@ -83,8 +79,6 @@ const homeCopy = {
       { href: "/13f", label: "13F holdings" },
       { href: "/pricing", label: "Pricing" },
     ],
-    previewEyebrow: "REAL ANSWER",
-    previewTitle: "A real answer example",
     previewDataStrip: "Filings · News · 13F holdings · Insider trades — 355 companies",
     workflowSteps: ["Pick a question", "Run the research", "Continue every day"],
     offerDescription: "Free plan",
@@ -102,8 +96,6 @@ const homeCopy = {
   accentLine: string;
   subtext: string;
   browseLinks: Array<{ href: string; label: string }>;
-  previewEyebrow: string;
-  previewTitle: string;
   previewDataStrip: string;
   workflowSteps: string[];
   offerDescription: string;
@@ -273,29 +265,10 @@ export default async function Home({ params }: HomePageProps) {
           </div>
 
           <TraceCardEntrance>
-            <div className="relative max-w-full rounded-[12px] border border-hairline bg-canvas p-4 text-ink shadow-[0_18px_48px_rgba(10,11,13,0.12)] sm:p-5">
-              <div className="flex flex-col gap-3 border-b border-hairline pb-4 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between">
-                <div className="min-w-0">
-                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-primary">
-                    {copy.previewEyebrow}
-                  </p>
-                  <h2 className="mt-2 text-[24px] font-black leading-[1.08]">
-                    {copy.previewTitle}
-                  </h2>
-                </div>
-              </div>
+            <div className="relative max-w-full">
+              <ResearchConsole locale={locale} />
 
-              <div className="mt-4">
-                <SampleResearchAnswerCard
-                  answer={SAMPLE_RESEARCH_ANSWERS[0]}
-                  ctaHref={sampleAnswerCtaHref(SAMPLE_RESEARCH_ANSWERS[0])}
-                  locale={locale}
-                  ctaId="home_sample_answer_start"
-                  surface="home_preview"
-                />
-              </div>
-
-              <p className="mt-3 border-t border-hairline pt-3 text-center text-[12px] font-semibold leading-5 text-muted">
+              <p className="mt-3 text-center text-[12px] font-semibold leading-5 text-muted">
                 {copy.previewDataStrip}
               </p>
             </div>
