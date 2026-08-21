@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import ChatArtifacts from "@/components/ChatArtifacts";
-import EvidenceGraphPreview from "@/components/EvidenceGraphPreview";
 import FollowUpQuestionActions from "@/components/FollowUpQuestionActions";
 import QueueRemotionAnimation from "@/components/QueueRemotionAnimation";
 import ResearchMarkdown from "@/components/ResearchMarkdown";
@@ -14,7 +13,6 @@ import MessageAttachments, {
 } from "@/components/MessageAttachments";
 import type { ToolCallState } from "@/hooks/useChat";
 import type {
-  ChatCitation,
   ChatArtifact,
   ChatMessagePresentation,
   ChatMessageVisualization,
@@ -39,7 +37,6 @@ interface ChatMessageProps {
   metadata?: Record<string, unknown> | null;
   isStreaming?: boolean;
   activity?: ResearchActivityUpdate | null;
-  citations?: ChatCitation[];
   artifacts?: ChatArtifact[];
   visualizations?: ChatMessageVisualization[];
   messagePresentation?: ChatMessagePresentation | null;
@@ -339,7 +336,7 @@ function MessageActions({
   );
 }
 
-function activityLabel(activity?: ResearchActivityUpdate | null): string {
+export function activityLabel(activity?: ResearchActivityUpdate | null): string {
   switch (activity?.stage) {
     case "queued":
       return "대기열에 추가됨";
@@ -348,7 +345,7 @@ function activityLabel(activity?: ResearchActivityUpdate | null): string {
     case "connecting":
       return "자료 연결 중";
     case "checking_evidence":
-      return "근거 정리 중";
+      return "자료 확인 중";
     case "composing":
       return "답변 작성 중";
     case "complete":
@@ -356,7 +353,7 @@ function activityLabel(activity?: ResearchActivityUpdate | null): string {
     case "researching":
     case "preparing":
     default:
-      return "근거 확인 중";
+      return "자료 확인 중";
   }
 }
 
@@ -468,7 +465,6 @@ export default function ChatMessage({
   presentation = "default",
   isStreaming,
   activity,
-  citations,
   artifacts,
   visualizations,
   messagePresentation,
@@ -540,7 +536,6 @@ export default function ChatMessage({
         <div className={progressFrameClass}>
           <ResearchProgress
             activity={activity}
-            citations={citations}
             isStreaming={isStreaming}
             toolCalls={toolCalls}
             workDurationMs={workDurationMs}
@@ -550,17 +545,12 @@ export default function ChatMessage({
       )}
       {isStreaming ? (
         <div className={assistantFrameClass}>
-          <EvidenceGraphPreview
-            activity={activity}
-            citations={citations}
-            toolCalls={toolCalls}
-          />
           {assistantContent ? (
             <StreamingContentBlocks
               content={assistantContent}
               presentation={presentation}
             />
-          ) : !toolCalls?.length && !citations?.length ? (
+          ) : !toolCalls?.length ? (
             <LoadingDots label={activityLabel(activity)} />
           ) : null}
         </div>

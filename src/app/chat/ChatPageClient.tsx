@@ -952,9 +952,6 @@ function ChatContent({
                         createdAt={
                           msg.role === "assistant" ? msg.created_at : undefined
                         }
-                        citations={
-                          isLatestAssistantMessage ? chat.citations : undefined
-                        }
                         artifacts={
                           msg.role === "assistant"
                             ? chat.artifactsByMessageId[msg.id]
@@ -1016,7 +1013,6 @@ function ChatContent({
                       presentation={isGuruAdvisor ? "guru" : "default"}
                       isStreaming={true}
                       activity={chat.activity}
-                      citations={chat.citations}
                       runStartedAt={chat.runStartedAt}
                       showHeader={
                         chat.messages.length === 0 ||
@@ -1043,7 +1039,6 @@ function ChatContent({
                       presentation={isGuruAdvisor ? "guru" : "default"}
                       isStreaming={true}
                       activity={chat.activity}
-                      citations={chat.citations}
                       runStartedAt={chat.runStartedAt}
                       showHeader={
                         chat.messages.length === 0 ||
