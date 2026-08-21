@@ -78,12 +78,12 @@ const pulseTourSteps: TourStep[] = [
     selector: '[data-onboarding-target="pulse-feed-list"]',
     icon: "dynamic_feed",
     title: {
-      ko: "질문 카드에서 리서치가 시작돼요",
-      en: "Research starts from question cards",
+      ko: "오늘 확인할 질문이 이 피드에 쌓여요",
+      en: "Today's questions stack up in this feed",
     },
     body: {
-      ko: "확인할 만한 질문 카드가 매일 이 피드에 쌓입니다. 카드를 누르면 공시 근거 리서치가 바로 실행돼요.",
-      en: "Cards worth checking pile up here every day. Tap one and filing-grounded research runs right away.",
+      ko: "매일 확인할 만한 질문 카드가 정해집니다. 누르면 공시 근거 리서치가 바로 실행돼요.",
+      en: "Cards worth checking are picked each day. Tap one and filing-grounded research runs right away.",
     },
   },
   {
@@ -136,12 +136,12 @@ const pulseTourSteps: TourStep[] = [
     icon: "travel_explore",
     opensMobileMenu: true,
     title: {
-      ko: "탐색 — 회사·관점별 분석·조건 검색",
-      en: "Explore — companies, perspectives, screens",
+      ko: "탐색 — 첫 질문은 회사에서 시작",
+      en: "Explore — start the first question from a company",
     },
     body: {
-      ko: "회사를 찾아 바로 들어가거나, 버핏·막스 같은 관점으로 점검하거나, 조건으로 여러 회사를 좁혀보세요.",
-      en: "Jump into a company, pressure-test it through lenses like Buffett or Marks, or narrow many companies by criteria.",
+      ko: "처음 질문은 회사를 골라 시작하는 게 가장 편해요. 버핏·막스 같은 관점으로 점검하거나, 조건으로 여러 회사를 좁혀보는 것도 여기 있습니다.",
+      en: "For your first question, picking a company is the easiest start. Pressure-test through lenses like Buffett or Marks, or narrow many companies by criteria — all from here.",
     },
   },
   {
