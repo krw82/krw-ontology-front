@@ -367,6 +367,18 @@ export default function ProductOnboardingTour({
     const safeContinuePath = normalizeContinuePath(continuePath);
     if (safeContinuePath) {
       router.replace(safeContinuePath, { scroll: false });
+      return;
+    }
+    // A forced replay (?tour=1) cleans the flag so a refresh or a repeated
+    // menu click starts fresh instead of silently re-running the tour.
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("tour")) {
+        url.searchParams.delete("tour");
+        router.replace(`${url.pathname}${url.search}` || url.pathname, {
+          scroll: false,
+        });
+      }
     }
   }, [continuePath, router, tour]);
 

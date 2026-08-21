@@ -11,6 +11,7 @@ import LocaleSwitcher from "@/components/LocaleSwitcher";
 import UsageStatus from "@/components/UsageStatus";
 import {
   localeSwitchHref,
+  queryLocalizedPath,
   resolveRouteLocale,
 } from "@/i18n/routing";
 import { normalizeInternalNextPath } from "@/lib/auth/redirect-path";
@@ -379,6 +380,20 @@ export default function TopNav({
                         className="material-symbols-outlined text-[18px]"
                       >
                         notifications
+                      </span>
+                    </Link>
+                    <Link
+                      href={`${queryLocalizedPath(currentLocale, "/pulse")}?tour=1`}
+                      className="mt-xs flex w-full items-center justify-between rounded-[8px] px-sm py-sm text-left text-[14px] font-semibold leading-[1.3] text-body transition-colors hover:bg-surface-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      role="menuitem"
+                      onClick={() => setAccountMenuOpen(false)}
+                    >
+                      <span>{currentLocale === "ko" ? "튜토리얼" : "Product tour"}</span>
+                      <span
+                        aria-hidden="true"
+                        className="material-symbols-outlined text-[18px]"
+                      >
+                        school
                       </span>
                     </Link>
                     <Link
