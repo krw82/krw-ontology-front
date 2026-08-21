@@ -5,19 +5,15 @@ import type {
   Message,
   StreamingEventType,
   RunStatus,
-  StreamingCitation,
-  ChatCitation,
   StreamingToolCallStart,
   StreamingToolCallEnd,
   ExecutionBudgetStatus,
   ReleaseMetadata,
   ErrorCode,
   GetChatSessionResponse,
-  GetChatEvidenceResponse,
   Session,
   ResearchActivityUpdate,
   MCPToolName,
-  ToolCall,
   ChatArtifact,
   ChatMessagePresentation,
   ChatMessageVisualization,
@@ -94,7 +90,6 @@ export interface ChatState {
   error: string | null;
   activity: ResearchActivityUpdate | null;
   toolCalls: ToolCallState[];
-  citations: ChatCitation[];
   artifactsByMessageId: Record<string, ChatArtifact[]>;
   visualizationsByMessageId: Record<string, ChatMessageVisualization[]>;
   presentationsByMessageId: Record<string, ChatMessagePresentation>;
@@ -123,7 +118,6 @@ function createInitialChatState(): ChatState {
     error: null,
     activity: null,
     toolCalls: [],
-    citations: [],
     artifactsByMessageId: {},
     visualizationsByMessageId: {},
     presentationsByMessageId: {},
@@ -144,35 +138,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
       typeof value === "object" &&
       !Array.isArray(value),
   );
-}
-
-function mapToolCallState(toolCall: ToolCall): ToolCallState {
-  return {
-    tool_call_id: toolCall.tool_use_id ?? toolCall.id,
-    tool_name: toolCall.tool_name,
-    status: toolCall.error_message
-      ? "failed"
-      : toolCall.finished_at
-        ? "completed"
-        : "running",
-    arguments: isPlainObject(toolCall.arguments_json)
-      ? toolCall.arguments_json
-      : undefined,
-    result_summary: toolCall.result_summary,
-    started_at: toolCall.started_at
-      ? new Date(toolCall.started_at).getTime()
-      : undefined,
-    finished_at: toolCall.finished_at
-      ? new Date(toolCall.finished_at).getTime()
-      : undefined,
-  };
-}
-
-function latestCompletedAssistantMessageId(messages: Message[]) {
-  return [...messages]
-    .reverse()
-    .find((message) => message.role === "assistant" && message.status === "completed")
-    ?.id;
 }
 
 function groupArtifactsByMessageId(
@@ -658,14 +623,6 @@ export function useChat({
         }));
         break;
       }
-      case "citation": {
-        const d = data as StreamingCitation;
-        setState((prev) => ({
-          ...prev,
-          citations: [...prev.citations, d],
-        }));
-        break;
-      }
       case "artifact": {
         const d = data as ChatArtifact;
         setState((prev) => ({
@@ -898,10 +855,6 @@ export function useChat({
       activeAssistantMessageIdRef.current = loaded.activeAssistantMessageId;
       streamingContentRef.current = loadedIsActive ? "" : loaded.streamingContent;
       sessionSyncRequestedRef.current = false;
-      const evidenceMessageId =
-        loaded.status === "completed"
-          ? latestCompletedAssistantMessageId(loaded.messages)
-          : undefined;
 
       setState((prev) => ({
         ...prev,
@@ -930,7 +883,6 @@ export function useChat({
         runId: loaded.activeRunId,
         runStartedAt: loaded.activeRunStartedAt,
         toolCalls: [],
-        citations: [],
         artifactsByMessageId: groupArtifactsByMessageId(data.chat_artifacts),
         visualizationsByMessageId: groupVisualizationsByMessageId(
           data.visualizations,
@@ -970,45 +922,6 @@ export function useChat({
             }
           : {}),
       }));
-
-      if (evidenceMessageId) {
-        void fetch(
-          `/api/chat/${encodeURIComponent(targetSessionId)}/evidence?message_id=${encodeURIComponent(evidenceMessageId)}`,
-        )
-          .then(async (evidenceResponse) => {
-            if (!evidenceResponse.ok) return null;
-            return (await evidenceResponse.json()) as GetChatEvidenceResponse;
-          })
-          .then((evidence) => {
-            if (
-              !evidence ||
-              !mountedRef.current ||
-              activeSessionIdRef.current !== targetSessionId ||
-              evidence.message_id !== evidenceMessageId
-            ) {
-              return;
-            }
-
-            setState((prev) => {
-              if (
-                prev.status !== "completed" ||
-                latestCompletedAssistantMessageId(prev.messages) !==
-                  evidenceMessageId
-              ) {
-                return prev;
-              }
-
-              return {
-                ...prev,
-                toolCalls: evidence.tool_calls.map(mapToolCallState),
-                citations: evidence.citations as ChatCitation[],
-              };
-            });
-          })
-          .catch(() => {
-            // Evidence is supplemental; the session itself has already loaded.
-          });
-      }
 
       return true;
     } catch {
@@ -1403,7 +1316,6 @@ export function useChat({
           label: "분석 준비 중",
         },
         toolCalls: [],
-        citations: [],
         runId: null,
         runStartedAt: null,
         usage: null,
@@ -1595,7 +1507,6 @@ export function useChat({
           label: "분석 준비 중",
         },
         toolCalls: [],
-        citations: [],
         artifactSelections: [
           ...prev.artifactSelections,
           {
