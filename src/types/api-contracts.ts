@@ -803,9 +803,6 @@ export interface StreamingCitation {
   trace_json: Record<string, unknown> | null;
 }
 
-export type ChatCitation = StreamingCitation &
-  Partial<Pick<Citation, "id" | "message_id" | "run_id">>;
-
 export type ResearchArtifactType =
   | "company_overview"
   | "financial_snapshot"
@@ -1567,14 +1564,6 @@ export interface GetChatSessionResponse {
   artifact_selections?: ChatArtifactSelection[];
   rich_answers?: ResearchArtifact[];
   research_artifacts?: ResearchArtifact[];
-}
-
-/** GET /api/chat/[sessionId]/evidence response */
-export interface GetChatEvidenceResponse {
-  message_id: string;
-  run_ids: string[];
-  citations: Citation[];
-  tool_calls: ToolCall[];
 }
 
 /** GET /api/sessions response */

@@ -12,7 +12,6 @@ import Composer, {
   type ComposerSendOptions,
   type ComposerSendResult,
 } from "@/components/Composer";
-import EvidenceGraphPreview from "@/components/EvidenceGraphPreview";
 import FloatingAskBar from "@/components/FloatingAskBar";
 import {
   EvidenceCardItem,
@@ -59,7 +58,6 @@ import type {
   AtomicNewsEventCard,
   ChatArtifact,
   ChatArtifactSelection,
-  ChatCitation,
   ResearchActivityUpdate,
   WatchlistOverviewResponse,
 } from "@/types/api-contracts";
@@ -179,22 +177,6 @@ const sampleToolCalls: ToolCallState[] = [
     status: "running",
     arguments: { ticker: "AAPL", query: "services margin revenue" },
     started_at: sampleRunningToolStartedAt,
-  },
-];
-
-const sampleCitations: ChatCitation[] = [
-  {
-    ticker: "AAPL",
-    document_type: "annual_report",
-    period: "FY2025",
-    section: "Management Discussion",
-    quote_text:
-      "Services net sales increased year over year driven by broad-based growth.",
-    claim_text: "서비스 매출은 전년 대비 성장했습니다.",
-    evidence_grade: "high",
-    source_quality: "filing_direct",
-    object_id: "dev-citation-1",
-    trace_json: { path: ["company", "services", "net sales"] },
   },
 ];
 
@@ -601,7 +583,6 @@ const coverageItems: CoverageItem[] = [
   { name: "CompanyCard", state: "rendered", section: "회사", note: "ko/en, 모바일/데스크톱 반응형" },
   { name: "CompanyWatchlistActions", state: "rendered", section: "회사", note: "로그아웃/관심 상태" },
   { name: "Composer", state: "rendered", section: "입력", note: "기본, URL, 파일 메뉴, 전송 샌드박스" },
-  { name: "EvidenceGraphPreview", state: "rendered", section: "근거", note: "citation/tool call 기반 그래프" },
   { name: "FloatingAskBar", state: "rendered", section: "입력", note: "고정 질문 바" },
   { name: "HeroSection exports", state: "rendered", section: "랜딩", note: "헤딩, 서브텍스트, 스텝, 카드 entrance" },
   { name: "HomeInteractions exports", state: "rendered", section: "랜딩", note: "CTA, 질문 폼, evidence cards, trace explorer" },
@@ -1027,16 +1008,9 @@ export default function DevComponentsGallery() {
 
         <Section
           title="근거와 아티팩트"
-          description="근거 그래프, 뉴스 선택 아티팩트, 마크다운 답변 렌더러를 확인합니다."
+          description="뉴스 선택 아티팩트와 마크다운 답변 렌더러를 확인합니다."
         >
           <div className="grid gap-base">
-            <PreviewCard title="EvidenceGraphPreview">
-              <EvidenceGraphPreview
-                activity={sampleActivityRunning}
-                citations={sampleCitations}
-                toolCalls={sampleToolCalls}
-              />
-            </PreviewCard>
             <PreviewCard title="ChatArtifacts news selection">
               <ChatArtifacts
                 artifacts={[sampleArtifact]}

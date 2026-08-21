@@ -951,19 +951,6 @@ test.describe("dev auth bypass", () => {
       });
     });
 
-    await page.route(`**/api/chat/${sessionId}/evidence?**`, async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          message_id: "66666666-6666-4666-8666-666666666666",
-          run_ids: [],
-          tool_calls: [],
-          citations: [],
-        }),
-      });
-    });
-
     await page.route("**/api/companies?**", async (route) => {
       const url = new URL(route.request().url());
       if (url.searchParams.get("ticker") !== "AAPL") {
