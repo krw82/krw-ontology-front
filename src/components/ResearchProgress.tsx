@@ -3,10 +3,7 @@
 import { motion } from "motion/react";
 import QueueRemotionAnimation from "@/components/QueueRemotionAnimation";
 import type { ToolCallState } from "@/hooks/useChat";
-import type {
-  ChatCitation,
-  ResearchActivityUpdate,
-} from "@/types/api-contracts";
+import type { ResearchActivityUpdate } from "@/types/api-contracts";
 import { getResearchActivityLabel } from "@/lib/chat/research-status";
 import {
   formatResearchDuration,
@@ -18,7 +15,6 @@ import {
 
 interface ResearchProgressProps {
   activity?: ResearchActivityUpdate | null;
-  citations?: ChatCitation[];
   isStreaming?: boolean;
   toolCalls?: ToolCallState[];
   workDurationMs?: number | null;
