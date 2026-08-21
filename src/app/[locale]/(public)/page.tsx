@@ -14,10 +14,8 @@ import {
   HeroSubtext,
   HeroEyebrow,
   WorkflowSteps,
-  TraceCardEntrance,
   QuestionFormEntrance,
 } from "@/components/HeroSection";
-import ResearchConsole from "@/components/public/ResearchConsole";
 import { isLocale, type Locale } from "@/i18n/config";
 import { localizedPageMetadata } from "@/i18n/metadata";
 import { localizedPath, queryLocalizedPath } from "@/i18n/routing";
@@ -54,7 +52,6 @@ const homeCopy = {
       { href: "/13f", label: "13F 보유" },
       { href: "/pricing", label: "가격" },
     ],
-    previewDataStrip: "공시 · 뉴스 · 13F 기관 보유 · 내부자 거래 — 355개 기업",
     workflowSteps: ["질문 고르기", "리서치 실행", "매일 이어서 보기"],
     offerDescription: "무료 플랜",
     browseAria: "공개 페이지 둘러보기",
@@ -79,7 +76,6 @@ const homeCopy = {
       { href: "/13f", label: "13F holdings" },
       { href: "/pricing", label: "Pricing" },
     ],
-    previewDataStrip: "Filings · News · 13F holdings · Insider trades — 355 companies",
     workflowSteps: ["Pick a question", "Run the research", "Continue every day"],
     offerDescription: "Free plan",
     browseAria: "Browse public pages",
@@ -96,7 +92,6 @@ const homeCopy = {
   accentLine: string;
   subtext: string;
   browseLinks: Array<{ href: string; label: string }>;
-  previewDataStrip: string;
   workflowSteps: string[];
   offerDescription: string;
   browseAria: string;
@@ -217,7 +212,7 @@ export default async function Home({ params }: HomePageProps) {
           aria-hidden="true"
           className="absolute inset-0 bg-[linear-gradient(90deg,rgba(10,11,13,0.04)_1px,transparent_1px),linear-gradient(180deg,rgba(10,11,13,0.04)_1px,transparent_1px)] bg-[size:72px_72px]"
         />
-        <section className="relative z-10 mx-auto grid w-full max-w-7xl grid-cols-[minmax(0,1fr)] items-start gap-12 lg:min-h-[calc(100dvh-160px)] lg:grid-cols-[minmax(0,0.92fr)_minmax(420px,0.78fr)]">
+        <section className="relative z-10 mx-auto grid w-full max-w-7xl grid-cols-[minmax(0,1fr)] items-start gap-12 ">
           <div className="min-w-0 max-w-full">
             <HeroEyebrow>{copy.eyebrow}</HeroEyebrow>
 
@@ -263,16 +258,6 @@ export default async function Home({ params }: HomePageProps) {
 
             <WorkflowSteps steps={copy.workflowSteps} />
           </div>
-
-          <TraceCardEntrance>
-            <div className="relative max-w-full">
-              <ResearchConsole locale={locale} />
-
-              <p className="mt-3 text-center text-[12px] font-semibold leading-5 text-muted">
-                {copy.previewDataStrip}
-              </p>
-            </div>
-          </TraceCardEntrance>
         </section>
       </main>
 
