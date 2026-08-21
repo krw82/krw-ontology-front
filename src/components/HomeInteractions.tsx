@@ -215,7 +215,7 @@ export function HomePrimaryCtas({
 }: {
   locale?: Locale;
 }) {
-  const companiesHref = localizedPath(locale, "/companies");
+  const pulseHref = queryLocalizedPath(locale, "/pulse");
   const label = locale === "ko" ? "리서치 시작" : "Check against filings";
   const useCases =
     locale === "ko"
@@ -242,13 +242,13 @@ export function HomePrimaryCtas({
   return (
     <div className="mt-6">
       <Link
-        href={companiesHref}
+        href={pulseHref}
         onClick={() => {
           trackClientEventSilently("cta_clicked", {
             cta_id: "home_hero_primary",
             cta_label: label,
             surface: "home_hero_primary",
-            destination: companiesHref,
+            destination: pulseHref,
           });
         }}
         className="inline-flex min-h-12 items-center justify-center rounded-[8px] bg-surface-dark px-5 py-3 text-[15px] font-extrabold leading-5 text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
