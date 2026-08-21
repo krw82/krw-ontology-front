@@ -46,7 +46,7 @@ const homeCopy = {
     headingLines: ["AI 답변을 믿기 전에"],
     accentLine: "회사 공시로 확인하세요",
     subtext:
-      "매일 공시·뉴스·기관 보유·내부자 거래를 한 곳으로 모아, 오늘 확인할 리서치 거리를 골라줍니다.",
+      "공시·뉴스·기관 보유·내부자 거래를 매일 대신 읽고, 중요한 순간만 골라 드립니다.",
     browseLinks: [
       { href: "/pulse", label: "피드" },
       { href: "/news", label: "뉴스" },
@@ -70,7 +70,7 @@ const homeCopy = {
     headingLines: ["Before you trust an AI answer,"],
     accentLine: "check the company filings",
     subtext:
-      "Filings, market news, institutional holdings, and insider trades — gathered in one place so today's research finds you.",
+      "Filings, market news, institutional holdings, and insider trades — read for you every day, shared only when they matter.",
     browseLinks: [
       { href: "/pulse", label: "Feed" },
       { href: "/news", label: "News" },
