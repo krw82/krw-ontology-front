@@ -53,7 +53,7 @@ const demoTimelineByLocale = {
     },
     {
       step: "source",
-      label: "답변 단서 확인 중",
+      label: "자료 확인 중",
       icon: "description",
       duration: 1050,
     },
@@ -65,13 +65,13 @@ const demoTimelineByLocale = {
     },
     {
       step: "path",
-      label: "답변 근거 정리 중",
+      label: "답변 정리 중",
       icon: "route",
       duration: 1050,
     },
     {
       step: "complete",
-      label: "근거 기반 답변 준비 완료",
+      label: "답변 준비 완료",
       icon: "check_circle",
       duration: 1250,
     },
@@ -85,7 +85,7 @@ const demoTimelineByLocale = {
     },
     {
       step: "source",
-      label: "Checking answer signals",
+      label: "Reviewing materials",
       icon: "description",
       duration: 1050,
     },
@@ -97,13 +97,13 @@ const demoTimelineByLocale = {
     },
     {
       step: "path",
-      label: "Organizing answer evidence",
+      label: "Organizing answer",
       icon: "route",
       duration: 1050,
     },
     {
       step: "complete",
-      label: "Evidence-first answer ready",
+      label: "Answer ready",
       icon: "check_circle",
       duration: 1250,
     },

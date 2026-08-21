@@ -65,8 +65,8 @@ export function buildCompanyPageOgCopy(
     description,
     footer:
       locale === "ko"
-        ? "회사 보고서에는 뉴스와 주가만으로는 보이지 않는 단서가 숨어 있습니다."
-        : "Find the clues that market headlines and price moves do not show.",
+        ? "매일 공시·뉴스·기관 보유·내부자 거래를 모아 오늘 확인할 리서치 거리를 골라줍니다."
+        : "Filings, news, 13F holdings, and insider trades — daily research leads worth checking.",
     badge: sector || (locale === "ko" ? "공시 기반" : "Filing-grounded"),
     brandName: SITE_NAME,
   });
@@ -139,7 +139,7 @@ const siteVariantCopy: Record<Locale, Record<string, Omit<PageOgCopy, "alt" | "b
       kicker: "공시 기반 기업 분석",
       title: "공시 근거가 보이는 기업 분석 AI",
       description: SITE_DESCRIPTION,
-      footer: "회사 보고서에는 뉴스와 주가만으로는 보이지 않는 단서가 숨어 있습니다.",
+      footer: "매일 공시·뉴스·기관 보유·내부자 거래를 모아 오늘 확인할 리서치 거리를 골라줍니다.",
       badge: "KRW Research",
     },
     home: {
@@ -181,7 +181,7 @@ const siteVariantCopy: Record<Locale, Record<string, Omit<PageOgCopy, "alt" | "b
       title: "Company analysis AI with visible evidence",
       description:
         "Trace U.S. public company performance changes, risks, and business drivers back to filing evidence.",
-      footer: "Company reports contain clues that headlines and price moves do not show.",
+      footer: "Filings, news, 13F holdings, and insider trades — daily research leads worth checking.",
       badge: "KRW Research",
     },
     home: {

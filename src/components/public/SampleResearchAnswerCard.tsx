@@ -8,6 +8,8 @@ interface SampleResearchAnswerCardProps {
   answer: SampleResearchAnswer;
   ctaHref: string;
   locale?: Locale;
+  ctaId?: string;
+  surface?: string;
 }
 
 const SAMPLE_BADGE_LABELS: Record<Locale, string> = {
@@ -28,6 +30,8 @@ export default function SampleResearchAnswerCard({
   answer,
   ctaHref,
   locale = "ko",
+  ctaId = "questions_sample_answer_start",
+  surface = "questions_index_sample_answer",
 }: SampleResearchAnswerCardProps) {
   const readMinutes = estimatedReadMinutes(answer);
   const badgeLabel = SAMPLE_BADGE_LABELS[locale];
@@ -72,9 +76,9 @@ export default function SampleResearchAnswerCard({
           </p>
           <MarketingCtaLink
             href={ctaHref}
-            ctaId="questions_sample_answer_start"
+            ctaId={ctaId}
             ctaLabel={ctaLabel}
-            surface="questions_index_sample_answer"
+            surface={surface}
             className="inline-flex min-h-11 w-full items-center justify-center rounded-[8px] bg-surface-dark px-5 py-3 text-[13px] font-extrabold leading-5 text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas sm:w-auto"
           >
             {ctaLabel}

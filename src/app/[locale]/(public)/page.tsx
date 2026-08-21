@@ -290,6 +290,8 @@ export default async function Home({ params }: HomePageProps) {
                   answer={SAMPLE_RESEARCH_ANSWERS[0]}
                   ctaHref={sampleAnswerCtaHref(SAMPLE_RESEARCH_ANSWERS[0])}
                   locale={locale}
+                  ctaId="home_sample_answer_start"
+                  surface="home_preview"
                 />
               </div>
 
