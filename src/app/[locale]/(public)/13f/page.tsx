@@ -223,10 +223,7 @@ export default async function ThirteenFPage({ params }: ThirteenFPageProps) {
                   href={localizedPath(locale, `/13f/managers/${page.slug}`)}
                   className="group flex min-h-[184px] flex-col rounded-[8px] border border-hairline bg-canvas p-base transition-colors hover:border-primary hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                 >
-                  <span className="font-mono text-[11px] font-black uppercase tracking-[0.14em] text-primary">
-                    {page.manager.countryCode || "13F"} · CIK {page.manager.cik}
-                  </span>
-                  <span className="mt-3 text-[20px] font-black leading-7 text-ink">
+                  <span className="text-[20px] font-black leading-7 text-ink">
                     {page.shortName}
                   </span>
                   {page.personName ? (
