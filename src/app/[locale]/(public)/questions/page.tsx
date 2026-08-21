@@ -5,10 +5,13 @@ import JsonLdScript from "@/components/JsonLdScript";
 import MarketingCtaLink from "@/components/MarketingCtaLink";
 import PublicRelatedLinks from "@/components/PublicRelatedLinks";
 import PublicTopNav from "@/components/PublicTopNav";
+import SampleResearchAnswerCard from "@/components/public/SampleResearchAnswerCard";
 import { getQuestionTopicDisplayList } from "@/content/questions/display";
+import { SAMPLE_RESEARCH_ANSWERS } from "@/content/sample-research-answer.ko";
 import { isLocale, type Locale } from "@/i18n/config";
 import { localizedPageMetadata } from "@/i18n/metadata";
 import { localizedPath } from "@/i18n/routing";
+import { sampleAnswerCtaHref } from "@/lib/content/sample-answer-display";
 import {
   absoluteUrl,
   buildQuestionChatHref,
@@ -35,6 +38,10 @@ const questionsCopy = {
       "추상적인 질문 목록 대신 Apple을 기준으로 질문이 어떻게 이어지는지 보여줍니다. 그래프를 고른 뒤 첫 질문부터 차례대로 공시 근거를 확인하세요.",
     primaryCta: "Apple 매출 그래프 시작",
     companyCta: "다른 회사 선택",
+    sampleEyebrow: "Sample research answer",
+    sampleHeading: "실제 답변 예시",
+    sampleBody:
+      "그래프를 고르면 이어지는 채팅에서 이런 형태의 답변을 받게 됩니다. 아래는 실제 리서치 답변에서 발췌한 예시입니다.",
     libraryEyebrow: "Graph library",
     libraryHeading: "Apple로 시작하는 질문 흐름",
     libraryBody:
@@ -53,6 +60,10 @@ const questionsCopy = {
       "Instead of a flat prompt list, KRW.O shows how questions connect around Apple's business structure. Pick a graph and start from the first filing-grounded question.",
     primaryCta: "Start Apple revenue graph",
     companyCta: "Choose another company",
+    sampleEyebrow: "Sample research answer",
+    sampleHeading: "A real answer example",
+    sampleBody:
+      "Picking a graph starts a chat that returns answers like this one. The card below is excerpted from a real research answer.",
     libraryEyebrow: "Graph library",
     libraryHeading: "Question flows starting from Apple",
     libraryBody:
@@ -89,6 +100,7 @@ export default async function QuestionsIndexPage({
 
   const copy = questionsCopy[locale];
   const displayTopics = getQuestionTopicDisplayList(locale, QUESTION_TOPIC_PAGES);
+  const sampleAnswer = SAMPLE_RESEARCH_ANSWERS[0];
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
@@ -163,6 +175,29 @@ export default async function QuestionsIndexPage({
               </MarketingCtaLink>
             </div>
           </header>
+
+          <section id="sample-answer" className="py-8">
+            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-primary">
+                  {copy.sampleEyebrow}
+                </p>
+                <h2 className="mt-2 text-[22px] font-black leading-7 text-ink">
+                  {copy.sampleHeading}
+                </h2>
+              </div>
+              <p className="w-full min-w-full max-w-xl text-[13px] font-medium leading-6 text-muted md:w-[520px] md:min-w-[360px] md:text-right">
+                {copy.sampleBody}
+              </p>
+            </div>
+
+            <div className="mt-5">
+              <SampleResearchAnswerCard
+                answer={sampleAnswer}
+                ctaHref={sampleAnswerCtaHref(sampleAnswer)}
+              />
+            </div>
+          </section>
 
           <section className="py-8">
             <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
