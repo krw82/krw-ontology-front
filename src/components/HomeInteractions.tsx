@@ -220,14 +220,23 @@ export function HomePrimaryCtas({
   const useCases =
     locale === "ko"
       ? [
-          { label: "이 종목 지금 살만한가?", href: companiesHref },
-          { label: "오늘 뉴스가 호재인가 악재인가?", href: companiesHref },
-          { label: "어떤 회사를 먼저 봐야 하나?", href: "/discover" },
+          {
+            label: "이 종목 지금 살만한가?",
+            href: localizedPath(locale, "/questions#sample-answer"),
+          },
+          { label: "오늘 뉴스가 호재인가 악재인가?", href: queryLocalizedPath(locale, "/news") },
+          { label: "어떤 회사를 먼저 봐야 하나?", href: queryLocalizedPath(locale, "/pulse") },
         ]
       : [
-          { label: "Is this stock worth buying now?", href: companiesHref },
-          { label: "Is today's news good or bad?", href: companiesHref },
-          { label: "Which companies should I check first?", href: "/discover" },
+          {
+            label: "Is this stock worth buying now?",
+            href: localizedPath(locale, "/questions#sample-answer"),
+          },
+          { label: "Is today's news good or bad?", href: queryLocalizedPath(locale, "/news") },
+          {
+            label: "Which companies should I check first?",
+            href: queryLocalizedPath(locale, "/pulse"),
+          },
         ];
 
   return (

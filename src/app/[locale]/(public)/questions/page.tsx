@@ -195,6 +195,7 @@ export default async function QuestionsIndexPage({
               <SampleResearchAnswerCard
                 answer={sampleAnswer}
                 ctaHref={sampleAnswerCtaHref(sampleAnswer)}
+                locale={locale}
               />
             </div>
           </section>

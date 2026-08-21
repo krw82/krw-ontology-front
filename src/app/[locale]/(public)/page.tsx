@@ -21,7 +21,7 @@ import SampleResearchAnswerCard from "@/components/public/SampleResearchAnswerCa
 import { SAMPLE_RESEARCH_ANSWERS } from "@/content/sample-research-answer.ko";
 import { isLocale, type Locale } from "@/i18n/config";
 import { localizedPageMetadata } from "@/i18n/metadata";
-import { localizedPath } from "@/i18n/routing";
+import { localizedPath, queryLocalizedPath } from "@/i18n/routing";
 import { buildNewChatHref } from "@/lib/chat/history-state";
 import { sampleAnswerCtaHref } from "@/lib/content/sample-answer-display";
 import {
@@ -50,8 +50,9 @@ const homeCopy = {
     subtext:
       "매일 공시·뉴스·기관 보유·내부자 거래를 한 곳으로 모아, 오늘 확인할 리서치 거리를 골라줍니다.",
     browseLinks: [
+      { href: "/pulse", label: "피드" },
+      { href: "/news", label: "뉴스" },
       { href: "/questions", label: "질문 예시" },
-      { href: "/companies", label: "회사 목록" },
       { href: "/13f", label: "13F 보유" },
       { href: "/pricing", label: "가격" },
     ],
@@ -76,8 +77,9 @@ const homeCopy = {
     subtext:
       "Filings, market news, institutional holdings, and insider trades — gathered in one place so today's research finds you.",
     browseLinks: [
+      { href: "/pulse", label: "Feed" },
+      { href: "/news", label: "News" },
       { href: "/questions", label: "Question examples" },
-      { href: "/companies", label: "Companies" },
       { href: "/13f", label: "13F holdings" },
       { href: "/pricing", label: "Pricing" },
     ],
@@ -182,9 +184,9 @@ export default async function Home({ params }: HomePageProps) {
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-hairline bg-canvas/95 backdrop-blur-xl">
         <nav className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <KrwBrand
-            href="/companies"
+            href="/pulse"
             compact
-            ariaLabel={locale === "ko" ? "회사 목록으로 이동" : "Go to companies"}
+            ariaLabel={locale === "ko" ? "펄스로 이동" : "Go to the feed"}
           />
 
           <div className="hidden items-center gap-8 text-sm font-semibold text-muted md:flex">
@@ -244,7 +246,7 @@ export default async function Home({ params }: HomePageProps) {
               {copy.browseLinks.map((item) => (
                 <Link
                   key={item.href}
-                  href={localizedPath(locale, item.href)}
+                  href={queryLocalizedPath(locale, item.href)}
                   className="group flex min-h-11 items-center justify-between gap-sm border-b border-hairline py-3 text-[14px] font-extrabold leading-5 text-ink transition-colors last:border-b-0 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                 >
                   <span className="flex min-w-0 items-center gap-sm">

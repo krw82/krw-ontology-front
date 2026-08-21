@@ -235,7 +235,7 @@ export default function PulseCard({
                     onResearch(item);
                   }}
                 >
-                  <span>{researchPending ? "Researching..." : "Research NOW"}</span>
+                  <span>{researchPending ? "분석 중…" : "리서치 시작"}</span>
                   <ResearchNowIcon />
                 </button>
               ) : visibleAction.type === "link" ? (
