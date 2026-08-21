@@ -20,21 +20,31 @@ import {
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { GET } from "./route";
 
+function mockAdminWithSessionCount(count: number) {
+  vi.mocked(getSupabaseAdmin).mockReturnValue({
+    from: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockResolvedValue({ count, error: null }),
+    }),
+  } as never);
+}
+
 describe("GET /auth/landing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getAuthUser).mockResolvedValue({ id: "user-1" } as never);
-    vi.mocked(getSupabaseAdmin).mockReturnValue({} as never);
+    mockAdminWithSessionCount(0);
     vi.mocked(recordOnboardingStateAction).mockResolvedValue({
       state: { user_id: "user-1", status: "in_progress" },
       changed: true,
     } as never);
   });
 
-  it("sends an untouched new account to the company directory once", async () => {
+  it("keeps sending a never-researched account to the company directory", async () => {
     vi.mocked(getOnboardingState).mockResolvedValue({
       user_id: "user-1",
-      status: "not_started",
+      status: "in_progress",
     } as never);
 
     const response = await GET(new Request("http://localhost/auth/landing"));
@@ -49,7 +59,8 @@ describe("GET /auth/landing", () => {
     );
   });
 
-  it("sends a returning account directly to Pulse", async () => {
+  it("lands an account with research history directly in Pulse", async () => {
+    mockAdminWithSessionCount(2);
     vi.mocked(getOnboardingState).mockResolvedValue({
       user_id: "user-1",
       status: "in_progress",
@@ -61,21 +72,27 @@ describe("GET /auth/landing", () => {
     expect(recordOnboardingStateAction).not.toHaveBeenCalled();
   });
 
-  it("keeps the company directory repeatable in local development", async () => {
-    vi.stubEnv("NODE_ENV", "development");
+  it("respects an explicit onboarding skip even without research", async () => {
     vi.mocked(getOnboardingState).mockResolvedValue({
       user_id: "user-1",
-      status: "completed",
+      status: "skipped",
     } as never);
 
     const response = await GET(new Request("http://localhost/auth/landing"));
 
-    expect(response.headers.get("location")).toBe(
-      "http://localhost/ko/companies?tour=1",
-    );
-    expect(getOnboardingState).not.toHaveBeenCalled();
+    expect(response.headers.get("location")).toBe("http://localhost/pulse");
     expect(recordOnboardingStateAction).not.toHaveBeenCalled();
-    vi.unstubAllEnvs();
+  });
+
+  it("falls back to Pulse when the landing lookup fails", async () => {
+    vi.mocked(getSupabaseAdmin).mockImplementation(() => {
+      throw new Error("database unavailable");
+    });
+    vi.mocked(getOnboardingState).mockResolvedValue(null);
+
+    const response = await GET(new Request("http://localhost/auth/landing"));
+
+    expect(response.headers.get("location")).toBe("http://localhost/pulse");
   });
 
   it("keeps the locale when resolving a first login", async () => {

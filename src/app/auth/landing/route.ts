@@ -28,10 +28,25 @@ function companiesPath(locale: "ko" | "en"): string {
   return `${destination}?tour=1`;
 }
 
+async function hasAnyResearchSession(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  userId: string,
+): Promise<boolean> {
+  const { count, error } = await admin
+    .from("chat_sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .is("deleted_at", null);
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}
+
 /**
- * The only default post-login branch. A new account receives the company
- * directory once; marking that visit started makes every later sign-in land
- * in Pulse. Explicit `next` destinations still bypass this route entirely.
+ * The only default post-login branch. Users who have never run a single
+ * research session keep landing on the company directory until they start
+ * one; a recorded onboarding skip opts out early. Everyone else — and any
+ * lookup failure — lands in Pulse. Explicit `next` destinations still
+ * bypass this route entirely.
  */
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
@@ -45,19 +60,19 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL(loginPath(landingPath), redirectOrigin));
   }
 
-  // Local development intentionally keeps this entry repeatable for the
-  // existing test account. Production remains state-driven below.
-  if (process.env.NODE_ENV === "development") {
-    return NextResponse.redirect(new URL(companiesPath(locale), redirectOrigin));
-  }
-
   try {
     const admin = getSupabaseAdmin();
-    const state = await getOnboardingState(admin, user.id);
-    if (state?.status === "not_started") {
-      // The durable state changes before the redirect, so refreshes and future
-      // sign-ins resolve to the feed instead of repeating a company prompt.
-      await recordOnboardingStateAction(admin, user.id, "started");
+    const [state, hasResearch] = await Promise.all([
+      getOnboardingState(admin, user.id),
+      hasAnyResearchSession(admin, user.id),
+    ]);
+
+    if (!hasResearch && state?.status !== "skipped") {
+      // Observability only — routing is decided by the session check, so a
+      // user who bounces without researching is guided again next sign-in.
+      await recordOnboardingStateAction(admin, user.id, "started").catch(
+        () => null,
+      );
       return NextResponse.redirect(
         new URL(companiesPath(locale), redirectOrigin),
       );
