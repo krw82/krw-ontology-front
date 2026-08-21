@@ -8,9 +8,7 @@ import { useReducedMotion } from "@/hooks/useReducedMotion";
  *
  * A light-mode ambient canvas: ticker nodes drift across the hero, nearby
  * nodes link into an evidence graph, pulses travel the links, and pointer
- * movement sends ripples that nudge the constellation. Filing tags (10-K,
- * 10-Q, 8-K) ride random links and flash their destination node — the
- * product's "filings → evidence → answer" loop as living wallpaper.
+ * movement sends ripples that nudge the constellation.
  *
  * Everything is aria-hidden decoration; reduced-motion renders a single
  * static frame and the loop never starts.
@@ -23,8 +21,6 @@ const TICKER_POOL = [
   "KO", "DIS", "PFE", "T", "BA", "GS",
 ] as const;
 
-const FILING_TAGS = ["10-K", "10-Q", "8-K"] as const;
-
 const LINK_DISTANCE = 190;
 const MAX_RIPPLES = 6;
 
@@ -34,8 +30,7 @@ interface StarNode {
   vx: number;
   vy: number;
   label: string;
-  tag: string;
-  isFiling: boolean;
+  radius: number;
   flash: number;
   phase: number;
 }
@@ -67,20 +62,16 @@ interface ConstellationScene {
 function buildScene(width: number, height: number): ConstellationScene {
   const density = width < 720 ? 42000 : 34000;
   const count = Math.max(12, Math.min(30, Math.round((width * height) / density)));
-  const nodes: StarNode[] = Array.from({ length: count }, (_, index) => {
-    const isFiling = index % 5 === 2;
-    return {
-      x: 24 + Math.random() * Math.max(1, width - 48),
-      y: 24 + Math.random() * Math.max(1, height - 48),
-      vx: (Math.random() - 0.5) * 0.14,
-      vy: (Math.random() - 0.5) * 0.14,
-      label: TICKER_POOL[index % TICKER_POOL.length],
-      tag: isFiling ? FILING_TAGS[index % FILING_TAGS.length] : "",
-      isFiling,
-      flash: 0,
-      phase: Math.random() * Math.PI * 2,
-    };
-  });
+  const nodes: StarNode[] = Array.from({ length: count }, (_, index) => ({
+    x: 24 + Math.random() * Math.max(1, width - 48),
+    y: 24 + Math.random() * Math.max(1, height - 48),
+    vx: (Math.random() - 0.5) * 0.14,
+    vy: (Math.random() - 0.5) * 0.14,
+    label: TICKER_POOL[index % TICKER_POOL.length],
+    radius: index % 5 === 2 ? 2.4 : 1.7,
+    flash: 0,
+    phase: Math.random() * Math.PI * 2,
+  }));
   return {
     nodes,
     ripples: [],
@@ -231,17 +222,14 @@ function drawScene(
       ctx.stroke();
     }
 
-    ctx.fillStyle = node.isFiling
-      ? `rgba(0, 62, 199, ${0.55 + breathe * 0.35})`
-      : `rgba(0, 82, 255, ${0.4 + breathe * 0.3})`;
+    ctx.fillStyle = `rgba(0, 82, 255, ${0.4 + breathe * 0.3})`;
     ctx.beginPath();
-    ctx.arc(node.x, node.y, node.isFiling ? 2.4 : 1.7, 0, Math.PI * 2);
+    ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
     ctx.fill();
 
     const textAlpha = 0.32 + breathe * 0.22 + flashRing * 0.4;
     ctx.fillStyle = `rgba(90, 101, 125, ${Math.min(0.95, textAlpha).toFixed(3)})`;
-    const labelText = node.isFiling ? `${node.label}·${node.tag}` : node.label;
-    ctx.fillText(labelText, node.x + 6, node.y + 3);
+    ctx.fillText(node.label, node.x + 6, node.y + 3);
   }
 }
 
