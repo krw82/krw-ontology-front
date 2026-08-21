@@ -3,7 +3,7 @@ import { KrwBrand } from "@/components/KrwBrand";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import MarketingCtaLink from "@/components/MarketingCtaLink";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
-import { localizedPath } from "@/i18n/routing";
+import { localizedPath, queryLocalizedPath } from "@/i18n/routing";
 
 const navItems = {
   ko: [
@@ -56,7 +56,7 @@ export default function PublicTopNav({
         <div className="flex shrink-0 items-center gap-xs">
           <LocaleSwitcher compact />
           <MarketingCtaLink
-            href={localizedPath(locale, "/companies")}
+            href={queryLocalizedPath(locale, "/pulse")}
             ctaId="public_nav_start"
             ctaLabel={ctaLabel}
             surface="public_nav"

@@ -137,7 +137,6 @@ export function HomeHeaderActions({
 }: {
   locale?: Locale;
 }) {
-  const companiesHref = localizedPath(locale, "/companies");
   const pulseHref = queryLocalizedPath(locale, "/pulse");
   const startLabel = locale === "ko" ? "리서치 시작" : "Start research";
   const loginLabel = locale === "ko" ? "로그인" : "Log in";
@@ -193,13 +192,13 @@ export function HomeHeaderActions({
         </Link>
       )}
       <Link
-        href={companiesHref}
+        href={pulseHref}
         onClick={() => {
           trackClientEventSilently("cta_clicked", {
             cta_id: "home_header_start",
             cta_label: startLabel,
             surface: "home_header",
-            destination: companiesHref,
+            destination: pulseHref,
           });
         }}
         className="inline-flex min-h-11 items-center rounded-[8px] bg-surface-dark px-4 py-2 text-sm font-extrabold text-on-dark transition-colors hover:bg-primary-active"
