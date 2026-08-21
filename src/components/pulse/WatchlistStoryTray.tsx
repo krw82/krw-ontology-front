@@ -82,6 +82,7 @@ export default function WatchlistStoryTray() {
   return (
     <motion.section
       aria-label="내 기업"
+      data-onboarding-target="watchlist-story-tray"
       className="mb-base border-b border-hairline pb-base"
       initial={reducedMotion ? false : { opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}

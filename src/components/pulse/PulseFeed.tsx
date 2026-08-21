@@ -906,7 +906,7 @@ export default function PulseFeed({
             ) : null}
 
             {displayEntries.length > 0 ? (
-          <div className="border-t border-hairline">
+          <div className="border-t border-hairline" data-onboarding-target="pulse-feed-list">
             <AnimatePresence initial={false}>
               {displayEntries.map((entry) => {
                 return (
@@ -1015,6 +1015,7 @@ function ResearchActivityRail({
   return (
     <motion.section
       id="research-activity"
+      data-onboarding-target="research-activity-rail"
       className="mb-base overflow-hidden rounded-[22px] bg-ink text-white"
       animate={{
         boxShadow: focused && !reducedMotion

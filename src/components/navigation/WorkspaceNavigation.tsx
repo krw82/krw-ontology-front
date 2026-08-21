@@ -139,7 +139,11 @@ export default function WorkspaceNavigation({
               </div>
               <nav className="flex-1 space-y-base p-base" aria-label={copy.menu}>
                 {groups.map((group) => (
-                  <section key={group.id} aria-labelledby={`workspace-menu-${group.id}`}>
+                  <section
+                    key={group.id}
+                    aria-labelledby={`workspace-menu-${group.id}`}
+                    data-onboarding-group={group.id}
+                  >
                     <h2
                       id={`workspace-menu-${group.id}`}
                       className="px-sm font-mono text-[11px] font-black uppercase tracking-[0.12em] text-muted"

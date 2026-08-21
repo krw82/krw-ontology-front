@@ -1,16 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { createClient } from "@/lib/supabase/client";
 import { dispatchOpenWorkspaceMenu } from "@/lib/navigation/workspace-menu-events";
 import { easeOutExpo } from "@/lib/animation";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { getPathLocale } from "@/i18n/routing";
 import type { Locale } from "@/i18n/config";
 
-const TOUR_STORAGE_VERSION = "v1";
+const TOUR_STORAGE_VERSION = "v2";
 const TOUR_STORAGE_PREFIX = `krw:onboarding:product-tour:${TOUR_STORAGE_VERSION}`;
 const IS_DEV_ENV = process.env.NODE_ENV === "development";
 const SPOTLIGHT_PADDING = 8;
@@ -26,18 +25,15 @@ const cardTransition = {
 } as const;
 
 type TourStepId =
-  | "research-pulse-nav"
-  | "research-notebook-nav"
-  | "stock-discovery-nav"
-  | "guru-advisor-nav"
-  | "company-search-nav"
-  | "wide-research-nav"
-  | "institutional-holdings-nav"
+  | "pulse-feed-cards"
+  | "pulse-activity-rail"
+  | "pulse-follow"
+  | "menu-now"
+  | "menu-explore"
+  | "menu-monitor"
+  | "company-search"
   | "chat-context"
-  | "chat-wide-research"
   | "chat-starters"
-  | "chat-composer"
-  | "chat-notebook"
   | "guru-lens"
   | "guru-company"
   | "guru-question"
@@ -47,6 +43,8 @@ interface TourStep {
   id: TourStepId;
   selector: string;
   icon: string;
+  /** Steps that highlight a workspace-menu group need the mobile drawer open. */
+  opensMobileMenu?: boolean;
   title: Record<Locale, string>;
   body: Record<Locale, string>;
 }
@@ -60,80 +58,122 @@ interface SpotlightRect {
 
 interface ProductOnboardingTourProps {
   pathname: string;
-  tour?: "companies" | "chat" | "guru-directory" | "guru-chat";
+  tour?: "pulse" | "companies" | "chat" | "guru-directory" | "guru-chat";
   force?: boolean;
   continuePath?: string | null;
 }
 
-const companyTourSteps: TourStep[] = [
+/**
+ * First-visit spotlight tours.
+ *
+ * Each surface (pulse, companies, chat, guru) has its own short tour that
+ * auto-starts once per browser on first visit — in production too. The pulse
+ * tour is the main one: it explains the feed, then walks the workspace menu
+ * group by group (now / explore / monitor). On mobile the menu drawer slides
+ * open for the group steps. `?tour=1` still forces a replay for demos.
+ */
+const pulseTourSteps: TourStep[] = [
   {
-    id: "research-pulse-nav",
-    selector:
-      '[data-onboarding-target="research-pulse-nav"], [data-onboarding-target="workspace-menu-trigger"]',
+    id: "pulse-feed-cards",
+    selector: '[data-onboarding-target="pulse-feed-list"]',
     icon: "dynamic_feed",
     title: {
-      ko: "피드에서 오늘의 변화를 보세요",
-      en: "Start with today's changes in the feed",
+      ko: "질문 카드에서 리서치가 시작돼요",
+      en: "Research starts from question cards",
     },
     body: {
-      ko: "관심 기업과 최근 질문을 바탕으로, 먼저 확인할 공시 변화와 리서치 흐름을 보여줍니다.",
-      en: "The feed surfaces filing changes and research threads to check first, based on watched companies and recent questions.",
+      ko: "확인할 만한 질문 카드가 매일 이 피드에 쌓입니다. 카드를 누르면 공시 근거 리서치가 바로 실행돼요.",
+      en: "Cards worth checking pile up here every day. Tap one and filing-grounded research runs right away.",
     },
   },
   {
-    id: "company-search-nav",
+    id: "pulse-activity-rail",
     selector:
-      '[data-onboarding-target="company-search-nav"], [data-onboarding-target="company-search"], [data-onboarding-target="workspace-menu-trigger"]',
+      '[data-onboarding-target="research-activity-rail"], [data-onboarding-target="pulse-feed-list"]',
+    icon: "route",
+    title: {
+      ko: "진행 중·완료된 리서치는 여기서 이어보세요",
+      en: "Continue research from here",
+    },
+    body: {
+      ko: "리서치가 끝나면 결과가 피드로 돌아옵니다. 완료된 답변은 카드에서 바로 열어볼 수 있어요.",
+      en: "Finished research returns to the feed. Open completed answers straight from the cards.",
+    },
+  },
+  {
+    id: "pulse-follow",
+    selector:
+      '[data-onboarding-target="watchlist-story-tray"], [data-onboarding-target="pulse-feed-list"]',
+    icon: "notifications",
+    title: {
+      ko: "관심 기업을 지정하면 알림이 와요",
+      en: "Follow companies to get alerts",
+    },
+    body: {
+      ko: "회사에 관심을 표시하면 새 공시와 리서치 소식을 알림으로 받아요. 무료 3개, 유료는 무제한입니다.",
+      en: "Follow a company and its new filings and research arrive as alerts. Free covers three; paid is unlimited.",
+    },
+  },
+  {
+    id: "menu-now",
+    selector:
+      "[data-onboarding-group=\"now\"], [data-onboarding-target=\"market-issues-nav\"], [data-onboarding-target=\"workspace-menu-trigger\"]",
+    icon: "dynamic_feed",
+    opensMobileMenu: true,
+    title: {
+      ko: "지금 — 피드와 뉴스",
+      en: "Now — feed and news",
+    },
+    body: {
+      ko: "오늘 확인할 거리는 피드와 뉴스에 쌓입니다. 뉴스는 호재인지 악재인지 함께 짚어줘요.",
+      en: "Today's checks land in the feed and news. News cards weigh whether a story helps or hurts.",
+    },
+  },
+  {
+    id: "menu-explore",
+    selector:
+      "[data-onboarding-group=\"explore\"], [data-onboarding-target=\"guru-advisor-nav\"], [data-onboarding-target=\"workspace-menu-trigger\"]",
+    icon: "travel_explore",
+    opensMobileMenu: true,
+    title: {
+      ko: "탐색 — 회사·관점별 분석·조건 검색",
+      en: "Explore — companies, perspectives, screens",
+    },
+    body: {
+      ko: "회사를 찾아 바로 들어가거나, 버핏·막스 같은 관점으로 점검하거나, 조건으로 여러 회사를 좁혀보세요.",
+      en: "Jump into a company, pressure-test it through lenses like Buffett or Marks, or narrow many companies by criteria.",
+    },
+  },
+  {
+    id: "menu-monitor",
+    selector:
+      "[data-onboarding-group=\"monitor\"], [data-onboarding-target=\"institutional-holdings-nav\"], [data-onboarding-target=\"workspace-menu-trigger\"]",
+    icon: "monitoring",
+    opensMobileMenu: true,
+    title: {
+      ko: "추적 — 13F 보유",
+      en: "Monitor — 13F holdings",
+    },
+    body: {
+      ko: "기관이 새로 담거나 뺀 주식을 보고, 다음에 확인할 회사와 질문을 정해보세요.",
+      en: "See what institutions added or trimmed, then pick the next companies and questions to check.",
+    },
+  },
+];
+
+const companiesTourSteps: TourStep[] = [
+  {
+    id: "company-search",
+    selector:
+      '[data-onboarding-target="company-search"], [data-onboarding-target="company-search-nav"], [data-onboarding-target="workspace-menu-trigger"]',
     icon: "search",
     title: {
-      ko: "궁금한 회사에서 시작하세요",
-      en: "Start with the company you want to know",
+      ko: "회사명·티커를 검색해 바로 시작하세요",
+      en: "Search a name or ticker to start",
     },
     body: {
-      ko: "티커나 회사명을 입력하면 그 회사의 공시·실적·리스크 리서치로 바로 이어집니다.",
-      en: "Enter a ticker or company name to go straight into filing, earnings, and risk research for that company.",
-    },
-  },
-  {
-    id: "guru-advisor-nav",
-    selector:
-      '[data-onboarding-target="guru-advisor-nav"], [data-onboarding-target="guru-advisor-cta"], [data-onboarding-target="workspace-menu-trigger"]',
-    icon: "psychology",
-    title: {
-      ko: "관점별 분석으로 가설을 점검하세요",
-      en: "Pressure-test a thesis from different perspectives",
-    },
-    body: {
-      ko: "공개된 투자 원칙을 기준으로 회사나 아이디어의 좋은 점과 의심할 점을 다시 정리합니다.",
-      en: "Use public investment principles to reframe the strengths and doubts in a company or idea.",
-    },
-  },
-  {
-    id: "stock-discovery-nav",
-    selector:
-      '[data-onboarding-target="stock-discovery-nav"], [data-onboarding-target="workspace-menu-trigger"]',
-    icon: "travel_explore",
-    title: {
-      ko: "조건으로 기업을 좁혀보세요",
-      en: "Narrow companies by criteria",
-    },
-    body: {
-      ko: "아이디어, 산업, 리스크, 재무 조건을 넣으면 여러 회사를 비교해 리서치 범위를 좁힙니다.",
-      en: "Add an idea, industry, risk, or financial condition to compare companies and narrow the research scope.",
-    },
-  },
-  {
-    id: "institutional-holdings-nav",
-    selector:
-      '[data-onboarding-target="institutional-holdings-nav"], [data-onboarding-target="workspace-menu-trigger"]',
-    icon: "monitoring",
-    title: {
-      ko: "13F 보유로 다음 확인 대상을 찾으세요",
-      en: "Use 13F holdings to find what to check next",
-    },
-    body: {
-      ko: "기관의 보유 변화를 보고, 다음에 더 확인할 회사와 질문을 정할 때 사용합니다.",
-      en: "Use institutional holding changes to decide which companies and questions to review next.",
+      ko: "회사를 고르면 공시·실적·리스크 리서치가 그 회사 맥락으로 시작됩니다.",
+      en: "Pick a company and filing, earnings, and risk research starts in that company's context.",
     },
   },
 ];
@@ -165,34 +205,6 @@ const chatTourSteps: TourStep[] = [
     body: {
       ko: "무엇을 물어야 할지 애매하면 시작 질문으로 시작하세요. 답변 끝의 이어서 볼 질문은 그대로 눌러 다음 리서치로 이어갈 수 있습니다.",
       en: "If the next question is unclear, start from suggested prompts. Follow-up prompts after answers are written so you can send them directly.",
-    },
-  },
-  {
-    id: "chat-composer",
-    selector:
-      '[data-onboarding-target="chat-composer"], [data-onboarding-target="chat-composer-input"]',
-    icon: "edit",
-    title: {
-      ko: "질문과 자료는 아래 입력창에서",
-      en: "Ask and attach context from the composer",
-    },
-    body: {
-      ko: "질문을 이어서 쓰고, 필요하면 + 버튼으로 URL이나 파일을 붙여 분석에 필요한 맥락을 보강할 수 있습니다.",
-      en: "Continue questions here, or use the + button to add URLs and files as extra context for analysis.",
-    },
-  },
-  {
-    id: "chat-notebook",
-    selector:
-      '[data-onboarding-target="chat-notebook-actions"], [data-onboarding-target="research-notebook-nav"], [data-onboarding-target="workspace-menu-trigger"]',
-    icon: "article",
-    title: {
-      ko: "관심 기업을 저장하세요",
-      en: "Save companies to your interests",
-    },
-    body: {
-      ko: "관심 기업은 최대 3개까지 저장할 수 있습니다. Pro에서는 리서치 노트북으로 질문과 메모를 이어서 관리합니다.",
-      en: "Save up to three companies. Pro adds a research notebook for carrying forward questions and notes.",
     },
   },
 ];
@@ -259,10 +271,29 @@ const guruChatTourSteps: TourStep[] = [
 ];
 
 function getTourSteps(tour: ProductOnboardingTourProps["tour"]): TourStep[] {
+  if (tour === "pulse") return pulseTourSteps;
+  if (tour === "companies") return companiesTourSteps;
   if (tour === "chat") return chatTourSteps;
   if (tour === "guru-directory") return guruDirectoryTourSteps;
   if (tour === "guru-chat") return guruChatTourSteps;
-  return companyTourSteps;
+  return companiesTourSteps;
+}
+
+function tourSeenKey(tour: string): string {
+  return `${TOUR_STORAGE_PREFIX}:${tour}`;
+}
+
+function devSessionSeenKey(tour: string): string {
+  return `${tourSeenKey(tour)}:dev-session`;
+}
+
+function hasStorageValue(key: string | null): boolean {
+  if (!key || typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(key) !== null;
+  } catch {
+    return false;
+  }
 }
 
 export default function ProductOnboardingTour({
@@ -274,13 +305,11 @@ export default function ProductOnboardingTour({
   const router = useRouter();
   const locale = getPathLocale(pathname) ?? "ko";
   const reducedMotion = useReducedMotion();
-  const [ready, setReady] = useState(false);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const [visible, setVisible] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [stepDirection, setStepDirection] = useState(1);
   const [spotlight, setSpotlight] = useState<SpotlightRect | null>(null);
-  const [userStorageKey, setUserStorageKey] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const steps = getTourSteps(tour);
 
   const currentStep = steps[stepIndex] ?? steps[0];
@@ -306,49 +335,6 @@ export default function ProductOnboardingTour({
   );
 
   useEffect(() => {
-    let cancelled = false;
-    const timeoutId = window.setTimeout(() => {
-      if (!cancelled) setReady(true);
-    }, 220);
-    let authTimer: number | null = null;
-
-    if (IS_DEV_ENV || force) {
-      authTimer = window.setTimeout(() => {
-        if (cancelled) return;
-        setIsAuthenticated(true);
-        setUserStorageKey(`${TOUR_STORAGE_PREFIX}:${tour}:dev`);
-      }, 0);
-      return () => {
-        cancelled = true;
-        window.clearTimeout(timeoutId);
-        if (authTimer !== null) window.clearTimeout(authTimer);
-      };
-    }
-
-    const supabase = createClient();
-    supabase.auth
-      .getUser()
-      .then(({ data: { user } }) => {
-        if (cancelled) return;
-        setIsAuthenticated(Boolean(user));
-        setUserStorageKey(
-          user ? `${TOUR_STORAGE_PREFIX}:${tour}:${user.id}` : null,
-        );
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setIsAuthenticated(false);
-          setUserStorageKey(null);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeoutId);
-    };
-  }, [force, tour]);
-
-  useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setStepDirection(1);
       setStepIndex(0);
@@ -356,36 +342,33 @@ export default function ProductOnboardingTour({
     return () => window.clearTimeout(timeoutId);
   }, [tour]);
 
+  // First visit per surface (and once per dev session) auto-starts the tour.
   useEffect(() => {
-    if (!ready || !isAuthenticated) return;
-    let timeoutId: number | null = null;
-
-    // Local development is an intentional onboarding-preview mode. In
-    // production the legacy guided tour is opt-in only; the first-value flow
-    // handles the normal product entry instead.
-    if (force || IS_DEV_ENV) {
-      timeoutId = window.setTimeout(() => setVisible(true), 0);
-      return () => {
-        if (timeoutId !== null) window.clearTimeout(timeoutId);
-      };
+    if (!force && hasStorageValue(tourSeenKey(tour))) return;
+    if (
+      !force &&
+      IS_DEV_ENV &&
+      hasStorageValue(devSessionSeenKey(tour))
+    ) {
+      return;
     }
-    return;
-  }, [force, isAuthenticated, ready, userStorageKey]);
+    const timeoutId = window.setTimeout(() => setVisible(true), force ? 0 : 220);
+    return () => window.clearTimeout(timeoutId);
+  }, [force, tour]);
 
   const completeTour = useCallback(() => {
-    if (userStorageKey) {
-      try {
-        window.localStorage.setItem(userStorageKey, "1");
-      } catch {
-        // Non-critical; onboarding can reappear if storage is unavailable.
-      }
+    try {
+      window.localStorage.setItem(tourSeenKey(tour), "1");
+      window.sessionStorage.setItem(devSessionSeenKey(tour), "1");
+    } catch {
+      // Non-critical; the tour can reappear if storage is unavailable.
     }
     setVisible(false);
     const safeContinuePath = normalizeContinuePath(continuePath);
     if (safeContinuePath) {
       router.replace(safeContinuePath, { scroll: false });
     }
-  }, [continuePath, router, userStorageKey]);
+  }, [continuePath, router, tour]);
 
   const goToNextStep = useCallback(() => {
     if (isLastStep) {
@@ -395,6 +378,40 @@ export default function ProductOnboardingTour({
     setStepDirection(1);
     setStepIndex((index) => Math.min(index + 1, steps.length - 1));
   }, [completeTour, isLastStep, steps.length]);
+
+  // Escape closes; Tab stays inside the card.
+  useEffect(() => {
+    if (!visible) return;
+    const node = dialogRef.current;
+    node
+      ?.querySelector<HTMLButtonElement>("[data-tour-next]")
+      ?.focus({ preventScroll: true });
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        completeTour();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusables = Array.from(
+        node?.querySelectorAll<HTMLButtonElement>("button") ?? [],
+      ).filter((button) => !button.disabled);
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [completeTour, stepIndex, visible]);
 
   const updateSpotlight = useCallback(() => {
     if (!visible) return;
@@ -427,7 +444,10 @@ export default function ProductOnboardingTour({
   useEffect(() => {
     if (!visible) return;
 
-    if (isMobileViewport() && needsMobileWorkspaceMenu(currentStep.id)) {
+    if (
+      isMobileViewport() &&
+      (currentStep.opensMobileMenu || needsMobileWorkspaceMenu(currentStep.id))
+    ) {
       dispatchOpenWorkspaceMenu();
     }
 
@@ -444,7 +464,7 @@ export default function ProductOnboardingTour({
       window.removeEventListener("resize", updateSpotlight);
       window.removeEventListener("scroll", updateSpotlight, true);
     };
-  }, [currentStep.id, updateSpotlight, visible]);
+  }, [currentStep, updateSpotlight, visible]);
 
   if (!visible) return null;
 
@@ -452,7 +472,12 @@ export default function ProductOnboardingTour({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[1100]" role="dialog" aria-modal="true">
+      <div
+        ref={dialogRef}
+        className="fixed inset-0 z-[1100]"
+        role="dialog"
+        aria-modal="true"
+      >
         <SpotlightOverlay
           rect={spotlight}
           reducedMotion={reducedMotion}
@@ -525,6 +550,7 @@ export default function ProductOnboardingTour({
                 </button>
                 <button
                   type="button"
+                  data-tour-next=""
                   className="inline-flex h-11 items-center gap-2 rounded-[8px] bg-surface-dark px-sm text-[13px] font-bold text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                   onClick={goToNextStep}
                 >
@@ -687,16 +713,11 @@ function isVisibleTarget(element: Element): boolean {
 }
 
 function needsMobileWorkspaceMenu(stepId: TourStepId): boolean {
-  if (stepId === "chat-notebook") {
-    return !findVisibleTarget('[data-onboarding-target="chat-notebook-actions"]');
-  }
-
   return (
-    stepId === "research-pulse-nav" ||
-    stepId === "stock-discovery-nav" ||
-    stepId === "guru-advisor-nav" ||
-    stepId === "company-search-nav" ||
-    stepId === "institutional-holdings-nav"
+    stepId === "company-search" ||
+    stepId === "guru-company" ||
+    stepId === "guru-question" ||
+    stepId === "guru-composer"
   );
 }
 

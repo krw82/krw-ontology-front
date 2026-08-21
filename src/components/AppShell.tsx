@@ -9,8 +9,6 @@ import WorkspaceScrollRestoration from "@/components/navigation/WorkspaceScrollR
 import { stripLocalePrefix } from "@/i18n/routing";
 import { getWorkspaceShellMode } from "@/lib/navigation/workspace-routes";
 
-const IS_DEV_ENV = process.env.NODE_ENV === "development";
-
 interface AppShellProps {
   children: React.ReactNode;
   initialUserProfile?: TopNavUserProfile | null;
@@ -37,15 +35,25 @@ function WorkspaceHeaderFallback() {
 
 function BrowseOnboardingLayer({ pathname }: { pathname: string }) {
   const searchParams = useSearchParams();
-  const forceLegacyTour = searchParams.get("tour") === "1";
+  const forceTour = searchParams.get("tour") === "1";
   const onboardingContinuePath = searchParams.get("continue");
+  // First-value onboarding links carry their own entry experience; the
+  // spotlight tour would only fight it.
+  const hasFirstValueQuery =
+    searchParams.has("entry") ||
+    searchParams.has("intent") ||
+    searchParams.has("onboarding");
 
-  if (!forceLegacyTour && !IS_DEV_ENV) return null;
+  if (hasFirstValueQuery && !forceTour) return null;
+
+  const unlocalized = stripLocalePrefix(pathname);
+  if (unlocalized !== "/pulse" && unlocalized !== "/companies") return null;
 
   return (
     <ProductOnboardingTour
       pathname={pathname}
-      force={forceLegacyTour}
+      tour={unlocalized === "/pulse" ? "pulse" : "companies"}
+      force={forceTour}
       continuePath={onboardingContinuePath}
     />
   );
@@ -138,11 +146,12 @@ export default function AppShell({
         <Suspense fallback={null}>
           <WorkspaceScrollRestoration />
         </Suspense>
-        {isCompanyWorkspace && unlocalizedPathname === "/companies" ? (
+        {(unlocalizedPathname === "/pulse" ||
+          unlocalizedPathname === "/companies") && (
           <Suspense fallback={null}>
             <BrowseOnboardingLayer pathname={pathname} />
           </Suspense>
-        ) : null}
+        )}
       </div>
     );
   }
