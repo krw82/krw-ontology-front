@@ -1,15 +1,24 @@
 import MarketingCtaLink from "@/components/MarketingCtaLink";
 import ResearchMarkdown from "@/components/ResearchMarkdown";
 import type { SampleResearchAnswer } from "@/content/sample-research-answer.ko";
+import type { Locale } from "@/i18n/config";
 import { estimatedReadMinutes } from "@/lib/content/sample-answer-display";
 
 interface SampleResearchAnswerCardProps {
   answer: SampleResearchAnswer;
   ctaHref: string;
+  locale?: Locale;
 }
 
-const SAMPLE_BADGE_LABEL = "답변 예시";
-const SAMPLE_CTA_LABEL = "이 질문으로 시작하기";
+const SAMPLE_BADGE_LABELS: Record<Locale, string> = {
+  ko: "답변 예시",
+  en: "Sample answer",
+};
+
+const SAMPLE_CTA_LABELS: Record<Locale, string> = {
+  ko: "이 질문으로 시작하기",
+  en: "Start with this question",
+};
 
 /**
  * 비로그인 사용자용 샘플 리서치 답변 카드 (서버 컴포넌트).
@@ -18,8 +27,11 @@ const SAMPLE_CTA_LABEL = "이 질문으로 시작하기";
 export default function SampleResearchAnswerCard({
   answer,
   ctaHref,
+  locale = "ko",
 }: SampleResearchAnswerCardProps) {
   const readMinutes = estimatedReadMinutes(answer);
+  const badgeLabel = SAMPLE_BADGE_LABELS[locale];
+  const ctaLabel = SAMPLE_CTA_LABELS[locale];
 
   return (
     <article className="overflow-hidden rounded-[8px] border border-hairline bg-canvas">
@@ -29,10 +41,11 @@ export default function SampleResearchAnswerCard({
             {answer.ticker}
           </p>
           <span className="rounded-[4px] border border-hairline bg-surface px-2 py-1 text-[11px] font-extrabold leading-4 text-muted">
-            {SAMPLE_BADGE_LABEL}
+            {badgeLabel}
           </span>
           <span className="ml-auto text-[12px] font-semibold leading-5 text-muted">
-            {answer.askedAtLabel} · 약 {readMinutes}분
+            {answer.askedAtLabel} ·{" "}
+            {locale === "ko" ? `약 ${readMinutes}분` : `~${readMinutes} min`}
           </span>
         </div>
 
@@ -60,11 +73,11 @@ export default function SampleResearchAnswerCard({
           <MarketingCtaLink
             href={ctaHref}
             ctaId="questions_sample_answer_start"
-            ctaLabel={SAMPLE_CTA_LABEL}
+            ctaLabel={ctaLabel}
             surface="questions_index_sample_answer"
             className="inline-flex min-h-11 w-full items-center justify-center rounded-[8px] bg-surface-dark px-5 py-3 text-[13px] font-extrabold leading-5 text-on-dark transition-colors hover:bg-primary-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas sm:w-auto"
           >
-            {SAMPLE_CTA_LABEL}
+            {ctaLabel}
           </MarketingCtaLink>
         </div>
       </div>

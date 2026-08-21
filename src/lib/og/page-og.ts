@@ -143,11 +143,11 @@ const siteVariantCopy: Record<Locale, Record<string, Omit<PageOgCopy, "alt" | "b
       badge: "KRW Research",
     },
     home: {
-      kicker: "기업 분석 에이전트",
-      title: "회사 보고서 속 숨은 단서를 투자 질문으로 확인하세요",
+      kicker: "개인 리서치 데스크",
+      title: "매일 확인할 리서치 거리를 골라 드립니다",
       description:
-        "뉴스와 주가만으로는 보이지 않는 매출, 마진, 현금흐름, 리스크의 의미를 회사 보고서 기준으로 확인합니다.",
-      footer: "질문하면 답변과 근거 경로를 함께 남깁니다.",
+        "공시·뉴스·기관 보유·내부자 거래를 한 곳에 모아, 오늘 확인할 리서치 거리를 골라 드립니다.",
+      footer: "오늘의 리서치는 매일 새로 도착합니다.",
       badge: "Filing-grounded",
     },
     pricing: {
@@ -185,11 +185,11 @@ const siteVariantCopy: Record<Locale, Record<string, Omit<PageOgCopy, "alt" | "b
       badge: "KRW Research",
     },
     home: {
-      kicker: "Company analysis agent",
-      title: "Turn company reports into investor questions",
+      kicker: "Personal research desk",
+      title: "Daily research leads worth checking",
       description:
-        "See what market news and stock moves mean for revenue, margin, cash flow, and risk using company filings.",
-      footer: "Ask a question and keep the evidence path with the answer.",
+        "Filings, market news, institutional holdings, and insider trades in one place — so today's research finds you.",
+      footer: "A fresh set of research questions arrives every day.",
       badge: "Filing-grounded",
     },
     pricing: {

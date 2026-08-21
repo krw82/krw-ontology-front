@@ -6,12 +6,8 @@ import { KrwBrand } from "@/components/KrwBrand";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import {
   HomeHeaderActions,
-  HomeEvidenceCards,
   HomePrimaryCtas,
   HomeQuestionForm,
-  HomeTraceExplorer,
-  type HomeEvidenceCard,
-  type HomeTraceNode,
 } from "@/components/HomeInteractions";
 import {
   HeroHeading,
@@ -21,10 +17,13 @@ import {
   TraceCardEntrance,
   QuestionFormEntrance,
 } from "@/components/HeroSection";
+import SampleResearchAnswerCard from "@/components/public/SampleResearchAnswerCard";
+import { SAMPLE_RESEARCH_ANSWERS } from "@/content/sample-research-answer.ko";
 import { isLocale, type Locale } from "@/i18n/config";
 import { localizedPageMetadata } from "@/i18n/metadata";
 import { localizedPath } from "@/i18n/routing";
 import { buildNewChatHref } from "@/lib/chat/history-state";
+import { sampleAnswerCtaHref } from "@/lib/content/sample-answer-display";
 import {
   absoluteUrl,
   buildSiteOgImagePath,
@@ -49,15 +48,17 @@ const homeCopy = {
     headingLines: ["AI 답변을 믿기 전에"],
     accentLine: "회사 공시로 확인하세요",
     subtext:
-      "회사 보고서에는 뉴스와 주가만으로는 보이지 않는 단서가 숨어 있습니다. 그 단서가 매출·마진·현금흐름·리스크에 어떤 의미인지 확인하세요.",
+      "매일 공시·뉴스·기관 보유·내부자 거래를 한 곳으로 모아, 오늘 확인할 리서치 거리를 골라줍니다.",
     browseLinks: [
       { href: "/questions", label: "질문 예시" },
       { href: "/companies", label: "회사 목록" },
       { href: "/13f", label: "13F 보유" },
       { href: "/pricing", label: "가격" },
     ],
-    previewEyebrow: "답변 미리보기",
-    previewTitle: "투자 질문 확인 예시",
+    previewEyebrow: "REAL ANSWER",
+    previewTitle: "실제 답변 예시",
+    previewDataStrip: "공시 · 뉴스 · 13F 기관 보유 · 내부자 거래 — 355개 기업",
+    workflowSteps: ["질문 고르기", "리서치 실행", "매일 이어서 보기"],
     offerDescription: "무료 플랜",
     browseAria: "공개 페이지 둘러보기",
   },
@@ -73,15 +74,17 @@ const homeCopy = {
     headingLines: ["Before you trust an AI answer,"],
     accentLine: "check the company filings",
     subtext:
-      "Company reports contain signals that news and price moves alone do not show. Check what those signals mean for revenue, margins, cash flow, and risk.",
+      "Filings, market news, institutional holdings, and insider trades — gathered in one place so today's research finds you.",
     browseLinks: [
       { href: "/questions", label: "Question examples" },
       { href: "/companies", label: "Companies" },
       { href: "/13f", label: "13F holdings" },
       { href: "/pricing", label: "Pricing" },
     ],
-    previewEyebrow: "Answer preview",
-    previewTitle: "Investment question check example",
+    previewEyebrow: "REAL ANSWER",
+    previewTitle: "A real answer example",
+    previewDataStrip: "Filings · News · 13F holdings · Insider trades — 355 companies",
+    workflowSteps: ["Pick a question", "Run the research", "Continue every day"],
     offerDescription: "Free plan",
     browseAria: "Browse public pages",
   },
@@ -99,125 +102,10 @@ const homeCopy = {
   browseLinks: Array<{ href: string; label: string }>;
   previewEyebrow: string;
   previewTitle: string;
+  previewDataStrip: string;
+  workflowSteps: string[];
   offerDescription: string;
   browseAria: string;
-}>;
-
-const homeExperienceCopy = {
-  ko: {
-    evidenceCards: [
-      {
-        id: "source",
-        label: "근거",
-        value: "회사 보고서",
-        detail: "답의 단서가 되는 문장 확인",
-      },
-      {
-        id: "node",
-        label: "흐름",
-        value: "사업 맥락",
-        detail: "실적 변화와 리스크 연결",
-      },
-      {
-        id: "path",
-        label: "정리",
-        value: "근거 기반 답변",
-        detail: "단서를 바탕으로 답변 정리",
-      },
-    ],
-    traceNodes: [
-      {
-        id: "filing",
-        label: "근거",
-        mobileLabel: "근거",
-        eyebrow: "단서 확인",
-        title: "회사 보고서에서 단서 확인",
-        detail:
-          "질문과 관련된 문장을 먼저 찾아 답변의 출발점을 고정합니다.",
-        quote: "답변은 보고서에서 찾은 단서에서 시작됩니다.",
-      },
-      {
-        id: "segment",
-        label: "연결",
-        mobileLabel: "연결",
-        eyebrow: "맥락 연결",
-        title: "사업 흐름과 리스크 연결",
-        detail:
-          "보고서 문장과 관련된 사업 활동, 변수, 기간을 한 화면에서 이어 봅니다.",
-        quote: "각 연결은 답변을 만들기 위한 단서로 유지됩니다.",
-      },
-      {
-        id: "driver",
-        label: "요약",
-        mobileLabel: "요약",
-        eyebrow: "답변 준비",
-        title: "근거와 함께 핵심 요인 정리",
-        detail:
-          "연결된 근거를 바탕으로 답변의 주요 요인을 압축합니다.",
-        quote: "최종 답변은 연결된 단서를 바탕으로 정리됩니다.",
-      },
-    ],
-    workflowSteps: ["회사 질문", "단서 찾기", "근거 정리"],
-  },
-  en: {
-    evidenceCards: [
-      {
-        id: "source",
-        label: "Source",
-        value: "Company filings",
-        detail: "Find the sentences behind the answer",
-      },
-      {
-        id: "node",
-        label: "Context",
-        value: "Business signals",
-        detail: "Connect performance changes and risks",
-      },
-      {
-        id: "path",
-        label: "Answer",
-        value: "Evidence-first summary",
-        detail: "Organize the answer from traced signals",
-      },
-    ],
-    traceNodes: [
-      {
-        id: "filing",
-        label: "Source",
-        mobileLabel: "Source",
-        eyebrow: "Signal check",
-        title: "Find signals in company reports",
-        detail:
-          "KRW.O anchors the answer by first finding report sentences related to the question.",
-        quote: "The answer starts from report evidence.",
-      },
-      {
-        id: "segment",
-        label: "Connect",
-        mobileLabel: "Connect",
-        eyebrow: "Context link",
-        title: "Connect business flow and risks",
-        detail:
-          "Report language is connected to business activity, variables, and periods in one trace.",
-        quote: "Each connection is kept as an answer signal.",
-      },
-      {
-        id: "driver",
-        label: "Summarize",
-        mobileLabel: "Summary",
-        eyebrow: "Answer prep",
-        title: "Summarize key drivers with evidence",
-        detail:
-          "The answer compresses key factors from the connected evidence path.",
-        quote: "The final answer is organized from linked signals.",
-      },
-    ],
-    workflowSteps: ["Company question", "Find signals", "Organize evidence"],
-  },
-} satisfies Record<Locale, {
-  evidenceCards: HomeEvidenceCard[];
-  traceNodes: HomeTraceNode[];
-  workflowSteps: string[];
 }>;
 
 export async function generateMetadata({
@@ -246,7 +134,6 @@ export default async function Home({ params }: HomePageProps) {
 
   const locale = rawLocale;
   const copy = homeCopy[locale];
-  const experience = homeExperienceCopy[locale];
   const siteUrl = absoluteUrl(localizedPath(locale));
   const jsonLd = {
     "@context": "https://schema.org",
@@ -380,7 +267,7 @@ export default async function Home({ params }: HomePageProps) {
               <HomeQuestionForm locale={locale} />
             </QuestionFormEntrance>
 
-            <WorkflowSteps steps={experience.workflowSteps} />
+            <WorkflowSteps steps={copy.workflowSteps} />
           </div>
 
           <TraceCardEntrance>
@@ -396,9 +283,17 @@ export default async function Home({ params }: HomePageProps) {
                 </div>
               </div>
 
-              <HomeEvidenceCards cards={experience.evidenceCards} />
+              <div className="mt-4">
+                <SampleResearchAnswerCard
+                  answer={SAMPLE_RESEARCH_ANSWERS[0]}
+                  ctaHref={sampleAnswerCtaHref(SAMPLE_RESEARCH_ANSWERS[0])}
+                  locale={locale}
+                />
+              </div>
 
-              <HomeTraceExplorer nodes={experience.traceNodes} locale={locale} />
+              <p className="mt-3 border-t border-hairline pt-3 text-center text-[12px] font-semibold leading-5 text-muted">
+                {copy.previewDataStrip}
+              </p>
             </div>
           </TraceCardEntrance>
         </section>
