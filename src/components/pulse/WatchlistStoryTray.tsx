@@ -7,13 +7,20 @@ import { trackClientEventSilently } from "@/lib/analytics/client";
 import { easeOutExpo } from "@/lib/animation";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import CompanyLogo from "@/components/CompanyLogo";
+import WatchlistNewsSheet from "@/components/pulse/WatchlistNewsSheet";
+
+interface TrayNewsItem {
+  issue_id: string;
+  title_ko: string | null;
+  published_at: string;
+}
 
 interface TrayItem {
   ticker: string;
   company_name: string | null;
   is_watchlist: boolean;
   new_count: number;
-  latest_issue_id: string | null;
+  new_items: TrayNewsItem[];
 }
 
 interface TrayPayload {
@@ -24,21 +31,17 @@ interface TrayPayload {
 /** Companies with a live sweep ring; beyond this the ring stays static. */
 const MAX_SWEEP_ITEMS = 3;
 
-function itemHref(item: TrayItem): string {
-  if (item.latest_issue_id) {
-    return `/news/${item.latest_issue_id}`;
-  }
-  return `/companies/${encodeURIComponent(item.ticker)}`;
-}
-
 /**
  * "관심 기업" story tray at the top of the Pulse feed: watchlist companies
  * plus recently-viewed ones, each a circular mark with a slow radar-sweep
- * ring when news published since the last engagement is waiting. Hidden
- * entirely when the resume API returns nothing.
+ * ring when unread news is waiting. Tapping a circle with news opens the
+ * unread list sheet instead of jumping to a single article, so the rest of
+ * the pile stays reachable. Hidden entirely when the resume API returns
+ * nothing.
  */
 export default function WatchlistStoryTray() {
   const [payload, setPayload] = useState<TrayPayload | null>(null);
+  const [sheetItem, setSheetItem] = useState<TrayItem | null>(null);
   const reducedMotion = useReducedMotion();
 
   useEffect(() => {
@@ -79,6 +82,16 @@ export default function WatchlistStoryTray() {
       .map((item) => item.ticker),
   );
 
+  const openSheet = (item: TrayItem) => {
+    trackClientEventSilently("cta_clicked", {
+      cta_id: "pulse_resume_sheet_open",
+      surface: "pulse",
+      ticker: item.ticker,
+      resume_count: item.new_count,
+    });
+    setSheetItem(item);
+  };
+
   return (
     <motion.section
       aria-label="내 기업"
@@ -103,8 +116,45 @@ export default function WatchlistStoryTray() {
         {items.map((item, index) => {
           const hasNew = item.new_count > 0;
           const sweep = hasNew && !reducedMotion && sweepTickers.has(item.ticker);
-          const href = itemHref(item);
           const label = item.company_name ?? item.ticker;
+          const circle = (
+            <>
+              <span className="relative grid h-14 w-14 place-items-center transition-transform duration-150 group-hover:scale-[1.04] group-active:scale-95 sm:h-16 sm:w-16">
+                <span
+                  aria-hidden="true"
+                  className={`absolute inset-0 rounded-full ${
+                    hasNew
+                      ? "pulse-story-breathe bg-primary-fixed"
+                      : "bg-surface-container-low"
+                  }`}
+                />
+                {sweep ? (
+                  <span
+                    aria-hidden="true"
+                    className="pulse-story-sweep absolute inset-0 rounded-full border-2 border-transparent border-t-primary-container"
+                  />
+                ) : null}
+                <CompanyLogo
+                  ticker={item.ticker}
+                  companyName={label}
+                  className="h-10 w-10 text-[10px] sm:h-12 sm:w-12"
+                />
+                {hasNew ? (
+                  <span className="pulse-story-badge absolute -top-0.5 right-0 grid h-[18px] min-w-[18px] place-items-center rounded-full border-2 border-background bg-primary px-1 font-mono text-[10px] font-black leading-none text-on-primary">
+                    {item.new_count}
+                  </span>
+                ) : null}
+              </span>
+              <span
+                className={`max-w-full truncate text-[11px] font-bold leading-4 ${
+                  hasNew ? "text-body-strong" : "text-muted"
+                }`}
+                title={label}
+              >
+                {label}
+              </span>
+            </>
+          );
           return (
             <motion.li
               key={item.ticker}
@@ -117,58 +167,32 @@ export default function WatchlistStoryTray() {
                 ease: easeOutExpo,
               }}
             >
-              <Link
-                href={href}
-                aria-label={
-                  hasNew
-                    ? `${label}, 새 소식 ${item.new_count}건, 최신 뉴스 열기`
-                    : `${label}, 회사 페이지 열기`
-                }
-                className="group flex w-16 flex-col items-center gap-1 rounded-[8px] px-xs py-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:w-[72px]"
-                onClick={() =>
-                  trackClientEventSilently("cta_clicked", {
-                    cta_id: "pulse_resume_banner",
-                    surface: "pulse",
-                    ticker: item.ticker,
-                    destination: href,
-                  })
-                }
-              >
-                <span className="relative grid h-14 w-14 place-items-center transition-transform duration-150 group-hover:scale-[1.04] group-active:scale-95 sm:h-16 sm:w-16">
-                  <span
-                    aria-hidden="true"
-                    className={`absolute inset-0 rounded-full ${
-                      hasNew
-                        ? "pulse-story-breathe bg-primary-fixed"
-                        : "bg-surface-container-low"
-                    }`}
-                  />
-                  {sweep ? (
-                    <span
-                      aria-hidden="true"
-                      className="pulse-story-sweep absolute inset-0 rounded-full border-2 border-transparent border-t-primary-container"
-                    />
-                  ) : null}
-                  <CompanyLogo
-                    ticker={item.ticker}
-                    companyName={label}
-                    className="h-10 w-10 text-[10px] sm:h-12 sm:w-12"
-                  />
-                  {hasNew ? (
-                    <span className="pulse-story-badge absolute -top-0.5 right-0 grid h-[18px] min-w-[18px] place-items-center rounded-full border-2 border-background bg-primary px-1 font-mono text-[10px] font-black leading-none text-on-primary">
-                      {item.new_count}
-                    </span>
-                  ) : null}
-                </span>
-                <span
-                  className={`max-w-full truncate text-[11px] font-bold leading-4 ${
-                    hasNew ? "text-body-strong" : "text-muted"
-                  }`}
-                  title={label}
+              {hasNew ? (
+                <button
+                  type="button"
+                  aria-label={`${label}, 새 소식 ${item.new_count}건 목록 열기`}
+                  className="group flex w-16 flex-col items-center gap-1 rounded-[8px] px-xs py-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:w-[72px]"
+                  onClick={() => openSheet(item)}
                 >
-                  {label}
-                </span>
-              </Link>
+                  {circle}
+                </button>
+              ) : (
+                <Link
+                  href={`/companies/${encodeURIComponent(item.ticker)}`}
+                  aria-label={`${label}, 회사 페이지 열기`}
+                  className="group flex w-16 flex-col items-center gap-1 rounded-[8px] px-xs py-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:w-[72px]"
+                  onClick={() =>
+                    trackClientEventSilently("cta_clicked", {
+                      cta_id: "pulse_resume_banner",
+                      surface: "pulse",
+                      ticker: item.ticker,
+                      destination: `/companies/${item.ticker}`,
+                    })
+                  }
+                >
+                  {circle}
+                </Link>
+              )}
             </motion.li>
           );
         })}
@@ -194,6 +218,13 @@ export default function WatchlistStoryTray() {
           </li>
         ) : null}
       </ul>
+      {sheetItem ? (
+        <WatchlistNewsSheet
+          item={sheetItem}
+          open
+          onClose={() => setSheetItem(null)}
+        />
+      ) : null}
     </motion.section>
   );
 }

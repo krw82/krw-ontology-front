@@ -11,6 +11,7 @@ import {
   type ResumeSeenEntityRow,
   type ResumeSeenIssueRow,
   type ResumeSeenStateRow,
+  type ResumeUserStateRow,
   type ResumeWatchlistMarkRow,
 } from "@/lib/pulse/resume";
 
@@ -138,6 +139,16 @@ export async function GET() {
       return Response.json(EMPTY_RESPONSE, { headers: PRIVATE_HEADERS });
     }
 
+    const userStatesResult = await db
+      .from("market_issue_user_states")
+      .select("issue_id, opened_at, is_hidden")
+      .eq("user_id", user.id)
+      .in("issue_id", candidateIssueIds);
+    if (userStatesResult.error) {
+      throw new Error(userStatesResult.error.message);
+    }
+    const userStates = (userStatesResult.data ?? []) as ResumeUserStateRow[];
+
     const candidatesResult = await db
       .from("market_issues")
       .select("id, title_ko, published_at")
@@ -153,6 +164,7 @@ export async function GET() {
       scan,
       candidateIssues: (candidatesResult.data ?? []) as ResumeCandidateIssueRow[],
       candidateEntities,
+      userStates,
     });
 
     return Response.json(result, { headers: PRIVATE_HEADERS });

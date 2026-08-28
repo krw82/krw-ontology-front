@@ -1,20 +1,23 @@
 /**
  * Pure resume/tray logic for the Pulse feed: computes which companies belong
- * in the "관심 기업" story tray and how many published issues are new per
+ * in the "관심 기업" story tray and which published issues are new per
  * company. Split in two phases so the route can query the candidate issues
  * between them: resolveResumeScan derives the union of watchlist tickers and
  * recently-seen tickers; buildPulseResumeItems turns fetched candidates into
  * the final tray items.
  *
  * Cutoff semantics: an issue is "new" for a company when it was published
- * strictly after the latest engagement with that company — the later of the
- * last news visit and the watchlist follow. Watchlist companies stay in the
- * tray even with nothing new; recently-seen companies only appear when they
- * have new issues (banner-era behavior).
+ * after that company's lower bound AND the user has never opened it AND it is
+ * not hidden. The lower bound is the watchlist follow time for watchlist
+ * companies (reading one article must not swallow the other unread ones) and
+ * the last news visit for recently-seen companies. Watchlist companies stay
+ * in the tray even with nothing new; recently-seen companies only appear when
+ * they have new issues.
  */
 
 export const RESUME_MAX_SCAN_TICKERS = 12;
 export const RESUME_MAX_ITEMS = 10;
+export const RESUME_MAX_NEW_ITEMS = 8;
 
 export interface ResumeWatchlistMarkRow {
   ticker: string | null;
@@ -39,6 +42,7 @@ export interface ResumeSeenEntityRow {
 
 export interface ResumeCandidateIssueRow {
   id: string | null;
+  title_ko: string | null;
   published_at: string | null;
 }
 
@@ -48,12 +52,24 @@ export interface ResumeCandidateEntityRow {
   entity_name: string | null;
 }
 
+export interface ResumeUserStateRow {
+  issue_id: string | null;
+  opened_at: string | null;
+  is_hidden: boolean | null;
+}
+
 export interface ResumeScan {
   scan_tickers: string[];
   watchlist_tickers: Set<string>;
-  /** Latest engagement per ticker; null when it cannot be determined. */
+  /** Lower bound per ticker; null when it cannot be determined. */
   cutoff_by_ticker: Map<string, Date | null>;
   seen_company_names: Map<string, string>;
+}
+
+export interface ResumeNewIssueItem {
+  issue_id: string;
+  title_ko: string | null;
+  published_at: string;
 }
 
 export interface PulseResumeItem {
@@ -61,7 +77,7 @@ export interface PulseResumeItem {
   company_name: string | null;
   is_watchlist: boolean;
   new_count: number;
-  latest_issue_id: string | null;
+  new_items: ResumeNewIssueItem[];
 }
 
 export interface PulseResumeResult {
@@ -72,12 +88,6 @@ export interface PulseResumeResult {
 function normalizeResumeTicker(raw: string | null | undefined): string | null {
   const ticker = raw?.trim().toUpperCase();
   return ticker ? ticker : null;
-}
-
-function maxDate(a: Date | null, b: Date | null): Date | null {
-  if (!a) return b;
-  if (!b) return a;
-  return a > b ? a : b;
 }
 
 export function resolveResumeScan(input: {
@@ -138,6 +148,8 @@ export function resolveResumeScan(input: {
     }
   }
 
+  // Watchlist companies are bounded by the follow time only — unread issues
+  // stay new regardless of when the user last visited the company.
   const cutoffByTicker = new Map<string, Date | null>();
   const watchlistSorted = [...watchlistTickers].sort((a, b) => {
     const followedA = followedAtByTicker.get(a)?.getTime() ?? 0;
@@ -146,10 +158,7 @@ export function resolveResumeScan(input: {
     return a < b ? -1 : a > b ? 1 : 0;
   });
   for (const ticker of watchlistSorted) {
-    cutoffByTicker.set(
-      ticker,
-      maxDate(followedAtByTicker.get(ticker) ?? null, seenCutoffByTicker.get(ticker) ?? null),
-    );
+    cutoffByTicker.set(ticker, followedAtByTicker.get(ticker) ?? null);
   }
 
   const recentOnlySorted = [...seenCutoffByTicker.keys()]
@@ -181,6 +190,7 @@ export function buildPulseResumeItems(input: {
   scan: ResumeScan;
   candidateIssues: ResumeCandidateIssueRow[];
   candidateEntities: ResumeCandidateEntityRow[];
+  userStates: ResumeUserStateRow[];
 }): PulseResumeResult {
   const { scan } = input;
   const scanSet = new Set(scan.scan_tickers);
@@ -199,31 +209,51 @@ export function buildPulseResumeItems(input: {
     }
   }
 
-  const newCountByTicker = new Map<string, number>();
-  const latestIssueIdByTicker = new Map<string, string>();
+  const openedIssueIds = new Set<string>();
+  const hiddenIssueIds = new Set<string>();
+  for (const state of input.userStates) {
+    const issueId = state?.issue_id;
+    if (!issueId) continue;
+    if (state.is_hidden === true) hiddenIssueIds.add(issueId);
+    const openedAt = state?.opened_at ? new Date(state.opened_at) : null;
+    if (openedAt && !Number.isNaN(openedAt.getTime())) {
+      openedIssueIds.add(issueId);
+    }
+  }
+
+  const newIssuesByTicker = new Map<string, ResumeNewIssueItem[]>();
   const sortedIssues = input.candidateIssues
     .flatMap((issue) => {
       const id = issue?.id;
       const publishedAt = issue?.published_at ? new Date(issue.published_at) : null;
       if (!id || !publishedAt || Number.isNaN(publishedAt.getTime())) return [];
-      return [{ id, publishedAt }];
+      return [{
+        id,
+        titleKo: issue.title_ko ?? null,
+        publishedAt,
+      }];
     })
     .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
   for (const issue of sortedIssues) {
+    if (openedIssueIds.has(issue.id) || hiddenIssueIds.has(issue.id)) continue;
     for (const ticker of tickersByIssueId.get(issue.id) ?? []) {
       const cutoff = scan.cutoff_by_ticker.get(ticker);
       if (!cutoff || issue.publishedAt <= cutoff) continue;
-      newCountByTicker.set(ticker, (newCountByTicker.get(ticker) ?? 0) + 1);
-      if (!latestIssueIdByTicker.has(ticker)) {
-        latestIssueIdByTicker.set(ticker, issue.id);
-      }
+      const list = newIssuesByTicker.get(ticker) ?? [];
+      list.push({
+        issue_id: issue.id,
+        title_ko: issue.titleKo,
+        published_at: issue.publishedAt.toISOString(),
+      });
+      newIssuesByTicker.set(ticker, list);
     }
   }
 
   const included = scan.scan_tickers
     .filter(
       (ticker) =>
-        scan.watchlist_tickers.has(ticker) || (newCountByTicker.get(ticker) ?? 0) > 0,
+        scan.watchlist_tickers.has(ticker) ||
+        (newIssuesByTicker.get(ticker)?.length ?? 0) > 0,
     )
     .map((ticker) => ({
       ticker,
@@ -232,8 +262,8 @@ export function buildPulseResumeItems(input: {
         candidateNameByTicker.get(ticker) ??
         null,
       is_watchlist: scan.watchlist_tickers.has(ticker),
-      new_count: newCountByTicker.get(ticker) ?? 0,
-      latest_issue_id: latestIssueIdByTicker.get(ticker) ?? null,
+      new_count: newIssuesByTicker.get(ticker)?.length ?? 0,
+      new_items: newIssuesByTicker.get(ticker)?.slice(0, RESUME_MAX_NEW_ITEMS) ?? [],
     }));
 
   const compareItems = (
