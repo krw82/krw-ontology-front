@@ -2,6 +2,12 @@
 
 import CompanyLogo from "@/components/CompanyLogo";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
+import {
+  formatValuationMarketCap,
+  formatValuationPercent,
+  formatValuationRatio,
+  type CompanyValuationMetrics,
+} from "@/lib/companies/valuation-sort";
 import { normalizeTicker } from "@/lib/ontology/ticker";
 
 export interface CompanyListItemData {
@@ -19,6 +25,7 @@ export interface CompanyListItemData {
   document_types?: string[];
   periods?: string[];
   generated_at?: string | null;
+  valuation?: CompanyValuationMetrics | null;
 }
 
 interface CompanyListItemProps {
@@ -173,9 +180,6 @@ export default function CompanyListItem({
   const coreStrength = company.core_strength
     ? readableText(company.core_strength, locale)
     : null;
-  const criticalRisk = company.critical_risk
-    ? readableText(company.critical_risk, locale)
-    : null;
   const researchAxisItems = researchAxisItemsFromValue(
     coreStrength ?? company.description ?? null,
   );
@@ -212,7 +216,7 @@ export default function CompanyListItem({
   }
 
   return (
-    <article className="grid grid-cols-[56px_minmax(0,1fr)] gap-x-3 gap-y-1 px-4 py-4 transition-[transform,color,background-color] duration-150 ease-out group-hover:bg-surface xl:grid-cols-[148px_minmax(220px,1.1fr)_minmax(260px,1.5fr)_minmax(220px,1fr)] xl:items-start xl:gap-3 xl:py-3.5 group-active:bg-surface-soft">
+    <article className="grid grid-cols-[56px_minmax(0,1fr)] gap-x-3 gap-y-1 px-4 py-4 transition-[transform,color,background-color] duration-150 ease-out group-hover:bg-surface xl:grid-cols-[148px_minmax(160px,1.1fr)_minmax(200px,1.4fr)_84px_64px_64px_64px_64px] xl:items-start xl:gap-3 xl:py-3.5 group-active:bg-surface-soft">
       <div className="row-span-4 flex min-w-0 items-start xl:row-auto xl:block">
         <div className="flex min-w-0 items-start gap-3">
           <CompanyLogo
@@ -245,6 +249,10 @@ export default function CompanyListItem({
             {secondaryLabel}
           </p>
         )}
+        <MobileValuationStrip
+          valuation={company.valuation ?? null}
+          locale={locale}
+        />
         <ResearchAxisSummary
           items={researchAxisItems}
           locale={locale}
@@ -258,11 +266,78 @@ export default function CompanyListItem({
         className="hidden min-w-0 xl:block"
       />
 
-      <p className="hidden min-w-0 text-[13px] leading-5 text-muted xl:line-clamp-2">
-        {criticalRisk ??
-          (locale === "ko" ? "추적 변수 미등록" : "No watch item registered")}
-      </p>
+      <ValuationCells valuation={company.valuation ?? null} locale={locale} />
     </article>
+  );
+}
+
+function MobileValuationStrip({
+  valuation,
+  locale,
+}: {
+  valuation: CompanyValuationMetrics | null;
+  locale: Locale;
+}) {
+  if (!valuation) return null;
+  const parts = [
+    formatValuationMarketCap(valuation.market_cap, locale === "ko" ? "ko" : "en"),
+    formatValuationRatio(valuation.pe_ttm),
+    formatValuationPercent(valuation.roe_ttm),
+  ];
+  if (parts.every((part) => part === "N/A")) return null;
+  const capLabel = locale === "ko" ? "시총" : "cap";
+  return (
+    <p className="mt-1 font-mono text-[11px] font-bold leading-4 text-muted">
+      <span className="text-muted-soft">{capLabel}</span> {parts[0]}
+      <span className="mx-1 text-muted-soft" aria-hidden="true">·</span>
+      <span className="text-muted-soft">PER</span> {parts[1]}
+      <span className="mx-1 text-muted-soft" aria-hidden="true">·</span>
+      <span className="text-muted-soft">ROE</span> {parts[2]}
+    </p>
+  );
+}
+
+function ValuationCells({
+  valuation,
+  locale,
+}: {
+  valuation: CompanyValuationMetrics | null;
+  locale: Locale;
+}) {
+  const cellClass = "hidden min-w-0 text-right font-mono text-[12px] font-bold leading-5 xl:block";
+  const valueClass = (isNa: boolean) =>
+    isNa ? "text-muted-soft" : "text-body";
+  return (
+    <>
+      <p className={cellClass}>
+        <span className={valueClass(valuation?.market_cap == null)}>
+          {formatValuationMarketCap(
+            valuation?.market_cap ?? null,
+            locale === "ko" ? "ko" : "en",
+          )}
+        </span>
+      </p>
+      <p className={cellClass}>
+        <span className={valueClass(valuation?.pe_ttm == null)}>
+          {formatValuationRatio(valuation?.pe_ttm ?? null)}
+        </span>
+      </p>
+      <p className={cellClass}>
+        <span className={valueClass(valuation?.pb == null)}>
+          {formatValuationRatio(valuation?.pb ?? null)}
+        </span>
+      </p>
+      <p className={cellClass}>
+        <span className={valueClass(valuation?.roe_ttm == null)}>
+          {formatValuationPercent(valuation?.roe_ttm ?? null)}
+        </span>
+      </p>
+      <p className={cellClass}>
+        <span className={valueClass(valuation?.roic_ttm == null)}>
+          {formatValuationPercent(valuation?.roic_ttm ?? null)}
+        </span>
+      </p>
+    </>
   );
 }
 
