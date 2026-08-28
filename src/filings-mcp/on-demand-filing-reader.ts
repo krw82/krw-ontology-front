@@ -202,7 +202,9 @@ export async function searchCatalogFilings(params: {
     .from("sec_filing_events")
     .select("*")
     .eq("env", env)
-    .eq("cik", normalizedCik(company.sec_cik))
+    // sec_filing_events.cik is stored zero-padded to SEC's 10-digit form, while
+    // normalizedCik() returns the unpadded EDGAR-archive form used in URLs.
+    .eq("cik", normalizedCik(company.sec_cik).padStart(10, "0"))
     .order("occurred_at", { ascending: false })
     .limit(clampLimit(params.limit));
   if (params.formType) query = query.eq("form_type", params.formType);
