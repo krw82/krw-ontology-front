@@ -297,7 +297,12 @@ describe("production deploy scripts", () => {
       "Retrying $scp_label upload after a transient GCP SSH copy failure",
     );
     expect(deployWeb).toContain(
-      "redis document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker market-issue-worker market-issue-stream-worker market-web-source-worker market-issue-enrichment-worker billing-worker",
+      'COMPOSE_SERVICES="reverse-proxy web agent-v1-outbox llm-gateway redis document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker market-issue-worker market-web-source-worker market-issue-enrichment-worker billing-worker"',
+    );
+    // market-issue-stream-worker stays out of the deploy lists while X
+    // ingestion is stopped; the compose definition remains for a re-enable.
+    expect(deployWeb).toContain(
+      "market-issue-stream-worker is intentionally NOT deployed",
     );
     expect(deployWeb).toContain(
       "GCP instance identity probe timed out after 30 seconds",

@@ -112,6 +112,7 @@
     "prod:agent:admission:open": "scripts/open-krw-agent-production-admission.sh",
     "prod:deploy:full": "scripts/deploy-production-full.sh",
     "prod:deploy:bootstrap": "scripts/deploy-production-simple.sh --bootstrap-unsealed-mac-runtime --apply-migrations",
+    "prod:prune": "scripts/prune-production-releases.sh",
     "deploy:prod:full": "scripts/deploy-production-full.sh",
     "deploy:all": "scripts/deploy-production-full.sh",
     "deploy:runtime:dev": "scripts/deploy-dev-runtime.sh",

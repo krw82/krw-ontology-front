@@ -88,6 +88,15 @@ if [ -z "$DEPLOY_MODE" ]; then
   exit 1
 fi
 
+# The four prepared-release lifecycle modes share one recovery flow; every
+# other mode (currently only prepare-only) runs the full staged pipeline.
+is_prepared_lifecycle_mode() {
+  case "$DEPLOY_MODE" in
+    activate-prepared|verify-prepared-only|publish-prepared|abandon-prepared) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 FRONT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 LOCK_FRONT_DIR=${PRODUCTION_DEPLOY_LOCK_FRONT_DIR:-$FRONT_DIR}
@@ -96,11 +105,7 @@ case "$LOCK_FRONT_DIR" in
   *) echo "PRODUCTION_DEPLOY_LOCK_FRONT_DIR must be absolute." >&2; exit 1 ;;
 esac
 LOCK_FRONT_DIR=$(CDPATH= cd -- "$LOCK_FRONT_DIR" && pwd -P)
-if [ "$LOCK_FRONT_DIR" != "$FRONT_DIR" ] \
-  && [ "$DEPLOY_MODE" != "activate-prepared" ] \
-  && [ "$DEPLOY_MODE" != "verify-prepared-only" ] \
-  && [ "$DEPLOY_MODE" != "publish-prepared" ] \
-  && [ "$DEPLOY_MODE" != "abandon-prepared" ]; then
+if [ "$LOCK_FRONT_DIR" != "$FRONT_DIR" ] && ! is_prepared_lifecycle_mode; then
   echo "A separate production lock root is allowed only for sealed prepared-release recovery." >&2
   exit 1
 fi
@@ -351,10 +356,7 @@ if [ "$ACTUAL_GCP_INSTANCE_ID" != "$CANONICAL_GCP_INSTANCE_ID" ]; then
   exit 1
 fi
 
-if [ "$DEPLOY_MODE" != "activate-prepared" ] \
-  && [ "$DEPLOY_MODE" != "verify-prepared-only" ] \
-  && [ "$DEPLOY_MODE" != "publish-prepared" ] \
-  && [ "$DEPLOY_MODE" != "abandon-prepared" ]; then
+if ! is_prepared_lifecycle_mode; then
   require_command tar
   test -f "$FRONT_DIR/scripts/compute-production-source-sha256.mjs"
   ONTOLOGY_SOURCE_DIR=${KRW_ONTOLOGY_SOURCE_DIR:-$HOME/krw-ontology}
@@ -371,10 +373,7 @@ if [ "$DEPLOY_MODE" != "activate-prepared" ] \
 fi
 case "$EXPECTED_ONTOLOGY_SOURCE_SHA256" in
   ''|*[!a-f0-9]*)
-    if { [ "$DEPLOY_MODE" != "activate-prepared" ] \
-      && [ "$DEPLOY_MODE" != "verify-prepared-only" ] \
-      && [ "$DEPLOY_MODE" != "publish-prepared" ] \
-      && [ "$DEPLOY_MODE" != "abandon-prepared" ]; } \
+    if ! is_prepared_lifecycle_mode \
       || [ -n "$EXPECTED_ONTOLOGY_SOURCE_SHA256" ]; then
       echo "EXPECTED_ONTOLOGY_SOURCE_SHA256 must be a lowercase SHA-256 digest." >&2
       exit 1
@@ -386,10 +385,7 @@ if [ -n "$EXPECTED_ONTOLOGY_SOURCE_SHA256" ] \
   echo "EXPECTED_ONTOLOGY_SOURCE_SHA256 must contain 64 hexadecimal characters." >&2
   exit 1
 fi
-if [ "$DEPLOY_MODE" != "activate-prepared" ] \
-  && [ "$DEPLOY_MODE" != "verify-prepared-only" ] \
-  && [ "$DEPLOY_MODE" != "publish-prepared" ] \
-  && [ "$DEPLOY_MODE" != "abandon-prepared" ]; then
+if ! is_prepared_lifecycle_mode; then
   LOCAL_FRONT_SOURCE_SHA256=$(node \
     "$FRONT_DIR/scripts/compute-production-source-sha256.mjs" \
     "$FRONT_DIR")
@@ -482,10 +478,7 @@ verify_production_health() {
   done
 }
 
-if [ "$DEPLOY_MODE" != "activate-prepared" ] \
-  && [ "$DEPLOY_MODE" != "verify-prepared-only" ] \
-  && [ "$DEPLOY_MODE" != "publish-prepared" ] \
-  && [ "$DEPLOY_MODE" != "abandon-prepared" ]; then
+if ! is_prepared_lifecycle_mode; then
   test -f "$FRONT_DIR/package.json"
   test -f "$FRONT_DIR/scripts/deploy-vm-compose.sh"
 fi
@@ -497,14 +490,15 @@ echo "Remote ontology compatibility path: $REMOTE_ONTOLOGY_DIR"
 echo "Deploy mode: $DEPLOY_MODE"
 echo "Frontend app version: $APP_VERSION"
 
-COMPOSE_SERVICES="reverse-proxy web agent-v1-outbox llm-gateway redis document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker market-issue-worker market-issue-stream-worker market-web-source-worker market-issue-enrichment-worker billing-worker"
-COMPOSE_APPLICATION_SERVICES="web agent-v1-outbox llm-gateway document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker market-issue-worker market-issue-stream-worker market-web-source-worker market-issue-enrichment-worker billing-worker"
+# market-issue-stream-worker is intentionally NOT deployed: X ingestion was
+# stopped 2026-08-17 (MARKET_ISSUE_X_SOURCES=[] + sources deactivated). The
+# compose definition and worker code remain for a future re-enable; add the
+# service back to both lists if X streaming returns.
+COMPOSE_SERVICES="reverse-proxy web agent-v1-outbox llm-gateway redis document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker market-issue-worker market-web-source-worker market-issue-enrichment-worker billing-worker"
+COMPOSE_APPLICATION_SERVICES="web agent-v1-outbox llm-gateway document-worker document-outbox-dispatcher filings-mcp filing-notification-worker filing-brief-worker market-issue-worker market-web-source-worker market-issue-enrichment-worker billing-worker"
 ROLLBACK_TRACKED_SERVICES="$COMPOSE_SERVICES"
 
-if [ "$DEPLOY_MODE" = "activate-prepared" ] \
-  || [ "$DEPLOY_MODE" = "verify-prepared-only" ] \
-  || [ "$DEPLOY_MODE" = "publish-prepared" ] \
-  || [ "$DEPLOY_MODE" = "abandon-prepared" ]; then
+if is_prepared_lifecycle_mode; then
   if [ "$DRY_RUN" = "1" ]; then
     case "$DEPLOY_MODE" in
       verify-prepared-only)
@@ -525,6 +519,16 @@ if [ "$DEPLOY_MODE" = "activate-prepared" ] \
   fi
   if [ -z "$EXPECTED_APP_VERSION" ]; then
     echo "EXPECTED_PREPARED_APP_VERSION is required for prepared-release lifecycle operations." >&2
+    exit 1
+  fi
+  # The remote marker check compares the PREPARED release id, but health
+  # verification and receipt paths below use the local APP_VERSION. Refuse a
+  # mismatched invocation up front: activating containers and only then failing
+  # health checks would strand the lifecycle between states.
+  if [ "$APP_VERSION" != "$EXPECTED_APP_VERSION" ]; then
+    echo "NEXT_PUBLIC_APP_VERSION must equal EXPECTED_PREPARED_APP_VERSION for lifecycle operations." >&2
+    echo "  expected: $EXPECTED_APP_VERSION" >&2
+    echo "  current:  $APP_VERSION" >&2
     exit 1
   fi
 
@@ -1281,11 +1285,7 @@ echo "Front archive: $(du -h "$FRONT_ARCHIVE" | awk '{print $1}')"
 echo "Ontology archive: $(du -h "$ONTOLOGY_ARCHIVE" | awk '{print $1}')"
 
 if [ "$DRY_RUN" = "1" ]; then
-  if [ "$DEPLOY_MODE" = "prepare-only" ]; then
-    echo "Dry run: would upload source, prebuild/verify the VM image, and write a prepared-release marker without restarting containers."
-  else
-    echo "Dry run: would upload source, build the VM image, and restart the selected containers."
-  fi
+  echo "Dry run: would upload source, prebuild/verify the VM image, and write a prepared-release marker without restarting containers."
   echo "Dry run complete. No files were uploaded and Docker Compose was not executed."
   exit 0
 fi
@@ -1758,7 +1758,6 @@ if [ '$DEPLOY_MODE' = 'prepare-only' ]; then
       | sha256sum \
       | awk '{print \$1}'
   )
-  RELEASE_DIR="\$REMOTE_FRONT_DIR/.deploy/releases/$APP_VERSION"
   FRONT_DIR="\$REMOTE_FRONT_DIR" \
   NEXT_PUBLIC_APP_VERSION='$APP_VERSION' \
   KRW_ONTOLOGY_SOURCE_DIR="\$REMOTE_ONTOLOGY_DIR" \
@@ -1832,12 +1831,11 @@ if [ '$DEPLOY_MODE' = 'prepare-only' ]; then
   exit 0
 fi
 
-NEXT_PUBLIC_APP_VERSION='$APP_VERSION' \
-VM_DEPLOY_ATTESTATION='$APP_VERSION:$CANONICAL_COMPOSE_PROJECT' \
-KRW_ONTOLOGY_SOURCE_DIR="\$REMOTE_ONTOLOGY_DIR" \
-BILLING_WORKER_REQUIRE_TOSS_PAYMENTS=0 \
-  scripts/deploy-vm-compose.sh $COMPOSE_SERVICES
-docker compose --project-name '$CANONICAL_COMPOSE_PROJECT' --env-file .env ps
+# Only prepare-only reaches the remote executor; the lifecycle modes are
+# handled by the orchestrator-side command earlier in this script. Fail
+# loudly if a future mode ever falls through.
+echo "Unexpected remote deploy mode: '$DEPLOY_MODE'" >&2
+exit 1
 EOF
 )
 
@@ -1845,21 +1843,13 @@ if ! gcloud compute ssh "$GCP_INSTANCE" \
   --project="$GCP_PROJECT" \
   --zone="$GCP_ZONE" \
   --command="$REMOTE_COMMAND"; then
-  if [ "$DEPLOY_MODE" = "prepare-only" ]; then
-    gcloud compute ssh "$GCP_INSTANCE" \
-      --project="$GCP_PROJECT" \
-      --zone="$GCP_ZONE" \
-      --command="rm -rf '$REMOTE_RUNTIME_ENV_DIR'; rm -f '$REMOTE_FRONT_ARCHIVE' '$REMOTE_ONTOLOGY_ARCHIVE'" \
-      >/dev/null 2>&1 || true
-  fi
+  gcloud compute ssh "$GCP_INSTANCE" \
+    --project="$GCP_PROJECT" \
+    --zone="$GCP_ZONE" \
+    --command="rm -rf '$REMOTE_RUNTIME_ENV_DIR'; rm -f '$REMOTE_FRONT_ARCHIVE' '$REMOTE_ONTOLOGY_ARCHIVE'" \
+    >/dev/null 2>&1 || true
   exit 1
 fi
 
-if [ "$DEPLOY_MODE" = "prepare-only" ]; then
-  echo "Web image preparation complete. Production containers were not restarted."
-  exit 0
-fi
-
-echo "Checking production health..."
-verify_production_health
-echo "Web deployment complete."
+echo "Web image preparation complete. Production containers were not restarted."
+exit 0

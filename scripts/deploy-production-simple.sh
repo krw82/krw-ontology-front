@@ -33,8 +33,7 @@ Queue-safe wrapper around a production deploy:
 
 The legacy sealed cutover orchestrator (deploy-all-production.sh) was removed;
 production deploys are fix-forward only. Use 'npm run prod:deploy:full' (the
-agent-repository controller adapter) or, until the first controller-validated
-production deploy, the fast fallback 'npm run prod:deploy:code'.
+agent-repository controller adapter).
 
 Slow local browser/PWA checks are deliberately separate:
   npm run prod:preflight

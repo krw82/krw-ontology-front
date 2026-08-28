@@ -23,7 +23,7 @@ describe("sealed prepared-release publication lifecycle", () => {
   it("separates release-local preparation from global publication and abandonment", () => {
     const source = readFileSync(deployWebPath, "utf8");
     const lifecycleBranch = source.indexOf(
-      'if [ "$DEPLOY_MODE" = "activate-prepared" ]',
+      'if is_prepared_lifecycle_mode; then',
     );
     const publishMutation = source.indexOf("GLOBAL_MARKER_TMP=", lifecycleBranch);
     const localPrepareBranch = source.lastIndexOf(
