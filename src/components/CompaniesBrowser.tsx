@@ -17,6 +17,7 @@ import { filterAndSortCompanies } from "@/lib/companies/filter";
 import {
   DEFAULT_VALUATION_SORT_DIRECTION,
   sortCompaniesByValuation,
+  valuationSortChipLabel,
   type CompanyValuationMetrics,
   type MetricValuationSortKey,
   type ValuationSortDirection,
@@ -55,6 +56,14 @@ interface ValuationSortChip {
   key: ValuationSortKey;
   label: string;
 }
+
+const METRIC_CHIP_KEYS: MetricValuationSortKey[] = [
+  "market_cap",
+  "pe_ttm",
+  "pb",
+  "roe_ttm",
+  "roic_ttm",
+];
 
 const SEARCH_COACHMARK_STORAGE_KEY = "krw:companies-search-coachmark-seen:v1";
 const IS_DEV_ENV = process.env.NODE_ENV === "development";
@@ -172,11 +181,6 @@ export default function CompaniesBrowser({
         searchResults: "검색 결과",
         emptySearch: "검색 조건에 맞는 회사가 없습니다.",
         sortDefault: "기본순",
-        sortMarketCap: "시총순",
-        sortPerLow: "PER 낮은순",
-        sortPbrLow: "PBR 낮은순",
-        sortRoeHigh: "ROE 높은순",
-        sortRoicHigh: "ROIC 높은순",
         sortAria: "회사 목록 정렬",
         footer:
           "© 2026 KRW.O. 공시 근거 기반 기업 리서치.",
@@ -197,11 +201,6 @@ export default function CompaniesBrowser({
         searchResults: "Search results",
         emptySearch: "No companies match this search.",
         sortDefault: "Default",
-        sortMarketCap: "Market cap",
-        sortPerLow: "Low P/E",
-        sortPbrLow: "Low P/B",
-        sortRoeHigh: "High ROE",
-        sortRoicHigh: "High ROIC",
         sortAria: "Sort company list",
         footer:
           "© 2026 KRW.O. Filing-grounded company research.",
@@ -222,7 +221,10 @@ export default function CompaniesBrowser({
 
   useEffect(() => {
     let active = true;
-    void fetch("/api/valuation/summary", { cache: "no-store" })
+    // Default cache mode: the endpoint sends max-age + ETag, so revisits
+    // within the window reuse the browser cache and later ones revalidate
+    // cheaply with a 304.
+    void fetch("/api/valuation/summary")
       .then(async (response) => {
         if (!response.ok) throw new Error("Unable to load valuation summary");
         const data = (await response.json()) as ValuationSummaryResponse;
@@ -376,11 +378,18 @@ export default function CompaniesBrowser({
 
   const sortChips: ValuationSortChip[] = [
     { key: "default", label: copy.sortDefault },
-    { key: "market_cap", label: copy.sortMarketCap },
-    { key: "pe_ttm", label: copy.sortPerLow },
-    { key: "pb", label: copy.sortPbrLow },
-    { key: "roe_ttm", label: copy.sortRoeHigh },
-    { key: "roic_ttm", label: copy.sortRoicHigh },
+    // Labels track the direction the chip would apply (or is applying), so
+    // toggling "PER 낮은순" to descending relabels it "PER 높은순".
+    ...METRIC_CHIP_KEYS.map((key) => ({
+      key,
+      label: valuationSortChipLabel(
+        key,
+        sortKey === key
+          ? sortDirection
+          : DEFAULT_VALUATION_SORT_DIRECTION[key],
+        locale === "ko" ? "ko" : "en",
+      ),
+    })),
   ];
   const metricHeaders: { key: MetricValuationSortKey; label: string }[] = [
     { key: "market_cap", label: "mkt cap" },

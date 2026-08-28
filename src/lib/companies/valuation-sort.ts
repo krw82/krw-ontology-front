@@ -36,6 +36,48 @@ export const DEFAULT_VALUATION_SORT_DIRECTION: Record<
   roic_ttm: "desc",
 };
 
+type ChipDirectionLabel = { ko: string; en: string };
+
+const VALUATION_CHIP_LABELS: Record<
+  MetricValuationSortKey,
+  Record<ValuationSortDirection, ChipDirectionLabel>
+> = {
+  market_cap: {
+    asc: { ko: "시총 낮은순", en: "Low market cap" },
+    desc: { ko: "시총 높은순", en: "High market cap" },
+  },
+  pe_ttm: {
+    asc: { ko: "PER 낮은순", en: "Low P/E" },
+    desc: { ko: "PER 높은순", en: "High P/E" },
+  },
+  pb: {
+    asc: { ko: "PBR 낮은순", en: "Low P/B" },
+    desc: { ko: "PBR 높은순", en: "High P/B" },
+  },
+  roe_ttm: {
+    asc: { ko: "ROE 낮은순", en: "Low ROE" },
+    desc: { ko: "ROE 높은순", en: "High ROE" },
+  },
+  roic_ttm: {
+    asc: { ko: "ROIC 낮은순", en: "Low ROIC" },
+    desc: { ko: "ROIC 높은순", en: "High ROIC" },
+  },
+};
+
+/**
+ * Chip labels must state the direction the list is actually sorted by:
+ * tapping an active chip flips asc↔desc, so a label frozen at "PER 낮은순"
+ * would lie about a descending list.
+ */
+export function valuationSortChipLabel(
+  key: ValuationSortKey,
+  direction: ValuationSortDirection,
+  locale: "ko" | "en",
+): string {
+  if (key === "default") return locale === "ko" ? "기본순" : "Default";
+  return VALUATION_CHIP_LABELS[key][direction][locale];
+}
+
 /**
  * Nulls always sink to the bottom regardless of direction: a missing
  * PER/PBR is "해당 없음" (by design for deficit/capital-impairment cases),

@@ -287,12 +287,14 @@ function MobileValuationStrip({
   if (parts.every((part) => part === "N/A")) return null;
   const capLabel = locale === "ko" ? "시총" : "cap";
   return (
-    <p className="mt-1 font-mono text-[11px] font-bold leading-4 text-muted">
-      <span className="text-muted-soft">{capLabel}</span> {parts[0]}
-      <span className="mx-1 text-muted-soft" aria-hidden="true">·</span>
-      <span className="text-muted-soft">PER</span> {parts[1]}
-      <span className="mx-1 text-muted-soft" aria-hidden="true">·</span>
-      <span className="text-muted-soft">ROE</span> {parts[2]}
+    // 11px bold text needs 4.5:1 on white: body (#5b616e) passes, the
+    // muted tokens do not. The separators are decorative and exempt.
+    <p className="mt-1 font-mono text-[11px] font-bold leading-4 text-body">
+      <span>{capLabel}</span> {parts[0]}
+      <span className="mx-1 text-muted" aria-hidden="true">·</span>
+      <span>PER</span> {parts[1]}
+      <span className="mx-1 text-muted" aria-hidden="true">·</span>
+      <span>ROE</span> {parts[2]}
     </p>
   );
 }
@@ -305,12 +307,13 @@ function ValuationCells({
   locale: Locale;
 }) {
   const cellClass = "hidden min-w-0 text-right font-mono text-[12px] font-bold leading-5 xl:block";
-  const valueClass = (isNa: boolean) =>
-    isNa ? "text-muted-soft" : "text-body";
+  // N/A is a real value ("해당 없음"), not decoration: it needs the same
+  // 4.5:1 contrast as the numbers, so both use body.
+  const valueClass = "text-body";
   return (
     <>
       <p className={cellClass}>
-        <span className={valueClass(valuation?.market_cap == null)}>
+        <span className={valueClass}>
           {formatValuationMarketCap(
             valuation?.market_cap ?? null,
             locale === "ko" ? "ko" : "en",
@@ -318,22 +321,22 @@ function ValuationCells({
         </span>
       </p>
       <p className={cellClass}>
-        <span className={valueClass(valuation?.pe_ttm == null)}>
+        <span className={valueClass}>
           {formatValuationRatio(valuation?.pe_ttm ?? null)}
         </span>
       </p>
       <p className={cellClass}>
-        <span className={valueClass(valuation?.pb == null)}>
+        <span className={valueClass}>
           {formatValuationRatio(valuation?.pb ?? null)}
         </span>
       </p>
       <p className={cellClass}>
-        <span className={valueClass(valuation?.roe_ttm == null)}>
+        <span className={valueClass}>
           {formatValuationPercent(valuation?.roe_ttm ?? null)}
         </span>
       </p>
       <p className={cellClass}>
-        <span className={valueClass(valuation?.roic_ttm == null)}>
+        <span className={valueClass}>
           {formatValuationPercent(valuation?.roic_ttm ?? null)}
         </span>
       </p>

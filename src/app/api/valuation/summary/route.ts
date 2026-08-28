@@ -12,6 +12,10 @@ export const dynamic = "force-dynamic";
  */
 const WINDOW_DAYS = 30;
 const MAX_ROWS = 2000;
+// Snapshots refresh at most hourly, so a short private browser cache plus
+// ETag revalidation keeps repeat /companies visits cheap without serving
+// meaningfully stale metrics.
+const CACHE_CONTROL = "private, max-age=300, must-revalidate";
 const COLUMNS =
   "ticker, market_cap, pe_ttm, pb, roe_ttm, roic_ttm, fundamental_period_end, computed_at";
 
@@ -36,6 +40,10 @@ export async function GET(request: NextRequest) {
       .from("valuation_snapshots")
       .select(COLUMNS)
       .gt("computed_at", windowStart)
+      // Same freshness key as lib/valuation/repository: a same-session
+      // recompute must not lose to an older-session backfill with a newer
+      // computed_at.
+      .order("session_date", { ascending: false, nullsFirst: false })
       .order("computed_at", { ascending: false })
       .limit(MAX_ROWS);
     if (error) throw new Error(error.message);
@@ -58,13 +66,17 @@ export async function GET(request: NextRequest) {
       computed_at: row.computed_at,
     }));
 
-    const generatedAt =
-      valuations.length > 0 ? (valuations[0].computed_at as string) : "";
+    // ISO-8601 UTC strings compare lexicographically, so reduce gives the
+    // newest compute time across tickers for a stable ETag seed.
+    const generatedAt = valuations.reduce<string>((newest, row) => {
+      const computedAt = row.computed_at ?? "";
+      return computedAt > newest ? computedAt : newest;
+    }, "");
     const etag = `"valuation-summary-${generatedAt}"`;
     if (request.headers.get("if-none-match") === etag) {
       return new Response(null, {
         status: 304,
-        headers: { ETag: etag },
+        headers: { "Cache-Control": CACHE_CONTROL, ETag: etag },
       });
     }
 
@@ -72,7 +84,7 @@ export async function GET(request: NextRequest) {
       { generated_at: generatedAt || null, count: valuations.length, valuations },
       {
         headers: {
-          "Cache-Control": "private, no-store, max-age=0",
+          "Cache-Control": CACHE_CONTROL,
           ETag: etag,
         },
       },

@@ -6,6 +6,7 @@ import {
   formatValuationPercent,
   formatValuationRatio,
   sortCompaniesByValuation,
+  valuationSortChipLabel,
   type CompanyValuationMetrics,
 } from "@/lib/companies/valuation-sort";
 
@@ -122,6 +123,59 @@ describe("formatters", () => {
     expect(formatValuationRatio(null)).toBe("N/A");
     expect(formatValuationPercent(1.204891)).toBe("120.5%");
     expect(formatValuationPercent(null)).toBe("N/A");
+  });
+});
+
+describe("valuationSortChipLabel", () => {
+  it("labels the default sort without a direction", () => {
+    expect(valuationSortChipLabel("default", "desc", "ko")).toBe("기본순");
+    expect(valuationSortChipLabel("default", "desc", "en")).toBe("Default");
+  });
+
+  it("states the low direction for the default ascending metrics", () => {
+    expect(valuationSortChipLabel("pe_ttm", "asc", "ko")).toBe("PER 낮은순");
+    expect(valuationSortChipLabel("pb", "asc", "ko")).toBe("PBR 낮은순");
+    expect(valuationSortChipLabel("pe_ttm", "asc", "en")).toBe("Low P/E");
+    expect(valuationSortChipLabel("pb", "asc", "en")).toBe("Low P/B");
+  });
+
+  it("states the high direction when a chip is toggled to descending", () => {
+    expect(valuationSortChipLabel("pe_ttm", "desc", "ko")).toBe("PER 높은순");
+    expect(valuationSortChipLabel("pb", "desc", "ko")).toBe("PBR 높은순");
+    expect(valuationSortChipLabel("pe_ttm", "desc", "en")).toBe("High P/E");
+    expect(valuationSortChipLabel("pb", "desc", "en")).toBe("High P/B");
+  });
+
+  it("states the high direction for the default descending metrics", () => {
+    expect(valuationSortChipLabel("market_cap", "desc", "ko")).toBe("시총 높은순");
+    expect(valuationSortChipLabel("roe_ttm", "desc", "ko")).toBe("ROE 높은순");
+    expect(valuationSortChipLabel("roic_ttm", "desc", "ko")).toBe("ROIC 높은순");
+    expect(valuationSortChipLabel("market_cap", "desc", "en")).toBe("High market cap");
+    expect(valuationSortChipLabel("roe_ttm", "desc", "en")).toBe("High ROE");
+    expect(valuationSortChipLabel("roic_ttm", "desc", "en")).toBe("High ROIC");
+  });
+
+  it("states the low direction when a descending metric is toggled to ascending", () => {
+    expect(valuationSortChipLabel("market_cap", "asc", "ko")).toBe("시총 낮은순");
+    expect(valuationSortChipLabel("roe_ttm", "asc", "ko")).toBe("ROE 낮은순");
+    expect(valuationSortChipLabel("roic_ttm", "asc", "ko")).toBe("ROIC 낮은순");
+    expect(valuationSortChipLabel("market_cap", "asc", "en")).toBe("Low market cap");
+    expect(valuationSortChipLabel("roe_ttm", "asc", "en")).toBe("Low ROE");
+    expect(valuationSortChipLabel("roic_ttm", "asc", "en")).toBe("Low ROIC");
+  });
+
+  it("names a direction for every metric chip in both locales", () => {
+    const metricKeys = Object.keys(
+      DEFAULT_VALUATION_SORT_DIRECTION,
+    ) as Array<keyof typeof DEFAULT_VALUATION_SORT_DIRECTION>;
+    for (const key of metricKeys) {
+      for (const direction of ["asc", "desc"] as const) {
+        const ko = valuationSortChipLabel(key, direction, "ko");
+        const en = valuationSortChipLabel(key, direction, "en");
+        expect(ko, `${key}/${direction}/ko`).toMatch(/낮은순$|높은순$/);
+        expect(en, `${key}/${direction}/en`).toMatch(/^Low |^High /);
+      }
+    }
   });
 });
 
